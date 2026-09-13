@@ -5,12 +5,15 @@
   "endOfLine": "lf",
   "jsxSingleQuote": false,
   "objectWrap": "collapse",
+  "plugins": ["prettier-plugin-tailwindcss"],
   "printWidth": 80,
   "quoteProps": "as-needed",
   "semi": true,
   "singleAttributePerLine": false,
   "singleQuote": false,
   "tabWidth": 2,
+  "tailwindFunctions": ["cn", "cva"],
+  "tailwindStylesheet": "./src/app/globals.css",
   "trailingComma": "all",
   "useTabs": false
 }
