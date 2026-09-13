@@ -1,10 +1,27 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import tseslint from "typescript-eslint";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  ...tseslint.configs.strictTypeChecked,
+  ...tseslint.configs.stylisticTypeChecked,
+  {
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
+    // Config files sit outside the TypeScript project, so type-aware
+    // rules have no program to resolve them against.
+    files: ["**/*.mjs", "**/*.js"],
+    extends: [tseslint.configs.disableTypeChecked],
+  },
   {
     // Scoped to the extensions eslint-config-next registers the
     // react-hooks plugin for. Naming a rule from a plugin that is not
