@@ -1,6 +1,7 @@
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments/configs";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import eslintConfigPrettier from "eslint-config-prettier";
 import perfectionist from "eslint-plugin-perfectionist";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
@@ -33,9 +34,7 @@ const eslintConfig = defineConfig([
     // requires each suppression to state why. ESLint's own
     // reportUnusedDisableDirectives already covers stale directives,
     // so the plugin's no-unused-disable is left off as redundant.
-    rules: {
-      "@eslint-community/eslint-comments/require-description": "error",
-    },
+    rules: { "@eslint-community/eslint-comments/require-description": "error" },
   },
   {
     // React Compiler correctness rules that ship with
@@ -53,6 +52,8 @@ const eslintConfig = defineConfig([
       "react-hooks/void-use-memo": "error",
     },
   },
+  // Must stay last: switches off any stylistic rule Prettier owns.
+  eslintConfigPrettier,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
