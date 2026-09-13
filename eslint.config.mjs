@@ -37,6 +37,22 @@ const eslintConfig = defineConfig([
     rules: { "@eslint-community/eslint-comments/require-description": "error" },
   },
   {
+    // Exported functions must state their return type. Inference is fine
+    // inside a module, but at a module boundary an accidental change to
+    // the inferred type propagates silently to every caller.
+    rules: {
+      "@typescript-eslint/explicit-module-boundary-types": [
+        "error",
+        {
+          allowArgumentsExplicitlyTypedAsAny: false,
+          allowDirectConstAssertionInArrowFunctions: true,
+          allowHigherOrderFunctions: true,
+          allowTypedFunctionExpressions: true,
+        },
+      ],
+    },
+  },
+  {
     // React Compiler correctness rules that ship with
     // eslint-plugin-react-hooks but are off by default. Both are
     // meta.type "problem" rather than stylistic.

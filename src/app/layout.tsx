@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { JSX } from "react";
 
 import "./globals.css";
 import { Geist } from "next/font/google";
@@ -12,7 +13,9 @@ export const metadata: Metadata = {
   title: "Create Next App",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: LayoutProps<"/">): JSX.Element {
   return (
     <html className={cn("font-sans", geist.variable)} lang="en">
       <body>{children}</body>
