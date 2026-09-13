@@ -1,3 +1,4 @@
+import eslintComments from "@eslint-community/eslint-plugin-eslint-comments/configs";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import perfectionist from "eslint-plugin-perfectionist";
@@ -10,6 +11,7 @@ const eslintConfig = defineConfig([
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
   perfectionist.configs["recommended-natural"],
+  eslintComments.recommended,
   {
     languageOptions: {
       parserOptions: {
@@ -23,6 +25,17 @@ const eslintConfig = defineConfig([
   {
     extends: [tseslint.configs.disableTypeChecked],
     files: ["**/*.mjs", "**/*.js"],
+  },
+  {
+    // Suppressing a rule must be a deliberate, narrow, justified act.
+    // no-unlimited-disable (from recommended) blocks bare
+    // eslint-disable that switches off every rule at once; this
+    // requires each suppression to state why. ESLint's own
+    // reportUnusedDisableDirectives already covers stale directives,
+    // so the plugin's no-unused-disable is left off as redundant.
+    rules: {
+      "@eslint-community/eslint-comments/require-description": "error",
+    },
   },
   {
     // React Compiler correctness rules that ship with
