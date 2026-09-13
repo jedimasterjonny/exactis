@@ -36,6 +36,104 @@ const eslintConfig = defineConfig([
     // so the plugin's no-unused-disable is left off as redundant.
     rules: { "@eslint-community/eslint-comments/require-description": "error" },
   },
+  // Naming, following the upstream typescript-eslint examples. camelCase
+  // by default, widened per selector where another convention is genuinely
+  // conventional, and narrowed where a prefix carries meaning: booleans
+  // read as assertions, type parameters start with T. In those two cases
+  // the prefix is stripped before format is applied, which is why they
+  // specify PascalCase - isEnabled is checked as Enabled. Booleans are
+  // constrained at parameters and type properties too, not only at
+  // variables, since those are the ones read at the call site.
+  //
+  // Anything unused must carry a leading underscore, so a dead binding is
+  // visibly dead rather than merely tolerated.
+  //
+  // Scoped to the files tsconfig.json includes - .ts, .tsx and .mts -
+  // because the boolean selector consults the type checker. The .mjs
+  // and .js config files are the ones that sit outside the TypeScript
+  // program; unscoped the rule reaches them and aborts the whole lint
+  // run.
+  {
+    files: ["**/*.ts", "**/*.tsx", "**/*.mts"],
+    rules: {
+      "@typescript-eslint/naming-convention": [
+        "error",
+        {
+          format: ["camelCase"],
+          leadingUnderscore: "allow",
+          selector: "default",
+          trailingUnderscore: "forbid",
+        },
+        {
+          format: ["camelCase", "PascalCase", "UPPER_CASE"],
+          leadingUnderscore: "allow",
+          selector: "variable",
+        },
+        // types: ["boolean"] outranks the requiresQuotes exemption below,
+        // so quoted keys are filtered out here as well - otherwise a
+        // data-* boolean prop would be told to start with a verb.
+        {
+          filter: { match: false, regex: "[^a-zA-Z0-9]" },
+          format: ["PascalCase"],
+          prefix: ["is", "should", "has", "can", "did", "will"],
+          selector: ["variable", "parameter", "typeProperty"],
+          types: ["boolean"],
+        },
+        { format: ["camelCase", "PascalCase"], selector: "function" },
+        {
+          format: ["camelCase"],
+          leadingUnderscore: "allow",
+          selector: "parameter",
+        },
+        {
+          format: ["camelCase", "PascalCase", "UPPER_CASE"],
+          leadingUnderscore: "require",
+          modifiers: ["unused"],
+          selector: ["variable", "parameter"],
+        },
+        { format: ["PascalCase"], selector: "typeLike" },
+        {
+          custom: { match: false, regex: "^I[A-Z]" },
+          format: ["PascalCase"],
+          selector: "interface",
+        },
+        { format: ["PascalCase"], prefix: ["T"], selector: "typeParameter" },
+        { format: ["PascalCase"], selector: "enumMember" },
+        { format: ["camelCase", "PascalCase"], selector: "import" },
+        // Quoted keys are external shapes - HTTP headers, CSS custom
+        // properties, data-* attributes - and are not ours to rename.
+        {
+          format: null,
+          modifiers: ["requiresQuotes"],
+          selector: [
+            "accessor",
+            "classMethod",
+            "classProperty",
+            "enumMember",
+            "objectLiteralMethod",
+            "objectLiteralProperty",
+            "typeMethod",
+            "typeProperty",
+          ],
+        },
+      ],
+    },
+  },
+  // Generated components are vendored, not authored: `shadcn add` writes
+  // into src/components/ui and overwrites on update, and the prop names
+  // there are the upstream API - asChild from Base UI, disabled from
+  // React.ComponentProps<"button">. The boolean prefix asserts a
+  // convention over names this repo picks, so it has nothing to say here.
+  //
+  // It has to be a separate block rather than an exemption inside the
+  // option array above: entries are selected by descending weight, types
+  // outranks every modifier, and the boolean entry already carries a
+  // filter, so neither a destructured nor a filter entry can be reached
+  // ahead of it.
+  {
+    files: ["src/components/ui/**"],
+    rules: { "@typescript-eslint/naming-convention": "off" },
+  },
   {
     // Type-only imports must say so, so they are erased at compile time
     // rather than left as a runtime import of a module needed only for
