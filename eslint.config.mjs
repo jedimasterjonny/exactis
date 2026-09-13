@@ -37,6 +37,21 @@ const eslintConfig = defineConfig([
     rules: { "@eslint-community/eslint-comments/require-description": "error" },
   },
   {
+    // Type-only imports must say so, so they are erased at compile time
+    // rather than left as a runtime import of a module needed only for
+    // its types.
+    rules: {
+      "@typescript-eslint/consistent-type-imports": [
+        "error",
+        {
+          disallowTypeAnnotations: true,
+          fixStyle: "separate-type-imports",
+          prefer: "type-imports",
+        },
+      ],
+    },
+  },
+  {
     // Exported functions must state their return type. Inference is fine
     // inside a module, but at a module boundary an accidental change to
     // the inferred type propagates silently to every caller.
