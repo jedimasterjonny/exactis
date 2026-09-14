@@ -15,3 +15,17 @@ This file is the source of truth for how work is done here. It is checked in, so
 - Propose the commit split before starting work that spans more than one decision.
 - History is audited after the fact. Expect to be asked to confirm minimum diff surface and true atomicity.
 - "Accepted" on a review finding means acknowledged and closed. It is not an instruction to go and fix it.
+
+# Code style
+
+Beyond `strict`, `tsconfig.json` sets `noUncheckedIndexedAccess` (indexing yields `T | undefined`), `exactOptionalPropertyTypes` (an optional property will not accept an explicit `undefined`), `verbatimModuleSyntax`, `noImplicitReturns`, `noFallthroughCasesInSwitch` and `noImplicitOverride`.
+
+ESLint runs `strictTypeChecked` and `stylisticTypeChecked` at `--max-warnings 0`. The rules most often tripped over:
+
+- Type-only imports must be written `import type`, on their own line.
+- Exported functions need an explicit return type.
+- perfectionist sorts imports and object keys naturally. Write them sorted.
+- Booleans are prefixed `is`, `should`, `has`, `can`, `did` or `will`; type parameters start with `T`; unused bindings need a leading underscore.
+- Every `eslint-disable` needs a `-- reason` description.
+
+Prettier owns formatting. Run `bun run format` rather than hand-aligning anything.
