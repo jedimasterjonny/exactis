@@ -24,6 +24,13 @@ matters live only in memory — put it here.
   surface and true atomicity.
 - "Accepted" on a review finding means acknowledged and closed. It is not an
   instruction to go and fix it.
+- Node is pinned by `.node-version` to 26.8.2, and that file is the only place
+  the version is written: both CI jobs read it through `node-version-file`
+  rather than naming one, and Renovate's nodenv manager updates it there.
+  `engines.node` is a separate statement — the range the package supports,
+  `^22.22.2 || ^24.15.0 || >=26.0.0` — and `constraintsFiltering: "strict"` in
+  `renovate.json` holds Renovate to it, so an upgrade that would need a newer
+  Node than the floor is never proposed.
 
 # Code style
 
@@ -55,14 +62,36 @@ ESLint runs `strictTypeChecked` and `stylisticTypeChecked` at
 JSON and YAML are linted too, so `package.json`, `renovate.json` and the
 workflow are not exempt. knip fails on an unused dependency, export or file.
 
+`bunfig.toml` sets `linker = "isolated"`, so `node_modules` is not hoisted and
+each package sees only what it declares. Importing a transitive dependency fails
+with `ERR_MODULE_NOT_FOUND` rather than quietly working — `scheduler` is
+installed for `react-dom` and does not resolve from here — which is the intended
+behaviour, not a broken install. The fix is to declare the package in
+`package.json` in its own right, never to reach through whatever pulled it in.
+
 Prettier owns formatting. Run `bun run format` rather than hand-aligning
 anything.
 
 Tests run on Vitest with jsdom and Testing Library, colocated as
 `*.test.ts`/`*.test.tsx`. `globals` is off, so `describe`, `it` and `expect` are
-imported. A test that asserts nothing fails, test order is shuffled, and
-unexpected `console.error`/`console.warn` output fails the test that produced
-it.
+imported. A test that asserts nothing fails, and test order is shuffled.
+
+`vitest.setup.ts` installs a console guard that fails the test which produced
+unexpected output, and it reaches further than `error` and `warn`. Fourteen
+methods are guarded — `log`, `debug`, `info`, `dir`, `trace`, `table` and the
+rest of the ones that emit on their own — and the guard stands in for the real
+console, so a `console.log` left in while debugging prints nothing and fails the
+test that ran it. Output from module scope, from a `beforeAll`, or from anything
+resolving after the file has finished is caught as well.
+
+The guard may not be switched off, and each obvious attempt is detected and
+reported as tampering: reassigning `console.error`, restoring the spy, and
+calling `mockImplementation` on it. Asserting on console output goes through
+`takeConsoleOutput()`, exported from `vitest.setup.ts`, which is the only
+sanctioned route. It returns `string[]` — one `console.<method>: <message>` line
+per call, worded as the guard would have reported it — takes only the running
+test's own output, and clears what it takes so that asserting on it does not
+also fail the test. Called outside a test, it throws.
 
 # Commit hygiene
 
