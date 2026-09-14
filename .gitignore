@@ -13,8 +13,11 @@
 # misc
 .DS_Store
 
-# env files (can opt-in for committing if needed)
+# env files. The example is the one that is meant to be committed - it is
+# how the variables an environment needs are documented - and the pattern
+# above it would otherwise swallow it with the secrets.
 .env*
+!.env.example
 
 # typescript
 *.tsbuildinfo
