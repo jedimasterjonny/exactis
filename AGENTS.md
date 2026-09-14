@@ -154,6 +154,9 @@ reach:
 Knowledge that applies only sometimes lives in `.claude/skills/`, loaded when
 the task calls for it rather than every session:
 
+- `shadcn-add`, for adding or updating a shadcn component. The short version:
+  files under `src/components/ui` are owned source held to every gate, and a
+  dependency lands with the first file that imports it.
 - `lint-stack-upgrade`, for bumping ESLint or TypeScript or enabling a further
   `react/` or `import/` rule. The short version: peer ranges are enforced by
   nothing here, and TypeScript 7 cannot lint here at all.
