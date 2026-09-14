@@ -74,3 +74,113 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: bunx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+
+  commits:
+    # AGENTS.md requires every commit to stand alone, not only the tip: each
+    # one installs from its own lockfile and is green by itself. The check job
+    # above only ever sees the tip, so a series that is green at the end and
+    # red in the middle passes unnoticed - which is exactly what git bisect
+    # later depends on not being true.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          # This job checks out and runs historical code. A token left in
+          # .git/config is readable by every commit it runs.
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' &&
+            github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' &&
+            github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -uo pipefail
+
+          # A new branch reports an all-zero base, and a force push can name a
+          # commit that no longer resolves. Either way there is no range, so
+          # fall back to the tip alone rather than failing on the arithmetic.
+          if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] ||
+             ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            echo "No usable base commit; checking $HEAD_SHA alone."
+            commits="$HEAD_SHA"
+          else
+            commits="$(git rev-list --reverse "${BASE_SHA}..${HEAD_SHA}")"
+          fi
+
+          if [ -z "$commits" ]; then
+            echo "Empty range; nothing to check."
+            exit 0
+          fi
+
+          echo "Checking $(echo "$commits" | wc -l | tr -d ' ') commit(s) individually."
+          failed=""
+
+          for sha in $commits; do
+            subject="$(git log -1 --format=%s "$sha")"
+            echo "::group::$(git rev-parse --short "$sha") $subject"
+
+            # --force discards the tracked files next build rewrites, and
+            # clean removes what it leaves untracked. Both are needed, and
+            # -x has to take node_modules with it: bun install
+            # --frozen-lockfile does not prune extraneous packages, so a
+            # reused tree lets a commit that drops a dependency it still
+            # imports pass here. Stale .next/types, which tsconfig includes
+            # as a tsc input, and tsconfig.tsbuildinfo survive a checkout
+            # for the same reason. Every commit therefore pays for a cold
+            # install; a wrong answer arrived at quickly is worth nothing.
+            git checkout --force --quiet --detach "$sha"
+            git clean -xdff --quiet
+
+            ok=true
+            bun install --frozen-lockfile || ok=false
+
+            if [ "$ok" = true ]; then
+              # Whatever that commit defines as green, not what the tip does.
+              # A commit predating a script has not failed it. Absent is
+              # exit 3 and nothing else: node answers an uncaught exception
+              # with 1, so reading 1 as absent would turn a package.json
+              # that cannot be parsed into a commit with nothing to run.
+              # Any other status is the probe breaking, which is a failure
+              # rather than a reason to skip.
+              for script in format:check lint typecheck test:coverage build; do
+                # The probe must not run bare: GitHub runs this with
+                # `bash -e`, so a non-zero exit would abort the whole loop
+                # before the code could be read. `|| probe=$?` puts it in an
+                # OR list, which errexit exempts.
+                probe=0
+                node -e "process.exit(require('./package.json').scripts?.['$script'] ? 0 : 3)" || probe=$?
+                if [ "$probe" -eq 3 ]; then
+                  echo "no $script script at this commit; skipped"
+                  continue
+                fi
+                if [ "$probe" -ne 0 ]; then
+                  echo "::error::probing for the $script script exited $probe"
+                  ok=false
+                  continue
+                fi
+                bun run "$script" || ok=false
+              done
+            fi
+
+            echo "::endgroup::"
+
+            if [ "$ok" = false ]; then
+              failed="$failed $(git rev-parse --short "$sha")"
+              echo "::error::$(git rev-parse --short "$sha") ($subject) is not green on its own"
+            fi
+          done
+
+          if [ -n "$failed" ]; then
+            echo "Not green standalone:$failed"
+            exit 1
+          fi
+          echo "Every commit in the range stands alone."
