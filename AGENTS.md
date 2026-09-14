@@ -29,3 +29,22 @@ ESLint runs `strictTypeChecked` and `stylisticTypeChecked` at `--max-warnings 0`
 - Every `eslint-disable` needs a `-- reason` description.
 
 Prettier owns formatting. Run `bun run format` rather than hand-aligning anything.
+
+# Commit hygiene
+
+Conventional Commits. Scope names the config surface touched (`ts`, `lint`, `hooks`) and is omitted for repo-wide changes or a new standalone tool. commitlint checks the type, the subject and the header length; the scope convention is not machine-enforced.
+
+- One decision per commit. Split scaffolding from the deliberate change layered on top.
+- Minimum diff surface. Formatter sweeps, drive-by renames and unrelated tidying get their own commit or do not happen.
+- Every commit stands alone. Regenerate `bun.lock` per commit, and check a series with a throwaway worktree: `git worktree add`, then `bun install --frozen-lockfile && bun run typecheck` at each commit.
+- Drop verification artefacts before the work lands: smoke-test files, scratch scripts, probe commits. Never fold them into a real commit.
+- The body says what was decided, what was rejected and why, and what was verified. Not a restatement of the diff.
+- Fix a wrong commit by amending or rebasing it, not with a follow-up `fix:`. Ask first before rewriting a commit you did not create in this session.
+
+## Never commit red
+
+The pre-commit hook already blocks unformatted, unlinted and mistyped code, so what matters here is what the hook cannot reach:
+
+- IMPORTANT: never use `--no-verify`.
+- `git rebase` does not re-run the hook. After reordering or amending, every commit in the series must still be green, not only the tip.
+- Never suppress a diagnostic to clear a check. When tests land the same applies to them: never delete, skip or `.only` a test, and never loosen an assertion to match behaviour that is broken. A skipped test reports nothing, which is worse than red.
