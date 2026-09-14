@@ -16,6 +16,7 @@
     "test:coverage": "vitest run --coverage",
     "knip": "knip",
     "mcp:next": "next-devtools-mcp",
+    "mcp:shadcn": "shadcn mcp",
     "prepare": "husky"
   },
   "dependencies": {
