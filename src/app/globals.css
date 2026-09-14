@@ -38,6 +38,11 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
+  /* Exactis additions: brand (oxide) and the two semantic tones shadcn lacks */
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand: var(--brand);
+  --color-positive: var(--positive);
+  --color-caution: var(--caution);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -48,72 +53,85 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Exactis greys: cool with a faint warm cast in the paper tints */
+  --background: #fafaf8; /* grey-25 paper */
+  --foreground: #232624; /* grey-800 ink */
+  --card: #ffffff;
+  --card-foreground: #232624;
+  --popover: #ffffff;
+  --popover-foreground: #232624;
+  --primary: #232624; /* ink, not brand: commit actions are not brand moments */
+  --primary-foreground: #fafaf8;
+  --secondary: #f4f5f3; /* grey-50 sunken */
+  --secondary-foreground: #232624;
+  --muted: #f4f5f3;
+  --muted-foreground: #6b716d; /* grey-500 */
+  --accent: #f4f5f3;
+  --accent-foreground: #232624;
+  --destructive: #c10007; /* red-700: losses and destructive actions. 6.1:1 on paper */
+  --border: #e8eae6; /* grey-100 hairline */
+  --input: #d6d9d4; /* grey-200 control border */
+  --ring: #151716; /* grey-900 focus ink */
+  /* Chart series by meaning: equity, bonds, property, cash, debt */
+  --chart-1: #163f3a;
+  --chart-2: #3f7e6f;
+  --chart-3: #b08540;
+  --chart-4: #cfcbbf;
+  --chart-5: #c10007; /* debt follows loss red, no longer oxide */
+  --radius: 0.5rem; /* controls on the lg step at 8px; the card takes xl, about 11px */
+  /* Ink sidebar, identical in both themes */
+  --sidebar: #151716;
+  --sidebar-foreground: #fafaf8;
+  --sidebar-primary: #ac5348; /* oxide-400: active rail, 3.5:1 on ink */
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgb(255 255 255 / 6%);
+  --sidebar-accent-foreground: #fafaf8;
+  --sidebar-border: rgb(255 255 255 / 8%);
+  --sidebar-ring: #fafaf8;
+  /* Exactis additions */
+  --brand: #8c2f27; /* oxide-500: wordmark dot, active tab, milestone markers */
+  --brand-foreground: #ffffff;
+  --positive: #1f6b4f; /* jade-500: gains, funded. 6.1:1 on paper, equal to loss */
+  --caution: #8e6116; /* ochre-600: stale data, changed assumptions */
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #151716; /* grey-900 */
+  --foreground: #e8eae6; /* grey-100 */
+  --card: #232624; /* grey-800 */
+  --card-foreground: #e8eae6;
+  --popover: #232624;
+  --popover-foreground: #e8eae6;
+  --primary: #fafaf8;
+  --primary-foreground: #151716;
+  --secondary: #363a37; /* grey-700 */
+  --secondary-foreground: #e8eae6;
+  --muted: #363a37;
+  --muted-foreground: #b8bdb8; /* grey-300: grey-400 fails AA on the muted surface */
+  --accent: #363a37;
+  --accent-foreground: #e8eae6;
+  --destructive: #ffa2a2; /* red-300: red-400 fails AA on the muted surface */
+  --border: rgb(255 255 255 / 8%);
+  --input: rgb(255 255 255 / 14%);
+  --ring: #fafaf8;
+  /* Series lighten in the dark scope; light-scope petrol reads as mud on ink */
+  --chart-1: #7fb8a8;
+  --chart-2: #43897a;
+  --chart-3: #d3a557;
+  --chart-4: #8a867b;
+  --chart-5: #ffa2a2;
+  --sidebar: #151716;
+  --sidebar-foreground: #fafaf8;
+  --sidebar-primary: #ac5348;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgb(255 255 255 / 6%);
+  --sidebar-accent-foreground: #fafaf8;
+  --sidebar-border: rgb(255 255 255 / 8%);
+  --sidebar-ring: #fafaf8;
+  --brand: #d18a7f; /* oxide-300 */
+  --brand-foreground: #151716;
+  --positive: #8fcfaf;
+  --caution: #d3a557; /* ochre-300: ochre-100 is indistinguishable from foreground */
 }
 
 @layer base {
