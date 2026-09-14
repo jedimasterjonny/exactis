@@ -8,12 +8,19 @@ import type { NextConfig } from "next";
 // be regenerated per view, which forces every page dynamic and rules out PPR.
 // What is left still closes off base-tag injection, form exfiltration, plugin
 // embedding and clickjacking, and none of it needs a request to be served.
+//
+// upgrade-insecure-requests is deliberately absent as well. WebKit applies it
+// on http://localhost where the spec exempts it (bugs.webkit.org 250776), so
+// every subresource of a dev or next start page is rewritten to https, nothing
+// answers, and fonts and chunks fail silently. Headers are baked at build
+// time, so a phase check could not spare next start. What the directive
+// guarded, an http reference in our own markup on an https page, every current
+// browser blocks or upgrades as mixed content, and HSTS covers navigations.
 const contentSecurityPolicy = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
-  "upgrade-insecure-requests",
 ].join("; ");
 
 const nextConfig: NextConfig = {
