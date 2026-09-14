@@ -17,6 +17,13 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // Top-level and stable-named in 16: it absorbed the removed `ppr`,
+  // `dynamicIO` and `useCache` flags, and `experimental.cacheComponents` is a
+  // deprecated alias for it. Off by default, and turning it on is not a
+  // rename - data read outside a `<Suspense>` boundary and not marked
+  // `use cache` becomes a build error rather than a route quietly going
+  // dynamic.
+  cacheComponents: true,
   experimental: {
     // Emits integrity="sha512-..." on every external chunk, which the browser
     // verifies independently of any CSP. Does not hash the inline scripts, so
