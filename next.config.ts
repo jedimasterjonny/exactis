@@ -44,9 +44,14 @@ const nextConfig: NextConfig = {
               "camera=(), microphone=(), geolocation=(), browsing-topics=()",
           },
           { key: "Referrer-Policy", value: "origin-when-cross-origin" },
+          // preload is deliberately absent. It asks browsers to hardcode the
+          // domain and every subdomain as HTTPS-only before a request is ever
+          // made, and leaving that list takes months, so it is the one value
+          // here that cannot be taken back. Add it when the domain is chosen
+          // and submitted at hstspreload.org, not before.
           {
             key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains; preload",
+            value: "max-age=63072000; includeSubDomains",
           },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-DNS-Prefetch-Control", value: "on" },
