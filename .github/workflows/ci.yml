@@ -239,9 +239,14 @@ jobs:
           # A new branch reports an all-zero base, and a force push can name a
           # commit that no longer resolves. Either way there is no range, so
           # fall back to the tip alone rather than failing on the arithmetic.
+          # A base that is not an ancestor of the head means history was
+          # rewritten: the old tip usually still resolves, so resolvability
+          # alone is not enough to detect it, and rev-list would then return
+          # every rewritten commit rather than the ones actually pushed.
           if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] ||
-             ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            echo "No usable base commit; checking $HEAD_SHA alone."
+             ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null ||
+             ! git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA" 2>/dev/null; then
+            echo "No usable base commit, or history was rewritten; checking $HEAD_SHA alone."
             commits="$HEAD_SHA"
           else
             commits="$(git rev-list --reverse "${BASE_SHA}..${HEAD_SHA}")"
