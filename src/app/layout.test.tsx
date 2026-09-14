@@ -3,13 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import RootLayout, { metadata } from "./layout";
 
-// next/font/google is rewritten by the Next compiler at build time and
-// throws when imported directly, so the loader is stubbed with the shape it
-// returns. Only the variable is asserted on, so the stub cannot flatter the
-// component.
-vi.mock("next/font/google", () => ({
-  // eslint-disable-next-line @typescript-eslint/naming-convention -- a mock factory key must mirror the exported loader name, which is not ours to rename
-  Geist: (): { variable: string } => ({ variable: "--font-sans" }),
+// geist/font/sans calls next/font/local, which is rewritten by the Next
+// compiler at build time and throws when imported directly, so the font is
+// stubbed with the shape the package exports. Only the variable is asserted
+// on, so the stub cannot flatter the component.
+vi.mock("geist/font/sans", () => ({
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- a mock factory key must mirror the exported name, which is not ours to rename
+  GeistSans: { variable: "--font-geist-sans" },
 }));
 
 describe("RootLayout", () => {
@@ -25,7 +25,7 @@ describe("RootLayout", () => {
     );
 
     expect(markup).toContain('lang="en"');
-    expect(markup).toContain("--font-sans");
+    expect(markup).toContain("--font-geist-sans");
     expect(markup).toContain("<p>child</p>");
   });
 });
