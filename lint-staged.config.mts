@@ -27,6 +27,17 @@ export default defineConfig({
   // sequential list stops at its first failure, so an unformatted file would
   // suppress the very result --continue-on-error exists to still report.
   "**/*": (): string => "bun run knip",
+  // The whole suite under coverage, not `vitest related` on the staged
+  // files: the per-file 100% gate is a property of the project, and a
+  // commit that adds an untested source file passes a related-only run.
+  //
+  // Keyed on every TypeScript file rather than on src, because the suite's
+  // own machinery lives at the root - vitest.setup.ts, the test that holds
+  // it, vitest.config.mts - and a change there is precisely when the suite
+  // has to run. A src glob let those through with no test run at all. It
+  // cannot share the typecheck key below, so it takes the `**/` spelling
+  // of the same pattern, matching the same files, as `*` and `**/*` do.
+  "**/*.{mts,ts,tsx}": (): string => "bun run test:coverage",
   // A staged file that ESLint ignores emits a warning, which
   // --max-warnings 0 would promote to a failure; --no-warn-ignored keeps
   // that from blocking an otherwise clean commit.
@@ -38,8 +49,4 @@ export default defineConfig({
   // script rather than calling tsc directly, because a bare tsc fails wherever
   // Next has not yet generated .next/types; the script pairs it with typegen.
   "*.{mts,ts,tsx}": (): string => "bun run typecheck",
-  // The whole suite under coverage, not `vitest related` on the staged
-  // files: the per-file 100% gate is a property of the project, and a
-  // commit that adds an untested source file passes a related-only run.
-  "src/**/*.{ts,tsx}": (): string => "bun run test:coverage",
 });
