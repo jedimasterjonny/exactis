@@ -17,6 +17,7 @@ describe("RootLayout", () => {
   // document, and mounting <html> inside a container div is invalid nesting
   // that React would rightly complain about.
   it("renders a document shell around its children", () => {
+    // eslint-disable-next-line testing-library/render-result-naming-convention -- renderToStaticMarkup returns a string, not a Testing Library render result
     const markup = renderToStaticMarkup(
       <RootLayout params={Promise.resolve({})}>
         <p>child</p>
