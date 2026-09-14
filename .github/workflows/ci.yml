@@ -173,6 +173,22 @@ jobs:
       - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bun run knip
 
+      # Dependabot alerts are on and Renovate raises a pull request for a
+      # known vulnerability, but both arrive after the fact: the version is
+      # on main by the time either notices. This fails the run that
+      # introduces one - a bump pulling in a vulnerable transitive, or a
+      # lockfile-maintenance refresh doing the same - at the pull request,
+      # where it is cheapest to read. Not gated on the install: it reads
+      # bun.lock rather than node_modules, and a lockfile that would not
+      # install is still worth auditing.
+      #
+      # Every severity fails it. An advisory that cannot be fixed is
+      # accepted with --ignore, the advisory named here and the reason
+      # beside it, the same shape as an eslint-disable and its -- reason.
+      # Not with --audit-level, which silences the next one too.
+      - if: ${{ !cancelled() }}
+        run: bun audit
+
       # The commit-msg hook is bypassable with --no-verify. This is not, and
       # it runs for a push as well as a pull request. Most of this history
       # landed by direct push to main, which a pull_request-only gate never
