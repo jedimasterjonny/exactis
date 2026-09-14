@@ -25,6 +25,11 @@ const nextConfig: NextConfig = {
   // dynamic.
   cacheComponents: true,
   experimental: {
+    // On by default, and stated because .mcp.json depends on it: the
+    // next-devtools server configured there is a client of the /_next/mcp
+    // endpoint this enables, and switching it off leaves that server with
+    // nothing to find.
+    mcpServer: true,
     // Emits integrity="sha512-..." on every external chunk, which the browser
     // verifies independently of any CSP. Does not hash the inline scripts, so
     // it does not unlock a strict script-src.

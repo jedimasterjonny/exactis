@@ -24,6 +24,7 @@ The app is then at <http://localhost:3000>, rendered from `src/app/page.tsx`.
 | `format`, `format:check`              | Prettier, rewriting and reporting                      |
 | `typecheck`                           | `next typegen`, then `tsc --noEmit`                    |
 | `test`, `test:watch`, `test:coverage` | Vitest; coverage enforces the per-file 100% gate       |
+| `mcp:next`                            | The Next devtools MCP server, launched by `.mcp.json`  |
 
 [AGENTS.md](AGENTS.md) is the source of truth for how work is done here: code
 style, commit rules, and what has to be green before anything lands.
