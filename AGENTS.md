@@ -65,6 +65,12 @@ ESLint runs `strictTypeChecked` and `stylisticTypeChecked` at
 JSON and YAML are linted too, so `package.json`, `renovate.json` and the
 workflow are not exempt. knip fails on an unused dependency, export or file.
 
+The three `.mjs` config files - ESLint, commitlint and PostCSS - stay outside
+the TypeScript program on purpose. ESLint 10 loads a `.ts` config only through
+jiti or its `unstable_native_nodejs_ts_config` flag, and either is a moving part
+on every invocation, the editor's included, bought for a file whose keys and
+rule options ESLint already validates at load.
+
 `bunfig.toml` sets `linker = "isolated"`, so `node_modules` is not hoisted and
 each package sees only what it declares. Importing a transitive dependency fails
 with `ERR_MODULE_NOT_FOUND` rather than quietly working — `scheduler` is
