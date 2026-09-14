@@ -29,18 +29,31 @@ matters live only in memory — put it here.
 
 Beyond `strict`, `tsconfig.json` sets `noUncheckedIndexedAccess` (indexing
 yields `T | undefined`), `exactOptionalPropertyTypes` (an optional property will
-not accept an explicit `undefined`), `verbatimModuleSyntax`,
+not accept an explicit `undefined`), `noPropertyAccessFromIndexSignature`
+(bracket access, not dot), `erasableSyntaxOnly` (no enum, namespace, parameter
+properties or `import =`), `moduleDetection: "force"`, `allowJs: false`,
+`noUnusedLocals`, `noUnusedParameters`, `verbatimModuleSyntax`,
 `noImplicitReturns`, `noFallthroughCasesInSwitch` and `noImplicitOverride`.
+`lib` is pinned to ES2022 rather than esnext, so an API newer than that is a
+type error rather than a runtime one.
 
 ESLint runs `strictTypeChecked` and `stylisticTypeChecked` at
 `--max-warnings 0`. The rules most often tripped over:
 
 - Type-only imports must be written `import type`, on their own line.
-- Exported functions need an explicit return type.
+- Every function needs an explicit return type, not only exported ones.
+  Contextually typed callbacks are exempt.
+- A type assertion from `any` or `unknown` is rejected. Parse or narrow instead.
+- A `switch` over a union must be exhaustive.
+- A number in a boolean position is an error, because `{items.length && <x/>}`
+  renders a literal `0`.
 - perfectionist sorts imports and object keys naturally. Write them sorted.
 - Booleans are prefixed `is`, `should`, `has`, `can`, `did` or `will`; type
   parameters start with `T`; unused bindings need a leading underscore.
 - Every `eslint-disable` needs a `-- reason` description.
+
+JSON and YAML are linted too, so `package.json`, `renovate.json` and the
+workflow are not exempt. knip fails on an unused dependency, export or file.
 
 Prettier owns formatting. Run `bun run format` rather than hand-aligning
 anything.
@@ -88,3 +101,26 @@ reach:
   skipped test reports nothing, which is worse than red.
 - Coverage is 100% per file. Reaching it by widening `coverage.exclude` is the
   same act as deleting a test.
+
+# Next config traps
+
+This Next version removes and renames more than its own docs admit, and several
+of the traps are silent. Verified against the installed package, not from
+memory.
+
+- `experimental.ppr` still has a deprecated type and still passes the config
+  schema, so a TypeScript config compiles clean and then `next build`
+  hard-throws. It merged into `cacheComponents`. This is the likeliest trap
+  here, because nothing catches it before runtime.
+- `devIndicators.buildActivity` and its siblings are stripped with no warning at
+  all: that schema object is non-strict, so unknown sub-keys vanish rather than
+  being reported.
+- An unknown top-level key warns but does not fail, so a typo survives a build.
+- The `eslint` key was removed in 16. In a typed config it is a `TS2353` and the
+  build exits 1.
+- `middleware.ts` is now `proxy.ts`, and the named export `middleware` is now
+  `proxy`. There is no edge runtime for it.
+- Never set `typescript.ignoreBuildErrors`, and never set
+  `experimental.useTypeScriptCli: false`. The legacy in-process checker discards
+  diagnostics in files matching `spec`/`test`/`__tests__`, so type errors in
+  tests disappear from `next build` entirely.
