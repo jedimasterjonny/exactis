@@ -150,3 +150,17 @@
     @apply font-sans;
   }
 }
+
+/* Every figure is mono and tabular so columns of money align. No exceptions. */
+@utility figure {
+  @apply font-mono tabular-nums;
+}
+
+/* Micro-labels: field labels, table headers, section numerals, card eyebrows.
+   The reference sets these at 11px; 12px is the floor for text that has to
+   read at 6am. Its 0.09em tracking is Tailwind's widest step to within a
+   hundredth of an em. Colour is left to the call site, since a label may be
+   muted, inverse or brand. */
+@utility label {
+  @apply font-mono text-xs font-medium tracking-widest uppercase;
+}
