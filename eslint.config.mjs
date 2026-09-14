@@ -25,14 +25,15 @@ import tseslint from "typescript-eslint";
 const codeFiles = ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"];
 
 // The extensions that can never be in the TypeScript program. tsconfig.json
-// includes .ts, .tsx and .mts, and no JavaScript extension can join them.
+// includes .ts, .tsx, .mts and .cts, and no JavaScript extension can join
+// them.
 const untypedFiles = ["**/*.{js,jsx,mjs,cjs}"];
 
 // The extensions tsconfig.json does include, and so the only ones a
 // type-aware rule can be named for. A type-aware rule listed against a
 // file with no program behind it fails that file at parse time, which is
 // why these do not simply reuse codeFiles and lean on disableTypeChecked.
-const typedFiles = ["**/*.{ts,tsx,mts}"];
+const typedFiles = ["**/*.{ts,tsx,mts,cts}"];
 
 const eslintConfig = defineConfig([
   // Deliberately the one block with no `files`, because neither option
@@ -115,9 +116,9 @@ const eslintConfig = defineConfig([
   // family, not just the two extensions that happen to exist today: a
   // .cjs or .jsx file inherits the TypeScript parser from
   // typescript-eslint/base and fails to parse at all, because tsconfig.json
-  // will never include it. .cts is deliberately not here - it is
-  // TypeScript, so the answer to one appearing is to add it to
-  // tsconfig.json, and the parse error says exactly that.
+  // will never include it. .cts is not here because it is TypeScript and
+  // tsconfig.json now includes it, so it has a program like any other
+  // TypeScript extension.
   { extends: [tseslint.configs.disableTypeChecked], files: untypedFiles },
   // Suppressing a rule must be a deliberate, narrow, justified act.
   // no-unlimited-disable (from recommended) blocks bare eslint-disable
@@ -141,13 +142,13 @@ const eslintConfig = defineConfig([
   // Anything unused must carry a leading underscore, so a dead binding is
   // visibly dead rather than merely tolerated.
   //
-  // Scoped to the files tsconfig.json includes - .ts, .tsx and .mts -
-  // because the boolean selector consults the type checker. The .mjs
-  // and .js config files are the ones that sit outside the TypeScript
-  // program; unscoped the rule reaches them and aborts the whole lint
-  // run.
+  // Scoped to the files tsconfig.json includes - .ts, .tsx, .mts and
+  // .cts - because the boolean selector consults the type checker. The
+  // .mjs and .js config files are the ones that sit outside the
+  // TypeScript program; unscoped the rule reaches them and aborts the
+  // whole lint run.
   {
-    files: ["**/*.ts", "**/*.tsx", "**/*.mts"],
+    files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
     rules: {
       "@typescript-eslint/naming-convention": [
         "error",
