@@ -3,7 +3,7 @@ import type { JSX } from "react";
 import { cn } from "cn";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
-type DeltaFormat = "currency" | "percent" | "plain" | "points";
+export type DeltaFormat = "currency" | "percent" | "plain" | "points";
 
 interface DeltaValueProps {
   readonly format?: DeltaFormat | undefined;
