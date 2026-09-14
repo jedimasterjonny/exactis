@@ -93,6 +93,19 @@ const eslintConfig = defineConfig([
     ],
     files: codeFiles,
   },
+  // sonarjs/argument-type cannot instantiate a type parameter under the
+  // TypeScript 6 API, so it reads every generic signature as unresolved:
+  // `[1, 2].indexOf(1)` reports `expected 'T' instead of 'number'`. It is
+  // not reacting to anything this repo wrote, which is why it is off
+  // everywhere rather than narrowed the way the exemptions below are -
+  // scoping it to the one file that trips it today would only move the
+  // error to whichever file next calls a generic method.
+  //
+  // sonarjs depends on `typescript: ">=5 <6.1.0"`, so 6.0 is inside the
+  // range it claims, and this is a bug rather than a version reached past.
+  // 4.2.0 is current and still carries it. The rule goes back on when a
+  // release fixes it; nothing else in recommended is affected.
+  { files: codeFiles, rules: { "sonarjs/argument-type": "off" } },
   // eslint-config-next ships eslint-plugin-react's recommended set, which
   // predates hooks and function components. @eslint-react is the modern
   // equivalent and reports under its own namespace, so it adds to that set
