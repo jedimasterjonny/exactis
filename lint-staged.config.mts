@@ -14,6 +14,19 @@ export default defineConfig({
   // passes over the rest (images, the lockfile) instead of failing on
   // them. .prettierignore still applies.
   "*": "prettier --check --ignore-unknown",
+  // knip: a dependency nothing imports, an export nothing reads, a file
+  // nothing references. Like typecheck it is a property of the whole graph
+  // rather than of any staged file, so the function form discards the
+  // matched list and it runs once over the project.
+  //
+  // A second everything-glob rather than a list of extensions, because every
+  // hole in such a list is a real one - knip resolves dependencies out of
+  // package.json, .prettierrc.json, commitlint.config.mjs and
+  // vitest.config.mts, and binaries out of .github/workflows/ci.yml and the
+  // two extensionless hooks in .husky. It cannot share the `*` key above: a
+  // sequential list stops at its first failure, so an unformatted file would
+  // suppress the very result --continue-on-error exists to still report.
+  "**/*": (): string => "bun run knip",
   // A staged file that ESLint ignores emits a warning, which
   // --max-warnings 0 would promote to a failure; --no-warn-ignored keeps
   // that from blocking an otherwise clean commit.
