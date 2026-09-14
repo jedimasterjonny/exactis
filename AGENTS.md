@@ -7,3 +7,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# Working agreements
+
+This file is the source of truth for how work is done here. It is checked in, so it travels between machines; agent memory does not. Never let a convention that matters live only in memory — put it here.
+
+- Propose the commit split before starting work that spans more than one decision.
+- History is audited after the fact. Expect to be asked to confirm minimum diff surface and true atomicity.
+- "Accepted" on a review finding means acknowledged and closed. It is not an instruction to go and fix it.
