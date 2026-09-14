@@ -16,7 +16,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 This file is the source of truth for how work is done here. It is checked in, so
 it travels between machines; agent memory does not. Never let a convention that
-matters live only in memory — put it here.
+matters live only in memory — put it here, or in a skill under `.claude/skills/`
+when it applies only sometimes.
 
 - Propose the commit split before starting work that spans more than one
   decision.
@@ -28,25 +29,15 @@ matters live only in memory — put it here.
   Merge and squash commits are disabled in the repository settings. Branch
   protection is deliberately not used, so CI is the gate and the discipline is
   the lock.
-- Node is pinned by `.node-version` to 26.8.2, and that file is the only place
-  the version is written: both CI jobs read it through `node-version-file`
-  rather than naming one, and Renovate's nodenv manager updates it there.
-  `engines.node` is a separate statement — the range the package supports,
-  `^22.22.2 || ^24.15.0 || >=26.0.0` — and `constraintsFiltering: "strict"` in
-  `renovate.json` holds Renovate to it, so an upgrade that would need a newer
-  Node than the floor is never proposed.
+- Node is pinned in `.node-version`, the only place the version is written.
+  `engines.node` is a separate statement, the range the package supports, and
+  Renovate is held to it.
 
 # Code style
 
-Beyond `strict`, `tsconfig.json` sets `noUncheckedIndexedAccess` (indexing
-yields `T | undefined`), `exactOptionalPropertyTypes` (an optional property will
-not accept an explicit `undefined`), `noPropertyAccessFromIndexSignature`
-(bracket access, not dot), `erasableSyntaxOnly` (no enum, namespace, parameter
-properties or `import =`), `moduleDetection: "force"`, `allowJs: false`,
-`noUnusedLocals`, `noUnusedParameters`, `verbatimModuleSyntax`,
-`noImplicitReturns`, `noFallthroughCasesInSwitch` and `noImplicitOverride`.
-`lib` is pinned to ES2022 rather than esnext, so an API newer than that is a
-type error rather than a runtime one.
+`tsconfig.json` is strict well beyond `strict`. Read it before assuming a
+default. `lib` is ES2022, so an API newer than that is a type error rather than
+a runtime one.
 
 ESLint runs `strictTypeChecked` and `stylisticTypeChecked` at
 `--max-warnings 0`. The rules most often tripped over:
@@ -69,18 +60,14 @@ ESLint runs `strictTypeChecked` and `stylisticTypeChecked` at
 JSON and YAML are linted too, so `package.json`, `renovate.json` and the
 workflow are not exempt. knip fails on an unused dependency, export or file.
 
-The three `.mjs` config files - ESLint, commitlint and PostCSS - stay outside
-the TypeScript program on purpose. ESLint 10 loads a `.ts` config only through
-jiti or its `unstable_native_nodejs_ts_config` flag, and either is a moving part
-on every invocation, the editor's included, bought for a file whose keys and
-rule options ESLint already validates at load.
+The `.mjs` config files stay outside the TypeScript program. ESLint loads a
+`.ts` config only through jiti or an unstable flag, and neither is worth a
+moving part on every invocation.
 
-`bunfig.toml` sets `linker = "isolated"`, so `node_modules` is not hoisted and
-each package sees only what it declares. Importing a transitive dependency fails
-with `ERR_MODULE_NOT_FOUND` rather than quietly working — `scheduler` is
-installed for `react-dom` and does not resolve from here — which is the intended
-behaviour, not a broken install. The fix is to declare the package in
-`package.json` in its own right, never to reach through whatever pulled it in.
+`node_modules` is not hoisted (`linker = "isolated"` in `bunfig.toml`), so an
+import of a transitive dependency fails with `ERR_MODULE_NOT_FOUND` by design.
+Declare the package in `package.json`; never reach through whatever pulled it
+in.
 
 Prettier owns formatting. Run `bun run format` rather than hand-aligning
 anything.
@@ -89,27 +76,13 @@ Tests run on Vitest with jsdom and Testing Library, colocated as
 `*.test.ts`/`*.test.tsx`. `globals` is off, so `describe`, `it` and `expect` are
 imported. A test that asserts nothing fails, and test order is shuffled.
 
-`vitest.setup.ts` installs a console guard that fails the test which produced
-unexpected output, and it reaches further than `error` and `warn`. Fourteen
-methods are guarded — `log`, `debug`, `info`, `dir`, `trace`, `table` and the
-rest of the ones that emit on their own — and the guard stands in for the real
-console, so a `console.log` left in while debugging prints nothing and fails the
-test that ran it. Output from module scope, from a `beforeAll`, or from anything
-resolving after the file has finished is caught as well.
-
-The guard may not be switched off, and each obvious attempt is detected and
-reported as tampering: reassigning `console.error`, restoring the spy, and
-calling `mockImplementation` on it. Asserting on console output goes through
-`takeConsoleOutput()`, exported from `vitest.setup.ts`, which is the only
-sanctioned route. It returns `string[]` — one `console.<method>: <message>` line
-per call, worded as the guard would have reported it — takes only the running
-test's own output, and clears what it takes so that asserting on it does not
-also fail the test. Called outside a test, it throws.
-
-`vitest.setup.test.ts` holds the guard to all of this. A test that is meant to
-go red cannot assert on its own redness, so it writes fixture suites to a
-temporary directory, runs them under a child Vitest loading the same setup file,
-and reads the child's report.
+- Console output during a test fails that test, on every method that emits and
+  wherever in the file it comes from. A `console.log` left in prints nothing and
+  goes red.
+- Do not silence the guard. Reassigning, restoring or re-mocking a console
+  method is detected and reported as tampering.
+- To assert on console output, call `takeConsoleOutput()` from
+  `vitest.setup.ts`. It returns the running test's lines and clears them.
 
 # Commit hygiene
 
@@ -163,9 +136,7 @@ the task calls for it rather than every session:
 
 # Next config traps
 
-This Next version removes and renames more than its own docs admit, and several
-of the traps are silent. Verified against the installed package, not from
-memory.
+Verified against the installed package, not from memory. Several are silent:
 
 - `experimental.ppr` still has a deprecated type and still passes the config
   schema, so a TypeScript config compiles clean and then `next build`
