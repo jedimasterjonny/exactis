@@ -13,4 +13,19 @@ describe("Home", () => {
       "Projected to age 89",
     );
   });
+
+  it("follows the header with the four dashboard tiles", () => {
+    render(<Home />);
+
+    const main = screen.getByRole("main");
+
+    for (const label of [
+      "Retirement",
+      "Net worth at 89",
+      "Chance of success",
+      "Net legacy",
+    ]) {
+      expect(within(main).getByText(label)).toBeInTheDocument();
+    }
+  });
 });
