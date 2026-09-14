@@ -1,0 +1,10 @@
+# Store every text file with LF and check it out with LF, whatever the
+# platform's convention is. Nothing depends on this today - no tracked file
+# contains a CR and core.autocrlf is unset here - so it is insurance against
+# a clone on a machine that has set it, not a fix for a live bug.
+* text=auto eol=lf
+
+# bun.lock is generated, so it is collapsed in diffs and left out of the
+# language statistics. Not marked binary: it is ASCII, and text=auto already
+# gives it the same normalisation as everything else.
+bun.lock linguist-generated=true
