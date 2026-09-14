@@ -25,4 +25,8 @@ export default defineConfig({
   // script rather than calling tsc directly, because a bare tsc fails wherever
   // Next has not yet generated .next/types; the script pairs it with typegen.
   "*.{mts,ts,tsx}": (): string => "bun run typecheck",
+  // The whole suite under coverage, not `vitest related` on the staged
+  // files: the per-file 100% gate is a property of the project, and a
+  // commit that adds an untested source file passes a related-only run.
+  "src/**/*.{ts,tsx}": (): string => "bun run test:coverage",
 });

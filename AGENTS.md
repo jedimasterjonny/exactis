@@ -30,6 +30,8 @@ ESLint runs `strictTypeChecked` and `stylisticTypeChecked` at `--max-warnings 0`
 
 Prettier owns formatting. Run `bun run format` rather than hand-aligning anything.
 
+Tests run on Vitest with jsdom and Testing Library, colocated as `*.test.ts`/`*.test.tsx`. `globals` is off, so `describe`, `it` and `expect` are imported. A test that asserts nothing fails, test order is shuffled, and unexpected `console.error`/`console.warn` output fails the test that produced it.
+
 # Commit hygiene
 
 Conventional Commits. Scope names the config surface touched (`ts`, `lint`, `hooks`) and is omitted for repo-wide changes or a new standalone tool. commitlint checks the type, the subject and the header length; the scope convention is not machine-enforced.
@@ -43,8 +45,9 @@ Conventional Commits. Scope names the config surface touched (`ts`, `lint`, `hoo
 
 ## Never commit red
 
-The pre-commit hook already blocks unformatted, unlinted and mistyped code, so what matters here is what the hook cannot reach:
+The pre-commit hook already blocks unformatted, unlinted and mistyped code, and a failing or uncovered test suite, so what matters here is what the hook cannot reach:
 
 - IMPORTANT: never use `--no-verify`.
 - `git rebase` does not re-run the hook. After reordering or amending, every commit in the series must still be green, not only the tip.
-- Never suppress a diagnostic to clear a check. When tests land the same applies to them: never delete, skip or `.only` a test, and never loosen an assertion to match behaviour that is broken. A skipped test reports nothing, which is worse than red.
+- Never suppress a diagnostic to clear a check, and never delete, skip or `.only` a test or loosen an assertion to match behaviour that is broken. A skipped test reports nothing, which is worse than red.
+- Coverage is 100% per file. Reaching it by widening `coverage.exclude` is the same act as deleting a test.
