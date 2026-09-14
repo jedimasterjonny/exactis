@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "knip": "knip",
+    "mcp:next": "next-devtools-mcp",
     "prepare": "husky"
   },
   "dependencies": {
@@ -59,6 +60,7 @@
     "jsdom": "30.0.1",
     "knip": "6.35.1",
     "lint-staged": "17.5.1",
+    "next-devtools-mcp": "0.4.0",
     "prettier": "3.9.6",
     "prettier-plugin-tailwindcss": "0.8.1",
     "shadcn": "4.21.0",
@@ -66,6 +68,9 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.0",
     "vitest": "5.0.0"
+  },
+  "overrides": {
+    "@modelcontextprotocol/sdk": "1.30.0"
   },
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
