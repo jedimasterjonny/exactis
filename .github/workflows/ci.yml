@@ -44,6 +44,42 @@ jobs:
           # once and Renovate updates it in one place.
           bun-version-file: package.json
 
+      # setup-bun does not do this, so the entry below is not redundant
+      # config. Read at the digest pinned above: its post step is
+      # cache-save.ts, whose body is saveCache([state.bunPath]) and nothing
+      # else, and its one cache input is no-cache - "Disable caching of bun
+      # executable". The binary is all it has ever meant.
+      #
+      # The path is asked of bun rather than written down. `bun pm cache`
+      # resolves BUN_INSTALL_CACHE_DIR, else $BUN_INSTALL/install/cache, else
+      # $XDG_CACHE_HOME/.bun/install/cache, else $HOME/.bun/install/cache -
+      # confirmed by running it under each. setup-bun sets none of them, so a
+      # hardcoded ~/.bun/install/cache is right today and silently a cache
+      # that never hits the day one of them is set.
+      - id: bun-cache
+        run: |
+          dir="$(bun pm cache)"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: bun-check-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          # node_modules is deliberately not here and must not be added. bun
+          # install --frozen-lockfile does not prune, so a restored tree
+          # resolves a dependency the commit no longer declares and the run
+          # goes green on a tree that cannot install - the false pass the
+          # commits job's `git clean -xdff` was added to close. The install
+          # cache cannot do that. It is content-addressed, keyed by what was
+          # fetched rather than by what is wanted, so a stale entry is dead
+          # weight rather than a wrong answer: it can only make an install
+          # that was going to happen anyway faster.
+          path: ${{ steps.bun-cache.outputs.dir }}
+          # Prefixed per job rather than shared between the two. On a shared
+          # key both jobs race to save the same entry, this one always gets
+          # there first, and the commits job's cache - the one worth having,
+          # since it accumulates every commit's dependencies - loses every
+          # time and is never written.
+          restore-keys: bun-check-${{ runner.os }}-
+
       - id: install
         run: bun install --frozen-lockfile
 
@@ -54,12 +90,77 @@ jobs:
       # anything it was asked to check, so they are gated on it succeeding.
       - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bun run format:check
+      # A misspelled option in .prettierrc.json is answered with
+      # `[warn] Ignored unknown option { printWdith: 80 }. Did you mean
+      # printWidth?` on stderr, after which Prettier exits 0 and the step
+      # above prints "All matched files use Prettier code style!". Verified
+      # with printWdith and tailwindStylesheat together: two warnings, both
+      # options doing nothing, format:check green. A plugin option is not a
+      # special case - core and plugin options are normalised through the
+      # same path, and tailwindStylesheat warns exactly like printWdith.
+      #
+      # There is no flag that promotes it. Prettier 3.9's CLI has no
+      # strict-config equivalent - the whole option list was read, not
+      # remembered - and --log-level only silences. Validating
+      # .prettierrc.json against getSupportInfo() was tried and rejected:
+      # it does work, but it is a second implementation of a check Prettier
+      # already performs, one that has to be taught about plugins,
+      # overrides and $schema and will go wrong differently. So what
+      # Prettier prints is what gets read.
+      #
+      # format:check is re-run rather than one file probed, because the
+      # warning is emitted per formatted file: a typo inside an overrides
+      # block only surfaces on a file that override matches. The whole run
+      # takes 0.3s. Only stderr is read - the pass/fail verdict belongs to
+      # the step above, and failing here for it too would report one
+      # problem as two.
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          # A grep for a vendor's log line is a check only for as long as
+          # the line exists, and Renovate keeps upgrading Prettier. Ask for
+          # an option that cannot be real and require the message back.
+          canary="$(bunx prettier --stdin-filepath canary.ts \
+            --unknown-option-canary=1 </dev/null 2>&1 >/dev/null || true)"
+          case "$canary" in
+            *"Ignored unknown option"*) ;;
+            *)
+              echo "::error::Prettier no longer reports an unknown option this way; this check is dead and needs rewriting."
+              exit 1
+              ;;
+          esac
+
+          warnings="$(bun run format:check 2>&1 >/dev/null || true)"
+          if printf '%s\n' "$warnings" | grep -q "Ignored unknown option"; then
+            printf '%s\n' "$warnings" | grep "Ignored unknown option" | sort -u
+            echo "::error::Prettier ignored an option in .prettierrc.json, so it is set to nothing. Fix the spelling."
+            exit 1
+          fi
       - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bun run lint
       - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bun run typecheck
       - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bun run test:coverage
+      # vitest writes an HTML report alongside the text summary and nothing
+      # has ever looked at it: the runner is thrown away, so a coverage
+      # failure can only be read by reproducing the run locally. Gated on
+      # the same condition as every other step rather than on the coverage
+      # step succeeding, because a red run is the case this exists for.
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          # warn rather than error. A suite that died before writing a
+          # report has already failed the step above, and failing again for
+          # the missing artifact reports one problem as two.
+          if-no-files-found: warn
+          name: coverage-html
+          # Where vitest puts it: coverage.reportsDirectory is unset in
+          # vitest.config.mts, so the default, and .gitignore names the
+          # same path.
+          path: coverage/
+          # Long enough to read a failure from the run that produced it.
+          # This is a diagnostic, not coverage history.
+          retention-days: 7
       # Kept alongside typecheck even though next build type checks too: a
       # type error should fail in seconds rather than after a full build, and
       # the build catches what tsc alone does not.
@@ -98,6 +199,26 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
+
+      # The job this is actually for. Every commit below pays a cold
+      # `git clean -xdff` and install; the clean is confined to the work
+      # tree, and this cache is not in it, so one restore serves the whole
+      # loop.
+      - id: bun-cache
+        run: |
+          dir="$(bun pm cache)"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          # Keyed on the tip's lockfile, which is not the one most of these
+          # commits install from. restore-keys is what does the work here:
+          # the entry carries forward between runs and accumulates the union
+          # of every commit's dependencies. node_modules stays out for the
+          # reason given in the check job, and here it would also undo the
+          # clean this job exists to perform.
+          key: bun-commits-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          path: ${{ steps.bun-cache.outputs.dir }}
+          restore-keys: bun-commits-${{ runner.os }}-
 
       - env:
           BASE_SHA:
