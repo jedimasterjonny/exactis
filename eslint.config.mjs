@@ -1,8 +1,11 @@
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments/configs";
+import vitest from "@vitest/eslint-plugin";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import eslintConfigPrettier from "eslint-config-prettier";
+import jestDom from "eslint-plugin-jest-dom";
 import perfectionist from "eslint-plugin-perfectionist";
+import testingLibrary from "eslint-plugin-testing-library";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
@@ -179,6 +182,37 @@ const eslintConfig = defineConfig([
     rules: {
       "react-hooks/no-deriving-state-in-effects": "error",
       "react-hooks/void-use-memo": "error",
+    },
+  },
+  // Test files carry their own rule sets. Several of these restate a
+  // vitest.config.mts setting at lint time, on purpose: the config fails
+  // the run, the rule fails the edit, and the second is the one that says
+  // which line is wrong.
+  {
+    extends: [
+      vitest.configs.recommended,
+      testingLibrary.configs["flat/react"],
+      jestDom.configs["flat/recommended"],
+    ],
+    files: ["**/*.test.{ts,tsx}"],
+    rules: {
+      // it, never test, and never both in one file.
+      "vitest/consistent-test-it": ["error", { fn: "it" }],
+      // A test with no assertion passes. requireAssertions catches it at
+      // run time; this catches it while it is being written.
+      "vitest/expect-expect": "error",
+      // A branch in a test means the test is not asserting one thing, and
+      // an assertion inside one may never execute at all.
+      "vitest/no-conditional-expect": "error",
+      "vitest/no-conditional-in-test": "error",
+      // The two ways to commit a suite that silently does not run.
+      // AGENTS.md forbids both.
+      "vitest/no-disabled-tests": "error",
+      "vitest/no-focused-tests": ["error", { fixable: false }],
+      // toEqual ignores undefined properties and class identity.
+      "vitest/prefer-strict-equal": "error",
+      // Every test sits in a describe, so a failure names the unit.
+      "vitest/require-top-level-describe": "error",
     },
   },
   // Must stay last: switches off any stylistic rule Prettier owns.
