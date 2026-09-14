@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "next-devtools": {
+      "command": "bun",
+      "args": ["run", "--silent", "mcp:next"]
+    }
+  }
+}
