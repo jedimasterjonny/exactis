@@ -32,6 +32,6 @@ describe("RootLayout", () => {
 
 describe("metadata", () => {
   it("names the app", () => {
-    expect(metadata.title).toBe("Create Next App");
+    expect(metadata.title).toBe("exactis");
   });
 });
