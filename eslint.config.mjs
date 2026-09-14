@@ -1,11 +1,19 @@
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments/configs";
+import react from "@eslint-react/eslint-plugin";
+import json from "@eslint/json";
 import vitest from "@vitest/eslint-plugin";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import eslintConfigPrettier from "eslint-config-prettier";
 import jestDom from "eslint-plugin-jest-dom";
+import jsxA11y from "eslint-plugin-jsx-a11y";
+import packageJson from "eslint-plugin-package-json";
 import perfectionist from "eslint-plugin-perfectionist";
+import promise from "eslint-plugin-promise";
+import regexp from "eslint-plugin-regexp";
+import sonarjs from "eslint-plugin-sonarjs";
 import testingLibrary from "eslint-plugin-testing-library";
+import yml from "eslint-plugin-yml";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
@@ -20,7 +28,40 @@ const codeFiles = ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"];
 // includes .ts, .tsx and .mts, and no JavaScript extension can join them.
 const untypedFiles = ["**/*.{js,jsx,mjs,cjs}"];
 
+// The extensions tsconfig.json does include, and so the only ones a
+// type-aware rule can be named for. A type-aware rule listed against a
+// file with no program behind it fails that file at parse time, which is
+// why these do not simply reuse codeFiles and lean on disableTypeChecked.
+const typedFiles = ["**/*.{ts,tsx,mts}"];
+
 const eslintConfig = defineConfig([
+  // Deliberately the one block with no `files`, because neither option
+  // names a rule, a plugin or a parser: an `eslint-disable` that no longer
+  // suppresses anything is stale in a YAML file exactly as it is in a
+  // TypeScript one.
+  //
+  // reportUnusedInlineConfigs is the larger of the two gains: ESLint
+  // leaves it off entirely, so an inline `/* eslint rule: "error" */` that
+  // only restates what this file already says was invisible until now.
+  //
+  // reportUnusedDisableDirectives is already "warn" by default (ESLint's
+  // own default-config.js), so a stale directive currently fails only
+  // because `lint` passes --max-warnings 0. At "error" the failure belongs
+  // to the config rather than to a CLI flag: a bare `eslint` exits 1
+  // instead of 0, which is what an editor and every invocation without
+  // that flag actually see.
+  //
+  // What the severity does not buy is protection from `lint:fix`, which
+  // deletes a stale directive rather than reporting it, and does so at
+  // either severity. The `-- reason` recording why a rule was ever
+  // suppressed goes with it, so `lint:fix` is the wrong command to reach
+  // for when this one fires.
+  {
+    linterOptions: {
+      reportUnusedDisableDirectives: "error",
+      reportUnusedInlineConfigs: "error",
+    },
+  },
   { extends: [nextVitals, nextTs], files: codeFiles },
   {
     extends: [
@@ -37,6 +78,38 @@ const eslintConfig = defineConfig([
       },
     },
   },
+  // Three plugins that each cover a class of bug the TypeScript rules
+  // cannot see. promise catches a floating or mis-nested then/catch;
+  // regexp catches a pattern that is wrong rather than merely ugly - a
+  // character class that can never match, a quantifier that backtracks
+  // catastrophically; sonarjs covers duplicated branches, unreachable
+  // conditions and the cognitive-complexity ceiling.
+  {
+    extends: [
+      promise.configs["flat/recommended"],
+      regexp.configs["flat/recommended"],
+      sonarjs.configs.recommended,
+    ],
+    files: codeFiles,
+  },
+  // eslint-config-next ships eslint-plugin-react's recommended set, which
+  // predates hooks and function components. @eslint-react is the modern
+  // equivalent and reports under its own namespace, so it adds to that set
+  // rather than colliding with it.
+  {
+    extends: [react.configs["recommended-typescript"]],
+    files: ["**/*.{ts,tsx}"],
+  },
+  // jsx-a11y, in full. next/core-web-vitals enables six of these rules;
+  // strict enables thirty-one, and switches none of the six off, so this
+  // is a pure gain of twenty-five - keyboard handlers to match mouse
+  // handlers, labels tied to controls, valid ARIA roles.
+  //
+  // Spread as bare rules rather than as the config, because
+  // eslint-config-next has already registered the jsx-a11y plugin and a
+  // second registration is `ConfigError: Key "plugins": Cannot redefine
+  // plugin "jsx-a11y"`, which takes down the whole run.
+  { files: ["**/*.tsx"], rules: jsxA11y.flatConfigs.strict.rules },
   // Config files sit outside the TypeScript project, so type-aware
   // rules have no program to resolve them against. The whole JavaScript
   // family, not just the two extensions that happen to exist today: a
@@ -170,22 +243,140 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // Every function states its return type, not only the exported ones.
+  // explicit-function-return-type supersedes
+  // explicit-module-boundary-types, which is removed here rather than kept
+  // alongside it: both would report the same missing annotation on an
+  // exported function, and the narrower rule has nothing left to say once
+  // the wider one is on.
+  //
+  // The reason to widen is that the module boundary is not where the type
+  // is decided. A helper whose inferred return type drifts changes the
+  // exported function that returns it, and the annotation that would have
+  // caught it is the one on the helper.
+  //
+  // allowTypedFunctionExpressions, on by default and stated here because
+  // it is what keeps this liveable, exempts a function expression that
+  // already has a type from its context: an onChange={(e) => ...} takes
+  // its signature from the JSX prop, and a .map(...) callback from the
+  // array, so neither is asked to repeat it.
   {
-    // Exported functions must state their return type. Inference is fine
-    // inside a module, but at a module boundary an accidental change to
-    // the inferred type propagates silently to every caller.
     files: codeFiles,
     rules: {
-      "@typescript-eslint/explicit-module-boundary-types": [
+      "@typescript-eslint/explicit-function-return-type": [
         "error",
         {
-          allowArgumentsExplicitlyTypedAsAny: false,
           allowDirectConstAssertionInArrowFunctions: true,
+          allowExpressions: false,
           allowHigherOrderFunctions: true,
           allowTypedFunctionExpressions: true,
         },
       ],
     },
+  },
+  // The rest of the non-deprecated typescript-eslint set, scoped to the
+  // extensions tsconfig.json includes because most of these consult the
+  // type checker and all of them are about TypeScript rather than about
+  // the .mjs config files.
+  {
+    files: typedFiles,
+    rules: {
+      // The class and enum rules are insurance: this codebase has neither
+      // yet, and enabling them now means the first class written here is
+      // written the way the rest of the config implies, rather than the
+      // rules arriving afterwards as a reformatting commit. They cost
+      // nothing until then.
+      "@typescript-eslint/class-methods-use-this": "error",
+      // `export type` on a type-only export, so it erases.
+      "@typescript-eslint/consistent-type-exports": "error",
+      "@typescript-eslint/default-param-last": "error",
+      "@typescript-eslint/explicit-member-accessibility": "error",
+      "@typescript-eslint/max-params": "error",
+      "@typescript-eslint/member-ordering": "error",
+      // A method declared as a method is bivariant in its parameters and a
+      // property holding a function is not, so `property` is the form that
+      // actually type checks what is passed to it.
+      "@typescript-eslint/method-signature-style": ["error", "property"],
+      "@typescript-eslint/no-dupe-class-members": "error",
+      // `import type` must not be the thing that pulls a module in for its
+      // side effects.
+      "@typescript-eslint/no-import-type-side-effects": "error",
+      "@typescript-eslint/no-invalid-this": "error",
+      "@typescript-eslint/no-unnecessary-qualifier": "error",
+      // The assertion strictTypeChecked does not cover, and the most
+      // valuable rule here. `as` onto a type the value is not already
+      // assignable to is the last way to lie to the compiler without
+      // writing `any`, and `(await response.json()) as ApiPayload` is how
+      // it usually happens: json() returns any, the assertion invents a
+      // shape, and nothing ever checks it.
+      "@typescript-eslint/no-unsafe-type-assertion": "error",
+      // functions: false, and it must be. At the default of true this rule
+      // and perfectionist/sort-modules are mutually unsatisfiable on any
+      // file with a helper below an export: sort-modules requires the
+      // exported function first, and no-use-before-define then reports the
+      // helper it calls. Verified in both directions. A hoisted function
+      // declaration has no temporal dead zone so exempting it costs no
+      // safety, and a `const` used above its declaration still reports.
+      "@typescript-eslint/no-use-before-define": [
+        "error",
+        { functions: false },
+      ],
+      // An `export {}` that is no longer what makes the file a module.
+      "@typescript-eslint/no-useless-empty-export": "error",
+      "@typescript-eslint/parameter-properties": "error",
+      "@typescript-eslint/prefer-enum-initializers": "error",
+      // A private field never reassigned outside the constructor should
+      // say readonly.
+      "@typescript-eslint/prefer-readonly": "error",
+      // A function returning a promise should say so in its signature
+      // rather than only in its body.
+      "@typescript-eslint/promise-function-async": "error",
+      // [10, 9, 1].sort() sorts lexicographically and yields [1, 10, 9].
+      "@typescript-eslint/require-array-sort-compare": "error",
+      // `{items.length && <Row/>}` renders a literal 0 when the list is
+      // empty, because && evaluates to the number rather than to a
+      // boolean. That single defect is the whole reason for
+      // allowNumber: false.
+      //
+      // allowString is deliberately left at its default of true. The
+      // empty-string case has no equivalent React footgun - "" renders as
+      // nothing - so turning it off would buy a `str !== ""` at every
+      // guard and prevent no defect.
+      "@typescript-eslint/strict-boolean-expressions": [
+        "error",
+        { allowNumber: false },
+      ],
+      // Passing an async function where a void-returning one is expected
+      // discards the promise: a rejection becomes an unhandled one and the
+      // await never happens. Event handlers and useEffect callbacks are
+      // the usual victims.
+      "@typescript-eslint/strict-void-return": "error",
+      // A switch over a union must handle every member, and a `default` is
+      // not accepted as handling them - a default is precisely what stops
+      // the compiler reporting a member added later. On a non-union
+      // switch, where exhaustiveness cannot be checked at all, one is
+      // required instead.
+      "@typescript-eslint/switch-exhaustiveness-check": [
+        "error",
+        {
+          considerDefaultExhaustiveForUnions: false,
+          requireDefaultForNonUnion: true,
+        },
+      ],
+      // Core rule: typescript-eslint ships no extension of it.
+      "no-unused-private-class-members": "error",
+    },
+  },
+  // vitest.setup.ts installs the console guard, and reaches console
+  // through `console as unknown as Record<GuardedMethod, Recorder>` because
+  // console's methods have mutually incompatible signatures and the guard
+  // treats them alike. That double assertion is exactly the shape
+  // no-unsafe-type-assertion exists to find, and here it is deliberate,
+  // commented, and the point of the file. Narrowed to the one file rather
+  // than weakened everywhere.
+  {
+    files: ["vitest.setup.ts"],
+    rules: { "@typescript-eslint/no-unsafe-type-assertion": "off" },
   },
   {
     // React Compiler correctness rules that ship with
@@ -233,6 +424,73 @@ const eslintConfig = defineConfig([
       // Every test sits in a describe, so a failure names the unit.
       "vitest/require-top-level-describe": "error",
     },
+  },
+  // JSON. renovate.json, components.json and .prettierrc.json were being
+  // checked by nothing at all until now - a duplicate key or a stray
+  // trailing comma in any of them was a runtime surprise in whatever tool
+  // reads it.
+  //
+  // package.json is excluded rather than merely ordered before its own
+  // block. eslint-plugin-package-json parses through
+  // languageOptions.parser (jsonc-eslint-parser) instead of declaring a
+  // language, so a block setting language: "json/json" on the same file
+  // wins the language slot, the plugin's rules are handed an AST they do
+  // not recognise, and all fifty-eight of them match nothing and report
+  // nothing. It fails open, silently, which is the trap.
+  {
+    extends: [json.configs.recommended],
+    files: ["**/*.json"],
+    ignores: ["**/package.json", "**/tsconfig.json"],
+    language: "json/json",
+  },
+  // tsconfig.json is read as JSON with Comments by TypeScript itself, and
+  // every other config file in this repo carries comments explaining
+  // itself. Parsing it as strict JSON would make adding one a lint
+  // failure, so it is the one file linted as jsonc.
+  {
+    extends: [json.configs.recommended],
+    files: ["**/tsconfig.json"],
+    language: "json/jsonc",
+  },
+  // package.json, which is the one JSON file here with semantics worth
+  // checking: duplicate dependencies, a dependency listed in two groups,
+  // a malformed version range.
+  //
+  // sort-collections is narrowed to the dependency groups. Its default
+  // also sorts `scripts`, which are ordered by lifecycle here - dev,
+  // build, start, then the checks - and that reads better than
+  // alphabetical. require-description and require-type are off: both
+  // demand new fields in package.json, and this commit adds linting
+  // rather than changing what is being linted. `type` in particular
+  // decides how every .js file in the repo is interpreted, which is a
+  // decision that deserves its own commit rather than arriving as a side
+  // effect of one about ESLint.
+  {
+    extends: [packageJson.configs.recommended],
+    files: ["**/package.json"],
+    rules: {
+      "package-json/require-description": "off",
+      "package-json/require-type": "off",
+      "package-json/sort-collections": [
+        "error",
+        ["dependencies", "devDependencies"],
+      ],
+    },
+  },
+  // YAML, which today means .github/workflows/ci.yml - the file that
+  // decides whether anything else here is checked at all, and the only
+  // one that was not itself checked. flat/prettier last, for the same
+  // reason eslintConfigPrettier is last below.
+  {
+    extends: [yml.configs["flat/standard"], yml.configs["flat/prettier"]],
+    files: ["**/*.{yaml,yml}"],
+  },
+  // `on: pull_request:` with no value is how a workflow subscribes to an
+  // event's default activity types. It is the idiomatic spelling, GitHub
+  // documents it, and no-empty-mapping-value reports every one of them.
+  {
+    files: [".github/workflows/*.{yaml,yml}"],
+    rules: { "yml/no-empty-mapping-value": "off" },
   },
   // Must stay last: switches off any stylistic rule Prettier owns.
   { extends: [eslintConfigPrettier], files: codeFiles },
