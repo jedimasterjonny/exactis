@@ -93,6 +93,11 @@ per call, worded as the guard would have reported it — takes only the running
 test's own output, and clears what it takes so that asserting on it does not
 also fail the test. Called outside a test, it throws.
 
+`vitest.setup.test.ts` holds the guard to all of this. A test that is meant to
+go red cannot assert on its own redness, so it writes fixture suites to a
+temporary directory, runs them under a child Vitest loading the same setup file,
+and reads the child's report.
+
 # Commit hygiene
 
 Conventional Commits. Scope names the config surface touched (`ts`, `lint`,
