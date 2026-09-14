@@ -1,5 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "constraintsFiltering": "strict",
-  "extends": ["config:best-practices", ":pinAllExceptPeerDependencies"]
+  "extends": ["config:best-practices", ":pinAllExceptPeerDependencies"],
+  "commitBody": "Raised by Renovate under the policy in renovate.json: dependencies are pinned, npm\nreleases are held for three days before they are offered, and every commit has to\ninstall from its own lockfile and pass CI on its own before it can land."
 }
