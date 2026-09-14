@@ -3,6 +3,7 @@
     "next-devtools": {
       "command": "bun",
       "args": ["run", "--silent", "mcp:next"]
-    }
+    },
+    "shadcn": { "command": "bun", "args": ["run", "--silent", "mcp:shadcn"] }
   }
 }
