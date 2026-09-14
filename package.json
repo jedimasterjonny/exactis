@@ -44,6 +44,7 @@
     "eslint": "10.10.0",
     "eslint-config-next": "16.3.5",
     "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-better-tailwindcss": "4.7.0",
     "eslint-plugin-jest-dom": "5.10.1",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-package-json": "1.8.1",

@@ -58,6 +58,9 @@ ESLint runs `strictTypeChecked` and `stylisticTypeChecked` at
 - Booleans are prefixed `is`, `should`, `has`, `can`, `did` or `will`; type
   parameters start with `T`; unused bindings need a leading underscore.
 - Every `eslint-disable` needs a `-- reason` description.
+- Tailwind class names are resolved against `src/app/globals.css`. An unknown
+  class, two classes setting the same property, and a class built from string
+  pieces are errors.
 
 JSON and YAML are linted too, so `package.json`, `renovate.json` and the
 workflow are not exempt. knip fails on an unused dependency, export or file.

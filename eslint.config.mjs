@@ -5,6 +5,7 @@ import vitest from "@vitest/eslint-plugin";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import eslintConfigPrettier from "eslint-config-prettier";
+import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 import jestDom from "eslint-plugin-jest-dom";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import packageJson from "eslint-plugin-package-json";
@@ -124,6 +125,31 @@ const eslintConfig = defineConfig([
   // second registration is `ConfigError: Key "plugins": Cannot redefine
   // plugin "jsx-a11y"`, which takes down the whole run.
   { files: ["**/*.tsx"], rules: jsxA11y.flatConfigs.strict.rules },
+  // Tailwind class names, checked against the stylesheet. The Prettier
+  // plugin sorts a class list and drops duplicates but validates nothing,
+  // so `text-cetner` ships as a class no rule matches and the element
+  // renders unstyled without a word. no-unknown-classes resolves every
+  // class through Tailwind itself, from the same entry point the Prettier
+  // plugin reads, so the theme tokens in globals.css and the tw-animate-css
+  // utilities are known and a typo is not. no-conflicting-classes reports
+  // two utilities setting the same property, where the winner is decided
+  // by stylesheet order rather than by the order written.
+  // no-concatenated-classes rejects a class assembled from string pieces,
+  // which Tailwind cannot see at build time any more than this rule can.
+  //
+  // The stylistic set is deliberately absent. Class order, whitespace,
+  // duplicates and line wrapping belong to Prettier, and a second opinion
+  // on them can only agree or fight.
+  {
+    files: ["**/*.{ts,tsx}"],
+    plugins: { "better-tailwindcss": betterTailwindcss },
+    rules: {
+      "better-tailwindcss/no-concatenated-classes": "error",
+      "better-tailwindcss/no-conflicting-classes": "error",
+      "better-tailwindcss/no-unknown-classes": "error",
+    },
+    settings: { "better-tailwindcss": { entryPoint: "src/app/globals.css" } },
+  },
   // Config files sit outside the TypeScript project, so type-aware
   // rules have no program to resolve them against. The whole JavaScript
   // family, not just the two extensions that happen to exist today: a
