@@ -47,7 +47,7 @@ Conventional Commits. Scope names the config surface touched (`ts`, `lint`, `hoo
 
 The pre-commit hook already blocks unformatted, unlinted and mistyped code, and a failing or uncovered test suite, so what matters here is what the hook cannot reach:
 
-- IMPORTANT: never use `--no-verify`.
+- IMPORTANT: never use `--no-verify`. CI runs the same checks on every push and pull request, so bypassing the hook defers the failure rather than avoiding it.
 - `git rebase` does not re-run the hook. After reordering or amending, every commit in the series must still be green, not only the tip.
 - Never suppress a diagnostic to clear a check, and never delete, skip or `.only` a test or loosen an assertion to match behaviour that is broken. A skipped test reports nothing, which is worse than red.
 - Coverage is 100% per file. Reaching it by widening `coverage.exclude` is the same act as deleting a test.

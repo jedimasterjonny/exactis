@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A superseded pull request run answers a question nobody is asking any more.
+# A push is not the same: its run is the only thing that ever looks at those
+# commits, and nothing revisits them, so cancelling one leaves them unchecked.
+concurrency:
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+# Nothing here writes to the repository.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Pinned to digests because renovate.json extends config:best-practices,
+      # which includes helpers:pinGitHubActionDigests. Renovate keeps them
+      # current; the comment is what makes the digest readable.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # commitlint needs the commits a pull request adds, not just its tip.
+          fetch-depth: 0
+          # Nothing here pushes, so there is no reason to leave a token in
+          # .git/config where every later step can read it.
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # Vitest 5 requires >= 22.12. Pinned rather than inherited from the
+          # runner image, so an image bump cannot silently change the version
+          # the suite runs under.
+          node-version: 26
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          # Reads packageManager from package.json, so the version is stated
+          # once and Renovate updates it in one place.
+          bun-version-file: package.json
+
+      - id: install
+        run: bun install --frozen-lockfile
+
+      # Every check runs even after one fails, so a red run reports everything
+      # that is wrong at once. Same reason the pre-commit hook passes
+      # --continue-on-error. A failed install is the exception: without
+      # node_modules each of these fails on a missing binary rather than on
+      # anything it was asked to check, so they are gated on it succeeding.
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bun run format:check
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bun run lint
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bun run typecheck
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bun run test:coverage
+      # Kept alongside typecheck even though next build type checks too: a
+      # type error should fail in seconds rather than after a full build, and
+      # the build catches what tsc alone does not.
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bun run build
+
+      # The commit-msg hook is bypassable with --no-verify. This is not.
+      # The SHAs go through the environment rather than into the command
+      # string, so nothing from the event is interpolated into a shell.
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' &&
+          github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bunx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
