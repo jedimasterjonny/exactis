@@ -1,0 +1,8 @@
+# --hide-unstaged stashes every unstaged change first, so the project-wide
+# `tsc` in lint-staged.config.mts sees the tree exactly as the commit will
+# leave it, rather than a mix of staged and working-tree content. No task
+# writes anything git tracks, so restoring that stash cannot conflict.
+#
+# --continue-on-error reports every failing check in one pass, rather than
+# stopping at the first and making the next one a surprise.
+lint-staged --hide-unstaged --continue-on-error
