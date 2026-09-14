@@ -3,6 +3,10 @@
 # leave it, rather than a mix of staged and working-tree content. No task
 # writes anything git tracks, so restoring that stash cannot conflict.
 #
+# --fail-on-changes makes that last sentence a checked property rather than a
+# claim. If a task ever does rewrite a tracked file, the commit fails and says
+# so, instead of the rewrite being quietly restored over by the stash.
+#
 # --continue-on-error reports every failing check in one pass, rather than
 # stopping at the first and making the next one a surprise.
-lint-staged --hide-unstaged --continue-on-error
+lint-staged --hide-unstaged --fail-on-changes --continue-on-error
