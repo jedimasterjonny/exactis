@@ -33,10 +33,11 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # Vitest 5 requires >= 22.12. Pinned rather than inherited from the
-          # runner image, so an image bump cannot silently change the version
-          # the suite runs under.
-          node-version: 26
+          # Read from .node-version rather than written here, so the version
+          # is stated once and Renovate's nodenv manager updates it in one
+          # place. Pinned rather than inherited from the runner image, so an
+          # image bump cannot silently change the version the suite runs under.
+          node-version-file: .node-version
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           # Reads packageManager from package.json, so the version is stated
@@ -93,7 +94,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 26
+          node-version-file: .node-version
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json

@@ -1,0 +1,11 @@
+# bun silently ignores keys it does not recognise, so a typo here is a setting
+# that quietly never applied. Every key below was confirmed to take effect.
+[install]
+# Write exact versions on `bun add`, matching the :pinAllExceptPeerDependencies
+# intent already declared in renovate.json.
+exact = true
+
+# pnpm-style non-hoisted node_modules: each package sees only what it declares,
+# so an import of a transitive dependency fails here rather than in production
+# after an unrelated upgrade removes it.
+linker = "isolated"
