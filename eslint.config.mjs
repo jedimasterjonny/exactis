@@ -9,14 +9,27 @@ import testingLibrary from "eslint-plugin-testing-library";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
+// Every extension ESLint is handed here, named once. Its own defaults
+// glob .js, .mjs and .cjs; eslint-config-next adds .jsx, .ts, .tsx, .mts
+// and .cts. A block with no `files` applies to every file ESLint visits,
+// which is indistinguishable from this list while the list is all there
+// is, and wrong the moment a config block matches something else.
+const codeFiles = ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"];
+
+// The extensions that can never be in the TypeScript program. tsconfig.json
+// includes .ts, .tsx and .mts, and no JavaScript extension can join them.
+const untypedFiles = ["**/*.{js,jsx,mjs,cjs}"];
+
 const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  ...tseslint.configs.strictTypeChecked,
-  ...tseslint.configs.stylisticTypeChecked,
-  perfectionist.configs["recommended-natural"],
-  eslintComments.recommended,
+  { extends: [nextVitals, nextTs], files: codeFiles },
   {
+    extends: [
+      tseslint.configs.strictTypeChecked,
+      tseslint.configs.stylisticTypeChecked,
+      perfectionist.configs["recommended-natural"],
+      eslintComments.recommended,
+    ],
+    files: codeFiles,
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -25,18 +38,22 @@ const eslintConfig = defineConfig([
     },
   },
   // Config files sit outside the TypeScript project, so type-aware
-  // rules have no program to resolve them against.
+  // rules have no program to resolve them against. The whole JavaScript
+  // family, not just the two extensions that happen to exist today: a
+  // .cjs or .jsx file inherits the TypeScript parser from
+  // typescript-eslint/base and fails to parse at all, because tsconfig.json
+  // will never include it. .cts is deliberately not here - it is
+  // TypeScript, so the answer to one appearing is to add it to
+  // tsconfig.json, and the parse error says exactly that.
+  { extends: [tseslint.configs.disableTypeChecked], files: untypedFiles },
+  // Suppressing a rule must be a deliberate, narrow, justified act.
+  // no-unlimited-disable (from recommended) blocks bare eslint-disable
+  // that switches off every rule at once; this requires each suppression
+  // to state why. ESLint's own reportUnusedDisableDirectives already
+  // covers stale directives, so the plugin's no-unused-disable is left
+  // off as redundant.
   {
-    extends: [tseslint.configs.disableTypeChecked],
-    files: ["**/*.mjs", "**/*.js"],
-  },
-  {
-    // Suppressing a rule must be a deliberate, narrow, justified act.
-    // no-unlimited-disable (from recommended) blocks bare
-    // eslint-disable that switches off every rule at once; this
-    // requires each suppression to state why. ESLint's own
-    // reportUnusedDisableDirectives already covers stale directives,
-    // so the plugin's no-unused-disable is left off as redundant.
+    files: codeFiles,
     rules: { "@eslint-community/eslint-comments/require-description": "error" },
   },
   // Naming, following the upstream typescript-eslint examples. camelCase
@@ -141,6 +158,7 @@ const eslintConfig = defineConfig([
     // Type-only imports must say so, so they are erased at compile time
     // rather than left as a runtime import of a module needed only for
     // its types.
+    files: codeFiles,
     rules: {
       "@typescript-eslint/consistent-type-imports": [
         "error",
@@ -156,6 +174,7 @@ const eslintConfig = defineConfig([
     // Exported functions must state their return type. Inference is fine
     // inside a module, but at a module boundary an accidental change to
     // the inferred type propagates silently to every caller.
+    files: codeFiles,
     rules: {
       "@typescript-eslint/explicit-module-boundary-types": [
         "error",
@@ -216,7 +235,7 @@ const eslintConfig = defineConfig([
     },
   },
   // Must stay last: switches off any stylistic rule Prettier owns.
-  eslintConfigPrettier,
+  { extends: [eslintConfigPrettier], files: codeFiles },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
