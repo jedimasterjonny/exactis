@@ -135,6 +135,24 @@
   --caution: #d3a557; /* ochre-300: ochre-100 is indistinguishable from foreground */
 }
 
+/* The inverse tile sits on the primary surface, ink in light and paper in
+   dark, so inside it the card takes that surface and every token that was
+   tuned for the page swaps to the other theme's value. Contrast-checked
+   like the palette above: each pairing clears AA on its surface. */
+[data-tone="inverse"] {
+  --card: var(--primary);
+  --card-foreground: var(--primary-foreground);
+  --muted-foreground: #b8bdb8;
+  --positive: #8fcfaf;
+  --destructive: #ffa2a2;
+}
+
+.dark [data-tone="inverse"] {
+  --muted-foreground: #6b716d;
+  --positive: #1f6b4f;
+  --destructive: #c10007;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
