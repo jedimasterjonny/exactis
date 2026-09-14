@@ -24,6 +24,10 @@ matters live only in memory — put it here.
   surface and true atomicity.
 - "Accepted" on a review finding means acknowledged and closed. It is not an
   instruction to go and fix it.
+- Work lands by pull request, merged by rebase once both CI jobs are green.
+  Merge and squash commits are disabled in the repository settings. Branch
+  protection is deliberately not used, so CI is the gate and the discipline is
+  the lock.
 - Node is pinned by `.node-version` to 26.8.2, and that file is the only place
   the version is written: both CI jobs read it through `node-version-file`
   rather than naming one, and Renovate's nodenv manager updates it there.
