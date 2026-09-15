@@ -3,6 +3,7 @@ import type { JSX } from "react";
 
 import "./globals.css";
 import { cn } from "cn";
+import { ThemeProvider } from "next-themes";
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 
 import { AppFrame } from "@/components/app-frame";
@@ -38,11 +39,22 @@ export default function RootLayout({
         spaceGrotesk.variable,
       )}
       lang="en"
+      // The theme provider sets the dark class on this element before the
+      // first paint, from a script, so the server's markup and the client's
+      // are allowed to differ in that one attribute.
+      suppressHydrationWarning
     >
       <body>
-        <Toaster>
-          <AppFrame>{children}</AppFrame>
-        </Toaster>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          disableTransitionOnChange
+          enableSystem={false}
+        >
+          <Toaster>
+            <AppFrame>{children}</AppFrame>
+          </Toaster>
+        </ThemeProvider>
       </body>
     </html>
   );
