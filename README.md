@@ -61,8 +61,9 @@ it showing on the terminal:
 read -rs PASSWORD && printf %s "$PASSWORD" | bun run hash-password
 ```
 
-A screen that reads the store sends anyone without a session to `/login`, and
-every server action checks the session again for itself.
+Every route but `/login` sends anyone without a session there, from the proxy,
+and every screen and server action that reads the store checks the session again
+for itself.
 
 ## Deploying
 
