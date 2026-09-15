@@ -14,6 +14,21 @@ describe("Home", () => {
     );
   });
 
+  it("opens the meta line with the plan's state badges", () => {
+    render(<Home />);
+
+    const main = screen.getByRole("main");
+
+    expect(within(main).getByText("On track")).toHaveAttribute(
+      "data-variant",
+      "positive",
+    );
+    expect(within(main).getByText("CMA-derived · Aug 26")).toHaveAttribute(
+      "data-variant",
+      "secondary",
+    );
+  });
+
   it("offers the assumptions action in the header", () => {
     render(<Home />);
 
