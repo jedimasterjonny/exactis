@@ -7,6 +7,7 @@ import { ScreenHeader } from "@/components/screen-header";
 import { StatTile } from "@/components/stat-tile";
 import { Button } from "@/components/ui/button";
 import { points } from "@/data/points";
+import { progress, sectionLabel } from "@/lib/nav";
 
 // Every figure below is the reference kit's invented plan, standing in until
 // there is a projection engine to read from.
@@ -21,7 +22,7 @@ export default function Progress(): JSX.Element {
             Add point
           </Button>
         }
-        label="Sect. IV · Progress"
+        label={sectionLabel(progress)}
         title="Progress points"
       >
         Newest first

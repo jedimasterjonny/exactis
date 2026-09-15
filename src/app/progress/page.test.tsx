@@ -14,6 +14,7 @@ describe("Progress", () => {
     expect(within(main).getByRole("heading", { level: 1 })).toHaveTextContent(
       "Progress points",
     );
+    expect(within(main).getByText("Sect. II · Progress")).toHaveClass("label");
     expect(
       within(main).getByRole("button", { name: "Add point" }),
     ).toBeInTheDocument();
