@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { points } from "@/data/points";
+import { formatGbp } from "@/lib/money";
 
 // The four figure columns, right-aligned mono per the ledger rules. The
 // date column is the row's name and stays in the body face.
@@ -86,7 +87,7 @@ export default function Progress(): JSX.Element {
                   <TableCell>{point.date}</TableCell>
                   {figureColumns.map(([header, key]) => (
                     <TableCell className="text-right figure" key={header}>
-                      {point[key]}
+                      {formatGbp(point[key])}
                     </TableCell>
                   ))}
                 </TableRow>
