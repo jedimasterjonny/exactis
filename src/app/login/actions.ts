@@ -1,0 +1,32 @@
+"use server";
+
+import { redirect } from "next/navigation";
+
+import { readEnv } from "@/lib/env";
+import { verifyPassword } from "@/lib/password";
+import { startSession } from "@/lib/session";
+
+// What the login form shows between attempts: nothing, or why the last
+// one failed.
+export interface LoginState {
+  readonly error?: string;
+}
+
+// Checks the password against the hash the deployment holds and, when it
+// matches, starts the session and goes to the dashboard. A miss says only
+// that it missed. A password is read from the form rather than taken as
+// an argument, so it arrives as the form sent it and nowhere else.
+export async function signIn(
+  _state: LoginState,
+  formData: FormData,
+): Promise<LoginState> {
+  const password = formData.get("password");
+  if (
+    typeof password !== "string" ||
+    !verifyPassword(password, readEnv("APP_PASSWORD_HASH"))
+  ) {
+    return { error: "That is not the password." };
+  }
+  await startSession();
+  redirect("/");
+}
