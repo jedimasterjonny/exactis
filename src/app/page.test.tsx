@@ -14,6 +14,16 @@ describe("Home", () => {
     );
   });
 
+  it("offers the assumptions action in the header", () => {
+    render(<Home />);
+
+    const main = screen.getByRole("main");
+
+    expect(
+      within(main).getByRole("button", { name: "Assumptions" }),
+    ).toBeInTheDocument();
+  });
+
   it("follows the header with the four dashboard tiles", () => {
     render(<Home />);
 
