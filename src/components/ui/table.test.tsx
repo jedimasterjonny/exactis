@@ -43,4 +43,22 @@ describe("Table", () => {
     expect(header).toHaveAttribute("data-slot", "table-header");
     expect(body).toHaveAttribute("data-slot", "table-body");
   });
+
+  it("sets the head as a muted label and leaves rows unhighlighted", () => {
+    render(
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Point</TableHead>
+          </TableRow>
+        </TableHeader>
+      </Table>,
+    );
+
+    expect(screen.getByRole("columnheader")).toHaveClass(
+      "label",
+      "text-muted-foreground",
+    );
+    expect(screen.getByRole("row")).not.toHaveClass("hover:bg-muted/50");
+  });
 });
