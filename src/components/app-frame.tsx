@@ -1,6 +1,7 @@
 import type { JSX, ReactNode } from "react";
 
 import { AppNav } from "@/components/app-nav";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Sidebar,
   SidebarContent,
@@ -36,7 +37,8 @@ export function AppFrame({ children }: AppFrameProps): JSX.Element {
         <SidebarContent className="px-2">
           <AppNav />
         </SidebarContent>
-        <SidebarFooter className="px-4 pb-5">
+        <SidebarFooter className="gap-3 px-4 pb-5">
+          <ThemeToggle />
           {/* The one Latin motto, and the whole of the 40k licence. */}
           <span className="label text-sidebar-foreground/60">
             Certitudo in numeris
