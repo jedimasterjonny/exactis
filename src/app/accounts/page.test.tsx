@@ -1,9 +1,12 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { accounts, assets } from "@/data/accounts";
+import { accounts, isAsset } from "@/data/accounts";
 
 import Accounts from "./page";
+
+const held = accounts.filter((account) => !isAsset(account));
+const assets = accounts.filter(isAsset);
 
 describe("Accounts", () => {
   it("opens with the header, its counts and its action", () => {
@@ -34,7 +37,7 @@ describe("Accounts", () => {
     let panel = screen.getByRole("tabpanel");
     let [, ...rows] = within(panel).getAllByRole("row");
 
-    expect(rows).toHaveLength(accounts.length);
+    expect(rows).toHaveLength(held.length);
     expect(within(panel).getByRole("paragraph")).toHaveTextContent(
       "Allocation is set once at plan level",
     );
