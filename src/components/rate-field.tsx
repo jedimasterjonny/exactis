@@ -5,44 +5,42 @@ import { NumberField } from "@base-ui/react/number-field";
 
 import { Input } from "@/components/ui/input";
 
-interface MoneyFieldProps {
+interface RateFieldProps {
   readonly defaultValue: number;
   readonly hint?: string;
   readonly label: string;
   readonly onValueCommitted?: (value: null | number) => void;
 }
 
-// Whole pounds are formatted by Intl, so the £ and the thousands separators
-// are the field's own and never typed. The value commits on blur, as fields
-// do in the product, and never on the wheel: a balance changing under a
-// scroll is a hazard. Arrow keys step by a hundred, a thousand with shift.
+// A rate is held as a fraction and shown as a percentage to two places,
+// so 0.021 reads 2.10% and a typed 2.1 commits as 0.021: Intl formats the
+// one way and the number field parses the other. The value commits on
+// blur, as fields do in the product. Arrow keys step by a tenth of a
+// point, a whole point with shift.
 const format: Intl.NumberFormatOptions = {
-  currency: "GBP",
-  maximumFractionDigits: 0,
-  style: "currency",
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 2,
+  style: "percent",
 };
 
-// A money input: a micro-label above, a mono right-aligned figure in the
-// input chrome, and a hint beneath that carries the derivation. Base UI's
-// field wires the label and the hint to the input; its number field owns
-// parsing, formatting and stepping. Every money, rate and year value in the
-// product is entered through a number field rather than a text input.
-export function MoneyField({
+// A rate input in the money field's form: a micro-label above, a mono
+// right-aligned figure in the input chrome, and a hint beneath.
+export function RateField({
   defaultValue,
   hint,
   label,
   onValueCommitted,
-}: MoneyFieldProps): JSX.Element {
+}: RateFieldProps): JSX.Element {
   return (
     <Field.Root className="grid content-start gap-1.5">
       <Field.Label className="label text-muted-foreground">{label}</Field.Label>
       <NumberField.Root
         defaultValue={defaultValue}
         format={format}
-        largeStep={1000}
+        largeStep={0.01}
         locale="en-GB"
         onValueCommitted={onValueCommitted}
-        step={100}
+        step={0.001}
       >
         <NumberField.Group>
           <NumberField.Input render={<Input className="text-right figure" />} />
