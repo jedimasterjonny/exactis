@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 
-import { accounts, isAsset } from "@/data/accounts";
+import { isAsset } from "@/data/accounts";
+import { accounts } from "@/data/accounts.fixture";
 
 import { AccountTable } from "./account-table";
 
