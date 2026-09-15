@@ -12,6 +12,7 @@ import { ScreenHeader } from "@/components/screen-header";
 import { StatTile } from "@/components/stat-tile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { dashboard, sectionLabel } from "@/lib/nav";
 
 // Every figure below is the reference kit's invented plan, standing in until
 // there is a projection engine to read from.
@@ -27,7 +28,7 @@ export default function Home(): JSX.Element {
             Assumptions
           </Button>
         }
-        label="Sect. I · Dashboard"
+        label={sectionLabel(dashboard)}
         title="Projected to age 89"
       >
         <Badge variant="positive">

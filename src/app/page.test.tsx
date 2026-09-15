@@ -12,6 +12,7 @@ describe("Home", () => {
     expect(within(main).getByRole("heading", { level: 1 })).toHaveTextContent(
       "Projected to age 89",
     );
+    expect(within(main).getByText("Sect. I · Dashboard")).toHaveClass("label");
   });
 
   it("opens the meta line with the plan's state badges", () => {
