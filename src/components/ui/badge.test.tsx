@@ -14,4 +14,12 @@ describe("Badge", () => {
     expect(badge).toHaveAttribute("data-variant", "default");
     expect(badge).toHaveClass("bg-primary");
   });
+
+  it("takes the positive and caution tones", () => {
+    render(<Badge variant="positive">On track</Badge>);
+    render(<Badge variant="caution">Assumptions stale</Badge>);
+
+    expect(screen.getByText("On track")).toHaveClass("text-positive");
+    expect(screen.getByText("Assumptions stale")).toHaveClass("text-caution");
+  });
 });
