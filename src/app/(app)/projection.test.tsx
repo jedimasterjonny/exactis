@@ -1,0 +1,21 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+import { Projection } from "./projection";
+import { getProjection } from "./store";
+
+vi.mock("./store", () => ({ getProjection: vi.fn() }));
+
+describe("Projection", () => {
+  it("hands the store's projection to the chart", async () => {
+    vi.mocked(getProjection).mockResolvedValue([
+      { age: 34, free: 271930, year: 2026 },
+      { age: 35, free: 285527, year: 2027 },
+    ]);
+
+    render(await Projection());
+
+    expect(screen.getByText("£285,527")).toHaveClass("figure");
+    expect(screen.getByText("in 2027")).toBeInTheDocument();
+  });
+});

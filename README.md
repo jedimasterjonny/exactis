@@ -35,11 +35,11 @@ over Neon's HTTP driver. The schema is `src/db/schema.ts`, the migrations
 generated from it are in `drizzle/`, and the queries are in
 `src/db/accounts.ts`.
 
-The accounts screen reads and writes it; the dashboard and progress screens
-still show the reference kit's figures. `DATABASE_URL` names the database, as
-`.env.example` shows. Nothing reads it until a query runs, so a build needs no
-database. Locally, point it at a Neon branch of your own and apply the
-migrations once:
+The accounts screen reads and writes it, and the dashboard projects what it
+holds; the progress screen still shows the reference kit's figures.
+`DATABASE_URL` names the database, as `.env.example` shows. Nothing reads it
+until a query runs, so a build needs no database. Locally, point it at a Neon
+branch of your own and apply the migrations once:
 
 ```bash
 bun run db:migrate
@@ -49,6 +49,16 @@ A schema change is a new migration, written with `db:generate` and committed
 with the change. The tests apply every migration to an in-process Postgres
 ([PGlite](https://pglite.dev)), so a migration that does not apply fails the
 suite before it reaches a database.
+
+## The projection
+
+The engine is `src/engine/projection.ts`: a pure function over the accounts and
+a plan, giving a point per year to the plan's horizon. So far it carries the
+tax-free balance alone, paid into as the account says and grown at a plan rate
+held as a constant until there is an assumptions screen to set it on. The
+dashboard reads it through `src/app/(app)/store.ts`, a cached read keyed on the
+accounts, so a save on the accounts screen is a new projection on the next
+render.
 
 ## Signing in
 

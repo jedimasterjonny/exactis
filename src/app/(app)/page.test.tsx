@@ -1,7 +1,12 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import Home from "./page";
+
+// The projection reads the store, and is async besides, which a test
+// render cannot resolve; the page's business is where it goes.
+// eslint-disable-next-line @typescript-eslint/naming-convention -- the mock factory's key mirrors the component's name
+vi.mock("./projection", () => ({ Projection: (): string => "The projection" }));
 
 describe("Home", () => {
   it("opens with the dashboard header", () => {
@@ -32,6 +37,12 @@ describe("Home", () => {
     expect(
       screen.getByRole("button", { name: "Assumptions" }),
     ).toBeInTheDocument();
+  });
+
+  it("follows the tiles with the projection", () => {
+    render(<Home />);
+
+    expect(screen.getByText("The projection")).toBeInTheDocument();
   });
 
   it("follows the header with the four dashboard tiles", () => {
