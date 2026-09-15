@@ -1,5 +1,8 @@
 import type { JSX, ReactNode } from "react";
 
+import { LogOut } from "lucide-react";
+
+import { signOut } from "@/app/login/actions";
 import { AppNav } from "@/components/app-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -16,11 +19,13 @@ interface AppFrameProps {
   readonly children: ReactNode;
 }
 
-// The shell every screen sits in: the ink sidebar with the wordmark, the
-// navigation and the motto, and the main column beside it. The inset is
-// the page's one main landmark, so screens render their content directly.
-// On a phone the sidebar is off canvas and a trigger above the screen
-// opens it as a sheet.
+// The shell every signed-in screen sits in: the ink sidebar with the
+// wordmark, the navigation, the theme toggle, sign-out and the motto, and
+// the main column beside it. The inset is the page's one main landmark, so
+// screens render their content directly. On a phone the sidebar is off
+// canvas and a trigger above the screen opens it as a sheet. Sign-out is a
+// form posting to its action, so it works before the page hydrates and
+// needs no client code of its own.
 export function AppFrame({ children }: AppFrameProps): JSX.Element {
   return (
     <SidebarProvider>
@@ -39,6 +44,15 @@ export function AppFrame({ children }: AppFrameProps): JSX.Element {
         </SidebarContent>
         <SidebarFooter className="gap-3 px-4 pb-5">
           <ThemeToggle />
+          <form action={signOut} aria-label="Sign out">
+            <button
+              className="flex h-8 w-full items-center gap-2 label text-sidebar-foreground/60 transition-colors hover:text-sidebar-foreground focus-visible:text-sidebar-foreground focus-visible:outline-none"
+              type="submit"
+            >
+              <LogOut aria-hidden className="size-3.5" />
+              Sign out
+            </button>
+          </form>
           {/* The one Latin motto, and the whole of the 40k licence. */}
           <span className="label text-sidebar-foreground/60">
             Certitudo in numeris

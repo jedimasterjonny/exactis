@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { readEnv } from "@/lib/env";
 import { verifyPassword } from "@/lib/password";
-import { startSession } from "@/lib/session";
+import { endSession, startSession } from "@/lib/session";
 
 // What the login form shows between attempts: nothing, or why the last
 // one failed.
@@ -29,4 +29,11 @@ export async function signIn(
   }
   await startSession();
   redirect("/");
+}
+
+// Ends the session and goes to the login screen. Posted from the sidebar,
+// so it takes the form's data and reads none of it.
+export async function signOut(): Promise<void> {
+  await endSession();
+  redirect("/login");
 }
