@@ -22,7 +22,7 @@ describe("getProjection", () => {
 
   it("runs the engine over the store's accounts from this year, given a life", async () => {
     vi.useFakeTimers({ now: new Date("2026-09-15T12:00:00Z") });
-    const points = [{ age: 34, free: 271930, year: 2026 }];
+    const points = [{ age: 34, deferred: 391640, free: 271930, year: 2026 }];
     vi.mocked(getAccounts).mockResolvedValue([...accounts]);
     vi.mocked(project).mockReturnValue(points);
 

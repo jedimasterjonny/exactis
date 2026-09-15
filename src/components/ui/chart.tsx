@@ -6,10 +6,17 @@ import * as RechartsPrimitive from "recharts";
 
 const INITIAL_DIMENSION = { height: 200, width: 320 } as const;
 
-// The chart's series by key, each with the colour its marks take. The
-// colour is any CSS value, so a series names a theme token and follows
-// the theme without the chart knowing which it is in.
-type ChartConfig = Record<string, { color: string }>;
+// The chart's series by key, each with the colour its marks take and the
+// name the legend shows for it. The colour is any CSS value, so a series
+// names a theme token and follows the theme without the chart knowing
+// which it is in.
+type ChartConfig = Record<string, { color: string; label?: React.ReactNode }>;
+
+interface ChartContextProps {
+  config: ChartConfig;
+}
+
+const ChartContext = React.createContext<ChartContextProps | null>(null);
 
 function ChartContainer({
   children,
@@ -29,22 +36,24 @@ function ChartContainer({
   const chartId = `chart-${id ?? uniqueId}`;
 
   return (
-    <div
-      className={cn(
-        "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
-        className,
-      )}
-      data-chart={chartId}
-      data-slot="chart"
-      {...props}
-    >
-      <ChartStyle config={config} id={chartId} />
-      <RechartsPrimitive.ResponsiveContainer
-        initialDimension={initialDimension}
+    <ChartContext value={{ config }}>
+      <div
+        className={cn(
+          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
+          className,
+        )}
+        data-chart={chartId}
+        data-slot="chart"
+        {...props}
       >
-        {children}
-      </RechartsPrimitive.ResponsiveContainer>
-    </div>
+        <ChartStyle config={config} id={chartId} />
+        <RechartsPrimitive.ResponsiveContainer
+          initialDimension={initialDimension}
+        >
+          {children}
+        </RechartsPrimitive.ResponsiveContainer>
+      </div>
+    </ChartContext>
   );
 }
 
@@ -74,6 +83,69 @@ function ChartStyle({
   );
 }
 
+function useChart(): ChartContextProps {
+  const context = React.use(ChartContext);
+
+  if (context === null) {
+    throw new Error("useChart must be used within a <ChartContainer />");
+  }
+
+  return context;
+}
+
 const ChartTooltip = RechartsPrimitive.Tooltip;
 
-export { ChartContainer, ChartTooltip };
+const ChartLegend = RechartsPrimitive.Legend;
+
+// Each series the chart drew, keyed by a swatch of its colour and named
+// from the config. A series' key is its data key unless a name key is
+// given, and one drawn with no legend type is left out.
+function ChartLegendContent({
+  className,
+  nameKey,
+  payload,
+  verticalAlign = "bottom",
+}: React.ComponentProps<"div"> &
+  RechartsPrimitive.DefaultLegendContentProps & {
+    nameKey?: string;
+  }): null | React.JSX.Element {
+  const { config } = useChart();
+
+  if (payload === undefined || payload.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center gap-4",
+        verticalAlign === "top" ? "pb-3" : "pt-3",
+        className,
+      )}
+      data-slot="chart-legend"
+    >
+      {payload
+        .filter((item) => item.type !== "none")
+        .map((item) => {
+          const key =
+            nameKey ??
+            (typeof item.dataKey === "string" ? item.dataKey : "value");
+
+          return (
+            <div
+              className="flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground"
+              key={key}
+            >
+              <div
+                className="h-2 w-2 shrink-0 rounded-[2px]"
+                style={{ backgroundColor: item.color }}
+              />
+              {config[key]?.label}
+            </div>
+          );
+        })}
+    </div>
+  );
+}
+
+export { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip };

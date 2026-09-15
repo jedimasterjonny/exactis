@@ -1,4 +1,4 @@
-import type { Account } from "@/data/accounts";
+import type { Account, AccountKind } from "@/data/accounts";
 
 // What the projection runs on: the rate every account on the plan rate
 // grows at, the first year plotted, which holds today's balances, how
@@ -15,28 +15,40 @@ export interface Plan {
 // it, whole pounds, under the name the progress point gives the same
 // balance, so a point recorded and a point projected can be laid over
 // each other, and the age reached that year, since a plan is read by
-// age as much as by year. Only the tax-free balance is projected yet.
+// age as much as by year. The two wrappers are projected yet, each
+// summed over its accounts.
 export interface ProjectionPoint {
   readonly age: number;
+  readonly deferred: number;
   readonly free: number;
   readonly year: number;
+}
+
+// An account and the balance the projection has carried it to.
+interface Held {
+  readonly account: Account;
+  readonly balance: number;
 }
 
 // The plan's years, the first holding the balances as they are and each
 // after it a year on: what the account is paid, then growth at its rate,
 // a fixed one or the plan's. Each account is carried on its own and the
-// year sums them. Nothing is drawn out or taxed yet.
+// year sums them by wrapper. Nothing is drawn out or taxed yet.
 export function project(
   accounts: readonly Account[],
   plan: Plan,
 ): ProjectionPoint[] {
-  let held = accounts
-    .filter((account) => account.kind === "tax-free")
+  let held: readonly Held[] = accounts
+    .filter(
+      (account) =>
+        account.kind === "tax-free" || account.kind === "tax-deferred",
+    )
     .map((account) => ({ account, balance: account.balance }));
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const point = {
       age: plan.from + offset - plan.born,
-      free: Math.round(held.reduce((sum, { balance }) => sum + balance, 0)),
+      deferred: total(held, "tax-deferred"),
+      free: total(held, "tax-free"),
       year: plan.from + offset,
     };
     held = held.map(({ account, balance }) => ({
@@ -81,4 +93,13 @@ function rateOf(account: Account, plan: Plan): number {
     case "plan":
       return plan.rate;
   }
+}
+
+// The wrapper's balance this year, whole pounds.
+function total(held: readonly Held[], kind: AccountKind): number {
+  return Math.round(
+    held
+      .filter(({ account }) => account.kind === kind)
+      .reduce((sum, { balance }) => sum + balance, 0),
+  );
 }
