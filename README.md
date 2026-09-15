@@ -64,5 +64,18 @@ read -rs PASSWORD && printf %s "$PASSWORD" | bun run hash-password
 A screen that reads the store sends anyone without a session to `/login`, and
 every server action checks the session again for itself.
 
+## Deploying
+
+The app is built for Vercel with Neon behind it. Adding Neon from the Vercel
+Marketplace sets `DATABASE_URL` on the project; `SESSION_PASSWORD` and
+`APP_PASSWORD_HASH` are set by hand, as `.env.example` describes. A build needs
+none of the three. The migrations are applied from a terminal with the
+production URL in `DATABASE_URL`, before the first deploy that reads the store
+and after any deploy that adds a migration:
+
+```bash
+bun run db:migrate
+```
+
 [AGENTS.md](AGENTS.md) is the source of truth for how work is done here: code
 style, commit rules, and what has to be green before anything lands.
