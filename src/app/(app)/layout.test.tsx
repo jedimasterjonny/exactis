@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import AppLayout from "./layout";
 
 vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
+vi.mock("@/app/login/actions", () => ({ signOut: vi.fn() }));
 
 describe("AppLayout", () => {
   afterEach(() => {
