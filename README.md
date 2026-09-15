@@ -66,6 +66,12 @@ and every screen and server action that reads the store checks the session again
 for itself. Sign out is at the foot of the sidebar; it ends the session and
 returns to `/login`.
 
+For development, `APP_DEV_SIGN_IN=1` in `.env.local` adds a second button to the
+login screen that starts a session with no password asked, so an agent that
+types no credentials can drive the app. It is read only outside a production
+build, so it does nothing on Vercel, and the action behind it refuses a post at
+a closed door rather than reporting a miss.
+
 ## Deploying
 
 The app is built for Vercel with Neon behind it. Adding Neon from the Vercel
