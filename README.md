@@ -63,7 +63,8 @@ read -rs PASSWORD && printf %s "$PASSWORD" | bun run hash-password
 
 Every route but `/login` sends anyone without a session there, from the proxy,
 and every screen and server action that reads the store checks the session again
-for itself.
+for itself. Sign out is at the foot of the sidebar; it ends the session and
+returns to `/login`.
 
 ## Deploying
 

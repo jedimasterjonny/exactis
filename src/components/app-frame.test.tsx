@@ -1,9 +1,12 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { signOut } from "@/app/login/actions";
 
 import { AppFrame } from "./app-frame";
 
 vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
+vi.mock("@/app/login/actions", () => ({ signOut: vi.fn() }));
 
 // jsdom has no matchMedia, and the sidebar's mobile hook reads the viewport.
 function stubViewport(width: number): void {
@@ -44,5 +47,24 @@ describe("AppFrame", () => {
       screen.getByRole("switch", { name: "Daylight" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Certitudo in numeris")).toHaveClass("label");
+  });
+
+  it("offers sign-out as a form posting to its action", () => {
+    stubViewport(1024);
+    render(
+      <AppFrame>
+        <p>Screen</p>
+      </AppFrame>,
+    );
+
+    const form = screen.getByRole("form", { name: "Sign out" });
+    const button = within(form).getByRole("button", { name: "Sign out" });
+
+    expect(button).toHaveAttribute("type", "submit");
+    expect(button).toHaveClass("label");
+
+    fireEvent.click(button);
+
+    expect(signOut).toHaveBeenCalledOnce();
   });
 });

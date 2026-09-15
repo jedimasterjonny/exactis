@@ -2,12 +2,15 @@ import { redirect } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { hashPassword } from "@/lib/password";
-import { startSession } from "@/lib/session";
+import { endSession, startSession } from "@/lib/session";
 
-import { signIn } from "./actions";
+import { signIn, signOut } from "./actions";
 
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
-vi.mock("@/lib/session", () => ({ startSession: vi.fn() }));
+vi.mock("@/lib/session", () => ({
+  endSession: vi.fn(),
+  startSession: vi.fn(),
+}));
 
 function form(password?: string): FormData {
   const data = new FormData();
@@ -42,5 +45,17 @@ describe("signIn", () => {
     );
     expect(startSession).toHaveBeenCalledOnce();
     expect(redirect).toHaveBeenCalledExactlyOnceWith("/");
+  });
+});
+
+describe("signOut", () => {
+  it("ends the session and goes to the login screen", async () => {
+    vi.mocked(redirect).mockImplementation(() => {
+      throw new Error("redirected");
+    });
+
+    await expect(signOut()).rejects.toThrow("redirected");
+    expect(endSession).toHaveBeenCalledOnce();
+    expect(redirect).toHaveBeenCalledExactlyOnceWith("/login");
   });
 });
