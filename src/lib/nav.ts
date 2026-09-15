@@ -31,5 +31,10 @@ export const screens: readonly Screen[] = [dashboard, progress];
 
 // The label every screen header opens with, "Sect. II · Progress".
 export function sectionLabel(screen: Screen): string {
-  return `Sect. ${toRoman(screens.indexOf(screen) + 1)} · ${screen.label}`;
+  return `Sect. ${sectionNumeral(screen)} · ${screen.label}`;
+}
+
+// The screen's numeral alone, as the navigation shows it beside the label.
+export function sectionNumeral(screen: Screen): string {
+  return toRoman(screens.indexOf(screen) + 1);
 }
