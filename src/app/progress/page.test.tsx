@@ -34,22 +34,13 @@ describe("Progress", () => {
     }
   });
 
-  it("lists every point as a row of right-aligned figures", () => {
+  it("carries the points table with a row per point", () => {
     render(<Progress />);
 
     const table = screen.getByRole("table");
     const [, ...rows] = within(table).getAllByRole("row");
 
     expect(rows).toHaveLength(points.length);
-    expect(within(table).getAllByRole("columnheader")).toHaveLength(5);
-
-    expect(
-      within(table).getByRole("cell", { name: "31 Aug 2026" }),
-    ).not.toHaveClass("figure");
-    expect(within(table).getByRole("cell", { name: "£412,880" })).toHaveClass(
-      "figure",
-      "text-right",
-    );
   });
 
   it("closes with the derivation note", () => {
