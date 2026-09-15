@@ -86,10 +86,26 @@ imported. A test that asserts nothing fails, and test order is shuffled.
 
 # Commit hygiene
 
-Conventional Commits. Scope names the config surface touched (`ts`, `lint`,
-`hooks`) and is omitted for repo-wide changes or a new standalone tool.
-commitlint checks the type, the subject and the header length; the scope
-convention is not machine-enforced.
+Conventional Commits, and every commit carries a scope. A bare `type:` header
+does not appear in this history and should not be the first.
+
+The scope names the surface touched, not the reason for the change: `ts`,
+`lint`, `hooks`, `format`, `deps`, `workflow` for the config files, `ui`,
+`theme`, `accounts`, `auth`, `projection` for the app. The vocabulary is
+open-ended and grows with the codebase, so a commit touching a surface none of
+the existing names cover brings a new one. What it must not do is give a surface
+a second spelling, because then neither name finds the whole story. Read the
+vocabulary back off the history before inventing a name.
+
+The type states the kind of change, and it is read against the diff rather than
+against the subject. A `docs:` commit that edits source, a `style:` one that
+changes behaviour, a `feat:` one that only moves code: each took its type from
+what the commit was about rather than from what it did, and each is usually a
+commit that should have been two.
+
+commitlint checks the type, the subject, the body and the header length, and
+rejects an upper-case scope. That a scope is there at all, and that the type and
+the scope are the right ones, is not machine-enforced.
 
 - One decision per commit. Split scaffolding from the deliberate change layered
   on top.
