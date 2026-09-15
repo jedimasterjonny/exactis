@@ -6,7 +6,6 @@ import { cn } from "cn";
 import { ThemeProvider } from "next-themes";
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 
-import { AppFrame } from "@/components/app-frame";
 import { Toaster } from "@/components/ui/toast";
 
 // Space Grotesk for headings only, Geist for body and UI text, Geist Mono
@@ -51,9 +50,7 @@ export default function RootLayout({
           disableTransitionOnChange
           enableSystem={false}
         >
-          <Toaster>
-            <AppFrame>{children}</AppFrame>
-          </Toaster>
+          <Toaster>{children}</Toaster>
         </ThemeProvider>
       </body>
     </html>
