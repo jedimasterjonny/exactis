@@ -31,10 +31,11 @@ interface AccountLedgerProps {
   readonly accounts: readonly Account[];
 }
 
-// What the entry dialog holds while it is open. Flatter than an account:
-// a contribution of nothing is a zero rather than an absence, and the rate
-// sits beside the growth choice, reset to nothing when the choice changes,
-// so the rate field always mounts showing what the draft holds.
+// What the dialog holds while it is open. Flatter than an account: a
+// contribution of nothing is a zero rather than an absence, and the rate
+// sits beside the growth choice, reset to what it opened with when the
+// choice changes, so the rate field always mounts showing what the draft
+// holds.
 interface Draft {
   readonly balance: number;
   readonly cadence: Cadence;
@@ -43,6 +44,15 @@ interface Draft {
   readonly kind: AccountKind;
   readonly name: string;
   readonly rate: number;
+}
+
+// An open dialog: the draft as it is, the draft as it opened, which the
+// uncontrolled fields take as their defaults, and the row it edits, or
+// null for a new account.
+interface Entry {
+  readonly draft: Draft;
+  readonly index: null | number;
+  readonly initial: Draft;
 }
 
 type Figure = "balance" | "contribution" | "rate";
@@ -79,44 +89,63 @@ const kinds = [
   { label: "Debt", value: "debt" },
 ] as const;
 
-// The accounts screen's ledger and its entry. Rows live in state and a
-// saved entry appends to them, so the tables reflect it until reload; a
-// store replaces the state when there is one. The draft doubles as the
-// dialog's open state, as the progress editor's point does, and the tab is
-// controlled so a saved account can bring its own tab forward. The fields
-// are uncontrolled and mount fresh with the blank draft's values each time
-// the dialog opens, and the draft mirrors what they report.
+// The accounts screen's ledger and its dialog, which enters a new account
+// from the header's button or edits one from its row. Rows live in state
+// and a save appends or writes back, so the tables reflect it until
+// reload; a store replaces the state when there is one. The entry doubles
+// as the dialog's open state, as the progress editor's point does, and the
+// tab is controlled so a saved account can bring its own tab forward. The
+// fields are uncontrolled and mount fresh with the entry's opening values
+// each time the dialog opens, and the draft mirrors what they report.
 export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   const [rows, setRows] = useState(accounts);
   const [tab, setTab] = useState<Tab>("accounts");
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [entry, setEntry] = useState<Entry | null>(null);
   const held = rows.filter((row) => !isAsset(row));
   const assets = rows.filter(isAsset);
 
-  // The dialog opens only from the header's button, so the only change it
-  // can report is a close: Cancel, Escape or a press outside.
+  function amend(current: Entry, patch: Partial<Draft>): void {
+    setEntry({ ...current, draft: { ...current.draft, ...patch } });
+  }
+
+  // The dialog opens only from a button, so the only change it can report
+  // is a close: Cancel, Escape or a press outside.
   function dismiss(): void {
-    setDraft(null);
+    setEntry(null);
+  }
+
+  // A row's pencil opens its account as it is, with its place in the rows
+  // so a save writes back to it.
+  function edit(account: Account): void {
+    open(toDraft(account), rows.indexOf(account));
   }
 
   // A figure field commits null when cleared, and a cleared figure is
   // left as it was rather than written as nothing.
-  function figure(current: Draft, key: Figure): (value: null | number) => void {
+  function figure(current: Entry, key: Figure): (value: null | number) => void {
     return (value) => {
       if (value !== null) {
-        setDraft({ ...current, [key]: value });
+        amend(current, { [key]: value });
       }
     };
   }
 
-  function save(current: Draft): void {
-    const account = toAccount(current);
-    setRows([...rows, account]);
+  function open(draft: Draft, index: null | number): void {
+    setEntry({ draft, index, initial: draft });
+  }
+
+  function save(current: Entry): void {
+    const account = toAccount(current.draft);
+    setRows(
+      current.index === null
+        ? [...rows, account]
+        : rows.map((row, index) => (index === current.index ? account : row)),
+    );
     setTab(isAsset(account) ? "assets" : "accounts");
-    setDraft(null);
+    setEntry(null);
     toast.add({
       description: account.name,
-      title: "Account added",
+      title: current.index === null ? "Account added" : "Account updated",
       type: "success",
     });
   }
@@ -127,7 +156,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
         actions={
           <Button
             onClick={() => {
-              setDraft(blank);
+              open(blank, null);
             }}
             size="sm"
           >
@@ -158,14 +187,14 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
             </TabsTrigger>
           </TabsList>
           <TabsContent className="grid gap-5" value="accounts">
-            <AccountTable accounts={held} />
+            <AccountTable accounts={held} onEdit={edit} />
             <Note>
               Allocation is set once at plan level and applied pro rata to every
               account.
             </Note>
           </TabsContent>
           <TabsContent className="grid gap-5" value="assets">
-            <AccountTable accounts={assets} />
+            <AccountTable accounts={assets} onEdit={edit} />
             <Note>
               A loan is listed against the asset it secures. The progress points
               reconcile the two as total assets and asset loans.
@@ -173,71 +202,74 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
           </TabsContent>
         </Tabs>
       </div>
-      <Dialog onOpenChange={dismiss} open={draft !== null}>
-        {draft !== null && (
+      <Dialog onOpenChange={dismiss} open={entry !== null}>
+        {entry !== null && (
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <span className="label text-brand">New account</span>
+              <span className="label text-brand">
+                {entry.index === null ? "New account" : "Edit account"}
+              </span>
               <DialogTitle>
-                {draft.name.trim() || "Untitled account"}
+                {entry.draft.name.trim() || "Untitled account"}
               </DialogTitle>
             </DialogHeader>
             <div className="grid gap-4">
               <div className="grid grid-cols-[1.4fr_1fr] gap-4">
                 <TextField
+                  defaultValue={entry.initial.name}
                   label="Name"
                   onValueChange={(name) => {
-                    setDraft({ ...draft, name });
+                    amend(entry, { name });
                   }}
                   placeholder="Lifetime ISA, car, loan…"
                 />
                 <SelectField
-                  defaultValue={blank.kind}
+                  defaultValue={entry.initial.kind}
                   label="Treatment"
                   onValueChange={(kind) => {
-                    setDraft({ ...draft, kind });
+                    amend(entry, { kind });
                   }}
                   options={kinds}
                 />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <MoneyField
-                  defaultValue={blank.balance}
+                  defaultValue={entry.initial.balance}
                   hint="A debt's is negative"
                   label="Balance"
-                  onValueCommitted={figure(draft, "balance")}
+                  onValueCommitted={figure(entry, "balance")}
                 />
                 <MoneyField
-                  defaultValue={blank.contribution}
+                  defaultValue={entry.initial.contribution}
                   hint="Leave at nothing for none"
                   label="Contribution"
-                  onValueCommitted={figure(draft, "contribution")}
+                  onValueCommitted={figure(entry, "contribution")}
                 />
                 <SelectField
-                  defaultValue={blank.cadence}
+                  defaultValue={entry.initial.cadence}
                   label="Cadence"
                   onValueChange={(cadence) => {
-                    setDraft({ ...draft, cadence });
+                    amend(entry, { cadence });
                   }}
                   options={cadences}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <SelectField
-                  defaultValue={blank.growth}
+                  defaultValue={entry.initial.growth}
                   hint="The plan rate is set on the assumptions screen"
                   label="Growth"
                   onValueChange={(growth) => {
-                    setDraft({ ...draft, growth, rate: blank.rate });
+                    amend(entry, { growth, rate: entry.initial.rate });
                   }}
                   options={growths}
                 />
-                {draft.growth === "fixed" && (
+                {entry.draft.growth === "fixed" && (
                   <RateField
-                    defaultValue={blank.rate}
+                    defaultValue={entry.initial.rate}
                     hint="Nominal, a year"
                     label="Rate"
-                    onValueCommitted={figure(draft, "rate")}
+                    onValueCommitted={figure(entry, "rate")}
                   />
                 )}
               </div>
@@ -247,9 +279,9 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
                 Cancel
               </DialogClose>
               <Button
-                disabled={draft.name.trim() === ""}
+                disabled={entry.draft.name.trim() === ""}
                 onClick={() => {
-                  save(draft);
+                  save(entry);
                 }}
                 size="sm"
               >
@@ -294,5 +326,19 @@ function toAccount(draft: Draft): Account {
         : { kind: "fixed", rate: draft.rate },
     kind: draft.kind,
     name: draft.name.trim(),
+  };
+}
+
+// The reverse, for a row being edited: an absent contribution opens as
+// nothing at the blank cadence, and a plan rate opens with no rate.
+function toDraft(account: Account): Draft {
+  return {
+    balance: account.balance,
+    cadence: account.contribution?.cadence ?? blank.cadence,
+    contribution: account.contribution?.amount ?? blank.contribution,
+    growth: account.growth.kind,
+    kind: account.kind,
+    name: account.name,
+    rate: account.growth.kind === "fixed" ? account.growth.rate : blank.rate,
   };
 }

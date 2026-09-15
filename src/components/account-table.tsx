@@ -1,5 +1,7 @@
 import type { JSX } from "react";
 
+import { Pencil } from "lucide-react";
+
 import type {
   Account,
   AccountKind,
@@ -9,6 +11,7 @@ import type {
 } from "@/data/accounts";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   Table,
@@ -22,6 +25,7 @@ import { formatGbp } from "@/lib/money";
 
 interface AccountTableProps {
   readonly accounts: readonly Account[];
+  readonly onEdit?: (account: Account, index: number) => void;
 }
 
 type Treatment = "destructive" | "secondary";
@@ -49,9 +53,13 @@ const treatments: Record<
 };
 
 // A ledger of accounts: the name and its balance carry the weight, the
-// treatment is a badge, and the three figures are right-aligned mono. The
-// edit column, the row click and the dialog they open wait for the dialog.
-export function AccountTable({ accounts }: AccountTableProps): JSX.Element {
+// treatment is a badge, and the three figures are right-aligned mono. A
+// table given an edit handler closes each row with a pencil that reports
+// the row and its place, so the caller can write back to it.
+export function AccountTable({
+  accounts,
+  onEdit,
+}: AccountTableProps): JSX.Element {
   return (
     <Card className="py-0">
       <Table className="[&_td]:px-4 [&_th]:px-4">
@@ -62,10 +70,15 @@ export function AccountTable({ accounts }: AccountTableProps): JSX.Element {
             <TableHead className="text-right">Contribution</TableHead>
             <TableHead className="text-right">Growth</TableHead>
             <TableHead className="text-right">Balance</TableHead>
+            {onEdit !== undefined && (
+              <TableHead className="w-0">
+                <span className="sr-only">Edit</span>
+              </TableHead>
+            )}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {accounts.map((account) => (
+          {accounts.map((account, index) => (
             <TableRow key={account.name}>
               <TableCell className="font-medium">{account.name}</TableCell>
               <TableCell>
@@ -82,6 +95,20 @@ export function AccountTable({ accounts }: AccountTableProps): JSX.Element {
               <TableCell className="text-right figure font-medium">
                 {formatGbp(account.balance)}
               </TableCell>
+              {onEdit !== undefined && (
+                <TableCell className="py-1">
+                  <Button
+                    aria-label={`Edit ${account.name}`}
+                    onClick={() => {
+                      onEdit(account, index);
+                    }}
+                    size="icon-sm"
+                    variant="ghost"
+                  >
+                    <Pencil aria-hidden />
+                  </Button>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
