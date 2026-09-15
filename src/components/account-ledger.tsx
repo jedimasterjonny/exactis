@@ -7,7 +7,7 @@ import { startTransition, useState, useTransition } from "react";
 
 import type { Account, AccountValues } from "@/data/accounts";
 
-import { saveAccount } from "@/app/accounts/actions";
+import { saveAccount } from "@/app/(app)/accounts/actions";
 import { AccountTable } from "@/components/account-table";
 import { MoneyField } from "@/components/money-field";
 import { RateField } from "@/components/rate-field";
