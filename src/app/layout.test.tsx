@@ -17,6 +17,10 @@ vi.mock("next/font/google", () => {
 });
 /* eslint-enable @typescript-eslint/naming-convention -- the exported names end with the factory */
 
+// The frame's navigation reads the pathname, which only the app router
+// provides.
+vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
+
 describe("RootLayout", () => {
   // Rendered to a string rather than into jsdom: a root layout emits a whole
   // document, and mounting <html> inside a container div is invalid nesting

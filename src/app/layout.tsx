@@ -5,6 +5,7 @@ import "./globals.css";
 import { cn } from "cn";
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 
+import { AppFrame } from "@/components/app-frame";
 import { Toaster } from "@/components/ui/toast";
 
 // Space Grotesk for headings only, Geist for body and UI text, Geist Mono
@@ -39,7 +40,9 @@ export default function RootLayout({
       lang="en"
     >
       <body>
-        <Toaster>{children}</Toaster>
+        <Toaster>
+          <AppFrame>{children}</AppFrame>
+        </Toaster>
       </body>
     </html>
   );

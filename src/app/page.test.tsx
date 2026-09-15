@@ -1,30 +1,26 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import Home from "./page";
 
 describe("Home", () => {
-  it("opens with the dashboard header inside the main landmark", () => {
+  it("opens with the dashboard header", () => {
     render(<Home />);
 
-    const main = screen.getByRole("main");
-
-    expect(within(main).getByRole("heading", { level: 1 })).toHaveTextContent(
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Projected to age 89",
     );
-    expect(within(main).getByText("Sect. I · Dashboard")).toHaveClass("label");
+    expect(screen.getByText("Sect. I · Dashboard")).toHaveClass("label");
   });
 
   it("opens the meta line with the plan's state badges", () => {
     render(<Home />);
 
-    const main = screen.getByRole("main");
-
-    expect(within(main).getByText("On track")).toHaveAttribute(
+    expect(screen.getByText("On track")).toHaveAttribute(
       "data-variant",
       "positive",
     );
-    expect(within(main).getByText("CMA-derived · Aug 26")).toHaveAttribute(
+    expect(screen.getByText("CMA-derived · Aug 26")).toHaveAttribute(
       "data-variant",
       "secondary",
     );
@@ -33,17 +29,13 @@ describe("Home", () => {
   it("offers the assumptions action in the header", () => {
     render(<Home />);
 
-    const main = screen.getByRole("main");
-
     expect(
-      within(main).getByRole("button", { name: "Assumptions" }),
+      screen.getByRole("button", { name: "Assumptions" }),
     ).toBeInTheDocument();
   });
 
   it("follows the header with the four dashboard tiles", () => {
     render(<Home />);
-
-    const main = screen.getByRole("main");
 
     for (const label of [
       "Retirement",
@@ -51,7 +43,7 @@ describe("Home", () => {
       "Chance of success",
       "Net legacy",
     ]) {
-      expect(within(main).getByText(label)).toBeInTheDocument();
+      expect(screen.getByText(label)).toBeInTheDocument();
     }
   });
 });

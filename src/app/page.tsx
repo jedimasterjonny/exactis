@@ -18,7 +18,7 @@ import { dashboard, sectionLabel } from "@/lib/nav";
 // there is a projection engine to read from.
 export default function Home(): JSX.Element {
   return (
-    <main>
+    <>
       <ScreenHeader
         // The assumptions route does not exist yet, and typed routes reject
         // a link to a missing one, so the button gets its href with that route.
@@ -69,6 +69,6 @@ export default function Home(): JSX.Element {
           value="£1,771,204"
         />
       </div>
-    </main>
+    </>
   );
 }
