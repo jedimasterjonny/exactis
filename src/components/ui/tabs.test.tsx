@@ -49,7 +49,14 @@ describe("Tabs", () => {
       </Tabs>,
     );
 
-    expect(screen.getByRole("tablist")).toHaveAttribute("data-variant", "line");
+    const list = screen.getByRole("tablist");
+
+    expect(list).toHaveAttribute("data-variant", "line");
+    expect(list).toHaveClass(
+      "data-[variant=line]:w-full",
+      "data-[variant=line]:border-b",
+    );
+    expect(screen.getByRole("tab")).toHaveClass("after:bg-brand");
     expect(screen.getByTestId("tabs")).toHaveAttribute(
       "data-orientation",
       "vertical",
