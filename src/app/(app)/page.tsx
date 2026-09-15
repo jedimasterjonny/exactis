@@ -7,15 +7,21 @@ import {
   ScrollText,
   SlidersHorizontal,
 } from "lucide-react";
+import { Suspense } from "react";
 
+import { ProjectionPending } from "@/components/projection-chart";
 import { ScreenHeader } from "@/components/screen-header";
 import { StatTile } from "@/components/stat-tile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { dashboard, sectionLabel } from "@/lib/nav";
 
-// Every figure below is the reference kit's invented plan, standing in until
-// there is a projection engine to read from.
+import { Projection } from "./projection";
+
+// The header and the tiles are the reference kit's invented plan, standing
+// in until the engine projects what they show. The chart beneath them is
+// the engine's, and streams in behind them, so the frame is served as it
+// is while the store is read.
 export default function Home(): JSX.Element {
   return (
     <>
@@ -38,36 +44,41 @@ export default function Home(): JSX.Element {
         <Badge variant="secondary">CMA-derived · Aug 26</Badge>
         {"Figures in today's money"}
       </ScreenHeader>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-4 p-8">
-        <StatTile
-          caption="Last working year 58"
-          icon={Flag}
-          label="Retirement"
-          tone="inverse"
-          unit="yrs"
-          value="59"
-        />
-        <StatTile
-          caption="vs Aug run"
-          delta={250418}
-          icon={Landmark}
-          label="Net worth at 89"
-          value="£4,533,429"
-        />
-        <StatTile
-          caption="5-run mean, SD 0.44pp"
-          delta={-0.96}
-          deltaFormat="points"
-          label="Chance of success"
-          unit="%"
-          value="96.90"
-        />
-        <StatTile
-          caption="After IHT and estate costs"
-          icon={ScrollText}
-          label="Net legacy"
-          value="£1,771,204"
-        />
+      <div className="grid gap-5 p-8">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-4">
+          <StatTile
+            caption="Last working year 58"
+            icon={Flag}
+            label="Retirement"
+            tone="inverse"
+            unit="yrs"
+            value="59"
+          />
+          <StatTile
+            caption="vs Aug run"
+            delta={250418}
+            icon={Landmark}
+            label="Net worth at 89"
+            value="£4,533,429"
+          />
+          <StatTile
+            caption="5-run mean, SD 0.44pp"
+            delta={-0.96}
+            deltaFormat="points"
+            label="Chance of success"
+            unit="%"
+            value="96.90"
+          />
+          <StatTile
+            caption="After IHT and estate costs"
+            icon={ScrollText}
+            label="Net legacy"
+            value="£1,771,204"
+          />
+        </div>
+        <Suspense fallback={<ProjectionPending />}>
+          <Projection />
+        </Suspense>
       </div>
     </>
   );
