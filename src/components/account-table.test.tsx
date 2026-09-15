@@ -64,7 +64,7 @@ describe("AccountTable", () => {
   });
 
   it("closes each row with a pencil when given an edit handler", () => {
-    const onEdit = vi.fn<(account: Account, index: number) => void>();
+    const onEdit = vi.fn<(account: Account) => void>();
     render(<AccountTable accounts={assets} onEdit={onEdit} />);
 
     const table = screen.getByRole("table");
@@ -78,6 +78,6 @@ describe("AccountTable", () => {
       within(table).getByRole("button", { name: "Edit Mortgage" }),
     );
 
-    expect(onEdit).toHaveBeenCalledExactlyOnceWith(assets[1], 1);
+    expect(onEdit).toHaveBeenCalledExactlyOnceWith(assets[1]);
   });
 });

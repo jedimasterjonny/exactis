@@ -47,11 +47,11 @@ interface Draft {
 }
 
 // An open dialog: the draft as it is, the draft as it opened, which the
-// uncontrolled fields take as their defaults, and the row it edits, or
-// null for a new account.
+// uncontrolled fields take as their defaults, and the id of the account it
+// edits, or null for a new one.
 interface Entry {
   readonly draft: Draft;
-  readonly index: null | number;
+  readonly id: null | number;
   readonly initial: Draft;
 }
 
@@ -91,12 +91,13 @@ const kinds = [
 
 // The accounts screen's ledger and its dialog, which enters a new account
 // from the header's button or edits one from its row. Rows live in state
-// and a save appends or writes back, so the tables reflect it until
-// reload; a store replaces the state when there is one. The entry doubles
-// as the dialog's open state, as the progress editor's point does, and the
-// tab is controlled so a saved account can bring its own tab forward. The
-// fields are uncontrolled and mount fresh with the entry's opening values
-// each time the dialog opens, and the draft mirrors what they report.
+// and a save appends or writes back by id, so the tables reflect it until
+// reload; a store replaces the state when there is one, and hands out the
+// ids this gives a new account for now. The entry doubles as the dialog's
+// open state, as the progress editor's point does, and the tab is
+// controlled so a saved account can bring its own tab forward. The fields
+// are uncontrolled and mount fresh with the entry's opening values each
+// time the dialog opens, and the draft mirrors what they report.
 export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   const [rows, setRows] = useState(accounts);
   const [tab, setTab] = useState<Tab>("accounts");
@@ -114,10 +115,10 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
     setEntry(null);
   }
 
-  // A row's pencil opens its account as it is, with its place in the rows
-  // so a save writes back to it.
+  // A row's pencil opens its account as it is, with its id so a save
+  // writes back to it.
   function edit(account: Account): void {
-    open(toDraft(account), rows.indexOf(account));
+    open(toDraft(account), account.id);
   }
 
   // A figure field commits null when cleared, and a cleared figure is
@@ -130,22 +131,22 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
     };
   }
 
-  function open(draft: Draft, index: null | number): void {
-    setEntry({ draft, index, initial: draft });
+  function open(draft: Draft, id: null | number): void {
+    setEntry({ draft, id, initial: draft });
   }
 
   function save(current: Entry): void {
-    const account = toAccount(current.draft);
+    const account = toAccount(current.draft, current.id ?? nextId(rows));
     setRows(
-      current.index === null
+      current.id === null
         ? [...rows, account]
-        : rows.map((row, index) => (index === current.index ? account : row)),
+        : rows.map((row) => (row.id === account.id ? account : row)),
     );
     setTab(isAsset(account) ? "assets" : "accounts");
     setEntry(null);
     toast.add({
       description: account.name,
-      title: current.index === null ? "Account added" : "Account updated",
+      title: current.id === null ? "Account added" : "Account updated",
       type: "success",
     });
   }
@@ -207,7 +208,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <span className="label text-brand">
-                {entry.index === null ? "New account" : "Edit account"}
+                {entry.id === null ? "New account" : "Edit account"}
               </span>
               <DialogTitle>
                 {entry.draft.name.trim() || "Untitled account"}
@@ -295,6 +296,11 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   );
 }
 
+// The id after the highest held, so a new account's id is one no row has.
+function nextId(rows: readonly Account[]): number {
+  return Math.max(0, ...rows.map((row) => row.id)) + 1;
+}
+
 // The muted note that closes a screen's section, as on the progress screen.
 function Note({ children }: { readonly children: string }): JSX.Element {
   return (
@@ -314,7 +320,7 @@ function TabCount({ count }: { readonly count: number }): JSX.Element {
 
 // A contribution of nothing is an absence on the account, and a growth
 // choice becomes the account's growth with the rate only where it applies.
-function toAccount(draft: Draft): Account {
+function toAccount(draft: Draft, id: number): Account {
   return {
     balance: draft.balance,
     ...(draft.contribution > 0 && {
@@ -324,6 +330,7 @@ function toAccount(draft: Draft): Account {
       draft.growth === "plan"
         ? { kind: "plan" }
         : { kind: "fixed", rate: draft.rate },
+    id,
     kind: draft.kind,
     name: draft.name.trim(),
   };
