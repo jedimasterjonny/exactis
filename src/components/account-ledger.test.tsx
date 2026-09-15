@@ -14,6 +14,11 @@ function commit(field: HTMLElement, value: string): void {
   fireEvent.blur(field);
 }
 
+function openEditor(name: string): HTMLElement {
+  fireEvent.click(screen.getByRole("button", { name: `Edit ${name}` }));
+  return screen.getByRole("dialog", { name });
+}
+
 function openEntry(): HTMLElement {
   fireEvent.click(screen.getByRole("button", { name: "Add account" }));
   return screen.getByRole("dialog");
@@ -200,5 +205,108 @@ describe("AccountLedger", () => {
       within(dialog).getByRole("textbox", { name: "Balance" }),
     ).toHaveValue("£0");
     expect(screen.getByText("3 accounts · 2 assets")).toBeInTheDocument();
+  });
+
+  it("opens a real asset as it is, keeps its rate across the growth choice and writes the edit back", () => {
+    renderLedger();
+    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
+
+    const dialog = openEditor("Home");
+
+    expect(within(dialog).getByText("Edit account")).toHaveClass("text-brand");
+    expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue(
+      "Home",
+    );
+    expect(
+      within(dialog).getByRole("combobox", { name: "Treatment" }),
+    ).toHaveValue("real-asset");
+    expect(
+      within(dialog).getByRole("textbox", { name: "Balance" }),
+    ).toHaveValue("£416,386");
+    expect(
+      within(dialog).getByRole("textbox", { name: "Contribution" }),
+    ).toHaveValue("£0");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Growth" }),
+    ).toHaveValue("fixed");
+    expect(within(dialog).getByRole("textbox", { name: "Rate" })).toHaveValue(
+      "2.10%",
+    );
+
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Growth" }), {
+      target: { value: "plan" },
+    });
+
+    expect(
+      within(dialog).queryByRole("textbox", { name: "Rate" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Growth" }), {
+      target: { value: "fixed" },
+    });
+
+    expect(within(dialog).getByRole("textbox", { name: "Rate" })).toHaveValue(
+      "2.10%",
+    );
+
+    commit(within(dialog).getByRole("textbox", { name: "Balance" }), "420,000");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(
+      screen.queryByRole("dialog", { name: "Home" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Account updated" }),
+    ).toHaveAccessibleDescription("Home");
+    expect(screen.getByRole("tab", { name: /^Assets/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("3 accounts · 2 assets")).toBeInTheDocument();
+
+    const panel = screen.getByRole("tabpanel");
+
+    expect(rowsOf(panel)).toHaveLength(assets.length);
+    expect(
+      within(panel).getByRole("cell", { name: "£420,000" }),
+    ).toBeInTheDocument();
+    expect(
+      within(panel).queryByRole("cell", { name: "£416,386" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens a wrapper with its contribution and no rate, and writes a new contribution back", () => {
+    renderLedger();
+
+    const dialog = openEditor("Workplace pension");
+
+    expect(
+      within(dialog).getByRole("textbox", { name: "Contribution" }),
+    ).toHaveValue("£27,195");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Cadence" }),
+    ).toHaveValue("year");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Growth" }),
+    ).toHaveValue("plan");
+    expect(
+      within(dialog).queryByRole("textbox", { name: "Rate" }),
+    ).not.toBeInTheDocument();
+
+    commit(
+      within(dialog).getByRole("textbox", { name: "Contribution" }),
+      "30,000",
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    const panel = screen.getByRole("tabpanel");
+
+    expect(rowsOf(panel)).toHaveLength(held.length);
+    expect(
+      within(panel).getByRole("cell", { name: "£30,000 / yr" }),
+    ).toBeInTheDocument();
+    expect(
+      within(panel).queryByRole("cell", { name: "£27,195 / yr" }),
+    ).not.toBeInTheDocument();
   });
 });
