@@ -25,7 +25,7 @@ import { formatGbp } from "@/lib/money";
 
 interface AccountTableProps {
   readonly accounts: readonly Account[];
-  readonly onEdit?: (account: Account, index: number) => void;
+  readonly onEdit?: (account: Account) => void;
 }
 
 type Treatment = "destructive" | "secondary";
@@ -55,7 +55,7 @@ const treatments: Record<
 // A ledger of accounts: the name and its balance carry the weight, the
 // treatment is a badge, and the three figures are right-aligned mono. A
 // table given an edit handler closes each row with a pencil that reports
-// the row and its place, so the caller can write back to it.
+// the row's account, whose id says where a save writes back.
 export function AccountTable({
   accounts,
   onEdit,
@@ -78,8 +78,8 @@ export function AccountTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {accounts.map((account, index) => (
-            <TableRow key={account.name}>
+          {accounts.map((account) => (
+            <TableRow key={account.id}>
               <TableCell className="font-medium">{account.name}</TableCell>
               <TableCell>
                 <Badge variant={treatments[account.kind].variant}>
@@ -100,7 +100,7 @@ export function AccountTable({
                   <Button
                     aria-label={`Edit ${account.name}`}
                     onClick={() => {
-                      onEdit(account, index);
+                      onEdit(account);
                     }}
                     size="icon-sm"
                     variant="ghost"
