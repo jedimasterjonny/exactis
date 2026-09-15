@@ -104,8 +104,9 @@ what the commit was about rather than from what it did, and each is usually a
 commit that should have been two.
 
 commitlint checks the type, the subject, the body and the header length, and
-rejects an upper-case scope. That a scope is there at all, and that the type and
-the scope are the right ones, is not machine-enforced.
+rejects a scope that is missing or upper-case. That the type and the scope are
+the right ones is not machine-enforced, and no scope enum is set to make it so,
+because the vocabulary is open by design.
 
 - One decision per commit. Split scaffolding from the deliberate change layered
   on top.
