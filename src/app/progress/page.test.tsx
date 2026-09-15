@@ -12,7 +12,7 @@ describe("Progress", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Progress points",
     );
-    expect(screen.getByText("Sect. II · Progress")).toHaveClass("label");
+    expect(screen.getByText("Sect. III · Progress")).toHaveClass("label");
     expect(
       screen.getByRole("button", { name: "Add point" }),
     ).toBeInTheDocument();
