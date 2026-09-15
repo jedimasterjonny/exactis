@@ -15,7 +15,7 @@ describe("Projection", () => {
 
     render(await Projection());
 
-    expect(screen.getByText("£783,531")).toHaveClass("figure");
-    expect(screen.getByText("in 2027")).toBeInTheDocument();
+    expect(screen.getByRole("application")).toHaveClass("recharts-surface");
+    expect(screen.getByText("Tax-free")).toBeInTheDocument();
   });
 });
