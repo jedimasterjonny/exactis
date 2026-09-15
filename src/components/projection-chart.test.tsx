@@ -15,19 +15,10 @@ const points = [
 ];
 
 describe("ProjectionChart", () => {
-  it("leads with the total at the horizon and plots the years to it", () => {
+  it("plots the years with a legend naming each series in stacking order", () => {
     render(<ProjectionChart points={points} />);
 
-    expect(screen.getByText("Tax wrappers")).toHaveClass("label");
-    expect(screen.getByText("£872,262")).toHaveClass("figure");
-    expect(screen.getByText("in 2028")).toHaveClass("figure");
-    expect(screen.getByText("From £699,025 today")).toBeInTheDocument();
     expect(screen.getByRole("application")).toHaveClass("recharts-surface");
-  });
-
-  it("names each series in a legend, in stacking order", () => {
-    render(<ProjectionChart points={points} />);
-
     expect(
       screen.getAllByText(/^Tax-/).map((name) => name.textContent),
     ).toStrictEqual(["Tax-deferred", "Tax-free"]);
@@ -62,7 +53,6 @@ describe("ProjectionChart", () => {
       />,
     );
 
-    expect(screen.getByText("—")).toHaveClass("figure");
     expect(screen.getByRole("paragraph")).toHaveTextContent(
       "Add a tax-free or tax-deferred account to see it projected.",
     );
@@ -82,8 +72,6 @@ describe("ProjectionPending", () => {
   it("holds the chart's frame while the store answers", () => {
     render(<ProjectionPending />);
 
-    expect(screen.getByText("Tax wrappers")).toHaveClass("label");
-    expect(screen.getByText("—")).toHaveClass("figure");
     expect(screen.getByRole("paragraph")).toHaveTextContent(
       "Reading the store…",
     );

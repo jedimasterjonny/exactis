@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX, ReactNode } from "react";
+import type { JSX } from "react";
 import type { TooltipContentProps } from "recharts";
 
 import { cn } from "cn";
@@ -8,7 +8,7 @@ import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import type { ProjectionPoint } from "@/engine/projection";
 
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   ChartContainer,
   ChartLegend,
@@ -17,25 +17,11 @@ import {
 } from "@/components/ui/chart";
 import { formatGbp } from "@/lib/money";
 
-interface FrameProps {
-  readonly caption?: string;
-  readonly children: ReactNode;
-  readonly figure: string;
-  readonly unit?: string;
-}
-
 interface ProjectionChartProps {
   readonly points: readonly ProjectionPoint[];
 }
 
 type Series = (typeof series)[number]["key"];
-
-// The projection's two ends: today's total and the total at the horizon,
-// which the header leads with.
-interface Span {
-  readonly first: ProjectionPoint;
-  readonly last: ProjectionPoint;
-}
 
 // The two series, in the order the progress table lists them and the
 // order they stack, the first at the baseline. Each keeps its colour for
@@ -62,29 +48,24 @@ const config = Object.fromEntries(
 );
 
 // The dashboard's chart: the two wrappers, projected a year at a time,
-// stacked as areas so the top of the stack is the total. The header
-// carries the figure that matters, the total at the horizon, and the
-// plot carries the years between: a hairline grid, the years and the
-// pounds as recessive ticks, a legend naming the series, and a crosshair
-// with the year's figures on hover and on the arrow keys. The pounds are
-// written in full, as money is everywhere here.
+// stacked as areas so the top of the stack is the total. The plot alone,
+// with no figure over it: a hairline grid, the years and the pounds as
+// recessive ticks, a legend naming the series, and a crosshair with the
+// year's figures on hover and on the arrow keys. The pounds are written
+// in full, as money is everywhere here. A projection of nothing, because
+// no account is a wrapper yet, says so in the plot's place rather than
+// drawing a flat zero over a column of £0 ticks.
 export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
-  const span = spanOf(points);
-
-  if (span === undefined) {
+  if (points.every((point) => totalOf(point) === 0)) {
     return (
-      <Frame figure="—">
+      <Frame>
         <Note>Add a tax-free or tax-deferred account to see it projected.</Note>
       </Frame>
     );
   }
 
   return (
-    <Frame
-      caption={`From ${formatGbp(totalOf(span.first))} today`}
-      figure={formatGbp(totalOf(span.last))}
-      unit={`in ${String(span.last.year)}`}
-    >
+    <Frame>
       <ChartContainer className="aspect-[3/1] w-full" config={config}>
         <AreaChart
           data={points}
@@ -157,33 +138,16 @@ export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
 // frame, so the screen does not shift when the chart arrives.
 export function ProjectionPending(): JSX.Element {
   return (
-    <Frame figure="—">
+    <Frame>
       <Note>Reading the store…</Note>
     </Frame>
   );
 }
 
-// The card around the plot, headed as a stat tile is: the label, the
-// figure with its unit, and a caption beneath.
-function Frame({ caption, children, figure, unit }: FrameProps): JSX.Element {
+// The card around the plot.
+function Frame({ children }: { readonly children: JSX.Element }): JSX.Element {
   return (
-    <Card className="gap-3">
-      <CardHeader className="gap-1.5">
-        <span className="label text-muted-foreground">Tax wrappers</span>
-        <span className="flex items-baseline gap-1.5">
-          <span className="figure text-3xl font-medium tracking-tight">
-            {figure}
-          </span>
-          {unit !== undefined && (
-            <span className="figure text-base text-muted-foreground">
-              {unit}
-            </span>
-          )}
-        </span>
-        {caption !== undefined && (
-          <span className="text-xs text-muted-foreground">{caption}</span>
-        )}
-      </CardHeader>
+    <Card>
       <CardContent>{children}</CardContent>
     </Card>
   );
@@ -237,21 +201,6 @@ function ProjectionTooltip({
       </span>
     </div>
   );
-}
-
-// A projection of nothing, because no account is a wrapper yet, has no
-// span, and the frame says so instead of plotting a flat zero.
-function spanOf(points: readonly ProjectionPoint[]): Span | undefined {
-  const [first] = points;
-  const last = points.at(-1);
-  if (
-    first === undefined ||
-    last === undefined ||
-    points.every((point) => totalOf(point) === 0)
-  ) {
-    return undefined;
-  }
-  return { first, last };
 }
 
 // The top of the stack: every series summed.
