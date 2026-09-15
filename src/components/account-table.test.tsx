@@ -1,5 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+import type { Account } from "@/data/accounts";
 
 import { accounts, isAsset } from "@/data/accounts";
 
@@ -17,6 +19,7 @@ describe("AccountTable", () => {
 
     expect(rows).toHaveLength(held.length);
     expect(within(table).getAllByRole("columnheader")).toHaveLength(5);
+    expect(within(table).queryByRole("button")).not.toBeInTheDocument();
     expect(
       within(table).getByRole("cell", { name: "Workplace pension" }),
     ).toHaveClass("font-medium");
@@ -58,5 +61,23 @@ describe("AccountTable", () => {
     expect(
       within(table).getByRole("cell", { name: "−£182,940" }),
     ).toBeInTheDocument();
+  });
+
+  it("closes each row with a pencil when given an edit handler", () => {
+    const onEdit = vi.fn<(account: Account, index: number) => void>();
+    render(<AccountTable accounts={assets} onEdit={onEdit} />);
+
+    const table = screen.getByRole("table");
+
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(6);
+    expect(
+      within(table).getAllByRole("button", { name: /^Edit / }),
+    ).toHaveLength(assets.length);
+
+    fireEvent.click(
+      within(table).getByRole("button", { name: "Edit Mortgage" }),
+    );
+
+    expect(onEdit).toHaveBeenCalledExactlyOnceWith(assets[1], 1);
   });
 });
