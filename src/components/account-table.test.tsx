@@ -1,18 +1,21 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { accounts, assets } from "@/data/accounts";
+import { accounts, isAsset } from "@/data/accounts";
 
 import { AccountTable } from "./account-table";
 
+const held = accounts.filter((account) => !isAsset(account));
+const assets = accounts.filter(isAsset);
+
 describe("AccountTable", () => {
   it("lists every account as a row with its treatment and three figures", () => {
-    render(<AccountTable accounts={accounts} />);
+    render(<AccountTable accounts={held} />);
 
     const table = screen.getByRole("table");
     const [, ...rows] = within(table).getAllByRole("row");
 
-    expect(rows).toHaveLength(accounts.length);
+    expect(rows).toHaveLength(held.length);
     expect(within(table).getAllByRole("columnheader")).toHaveLength(5);
     expect(
       within(table).getByRole("cell", { name: "Workplace pension" }),

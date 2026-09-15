@@ -6,7 +6,7 @@ import { AccountTable } from "@/components/account-table";
 import { ScreenHeader } from "@/components/screen-header";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { accounts, assets } from "@/data/accounts";
+import { accounts, isAsset } from "@/data/accounts";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 // The reference's plan screen opens on its accounts tab, and this screen is
@@ -14,6 +14,8 @@ import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 // the loans against them on the other. Every figure is the reference kit's
 // invented plan, standing in until there is an engine to read from.
 export default function Accounts(): JSX.Element {
+  const held = accounts.filter((account) => !isAsset(account));
+  const assets = accounts.filter(isAsset);
   return (
     <>
       <ScreenHeader
@@ -27,14 +29,14 @@ export default function Accounts(): JSX.Element {
         label={sectionLabel(accountsAndAssets)}
         title="Accounts & assets"
       >
-        {`${String(accounts.length)} accounts · ${String(assets.length)} assets`}
+        {`${String(held.length)} accounts · ${String(assets.length)} assets`}
       </ScreenHeader>
       <div className="grid gap-5 p-8">
         <Tabs defaultValue="accounts">
           <TabsList variant="line">
             <TabsTrigger value="accounts">
               Accounts
-              <TabCount count={accounts.length} />
+              <TabCount count={held.length} />
             </TabsTrigger>
             <TabsTrigger value="assets">
               Assets
@@ -42,7 +44,7 @@ export default function Accounts(): JSX.Element {
             </TabsTrigger>
           </TabsList>
           <TabsContent className="grid gap-5" value="accounts">
-            <AccountTable accounts={accounts} />
+            <AccountTable accounts={held} />
             <Note>
               Allocation is set once at plan level and applied pro rata to every
               account.
