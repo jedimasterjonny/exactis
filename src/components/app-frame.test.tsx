@@ -40,6 +40,9 @@ describe("AppFrame", () => {
     expect(screen.getByRole("link", { name: /^Dashboard/ })).toHaveAttribute(
       "data-active",
     );
+    expect(
+      screen.getByRole("switch", { name: "Daylight" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Certitudo in numeris")).toHaveClass("label");
   });
 });
