@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { accounts, isAsset, toAccount, toValues } from "./accounts";
+import { isAsset, toAccount, toValues } from "./accounts";
+import { accounts } from "./accounts.fixture";
 
 describe("accounts", () => {
   it("files a real asset and a debt as assets and the rest as accounts", () => {
