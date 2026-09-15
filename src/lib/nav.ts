@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
-import { History, LayoutDashboard } from "lucide-react";
+import { History, LayoutDashboard, Wallet } from "lucide-react";
 
 import { toRoman } from "@/lib/roman";
 
@@ -17,6 +17,12 @@ export const dashboard: Screen = {
   label: "Dashboard",
 };
 
+export const accountsAndAssets: Screen = {
+  href: "/accounts",
+  icon: Wallet,
+  label: "Accounts & assets",
+};
+
 export const progress: Screen = {
   href: "/progress",
   icon: History,
@@ -27,7 +33,11 @@ export const progress: Screen = {
 // so inserting a screen renumbers every header after it and nothing else
 // has to change. Only built screens appear, since a typed route cannot
 // point at one that does not exist.
-export const screens: readonly Screen[] = [dashboard, progress];
+export const screens: readonly Screen[] = [
+  dashboard,
+  accountsAndAssets,
+  progress,
+];
 
 // The label every screen header opens with, "Sect. II · Progress".
 export function sectionLabel(screen: Screen): string {

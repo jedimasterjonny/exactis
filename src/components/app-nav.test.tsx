@@ -35,13 +35,17 @@ describe("AppNav", () => {
     );
 
     const dashboard = screen.getByRole("link", { name: /^Dashboard/ });
+    const accounts = screen.getByRole("link", { name: /^Accounts/ });
     const progress = screen.getByRole("link", { name: /^Progress/ });
 
     expect(dashboard).toHaveAttribute("href", "/");
     expect(dashboard).not.toHaveAttribute("data-active");
     expect(within(dashboard).getByText("I")).toHaveClass("label");
+    expect(accounts).toHaveAttribute("href", "/accounts");
+    expect(accounts).not.toHaveAttribute("data-active");
+    expect(within(accounts).getByText("II")).toHaveClass("label");
     expect(progress).toHaveAttribute("href", "/progress");
     expect(progress).toHaveAttribute("data-active");
-    expect(within(progress).getByText("II")).toHaveClass("label");
+    expect(within(progress).getByText("III")).toHaveClass("label");
   });
 });
