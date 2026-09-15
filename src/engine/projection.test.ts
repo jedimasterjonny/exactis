@@ -6,19 +6,22 @@ import { accounts } from "@/data/accounts.fixture";
 
 import { project } from "./projection";
 
-const [pension, isa] = accounts;
+const [pension, isa, , home, mortgage] = accounts;
 
 const plan = { born: 1990, from: 2026, rate: 0.05 };
 
 describe("project", () => {
-  // (286,145 + 20,000) × 1.05 = 321,452.25, then (321,452.25 + 20,000) ×
-  // 1.05 = 358,524.86: the year's contribution lands first, then the
-  // year's growth.
-  it("pays a year's contribution in, then grows the year at the plan rate", () => {
+  // The ISA: (286,145 + 20,000) × 1.05 = 321,452.25, then (321,452.25 +
+  // 20,000) × 1.05 = 358,524.86, the year's contribution landing first
+  // and then the year's growth. The pension the same way: (412,880 +
+  // 27,195) × 1.05 = 462,078.75, then (462,078.75 + 27,195) × 1.05 =
+  // 513,737.44. The current account, the home and the mortgage are no
+  // wrapper and are left out.
+  it("pays a year's contribution in, then grows the year at the plan rate, by wrapper", () => {
     expect(project(accounts, { ...plan, years: 2 })).toStrictEqual([
-      { age: 36, free: 286145, year: 2026 },
-      { age: 37, free: 321452, year: 2027 },
-      { age: 38, free: 358525, year: 2028 },
+      { age: 36, deferred: 412880, free: 286145, year: 2026 },
+      { age: 37, deferred: 462079, free: 321452, year: 2027 },
+      { age: 38, deferred: 513737, free: 358525, year: 2028 },
     ]);
   });
 
@@ -35,9 +38,9 @@ describe("project", () => {
     };
 
     expect(project([monthly], { ...plan, years: 2 })).toStrictEqual([
-      { age: 36, free: 1000, year: 2026 },
-      { age: 37, free: 2200, year: 2027 },
-      { age: 38, free: 3400, year: 2028 },
+      { age: 36, deferred: 0, free: 1000, year: 2026 },
+      { age: 37, deferred: 0, free: 2200, year: 2027 },
+      { age: 38, deferred: 0, free: 3400, year: 2028 },
     ]);
   });
 
@@ -53,21 +56,21 @@ describe("project", () => {
     };
 
     expect(project([isa, lifetime], { ...plan, years: 1 })).toStrictEqual([
-      { age: 36, free: 296145, year: 2026 },
-      { age: 37, free: 331652, year: 2027 },
+      { age: 36, deferred: 0, free: 296145, year: 2026 },
+      { age: 37, deferred: 0, free: 331652, year: 2027 },
     ]);
   });
 
-  it("projects nothing when no account is tax-free", () => {
-    expect(project([pension], { ...plan, years: 1 })).toStrictEqual([
-      { age: 36, free: 0, year: 2026 },
-      { age: 37, free: 0, year: 2027 },
+  it("projects nothing when no account is a wrapper", () => {
+    expect(project([home, mortgage], { ...plan, years: 1 })).toStrictEqual([
+      { age: 36, deferred: 0, free: 0, year: 2026 },
+      { age: 37, deferred: 0, free: 0, year: 2027 },
     ]);
   });
 
   it("holds only today's balances over no years", () => {
-    expect(project(accounts, { ...plan, years: 0 })).toStrictEqual([
-      { age: 36, free: 286145, year: 2026 },
+    expect(project([pension, isa], { ...plan, years: 0 })).toStrictEqual([
+      { age: 36, deferred: 412880, free: 286145, year: 2026 },
     ]);
   });
 });
