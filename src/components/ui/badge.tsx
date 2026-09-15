@@ -12,6 +12,8 @@ const badgeVariants = cva(
     defaultVariants: { variant: "default" },
     variants: {
       variant: {
+        caution:
+          "bg-caution/10 text-caution focus-visible:ring-caution/20 dark:bg-caution/20 dark:focus-visible:ring-caution/40 [a]:hover:bg-caution/20",
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         destructive:
           "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
@@ -20,6 +22,8 @@ const badgeVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         outline:
           "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
+        positive:
+          "bg-positive/10 text-positive focus-visible:ring-positive/20 dark:bg-positive/20 dark:focus-visible:ring-positive/40 [a]:hover:bg-positive/20",
         secondary:
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
       },
