@@ -25,7 +25,7 @@ export function TextField({
   placeholder,
 }: TextFieldProps): JSX.Element {
   return (
-    <Field.Root className="grid gap-1.5">
+    <Field.Root className="grid content-start gap-1.5">
       <Field.Label className="label text-muted-foreground">{label}</Field.Label>
       <Input
         defaultValue={defaultValue}

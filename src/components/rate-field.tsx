@@ -32,7 +32,7 @@ export function RateField({
   onValueCommitted,
 }: RateFieldProps): JSX.Element {
   return (
-    <Field.Root className="grid gap-1.5">
+    <Field.Root className="grid content-start gap-1.5">
       <Field.Label className="label text-muted-foreground">{label}</Field.Label>
       <NumberField.Root
         defaultValue={defaultValue}
