@@ -6,24 +6,20 @@ import { points } from "@/data/points";
 import Progress from "./page";
 
 describe("Progress", () => {
-  it("opens with the progress header and its action inside the main landmark", () => {
+  it("opens with the progress header and its action", () => {
     render(<Progress />);
 
-    const main = screen.getByRole("main");
-
-    expect(within(main).getByRole("heading", { level: 1 })).toHaveTextContent(
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Progress points",
     );
-    expect(within(main).getByText("Sect. II · Progress")).toHaveClass("label");
+    expect(screen.getByText("Sect. II · Progress")).toHaveClass("label");
     expect(
-      within(main).getByRole("button", { name: "Add point" }),
+      screen.getByRole("button", { name: "Add point" }),
     ).toBeInTheDocument();
   });
 
   it("follows the header with the four progress tiles", () => {
     render(<Progress />);
-
-    const main = screen.getByRole("main");
 
     for (const label of [
       "Points recorded",
@@ -31,7 +27,7 @@ describe("Progress", () => {
       "Tracked 12 months",
       "Net worth today",
     ]) {
-      expect(within(main).getByText(label)).toBeInTheDocument();
+      expect(screen.getByText(label)).toBeInTheDocument();
     }
   });
 

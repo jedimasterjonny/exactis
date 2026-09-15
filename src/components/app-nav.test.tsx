@@ -1,0 +1,47 @@
+import { render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { SidebarProvider } from "@/components/ui/sidebar";
+
+import { AppNav } from "./app-nav";
+
+const pathname = vi.hoisted(() => ({ current: "/" }));
+
+vi.mock("next/navigation", () => ({
+  usePathname: (): string => pathname.current,
+}));
+
+// jsdom has no matchMedia, and the sidebar's mobile hook reads the viewport.
+function stubViewport(width: number): void {
+  vi.stubGlobal("innerWidth", width);
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({ addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+  );
+}
+
+describe("AppNav", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("links every screen with its numeral and marks the current one", () => {
+    stubViewport(1024);
+    pathname.current = "/progress";
+    render(
+      <SidebarProvider>
+        <AppNav />
+      </SidebarProvider>,
+    );
+
+    const dashboard = screen.getByRole("link", { name: /^Dashboard/ });
+    const progress = screen.getByRole("link", { name: /^Progress/ });
+
+    expect(dashboard).toHaveAttribute("href", "/");
+    expect(dashboard).not.toHaveAttribute("data-active");
+    expect(within(dashboard).getByText("I")).toHaveClass("label");
+    expect(progress).toHaveAttribute("href", "/progress");
+    expect(progress).toHaveAttribute("data-active");
+    expect(within(progress).getByText("II")).toHaveClass("label");
+  });
+});
