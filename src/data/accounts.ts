@@ -17,6 +17,22 @@ export interface Account {
 export type AccountKind =
   "cash" | "debt" | "real-asset" | "tax-deferred" | "tax-free";
 
+// The account as a form or a table row holds it: flat, with every field
+// present. A contribution of nothing is a zero rather than an absence, the
+// cadence is kept beside it whether or not it applies, and the rate sits
+// beside the growth choice whether or not that is fixed. So a value can
+// be edited field by field and stored column by column, and becomes an
+// account by the rules below.
+export interface AccountValues {
+  readonly balance: number;
+  readonly cadence: Cadence;
+  readonly contribution: number;
+  readonly growth: Growth["kind"];
+  readonly kind: AccountKind;
+  readonly name: string;
+  readonly rate: number;
+}
+
 export type Cadence = "month" | "year";
 
 export interface Contribution {
@@ -77,4 +93,36 @@ export const accounts: readonly Account[] = [
 // progress points reconcile as total assets and asset loans.
 export function isAsset(account: Account): boolean {
   return account.kind === "debt" || account.kind === "real-asset";
+}
+
+// A contribution of nothing is an absence on the account, and a growth
+// choice becomes the account's growth with the rate only where it applies.
+export function toAccount(values: AccountValues, id: number): Account {
+  return {
+    balance: values.balance,
+    ...(values.contribution > 0 && {
+      contribution: { amount: values.contribution, cadence: values.cadence },
+    }),
+    growth:
+      values.growth === "plan"
+        ? { kind: "plan" }
+        : { kind: "fixed", rate: values.rate },
+    id,
+    kind: values.kind,
+    name: values.name,
+  };
+}
+
+// The reverse: an absent contribution is nothing a year, and a plan rate
+// carries no rate.
+export function toValues(account: Account): AccountValues {
+  return {
+    balance: account.balance,
+    cadence: account.contribution?.cadence ?? "year",
+    contribution: account.contribution?.amount ?? 0,
+    growth: account.growth.kind,
+    kind: account.kind,
+    name: account.name,
+    rate: account.growth.kind === "fixed" ? account.growth.rate : 0,
+  };
 }

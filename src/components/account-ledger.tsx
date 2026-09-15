@@ -5,7 +5,7 @@ import type { JSX } from "react";
 import { Info, Plus } from "lucide-react";
 import { useState } from "react";
 
-import type { Account, AccountKind, Cadence } from "@/data/accounts";
+import type { Account, AccountValues } from "@/data/accounts";
 
 import { AccountTable } from "@/components/account-table";
 import { MoneyField } from "@/components/money-field";
@@ -24,27 +24,18 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
-import { isAsset } from "@/data/accounts";
+import { isAsset, toAccount, toValues } from "@/data/accounts";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
   readonly accounts: readonly Account[];
 }
 
-// What the dialog holds while it is open. Flatter than an account: a
-// contribution of nothing is a zero rather than an absence, and the rate
-// sits beside the growth choice, reset to what it opened with when the
-// choice changes, so the rate field always mounts showing what the draft
-// holds.
-interface Draft {
-  readonly balance: number;
-  readonly cadence: Cadence;
-  readonly contribution: number;
-  readonly growth: GrowthChoice;
-  readonly kind: AccountKind;
-  readonly name: string;
-  readonly rate: number;
-}
+// What the dialog holds while it is open: the account's values, flat, so
+// the rate sits beside the growth choice, reset to what it opened with
+// when the choice changes, and the rate field always mounts showing what
+// the draft holds.
+type Draft = AccountValues;
 
 // An open dialog: the draft as it is, the draft as it opened, which the
 // uncontrolled fields take as their defaults, and the id of the account it
@@ -56,8 +47,6 @@ interface Entry {
 }
 
 type Figure = "balance" | "contribution" | "rate";
-
-type GrowthChoice = "fixed" | "plan";
 
 type Tab = "accounts" | "assets";
 
@@ -118,7 +107,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   // A row's pencil opens its account as it is, with its id so a save
   // writes back to it.
   function edit(account: Account): void {
-    open(toDraft(account), account.id);
+    open(toValues(account), account.id);
   }
 
   // A figure field commits null when cleared, and a cleared figure is
@@ -135,8 +124,13 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
     setEntry({ draft, id, initial: draft });
   }
 
+  // The name is saved as typed less the space around it, which is what
+  // the title shows and what save waited for.
   function save(current: Entry): void {
-    const account = toAccount(current.draft, current.id ?? nextId(rows));
+    const account = toAccount(
+      { ...current.draft, name: current.draft.name.trim() },
+      current.id ?? nextId(rows),
+    );
     setRows(
       current.id === null
         ? [...rows, account]
@@ -316,36 +310,4 @@ function TabCount({ count }: { readonly count: number }): JSX.Element {
   return (
     <span className="label text-muted-foreground/60">{String(count)}</span>
   );
-}
-
-// A contribution of nothing is an absence on the account, and a growth
-// choice becomes the account's growth with the rate only where it applies.
-function toAccount(draft: Draft, id: number): Account {
-  return {
-    balance: draft.balance,
-    ...(draft.contribution > 0 && {
-      contribution: { amount: draft.contribution, cadence: draft.cadence },
-    }),
-    growth:
-      draft.growth === "plan"
-        ? { kind: "plan" }
-        : { kind: "fixed", rate: draft.rate },
-    id,
-    kind: draft.kind,
-    name: draft.name.trim(),
-  };
-}
-
-// The reverse, for a row being edited: an absent contribution opens as
-// nothing at the blank cadence, and a plan rate opens with no rate.
-function toDraft(account: Account): Draft {
-  return {
-    balance: account.balance,
-    cadence: account.contribution?.cadence ?? blank.cadence,
-    contribution: account.contribution?.amount ?? blank.contribution,
-    growth: account.growth.kind,
-    kind: account.kind,
-    name: account.name,
-    rate: account.growth.kind === "fixed" ? account.growth.rate : blank.rate,
-  };
 }
