@@ -34,4 +34,24 @@ describe("ScreenHeader", () => {
 
     expect(screen.getByText("Figures in today's money")).toBeInTheDocument();
   });
+
+  it("renders the actions beside the title only when one actually renders", () => {
+    const { rerender } = render(
+      <ScreenHeader actions={false} label="Sect. I" title="Title" />,
+    );
+
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+
+    rerender(
+      <ScreenHeader
+        actions={<button type="button">Assumptions</button>}
+        label="Sect. I"
+        title="Title"
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Assumptions" }),
+    ).toBeInTheDocument();
+  });
 });
