@@ -1,1 +1,4 @@
 bun.lock
+# Written by drizzle-kit generate and rewritten by the next one, so any
+# formatting applied here is undone by the tool that owns the files.
+drizzle/meta

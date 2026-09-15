@@ -14,8 +14,7 @@ export interface Account {
   readonly name: string;
 }
 
-export type AccountKind =
-  "cash" | "debt" | "real-asset" | "tax-deferred" | "tax-free";
+export type AccountKind = (typeof accountKinds)[number];
 
 // The account as a form or a table row holds it: flat, with every field
 // present. A contribution of nothing is a zero rather than an absence, the
@@ -27,13 +26,13 @@ export interface AccountValues {
   readonly balance: number;
   readonly cadence: Cadence;
   readonly contribution: number;
-  readonly growth: Growth["kind"];
+  readonly growth: (typeof growthKinds)[number];
   readonly kind: AccountKind;
   readonly name: string;
   readonly rate: number;
 }
 
-export type Cadence = "month" | "year";
+export type Cadence = (typeof cadences)[number];
 
 export interface Contribution {
   readonly amount: number;
@@ -44,6 +43,20 @@ export interface Contribution {
 // to every wrapper, or a fixed rate the account carries itself.
 export type Growth =
   { readonly kind: "fixed"; readonly rate: number } | { readonly kind: "plan" };
+
+// The three choices as lists, so the store's columns take the same words
+// the types do and cannot drift from them.
+export const accountKinds = [
+  "cash",
+  "debt",
+  "real-asset",
+  "tax-deferred",
+  "tax-free",
+] as const;
+
+export const cadences = ["month", "year"] as const;
+
+export const growthKinds = ["fixed", "plan"] as const;
 
 // The five, in the order the reference lists them. The accounts tab shows
 // the wrappers and the cash account, the assets tab the rest, and the kind

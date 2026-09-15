@@ -186,8 +186,17 @@ jobs:
       # accepted with --ignore, the advisory named here and the reason
       # beside it, the same shape as an eslint-disable and its -- reason.
       # Not with --audit-level, which silences the next one too.
+      #
+      # GHSA-67mh-4wv8-2f99 is esbuild 0.18's development server answering
+      # any origin, fixed in 0.25. The 0.18 copy arrives through
+      # drizzle-kit, which declares @esbuild-kit/esm-loader and never loads
+      # it: its bundled bin.cjs does not mention the package, and it
+      # transpiles the config with the 0.25 esbuild it also declares. A
+      # development server that is never started answers nobody. Nothing
+      # here can drop the declaration, so the advisory is accepted until
+      # drizzle-kit does.
       - if: ${{ !cancelled() }}
-        run: bun audit
+        run: bun audit --ignore GHSA-67mh-4wv8-2f99
 
       # The commit-msg hook is bypassable with --no-verify. This is not, and
       # it runs for a push as well as a pull request. Most of this history
