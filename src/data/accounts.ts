@@ -26,7 +26,9 @@ export interface Contribution {
 export type Growth =
   { readonly kind: "fixed"; readonly rate: number } | { readonly kind: "plan" };
 
-// The wrappers and the cash account: what the accounts tab lists.
+// The five, in the order the reference lists them. The accounts tab shows
+// the wrappers and the cash account, the assets tab the rest, and the kind
+// decides which, so a new account files itself.
 export const accounts: readonly Account[] = [
   {
     balance: 412880,
@@ -48,12 +50,6 @@ export const accounts: readonly Account[] = [
     kind: "cash",
     name: "Current account",
   },
-];
-
-// The real assets and the loans against them: what the assets tab lists,
-// and the side of the plan the progress points reconcile as total assets
-// and asset loans.
-export const assets: readonly Account[] = [
   {
     balance: 416386,
     growth: { kind: "fixed", rate: 0.021 },
@@ -68,3 +64,9 @@ export const assets: readonly Account[] = [
     name: "Mortgage",
   },
 ];
+
+// A real asset and the loan against it are the side of the plan the
+// progress points reconcile as total assets and asset loans.
+export function isAsset(account: Account): boolean {
+  return account.kind === "debt" || account.kind === "real-asset";
+}
