@@ -53,12 +53,12 @@ suite before it reaches a database.
 ## The projection
 
 The engine is `src/engine/projection.ts`: a pure function over the accounts and
-a plan, giving a point per year to the plan's horizon. So far it carries the
-tax-free balance alone, paid into as the account says and grown at a plan rate
-held as a constant until there is an assumptions screen to set it on. The
-dashboard reads it through `src/app/(app)/store.ts`, a cached read keyed on the
-accounts, so a save on the accounts screen is a new projection on the next
-render.
+a plan, giving a point per year to the plan's horizon. So far it carries the two
+wrappers, tax-free and tax-deferred, each paid into as its accounts say and
+grown at a plan rate held as a constant until there is an assumptions screen to
+set it on. The dashboard reads it through `src/app/(app)/store.ts`, a cached
+read keyed on the accounts, so a save on the accounts screen is a new projection
+on the next render.
 
 ## Signing in
 
