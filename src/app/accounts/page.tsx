@@ -1,13 +1,14 @@
 import type { JSX } from "react";
 
 import { AccountLedger } from "@/components/account-ledger";
-import { accounts } from "@/data/accounts";
+
+import { getAccounts } from "./store";
 
 // The reference's plan screen opened on its accounts tab, with that tab
 // split in two: the wrappers and cash on one, the real assets and the loans
-// against them on the other. The ledger holds the rows and the entry, and
-// the page hands it the reference kit's invented plan, standing in until
-// there is a store to read from.
-export default function Accounts(): JSX.Element {
-  return <AccountLedger accounts={accounts} />;
+// against them on the other. The page reads the accounts from the store,
+// which reads the session first, so it renders behind the loading screen
+// beside it and the rest of the shell does not wait for either.
+export default async function Accounts(): Promise<JSX.Element> {
+  return <AccountLedger accounts={await getAccounts()} />;
 }

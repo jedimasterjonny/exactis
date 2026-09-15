@@ -35,9 +35,11 @@ over Neon's HTTP driver. The schema is `src/db/schema.ts`, the migrations
 generated from it are in `drizzle/`, and the queries are in
 `src/db/accounts.ts`.
 
-`DATABASE_URL` names the database, as `.env.example` shows. Nothing reads it
-until a query runs, so a build needs no database. Locally, point it at a Neon
-branch of your own and apply the migrations once:
+The accounts screen reads and writes it; the dashboard and progress screens
+still show the reference kit's figures. `DATABASE_URL` names the database, as
+`.env.example` shows. Nothing reads it until a query runs, so a build needs no
+database. Locally, point it at a Neon branch of your own and apply the
+migrations once:
 
 ```bash
 bun run db:migrate

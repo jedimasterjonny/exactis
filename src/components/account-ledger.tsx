@@ -3,10 +3,11 @@
 import type { JSX } from "react";
 
 import { Info, Plus } from "lucide-react";
-import { useState } from "react";
+import { startTransition, useState, useTransition } from "react";
 
 import type { Account, AccountValues } from "@/data/accounts";
 
+import { saveAccount } from "@/app/accounts/actions";
 import { AccountTable } from "@/components/account-table";
 import { MoneyField } from "@/components/money-field";
 import { RateField } from "@/components/rate-field";
@@ -24,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
-import { isAsset, toAccount, toValues } from "@/data/accounts";
+import { isAsset, toValues } from "@/data/accounts";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
@@ -79,20 +80,20 @@ const kinds = [
 ] as const;
 
 // The accounts screen's ledger and its dialog, which enters a new account
-// from the header's button or edits one from its row. Rows live in state
-// and a save appends or writes back by id, so the tables reflect it until
-// reload; a store replaces the state when there is one, and hands out the
-// ids this gives a new account for now. The entry doubles as the dialog's
-// open state, as the progress editor's point does, and the tab is
-// controlled so a saved account can bring its own tab forward. The fields
-// are uncontrolled and mount fresh with the entry's opening values each
-// time the dialog opens, and the draft mirrors what they report.
+// from the header's button or edits one from its row. The rows are the
+// store's, handed down by the page, and a save goes to the store and comes
+// back with the page re-read, so the tables reflect it without the ledger
+// holding rows of its own. The entry doubles as the dialog's open state,
+// as the progress editor's point does, and the tab is controlled so a
+// saved account can bring its own tab forward. The fields are uncontrolled
+// and mount fresh with the entry's opening values each time the dialog
+// opens, and the draft mirrors what they report.
 export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
-  const [rows, setRows] = useState(accounts);
   const [tab, setTab] = useState<Tab>("accounts");
   const [entry, setEntry] = useState<Entry | null>(null);
-  const held = rows.filter((row) => !isAsset(row));
-  const assets = rows.filter(isAsset);
+  const [isSaving, startSaving] = useTransition();
+  const held = accounts.filter((account) => !isAsset(account));
+  const assets = accounts.filter(isAsset);
 
   function amend(current: Entry, patch: Partial<Draft>): void {
     setEntry({ ...current, draft: { ...current.draft, ...patch } });
@@ -125,23 +126,23 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   }
 
   // The name is saved as typed less the space around it, which is what
-  // the title shows and what save waited for.
+  // the title shows and what save waited for. The dialog stays open with
+  // its save held until the store answers, then closes onto the tab the
+  // account belongs to; the close is a transition of its own, since a
+  // state update after an await is not part of the one it awaited in.
   function save(current: Entry): void {
-    const account = toAccount(
-      { ...current.draft, name: current.draft.name.trim() },
-      current.id ?? nextId(rows),
-    );
-    setRows(
-      current.id === null
-        ? [...rows, account]
-        : rows.map((row) => (row.id === account.id ? account : row)),
-    );
-    setTab(isAsset(account) ? "assets" : "accounts");
-    setEntry(null);
-    toast.add({
-      description: account.name,
-      title: current.id === null ? "Account added" : "Account updated",
-      type: "success",
+    const values = { ...current.draft, name: current.draft.name.trim() };
+    startSaving(async () => {
+      const account = await saveAccount(current.id, values);
+      startTransition(() => {
+        setTab(isAsset(account) ? "assets" : "accounts");
+        setEntry(null);
+      });
+      toast.add({
+        description: account.name,
+        title: current.id === null ? "Account added" : "Account updated",
+        type: "success",
+      });
     });
   }
 
@@ -274,7 +275,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
                 Cancel
               </DialogClose>
               <Button
-                disabled={entry.draft.name.trim() === ""}
+                disabled={isSaving || entry.draft.name.trim() === ""}
                 onClick={() => {
                   save(entry);
                 }}
@@ -288,11 +289,6 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
       </Dialog>
     </>
   );
-}
-
-// The id after the highest held, so a new account's id is one no row has.
-function nextId(rows: readonly Account[]): number {
-  return Math.max(0, ...rows.map((row) => row.id)) + 1;
 }
 
 // The muted note that closes a screen's section, as on the progress screen.
