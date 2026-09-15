@@ -38,6 +38,20 @@ const commitlintConfig = {
     // names a config surface - ts, lint, hooks - and one that varies in case
     // is one you cannot grep for.
     "scope-case": [2, "always", "lower-case"],
+    // Off in config-conventional too, so a bare `feat:` header passes it.
+    // AGENTS.md requires a scope on every commit, and this is the half of
+    // that rule a machine can hold: a header with no scope answers what kind
+    // of change it is and never what it is to.
+    //
+    // The other half stays prose. scope-enum would be the way to reach it,
+    // and it is deliberately not set: the vocabulary is open, so a commit
+    // touching a surface that has no name yet brings one, and an enum turns
+    // that into an edit here before the commit can land. What an enum would
+    // catch is the real failure - a second spelling for a surface that
+    // already has one - and what it would cost is a gate that fails on
+    // correct commits. Naming a surface twice is caught by reading the
+    // history back, which is what AGENTS.md asks for.
+    "scope-empty": [2, "never"],
   },
 };
 
