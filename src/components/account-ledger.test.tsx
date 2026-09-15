@@ -9,14 +9,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 
-import { saveAccount } from "@/app/accounts/actions";
+import { saveAccount } from "@/app/(app)/accounts/actions";
 import { Toaster } from "@/components/ui/toast";
 import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 
 import { AccountLedger } from "./account-ledger";
 
-vi.mock("@/app/accounts/actions", () => ({ saveAccount: vi.fn() }));
+vi.mock("@/app/(app)/accounts/actions", () => ({ saveAccount: vi.fn() }));
 
 const held = accounts.filter((account) => !isAsset(account));
 const assets = accounts.filter(isAsset);
