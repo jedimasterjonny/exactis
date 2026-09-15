@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { Toaster } from "@/components/ui/toast";
 import { points } from "@/data/points";
 
 import { ProgressPoints } from "./progress-points";
@@ -15,9 +16,18 @@ function openEditor(date: string): HTMLElement {
   return screen.getByRole("dialog", { name: date });
 }
 
+// Save reports through the toast manager, which needs its Toaster mounted.
+function renderPoints(): void {
+  render(
+    <Toaster>
+      <ProgressPoints points={points} />
+    </Toaster>,
+  );
+}
+
 describe("ProgressPoints", () => {
   it("lists every point as a row of right-aligned figures with an edit button", () => {
-    render(<ProgressPoints points={points} />);
+    renderPoints();
 
     const table = screen.getByRole("table");
     const [, ...rows] = within(table).getAllByRole("row");
@@ -38,7 +48,7 @@ describe("ProgressPoints", () => {
   });
 
   it("opens the point in a dialog of its four balances", () => {
-    render(<ProgressPoints points={points} />);
+    renderPoints();
 
     const dialog = openEditor("31 Aug 2026");
 
@@ -49,8 +59,8 @@ describe("ProgressPoints", () => {
     ).toHaveValue("£182,940");
   });
 
-  it("writes a saved edit back into the table", () => {
-    render(<ProgressPoints points={points} />);
+  it("writes a saved edit back into the table and reports it", () => {
+    renderPoints();
 
     const dialog = openEditor("31 Aug 2026");
 
@@ -60,7 +70,12 @@ describe("ProgressPoints", () => {
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "31 Aug 2026" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Point updated" }),
+    ).toHaveAccessibleDescription("31 Aug 2026");
 
     const table = screen.getByRole("table");
 
@@ -73,7 +88,7 @@ describe("ProgressPoints", () => {
   });
 
   it("drops a cancelled edit and a cleared field", () => {
-    render(<ProgressPoints points={points} />);
+    renderPoints();
 
     let dialog = openEditor("31 Jul 2026");
 

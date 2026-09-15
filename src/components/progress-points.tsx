@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { toast } from "@/components/ui/toast";
 import { formatGbp } from "@/lib/money";
 
 type Balance = Exclude<keyof ProgressPoint, "date">;
@@ -65,13 +66,18 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
     setEditing(null);
   }
 
-  function save(): void {
+  // The reference reports "plan recalculated" beside the date. Nothing here
+  // recalculates yet, so the toast says only what happened.
+  function save(point: ProgressPoint): void {
     setRows(
-      rows.map((row) =>
-        row.date === editing?.date ? { ...row, ...edits } : row,
-      ),
+      rows.map((row) => (row.date === point.date ? { ...row, ...edits } : row)),
     );
     setEditing(null);
+    toast.add({
+      description: point.date,
+      title: "Point updated",
+      type: "success",
+    });
   }
 
   return (
@@ -142,7 +148,12 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
               <DialogClose render={<Button size="sm" variant="outline" />}>
                 Cancel
               </DialogClose>
-              <Button onClick={save} size="sm">
+              <Button
+                onClick={() => {
+                  save(editing);
+                }}
+                size="sm"
+              >
                 Save
               </Button>
             </DialogFooter>
