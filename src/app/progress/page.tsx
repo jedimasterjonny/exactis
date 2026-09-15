@@ -13,7 +13,7 @@ import { progress, sectionLabel } from "@/lib/nav";
 // there is a projection engine to read from.
 export default function Progress(): JSX.Element {
   return (
-    <main>
+    <>
       <ScreenHeader
         // Adding a point needs the edit dialog, which the button waits for.
         actions={
@@ -59,6 +59,6 @@ export default function Progress(): JSX.Element {
           record here.
         </p>
       </div>
-    </main>
+    </>
   );
 }
