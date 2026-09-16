@@ -1,5 +1,7 @@
 import type { LineValues } from "@/data/schedule";
 
+export type ExpenseKind = (typeof expenseKinds)[number];
+
 // An expense line is money going out over a run of years: the household's
 // spending, a child's nursery, a loan's payments, a late-life allowance.
 // It holds what every line holds, and its kind says what the money is:
@@ -19,8 +21,6 @@ export interface ExpenseLine extends ExpenseLineValues {
 export interface ExpenseLineValues extends LineValues {
   readonly kind: ExpenseKind;
 }
-
-type ExpenseKind = (typeof expenseKinds)[number];
 
 // The kinds as a list, so the store's column takes the same words the
 // type does and cannot drift from them.
