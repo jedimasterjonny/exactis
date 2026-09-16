@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/kit/input";
 
 import { Field } from "./field";
 

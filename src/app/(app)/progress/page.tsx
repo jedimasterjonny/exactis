@@ -6,7 +6,7 @@ import { Note } from "@/components/app/note";
 import { ProgressPoints } from "@/components/app/progress-points";
 import { ScreenHeader } from "@/components/app/screen-header";
 import { StatTile } from "@/components/app/stat-tile";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/kit/button";
 import { points } from "@/data/points";
 import { progress, sectionLabel } from "@/lib/nav";
 

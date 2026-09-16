@@ -15,7 +15,7 @@ import { RateField } from "@/components/app/rate-field";
 import { ScreenHeader } from "@/components/app/screen-header";
 import { SelectField } from "@/components/app/select-field";
 import { TextField } from "@/components/app/text-field";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/kit/button";
 import {
   Dialog,
   DialogClose,
@@ -23,9 +23,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "@/components/ui/toast";
+} from "@/components/kit/dialog";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/kit/tabs";
+import { toast } from "@/components/kit/toast";
 import { isAsset, toValues } from "@/data/accounts";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 

@@ -267,6 +267,31 @@ const eslintConfig = defineConfig([
     files: ["src/components/ui/**"],
     rules: { "@typescript-eslint/naming-convention": "off" },
   },
+  // The kit layer is the app's only door to the vendored components. Left as
+  // a convention this survives until the first hurried import, after which
+  // the wrapper is no longer the whole surface and an upstream rename
+  // reaches app code that the wrapper existed to shield.
+  //
+  // ui/ is exempt because the vendored files import each other, and kit/
+  // because wrapping them is what it is for.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/components/kit/**", "src/components/ui/**"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/components/ui/*"],
+              message:
+                "Only src/components/kit may import a vendored component. Import the wrapper from @/components/kit instead.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     // Type-only imports must say so, so they are erased at compile time
     // rather than left as a runtime import of a module needed only for

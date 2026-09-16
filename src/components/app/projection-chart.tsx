@@ -18,14 +18,14 @@ import {
 
 import type { ProjectionPoint } from "@/engine/projection";
 
-import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { buttonVariants } from "@/components/kit/button";
+import { Card, CardContent } from "@/components/kit/card";
 import {
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
-} from "@/components/ui/chart";
+} from "@/components/kit/chart";
 import {
   Empty,
   EmptyContent,
@@ -33,8 +33,8 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
-import { Switch } from "@/components/ui/switch";
+} from "@/components/kit/empty";
+import { Switch } from "@/components/kit/switch";
 import { formatGbp } from "@/lib/money";
 import { accountsAndAssets } from "@/lib/nav";
 

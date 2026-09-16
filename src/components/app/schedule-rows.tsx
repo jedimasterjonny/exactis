@@ -8,15 +8,15 @@ import type { LineGrowth, LineValues, Side } from "@/data/schedule";
 import type { Plan } from "@/engine/projection";
 
 import { SpanBar } from "@/components/app/span-bar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/kit/badge";
+import { Button } from "@/components/kit/button";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@/components/kit/empty";
 import { endYear } from "@/engine/projection";
 import { formatGbp } from "@/lib/money";
 

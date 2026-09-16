@@ -5,8 +5,8 @@ import type { JSX } from "react";
 import { Field } from "@base-ui/react/field";
 import { useActionState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/kit/button";
+import { Input } from "@/components/kit/input";
 
 import { signIn } from "./actions";
 
