@@ -1,7 +1,8 @@
 import type { JSX } from "react";
 
-import { Field } from "@base-ui/react/field";
+import { Field as FieldPrimitive } from "@base-ui/react/field";
 
+import { Field } from "@/components/field";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -20,12 +21,11 @@ interface SelectOption<TValue extends string> {
   readonly value: TValue;
 }
 
-// A choice from a short fixed list, in the money field's form: a
-// micro-label above, the native select in the input chrome, and a hint
-// beneath. Base UI's field wires the label and the hint to the select
-// through its control, rendered as the select. The change is reported as
-// the option's typed value rather than the element's string, so a caller
-// never parses what it already gave.
+// A choice from a short fixed list. The select is Base UI's field control
+// rendered as the native select, which is what ties it to the label the
+// field draws. The change is reported as the option's typed value rather
+// than the element's string, so a caller never parses what it already
+// gave.
 export function SelectField<TValue extends string>({
   defaultValue,
   hint,
@@ -34,9 +34,8 @@ export function SelectField<TValue extends string>({
   options,
 }: SelectFieldProps<TValue>): JSX.Element {
   return (
-    <Field.Root className="grid content-start gap-1.5">
-      <Field.Label className="label text-muted-foreground">{label}</Field.Label>
-      <Field.Control
+    <Field hint={hint} label={label}>
+      <FieldPrimitive.Control
         defaultValue={defaultValue}
         onChange={(event) => {
           const chosen = options.find(
@@ -56,11 +55,6 @@ export function SelectField<TValue extends string>({
           </NativeSelect>
         }
       />
-      {hint !== undefined && (
-        <Field.Description className="text-xs text-muted-foreground">
-          {hint}
-        </Field.Description>
-      )}
-    </Field.Root>
+    </Field>
   );
 }
