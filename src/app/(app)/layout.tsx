@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { AppFrame } from "@/components/app/app-frame";
+import { AppFrame } from "@/components/app/templates/app-frame";
 
 // The signed-in screens share the frame: the sidebar with the navigation
 // and the main column beside it. The login screen sits outside this group,
