@@ -3,42 +3,72 @@
 import { updateTag } from "next/cache";
 import * as z from "zod";
 
+import type { ExpenseLine, ExpenseLineValues } from "@/data/expenses";
 import type { IncomeLine, IncomeLineValues } from "@/data/income";
+import type { LineValues } from "@/data/schedule";
 
 import { cadences } from "@/data/accounts";
+import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
 import { lineGrowths } from "@/data/schedule";
 import { getDb } from "@/db/client";
+import { insertExpenseLine, updateExpenseLine } from "@/db/expenses";
 import { insertIncomeLine, updateIncomeLine } from "@/db/income";
 import { requireSession } from "@/lib/session";
 
-import { incomeLinesTag } from "./store";
+import { expenseLinesTag, incomeLinesTag } from "./store";
 
-// What a save may carry, checked against the model's own lists so the
-// two cannot drift: the figures whole and never negative, with a bonus
-// or RSUs only on an employment line; the years whole, the last one
-// absent for a line that runs to the end of the plan and never before
-// the first when it is there; and the name as typed less the space
-// around it, which the form also trims.
-const values = z
+// What a save of either line may carry, checked against the model's own
+// lists so the two cannot drift: the amount whole and never negative;
+// the years whole, the last one absent for a line that runs to the end
+// of the plan and never before the first when it is there; and the name
+// as typed less the space around it, which the form also trims.
+const line = {
+  amount: z.number().int().nonnegative(),
+  cadence: z.enum(cadences),
+  firstYear: z.number().int().positive(),
+  growth: z.enum(lineGrowths),
+  lastYear: z.number().int().positive().nullable(),
+  name: z.string().trim().min(1),
+};
+
+const expenseValues = z
+  .object({ ...line, kind: z.enum(expenseKinds) })
+  .refine(endsAfterItStarts) satisfies z.ZodType<ExpenseLineValues>;
+
+// An income line adds its kind and its parts, whole and never negative,
+// with a bonus or RSUs only on an employment line.
+const incomeValues = z
   .object({
-    amount: z.number().int().nonnegative(),
+    ...line,
     bonus: z.number().int().nonnegative(),
-    cadence: z.enum(cadences),
-    firstYear: z.number().int().positive(),
-    growth: z.enum(lineGrowths),
     kind: z.enum(incomeKinds),
-    lastYear: z.number().int().positive().nullable(),
-    name: z.string().trim().min(1),
     rsu: z.number().int().nonnegative(),
   })
-  .refine((line) => line.lastYear === null || line.lastYear >= line.firstYear)
+  .refine(endsAfterItStarts)
   .refine(
-    (line) =>
-      line.kind === "employment" || (line.bonus === 0 && line.rsu === 0),
+    (values) =>
+      values.kind === "employment" || (values.bonus === 0 && values.rsu === 0),
   ) satisfies z.ZodType<IncomeLineValues>;
 
 const target = z.number().int().positive().nullable();
+
+// Writes an expense line, as an income line is written below.
+export async function saveExpenseLine(
+  id: null | number,
+  draft: ExpenseLineValues,
+): Promise<ExpenseLine> {
+  await requireSession();
+  const at = target.parse(id);
+  const parsed = expenseValues.parse(draft);
+  const db = getDb();
+  const saved =
+    at === null
+      ? await insertExpenseLine(db, parsed)
+      : await updateExpenseLine(db, at, parsed);
+  updateTag(expenseLinesTag);
+  return saved;
+}
 
 // Writes an income line: a new one when the id is null, else over the one
 // with that id, and hands back the line as the store now has it. An
@@ -52,12 +82,16 @@ export async function saveIncomeLine(
 ): Promise<IncomeLine> {
   await requireSession();
   const at = target.parse(id);
-  const parsed = values.parse(draft);
+  const parsed = incomeValues.parse(draft);
   const db = getDb();
-  const line =
+  const saved =
     at === null
       ? await insertIncomeLine(db, parsed)
       : await updateIncomeLine(db, at, parsed);
   updateTag(incomeLinesTag);
-  return line;
+  return saved;
+}
+
+function endsAfterItStarts(values: LineValues): boolean {
+  return values.lastYear === null || values.lastYear >= values.firstYear;
 }
