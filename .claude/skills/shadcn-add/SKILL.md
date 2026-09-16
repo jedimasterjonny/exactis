@@ -33,7 +33,15 @@ imports do not resolve.
    `package.json` in its own right, never reached through whatever already pulls
    it in.
 3. `bun run format` and `bun run lint:fix` clear everything except the return
-   type, which is written by hand.
+   type, which is written by hand. Read what `lint:fix` changed before trusting
+   it: on `field` it rewrote `useMemo(() => {` to `useMemo(async () => {` and
+   React Compiler then refused the file. React 19 types `ReactNode` as including
+   `Promise<AwaitedReactNode>`, so `promise-function-async` reads any callback
+   returning children as promise-returning and autofixes it. The rule names the
+   repair in its own message: annotate the callback's return type. Expect a
+   component that renders a bare `<label>` to trip
+   `jsx-a11y/label-has-associated-control` too, which needs a disable with a
+   reason rather than a fix.
 4. Drop what knip reports. `button` exports `buttonVariants` and nothing imports
    it; an unused export is dropped like any other and restored when a component
    that composes on it arrives.
