@@ -30,10 +30,10 @@ The app is then at <http://localhost:3000>, rendered from `src/app/page.tsx`.
 
 ## The store
 
-Accounts live in Postgres, reached through [Drizzle](https://orm.drizzle.team)
-over Neon's HTTP driver. The schema is `src/db/schema.ts`, the migrations
-generated from it are in `drizzle/`, and the queries are in
-`src/db/accounts.ts`.
+Accounts and income lines live in Postgres, reached through
+[Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The schema is
+`src/db/schema.ts`, the migrations generated from it are in `drizzle/`, and the
+queries are in `src/db/accounts.ts` and `src/db/income.ts`.
 
 The accounts screen reads and writes it, and the dashboard projects what it
 holds; the progress screen still shows the reference kit's figures.

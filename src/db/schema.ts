@@ -7,12 +7,18 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { accountKinds, cadences, growthKinds } from "@/data/accounts";
+import { incomeKinds } from "@/data/income";
+import { lineGrowths } from "@/data/schedule";
 
 export const accountKind = pgEnum("account_kind", accountKinds);
 
 export const cadence = pgEnum("cadence", cadences);
 
 export const growthKind = pgEnum("growth_kind", growthKinds);
+
+export const incomeGrowth = pgEnum("income_growth", lineGrowths);
+
+export const incomeKind = pgEnum("income_kind", incomeKinds);
 
 // One row per account, holding the account's values as the model lays
 // them flat: every column present, a contribution of nothing as a zero
@@ -28,4 +34,22 @@ export const accounts = pgTable("accounts", {
   kind: accountKind().notNull(),
   name: text().notNull(),
   rate: doublePrecision().notNull(),
+});
+
+// One row per income line: the line's values with an id, the parts held
+// as columns of their own, and no last year for a line that runs to the
+// end of the plan. The cadence is the accounts' own type, since a line is
+// paid as a contribution is. The two year columns are named, since the
+// model's names are the dialog's words and the store's are snake case.
+export const incomeLines = pgTable("income_lines", {
+  amount: integer().notNull(),
+  bonus: integer().notNull(),
+  cadence: cadence().notNull(),
+  firstYear: integer("first_year").notNull(),
+  growth: incomeGrowth().notNull(),
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  kind: incomeKind().notNull(),
+  lastYear: integer("last_year"),
+  name: text().notNull(),
+  rsu: integer().notNull(),
 });
