@@ -8,7 +8,12 @@ import { accounts } from "@/db/schema";
 // @vitest-environment node
 import type { Database } from "./accounts";
 
-import { insertAccount, listAccounts, updateAccount } from "./accounts";
+import {
+  insertAccount,
+  listAccounts,
+  placeAccounts,
+  updateAccount,
+} from "./accounts";
 
 const pension = {
   balance: 412880,
@@ -135,6 +140,47 @@ describe("accounts store", () => {
       { id: 2, position: 2 },
     ]);
     expect((await listAccounts(db)).map(({ id }) => id)).toStrictEqual([1, 2]);
+  });
+
+  it("places every account in the order given and lists them so", async () => {
+    const db = await openStore();
+    const first = await insertAccount(db, pension);
+    const second = await insertAccount(db, mortgage);
+    const third = await insertAccount(db, { ...pension, name: "ISA" });
+
+    await placeAccounts(db, [third.id, first.id, second.id]);
+
+    expect((await listAccounts(db)).map(({ name }) => name)).toStrictEqual([
+      "ISA",
+      "Workplace pension",
+      "Mortgage",
+    ]);
+    expect((await insertAccount(db, { ...pension, name: "LISA" })).name).toBe(
+      "LISA",
+    );
+    expect((await listAccounts(db)).map(({ name }) => name)).toStrictEqual([
+      "ISA",
+      "Workplace pension",
+      "Mortgage",
+      "LISA",
+    ]);
+  });
+
+  it("refuses to place a list that leaves an account out or names an id no account has", async () => {
+    const db = await openStore();
+    const first = await insertAccount(db, pension);
+    const second = await insertAccount(db, mortgage);
+
+    await expect(placeAccounts(db, [second.id])).rejects.toThrow(
+      "Not every account was placed",
+    );
+    await expect(placeAccounts(db, [second.id, 99])).rejects.toThrow(
+      "Not every account was placed",
+    );
+    expect((await listAccounts(db)).map(({ id }) => id)).toStrictEqual([
+      first.id,
+      second.id,
+    ]);
   });
 
   it("refuses to update an id no account has", async () => {

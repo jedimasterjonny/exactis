@@ -4,11 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
 import { accounts } from "@/data/accounts.fixture";
-import { insertAccount, updateAccount } from "@/db/accounts";
+import { insertAccount, placeAccounts, updateAccount } from "@/db/accounts";
 import { getDb } from "@/db/client";
 import { requireSession } from "@/lib/session";
 
-import { saveAccount } from "./actions";
+import { placeAccountsInOrder, saveAccount } from "./actions";
 import { accountsTag } from "./store";
 
 vi.mock("server-only", () => ({}));
@@ -19,6 +19,7 @@ vi.mock("next/cache", () => ({
 }));
 vi.mock("@/db/accounts", () => ({
   insertAccount: vi.fn(),
+  placeAccounts: vi.fn(),
   updateAccount: vi.fn(),
 }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
@@ -114,6 +115,35 @@ describe("saveAccount", () => {
     ).rejects.toThrow(z.ZodError);
     expect(insertAccount).not.toHaveBeenCalled();
     expect(updateAccount).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+});
+
+describe("placeAccountsInOrder", () => {
+  beforeEach(() => {
+    vi.mocked(getDb).mockReturnValue(db);
+  });
+
+  it("places nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(placeAccountsInOrder([1, 2])).rejects.toThrow("redirected");
+    expect(placeAccounts).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+
+  it("places the accounts in the order given and expires the tag", async () => {
+    await placeAccountsInOrder([3, 1, 2]);
+
+    expect(placeAccounts).toHaveBeenCalledExactlyOnceWith(db, [3, 1, 2]);
+    expect(updateTag).toHaveBeenCalledExactlyOnceWith(accountsTag);
+  });
+
+  it("refuses an order the ledger could not have sent", async () => {
+    await expect(placeAccountsInOrder([])).rejects.toThrow(z.ZodError);
+    await expect(placeAccountsInOrder([1, 1])).rejects.toThrow(z.ZodError);
+    await expect(placeAccountsInOrder([0, 1])).rejects.toThrow(z.ZodError);
+    expect(placeAccounts).not.toHaveBeenCalled();
     expect(updateTag).not.toHaveBeenCalled();
   });
 });
