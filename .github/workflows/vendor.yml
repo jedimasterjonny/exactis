@@ -1,0 +1,214 @@
+name: Vendor
+
+# src/components/ui is vendored 1:1: every byte there is what
+# `shadcn add --overwrite` writes, which is the whole reason those files are
+# exempt from Prettier, ESLint and knip. Nothing in ci.yml proves that. It
+# cannot - the registry is a network call, and putting one in the gate on
+# every push trades a hermetic check for a flaky one - so it is proved here
+# instead, once a week, against the live registry.
+#
+# Drift in either direction is worth knowing about: upstream moving on, or a
+# hand-edit landing in a directory the style gates no longer look at.
+
+on:
+  schedule:
+    # Monday morning, off the hour. GitHub queues scheduled runs at popular
+    # minutes and sheds them under load. Note that GitHub disables a
+    # scheduled workflow after 60 days without repository activity.
+    - cron: "17 6 * * 1"
+  # The weekly cadence is for drift nobody has asked about yet. This is for
+  # when someone wants the answer now, or after taking a component by hand.
+  workflow_dispatch:
+
+# Unlike ci.yml, which writes nothing, this one opens a pull request.
+permissions:
+  contents: write
+  pull-requests: write
+
+# Never cancel a refresh: two runs racing on one branch would leave whichever
+# lost having force-pushed a half-built tree.
+concurrency:
+  cancel-in-progress: false
+  group: vendor
+
+env:
+  BRANCH: vendor/shadcn-refresh
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Digests match ci.yml, and Renovate updates both together.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # ci.yml drops the token because nothing there pushes. Pushing is
+          # this job's entire purpose, so it stays.
+          persist-credentials: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - id: bun-cache
+        run: |
+          dir="$(bun pm cache)"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: bun-vendor-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          path: ${{ steps.bun-cache.outputs.dir }}
+          restore-keys: bun-vendor-${{ runner.os }}-
+
+      - run: bun install --frozen-lockfile
+
+      # The component list is read off the directory rather than written
+      # here, so adding one does not mean remembering to also name it in a
+      # workflow. Registry names and file names are the same string, and
+      # use-mobile.ts is a registry item like the rest.
+      - id: regenerate
+        run: |
+          set -uo pipefail
+          names="$(ls src/components/ui | sed 's/\.[^.]*$//' | tr '\n' ' ')"
+          echo "Regenerating: $names"
+          cp package.json "$RUNNER_TEMP/package.json.orig"
+          cp bun.lock "$RUNNER_TEMP/bun.lock.orig"
+
+          if ! bunx shadcn add $names --overwrite --yes; then
+            echo "::error::shadcn add failed. A component may have been renamed or withdrawn upstream."
+            exit 1
+          fi
+
+          # `shadcn add` rewrites dependency ranges in package.json - it has
+          # been seen dropping a pinned recharts 3.10.1 to 3.8.0 - and
+          # touches bun.lock. Versions here are pinned and Renovate owns
+          # them, so both files are put back. A dependency the CLI wants to
+          # *add* is a different matter and must not be swallowed, so the
+          # names are compared before the file is restored.
+          node -e '
+            const fs = require("fs");
+            const read = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
+            const names = (m) => Object.keys({ ...m.dependencies, ...m.devDependencies });
+            const before = names(read(process.env.RUNNER_TEMP + "/package.json.orig"));
+            const added = names(read("package.json")).filter((n) => !before.includes(n));
+            if (added.length > 0) {
+              console.log("::error::shadcn wants dependencies this repo does not declare: " + added.join(", ") + ". Add them by hand before this refresh can land.");
+              process.exit(1);
+            }
+          '
+          status=$?
+          cp "$RUNNER_TEMP/package.json.orig" package.json
+          cp "$RUNNER_TEMP/bun.lock.orig" bun.lock
+          [ "$status" -eq 0 ] || exit "$status"
+
+          # Putting the two files back is not the whole restore. `shadcn add`
+          # installs as it goes, so node_modules is left holding whatever
+          # version the CLI wrote - a downgraded recharts, in the case that
+          # prompted this - and every check below would run against a tree
+          # that matches neither package.json nor bun.lock. Re-link them to
+          # the lockfile before anything reads node_modules again.
+          bun install --frozen-lockfile
+
+          # Everything the CLI writes is supposed to land under the one
+          # exempt path. Anything else means components.json aliases have
+          # drifted, and a file has been written where the style gates will
+          # fail it on the next commit.
+          stray="$(git status --porcelain -- . ':(exclude)src/components/ui')"
+          if [ -n "$stray" ]; then
+            echo "$stray"
+            echo "::error::shadcn wrote outside src/components/ui. Check the aliases in components.json."
+            exit 1
+          fi
+
+          if [ -z "$(git status --porcelain -- src/components/ui)" ]; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+            echo "The vendored components are identical to the registry."
+          else
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+            git status --porcelain -- src/components/ui
+          fi
+
+      # Run on the refreshed tree, because the pull request this opens is
+      # created with GITHUB_TOKEN and GitHub will not start a workflow run
+      # from it - so ci.yml never sees the branch. Rather than leave that
+      # unanswered, the same checks run here and the outcome goes in the
+      # body. To get real CI on the branch instead, push it with a
+      # fine-grained PAT in place of the default token.
+      #
+      # A red result is not a reason to stop: an upstream change that breaks
+      # a kit wrapper is exactly what a human needs to see.
+      - id: checks
+        if: steps.regenerate.outputs.drift == 'true'
+        run: |
+          set -uo pipefail
+          : > "$RUNNER_TEMP/checks.md"
+          overall=passing
+          for script in format:check lint typecheck test:coverage build knip; do
+            if bun run "$script"; then
+              echo "| \`$script\` | passed |" >> "$RUNNER_TEMP/checks.md"
+            else
+              echo "| \`$script\` | **FAILED** |" >> "$RUNNER_TEMP/checks.md"
+              overall=failing
+            fi
+          done
+          echo "overall=$overall" >> "$GITHUB_OUTPUT"
+
+      - if: steps.regenerate.outputs.drift == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Reset to a fresh branch off the default every week rather than
+          # building on last week's: the refresh is always the current
+          # registry against current main, never a stack of them.
+          git switch --force-create "$BRANCH"
+          git add src/components/ui
+          git commit --file - <<'COMMIT'
+          refactor(vendor): refresh the vendored shadcn components
+
+          Written by the weekly Vendor workflow, not by hand: this is
+          `shadcn add --overwrite` over every name in src/components/ui,
+          with package.json and bun.lock restored afterwards because the
+          CLI rewrites pinned ranges that Renovate owns.
+
+          Review it as an upstream diff. The kit wrappers in front of these
+          files are what the app talks to, so a rename or a dropped export
+          shows up there as a type error rather than in a screen.
+          COMMIT
+
+          git push --force origin "$BRANCH"
+
+          body="$RUNNER_TEMP/body.md"
+          {
+            echo "\`shadcn add --overwrite\` produced files that differ from the ones on \`main\`."
+            echo
+            echo "| check | result |"
+            echo "| --- | --- |"
+            cat "$RUNNER_TEMP/checks.md"
+            echo
+            echo "These ran in the Vendor workflow, on this branch's tree. GitHub does not start"
+            echo "a workflow run for a pull request opened with \`GITHUB_TOKEN\`, so **ci.yml has not"
+            echo "run on this branch** - push any commit to it yourself to get a real CI run."
+            echo
+            if [ "${{ steps.checks.outputs.overall }}" = "failing" ]; then
+              echo "A failing check here usually means upstream changed something a wrapper in"
+              echo "\`src/components/kit\` depends on. Fix the wrapper, not the vendored file."
+            else
+              echo "Nothing here depends on a vendored file that changed shape, so this is a"
+              echo "straight upstream refresh."
+            fi
+          } > "$body"
+
+          if gh pr view "$BRANCH" --json number >/dev/null 2>&1; then
+            gh pr edit "$BRANCH" --body-file "$body"
+            echo "Updated the open pull request."
+          else
+            gh pr create --base "${{ github.ref_name }}" --head "$BRANCH" \
+              --title "refactor(vendor): refresh the vendored shadcn components" \
+              --body-file "$body"
+          fi
