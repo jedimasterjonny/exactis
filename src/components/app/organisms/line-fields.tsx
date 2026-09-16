@@ -3,12 +3,12 @@ import type { JSX, ReactNode } from "react";
 import type { LineValues, Side } from "@/data/schedule";
 import type { Plan } from "@/engine/projection";
 
-import { MoneyField } from "@/components/app/money-field";
-import { growthLabels } from "@/components/app/schedule-rows";
-import { SelectField } from "@/components/app/select-field";
-import { SpanBar } from "@/components/app/span-bar";
-import { TextField } from "@/components/app/text-field";
-import { YearField } from "@/components/app/year-field";
+import { SpanBar } from "@/components/app/atoms/span-bar";
+import { MoneyField } from "@/components/app/molecules/money-field";
+import { SelectField } from "@/components/app/molecules/select-field";
+import { TextField } from "@/components/app/molecules/text-field";
+import { YearField } from "@/components/app/molecules/year-field";
+import { growthLabels } from "@/components/app/organisms/schedule-rows";
 import { endYear } from "@/engine/projection";
 
 // How a line ends: in a year typed into the field beneath the choice, or

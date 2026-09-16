@@ -5,20 +5,20 @@ import type { JSX } from "react";
 import { Plus } from "lucide-react";
 import { startTransition, useState, useTransition } from "react";
 
-import type { Summary } from "@/components/app/schedule-rows";
+import type { Summary } from "@/components/app/organisms/schedule-rows";
 import type { IncomeKind, IncomeLine, IncomeLineValues } from "@/data/income";
 import type { Plan } from "@/engine/projection";
 
 import { saveIncomeLine } from "@/app/(app)/plan/actions";
+import { Note } from "@/components/app/atoms/note";
+import { MoneyField } from "@/components/app/molecules/money-field";
 import {
   isSound,
   LineFields,
   optionsOf,
   spanOf,
-} from "@/components/app/line-fields";
-import { MoneyField } from "@/components/app/money-field";
-import { Note } from "@/components/app/note";
-import { ScheduleRows } from "@/components/app/schedule-rows";
+} from "@/components/app/organisms/line-fields";
+import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
 import {

@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { AccountLedger } from "@/components/app/account-ledger";
+import { AccountLedger } from "@/components/app/organisms/account-ledger";
 
 import { getAccounts } from "./store";
 

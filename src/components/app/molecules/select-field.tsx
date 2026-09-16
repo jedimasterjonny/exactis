@@ -2,7 +2,7 @@ import type { JSX } from "react";
 
 import { Field as FieldPrimitive } from "@base-ui/react/field";
 
-import { Field } from "@/components/app/field";
+import { Field } from "@/components/app/atoms/field";
 import {
   NativeSelect,
   NativeSelectOption,

@@ -3,8 +3,8 @@ import type { JSX, ReactNode } from "react";
 import { LogOut } from "lucide-react";
 
 import { signOut } from "@/app/login/actions";
-import { AppNav } from "@/components/app/app-nav";
-import { ThemeToggle } from "@/components/app/theme-toggle";
+import { AppNav } from "@/components/app/molecules/app-nav";
+import { ThemeToggle } from "@/components/app/molecules/theme-toggle";
 import {
   Sidebar,
   SidebarContent,

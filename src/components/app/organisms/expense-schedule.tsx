@@ -5,7 +5,7 @@ import type { JSX } from "react";
 import { Plus } from "lucide-react";
 import { startTransition, useState, useTransition } from "react";
 
-import type { Summary } from "@/components/app/schedule-rows";
+import type { Summary } from "@/components/app/organisms/schedule-rows";
 import type {
   ExpenseKind,
   ExpenseLine,
@@ -14,14 +14,14 @@ import type {
 import type { Plan } from "@/engine/projection";
 
 import { saveExpenseLine } from "@/app/(app)/plan/actions";
+import { Note } from "@/components/app/atoms/note";
 import {
   isSound,
   LineFields,
   optionsOf,
   spanOf,
-} from "@/components/app/line-fields";
-import { Note } from "@/components/app/note";
-import { ScheduleRows } from "@/components/app/schedule-rows";
+} from "@/components/app/organisms/line-fields";
+import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
 import {
