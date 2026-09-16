@@ -2,10 +2,10 @@ import type { JSX } from "react";
 
 import { Plus } from "lucide-react";
 
-import { Note } from "@/components/note";
-import { ProgressPoints } from "@/components/progress-points";
-import { ScreenHeader } from "@/components/screen-header";
-import { StatTile } from "@/components/stat-tile";
+import { Note } from "@/components/app/note";
+import { ProgressPoints } from "@/components/app/progress-points";
+import { ScreenHeader } from "@/components/app/screen-header";
+import { StatTile } from "@/components/app/stat-tile";
 import { Button } from "@/components/ui/button";
 import { points } from "@/data/points";
 import { progress, sectionLabel } from "@/lib/nav";

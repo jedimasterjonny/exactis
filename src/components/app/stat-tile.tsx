@@ -1,9 +1,9 @@
 import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
 
-import type { DeltaFormat } from "@/components/delta-value";
+import type { DeltaFormat } from "@/components/app/delta-value";
 
-import { DeltaValue } from "@/components/delta-value";
+import { DeltaValue } from "@/components/app/delta-value";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 interface StatTileProps {
