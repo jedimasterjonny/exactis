@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { IncomeLine } from "@/data/income";
 
 import { saveIncomeLine } from "@/app/(app)/plan/actions";
-import { Toaster } from "@/components/ui/toast";
+import { Toaster } from "@/components/kit/toast";
 import { incomeKinds } from "@/data/income";
 import { incomeLines, plan } from "@/data/income.fixture";
 import { lineGrowths } from "@/data/schedule";

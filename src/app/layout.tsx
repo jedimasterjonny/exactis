@@ -6,7 +6,7 @@ import { cn } from "cn";
 import { ThemeProvider } from "next-themes";
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 
-import { Toaster } from "@/components/ui/toast";
+import { Toaster } from "@/components/kit/toast";
 
 // Space Grotesk for headings only, Geist for body and UI text, Geist Mono
 // for every figure. next/font downloads each face at build time and serves

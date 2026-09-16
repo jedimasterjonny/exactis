@@ -19,8 +19,8 @@ import {
 import { MoneyField } from "@/components/app/money-field";
 import { Note } from "@/components/app/note";
 import { ScheduleRows } from "@/components/app/schedule-rows";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/kit/button";
+import { Card, CardContent, CardHeader } from "@/components/kit/card";
 import {
   Dialog,
   DialogClose,
@@ -28,8 +28,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { toast } from "@/components/ui/toast";
+} from "@/components/kit/dialog";
+import { toast } from "@/components/kit/toast";
 import { totalOf } from "@/data/income";
 import { formatGbp } from "@/lib/money";
 import { plan as planScreen, sectionNumeral } from "@/lib/nav";

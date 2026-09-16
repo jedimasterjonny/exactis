@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { Toaster } from "@/components/ui/toast";
+import { Toaster } from "@/components/kit/toast";
 import { points } from "@/data/points";
 
 import { ProgressPoints } from "./progress-points";

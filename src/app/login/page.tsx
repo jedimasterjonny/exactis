@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/kit/button";
+import { Card, CardContent, CardHeader } from "@/components/kit/card";
 import { isDevSignInOpen } from "@/lib/dev-sign-in";
 
 import { signInAsDeveloper } from "./actions";
