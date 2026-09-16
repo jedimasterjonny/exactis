@@ -4,10 +4,13 @@ import type { JSX } from "react";
 import type { TooltipContentProps } from "recharts";
 
 import { cn } from "cn";
+import { ChartArea } from "lucide-react";
+import Link from "next/link";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import type { ProjectionPoint } from "@/engine/projection";
 
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -15,7 +18,16 @@ import {
   ChartLegendContent,
   ChartTooltip,
 } from "@/components/ui/chart";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { formatGbp } from "@/lib/money";
+import { accountsAndAssets } from "@/lib/nav";
 
 interface ProjectionChartProps {
   readonly points: readonly ProjectionPoint[];
@@ -54,12 +66,31 @@ const config = Object.fromEntries(
 // year's figures on hover and on the arrow keys. The pounds are written
 // in full, as money is everywhere here. A projection of nothing, because
 // no account is a wrapper yet, says so in the plot's place rather than
-// drawing a flat zero over a column of £0 ticks.
+// drawing a flat zero over a column of £0 ticks, and points at the screen
+// where the account is added: the dashboard has no way to add one itself.
 export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
   if (points.every((point) => totalOf(point) === 0)) {
     return (
       <Frame>
-        <Note>Add a tax-free or tax-deferred account to see it projected.</Note>
+        <Empty className="aspect-[3/1]">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ChartArea aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>Nothing to project yet</EmptyTitle>
+            <EmptyDescription>
+              Add a tax-free or tax-deferred account to see it projected.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Link
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+              href={accountsAndAssets.href}
+            >
+              {accountsAndAssets.label}
+            </Link>
+          </EmptyContent>
+        </Empty>
       </Frame>
     );
   }
