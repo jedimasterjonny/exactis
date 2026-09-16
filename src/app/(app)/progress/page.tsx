@@ -1,7 +1,8 @@
 import type { JSX } from "react";
 
-import { Info, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
+import { Note } from "@/components/note";
 import { ProgressPoints } from "@/components/progress-points";
 import { ScreenHeader } from "@/components/screen-header";
 import { StatTile } from "@/components/stat-tile";
@@ -53,11 +54,10 @@ export default function Progress(): JSX.Element {
           />
         </div>
         <ProgressPoints points={points} />
-        <p className="flex items-start gap-2 text-sm text-muted-foreground">
-          <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
+        <Note>
           Net worth, assets and liabilities are derived from the values you
           record here.
-        </p>
+        </Note>
       </div>
     </>
   );

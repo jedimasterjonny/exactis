@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { Info, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { startTransition, useState, useTransition } from "react";
 
 import type { Account, AccountValues } from "@/data/accounts";
@@ -10,6 +10,7 @@ import type { Account, AccountValues } from "@/data/accounts";
 import { saveAccount } from "@/app/(app)/accounts/actions";
 import { AccountTable } from "@/components/account-table";
 import { MoneyField } from "@/components/money-field";
+import { Note } from "@/components/note";
 import { RateField } from "@/components/rate-field";
 import { ScreenHeader } from "@/components/screen-header";
 import { SelectField } from "@/components/select-field";
@@ -298,16 +299,6 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
         )}
       </Dialog>
     </>
-  );
-}
-
-// The muted note that closes a screen's section, as on the progress screen.
-function Note({ children }: { readonly children: string }): JSX.Element {
-  return (
-    <p className="flex items-start gap-2 text-sm text-muted-foreground">
-      <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
-      {children}
-    </p>
   );
 }
 
