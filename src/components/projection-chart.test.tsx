@@ -53,18 +53,25 @@ describe("ProjectionChart", () => {
       />,
     );
 
-    expect(screen.getByRole("paragraph")).toHaveTextContent(
-      "Add a tax-free or tax-deferred account to see it projected.",
-    );
+    expect(
+      screen.getByText(
+        "Add a tax-free or tax-deferred account to see it projected.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Accounts & assets" }),
+    ).toHaveAttribute("href", "/accounts");
     expect(screen.queryByRole("application")).not.toBeInTheDocument();
   });
 
   it("has nothing to plot over no years either", () => {
     render(<ProjectionChart points={[]} />);
 
-    expect(screen.getByRole("paragraph")).toHaveTextContent(
-      "Add a tax-free or tax-deferred account to see it projected.",
-    );
+    expect(
+      screen.getByText(
+        "Add a tax-free or tax-deferred account to see it projected.",
+      ),
+    ).toBeInTheDocument();
   });
 });
 
