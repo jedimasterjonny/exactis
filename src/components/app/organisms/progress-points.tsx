@@ -7,7 +7,7 @@ import { useState } from "react";
 
 import type { ProgressPoint } from "@/data/points";
 
-import { MoneyField } from "@/components/app/money-field";
+import { MoneyField } from "@/components/app/molecules/money-field";
 import { Button } from "@/components/kit/button";
 import { Card } from "@/components/kit/card";
 import {

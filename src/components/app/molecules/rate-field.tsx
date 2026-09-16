@@ -2,7 +2,7 @@ import type { JSX } from "react";
 
 import { NumberField } from "@base-ui/react/number-field";
 
-import { Field } from "@/components/app/field";
+import { Field } from "@/components/app/atoms/field";
 import { Input } from "@/components/kit/input";
 
 interface RateFieldProps {
