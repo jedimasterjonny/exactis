@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { Pencil } from "lucide-react";
+import { Pencil, Wallet } from "lucide-react";
 
 import type {
   Account,
@@ -14,6 +14,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
   Table,
   TableBody,
   TableCell,
@@ -25,6 +32,8 @@ import { formatGbp } from "@/lib/money";
 
 interface AccountTableProps {
   readonly accounts: readonly Account[];
+  readonly emptyDescription: string;
+  readonly emptyTitle: string;
   readonly onEdit?: (account: Account) => void;
 }
 
@@ -55,11 +64,33 @@ const treatments: Record<
 // A ledger of accounts: the name and its balance carry the weight, the
 // treatment is a badge, and the three figures are right-aligned mono. A
 // table given an edit handler closes each row with a pencil that reports
-// the row's account, whose id says where a save writes back.
+// the row's account, whose id says where a save writes back. A ledger
+// holding nothing draws its empty state instead of the table, since a
+// header row over no rows states five column names and no information.
+// The words are the caller's, because accounts and assets are the same
+// table and want different sentences.
 export function AccountTable({
   accounts,
+  emptyDescription,
+  emptyTitle,
   onEdit,
 }: AccountTableProps): JSX.Element {
+  if (accounts.length === 0) {
+    return (
+      <Card className="py-0">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Wallet aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>{emptyTitle}</EmptyTitle>
+            <EmptyDescription>{emptyDescription}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </Card>
+    );
+  }
+
   return (
     <Card className="py-0">
       <Table className="[&_td]:px-4 [&_th]:px-4">
