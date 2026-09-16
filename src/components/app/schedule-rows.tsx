@@ -7,7 +7,7 @@ import type { Cadence } from "@/data/accounts";
 import type { LineGrowth, LineValues, Side } from "@/data/schedule";
 import type { Plan } from "@/engine/projection";
 
-import { SpanBar } from "@/components/span-bar";
+import { SpanBar } from "@/components/app/span-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

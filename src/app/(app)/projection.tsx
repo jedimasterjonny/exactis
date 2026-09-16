@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { ProjectionChart } from "@/components/projection-chart";
+import { ProjectionChart } from "@/components/app/projection-chart";
 
 import { getProjection } from "./store";
 
