@@ -11,6 +11,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarInset,
+  SidebarMenuButton,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
@@ -25,7 +26,10 @@ interface AppFrameProps {
 // screens render their content directly. On a phone the sidebar is off
 // canvas and a trigger above the screen opens it as a sheet. Sign-out is a
 // form posting to its action, so it works before the page hydrates and
-// needs no client code of its own.
+// needs no client code of its own. Its button is the registry's, so hover
+// and focus come from where the navigation's do, but the footer's
+// micro-label type is laid back over it: this row reads with the motto
+// below it, not the navigation above.
 export function AppFrame({ children }: AppFrameProps): JSX.Element {
   return (
     <SidebarProvider>
@@ -45,13 +49,13 @@ export function AppFrame({ children }: AppFrameProps): JSX.Element {
         <SidebarFooter className="gap-3 px-4 pb-5">
           <ThemeToggle />
           <form action={signOut} aria-label="Sign out">
-            <button
-              className="flex h-8 w-full items-center gap-2 label text-sidebar-foreground/60 transition-colors hover:text-sidebar-foreground focus-visible:text-sidebar-foreground focus-visible:outline-none"
+            <SidebarMenuButton
+              className="-mx-2 label text-xs text-sidebar-foreground/60 [&_svg]:size-3.5"
               type="submit"
             >
-              <LogOut aria-hidden className="size-3.5" />
+              <LogOut aria-hidden />
               Sign out
-            </button>
+            </SidebarMenuButton>
           </form>
           {/* The one Latin motto, and the whole of the 40k licence. */}
           <span className="label text-sidebar-foreground/60">
