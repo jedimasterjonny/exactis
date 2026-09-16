@@ -3,6 +3,8 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
 
+import { accounts } from "@/db/schema";
+
 // @vitest-environment node
 import type { Database } from "./accounts";
 
@@ -112,6 +114,27 @@ describe("accounts store", () => {
     expect(capped.contribution).toStrictEqual({ cap: 4000, kind: "spare" });
     expect(uncapped.contribution).toStrictEqual({ cap: null, kind: "spare" });
     expect(await listAccounts(db)).toStrictEqual([uncapped]);
+  });
+
+  // The place is the store's, read back off the table since no account
+  // carries it: each new account after the last, so the list is the
+  // order added, and an edit leaves it where it is.
+  it("places each new account after the last and an edit where it was", async () => {
+    const db = await openStore();
+    const first = await insertAccount(db, pension);
+    await insertAccount(db, mortgage);
+    await updateAccount(db, first.id, { ...pension, balance: 1 });
+
+    expect(
+      await db
+        .select({ id: accounts.id, position: accounts.position })
+        .from(accounts)
+        .orderBy(accounts.id),
+    ).toStrictEqual([
+      { id: 1, position: 1 },
+      { id: 2, position: 2 },
+    ]);
+    expect((await listAccounts(db)).map(({ id }) => id)).toStrictEqual([1, 2]);
   });
 
   it("refuses to update an id no account has", async () => {

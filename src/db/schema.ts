@@ -33,8 +33,10 @@ export const expenseKind = pgEnum("expense_kind", expenseKinds);
 // One row per account, holding the account's values as the model lays
 // them flat: every column present, a contribution of nothing as a zero,
 // a cap of nothing as one and a plan rate's rate as one, so a row is the
-// values with an id and nothing in it needs the model to read. The id is an identity the store
-// hands out; insertion order is the order accounts are listed in.
+// values with an id and nothing in it needs the model to read. The id is
+// an identity the store hands out. The position is the account's place
+// in the list, which the store sets after the last on insert, so it is
+// the order accounts were added until it is changed.
 export const accounts = pgTable("accounts", {
   balance: integer().notNull(),
   cadence: cadence().notNull(),
@@ -45,6 +47,7 @@ export const accounts = pgTable("accounts", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   kind: accountKind().notNull(),
   name: text().notNull(),
+  position: integer().notNull(),
   rate: doublePrecision().notNull(),
 });
 

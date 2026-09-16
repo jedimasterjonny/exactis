@@ -3,8 +3,9 @@
 // negative, formatted where they are rendered; a rate is a fraction, so
 // 0.021 is 2.10%. The id is the account's identity, so an edit writes back
 // to the account rather than to a place in a list, and two accounts may
-// share a name. The store hands the ids out, in the order accounts were
-// added, and that order is the order they are listed in.
+// share a name. The store hands the ids out, and holds the order the
+// accounts are listed in, which is the order they were added until it
+// is changed.
 export interface Account {
   readonly balance: number;
   readonly contribution?: Contribution;

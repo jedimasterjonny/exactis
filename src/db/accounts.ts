@@ -1,6 +1,6 @@
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 
 import type { Account, AccountValues } from "@/data/accounts";
 
@@ -13,18 +13,29 @@ export type Database = PgDatabase<PgQueryResultHKT>;
 
 type Row = typeof accounts.$inferSelect;
 
-// A new account, with the id the store gives it.
+// The place after the last account's, or the first when there is none,
+// read in the insert itself so two inserts cannot read the same last.
+const nextPosition = sql<number>`(select coalesce(max(${accounts.position}), 0) + 1 from ${accounts})`;
+
+// A new account, with the id the store gives it, placed after the last.
 export async function insertAccount(
   db: Database,
   values: AccountValues,
 ): Promise<Account> {
-  const rows = await db.insert(accounts).values(values).returning();
+  const rows = await db
+    .insert(accounts)
+    .values({ ...values, position: nextPosition })
+    .returning();
   return single(rows);
 }
 
-// Every account, in the order they were added.
+// Every account, in the order they are placed, which is the order they
+// were added until it is changed.
 export async function listAccounts(db: Database): Promise<Account[]> {
-  const rows = await db.select().from(accounts).orderBy(asc(accounts.id));
+  const rows = await db
+    .select()
+    .from(accounts)
+    .orderBy(asc(accounts.position), asc(accounts.id));
   return rows.map(fromRow);
 }
 
