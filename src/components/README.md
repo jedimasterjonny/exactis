@@ -32,12 +32,12 @@ in the vendored file works until the next refresh silently discards it.
 
 ## Tier: the app directory
 
-| tier         | what it is                                       | here                                                                                                                                            |
-| ------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `atoms/`     | one presentational job, composes nothing of ours | `delta-value`, `field`, `note`, `screen-header`, `span-bar`                                                                                     |
-| `molecules/` | atoms combined into one reusable control         | `app-nav`, `money-field`, `rate-field`, `select-field`, `stat-tile`, `text-field`, `theme-toggle`, `year-field`                                 |
-| `organisms/` | a whole region of a screen                       | `account-ledger`, `account-table`, `expense-schedule`, `income-schedule`, `line-fields`, `progress-points`, `projection-chart`, `schedule-rows` |
-| `templates/` | the shell a page sits in                         | `app-frame`                                                                                                                                     |
+| tier         | what it is                                       | here                                                                                                                                                              |
+| ------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `atoms/`     | one presentational job, composes nothing of ours | `delta-value`, `field`, `note`, `screen-header`, `span-bar`                                                                                                       |
+| `molecules/` | atoms combined into one reusable control         | `app-nav`, `money-field`, `rate-field`, `select-field`, `stat-tile`, `text-field`, `theme-toggle`, `year-field`                                                   |
+| `organisms/` | a whole region of a screen                       | `account-ledger`, `account-table`, `cash-flow-card`, `expense-schedule`, `income-schedule`, `line-fields`, `progress-points`, `projection-chart`, `schedule-rows` |
+| `templates/` | the shell a page sits in                         | `app-frame`                                                                                                                                                       |
 
 A component composes what is below it, and beside it, never above.
 Organism-on-organism is the one same-tier edge this allows, and there are six of
@@ -56,8 +56,8 @@ Ask what it composes, not how big it is. Size correlates but does not decide.
 
 A useful check: the tiers correlate with how much `kit/` a component reaches
 for. The atoms here import none of it, every molecule imports exactly one, and
-the organisms take three to five. A proposed atom that needs four wrappers is
-probably a molecule or an organism.
+the organisms take one to five, most of them three or more. A proposed atom that
+needs four wrappers is probably a molecule or an organism.
 
 If a component seems to belong in two tiers it is usually two components.
 
