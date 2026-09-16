@@ -2,3 +2,7 @@ bun.lock
 # Written by drizzle-kit generate and rewritten by the next one, so any
 # formatting applied here is undone by the tool that owns the files.
 drizzle/meta
+# Vendored 1:1 from the shadcn registry, so the bytes belong to upstream.
+# Formatting them is a change the next `shadcn add --overwrite` discards,
+# and one the weekly drift check reports as drift in the meantime.
+src/components/ui
