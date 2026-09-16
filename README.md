@@ -30,10 +30,11 @@ The app is then at <http://localhost:3000>, rendered from `src/app/page.tsx`.
 
 ## The store
 
-Accounts and income lines live in Postgres, reached through
+Accounts, income lines and expense lines live in Postgres, reached through
 [Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The schema is
 `src/db/schema.ts`, the migrations generated from it are in `drizzle/`, and the
-queries are in `src/db/accounts.ts` and `src/db/income.ts`.
+queries are in `src/db/accounts.ts`, `src/db/income.ts` and
+`src/db/expenses.ts`.
 
 The accounts and plan screens read and write it, and the dashboard projects what
 it holds; the progress screen still shows the reference kit's figures.
@@ -52,13 +53,18 @@ suite before it reaches a database.
 
 ## The projection
 
-The engine is `src/engine/projection.ts`: a pure function over the accounts and
-a plan, giving a point per year to the plan's horizon. So far it carries the two
-wrappers, tax-free and tax-deferred, each paid into as its accounts say and
-grown at a plan rate held as a constant until there is an assumptions screen to
-set it on. The dashboard reads it through `src/app/(app)/store.ts`, a cached
-read keyed on the accounts, so a save on the accounts screen is a new projection
-on the next render.
+The engine is `src/engine/projection.ts`: a pure function over the accounts, the
+income and expense lines and a plan, giving a point per year to the plan's
+horizon. So far it carries the two wrappers, tax-free and tax-deferred, each
+paid into as its accounts say and grown at a plan rate held as a constant until
+there is an assumptions screen to set it on. An account paid the spare money is
+paid what `src/engine/cash-flow.ts` works out for the year: a month's income
+less the expenses and every fixed sum, handed down the accounts that take it in
+the order they are listed, each to a twelfth of its cap. Every line is taken at
+the amount it states, in today's money, until the plan carries an inflation
+assumption. The dashboard reads the projection through `src/app/(app)/store.ts`,
+a cached read keyed on the accounts and the lines, so a save on the accounts or
+the plan screen is a new projection on the next render.
 
 ## Signing in
 
