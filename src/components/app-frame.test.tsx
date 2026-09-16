@@ -61,6 +61,7 @@ describe("AppFrame", () => {
     const button = within(form).getByRole("button", { name: "Sign out" });
 
     expect(button).toHaveAttribute("type", "submit");
+    expect(button).toHaveAttribute("data-slot", "sidebar-menu-button");
     expect(button).toHaveClass("label");
 
     fireEvent.click(button);
