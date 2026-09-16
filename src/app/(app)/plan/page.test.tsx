@@ -9,6 +9,7 @@ import { getIncomeLines } from "./store";
 
 vi.mock("../store", () => ({ getPlan: vi.fn() }));
 vi.mock("./store", () => ({ getIncomeLines: vi.fn() }));
+vi.mock("./actions", () => ({ saveIncomeLine: vi.fn() }));
 
 const [salary] = incomeLines;
 
