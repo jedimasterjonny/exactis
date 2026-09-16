@@ -1,6 +1,6 @@
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, count, eq, inArray, sql } from "drizzle-orm";
 
 import type { Account, AccountValues } from "@/data/accounts";
 
@@ -37,6 +37,36 @@ export async function listAccounts(db: Database): Promise<Account[]> {
     .from(accounts)
     .orderBy(asc(accounts.position), asc(accounts.id));
   return rows.map(fromRow);
+}
+
+// Every account placed in the order the ids are given, the first first,
+// as one statement. The list must name every account and no other: one
+// that left an account out would leave it sharing a place with the one
+// put there, and one naming an id no account has is a caller's mistake
+// rather than a result, so either is refused, on one count of how many
+// accounts there are and how many the list names. The list is placed
+// rather than placing and its column a place rather than a position,
+// since Postgres keeps both words for itself.
+export async function placeAccounts(
+  db: Database,
+  ids: readonly number[],
+): Promise<void> {
+  const [counted] = await db
+    .select({
+      named: count(sql`case when ${inArray(accounts.id, ids)} then 1 end`),
+      total: count(),
+    })
+    .from(accounts);
+  if (counted?.total !== ids.length || counted.named !== ids.length) {
+    throw new Error("Not every account was placed");
+  }
+  const places = sql.join(
+    ids.map((id, index) => sql`(${id}::int, ${index + 1}::int)`),
+    sql`, `,
+  );
+  await db.execute(
+    sql`update ${accounts} set ${sql.identifier("position")} = placed.place from (values ${places}) as placed(id, place) where ${accounts.id} = placed.id`,
+  );
 }
 
 // The account with that id, written over with the values.

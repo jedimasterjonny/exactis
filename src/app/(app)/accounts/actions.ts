@@ -12,7 +12,7 @@ import {
   growthKinds,
   isAsset,
 } from "@/data/accounts";
-import { insertAccount, updateAccount } from "@/db/accounts";
+import { insertAccount, placeAccounts, updateAccount } from "@/db/accounts";
 import { getDb } from "@/db/client";
 import { requireSession } from "@/lib/session";
 
@@ -38,7 +38,24 @@ const values = z
     (draft) => draft.funding === "fixed" || !isAsset(draft),
   ) satisfies z.ZodType<AccountValues>;
 
+// An order: every account's id once, so the store can place them all.
+const order = z
+  .array(z.number().int().positive())
+  .nonempty()
+  .refine((ids) => new Set(ids).size === ids.length);
+
 const target = z.number().int().positive().nullable();
+
+// Places the accounts in the order the ids are given, which is the order
+// they are listed in and the order the spare money is handed down them.
+// Checked and expired as a save is.
+export async function placeAccountsInOrder(
+  ids: readonly number[],
+): Promise<void> {
+  await requireSession();
+  await placeAccounts(getDb(), order.parse(ids));
+  updateTag(accountsTag);
+}
 
 // Writes an account: a new one when the id is null, else over the one
 // with that id, and hands back the account as the store now has it. An
