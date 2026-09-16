@@ -118,7 +118,7 @@ describe("ChartLegendContent", () => {
           <Area dataKey="free" />
           <ChartLegend
             content={<ChartLegendContent nameKey="wrappers" />}
-            verticalAlign="top"
+            position="top"
           />
         </AreaChart>
       </ChartContainer>,
