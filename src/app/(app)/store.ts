@@ -16,15 +16,21 @@ const rate = 0.05;
 
 const years = 30;
 
+// The plan as it stands, from this year: what the projection runs on
+// and what the plan screen lays its lines over. The year is read when
+// the plan is, so it is read at request time.
+export function getPlan(): Plan {
+  return { born, from: new Date().getFullYear(), rate, years };
+}
+
 // The projection, for whoever is signed in, run over the accounts as the
 // store has them. The accounts read checks the session and is the read a
 // save expires, so a save is seen here on the way back from it too. The
-// year is read after that, so it is read at request time as the accounts
-// are, and both go into the projection's key.
+// plan is read after that, so its year is read at request time as the
+// accounts are, and both go into the projection's key.
 export async function getProjection(): Promise<ProjectionPoint[]> {
   const accounts = await getAccounts();
-  const from = new Date().getFullYear();
-  return readProjection(accounts, { born, from, rate, years });
+  return readProjection(accounts, getPlan());
 }
 
 // Keyed on what it is run over, so a change to the accounts misses here

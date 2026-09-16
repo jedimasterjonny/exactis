@@ -30,6 +30,12 @@ interface Held {
   readonly balance: number;
 }
 
+// The last year the plan runs to, which is the last year plotted and the
+// year an open-ended line runs to.
+export function endYear(plan: Plan): number {
+  return plan.from + plan.years;
+}
+
 // The plan's years, the first holding the balances as they are and each
 // after it a year on: what the account is paid, then growth at its rate,
 // a fixed one or the plan's. Each account is carried on its own and the

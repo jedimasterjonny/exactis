@@ -1,5 +1,7 @@
 import type { LineValues } from "@/data/schedule";
 
+export type IncomeKind = (typeof incomeKinds)[number];
+
 // An income line is money coming in over a run of years: a salary, a
 // pension, a side line. It holds what every line holds, and an employment
 // line carries a bonus and RSUs on top of its base, each nothing when
@@ -23,8 +25,6 @@ export interface IncomeLineValues extends LineValues {
   readonly rsu: number;
 }
 
-type IncomeKind = (typeof incomeKinds)[number];
-
 // The kinds as a list, so the store's column takes the same words the
 // type does and cannot drift from them.
 export const incomeKinds = [
@@ -33,3 +33,11 @@ export const incomeKinds = [
   "pension",
   "self-employment",
 ] as const;
+
+// What a line pays at its cadence: the amount, with an employment line's
+// bonus and RSUs on top. The parts are summed here and nowhere else, so
+// the one place that knows which part is which is the one that reads
+// them apart.
+export function totalOf(line: IncomeLineValues): number {
+  return line.amount + line.bonus + line.rsu;
+}
