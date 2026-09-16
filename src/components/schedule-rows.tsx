@@ -52,7 +52,7 @@ const cadences: Record<Cadence, string> = { month: "mo", year: "yr" };
 // What each growth choice is called, here and in the dialog that offers
 // them: the amount rises with inflation, a point or two over it, the
 // triple lock, or not at all.
-const growthLabels: Record<LineGrowth, string> = {
+export const growthLabels: Record<LineGrowth, string> = {
   inflation: "Inflation",
   "inflation-plus-1": "Inflation +1%",
   "inflation-plus-2": "Inflation +2%",
