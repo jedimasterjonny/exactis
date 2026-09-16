@@ -1,8 +1,8 @@
 import type { JSX } from "react";
 
-import { Field } from "@base-ui/react/field";
 import { NumberField } from "@base-ui/react/number-field";
 
+import { Field } from "@/components/field";
 import { Input } from "@/components/ui/input";
 
 interface RateFieldProps {
@@ -23,8 +23,8 @@ const format: Intl.NumberFormatOptions = {
   style: "percent",
 };
 
-// A rate input in the money field's form: a micro-label above, a mono
-// right-aligned figure in the input chrome, and a hint beneath.
+// A rate input, drawn as the money field is: a mono right-aligned figure
+// in the input chrome.
 export function RateField({
   defaultValue,
   hint,
@@ -32,8 +32,7 @@ export function RateField({
   onValueCommitted,
 }: RateFieldProps): JSX.Element {
   return (
-    <Field.Root className="grid content-start gap-1.5">
-      <Field.Label className="label text-muted-foreground">{label}</Field.Label>
+    <Field hint={hint} label={label}>
       <NumberField.Root
         defaultValue={defaultValue}
         format={format}
@@ -46,11 +45,6 @@ export function RateField({
           <NumberField.Input render={<Input className="text-right figure" />} />
         </NumberField.Group>
       </NumberField.Root>
-      {hint !== undefined && (
-        <Field.Description className="text-xs text-muted-foreground">
-          {hint}
-        </Field.Description>
-      )}
-    </Field.Root>
+    </Field>
   );
 }

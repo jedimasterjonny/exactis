@@ -1,8 +1,8 @@
 import type { JSX } from "react";
 
-import { Field } from "@base-ui/react/field";
 import { NumberField } from "@base-ui/react/number-field";
 
+import { Field } from "@/components/field";
 import { Input } from "@/components/ui/input";
 
 interface MoneyFieldProps {
@@ -22,11 +22,10 @@ const format: Intl.NumberFormatOptions = {
   style: "currency",
 };
 
-// A money input: a micro-label above, a mono right-aligned figure in the
-// input chrome, and a hint beneath that carries the derivation. Base UI's
-// field wires the label and the hint to the input; its number field owns
-// parsing, formatting and stepping. Every money, rate and year value in the
-// product is entered through a number field rather than a text input.
+// A money input: a mono right-aligned figure in the input chrome, under a
+// hint that carries the derivation. Base UI's number field owns parsing,
+// formatting and stepping. Every money, rate and year value in the product
+// is entered through a number field rather than a text input.
 export function MoneyField({
   defaultValue,
   hint,
@@ -34,8 +33,7 @@ export function MoneyField({
   onValueCommitted,
 }: MoneyFieldProps): JSX.Element {
   return (
-    <Field.Root className="grid content-start gap-1.5">
-      <Field.Label className="label text-muted-foreground">{label}</Field.Label>
+    <Field hint={hint} label={label}>
       <NumberField.Root
         defaultValue={defaultValue}
         format={format}
@@ -48,11 +46,6 @@ export function MoneyField({
           <NumberField.Input render={<Input className="text-right figure" />} />
         </NumberField.Group>
       </NumberField.Root>
-      {hint !== undefined && (
-        <Field.Description className="text-xs text-muted-foreground">
-          {hint}
-        </Field.Description>
-      )}
-    </Field.Root>
+    </Field>
   );
 }
