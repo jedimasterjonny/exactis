@@ -10,16 +10,16 @@ import type {
   Growth,
 } from "@/data/accounts";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/kit/badge";
+import { Button } from "@/components/kit/button";
+import { Card } from "@/components/kit/card";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@/components/kit/empty";
 import {
   Table,
   TableBody,
@@ -27,7 +27,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/kit/table";
 import { formatGbp } from "@/lib/money";
 
 interface AccountTableProps {

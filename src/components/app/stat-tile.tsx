@@ -4,7 +4,7 @@ import type { JSX } from "react";
 import type { DeltaFormat } from "@/components/app/delta-value";
 
 import { DeltaValue } from "@/components/app/delta-value";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/kit/card";
 
 interface StatTileProps {
   readonly caption?: string;

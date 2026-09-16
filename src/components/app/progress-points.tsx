@@ -8,8 +8,8 @@ import { useState } from "react";
 import type { ProgressPoint } from "@/data/points";
 
 import { MoneyField } from "@/components/app/money-field";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button } from "@/components/kit/button";
+import { Card } from "@/components/kit/card";
 import {
   Dialog,
   DialogClose,
@@ -17,7 +17,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/kit/dialog";
 import {
   Table,
   TableBody,
@@ -25,8 +25,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { toast } from "@/components/ui/toast";
+} from "@/components/kit/table";
+import { toast } from "@/components/kit/toast";
 import { formatGbp } from "@/lib/money";
 
 type Balance = Exclude<keyof ProgressPoint, "date">;

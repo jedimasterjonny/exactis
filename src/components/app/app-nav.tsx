@@ -9,7 +9,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@/components/kit/sidebar";
 import { screens, sectionNumeral } from "@/lib/nav";
 
 // One item per built screen, in navigation order, each with its icon, its

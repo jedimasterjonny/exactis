@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 
 import { Field } from "@/components/app/field";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/kit/input";
 
 interface TextFieldProps {
   readonly defaultValue?: string;

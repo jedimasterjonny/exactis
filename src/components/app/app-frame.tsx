@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar";
+} from "@/components/kit/sidebar";
 
 interface AppFrameProps {
   readonly children: ReactNode;

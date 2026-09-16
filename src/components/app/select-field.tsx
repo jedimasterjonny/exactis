@@ -6,7 +6,7 @@ import { Field } from "@/components/app/field";
 import {
   NativeSelect,
   NativeSelectOption,
-} from "@/components/ui/native-select";
+} from "@/components/kit/native-select";
 
 interface SelectFieldProps<TValue extends string> {
   readonly defaultValue: TValue;

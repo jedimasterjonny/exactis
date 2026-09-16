@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Account } from "@/data/accounts";
 
 import { saveAccount } from "@/app/(app)/accounts/actions";
-import { Toaster } from "@/components/ui/toast";
+import { Toaster } from "@/components/kit/toast";
 import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 

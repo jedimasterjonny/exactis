@@ -6,7 +6,7 @@ import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
 
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "@/components/kit/switch";
 
 // Daylight is the default and the intended theme; night watch is opt-in,
 // as the reference has it. The switch fills with the sidebar's oxide when
