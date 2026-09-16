@@ -55,6 +55,13 @@ against the registry is the whole file and says nothing. An upstream update is
 `shadcn add <name> --overwrite`, which discards the local copy, followed by the
 same pass; the diff to review is git's.
 
+`--overwrite` reaches past the component named. Adding `chart` over an existing
+tree rewrote `card` too, because the registry lists it as a dependency, and the
+pass that file had already been through was gone with no mention of it in the
+output. Reading a component to see what upstream says is the same act: do it on
+a clean tree, and read `git status` rather than the CLI's list of files before
+going further.
+
 ## Landing it
 
 A dependency lands in the same commit as the first file that imports it: knip
