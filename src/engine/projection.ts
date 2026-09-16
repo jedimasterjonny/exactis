@@ -78,17 +78,19 @@ function grownAYear(balance: number, account: Account, plan: Plan): number {
   return grown;
 }
 
-// What lands in the month: a monthly contribution every month, a yearly
-// one in the first, and nothing for an account with none.
+// What lands in the month: a monthly sum every month, a yearly one in
+// the first, and nothing for an account with none. The spare money waits
+// on the schedule, which the projection does not read yet.
 function paidIn(account: Account, month: number): number {
-  if (account.contribution === undefined) {
+  const { contribution } = account;
+  if (contribution === undefined || contribution.kind === "spare") {
     return 0;
   }
-  switch (account.contribution.cadence) {
+  switch (contribution.cadence) {
     case "month":
-      return account.contribution.amount;
+      return contribution.amount;
     case "year":
-      return month === 0 ? account.contribution.amount : 0;
+      return month === 0 ? contribution.amount : 0;
   }
 }
 

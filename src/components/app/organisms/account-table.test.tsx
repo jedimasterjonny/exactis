@@ -76,6 +76,33 @@ describe("AccountTable", () => {
     ).toBeInTheDocument();
   });
 
+  it("says the most an account paid the spare money takes a year", () => {
+    const [pension, isa, cash] = accounts;
+    render(
+      <AccountTable
+        accounts={[
+          { ...pension, contribution: { cap: null, kind: "spare" } },
+          { ...isa, contribution: { cap: 4000, kind: "spare" } },
+          { ...cash, contribution: { cap: null, kind: "spare" } },
+        ]}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+      />,
+    );
+
+    const table = screen.getByRole("table");
+
+    expect(
+      within(table).getByRole("cell", { name: "Spare, to £60,000 / yr" }),
+    ).toHaveClass("figure");
+    expect(
+      within(table).getByRole("cell", { name: "Spare, to £4,000 / yr" }),
+    ).toBeInTheDocument();
+    expect(
+      within(table).getByRole("cell", { name: "Spare, uncapped" }),
+    ).toBeInTheDocument();
+  });
+
   it("draws its empty state rather than a header over no rows", () => {
     render(
       <AccountTable

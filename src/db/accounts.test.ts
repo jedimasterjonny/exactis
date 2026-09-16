@@ -11,7 +11,9 @@ import { insertAccount, listAccounts, updateAccount } from "./accounts";
 const pension = {
   balance: 412880,
   cadence: "year",
+  cap: 0,
   contribution: 27195,
+  funding: "fixed",
   growth: "plan",
   kind: "tax-deferred",
   name: "Workplace pension",
@@ -21,7 +23,9 @@ const pension = {
 const mortgage = {
   balance: -182940,
   cadence: "month",
+  cap: 0,
   contribution: 2210,
+  funding: "fixed",
   growth: "fixed",
   kind: "debt",
   name: "Mortgage",
@@ -47,7 +51,7 @@ describe("accounts store", () => {
 
     expect(first).toStrictEqual({
       balance: -182940,
-      contribution: { amount: 2210, cadence: "month" },
+      contribution: { amount: 2210, cadence: "month", kind: "fixed" },
       growth: { kind: "fixed", rate: 0.0515 },
       id: 1,
       kind: "debt",
@@ -55,7 +59,7 @@ describe("accounts store", () => {
     });
     expect(second).toStrictEqual({
       balance: 412880,
-      contribution: { amount: 27195, cadence: "year" },
+      contribution: { amount: 27195, cadence: "year", kind: "fixed" },
       growth: { kind: "plan" },
       id: 2,
       kind: "tax-deferred",
@@ -83,6 +87,31 @@ describe("accounts store", () => {
       name: "Workplace pension",
     });
     expect(await listAccounts(db)).toHaveLength(2);
+  });
+
+  it("holds an account paid the spare money, with and without a cap", async () => {
+    const db = await openStore();
+
+    const capped = await insertAccount(db, {
+      ...pension,
+      cap: 4000,
+      contribution: 0,
+      funding: "spare",
+      kind: "tax-free",
+      name: "Lifetime ISA",
+    });
+    const uncapped = await updateAccount(db, capped.id, {
+      ...pension,
+      cap: 0,
+      contribution: 0,
+      funding: "spare",
+      kind: "cash",
+      name: "Savings",
+    });
+
+    expect(capped.contribution).toStrictEqual({ cap: 4000, kind: "spare" });
+    expect(uncapped.contribution).toStrictEqual({ cap: null, kind: "spare" });
+    expect(await listAccounts(db)).toStrictEqual([uncapped]);
   });
 
   it("refuses to update an id no account has", async () => {

@@ -20,7 +20,7 @@ vi.mock("@/app/(app)/accounts/actions", () => ({ saveAccount: vi.fn() }));
 
 const held = accounts.filter((account) => !isAsset(account));
 const assets = accounts.filter(isAsset);
-const [pension, , , home] = accounts;
+const [pension, isa, cash, home] = accounts;
 
 function commit(field: HTMLElement, value: string): void {
   fireEvent.change(field, { target: { value } });
@@ -129,10 +129,10 @@ describe("AccountLedger", () => {
       { target: { value: "tax-free" } },
     );
     commit(within(dialog).getByRole("textbox", { name: "Balance" }), "4,000");
-    commit(
-      within(dialog).getByRole("textbox", { name: "Contribution" }),
-      "333",
-    );
+    expect(
+      within(dialog).getByRole("combobox", { name: "Contribution" }),
+    ).toHaveValue("fixed");
+    commit(within(dialog).getByRole("textbox", { name: "Amount" }), "333");
     fireEvent.change(
       within(dialog).getByRole("combobox", { name: "Cadence" }),
       { target: { value: "month" } },
@@ -158,7 +158,9 @@ describe("AccountLedger", () => {
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(null, {
       balance: 4000,
       cadence: "month",
+      cap: 0,
       contribution: 333,
+      funding: "fixed",
       growth: "fixed",
       kind: "tax-free",
       name: "Lifetime ISA",
@@ -169,7 +171,7 @@ describe("AccountLedger", () => {
 
     answer({
       balance: 4000,
-      contribution: { amount: 333, cadence: "month" },
+      contribution: { amount: 333, cadence: "month", kind: "fixed" },
       growth: { kind: "fixed", rate: 0.03 },
       id: 6,
       kind: "tax-free",
@@ -209,6 +211,14 @@ describe("AccountLedger", () => {
       within(dialog).getByRole("combobox", { name: "Treatment" }),
       { target: { value: "real-asset" } },
     );
+
+    expect(
+      within(dialog).queryByRole("combobox", { name: "Contribution" }),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("textbox", { name: "Amount" })).toHaveValue(
+      "£0",
+    );
+
     commit(within(dialog).getByRole("textbox", { name: "Balance" }), "12,500");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
@@ -223,7 +233,9 @@ describe("AccountLedger", () => {
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(null, {
       balance: 12500,
       cadence: "year",
+      cap: 0,
       contribution: 0,
+      funding: "fixed",
       growth: "plan",
       kind: "real-asset",
       name: "Car",
@@ -277,9 +289,12 @@ describe("AccountLedger", () => {
     expect(
       within(dialog).getByRole("textbox", { name: "Balance" }),
     ).toHaveValue("£416,386");
+    expect(within(dialog).getByRole("textbox", { name: "Amount" })).toHaveValue(
+      "£0",
+    );
     expect(
-      within(dialog).getByRole("textbox", { name: "Contribution" }),
-    ).toHaveValue("£0");
+      within(dialog).queryByRole("combobox", { name: "Contribution" }),
+    ).not.toBeInTheDocument();
     expect(
       within(dialog).getByRole("combobox", { name: "Growth" }),
     ).toHaveValue("fixed");
@@ -317,7 +332,9 @@ describe("AccountLedger", () => {
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(4, {
       balance: 420000,
       cadence: "year",
+      cap: 0,
       contribution: 0,
+      funding: "fixed",
       growth: "fixed",
       kind: "real-asset",
       name: "Home",
@@ -331,13 +348,19 @@ describe("AccountLedger", () => {
 
   it("opens a wrapper with its contribution and no rate, and writes a new contribution back", async () => {
     renderLedger();
-    saved({ ...pension, contribution: { amount: 30000, cadence: "year" } });
+    saved({
+      ...pension,
+      contribution: { amount: 30000, cadence: "year", kind: "fixed" },
+    });
 
     const dialog = openEditor("Workplace pension");
 
     expect(
-      within(dialog).getByRole("textbox", { name: "Contribution" }),
-    ).toHaveValue("£27,195");
+      within(dialog).getByRole("combobox", { name: "Contribution" }),
+    ).toHaveValue("fixed");
+    expect(within(dialog).getByRole("textbox", { name: "Amount" })).toHaveValue(
+      "£27,195",
+    );
     expect(
       within(dialog).getByRole("combobox", { name: "Cadence" }),
     ).toHaveValue("year");
@@ -348,10 +371,7 @@ describe("AccountLedger", () => {
       within(dialog).queryByRole("textbox", { name: "Rate" }),
     ).not.toBeInTheDocument();
 
-    commit(
-      within(dialog).getByRole("textbox", { name: "Contribution" }),
-      "30,000",
-    );
+    commit(within(dialog).getByRole("textbox", { name: "Amount" }), "30,000");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -365,7 +385,9 @@ describe("AccountLedger", () => {
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(1, {
       balance: 412880,
       cadence: "year",
+      cap: 0,
       contribution: 30000,
+      funding: "fixed",
       growth: "plan",
       kind: "tax-deferred",
       name: "Workplace pension",
@@ -375,5 +397,184 @@ describe("AccountLedger", () => {
       "aria-selected",
       "true",
     );
+  });
+
+  it("pays a wrapper the spare money up to a cap, and drops the sum with the choice", async () => {
+    renderLedger();
+    saved({ ...isa, contribution: { cap: 4000, kind: "spare" } });
+
+    const dialog = openEditor("Stocks & shares ISA");
+
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Contribution" }),
+      { target: { value: "spare" } },
+    );
+
+    expect(
+      within(dialog).queryByRole("textbox", { name: "Amount" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("combobox", { name: "Cadence" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("textbox", { name: "Cap, a year" }),
+    ).toHaveValue("£0");
+    expect(
+      within(dialog).getByRole("textbox", { name: "Cap, a year" }),
+    ).toHaveAccessibleDescription("Leave at nothing for the £20,000 allowance");
+
+    commit(
+      within(dialog).getByRole("textbox", { name: "Cap, a year" }),
+      "4,000",
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Stocks & shares ISA" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(2, {
+      balance: 286145,
+      cadence: "year",
+      cap: 4000,
+      contribution: 0,
+      funding: "spare",
+      growth: "plan",
+      kind: "tax-free",
+      name: "Stocks & shares ISA",
+      rate: 0,
+    });
+  });
+
+  it("opens a spare-money account as it is and brings its sum back with the fixed choice", () => {
+    render(
+      <Toaster>
+        <AccountLedger
+          accounts={[
+            { ...cash, contribution: { cap: null, kind: "spare" } },
+            {
+              ...isa,
+              contribution: { amount: 500, cadence: "month", kind: "fixed" },
+            },
+          ]}
+        />
+      </Toaster>,
+    );
+
+    let dialog = openEditor("Current account");
+
+    expect(
+      within(dialog).getByRole("combobox", { name: "Contribution" }),
+    ).toHaveValue("spare");
+    expect(
+      within(dialog).getByRole("textbox", { name: "Cap, a year" }),
+    ).toHaveAccessibleDescription("Leave at nothing for no cap");
+
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Contribution" }),
+      { target: { value: "fixed" } },
+    );
+
+    expect(within(dialog).getByRole("textbox", { name: "Amount" })).toHaveValue(
+      "£0",
+    );
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    dialog = openEditor("Stocks & shares ISA");
+
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Contribution" }),
+      { target: { value: "spare" } },
+    );
+    commit(
+      within(dialog).getByRole("textbox", { name: "Cap, a year" }),
+      "9,000",
+    );
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Contribution" }),
+      { target: { value: "fixed" } },
+    );
+
+    expect(within(dialog).getByRole("textbox", { name: "Amount" })).toHaveValue(
+      "£500",
+    );
+    expect(
+      within(dialog).getByRole("combobox", { name: "Cadence" }),
+    ).toHaveValue("month");
+  });
+
+  // The choice leaves with the asset treatment: an ISA paid the spare
+  // money made a debt is paid a fixed sum of nothing, as it opened, and
+  // made cash again is paid the spare money to the cap it opened with,
+  // which is what the choice mounts showing. A change that stays among
+  // the wrappers and cash leaves what was typed where it is.
+  it("drops the spare money with an asset treatment and brings it back with a wrapper's", () => {
+    render(
+      <Toaster>
+        <AccountLedger
+          accounts={[{ ...isa, contribution: { cap: 4000, kind: "spare" } }]}
+        />
+      </Toaster>,
+    );
+    saved(isa);
+
+    const dialog = openEditor("Stocks & shares ISA");
+    const treatment = within(dialog).getByRole("combobox", {
+      name: "Treatment",
+    });
+
+    expect(
+      within(dialog).getByRole("textbox", { name: "Cap, a year" }),
+    ).toHaveValue("£4,000");
+
+    fireEvent.change(treatment, { target: { value: "debt" } });
+
+    expect(
+      within(dialog).queryByRole("combobox", { name: "Contribution" }),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("textbox", { name: "Amount" })).toHaveValue(
+      "£0",
+    );
+    expect(
+      within(dialog).getByRole("combobox", { name: "Cadence" }),
+    ).toHaveValue("year");
+
+    fireEvent.change(treatment, { target: { value: "real-asset" } });
+    commit(within(dialog).getByRole("textbox", { name: "Amount" }), "100");
+    fireEvent.change(treatment, { target: { value: "cash" } });
+
+    expect(
+      within(dialog).getByRole("combobox", { name: "Contribution" }),
+    ).toHaveValue("spare");
+    expect(
+      within(dialog).getByRole("textbox", { name: "Cap, a year" }),
+    ).toHaveValue("£4,000");
+
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Contribution" }),
+      { target: { value: "fixed" } },
+    );
+    commit(within(dialog).getByRole("textbox", { name: "Amount" }), "250");
+    fireEvent.change(treatment, { target: { value: "tax-free" } });
+
+    expect(within(dialog).getByRole("textbox", { name: "Amount" })).toHaveValue(
+      "£250",
+    );
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(2, {
+      balance: 286145,
+      cadence: "year",
+      cap: 0,
+      contribution: 250,
+      funding: "fixed",
+      growth: "plan",
+      kind: "tax-free",
+      name: "Stocks & shares ISA",
+      rate: 0,
+    });
   });
 });

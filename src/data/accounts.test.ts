@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isAsset, toAccount, toValues } from "./accounts";
+import { allowanceOf, isAsset, toAccount, toValues } from "./accounts";
 import { accounts } from "./accounts.fixture";
 
 describe("accounts", () => {
@@ -17,7 +17,9 @@ describe("accounts", () => {
     const values = {
       balance: -182940,
       cadence: "month",
+      cap: 0,
       contribution: 2210,
+      funding: "fixed",
       growth: "fixed",
       kind: "debt",
       name: "Mortgage",
@@ -35,7 +37,9 @@ describe("accounts", () => {
       {
         balance: 4000,
         cadence: "month",
+        cap: 0,
         contribution: 0,
+        funding: "fixed",
         growth: "plan",
         kind: "tax-free",
         name: "Lifetime ISA",
@@ -54,11 +58,58 @@ describe("accounts", () => {
     expect(toValues(account)).toStrictEqual({
       balance: 4000,
       cadence: "year",
+      cap: 0,
       contribution: 0,
+      funding: "fixed",
       growth: "plan",
       kind: "tax-free",
       name: "Lifetime ISA",
       rate: 0,
     });
+  });
+
+  // The sum and the cadence are dropped with the spare money, so the
+  // values come back with nothing a year, whatever was typed before the
+  // choice changed; and a cap of nothing is no cap on the account, which
+  // is the allowance its kind has.
+  it("reads the spare money off an account with and without a cap", () => {
+    const values = {
+      balance: 4000,
+      cadence: "month",
+      cap: 4000,
+      contribution: 333,
+      funding: "spare",
+      growth: "plan",
+      kind: "tax-free",
+      name: "Lifetime ISA",
+      rate: 0,
+    } as const;
+
+    const capped = toAccount(values, 6);
+    const uncapped = toAccount({ ...values, cap: 0 }, 7);
+
+    expect(capped.contribution).toStrictEqual({ cap: 4000, kind: "spare" });
+    expect(uncapped.contribution).toStrictEqual({ cap: null, kind: "spare" });
+    expect(toValues(capped)).toStrictEqual({
+      ...values,
+      cadence: "year",
+      contribution: 0,
+    });
+    expect(toValues(uncapped)).toStrictEqual({
+      ...values,
+      cadence: "year",
+      cap: 0,
+      contribution: 0,
+    });
+  });
+});
+
+describe("allowanceOf", () => {
+  it("gives the ISA and the pension the UK's yearly allowances and the rest none", () => {
+    expect(allowanceOf("tax-free")).toBe(20000);
+    expect(allowanceOf("tax-deferred")).toBe(60000);
+    expect(allowanceOf("cash")).toBeNull();
+    expect(allowanceOf("real-asset")).toBeNull();
+    expect(allowanceOf("debt")).toBeNull();
   });
 });
