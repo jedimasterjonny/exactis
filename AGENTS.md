@@ -101,13 +101,22 @@ downwards:
   cannot reach a screen. Most are one line; one becomes a real component when it
   has something to add, as `badge` does for the `positive` and `caution` tones.
   Held to every gate, at 100% coverage.
-- `app/` is the app's own composed components, and talks to `kit/`, never to
-  `ui/`.
+- `app/` is the app's own composed components, tiered by atomic design into
+  `atoms/`, `molecules/`, `organisms/` and `templates/`, with the routes in
+  `src/app` as the fifth tier. A component composes what is below it and beside
+  it, never above; organism on organism is the one same-tier edge allowed. It
+  talks to `kit/`, never to `ui/`.
 
-`no-restricted-imports` enforces the middle rule rather than trusting it. A
-customisation that has to survive belongs in the wrapper, never in the vendored
-file, and taking a component by hand means `shadcn add`, nothing more: no
-formatting pass, no return types, no pruning.
+`src/components/README.md` is the map: which component sits in which tier, how
+to place a new one, and what enforces each rule. It carries the detail so this
+file does not have to restate it.
+
+`no-restricted-imports` enforces both rules rather than trusting them - the
+vendored boundary and the tier direction - and `import/no-cycle` covers the loop
+that the permitted same-tier edge makes possible. A customisation that has to
+survive belongs in the wrapper, never in the vendored file, and taking a
+component by hand means `shadcn add`, nothing more: no formatting pass, no
+return types, no pruning.
 
 The premise that `ui/` is byte-identical to the registry is what the exemptions
 rest on, so it is checked weekly by `.github/workflows/vendor.yml` rather than
