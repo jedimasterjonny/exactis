@@ -84,6 +84,35 @@ imported. A test that asserts nothing fails, and test order is shuffled.
 - To assert on console output, call `takeConsoleOutput()` from
   `vitest.setup.ts`. It returns the running test's lines and clears them.
 
+# Components
+
+`src/components` has three layers, and the dependency arrows only ever point
+downwards:
+
+- `ui/` is vendored. Every byte is what `shadcn add --overwrite` writes, and
+  nothing in it is edited, ever - not to format it, not to satisfy a rule, not
+  to prune an export nothing imports. Prettier, ESLint and knip are switched off
+  over it, because holding upstream's code to conventions written for ours cost
+  187 hand-edits that the next overwrite discarded anyway. tsc and `next build`
+  still type check it like any other directory, so what is off is style rather
+  than correctness.
+- `kit/` is ours, and is the only thing allowed to import from `ui/`. A wrapper
+  re-exports exactly the names the app uses, so upstream churn in the rest
+  cannot reach a screen. Most are one line; one becomes a real component when it
+  has something to add, as `badge` does for the `positive` and `caution` tones.
+  Held to every gate, at 100% coverage.
+- `app/` is the app's own composed components, and talks to `kit/`, never to
+  `ui/`.
+
+`no-restricted-imports` enforces the middle rule rather than trusting it. A
+customisation that has to survive belongs in the wrapper, never in the vendored
+file, and taking a component by hand means `shadcn add`, nothing more: no
+formatting pass, no return types, no pruning.
+
+The premise that `ui/` is byte-identical to the registry is what the exemptions
+rest on, so it is checked weekly by `.github/workflows/vendor.yml` rather than
+assumed. On drift it opens a pull request.
+
 # Commit hygiene
 
 Conventional Commits, and every commit carries a scope. A bare `type:` header
@@ -91,11 +120,12 @@ does not appear in this history and should not be the first.
 
 The scope names the surface touched, not the reason for the change: `ts`,
 `lint`, `hooks`, `format`, `deps`, `workflow` for the config files, `ui`,
-`theme`, `accounts`, `auth`, `projection` for the app. The vocabulary is
-open-ended and grows with the codebase, so a commit touching a surface none of
-the existing names cover brings a new one. What it must not do is give a surface
-a second spelling, because then neither name finds the whole story. Read the
-vocabulary back off the history before inventing a name.
+`theme`, `accounts`, `auth`, `projection` for the app, `vendor` for the vendored
+components and the terms they are kept on. The vocabulary is open-ended and
+grows with the codebase, so a commit touching a surface none of the existing
+names cover brings a new one. What it must not do is give a surface a second
+spelling, because then neither name finds the whole story. Read the vocabulary
+back off the history before inventing a name.
 
 The type states the kind of change, and it is read against the diff rather than
 against the subject. A `docs:` commit that edits source, a `style:` one that
@@ -137,7 +167,12 @@ reach:
   `.only` a test or loosen an assertion to match behaviour that is broken. A
   skipped test reports nothing, which is worse than red.
 - Coverage is 100% per file. Reaching it by widening `coverage.exclude` is the
-  same act as deleting a test.
+  same act as deleting a test. The single standing exception is
+  `src/components/ui`, which is vendored rather than written here: covering it
+  would mean testing upstream's API rather than this app's, and what stands in
+  for the claim is the weekly check proving those files are upstream's
+  unaltered. Anything that argues for a second entry is almost certainly a
+  missing test.
 
 # Skills
 
@@ -145,8 +180,9 @@ Knowledge that applies only sometimes lives in `.claude/skills/`, loaded when
 the task calls for it rather than every session:
 
 - `shadcn-add`, for adding or updating a shadcn component. The short version:
-  files under `src/components/ui` are owned source held to every gate, and a
-  dependency lands with the first file that imports it.
+  the generated file is vendored untouched and the work is the wrapper in
+  `src/components/kit`, and a dependency lands with the first file that imports
+  it.
 - `lint-stack-upgrade`, for bumping ESLint or TypeScript or enabling a further
   `react/` or `import/` rule. The short version: peer ranges are enforced by
   nothing here, and TypeScript 7 cannot lint here at all.
