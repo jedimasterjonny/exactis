@@ -9,9 +9,9 @@ import {
 } from "lucide-react";
 import { Suspense } from "react";
 
-import { ProjectionPending } from "@/components/projection-chart";
-import { ScreenHeader } from "@/components/screen-header";
-import { StatTile } from "@/components/stat-tile";
+import { ProjectionPending } from "@/components/app/projection-chart";
+import { ScreenHeader } from "@/components/app/screen-header";
+import { StatTile } from "@/components/app/stat-tile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { dashboard, sectionLabel } from "@/lib/nav";

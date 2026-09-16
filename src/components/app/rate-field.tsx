@@ -2,38 +2,44 @@ import type { JSX } from "react";
 
 import { NumberField } from "@base-ui/react/number-field";
 
-import { Field } from "@/components/field";
+import { Field } from "@/components/app/field";
 import { Input } from "@/components/ui/input";
 
-interface YearFieldProps {
+interface RateFieldProps {
   readonly defaultValue: number;
   readonly hint?: string;
   readonly label: string;
   readonly onValueCommitted?: (value: null | number) => void;
 }
 
-// A year is a whole number written without a separator, so 2026 never
-// reads 2,026. The value commits on blur, as fields do in the product,
-// and never on the wheel. Arrow keys step by a year, ten with shift.
-const format: Intl.NumberFormatOptions = { useGrouping: false };
+// A rate is held as a fraction and shown as a percentage to two places,
+// so 0.021 reads 2.10% and a typed 2.1 commits as 0.021: Intl formats the
+// one way and the number field parses the other. The value commits on
+// blur, as fields do in the product. Arrow keys step by a tenth of a
+// point, a whole point with shift.
+const format: Intl.NumberFormatOptions = {
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 2,
+  style: "percent",
+};
 
-// A year input, drawn as the money field is: a mono right-aligned figure
-// in the input chrome, under a hint that carries the age reached.
-export function YearField({
+// A rate input, drawn as the money field is: a mono right-aligned figure
+// in the input chrome.
+export function RateField({
   defaultValue,
   hint,
   label,
   onValueCommitted,
-}: YearFieldProps): JSX.Element {
+}: RateFieldProps): JSX.Element {
   return (
     <Field hint={hint} label={label}>
       <NumberField.Root
         defaultValue={defaultValue}
         format={format}
-        largeStep={10}
+        largeStep={0.01}
         locale="en-GB"
         onValueCommitted={onValueCommitted}
-        step={1}
+        step={0.001}
       >
         <NumberField.Group>
           <NumberField.Input render={<Input className="text-right figure" />} />

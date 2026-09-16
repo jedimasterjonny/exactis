@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { ScreenHeader } from "@/components/screen-header";
+import { ScreenHeader } from "@/components/app/screen-header";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 // What the accounts screen shows while the store answers: its header,

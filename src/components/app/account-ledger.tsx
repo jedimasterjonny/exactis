@@ -8,13 +8,13 @@ import { startTransition, useState, useTransition } from "react";
 import type { Account, AccountValues } from "@/data/accounts";
 
 import { saveAccount } from "@/app/(app)/accounts/actions";
-import { AccountTable } from "@/components/account-table";
-import { MoneyField } from "@/components/money-field";
-import { Note } from "@/components/note";
-import { RateField } from "@/components/rate-field";
-import { ScreenHeader } from "@/components/screen-header";
-import { SelectField } from "@/components/select-field";
-import { TextField } from "@/components/text-field";
+import { AccountTable } from "@/components/app/account-table";
+import { MoneyField } from "@/components/app/money-field";
+import { Note } from "@/components/app/note";
+import { RateField } from "@/components/app/rate-field";
+import { ScreenHeader } from "@/components/app/screen-header";
+import { SelectField } from "@/components/app/select-field";
+import { TextField } from "@/components/app/text-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

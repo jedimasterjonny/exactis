@@ -1,8 +1,8 @@
 import type { JSX } from "react";
 
-import { ExpenseSchedule } from "@/components/expense-schedule";
-import { IncomeSchedule } from "@/components/income-schedule";
-import { ScreenHeader } from "@/components/screen-header";
+import { ExpenseSchedule } from "@/components/app/expense-schedule";
+import { IncomeSchedule } from "@/components/app/income-schedule";
+import { ScreenHeader } from "@/components/app/screen-header";
 import { plan as planScreen, sectionLabel } from "@/lib/nav";
 
 import { getPlan } from "../store";

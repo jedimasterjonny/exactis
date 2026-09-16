@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { takeConsoleOutput } from "../../vitest.setup";
+import { takeConsoleOutput } from "../../../vitest.setup";
 import { ThemeToggle } from "./theme-toggle";
 
 describe("ThemeToggle", () => {

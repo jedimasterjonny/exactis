@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { Field } from "@/components/field";
+import { Field } from "@/components/app/field";
 import { Input } from "@/components/ui/input";
 
 interface TextFieldProps {
