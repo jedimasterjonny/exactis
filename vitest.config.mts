@@ -18,7 +18,14 @@ export default defineConfig({
     chaiConfig: { truncateThreshold: 0 },
     clearMocks: true,
     coverage: {
-      exclude: ["src/**/*.test.{ts,tsx}"],
+      // The vendored shadcn components are excluded because they are not
+      // ours to cover: they ship exports this app never calls, so per-file
+      // 100% would mean writing tests for upstream's API rather than for
+      // anything here. The kit wrappers in front of them stay at 100%, and
+      // a wrapper test still executes the vendored code it renders - the
+      // coverage is simply no longer attributed. What replaces the claim is
+      // the weekly check proving these files are byte-identical to upstream.
+      exclude: ["src/**/*.test.{ts,tsx}", "src/components/ui/**"],
       include: ["src/**/*.{ts,tsx}"],
       provider: "v8",
       reporter: ["text", "html"],
