@@ -13,7 +13,13 @@ const assets = accounts.filter(isAsset);
 
 describe("AccountTable", () => {
   it("lists every account as a row with its treatment and three figures", () => {
-    render(<AccountTable accounts={held} />);
+    render(
+      <AccountTable
+        accounts={held}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+      />,
+    );
 
     const table = screen.getByRole("table");
     const [, ...rows] = within(table).getAllByRole("row");
@@ -44,7 +50,13 @@ describe("AccountTable", () => {
   });
 
   it("shows a flat dash for no contribution and a real minus on a debt", () => {
-    render(<AccountTable accounts={assets} />);
+    render(
+      <AccountTable
+        accounts={assets}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+      />,
+    );
 
     const table = screen.getByRole("table");
 
@@ -64,9 +76,32 @@ describe("AccountTable", () => {
     ).toBeInTheDocument();
   });
 
+  it("draws its empty state rather than a header over no rows", () => {
+    render(
+      <AccountTable
+        accounts={[]}
+        emptyDescription="A house, a car, anything owned outright."
+        emptyTitle="No assets yet"
+      />,
+    );
+
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByText("No assets yet")).toBeInTheDocument();
+    expect(
+      screen.getByText("A house, a car, anything owned outright."),
+    ).toBeInTheDocument();
+  });
+
   it("closes each row with a pencil when given an edit handler", () => {
     const onEdit = vi.fn<(account: Account) => void>();
-    render(<AccountTable accounts={assets} onEdit={onEdit} />);
+    render(
+      <AccountTable
+        accounts={assets}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        onEdit={onEdit}
+      />,
+    );
 
     const table = screen.getByRole("table");
 

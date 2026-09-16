@@ -183,14 +183,24 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
             </TabsTrigger>
           </TabsList>
           <TabsContent className="grid gap-5" value="accounts">
-            <AccountTable accounts={held} onEdit={edit} />
+            <AccountTable
+              accounts={held}
+              emptyDescription="Add a pension, an ISA, a savings account or a debt to see it listed here."
+              emptyTitle="No accounts yet"
+              onEdit={edit}
+            />
             <Note>
               Allocation is set once at plan level and applied pro rata to every
               account.
             </Note>
           </TabsContent>
           <TabsContent className="grid gap-5" value="assets">
-            <AccountTable accounts={assets} onEdit={edit} />
+            <AccountTable
+              accounts={assets}
+              emptyDescription="A house, a car, anything owned outright. Add one to see it listed here."
+              emptyTitle="No assets yet"
+              onEdit={edit}
+            />
             <Note>
               A loan is listed against the asset it secures. The progress points
               reconcile the two as total assets and asset loans.
