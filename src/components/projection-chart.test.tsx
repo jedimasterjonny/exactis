@@ -3,6 +3,16 @@ import { describe, expect, it } from "vitest";
 
 import { ProjectionChart, ProjectionPending } from "./projection-chart";
 
+// recharts names the layer it draws each series in after the mark, which
+// is what tells the plot's areas from its bars. A layer has no role,
+// label or text, so no query is more accessible than this one and none
+// can be suggested; the suggestion pass is told so, since it falls over
+// on elements it can suggest nothing for.
+const byClass =
+  (className: string) =>
+  (_content: string, element: Element | null): boolean =>
+    element?.classList.contains(className) === true;
+
 const bySlot =
   (slot: string) =>
   (_content: string, element: Element | null): boolean =>
@@ -43,6 +53,38 @@ describe("ProjectionChart", () => {
     expect(tooltip.getByText("Total")).toBeInTheDocument();
   });
 
+  it("swaps the areas for a column per year on the toggle, and back", () => {
+    render(<ProjectionChart points={points} />);
+
+    expect(
+      screen.getAllByText(byClass("recharts-area"), { suggest: false }),
+    ).toHaveLength(2);
+
+    const control = screen.getByRole("switch", { name: "Areas" });
+
+    expect(control).not.toBeChecked();
+
+    fireEvent.click(control);
+
+    expect(screen.getByRole("switch", { name: "Bars" })).toBeChecked();
+    expect(
+      screen.getAllByText(byClass("recharts-bar"), { suggest: false }),
+    ).toHaveLength(2);
+    expect(
+      screen.queryAllByText(byClass("recharts-area"), { suggest: false }),
+    ).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
+
+    expect(screen.getByRole("switch", { name: "Areas" })).not.toBeChecked();
+    expect(
+      screen.getAllByText(byClass("recharts-area"), { suggest: false }),
+    ).toHaveLength(2);
+    expect(
+      screen.queryAllByText(byClass("recharts-bar"), { suggest: false }),
+    ).toHaveLength(0);
+  });
+
   it("says so instead of plotting nothing when no account is a wrapper", () => {
     render(
       <ProjectionChart
@@ -62,6 +104,7 @@ describe("ProjectionChart", () => {
       screen.getByRole("link", { name: "Accounts & assets" }),
     ).toHaveAttribute("href", "/accounts");
     expect(screen.queryByRole("application")).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   });
 
   it("has nothing to plot over no years either", () => {
