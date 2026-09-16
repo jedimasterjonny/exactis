@@ -3,9 +3,18 @@
 import type { JSX } from "react";
 import type { TooltipContentProps } from "recharts";
 
-import { ChartArea } from "lucide-react";
+import { ChartArea, ChartColumnStacked } from "lucide-react";
 import Link from "next/link";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { useState } from "react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import type { ProjectionPoint } from "@/engine/projection";
 
@@ -25,8 +34,13 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Switch } from "@/components/ui/switch";
 import { formatGbp } from "@/lib/money";
 import { accountsAndAssets } from "@/lib/nav";
+
+// The mark each series is drawn as: an area under a line, or a column
+// per year. The series stack either way, so the top is the total.
+type Mark = "area" | "bar";
 
 interface ProjectionChartProps {
   readonly points: readonly ProjectionPoint[];
@@ -50,15 +64,21 @@ const config = Object.fromEntries(
 );
 
 // The dashboard's chart: the two wrappers, projected a year at a time,
-// stacked as areas so the top of the stack is the total. The plot alone,
-// with no figure over it: a hairline grid, the years and the pounds as
-// recessive ticks, a legend naming the series, and a crosshair with the
-// year's figures on hover and on the arrow keys. The pounds are written
-// in full, as money is everywhere here. A projection of nothing, because
-// no account is a wrapper yet, says so in the plot's place rather than
-// drawing a flat zero over a column of £0 ticks, and points at the screen
-// where the account is added: the dashboard has no way to add one itself.
+// stacked so the top of the stack is the total, as areas under lines or,
+// on the toggle, as a column per year. The plot alone, with no figure
+// over it: a hairline grid, the years and the pounds as recessive ticks,
+// a legend naming the series, and a crosshair with the year's figures on
+// hover and on the arrow keys. The pounds are written in full, as money
+// is everywhere here. The toggle takes its row from inside the plot's
+// box rather than adding one over it, so the box is the same height as
+// the frames that stand in for it and nothing shifts when the chart
+// arrives. A projection of nothing, because no account is a wrapper yet,
+// says so in the plot's place rather than drawing a flat zero over a
+// column of £0 ticks, and points at the screen where the account is
+// added: the dashboard has no way to add one itself.
 export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
+  const [mark, setMark] = useState<Mark>("area");
+
   if (points.every((point) => totalOf(point) === 0)) {
     return (
       <Frame>
@@ -85,72 +105,92 @@ export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
     );
   }
 
+  // The bar chart rather than the composed one, which would hold either
+  // mark: recharts draws the crosshair as a band over the year's columns
+  // only when the chart is a bar chart by name.
+  const Plot = mark === "bar" ? BarChart : AreaChart;
+
   return (
     <Frame>
-      <ChartContainer className="aspect-[3/1] w-full" config={config}>
-        <AreaChart
-          data={points}
-          margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
-        >
-          <defs>
-            {series.map(({ key }) => (
-              <linearGradient
-                id={washOf(key)}
-                key={key}
-                x1="0"
-                x2="0"
-                y1="0"
-                y2="1"
-              >
-                <stop
-                  offset="0%"
-                  stopColor={`var(--color-${key})`}
-                  stopOpacity={0.25}
-                />
-                <stop
-                  offset="100%"
-                  stopColor={`var(--color-${key})`}
-                  stopOpacity={0}
-                />
-              </linearGradient>
-            ))}
-          </defs>
-          <CartesianGrid vertical={false} />
-          <XAxis
-            axisLine={false}
-            dataKey="year"
-            minTickGap={40}
-            tickLine={false}
-            tickMargin={8}
-          />
-          <YAxis
-            axisLine={false}
-            tickFormatter={formatGbp}
-            tickLine={false}
-            width="auto"
-          />
-          <ChartTooltip
-            content={(props) => (
-              <ProjectionTooltip {...props} points={points} />
+      <div className="flex aspect-[3/1] w-full flex-col">
+        <MarkToggle mark={mark} onMarkChange={setMark} />
+        <ChartContainer className="aspect-auto min-h-0 flex-1" config={config}>
+          <Plot
+            data={points}
+            margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
+          >
+            {mark === "area" && (
+              <defs>
+                {series.map(({ key }) => (
+                  <linearGradient
+                    id={washOf(key)}
+                    key={key}
+                    x1="0"
+                    x2="0"
+                    y1="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor={`var(--color-${key})`}
+                      stopOpacity={0.25}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor={`var(--color-${key})`}
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                ))}
+              </defs>
             )}
-          />
-          <ChartLegend content={<ChartLegendContent />} />
-          {series.map(({ key }) => (
-            <Area
-              activeDot={{ r: 4, stroke: "var(--card)", strokeWidth: 2 }}
-              dataKey={key}
-              dot={false}
-              fill={`url(#${washOf(key)})`}
-              isAnimationActive={false}
-              key={key}
-              stackId="wrappers"
-              stroke={`var(--color-${key})`}
-              strokeWidth={2}
-              type="monotone"
+            <CartesianGrid vertical={false} />
+            <XAxis
+              axisLine={false}
+              dataKey="year"
+              minTickGap={40}
+              tickLine={false}
+              tickMargin={8}
             />
-          ))}
-        </AreaChart>
-      </ChartContainer>
+            <YAxis
+              axisLine={false}
+              tickFormatter={formatGbp}
+              tickLine={false}
+              width="auto"
+            />
+            <ChartTooltip
+              content={(props) => (
+                <ProjectionTooltip {...props} points={points} />
+              )}
+            />
+            <ChartLegend content={<ChartLegendContent />} />
+            {series.map(({ key }) =>
+              mark === "area" ? (
+                <Area
+                  activeDot={{ r: 4, stroke: "var(--card)", strokeWidth: 2 }}
+                  dataKey={key}
+                  dot={false}
+                  fill={`url(#${washOf(key)})`}
+                  isAnimationActive={false}
+                  key={key}
+                  stackId="wrappers"
+                  stroke={`var(--color-${key})`}
+                  strokeWidth={2}
+                  type="monotone"
+                />
+              ) : (
+                <Bar
+                  dataKey={key}
+                  fill={`var(--color-${key})`}
+                  isAnimationActive={false}
+                  key={key}
+                  stackId="wrappers"
+                />
+              ),
+            )}
+          </Plot>
+        </ChartContainer>
+      </div>
     </Frame>
   );
 }
@@ -171,6 +211,34 @@ function Frame({ children }: { readonly children: JSX.Element }): JSX.Element {
     <Card>
       <CardContent>{children}</CardContent>
     </Card>
+  );
+}
+
+// The switch between the two marks, drawn as the sidebar's theme toggle
+// is: an icon and the name of the mark drawn now, with the switch on for
+// the bars. It sits at the right of the plot's top row, where a screen
+// keeps its actions.
+function MarkToggle({
+  mark,
+  onMarkChange,
+}: {
+  readonly mark: Mark;
+  readonly onMarkChange: (mark: Mark) => void;
+}): JSX.Element {
+  const isBars = mark === "bar";
+  const Icon = isBars ? ChartColumnStacked : ChartArea;
+  return (
+    <label className="flex h-8 items-center gap-2 self-end label text-muted-foreground">
+      <Icon aria-hidden className="size-3.5" />
+      {isBars ? "Bars" : "Areas"}
+      <Switch
+        checked={isBars}
+        onCheckedChange={(isChecked) => {
+          onMarkChange(isChecked ? "bar" : "area");
+        }}
+        size="sm"
+      />
+    </label>
   );
 }
 
