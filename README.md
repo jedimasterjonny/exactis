@@ -35,8 +35,8 @@ Accounts and income lines live in Postgres, reached through
 `src/db/schema.ts`, the migrations generated from it are in `drizzle/`, and the
 queries are in `src/db/accounts.ts` and `src/db/income.ts`.
 
-The accounts screen reads and writes it, and the dashboard projects what it
-holds; the progress screen still shows the reference kit's figures.
+The accounts and plan screens read and write it, and the dashboard projects what
+it holds; the progress screen still shows the reference kit's figures.
 `DATABASE_URL` names the database, as `.env.example` shows. Nothing reads it
 until a query runs, so a build needs no database. Locally, point it at a Neon
 branch of your own and apply the migrations once:
