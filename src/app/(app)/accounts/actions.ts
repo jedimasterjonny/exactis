@@ -5,7 +5,13 @@ import * as z from "zod";
 
 import type { Account, AccountValues } from "@/data/accounts";
 
-import { accountKinds, cadences, growthKinds } from "@/data/accounts";
+import {
+  accountKinds,
+  cadences,
+  fundings,
+  growthKinds,
+  isAsset,
+} from "@/data/accounts";
 import { insertAccount, updateAccount } from "@/db/accounts";
 import { getDb } from "@/db/client";
 import { requireSession } from "@/lib/session";
@@ -13,17 +19,24 @@ import { requireSession } from "@/lib/session";
 import { accountsTag } from "./store";
 
 // What a save may carry, checked against the model's own lists so the
-// two cannot drift: the figures whole, a contribution never negative, and
-// the name as typed less the space around it, which the form also trims.
-const values = z.object({
-  balance: z.number().int(),
-  cadence: z.enum(cadences),
-  contribution: z.number().int().nonnegative(),
-  growth: z.enum(growthKinds),
-  kind: z.enum(accountKinds),
-  name: z.string().trim().min(1),
-  rate: z.number(),
-}) satisfies z.ZodType<AccountValues>;
+// two cannot drift: the figures whole, a contribution and a cap never
+// negative, the spare money only into an account that takes it, and the
+// name as typed less the space around it, which the form also trims.
+const values = z
+  .object({
+    balance: z.number().int(),
+    cadence: z.enum(cadences),
+    cap: z.number().int().nonnegative(),
+    contribution: z.number().int().nonnegative(),
+    funding: z.enum(fundings),
+    growth: z.enum(growthKinds),
+    kind: z.enum(accountKinds),
+    name: z.string().trim().min(1),
+    rate: z.number(),
+  })
+  .refine(
+    (draft) => draft.funding === "fixed" || !isAsset(draft),
+  ) satisfies z.ZodType<AccountValues>;
 
 const target = z.number().int().positive().nullable();
 

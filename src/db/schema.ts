@@ -6,7 +6,7 @@ import {
   text,
 } from "drizzle-orm/pg-core";
 
-import { accountKinds, cadences, growthKinds } from "@/data/accounts";
+import { accountKinds, cadences, fundings, growthKinds } from "@/data/accounts";
 import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
 import { lineGrowths } from "@/data/schedule";
@@ -14,6 +14,8 @@ import { lineGrowths } from "@/data/schedule";
 export const accountKind = pgEnum("account_kind", accountKinds);
 
 export const cadence = pgEnum("cadence", cadences);
+
+export const funding = pgEnum("funding", fundings);
 
 export const growthKind = pgEnum("growth_kind", growthKinds);
 
@@ -29,14 +31,16 @@ export const expenseGrowth = pgEnum("expense_growth", lineGrowths);
 export const expenseKind = pgEnum("expense_kind", expenseKinds);
 
 // One row per account, holding the account's values as the model lays
-// them flat: every column present, a contribution of nothing as a zero
-// and a plan rate's rate as one, so a row is the values with an id and
-// nothing in it needs the model to read. The id is an identity the store
+// them flat: every column present, a contribution of nothing as a zero,
+// a cap of nothing as one and a plan rate's rate as one, so a row is the
+// values with an id and nothing in it needs the model to read. The id is an identity the store
 // hands out; insertion order is the order accounts are listed in.
 export const accounts = pgTable("accounts", {
   balance: integer().notNull(),
   cadence: cadence().notNull(),
+  cap: integer().notNull(),
   contribution: integer().notNull(),
+  funding: funding().notNull(),
   growth: growthKind().notNull(),
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   kind: accountKind().notNull(),

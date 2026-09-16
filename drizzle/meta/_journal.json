@@ -22,6 +22,13 @@
       "when": 1789580602381,
       "tag": "0002_expense_lines",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789590729001,
+      "tag": "0003_funding",
+      "breakpoints": true
     }
   ]
 }
