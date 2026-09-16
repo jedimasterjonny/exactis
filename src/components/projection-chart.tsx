@@ -3,7 +3,6 @@
 import type { JSX } from "react";
 import type { TooltipContentProps } from "recharts";
 
-import { cn } from "cn";
 import { ChartArea } from "lucide-react";
 import Link from "next/link";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
@@ -37,22 +36,13 @@ type Series = (typeof series)[number]["key"];
 
 // The two series, in the order the progress table lists them and the
 // order they stack, the first at the baseline. Each keeps its colour for
-// good: a series is never recoloured by what else is plotted. The swatch
-// is the same token as a class, for the tooltip, which sits outside the
-// scope the chart's own variables are set in.
+// good: a series is never recoloured by what else is plotted. The colour
+// is named once: the container writes it into --color-<key> within its
+// own scope, and everything drawn for the series, the tooltip's key
+// included, reads it back from there.
 const series = [
-  {
-    color: "var(--chart-2)",
-    key: "deferred",
-    label: "Tax-deferred",
-    swatch: "bg-chart-2",
-  },
-  {
-    color: "var(--chart-1)",
-    key: "free",
-    label: "Tax-free",
-    swatch: "bg-chart-1",
-  },
+  { color: "var(--chart-2)", key: "deferred", label: "Tax-deferred" },
+  { color: "var(--chart-1)", key: "free", label: "Tax-free" },
 ] as const;
 
 const config = Object.fromEntries(
@@ -215,9 +205,13 @@ function ProjectionTooltip({
       <span className="font-medium">
         {`${String(point.year)} · Age ${String(point.age)}`}
       </span>
-      {series.map(({ key, label: name, swatch }) => (
+      {series.map(({ key, label: name }) => (
         <span className="flex items-center gap-2" key={key}>
-          <span aria-hidden className={cn("h-0.5 w-3 rounded-full", swatch)} />
+          <span
+            aria-hidden
+            className="h-0.5 w-3 rounded-full"
+            style={{ backgroundColor: `var(--color-${key})` }}
+          />
           <span className="text-muted-foreground">{name}</span>
           <span className="ml-auto figure font-medium">
             {formatGbp(point[key])}
