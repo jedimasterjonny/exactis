@@ -36,6 +36,25 @@ const untypedFiles = ["**/*.{js,jsx,mjs,cjs}"];
 // why these do not simply reuse codeFiles and lean on disableTypeChecked.
 const typedFiles = ["**/*.{ts,tsx,mts,cts}"];
 
+// The import the app may never make directly. Restated in every block below
+// that sets no-restricted-imports, because flat config replaces a rule's
+// options rather than merging them: a tier block naming only its own tiers
+// would quietly hand that tier a door back to the vendored files.
+const vendoredPattern = {
+  group: ["@/components/ui/*"],
+  message:
+    "Only src/components/kit may import a vendored component. Import the wrapper from @/components/kit instead.",
+};
+
+// Atomic design's one mechanical rule: a component composes what is below it,
+// and beside it, never above. Written as what each tier may not reach, so a
+// new tier is one entry rather than an edit to every other.
+const tierBans = {
+  atoms: ["molecules", "organisms", "templates"],
+  molecules: ["organisms", "templates"],
+  organisms: ["templates"],
+};
+
 const eslintConfig = defineConfig([
   // Deliberately the one block with no `files`, because neither option
   // names a rule, a plugin or a parser: an `eslint-disable` that no longer
@@ -265,18 +284,34 @@ const eslintConfig = defineConfig([
     rules: {
       "@typescript-eslint/no-restricted-imports": [
         "error",
+        { patterns: [vendoredPattern] },
+      ],
+    },
+  },
+  // Templates are the top tier, so they ban nothing and do not appear here.
+  // src/app composes organisms and templates and is above both.
+  ...Object.entries(tierBans).map(([tier, above]) => ({
+    files: [`src/components/app/${tier}/**`],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
         {
           patterns: [
+            vendoredPattern,
             {
-              group: ["@/components/ui/*"],
-              message:
-                "Only src/components/kit may import a vendored component. Import the wrapper from @/components/kit instead.",
+              group: above.map((t) => `@/components/app/${t}/*`),
+              message: `A component composes what is below it, never above: ${tier} cannot import ${above.join(", ")}.`,
             },
           ],
         },
       ],
     },
-  },
+  })),
+  // A tier rule cannot see a cycle. Two organisms importing each other both
+  // point sideways, which the rule above allows and should: organism on
+  // organism is the one same-tier edge atomic design permits. This is the
+  // companion that catches the case where that freedom closes a loop.
+  { files: codeFiles, rules: { "import/no-cycle": "error" } },
   {
     // Type-only imports must say so, so they are erased at compile time
     // rather than left as a runtime import of a module needed only for
