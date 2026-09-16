@@ -1,4 +1,7 @@
 import type { Account, AccountKind } from "@/data/accounts";
+import type { CashFlow, Schedule } from "@/engine/cash-flow";
+
+import { cashFlow } from "@/engine/cash-flow";
 
 // What the projection runs on: the rate every account on the plan rate
 // grows at, the first year plotted, which holds today's balances, how
@@ -39,9 +42,13 @@ export function endYear(plan: Plan): number {
 // The plan's years, the first holding the balances as they are and each
 // after it a year on: what the account is paid, then growth at its rate,
 // a fixed one or the plan's. Each account is carried on its own and the
-// year sums them by wrapper. Nothing is drawn out or taxed yet.
+// year sums them by wrapper. An account paid the spare money is paid
+// what that year's cash flow hands it, which is read over every
+// account, since a fixed sum into any of them is money the month no
+// longer has. Nothing is drawn out or taxed yet.
 export function project(
   accounts: readonly Account[],
+  schedule: Schedule,
   plan: Plan,
 ): ProjectionPoint[] {
   let held: readonly Held[] = accounts
@@ -51,15 +58,19 @@ export function project(
     )
     .map((account) => ({ account, balance: account.balance }));
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
+    const year = plan.from + offset;
     const point = {
-      age: plan.from + offset - plan.born,
+      age: year - plan.born,
       deferred: total(held, "tax-deferred"),
       free: total(held, "tax-free"),
-      year: plan.from + offset,
+      year,
     };
+    const flow = cashFlow(accounts, schedule, year);
     held = held.map(({ account, balance }) => ({
       account,
-      balance: grownAYear(balance, account, plan),
+      balance: grownAYear(balance, rateOf(account, plan), (month) =>
+        paidIn(account, month, flow),
+      ),
     }));
     return point;
   });
@@ -69,28 +80,40 @@ export function project(
 // month, and the balance then grows a month at the rate's twelfth root,
 // so a year's growth compounds to the yearly rate and a monthly
 // contribution earns the months it has been in for.
-function grownAYear(balance: number, account: Account, plan: Plan): number {
-  const monthly = (1 + rateOf(account, plan)) ** (1 / 12);
+function grownAYear(
+  balance: number,
+  rate: number,
+  paid: (month: number) => number,
+): number {
+  const monthly = (1 + rate) ** (1 / 12);
   let grown = balance;
   for (let month = 0; month < 12; month += 1) {
-    grown = (grown + paidIn(account, month)) * monthly;
+    grown = (grown + paid(month)) * monthly;
   }
   return grown;
 }
 
 // What lands in the month: a monthly sum every month, a yearly one in
-// the first, and nothing for an account with none. The spare money waits
-// on the schedule, which the projection does not read yet.
-function paidIn(account: Account, month: number): number {
+// the first, the spare money's take every month, since the spare money
+// is a month's, and nothing for an account with none. The take is read
+// off the flow as the one listed for the account itself, the same
+// object the flow was read over, rather than for its id, which two
+// accounts could share only by a caller's mistake; a sum over the one
+// take, so a miss needs no fallback that could never be reached.
+function paidIn(account: Account, month: number, flow: CashFlow): number {
   const { contribution } = account;
-  if (contribution === undefined || contribution.kind === "spare") {
+  if (contribution === undefined) {
     return 0;
   }
-  switch (contribution.cadence) {
-    case "month":
-      return contribution.amount;
-    case "year":
-      return month === 0 ? contribution.amount : 0;
+  switch (contribution.kind) {
+    case "fixed":
+      return contribution.cadence === "month" || month === 0
+        ? contribution.amount
+        : 0;
+    case "spare":
+      return flow.spare
+        .filter((take) => take.account === account)
+        .reduce((sum, take) => sum + take.amount, 0);
   }
 }
 
