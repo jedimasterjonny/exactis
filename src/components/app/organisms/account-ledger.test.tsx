@@ -9,14 +9,20 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 
-import { saveAccount } from "@/app/(app)/accounts/actions";
+import {
+  placeAccountsInOrder,
+  saveAccount,
+} from "@/app/(app)/accounts/actions";
 import { Toaster } from "@/components/kit/toast";
 import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 
 import { AccountLedger } from "./account-ledger";
 
-vi.mock("@/app/(app)/accounts/actions", () => ({ saveAccount: vi.fn() }));
+vi.mock("@/app/(app)/accounts/actions", () => ({
+  placeAccountsInOrder: vi.fn(),
+  saveAccount: vi.fn(),
+}));
 
 const held = accounts.filter((account) => !isAsset(account));
 const assets = accounts.filter(isAsset);
@@ -88,9 +94,17 @@ describe("AccountLedger", () => {
     let panel = screen.getByRole("tabpanel");
 
     expect(rowsOf(panel)).toHaveLength(held.length);
-    expect(within(panel).getByRole("paragraph")).toHaveTextContent(
-      "Allocation is set once at plan level",
-    );
+    expect(
+      within(panel)
+        .getAllByRole("paragraph")
+        .map((note) => note.textContent),
+    ).toStrictEqual([
+      "Spare money is handed down the accounts in this order. Drag a row by its grip, or move it with the arrow keys.",
+      "Allocation is set once at plan level and applied pro rata to every account.",
+    ]);
+    expect(
+      within(panel).getAllByRole("button", { name: /^Move / }),
+    ).toHaveLength(held.length);
 
     fireEvent.click(assetsTab);
 
@@ -101,6 +115,9 @@ describe("AccountLedger", () => {
     expect(within(panel).getByRole("paragraph")).toHaveTextContent(
       "A loan is listed against the asset it secures.",
     );
+    expect(
+      within(panel).queryByRole("button", { name: /^Move / }),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(accountsTab);
 
@@ -575,6 +592,82 @@ describe("AccountLedger", () => {
       kind: "tax-free",
       name: "Stocks & shares ISA",
       rate: 0,
+    });
+  });
+
+  // The names down the accounts tab, as the rows now stand: each row's
+  // grip is named for its account.
+  function names(): string[] {
+    return screen
+      .getAllByRole("button", { name: /^Move / })
+      .map((grip) => grip.getAttribute("aria-label")?.slice(5) ?? "");
+  }
+
+  // Moving the ISA onto the pension puts it before the pension, since it
+  // was below; the whole order goes to the store, the home and the
+  // mortgage where they were, and the rows show it before the store
+  // answers.
+  it("moves a row onto another from the keyboard, shows the order at once and sends it whole to the store", async () => {
+    renderLedger();
+    let answer!: () => void;
+    vi.mocked(placeAccountsInOrder).mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+
+    expect(names()).toStrictEqual([
+      "Workplace pension",
+      "Stocks & shares ISA",
+      "Current account",
+    ]);
+
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: "Move Stocks & shares ISA" }),
+      { key: "ArrowUp" },
+    );
+
+    await waitFor(() => {
+      expect(names()).toStrictEqual([
+        "Stocks & shares ISA",
+        "Workplace pension",
+        "Current account",
+      ]);
+    });
+    expect(placeAccountsInOrder).toHaveBeenCalledExactlyOnceWith([
+      2, 1, 3, 4, 5,
+    ]);
+
+    answer();
+
+    await waitFor(() => {
+      expect(names()).toStrictEqual([
+        "Workplace pension",
+        "Stocks & shares ISA",
+        "Current account",
+      ]);
+    });
+  });
+
+  // Dropping the pension on the current account puts it after, since it
+  // was above; the assets keep their places in the whole.
+  it("moves a row dropped on another after it when it came from above", async () => {
+    renderLedger();
+    vi.mocked(placeAccountsInOrder).mockResolvedValue();
+
+    const cashRow = screen.getByRole("row", { name: /Current account/ });
+
+    fireEvent.dragStart(
+      screen.getByRole("button", { name: "Move Workplace pension" }),
+      { dataTransfer: { setData: vi.fn() } },
+    );
+    fireEvent.dragOver(cashRow);
+    fireEvent.drop(cashRow);
+
+    await waitFor(() => {
+      expect(placeAccountsInOrder).toHaveBeenCalledExactlyOnceWith([
+        2, 3, 1, 4, 5,
+      ]);
     });
   });
 });

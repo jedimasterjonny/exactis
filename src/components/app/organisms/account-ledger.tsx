@@ -3,7 +3,7 @@
 import type { JSX } from "react";
 
 import { Plus } from "lucide-react";
-import { startTransition, useState, useTransition } from "react";
+import { startTransition, useOptimistic, useState, useTransition } from "react";
 
 import type {
   Account,
@@ -12,7 +12,10 @@ import type {
   Funding,
 } from "@/data/accounts";
 
-import { saveAccount } from "@/app/(app)/accounts/actions";
+import {
+  placeAccountsInOrder,
+  saveAccount,
+} from "@/app/(app)/accounts/actions";
 import { Note } from "@/components/app/atoms/note";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { MoneyField } from "@/components/app/molecules/money-field";
@@ -103,17 +106,25 @@ const kinds = [
 // from the header's button or edits one from its row. The rows are the
 // store's, handed down by the page, and a save goes to the store and comes
 // back with the page re-read, so the tables reflect it without the ledger
-// holding rows of its own. The entry doubles as the dialog's open state,
-// as the progress editor's point does, and the tab is controlled so a
-// saved account can bring its own tab forward. The fields are uncontrolled
-// and mount fresh with the entry's opening values each time the dialog
-// opens, and the draft mirrors what they report.
+// holding rows of its own. The one thing the ledger holds is the order
+// while a move is on its way to the store, since a row dragged into
+// place has to stay there rather than spring back until the page
+// re-reads; the optimistic order is the page's again once it does. The
+// entry doubles as the dialog's open state, as the progress editor's
+// point does, and the tab is controlled so a saved account can bring
+// its own tab forward. The fields are uncontrolled and mount fresh with
+// the entry's opening values each time the dialog opens, and the draft
+// mirrors what they report.
 export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   const [tab, setTab] = useState<Tab>("accounts");
   const [entry, setEntry] = useState<Entry | null>(null);
   const [isSaving, startSaving] = useTransition();
-  const held = accounts.filter((account) => !isAsset(account));
-  const assets = accounts.filter(isAsset);
+  const [order, placeOptimistically] = useOptimistic(
+    accounts,
+    (_current: readonly Account[], next: readonly Account[]) => next,
+  );
+  const held = order.filter((account) => !isAsset(account));
+  const assets = order.filter(isAsset);
 
   function amend(current: Entry, patch: Partial<Draft>): void {
     setEntry({ ...current, draft: { ...current.draft, ...patch } });
@@ -146,6 +157,24 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   // fields the choice leaves behind go back to nothing.
   function fund(current: Entry, funding: Funding): void {
     amend(current, fundedBy(current, funding));
+  }
+
+  // A row moved onto another takes its place in the whole list: before
+  // it when moved up, after it when moved down, so the spare money is
+  // handed down the accounts as the tab now shows them. The order shows
+  // at once and goes to the store behind it; the transition holds the
+  // optimistic order until the store's answer brings the page re-read.
+  function move(account: Account, target: Account): void {
+    const at = (id: number): number => order.findIndex((a) => a.id === id);
+    const without = order.filter((a) => a.id !== account.id);
+    const place =
+      without.findIndex((a) => a.id === target.id) +
+      (at(account.id) < at(target.id) ? 1 : 0);
+    const next = [...without.slice(0, place), account, ...without.slice(place)];
+    startTransition(async () => {
+      placeOptimistically(next);
+      await placeAccountsInOrder(next.map((a) => a.id));
+    });
   }
 
   function open(draft: Draft, id: null | number): void {
@@ -236,7 +265,12 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
               emptyDescription="Add a pension, an ISA, a savings account or a debt to see it listed here."
               emptyTitle="No accounts yet"
               onEdit={edit}
+              onMove={move}
             />
+            <Note>
+              Spare money is handed down the accounts in this order. Drag a row
+              by its grip, or move it with the arrow keys.
+            </Note>
             <Note>
               Allocation is set once at plan level and applied pro rata to every
               account.
