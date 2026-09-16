@@ -7,6 +7,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { accountKinds, cadences, growthKinds } from "@/data/accounts";
+import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
 import { lineGrowths } from "@/data/schedule";
 
@@ -19,6 +20,13 @@ export const growthKind = pgEnum("growth_kind", growthKinds);
 export const incomeGrowth = pgEnum("income_growth", lineGrowths);
 
 export const incomeKind = pgEnum("income_kind", incomeKinds);
+
+// The expense table's growth is a type of its own from the same list as
+// the income table's, since each table's vocabulary is its own type, as
+// the account and income kinds are.
+export const expenseGrowth = pgEnum("expense_growth", lineGrowths);
+
+export const expenseKind = pgEnum("expense_kind", expenseKinds);
 
 // One row per account, holding the account's values as the model lays
 // them flat: every column present, a contribution of nothing as a zero
@@ -52,4 +60,17 @@ export const incomeLines = pgTable("income_lines", {
   lastYear: integer("last_year"),
   name: text().notNull(),
   rsu: integer().notNull(),
+});
+
+// One row per expense line, laid out as the income table lays its lines,
+// less the parts an employment line alone is paid in.
+export const expenseLines = pgTable("expense_lines", {
+  amount: integer().notNull(),
+  cadence: cadence().notNull(),
+  firstYear: integer("first_year").notNull(),
+  growth: expenseGrowth().notNull(),
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  kind: expenseKind().notNull(),
+  lastYear: integer("last_year"),
+  name: text().notNull(),
 });
