@@ -2,13 +2,7 @@ import type { JSX } from "react";
 
 import { Pencil, Wallet } from "lucide-react";
 
-import type {
-  Account,
-  AccountKind,
-  Cadence,
-  Contribution,
-  Growth,
-} from "@/data/accounts";
+import type { Account, AccountKind, Cadence, Growth } from "@/data/accounts";
 
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
@@ -28,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/kit/table";
+import { allowanceOf } from "@/data/accounts";
 import { formatGbp } from "@/lib/money";
 
 interface AccountTableProps {
@@ -118,7 +113,7 @@ export function AccountTable({
                 </Badge>
               </TableCell>
               <TableCell className="text-right figure">
-                {formatContribution(account.contribution)}
+                {formatContribution(account)}
               </TableCell>
               <TableCell className="text-right figure">
                 {formatGrowth(account.growth)}
@@ -149,11 +144,23 @@ export function AccountTable({
 }
 
 // An account with nothing paid in shows a flat dash, as a flat delta does.
-function formatContribution(contribution: Contribution | undefined): string {
+// One paid the spare money says the most it takes a year, which is its
+// own allowance when it was given no cap.
+function formatContribution(account: Account): string {
+  const { contribution } = account;
   if (contribution === undefined) {
     return "—";
   }
-  return `${formatGbp(contribution.amount)} / ${cadences[contribution.cadence]}`;
+  switch (contribution.kind) {
+    case "fixed":
+      return `${formatGbp(contribution.amount)} / ${cadences[contribution.cadence]}`;
+    case "spare": {
+      const cap = contribution.cap ?? allowanceOf(account.kind);
+      return cap === null
+        ? "Spare, uncapped"
+        : `Spare, to ${formatGbp(cap)} / yr`;
+    }
+  }
 }
 
 function formatGrowth(growth: Growth): string {

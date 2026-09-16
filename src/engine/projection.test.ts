@@ -30,7 +30,7 @@ describe("project", () => {
   it("pays a monthly contribution in every month", () => {
     const monthly: Account = {
       balance: 1000,
-      contribution: { amount: 100, cadence: "month" },
+      contribution: { amount: 100, cadence: "month", kind: "fixed" },
       growth: { kind: "fixed", rate: 0 },
       id: 6,
       kind: "tax-free",

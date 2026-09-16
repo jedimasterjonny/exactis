@@ -5,7 +5,12 @@ import type { JSX } from "react";
 import { Plus } from "lucide-react";
 import { startTransition, useState, useTransition } from "react";
 
-import type { Account, AccountValues } from "@/data/accounts";
+import type {
+  Account,
+  AccountKind,
+  AccountValues,
+  Funding,
+} from "@/data/accounts";
 
 import { saveAccount } from "@/app/(app)/accounts/actions";
 import { Note } from "@/components/app/atoms/note";
@@ -31,7 +36,8 @@ import {
   TabsTrigger,
 } from "@/components/kit/tabs";
 import { toast } from "@/components/kit/toast";
-import { isAsset, toValues } from "@/data/accounts";
+import { allowanceOf, isAsset, toValues } from "@/data/accounts";
+import { formatGbp } from "@/lib/money";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
@@ -39,9 +45,10 @@ interface AccountLedgerProps {
 }
 
 // What the dialog holds while it is open: the account's values, flat, so
-// the rate sits beside the growth choice, reset to what it opened with
-// when the choice changes, and the rate field always mounts showing what
-// the draft holds.
+// the rate sits beside the growth choice and the sum and the cap beside
+// the contribution choice, each reset to what it opened with when its
+// choice changes, and the field always mounts showing what the draft
+// holds.
 type Draft = AccountValues;
 
 // An open dialog: the draft as it is, the draft as it opened, which the
@@ -53,14 +60,16 @@ interface Entry {
   readonly initial: Draft;
 }
 
-type Figure = "balance" | "contribution" | "rate";
+type Figure = "balance" | "cap" | "contribution" | "rate";
 
 type Tab = "accounts" | "assets";
 
 const blank: Draft = {
   balance: 0,
   cadence: "year",
+  cap: 0,
   contribution: 0,
+  funding: "fixed",
   growth: "plan",
   kind: "tax-deferred",
   name: "",
@@ -70,6 +79,11 @@ const blank: Draft = {
 const cadences = [
   { label: "A year", value: "year" },
   { label: "A month", value: "month" },
+] as const;
+
+const fundings = [
+  { label: "A fixed sum", value: "fixed" },
+  { label: "Spare money", value: "spare" },
 ] as const;
 
 const growths = [
@@ -127,8 +141,36 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
     };
   }
 
+  // The contribution choice: the fields the new choice shows mount with
+  // what the account opened with, so the draft takes the same, and the
+  // fields the choice leaves behind go back to nothing.
+  function fund(current: Entry, funding: Funding): void {
+    amend(current, fundedBy(current, funding));
+  }
+
   function open(draft: Draft, id: null | number): void {
     setEntry({ draft, id, initial: draft });
+  }
+
+  // The treatment choice: an asset is paid only a fixed sum, so the
+  // contribution choice leaves with it and an account paid the spare
+  // money is paid a fixed sum instead, as it opened. The choice comes
+  // back when a wrapper or cash is chosen again, as the account opened
+  // with it, which is what the choice mounts showing. A change that
+  // stays on one side leaves the choice where it is.
+  function treat(current: Entry, kind: AccountKind): void {
+    const willBeAsset = isAsset({ kind });
+    if (willBeAsset && current.draft.funding === "spare") {
+      amend(current, { kind, ...fundedBy(current, "fixed") });
+    } else if (
+      !willBeAsset &&
+      isAsset(current.draft) &&
+      current.initial.funding !== current.draft.funding
+    ) {
+      amend(current, { kind, ...fundedBy(current, current.initial.funding) });
+    } else {
+      amend(current, { kind });
+    }
   }
 
   // The name is saved as typed less the space around it, which is what
@@ -239,32 +281,61 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
                   defaultValue={entry.initial.kind}
                   label="Treatment"
                   onValueChange={(kind) => {
-                    amend(entry, { kind });
+                    treat(entry, kind);
                   }}
                   options={kinds}
                 />
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <MoneyField
                   defaultValue={entry.initial.balance}
                   hint="A debt's is negative"
                   label="Balance"
                   onValueCommitted={figure(entry, "balance")}
                 />
-                <MoneyField
-                  defaultValue={entry.initial.contribution}
-                  hint="Leave at nothing for none"
-                  label="Contribution"
-                  onValueCommitted={figure(entry, "contribution")}
-                />
-                <SelectField
-                  defaultValue={entry.initial.cadence}
-                  label="Cadence"
-                  onValueChange={(cadence) => {
-                    amend(entry, { cadence });
-                  }}
-                  options={cadences}
-                />
+                {!isAsset(entry.draft) && (
+                  <SelectField
+                    defaultValue={entry.initial.funding}
+                    hint="Spare money is what a month's income leaves after the expenses and every fixed sum"
+                    label="Contribution"
+                    onValueChange={(funding) => {
+                      fund(entry, funding);
+                    }}
+                    options={fundings}
+                  />
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {entry.draft.funding === "fixed" ? (
+                  <>
+                    <MoneyField
+                      defaultValue={entry.initial.contribution}
+                      hint="Leave at nothing for none"
+                      // Keyed apart from the cap, which takes its place:
+                      // the fragment is unwrapped and the two would be
+                      // one field, keeping what was typed into the other.
+                      key="contribution"
+                      label="Amount"
+                      onValueCommitted={figure(entry, "contribution")}
+                    />
+                    <SelectField
+                      defaultValue={entry.initial.cadence}
+                      label="Cadence"
+                      onValueChange={(cadence) => {
+                        amend(entry, { cadence });
+                      }}
+                      options={cadences}
+                    />
+                  </>
+                ) : (
+                  <MoneyField
+                    defaultValue={entry.initial.cap}
+                    hint={capHint(entry.draft.kind)}
+                    key="cap"
+                    label="Cap, a year"
+                    onValueCommitted={figure(entry, "cap")}
+                  />
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <SelectField
@@ -305,6 +376,29 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
       </Dialog>
     </>
   );
+}
+
+// What the cap field says a cap of nothing means: the kind's allowance,
+// or no cap at all for cash.
+function capHint(kind: AccountKind): string {
+  const allowance = allowanceOf(kind);
+  return allowance === null
+    ? "Leave at nothing for no cap"
+    : `Leave at nothing for the ${formatGbp(allowance)} allowance`;
+}
+
+// The draft as a contribution choice leaves it: the fields the choice
+// shows at what the account opened with, since that is what they mount
+// showing, and the fields it hides at nothing.
+function fundedBy(current: Entry, funding: Funding): Partial<Draft> {
+  return funding === "fixed"
+    ? {
+        cadence: current.initial.cadence,
+        cap: 0,
+        contribution: current.initial.contribution,
+        funding,
+      }
+    : { cadence: "year", cap: current.initial.cap, contribution: 0, funding };
 }
 
 // The row count beside a tab's label, in the micro-label face and faint.

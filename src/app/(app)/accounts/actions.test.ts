@@ -29,7 +29,9 @@ const [pension, , , home] = accounts;
 const values = {
   balance: 4000,
   cadence: "month",
+  cap: 0,
   contribution: 333,
+  funding: "fixed",
   growth: "fixed",
   kind: "tax-free",
   name: " Lifetime ISA ",
@@ -77,6 +79,22 @@ describe("saveAccount", () => {
     expect(updateTag).toHaveBeenCalledExactlyOnceWith(accountsTag);
   });
 
+  it("takes the spare money into an account that takes it", async () => {
+    const isa = {
+      ...values,
+      cap: 20000,
+      contribution: 0,
+      funding: "spare",
+    } as const;
+    vi.mocked(insertAccount).mockResolvedValue(pension);
+
+    expect(await saveAccount(null, isa)).toBe(pension);
+    expect(insertAccount).toHaveBeenCalledExactlyOnceWith(db, {
+      ...isa,
+      name: "Lifetime ISA",
+    });
+  });
+
   it("refuses what the form could not have sent", async () => {
     await expect(saveAccount(0, values)).rejects.toThrow(z.ZodError);
     await expect(saveAccount(null, { ...values, name: "  " })).rejects.toThrow(
@@ -87,6 +105,12 @@ describe("saveAccount", () => {
     ).rejects.toThrow(z.ZodError);
     await expect(
       saveAccount(null, { ...values, balance: 0.5 }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(saveAccount(null, { ...values, cap: -1 })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(
+      saveAccount(null, { ...values, funding: "spare", kind: "debt" }),
     ).rejects.toThrow(z.ZodError);
     expect(insertAccount).not.toHaveBeenCalled();
     expect(updateAccount).not.toHaveBeenCalled();

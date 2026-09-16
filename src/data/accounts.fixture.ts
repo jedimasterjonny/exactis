@@ -7,7 +7,7 @@ import type { Account } from "@/data/accounts";
 export const accounts = [
   {
     balance: 391640,
-    contribution: { amount: 28512, cadence: "year" },
+    contribution: { amount: 28512, cadence: "year", kind: "fixed" },
     growth: { kind: "plan" },
     id: 1,
     kind: "tax-deferred",
@@ -15,7 +15,7 @@ export const accounts = [
   },
   {
     balance: 271930,
-    contribution: { amount: 20000, cadence: "year" },
+    contribution: { amount: 20000, cadence: "year", kind: "fixed" },
     growth: { kind: "plan" },
     id: 2,
     kind: "tax-free",
@@ -37,7 +37,7 @@ export const accounts = [
   },
   {
     balance: -176520,
-    contribution: { amount: 2180, cadence: "month" },
+    contribution: { amount: 2180, cadence: "month", kind: "fixed" },
     growth: { kind: "fixed", rate: 0.0485 },
     id: 5,
     kind: "debt",
