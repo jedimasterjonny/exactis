@@ -1,13 +1,16 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
 
+import { getAccounts } from "../accounts/store";
 import { getPlan } from "../store";
 import Plan from "./page";
 import { getExpenseLines, getIncomeLines } from "./store";
 
+vi.mock("../accounts/store", () => ({ getAccounts: vi.fn() }));
 vi.mock("../store", () => ({ getPlan: vi.fn() }));
 vi.mock("./store", () => ({
   getExpenseLines: vi.fn(),
@@ -21,9 +24,13 @@ vi.mock("./actions", () => ({
 const [salary] = incomeLines;
 
 describe("Plan", () => {
-  it("hands the store's lines and the plan to both schedules under one header", async () => {
+  // The fixture's first year: the salary's £12,250 a month against the
+  // household's £3,500, the pension's, the ISA's and the mortgage's
+  // fixed sums, leaving £2,607.
+  it("hands the store's lines and the plan to both schedules under one header, and this year's cash flow beneath", async () => {
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
     vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
+    vi.mocked(getAccounts).mockResolvedValue([...accounts]);
     vi.mocked(getPlan).mockReturnValue(plan);
 
     render(await Plan());
@@ -37,15 +44,25 @@ describe("Plan", () => {
     ).toBeInTheDocument();
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
-    ).toStrictEqual(["Income by year", "Expenses by year"]);
+    ).toStrictEqual([
+      "Income by year",
+      "Expenses by year",
+      "Cash flow each month",
+    ]);
     expect(screen.getByText("Age 68–89")).toBeInTheDocument();
     expect(screen.getByText("Age 82–89")).toBeInTheDocument();
     expect(screen.getAllByRole("paragraph")).toHaveLength(2);
+    expect(screen.getByText("2026, in today's money")).toBeInTheDocument();
+    expect(screen.getByText("Left over")).toBeInTheDocument();
+    expect(screen.getByText("£2,607")).toHaveClass("figure", "font-medium");
   });
 
+  // The salary alone, with nothing going out and no account to pay,
+  // leaves all of its £12,250 a month.
   it("counts a single line in the singular and none as none", async () => {
     vi.mocked(getIncomeLines).mockResolvedValue([salary]);
     vi.mocked(getExpenseLines).mockResolvedValue([]);
+    vi.mocked(getAccounts).mockResolvedValue([]);
     vi.mocked(getPlan).mockReturnValue(plan);
 
     render(await Plan());
@@ -54,5 +71,6 @@ describe("Plan", () => {
       screen.getByText("1 income line · 0 expense lines"),
     ).toBeInTheDocument();
     expect(screen.getByText("No expenses yet")).toBeInTheDocument();
+    expect(screen.getAllByText("£12,250")).toHaveLength(2);
   });
 });
