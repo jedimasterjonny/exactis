@@ -5,12 +5,25 @@ import { accounts } from "@/data/accounts.fixture";
 import { project } from "@/engine/projection";
 
 import { getAccounts } from "./accounts/store";
-import { getProjection } from "./store";
+import { getPlan, getProjection } from "./store";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ cacheLife: vi.fn() }));
 vi.mock("@/engine/projection", () => ({ project: vi.fn() }));
 vi.mock("./accounts/store", () => ({ getAccounts: vi.fn() }));
+
+describe("getPlan", () => {
+  it("hands out the plan's constants from this year", () => {
+    vi.useFakeTimers({ now: new Date("2026-09-15T12:00:00Z") });
+
+    expect(getPlan()).toStrictEqual({
+      born: 1990,
+      from: 2026,
+      rate: 0.05,
+      years: 30,
+    });
+  });
+});
 
 describe("getProjection", () => {
   it("projects nothing without the accounts", async () => {

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   accountsAndAssets,
   dashboard,
+  plan,
   progress,
   screens,
   sectionLabel,
@@ -15,8 +16,9 @@ describe("sectionLabel", () => {
     expect(sectionLabel(accountsAndAssets)).toBe(
       "Sect. II · Accounts & assets",
     );
-    expect(sectionLabel(progress)).toBe("Sect. III · Progress");
-    expect(sectionNumeral(progress)).toBe("III");
+    expect(sectionLabel(plan)).toBe("Sect. III · Plan");
+    expect(sectionLabel(progress)).toBe("Sect. IV · Progress");
+    expect(sectionNumeral(progress)).toBe("IV");
   });
 
   it("lists every screen with a distinct typed route", () => {
@@ -24,6 +26,7 @@ describe("sectionLabel", () => {
 
     expect(new Set(hrefs).size).toBe(screens.length);
     expect(hrefs).toContain("/accounts");
+    expect(hrefs).toContain("/plan");
     expect(hrefs).toContain("/progress");
   });
 });

@@ -4,7 +4,7 @@ import type { Account } from "@/data/accounts";
 
 import { accounts } from "@/data/accounts.fixture";
 
-import { project } from "./projection";
+import { endYear, project } from "./projection";
 
 const [pension, isa, , home, mortgage] = accounts;
 
@@ -72,5 +72,14 @@ describe("project", () => {
     expect(project([pension, isa], { ...plan, years: 0 })).toStrictEqual([
       { age: 36, deferred: 412880, free: 286145, year: 2026 },
     ]);
+  });
+});
+
+describe("endYear", () => {
+  it("names the last year the plan runs to, which is the last year plotted", () => {
+    const [, , last] = project([], { ...plan, years: 2 });
+
+    expect(endYear({ ...plan, years: 2 })).toBe(2028);
+    expect(last?.year).toBe(endYear({ ...plan, years: 2 }));
   });
 });

@@ -36,6 +36,7 @@ describe("AppNav", () => {
 
     const dashboard = screen.getByRole("link", { name: /^Dashboard/ });
     const accounts = screen.getByRole("link", { name: /^Accounts/ });
+    const plan = screen.getByRole("link", { name: /^Plan/ });
     const progress = screen.getByRole("link", { name: /^Progress/ });
 
     expect(dashboard).toHaveAttribute("href", "/");
@@ -44,8 +45,11 @@ describe("AppNav", () => {
     expect(accounts).toHaveAttribute("href", "/accounts");
     expect(accounts).not.toHaveAttribute("data-active");
     expect(within(accounts).getByText("II")).toHaveClass("label");
+    expect(plan).toHaveAttribute("href", "/plan");
+    expect(plan).not.toHaveAttribute("data-active");
+    expect(within(plan).getByText("III")).toHaveClass("label");
     expect(progress).toHaveAttribute("href", "/progress");
     expect(progress).toHaveAttribute("data-active");
-    expect(within(progress).getByText("III")).toHaveClass("label");
+    expect(within(progress).getByText("IV")).toHaveClass("label");
   });
 });
