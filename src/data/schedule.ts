@@ -1,5 +1,7 @@
 import type { Cadence } from "@/data/accounts";
 
+export type LineGrowth = (typeof lineGrowths)[number];
+
 // What the lines of both schedules share. A line is money over a run of
 // years: whole pounds in today's money, paid at a cadence from a first
 // year to a last, or to the end of the plan when it has no last year,
@@ -15,7 +17,8 @@ export interface LineValues {
   readonly name: string;
 }
 
-type LineGrowth = (typeof lineGrowths)[number];
+// The two schedules a line belongs to: money coming in, or going out.
+export type Side = "expense" | "income";
 
 // The growth choices as a list, so each store's column takes the same
 // words the type does and cannot drift from them. Growth is stated

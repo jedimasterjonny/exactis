@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
-import { History, LayoutDashboard, Wallet } from "lucide-react";
+import { History, LayoutDashboard, ListTree, Wallet } from "lucide-react";
 
 import { toRoman } from "@/lib/roman";
 
@@ -23,6 +23,8 @@ export const accountsAndAssets: Screen = {
   label: "Accounts & assets",
 };
 
+export const plan: Screen = { href: "/plan", icon: ListTree, label: "Plan" };
+
 export const progress: Screen = {
   href: "/progress",
   icon: History,
@@ -36,6 +38,7 @@ export const progress: Screen = {
 export const screens: readonly Screen[] = [
   dashboard,
   accountsAndAssets,
+  plan,
   progress,
 ];
 
