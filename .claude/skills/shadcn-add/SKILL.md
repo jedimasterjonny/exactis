@@ -2,67 +2,88 @@
 name: shadcn-add
 description:
   Adding or updating a shadcn component under src/components/ui. The vendoring
-  policy, the pass every generated file goes through before it is green, how
-  upstream updates are taken, and how a component's dependencies land.
+  policy, what belongs in the kit wrapper instead of the generated file, how
+  upstream updates are taken, and the traps in the CLI.
 ---
 
 # Adding a shadcn component
 
-`shadcn add` writes into `src/components/ui`, and what it writes is owned
-source: every gate that applies under `src` applies there, and the file is
-edited to satisfy them rather than the gates being loosened around it. The
-alternative — a directory the checks skip, on the grounds that the code is
-vendored — was rejected. shadcn's own position is that the code is yours to
-edit, and a directory the gates skip is where the next unsafe assertion lands.
+The generated file is vendored, not authored. `shadcn add` writes into
+`src/components/ui` and what it writes is left exactly as it lands: not
+formatted, not annotated, not pruned. Prettier, ESLint and knip are switched off
+over that directory, so there is nothing to satisfy and nothing to fix.
 
-The one rule relaxed under `src/components/ui` is
-`@typescript-eslint/naming-convention`, because the prop names are the upstream
-API rather than ours; `eslint.config.mjs` says why, and nothing else joins it.
+If a generated file looks wrong, that is not a licence to edit it. Everything
+this app wants to be different goes in the wrapper.
+
+This is the reverse of the policy that held until the vendoring change, so treat
+any older instinct to tidy these files as out of date.
 
 ## The pass
 
-What it costs was measured on `button` against a clean tree. As shipped the file
-fails Prettier, perfectionist and `explicit-function-return-type`, and its
-imports do not resolve.
+1. `bunx shadcn add <name>`. Then read `git status` rather than the CLI's
+   summary, because it reaches past the component you asked for - see below.
+2. Restore `package.json` and `bun.lock`. The CLI rewrites pinned ranges that
+   Renovate owns; adding `chart` pushed `recharts` from `3.10.1` down to
+   `3.8.0`. Check the dependency _names_ before restoring: a genuinely new
+   package has to be declared by hand, pinned, in its own right - never reached
+   through whatever pulled it in.
+3. Write the wrapper in `src/components/kit`. One line is the normal case:
 
-1. `bunx shadcn add <name>`.
-2. Declare what it imports. The registry entries declare only `cn`, so the CLI
-   installs nothing else. `@base-ui/react` and `class-variance-authority` are
-   the two the base-nova style leans on across the set; anything further a
-   component imports — an icon set, a date library — is declared in
-   `package.json` in its own right, never reached through whatever already pulls
-   it in.
-3. `bun run format` and `bun run lint:fix` clear everything except the return
-   type, which is written by hand. Read what `lint:fix` changed before trusting
-   it: on `field` it rewrote `useMemo(() => {` to `useMemo(async () => {` and
-   React Compiler then refused the file. React 19 types `ReactNode` as including
-   `Promise<AwaitedReactNode>`, so `promise-function-async` reads any callback
-   returning children as promise-returning and autofixes it. The rule names the
-   repair in its own message: annotate the callback's return type. Expect a
-   component that renders a bare `<label>` to trip
-   `jsx-a11y/label-has-associated-control` too, which needs a disable with a
-   reason rather than a fix.
-4. Drop what knip reports. `button` exports `buttonVariants` and nothing imports
-   it; an unused export is dropped like any other and restored when a component
-   that composes on it arrives.
-5. Write the test. A single render took `button` to 100%, default variants
-   included.
+   ```tsx
+   export { Card, CardContent, CardHeader } from "@/components/ui/card";
+   ```
+
+   Re-export only the names the app actually uses. That narrowing is the point
+   of the layer, and knip enforces it - a wrapper export nothing imports is
+   reported like any other.
+
+4. Import it from `app/` as `@/components/kit/<name>`. Nothing outside `kit/`
+   may import `@/components/ui/*`; `no-restricted-imports` will say so.
+5. Test the wrapper only if it has logic. A re-export compiles to no statements,
+   so there is nothing to execute and coverage does not ask for a test. A
+   wrapper that branches gets one.
+
+A wrapper is promoted to a real component when it has something to add. `badge`
+is the example: this app needs `positive` and `caution` tones that base-nova
+does not ship. It passes `variant={null}`, which makes the vendored cva emit its
+base classes and no variant classes, adds the tone classes through `className`,
+and sets `data-variant` by hand - a prop wins over the state Base UI derives.
+Layering a tone over one of upstream's variants and letting tailwind-merge
+settle it works only while that variant sets no property the tone leaves alone,
+and nothing would report the day it stopped.
 
 ## Updates
 
-`shadcn diff` is written off. Reformatting touches most lines, so the diff
-against the registry is the whole file and says nothing. An upstream update is
-`shadcn add <name> --overwrite`, which discards the local copy, followed by the
-same pass; the diff to review is git's.
+An update is `shadcn add <name> --overwrite` and nothing else. There is no pass
+afterwards. The diff to review is git's, and it is upstream's diff: read it for
+a renamed or dropped export, which shows up as a type error in the wrapper
+rather than in a screen.
 
-`--overwrite` reaches past the component named. Adding `chart` over an existing
-tree rewrote `card` too, because the registry lists it as a dependency, and the
-pass that file had already been through was gone with no mention of it in the
-output. Reading a component to see what upstream says is the same act: do it on
-a clean tree, and read `git status` rather than the CLI's list of files before
-going further.
+`shadcn diff` is written off - it compares against a registry payload that is
+not what lands on disk.
 
-## Landing it
+The weekly `Vendor` workflow does this across every vendored name and opens a
+pull request when the registry has moved. Most updates should arrive that way
+rather than by hand.
 
-A dependency lands in the same commit as the first file that imports it: knip
-rejects one nothing imports, so an install on its own is never green.
+## Traps
+
+- `--overwrite` reaches past the component named, via `registryDependencies`.
+  Adding `sidebar` also writes `button`, `input`, `separator`, `skeleton`,
+  `sheet`, `tooltip` and `use-mobile`. Do it on a clean tree and read
+  `git status`.
+- `shadcn view <name>` returns the raw registry payload, not what the CLI
+  writes. It still carries `@/registry/base-nova/...` imports and, in `sidebar`,
+  an `IconPlaceholder` from the shadcn website. The CLI rewrites those against
+  `components.json` on the way to disk.
+- `aliases.ui`, `aliases.components` and `aliases.hooks` all point at
+  `@/components/ui`, so everything the CLI writes lands under the one exempt
+  path. If a registry item ever ships a `registry:lib` file it would land in
+  `src/lib` instead, outside it - the weekly workflow fails on exactly that.
+- `Skipped N files: (files might be identical, use --overwrite to overwrite)` is
+  the healthy message when the files already match the registry. It does not
+  mean the flag was ignored.
+- If you script this, mind the shell. `zsh` does not word-split an unquoted
+  variable, so a `$names` list arrives as one long item name and the CLI fails
+  on a URL built from it. GitHub Actions runs `bash`, which splits.
