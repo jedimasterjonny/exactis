@@ -4,8 +4,8 @@ import type { Plan } from "@/engine/projection";
 // The reference kit's invented schedule: four income lines, in the order
 // the reference lists them, with the ids a store would have given them,
 // the salary paid in parts that sum to the reference's figure, and the
-// plan they are laid over, which runs from 2026 to 2079 for someone born
-// in 1990. For tests, since the screen reads the store. A
+// plan they are laid over, which runs from September 2026 to 2079 for
+// someone born in 1990. For tests, since the screen reads the store. A
 // tuple, so a test reading a line by its place gets a line.
 export const incomeLines = [
   {
@@ -58,4 +58,10 @@ export const incomeLines = [
   },
 ] as const satisfies readonly IncomeLine[];
 
-export const plan: Plan = { born: 1990, from: 2026, rate: 0.05, years: 53 };
+export const plan: Plan = {
+  born: 1990,
+  from: 2026,
+  month: 8,
+  rate: 0.05,
+  years: 53,
+};

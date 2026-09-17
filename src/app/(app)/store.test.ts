@@ -20,12 +20,13 @@ vi.mock("./plan/store", () => ({
 }));
 
 describe("getPlan", () => {
-  it("hands out the plan's constants from this year", () => {
+  it("hands out the plan's constants from this year and this month", () => {
     vi.useFakeTimers({ now: new Date("2026-09-15T12:00:00Z") });
 
     expect(getPlan()).toStrictEqual({
       born: 1990,
       from: 2026,
+      month: 8,
       rate: 0.05,
       years: 30,
     });
@@ -54,7 +55,7 @@ describe("getProjection", () => {
     expect(project).toHaveBeenCalledExactlyOnceWith(
       accounts,
       { expenses: expenseLines, income: incomeLines },
-      { born: 1990, from: 2026, rate: 0.05, years: 30 },
+      { born: 1990, from: 2026, month: 8, rate: 0.05, years: 30 },
     );
     expect(cacheLife).toHaveBeenCalledExactlyOnceWith("hours");
   });

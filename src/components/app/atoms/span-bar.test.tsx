@@ -11,7 +11,7 @@ const bySlot =
     element?.getAttribute("data-slot") === slot;
 
 // Forty years from 2026, so the span ends in 2066 and the shares are round.
-const plan: Plan = { born: 1990, from: 2026, rate: 0.05, years: 40 };
+const plan: Plan = { born: 1990, from: 2026, month: 0, rate: 0.05, years: 40 };
 
 describe("SpanBar", () => {
   it("places a line on the plan's span by its years, hidden from the tree", () => {
