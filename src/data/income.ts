@@ -6,8 +6,8 @@ export type IncomeKind = (typeof incomeKinds)[number];
 // pension, a side line. It holds what every line holds, and an employment
 // line carries a bonus and RSUs on top of its base, each nothing when
 // there is none and both nothing on any other kind of line; the three
-// are paid together but held apart, since a pension contribution is a
-// share of the base alone. Lines overlap freely: a step-up is a second
+// are paid together, at the line's one cadence, but held apart, since
+// a pension contribution is a share of the base alone. Lines overlap freely: a step-up is a second
 // line starting mid-way, not an edit to the first. The kind says what the
 // money is, for the badge now and for tax later. The id is the line's
 // identity, handed out by the store in the order lines were added, which
