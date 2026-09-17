@@ -20,8 +20,10 @@ import { accountsTag } from "./store";
 
 // What a save may carry, checked against the model's own lists so the
 // two cannot drift: the figures whole, a contribution and a cap never
-// negative, the spare money only into an account that takes it, and the
-// name as typed less the space around it, which the form also trims.
+// negative, the spare money only into an account that takes it, a rate
+// no lower than losing everything, since below that a year's growth is
+// not a number, and the name as typed less the space around it, which
+// the form also trims.
 const values = z
   .object({
     balance: z.number().int(),
@@ -32,7 +34,7 @@ const values = z
     growth: z.enum(growthKinds),
     kind: z.enum(accountKinds),
     name: z.string().trim().min(1),
-    rate: z.number(),
+    rate: z.number().min(-1),
   })
   .refine(
     (draft) => draft.funding === "fixed" || !isAsset(draft),
