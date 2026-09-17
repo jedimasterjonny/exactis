@@ -7,7 +7,7 @@ interface MoneyFieldProps {
   readonly defaultValue: number;
   readonly hint?: string;
   readonly label: string;
-  readonly onValueCommitted?: (value: null | number) => void;
+  readonly onValueCommitted?: (value: number) => void;
 }
 
 // Whole pounds are formatted by Intl, so the £ and the thousands separators

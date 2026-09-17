@@ -7,7 +7,7 @@ interface YearFieldProps {
   readonly defaultValue: number;
   readonly hint?: string;
   readonly label: string;
-  readonly onValueCommitted?: (value: null | number) => void;
+  readonly onValueCommitted?: (value: number) => void;
 }
 
 // A year is a whole number written without a separator, so 2026 never

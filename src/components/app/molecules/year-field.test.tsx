@@ -15,7 +15,7 @@ describe("YearField", () => {
   });
 
   it("commits the parsed year on blur and shows a hint when given one", () => {
-    const onValueCommitted = vi.fn<(value: null | number) => void>();
+    const onValueCommitted = vi.fn<(value: number) => void>();
     render(
       <YearField
         defaultValue={2026}
@@ -30,7 +30,7 @@ describe("YearField", () => {
     fireEvent.change(input, { target: { value: "2031" } });
     fireEvent.blur(input);
 
-    expect(onValueCommitted).toHaveBeenCalledWith(2031, expect.anything());
+    expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(2031);
     expect(input).toHaveValue("2031");
     expect(screen.getByRole("paragraph")).toHaveTextContent("Age 36");
   });
