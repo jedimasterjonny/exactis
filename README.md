@@ -55,9 +55,11 @@ suite before it reaches a database.
 
 The engine is `src/engine/projection.ts`: a pure function over the accounts, the
 income and expense lines and a plan, giving a point per year to the plan's
-horizon. So far it carries the two wrappers, tax-free and tax-deferred, each
-paid into as its accounts say and grown at a plan rate held as a constant until
-there is an assumptions screen to set it on. An account paid the spare money is
+horizon, each the balance entering that year. So far it carries the two
+wrappers, tax-free and tax-deferred, each paid into a month at a time as its
+accounts say and grown at a plan rate held as a constant until there is an
+assumptions screen to set it on. The first year runs from the month the plan is
+read in, since the balances are that month's. An account paid the spare money is
 paid what `src/engine/cash-flow.ts` works out for the year: a month's income
 less the expenses and every fixed sum, handed down the accounts that take it in
 the order they are listed, each to a twelfth of its cap. Every line is taken at

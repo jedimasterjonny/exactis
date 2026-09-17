@@ -18,11 +18,12 @@ const rate = 0.05;
 
 const years = 30;
 
-// The plan as it stands, from this year: what the projection runs on
-// and what the plan screen lays its lines over. The year is read when
-// the plan is, so it is read at request time.
+// The plan as it stands, from this year and this month of it: what the
+// projection runs on and what the plan screen lays its lines over. The
+// date is read when the plan is, so it is read at request time.
 export function getPlan(): Plan {
-  return { born, from: new Date().getFullYear(), rate, years };
+  const now = new Date();
+  return { born, from: now.getFullYear(), month: now.getMonth(), rate, years };
 }
 
 // The projection, for whoever is signed in, run over the accounts and
