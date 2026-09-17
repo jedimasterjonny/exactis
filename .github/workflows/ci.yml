@@ -247,6 +247,12 @@ jobs:
     # once, and takes as long as its slowest commit.
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions: read is for listing the cache, which is where the commit job
+    # leaves its markers. Stated in full because a job's permissions replace
+    # the workflow's rather than adding to them.
+    permissions:
+      actions: read
+      contents: read
     outputs:
       commits: ${{ steps.list.outputs.commits }}
     steps:
@@ -263,6 +269,7 @@ jobs:
       # can explain it.
       - id: list
         env:
+          GH_TOKEN: ${{ github.token }}
           BASE_SHA:
             ${{ github.event_name == 'pull_request' &&
             github.event.pull_request.base.sha || github.event.before }}
@@ -293,15 +300,36 @@ jobs:
             commits="$(git rev-list --reverse "${BASE_SHA}..${HEAD_SHA}" | sed '$d')"
           fi
 
+          # A commit is green standalone as a function of its tree alone,
+          # so a tree proven once need not be proven again. The commit job
+          # saves a marker under the tree's hash when every script passes,
+          # and the list leaves out each commit whose tree has one: a push
+          # that adds or amends one commit checks one commit. The markers
+          # are looked up over the API rather than restored, since a
+          # restore is one key a step and this is a list, and the API sees
+          # every cache in the repository whichever branch wrote it, which
+          # is right for a fact about a tree. A marker unused for a week is
+          # evicted, and a rebase onto a moved main changes every tree;
+          # either way the commit is checked again, which costs a runner
+          # and nothing else. A lookup that fails is read as no marker, for
+          # the same reason.
+          #
           # One entry per commit, as the matrix takes it: the sha to check
-          # out, and the short sha and the subject to name the job by. An
-          # empty range is an empty list, which the commit job reads as
-          # nothing to do.
+          # out, the tree to mark, and the short sha and the subject to name
+          # the job by. An empty range is an empty list, which the commit
+          # job reads as nothing to do.
           list="$(for sha in $commits; do
+            tree="$(git rev-parse "${sha}^{tree}")"
+            found="$(gh cache list --key "green-tree-$tree" --limit 1 --json key --jq length 2>/dev/null || echo 0)"
+            if [ "$found" != "0" ]; then
+              echo "$(git rev-parse --short "$sha") is tree $tree, already proven green; skipped" >&2
+              continue
+            fi
             jq -n --arg sha "$sha" \
               --arg short "$(git rev-parse --short "$sha")" \
               --arg subject "$(git log -1 --format=%s "$sha")" \
-              '{sha: $sha, short: $short, subject: $subject}'
+              --arg tree "$tree" \
+              '{sha: $sha, short: $short, subject: $subject, tree: $tree}'
           done | jq -sc .)"
 
           echo "Checking $(echo "$list" | jq length) commit(s), one job each."
@@ -396,3 +424,17 @@ jobs:
             exit 1
           fi
           echo "$SHORT stands alone."
+
+      # The marker the range job looks for, saved under the tree's hash
+      # once every script has passed and not otherwise, since a failed step
+      # above ends the job. What is saved does not matter; that the key
+      # exists is the fact.
+      - env:
+          TREE: ${{ matrix.tree }}
+        run: |
+          mkdir -p .green
+          echo "$TREE" > .green/tree
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: green-tree-${{ matrix.tree }}
+          path: .green
