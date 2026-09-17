@@ -18,6 +18,7 @@ import {
 
 import type { ProjectionPoint } from "@/engine/projection";
 
+import { EmptyState } from "@/components/app/atoms/empty-state";
 import { buttonVariants } from "@/components/kit/button";
 import { Card, CardContent } from "@/components/kit/card";
 import {
@@ -26,14 +27,6 @@ import {
   ChartLegendContent,
   ChartTooltip,
 } from "@/components/kit/chart";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/kit/empty";
 import { Switch } from "@/components/kit/switch";
 import { formatGbp } from "@/lib/money";
 import { accountsAndAssets } from "@/lib/nav";
@@ -82,25 +75,19 @@ export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
   if (points.every((point) => totalOf(point) === 0)) {
     return (
       <Frame>
-        <Empty className="aspect-[3/1]">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ChartArea aria-hidden />
-            </EmptyMedia>
-            <EmptyTitle>Nothing to project yet</EmptyTitle>
-            <EmptyDescription>
-              Add a tax-free or tax-deferred account to see it projected.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Link
-              className={buttonVariants({ size: "sm", variant: "outline" })}
-              href={accountsAndAssets.href}
-            >
-              {accountsAndAssets.label}
-            </Link>
-          </EmptyContent>
-        </Empty>
+        <EmptyState
+          className="aspect-[3/1]"
+          description="Add a tax-free or tax-deferred account to see it projected."
+          icon={ChartArea}
+          title="Nothing to project yet"
+        >
+          <Link
+            className={buttonVariants({ size: "sm", variant: "outline" })}
+            href={accountsAndAssets.href}
+          >
+            {accountsAndAssets.label}
+          </Link>
+        </EmptyState>
       </Frame>
     );
   }
