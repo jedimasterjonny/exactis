@@ -48,15 +48,19 @@ each of the two schedules on both `line-fields` and `schedule-rows`.
 
 Ask what it composes, not how big it is. Size correlates but does not decide.
 
-1. Does it compose any of our components? If not it is an atom.
-2. Does it compose only atoms, and serve one purpose? It is a molecule.
+1. Does it compose none of our components and hold no state of its own? It is an
+   atom. An atom may wrap one primitive, from `kit/` or from Base UI directly as
+   `field` does, to give it this app's grammar.
+2. Does it combine atoms, or more than one `kit/` primitive, into one control,
+   or give a control state of its own? It is a molecule. `theme-toggle` wraps
+   one primitive and is a molecule because it reads and sets the theme.
 3. Does it own a region of a screen - a table with its empty state, a schedule
    with its dialogs? It is an organism.
 4. Does it arrange regions without knowing what goes in them? It is a template.
 
 A useful check: the tiers correlate with how much `kit/` a component reaches
-for. The atoms here import none of it, every molecule imports exactly one, and
-the organisms take one to five, most of them three or more. A proposed atom that
+for. An atom imports at most one wrapper, a molecule one or two, and the
+organisms take one to five, most of them three or more. A proposed atom that
 needs four wrappers is probably a molecule or an organism.
 
 If a component seems to belong in two tiers it is usually two components.
