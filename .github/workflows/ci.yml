@@ -240,10 +240,9 @@ jobs:
     # later depends on not being true.
     runs-on: ubuntu-latest
     # A guard against a hang, not a budget for the series: each commit pays
-    # a cold install and every script, about three and a half minutes, so
-    # eleven commits are forty and thirty cancelled a green run part way
-    # through. Ninety covers a series twice that long before it is read as
-    # stuck.
+    # a cold install and every script, about four minutes, so twelve
+    # commits are fifty and thirty cancelled a green run part way through.
+    # Ninety covers a series twice that long before it is read as stuck.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -289,9 +288,14 @@ jobs:
         run: |
           set -uo pipefail
 
+          # The tip is the check job's: it runs every script there already,
+          # on the same tree, and a second run here would answer nothing it
+          # has not. So the range stops one short of the head.
+          #
           # A new branch reports an all-zero base, and a force push can name a
-          # commit that no longer resolves. Either way there is no range, so
-          # fall back to the tip alone rather than failing on the arithmetic.
+          # commit that no longer resolves. Either way there is no range, and
+          # the check job covers the one commit that can be named, so there is
+          # nothing to check here rather than something to fail on.
           # A base that is not an ancestor of the head means history was
           # rewritten: the old tip usually still resolves, so resolvability
           # alone is not enough to detect it, and rev-list would then return
@@ -299,10 +303,10 @@ jobs:
           if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] ||
              ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null ||
              ! git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA" 2>/dev/null; then
-            echo "No usable base commit, or history was rewritten; checking $HEAD_SHA alone."
-            commits="$HEAD_SHA"
+            echo "No usable base commit, or history was rewritten; the check job covers $HEAD_SHA."
+            commits=""
           else
-            commits="$(git rev-list --reverse "${BASE_SHA}..${HEAD_SHA}")"
+            commits="$(git rev-list --reverse "${BASE_SHA}..${HEAD_SHA}" | sed '$d')"
           fi
 
           if [ -z "$commits" ]; then
