@@ -19,10 +19,7 @@ import {
 import { Note } from "@/components/app/atoms/note";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
-import { MoneyField } from "@/components/app/molecules/money-field";
-import { RateField } from "@/components/app/molecules/rate-field";
-import { SelectField } from "@/components/app/molecules/select-field";
-import { TextField } from "@/components/app/molecules/text-field";
+import { AccountFields } from "@/components/app/organisms/account-fields";
 import { AccountTable } from "@/components/app/organisms/account-table";
 import { Button } from "@/components/kit/button";
 import {
@@ -32,9 +29,7 @@ import {
   TabsTrigger,
 } from "@/components/kit/tabs";
 import { toast } from "@/components/kit/toast";
-import { allowanceOf, isAsset, toValues } from "@/data/accounts";
-import { cadenceOptions } from "@/lib/cadence";
-import { formatGbp } from "@/lib/money";
+import { isAsset, toValues } from "@/data/accounts";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
@@ -70,24 +65,6 @@ const blank: Draft = {
   name: "",
   rate: 0,
 };
-
-const fundings = [
-  { label: "A fixed sum", value: "fixed" },
-  { label: "Spare money", value: "spare" },
-] as const;
-
-const growths = [
-  { label: "Plan rate", value: "plan" },
-  { label: "Fixed rate", value: "fixed" },
-] as const;
-
-const kinds = [
-  { label: "Tax-deferred", value: "tax-deferred" },
-  { label: "Tax-free", value: "tax-free" },
-  { label: "Cash", value: "cash" },
-  { label: "Real asset", value: "real-asset" },
-  { label: "Debt", value: "debt" },
-] as const;
 
 // The accounts screen's ledger and its dialog, which enters a new account
 // from the header's button or edits one from its row. The rows are the
@@ -276,117 +253,23 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
           }}
           title={entry.draft.name.trim() || "Untitled account"}
         >
-          <div className="grid gap-4">
-            <div className="grid grid-cols-[1.4fr_1fr] gap-4">
-              <TextField
-                defaultValue={entry.initial.name}
-                label="Name"
-                onValueChange={(name) => {
-                  amend(entry, { name });
-                }}
-                placeholder="Lifetime ISA, car, loan…"
-              />
-              <SelectField
-                defaultValue={entry.initial.kind}
-                label="Treatment"
-                onValueChange={(kind) => {
-                  treat(entry, kind);
-                }}
-                options={kinds}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <MoneyField
-                defaultValue={entry.initial.balance}
-                hint="A debt's is negative"
-                label="Balance"
-                onValueCommitted={(balance) => {
-                  amend(entry, { balance });
-                }}
-              />
-              {!isAsset(entry.draft) && (
-                <SelectField
-                  defaultValue={entry.initial.funding}
-                  hint="Spare money is what a month's income leaves after the expenses and every fixed sum"
-                  label="Contribution"
-                  onValueChange={(funding) => {
-                    fund(entry, funding);
-                  }}
-                  options={fundings}
-                />
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {entry.draft.funding === "fixed" ? (
-                <>
-                  <MoneyField
-                    defaultValue={entry.initial.contribution}
-                    hint="Leave at nothing for none"
-                    // Keyed apart from the cap, which takes its place:
-                    // the fragment is unwrapped and the two would be
-                    // one field, keeping what was typed into the other.
-                    key="contribution"
-                    label="Amount"
-                    onValueCommitted={(contribution) => {
-                      amend(entry, { contribution });
-                    }}
-                  />
-                  <SelectField
-                    defaultValue={entry.initial.cadence}
-                    label="Cadence"
-                    onValueChange={(cadence) => {
-                      amend(entry, { cadence });
-                    }}
-                    options={cadenceOptions}
-                  />
-                </>
-              ) : (
-                <MoneyField
-                  defaultValue={entry.initial.cap}
-                  hint={capHint(entry.draft.kind)}
-                  key="cap"
-                  label="Cap, a year"
-                  onValueCommitted={(cap) => {
-                    amend(entry, { cap });
-                  }}
-                />
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <SelectField
-                defaultValue={entry.initial.growth}
-                hint="The plan rate is set on the assumptions screen"
-                label="Growth"
-                onValueChange={(growth) => {
-                  amend(entry, { growth, rate: entry.initial.rate });
-                }}
-                options={growths}
-              />
-              {entry.draft.growth === "fixed" && (
-                <RateField
-                  defaultValue={entry.initial.rate}
-                  hint="Nominal, a year"
-                  label="Rate"
-                  onValueCommitted={(rate) => {
-                    amend(entry, { rate });
-                  }}
-                />
-              )}
-            </div>
-          </div>
+          <AccountFields
+            draft={entry.draft}
+            initial={entry.initial}
+            onAmend={(patch) => {
+              amend(entry, patch);
+            }}
+            onFundingChange={(funding) => {
+              fund(entry, funding);
+            }}
+            onKindChange={(kind) => {
+              treat(entry, kind);
+            }}
+          />
         </EditDialog>
       )}
     </>
   );
-}
-
-// What the cap field says a cap of nothing means: the kind's allowance,
-// or no cap at all for cash.
-function capHint(kind: AccountKind): string {
-  const allowance = allowanceOf(kind);
-  return allowance === null
-    ? "Leave at nothing for no cap"
-    : `Leave at nothing for the ${formatGbp(allowance)} allowance`;
 }
 
 // The draft as a contribution choice leaves it: the fields the choice
