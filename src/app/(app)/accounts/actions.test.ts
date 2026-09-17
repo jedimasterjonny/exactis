@@ -110,6 +110,9 @@ describe("saveAccount", () => {
     await expect(saveAccount(null, { ...values, cap: -1 })).rejects.toThrow(
       z.ZodError,
     );
+    await expect(saveAccount(null, { ...values, rate: -1.5 })).rejects.toThrow(
+      z.ZodError,
+    );
     await expect(
       saveAccount(null, { ...values, funding: "spare", kind: "debt" }),
     ).rejects.toThrow(z.ZodError);
