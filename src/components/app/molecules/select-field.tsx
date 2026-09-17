@@ -2,6 +2,8 @@ import type { JSX } from "react";
 
 import { Field as FieldPrimitive } from "@base-ui/react/field";
 
+import type { Option } from "@/lib/options";
+
 import { Field } from "@/components/app/atoms/field";
 import {
   NativeSelect,
@@ -13,12 +15,7 @@ interface SelectFieldProps<TValue extends string> {
   readonly hint?: string;
   readonly label: string;
   readonly onValueChange?: (value: TValue) => void;
-  readonly options: readonly SelectOption<TValue>[];
-}
-
-interface SelectOption<TValue extends string> {
-  readonly label: string;
-  readonly value: TValue;
+  readonly options: readonly Option<TValue>[];
 }
 
 // A choice from a short fixed list. The select is Base UI's field control

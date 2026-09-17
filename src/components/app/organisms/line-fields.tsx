@@ -2,6 +2,7 @@ import type { JSX, ReactNode } from "react";
 
 import type { LineValues, Side } from "@/data/schedule";
 import type { Plan } from "@/engine/projection";
+import type { Option } from "@/lib/options";
 
 import { SpanBar } from "@/components/app/atoms/span-bar";
 import { MoneyField } from "@/components/app/molecules/money-field";
@@ -10,6 +11,7 @@ import { TextField } from "@/components/app/molecules/text-field";
 import { YearField } from "@/components/app/molecules/year-field";
 import { growthLabels } from "@/components/app/organisms/schedule-rows";
 import { endYear } from "@/engine/projection";
+import { optionsOf } from "@/lib/options";
 
 // How a line ends: in a year typed into the field beneath the choice, or
 // with the plan, so it has no last year.
@@ -30,11 +32,6 @@ interface LineFieldsProps<TKind extends string> {
   readonly onKindChange: (kind: TKind) => void;
   readonly plan: Plan;
   readonly side: Side;
-}
-
-interface Option<TValue extends string> {
-  readonly label: string;
-  readonly value: TValue;
 }
 
 const cadences = [
@@ -186,15 +183,6 @@ export function LineFields<TKind extends string>({
       </div>
     </div>
   );
-}
-
-// The choices as the select takes them, in the order given, each named
-// as its label says.
-export function optionsOf<TValue extends string>(
-  labels: Record<TValue, string>,
-  order: readonly TValue[],
-): readonly Option<TValue>[] {
-  return order.map((value) => ({ label: labels[value], value }));
 }
 
 // The years a saved line runs, for the toast that reports it.
