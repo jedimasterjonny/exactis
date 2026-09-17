@@ -7,7 +7,7 @@ interface RateFieldProps {
   readonly defaultValue: number;
   readonly hint?: string;
   readonly label: string;
-  readonly onValueCommitted?: (value: null | number) => void;
+  readonly onValueCommitted?: (value: number) => void;
 }
 
 // A rate is held as a fraction and shown as a percentage to two places,

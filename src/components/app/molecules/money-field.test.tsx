@@ -15,7 +15,7 @@ describe("MoneyField", () => {
   });
 
   it("commits the parsed number on blur and shows a hint when given one", () => {
-    const onValueCommitted = vi.fn<(value: null | number) => void>();
+    const onValueCommitted = vi.fn<(value: number) => void>();
     render(
       <MoneyField
         defaultValue={391640}
@@ -30,7 +30,7 @@ describe("MoneyField", () => {
     fireEvent.change(input, { target: { value: "398,000" } });
     fireEvent.blur(input);
 
-    expect(onValueCommitted).toHaveBeenCalledWith(398000, expect.anything());
+    expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(398000);
     expect(input).toHaveValue("£398,000");
     expect(screen.getByRole("paragraph")).toHaveTextContent(
       "From the August statement",

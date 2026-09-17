@@ -27,7 +27,7 @@ describe("FigureInput", () => {
   });
 
   it("commits the parsed value on blur and not before", () => {
-    const onValueCommitted = vi.fn<(value: null | number) => void>();
+    const onValueCommitted = vi.fn<(value: number) => void>();
     render(
       <FigureInput
         defaultValue={2026}
@@ -46,8 +46,29 @@ describe("FigureInput", () => {
 
     fireEvent.blur(input);
 
-    expect(onValueCommitted).toHaveBeenCalledWith(2031, expect.anything());
+    expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(2031);
     expect(input).toHaveValue("2031");
+  });
+
+  it("reports nothing for a figure cleared to nothing", () => {
+    const onValueCommitted = vi.fn<(value: number) => void>();
+    render(
+      <FigureInput
+        defaultValue={2026}
+        format={plain}
+        largeStep={10}
+        onValueCommitted={onValueCommitted}
+        step={1}
+      />,
+    );
+
+    const input = screen.getByRole("textbox");
+
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.blur(input);
+
+    expect(onValueCommitted).not.toHaveBeenCalled();
+    expect(input).toHaveValue("");
   });
 
   it("steps by the step on an arrow key and by the large step with shift", () => {

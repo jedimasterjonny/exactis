@@ -15,7 +15,7 @@ describe("RateField", () => {
   });
 
   it("commits a typed percentage as a fraction on blur and shows a hint", () => {
-    const onValueCommitted = vi.fn<(value: null | number) => void>();
+    const onValueCommitted = vi.fn<(value: number) => void>();
     render(
       <RateField
         defaultValue={0}
@@ -32,7 +32,7 @@ describe("RateField", () => {
     fireEvent.change(input, { target: { value: "3.5" } });
     fireEvent.blur(input);
 
-    expect(onValueCommitted).toHaveBeenCalledWith(0.035, expect.anything());
+    expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(0.035);
     expect(input).toHaveValue("3.50%");
     expect(screen.getByRole("paragraph")).toHaveTextContent(
       "Nominal, before inflation",
