@@ -31,17 +31,18 @@ const spareIsa: Account = {
 };
 
 describe("project", () => {
-  // The ISA: (286,145 + 20,000) × 1.05 = 321,452.25, then (321,452.25 +
-  // 20,000) × 1.05 = 358,524.86, the year's contribution landing first
-  // and then the year's growth. The pension the same way: (412,880 +
-  // 27,195) × 1.05 = 462,078.75, then (462,078.75 + 27,195) × 1.05 =
-  // 513,737.44. The current account, the home and the mortgage are no
-  // wrapper and are left out.
-  it("pays a year's contribution in, then grows the year at the plan rate, by wrapper", () => {
+  // The ISA's £20,000 a year lands as £1,666.67 a month, each month's
+  // then growing at m = 1.05^(1/12) for the months it is in: 286,145 ×
+  // 1.05 + 1,666.67 × m(m¹² − 1)/(m − 1) = 300,452.25 + 20,537.63 =
+  // 320,989.88, then the same again on that: 357,577.00. The pension
+  // the same way with £2,266.25 a month: 461,450.04, then 512,448.58.
+  // The current account, the home and the mortgage are no wrapper and
+  // are left out.
+  it("pays a year's sum in a twelfth at a time, each month grown at the plan rate, by wrapper", () => {
     expect(project(accounts, nothing, { ...plan, years: 2 })).toStrictEqual([
       { age: 36, deferred: 412880, free: 286145, year: 2026 },
-      { age: 37, deferred: 462079, free: 321452, year: 2027 },
-      { age: 38, deferred: 513737, free: 358525, year: 2028 },
+      { age: 37, deferred: 461450, free: 320990, year: 2027 },
+      { age: 38, deferred: 512449, free: 357577, year: 2028 },
     ]);
   });
 
@@ -64,7 +65,7 @@ describe("project", () => {
     ]);
   });
 
-  // 321,452.25 from the ISA and 10,000 × 1.02 = 10,200 from an account
+  // 320,989.88 from the ISA and 10,000 × 1.02 = 10,200 from an account
   // with nothing paid in.
   it("grows an account on a fixed rate at its own and sums the accounts", () => {
     const lifetime: Account = {
@@ -79,7 +80,7 @@ describe("project", () => {
       project([isa, lifetime], nothing, { ...plan, years: 1 }),
     ).toStrictEqual([
       { age: 36, deferred: 0, free: 296145, year: 2026 },
-      { age: 37, deferred: 0, free: 331652, year: 2027 },
+      { age: 37, deferred: 0, free: 331190, year: 2027 },
     ]);
   });
 
@@ -97,7 +98,8 @@ describe("project", () => {
   // The mortgage's £2,210 a month and the pension's £27,195 a year come
   // out of the month before the spare money does, leaving £4,273.42, and
   // the current account, listed first and uncapped, takes all of it,
-  // so the ISA is paid nothing; the pension is still paid its sum.
+  // so the ISA is paid nothing; the pension is still paid its sum, a
+  // twelfth a month.
   it("reads the cash flow over every account, in the order they are listed", () => {
     const spareCash: Account = {
       ...cash,
@@ -111,7 +113,7 @@ describe("project", () => {
 
     expect(a?.free).toBe(286145);
     expect(b?.free).toBe(286145);
-    expect(a?.deferred).toBe(462079);
+    expect(a?.deferred).toBe(461450);
   });
 
   // Two ISAs that share an id, which the store never hands out, are
