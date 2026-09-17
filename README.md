@@ -14,6 +14,23 @@ bun dev
 
 The app is then at <http://localhost:3000>, rendered from `src/app/page.tsx`.
 
+Node is pinned in `.node-version`, which CI and Vercel read. Bun runs every
+script here, so a local Node is not a prerequisite, but a `node` on `PATH` that
+is not the pinned one is a difference between your machine and theirs. With nvm,
+this closes it:
+
+```bash
+source scripts/use-node.sh
+```
+
+It installs the pinned version if it is missing, points nvm's `default` alias at
+it, and switches the current shell. Sourced rather than run, because nvm is a
+shell function and an executed script cannot move the shell that started it; as
+`bash scripts/use-node.sh` it still installs and sets the default, and says the
+shell was left alone. nvm reads `.nvmrc` and not `.node-version`, and the
+version is written in one place only, so the script hands it to nvm rather than
+a second file repeating it.
+
 ## Scripts
 
 | Script                                | Does                                                              |
