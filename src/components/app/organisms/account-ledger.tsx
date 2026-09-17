@@ -33,6 +33,7 @@ import {
 } from "@/components/kit/tabs";
 import { toast } from "@/components/kit/toast";
 import { allowanceOf, isAsset, toValues } from "@/data/accounts";
+import { cadenceOptions } from "@/lib/cadence";
 import { formatGbp } from "@/lib/money";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
@@ -69,11 +70,6 @@ const blank: Draft = {
   name: "",
   rate: 0,
 };
-
-const cadences = [
-  { label: "A year", value: "year" },
-  { label: "A month", value: "month" },
-] as const;
 
 const fundings = [
   { label: "A fixed sum", value: "fixed" },
@@ -341,7 +337,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
                     onValueChange={(cadence) => {
                       amend(entry, { cadence });
                     }}
-                    options={cadences}
+                    options={cadenceOptions}
                   />
                 </>
               ) : (
