@@ -36,4 +36,12 @@ describe("MoneyField", () => {
       "From the August statement",
     );
   });
+
+  it("shows the value it is given as pounds", () => {
+    render(<MoneyField label="Payment" value={2210} />);
+
+    expect(screen.getByRole("textbox", { name: "Payment" })).toHaveValue(
+      "£2,210",
+    );
+  });
 });
