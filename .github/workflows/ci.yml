@@ -67,17 +67,17 @@ jobs:
           # install --frozen-lockfile does not prune, so a restored tree
           # resolves a dependency the commit no longer declares and the run
           # goes green on a tree that cannot install - the false pass the
-          # commits job's `git clean -xdff` was added to close. The install
-          # cache cannot do that. It is content-addressed, keyed by what was
-          # fetched rather than by what is wanted, so a stale entry is dead
-          # weight rather than a wrong answer: it can only make an install
-          # that was going to happen anyway faster.
+          # commit job avoids by starting every commit on a fresh runner.
+          # The install cache cannot do that. It is content-addressed, keyed
+          # by what was fetched rather than by what is wanted, so a stale
+          # entry is dead weight rather than a wrong answer: it can only
+          # make an install that was going to happen anyway faster.
           path: ${{ steps.bun-cache.outputs.dir }}
-          # Prefixed per job rather than shared between the two. On a shared
-          # key both jobs race to save the same entry, this one always gets
-          # there first, and the commits job's cache - the one worth having,
-          # since it accumulates every commit's dependencies - loses every
-          # time and is never written.
+          # Prefixed per job rather than shared with the commit job. Each
+          # keys on the lockfile it installs from, and a save onto a key
+          # that exists is a no-op, so a shared prefix would race only on
+          # identical content; the prefixes stay so a restore reads off its
+          # key as the tip's or a commit's.
           restore-keys: bun-check-${{ runner.os }}-
 
       - id: install
@@ -232,53 +232,37 @@ jobs:
             bunx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
           fi
 
-  commits:
+  range:
     # AGENTS.md requires every commit to stand alone, not only the tip: each
     # one installs from its own lockfile and is green by itself. The check job
     # above only ever sees the tip, so a series that is green at the end and
     # red in the middle passes unnoticed - which is exactly what git bisect
     # later depends on not being true.
+    #
+    # This job lists the commits to check and the commit job below checks
+    # them, one runner each. They used to be one job looping over the range,
+    # and a series paid for its length in wall clock: four minutes a commit,
+    # in order, so twelve were fifty minutes and the loop's timeout had to
+    # grow with the longest series. Now a series pays in runners, all at
+    # once, and takes as long as its slowest commit.
     runs-on: ubuntu-latest
-    # A guard against a hang, not a budget for the series: each commit pays
-    # a cold install and every script, about four minutes, so twelve
-    # commits are fifty and thirty cancelled a green run part way through.
-    # Ninety covers a series twice that long before it is read as stuck.
-    timeout-minutes: 90
+    timeout-minutes: 5
+    outputs:
+      commits: ${{ steps.list.outputs.commits }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # The range is walked here, so the whole history is needed.
           fetch-depth: 0
-          # This job checks out and runs historical code. A token left in
-          # .git/config is readable by every commit it runs.
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: package.json
 
-      # The job this is actually for. Every commit below pays a cold
-      # `git clean -xdff` and install; the clean is confined to the work
-      # tree, and this cache is not in it, so one restore serves the whole
-      # loop.
-      - id: bun-cache
-        run: |
-          dir="$(bun pm cache)"
-          echo "dir=$dir" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          # Keyed on the tip's lockfile, which is not the one most of these
-          # commits install from. restore-keys is what does the work here:
-          # the entry carries forward between runs and accumulates the union
-          # of every commit's dependencies. node_modules stays out for the
-          # reason given in the check job, and here it would also undo the
-          # clean this job exists to perform.
-          key: bun-commits-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          path: ${{ steps.bun-cache.outputs.dir }}
-          restore-keys: bun-commits-${{ runner.os }}-
-
-      - env:
+      # The SHAs go through the environment rather than into the command
+      # string, so nothing from the event is interpolated into a shell. The
+      # range logic is the check job's commitlint step's, duplicated rather
+      # than shared: a composite action would put it where neither comment
+      # can explain it.
+      - id: list
+        env:
           BASE_SHA:
             ${{ github.event_name == 'pull_request' &&
             github.event.pull_request.base.sha || github.event.before }}
@@ -309,71 +293,106 @@ jobs:
             commits="$(git rev-list --reverse "${BASE_SHA}..${HEAD_SHA}" | sed '$d')"
           fi
 
-          if [ -z "$commits" ]; then
-            echo "Empty range; nothing to check."
-            exit 0
+          # One entry per commit, as the matrix takes it: the sha to check
+          # out, and the short sha and the subject to name the job by. An
+          # empty range is an empty list, which the commit job reads as
+          # nothing to do.
+          list="$(for sha in $commits; do
+            jq -n --arg sha "$sha" \
+              --arg short "$(git rev-parse --short "$sha")" \
+              --arg subject "$(git log -1 --format=%s "$sha")" \
+              '{sha: $sha, short: $short, subject: $subject}'
+          done | jq -sc .)"
+
+          echo "Checking $(echo "$list" | jq length) commit(s), one job each."
+          echo "commits=$list" >> "$GITHUB_OUTPUT"
+
+  commit:
+    needs: range
+    if: ${{ needs.range.outputs.commits != '[]' }}
+    name: commit ${{ matrix.short }} ${{ matrix.subject }}
+    runs-on: ubuntu-latest
+    # A guard against a hang, not a budget: one commit is about four
+    # minutes, install and every script.
+    timeout-minutes: 15
+    strategy:
+      # Every commit is reported, not only the first to fail, so a red
+      # series says everything that is wrong with it at once.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.range.outputs.commits) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.sha }}
+          # This job runs historical code. A token left in .git/config is
+          # readable by it.
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - id: bun-cache
+        run: |
+          dir="$(bun pm cache)"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          # Keyed on this commit's own lockfile, which is what it installs
+          # from. Most of a series shares one, so the first job to finish
+          # saves the entry and the rest find it already there; a series
+          # that changes the lockfile mid-way saves one entry per lockfile.
+          # node_modules stays out for the reason given in the check job.
+          key: bun-commits-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          path: ${{ steps.bun-cache.outputs.dir }}
+          restore-keys: bun-commits-${{ runner.os }}-
+
+      # A fresh runner, so there is nothing to clean: no node_modules from
+      # another commit for bun install to leave unpruned, no stale
+      # .next/types for tsc to read. The loop this replaced paid a
+      # `git clean -xdff` per commit for exactly that.
+      - env:
+          SHORT: ${{ matrix.short }}
+          SUBJECT: ${{ matrix.subject }}
+        run: |
+          set -uo pipefail
+
+          ok=true
+          bun install --frozen-lockfile || ok=false
+
+          if [ "$ok" = true ]; then
+            # Whatever this commit defines as green, not what the tip does.
+            # A commit predating a script has not failed it. Absent is
+            # exit 3 and nothing else: node answers an uncaught exception
+            # with 1, so reading 1 as absent would turn a package.json
+            # that cannot be parsed into a commit with nothing to run.
+            # Any other status is the probe breaking, which is a failure
+            # rather than a reason to skip.
+            for script in format:check lint typecheck test:coverage build knip; do
+              # The probe must not run bare: GitHub runs this with
+              # `bash -e`, so a non-zero exit would abort the whole loop
+              # before the code could be read. `|| probe=$?` puts it in an
+              # OR list, which errexit exempts.
+              probe=0
+              node -e "process.exit(require('./package.json').scripts?.['$script'] ? 0 : 3)" || probe=$?
+              if [ "$probe" -eq 3 ]; then
+                echo "no $script script at this commit; skipped"
+                continue
+              fi
+              if [ "$probe" -ne 0 ]; then
+                echo "::error::probing for the $script script exited $probe"
+                ok=false
+                continue
+              fi
+              bun run "$script" || ok=false
+            done
           fi
 
-          echo "Checking $(echo "$commits" | wc -l | tr -d ' ') commit(s) individually."
-          failed=""
-
-          for sha in $commits; do
-            subject="$(git log -1 --format=%s "$sha")"
-            echo "::group::$(git rev-parse --short "$sha") $subject"
-
-            # --force discards the tracked files next build rewrites, and
-            # clean removes what it leaves untracked. Both are needed, and
-            # -x has to take node_modules with it: bun install
-            # --frozen-lockfile does not prune extraneous packages, so a
-            # reused tree lets a commit that drops a dependency it still
-            # imports pass here. Stale .next/types, which tsconfig includes
-            # as a tsc input, and tsconfig.tsbuildinfo survive a checkout
-            # for the same reason. Every commit therefore pays for a cold
-            # install; a wrong answer arrived at quickly is worth nothing.
-            git checkout --force --quiet --detach "$sha"
-            git clean -xdff --quiet
-
-            ok=true
-            bun install --frozen-lockfile || ok=false
-
-            if [ "$ok" = true ]; then
-              # Whatever that commit defines as green, not what the tip does.
-              # A commit predating a script has not failed it. Absent is
-              # exit 3 and nothing else: node answers an uncaught exception
-              # with 1, so reading 1 as absent would turn a package.json
-              # that cannot be parsed into a commit with nothing to run.
-              # Any other status is the probe breaking, which is a failure
-              # rather than a reason to skip.
-              for script in format:check lint typecheck test:coverage build knip; do
-                # The probe must not run bare: GitHub runs this with
-                # `bash -e`, so a non-zero exit would abort the whole loop
-                # before the code could be read. `|| probe=$?` puts it in an
-                # OR list, which errexit exempts.
-                probe=0
-                node -e "process.exit(require('./package.json').scripts?.['$script'] ? 0 : 3)" || probe=$?
-                if [ "$probe" -eq 3 ]; then
-                  echo "no $script script at this commit; skipped"
-                  continue
-                fi
-                if [ "$probe" -ne 0 ]; then
-                  echo "::error::probing for the $script script exited $probe"
-                  ok=false
-                  continue
-                fi
-                bun run "$script" || ok=false
-              done
-            fi
-
-            echo "::endgroup::"
-
-            if [ "$ok" = false ]; then
-              failed="$failed $(git rev-parse --short "$sha")"
-              echo "::error::$(git rev-parse --short "$sha") ($subject) is not green on its own"
-            fi
-          done
-
-          if [ -n "$failed" ]; then
-            echo "Not green standalone:$failed"
+          if [ "$ok" = false ]; then
+            echo "::error::$SHORT ($SUBJECT) is not green on its own"
             exit 1
           fi
-          echo "Every commit in the range stands alone."
+          echo "$SHORT stands alone."
