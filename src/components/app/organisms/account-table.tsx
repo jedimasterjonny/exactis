@@ -5,7 +5,7 @@ import type { DragEvent, JSX, KeyboardEvent } from "react";
 import { GripVertical, Pencil, Wallet } from "lucide-react";
 import { useState } from "react";
 
-import type { Account, AccountKind, Cadence, Growth } from "@/data/accounts";
+import type { Account, AccountKind, Growth } from "@/data/accounts";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { Badge } from "@/components/kit/badge";
@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/kit/table";
 import { allowanceOf } from "@/data/accounts";
+import { cadenceAbbreviations } from "@/lib/cadence";
 import { formatGbp } from "@/lib/money";
 
 interface AccountTableProps {
@@ -31,8 +32,6 @@ interface AccountTableProps {
 }
 
 type Treatment = "destructive" | "secondary";
-
-const cadences: Record<Cadence, string> = { month: "mo", year: "yr" };
 
 // A rate is shown to two places, so 0 reads 0.00% and 0.021 reads 2.10%.
 const percent = new Intl.NumberFormat("en-GB", {
@@ -246,7 +245,7 @@ function formatContribution(account: Account): string {
   }
   switch (contribution.kind) {
     case "fixed":
-      return `${formatGbp(contribution.amount)} / ${cadences[contribution.cadence]}`;
+      return `${formatGbp(contribution.amount)} / ${cadenceAbbreviations[contribution.cadence]}`;
     case "spare": {
       const cap = contribution.cap ?? allowanceOf(account.kind);
       return cap === null
