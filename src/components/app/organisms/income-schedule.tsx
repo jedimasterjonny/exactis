@@ -11,6 +11,7 @@ import type { Plan } from "@/engine/projection";
 
 import { saveIncomeLine } from "@/app/(app)/plan/actions";
 import { Note } from "@/components/app/atoms/note";
+import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { MoneyField } from "@/components/app/molecules/money-field";
 import {
   isSound,
@@ -21,14 +22,6 @@ import {
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { totalOf } from "@/data/income";
 import { formatGbp } from "@/lib/money";
@@ -105,8 +98,6 @@ export function IncomeSchedule({
     });
   }
 
-  // The dialog opens only from a button, so the only change it can report
-  // is a close: Cancel, Escape or a press outside.
   function dismiss(): void {
     setEntry(null);
   }
@@ -181,72 +172,57 @@ export function IncomeSchedule({
         Lines overlap freely: a step-up is a second line starting mid-way, not
         an edit to the first.
       </Note>
-      <Dialog onOpenChange={dismiss} open={entry !== null}>
-        {entry !== null && (
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <span className="label text-brand">
-                {entry.id === null ? "New income line" : "Edit income line"}
-              </span>
-              <DialogTitle>
-                {entry.draft.name.trim() || "Untitled line"}
-              </DialogTitle>
-            </DialogHeader>
-            <LineFields
-              amountLabel={
-                entry.draft.kind === "employment" ? "Base salary" : "Amount"
-              }
-              draft={entry.draft}
-              initial={entry.initial}
-              kinds={kinds}
-              namePlaceholder="Salary, consulting, state pension…"
-              onAmend={(patch) => {
-                amend(entry, patch);
-              }}
-              onKindChange={(kind) => {
-                categorise(entry, kind);
-              }}
-              plan={plan}
-              side="income"
-            >
-              {entry.draft.kind === "employment" && (
-                <div className="grid grid-cols-3 gap-4">
-                  <MoneyField
-                    defaultValue={entry.initial.bonus}
-                    hint="At the salary's cadence; nothing for none"
-                    label="Bonus"
-                    onValueCommitted={(bonus) => {
-                      amend(entry, { bonus });
-                    }}
-                  />
-                  <MoneyField
-                    defaultValue={entry.initial.rsu}
-                    hint="Vesting at the salary's cadence"
-                    label="RSUs"
-                    onValueCommitted={(rsu) => {
-                      amend(entry, { rsu });
-                    }}
-                  />
-                </div>
-              )}
-            </LineFields>
-            <DialogFooter>
-              <DialogClose render={<Button size="sm" variant="outline" />}>
-                Cancel
-              </DialogClose>
-              <Button
-                disabled={isSaving || !isSound(entry.draft)}
-                onClick={() => {
-                  save(entry);
-                }}
-                size="sm"
-              >
-                Save
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
+      {entry !== null && (
+        <EditDialog
+          canSave={!isSaving && isSound(entry.draft)}
+          eyebrow={entry.id === null ? "New income line" : "Edit income line"}
+          isWide
+          onDismiss={dismiss}
+          onSave={() => {
+            save(entry);
+          }}
+          title={entry.draft.name.trim() || "Untitled line"}
+        >
+          <LineFields
+            amountLabel={
+              entry.draft.kind === "employment" ? "Base salary" : "Amount"
+            }
+            draft={entry.draft}
+            initial={entry.initial}
+            kinds={kinds}
+            namePlaceholder="Salary, consulting, state pension…"
+            onAmend={(patch) => {
+              amend(entry, patch);
+            }}
+            onKindChange={(kind) => {
+              categorise(entry, kind);
+            }}
+            plan={plan}
+            side="income"
+          >
+            {entry.draft.kind === "employment" && (
+              <div className="grid grid-cols-3 gap-4">
+                <MoneyField
+                  defaultValue={entry.initial.bonus}
+                  hint="At the salary's cadence; nothing for none"
+                  label="Bonus"
+                  onValueCommitted={(bonus) => {
+                    amend(entry, { bonus });
+                  }}
+                />
+                <MoneyField
+                  defaultValue={entry.initial.rsu}
+                  hint="Vesting at the salary's cadence"
+                  label="RSUs"
+                  onValueCommitted={(rsu) => {
+                    amend(entry, { rsu });
+                  }}
+                />
+              </div>
+            )}
+          </LineFields>
+        </EditDialog>
+      )}
     </>
   );
 }
