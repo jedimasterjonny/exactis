@@ -40,12 +40,13 @@ export function endYear(plan: Plan): number {
 }
 
 // The plan's years, the first holding the balances as they are and each
-// after it a year on: what the account is paid, then growth at its rate,
-// a fixed one or the plan's. Each account is carried on its own and the
-// year sums them by wrapper. An account paid the spare money is paid
-// what that year's cash flow hands it, which is read over every
-// account, since a fixed sum into any of them is money the month no
-// longer has. Nothing is drawn out or taxed yet.
+// after it a year on: what the account is paid each month, then growth
+// at its rate, a fixed one or the plan's. Each account is carried on
+// its own and the year sums them by wrapper. What an account is paid a
+// month is what that year's cash flow says, a fixed sum spread over the
+// months as the flow spreads it or the spare money's take, and the flow
+// is read over every account, since a fixed sum into any of them is
+// money the month no longer has. Nothing is drawn out or taxed yet.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -68,53 +69,43 @@ export function project(
     const flow = cashFlow(accounts, schedule, year);
     held = held.map(({ account, balance }) => ({
       account,
-      balance: grownAYear(balance, rateOf(account, plan), (month) =>
-        paidIn(account, month, flow),
+      balance: grownAYear(
+        balance,
+        rateOf(account, plan),
+        paidIn(account, flow),
       ),
     }));
     return point;
   });
 }
 
-// A year, month by month: what is paid in lands at the start of its
+// A year, month by month: what is paid in lands at the start of the
 // month, and the balance then grows a month at the rate's twelfth root,
-// so a year's growth compounds to the yearly rate and a monthly
-// contribution earns the months it has been in for.
-function grownAYear(
-  balance: number,
-  rate: number,
-  paid: (month: number) => number,
-): number {
+// so a year's growth compounds to the yearly rate and each month's sum
+// earns the months it has been in for. A yearly sum is paid a twelfth
+// at a time, as the cash flow spreads it, so it is paid as the spare
+// money is and the two earn alike; the year in which it is really paid
+// is not the model's to know.
+function grownAYear(balance: number, rate: number, paid: number): number {
   const monthly = (1 + rate) ** (1 / 12);
   let grown = balance;
   for (let month = 0; month < 12; month += 1) {
-    grown = (grown + paid(month)) * monthly;
+    grown = (grown + paid) * monthly;
   }
   return grown;
 }
 
-// What lands in the month: a monthly sum every month, a yearly one in
-// the first, the spare money's take every month, since the spare money
-// is a month's, and nothing for an account with none. The take is read
-// off the flow as the one listed for the account itself, the same
-// object the flow was read over, rather than for its id, which two
-// accounts could share only by a caller's mistake; a sum over the one
-// take, so a miss needs no fallback that could never be reached.
-function paidIn(account: Account, month: number, flow: CashFlow): number {
-  const { contribution } = account;
-  if (contribution === undefined) {
-    return 0;
-  }
-  switch (contribution.kind) {
-    case "fixed":
-      return contribution.cadence === "month" || month === 0
-        ? contribution.amount
-        : 0;
-    case "spare":
-      return flow.spare
-        .filter((take) => take.account === account)
-        .reduce((sum, take) => sum + take.amount, 0);
-  }
+// What lands in an account each month of the year: the fixed sum or
+// the spare money's take the flow lists for it, and nothing for an
+// account it lists nothing for. The entry is read off the flow as the
+// one listed for the account itself, the same object the flow was read
+// over, rather than for its id, which two accounts could share only by
+// a caller's mistake; a sum over the one entry, so a miss needs no
+// fallback that could never be reached.
+function paidIn(account: Account, flow: CashFlow): number {
+  return [...flow.fixed, ...flow.spare]
+    .filter((paid) => paid.account === account)
+    .reduce((sum, paid) => sum + paid.amount, 0);
 }
 
 function rateOf(account: Account, plan: Plan): number {
