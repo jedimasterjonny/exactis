@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { Note } from "@/components/app/atoms/note";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
+import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ProgressPoints } from "@/components/app/organisms/progress-points";
 import { Button } from "@/components/kit/button";
@@ -30,7 +31,7 @@ export default function Progress(): JSX.Element {
         Newest first
       </ScreenHeader>
       <ScreenBody>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-4">
+        <TileGrid>
           <StatTile
             caption="Monthly since Jan 2025"
             label="Points recorded"
@@ -53,7 +54,7 @@ export default function Progress(): JSX.Element {
             label="Net worth today"
             value="£533,671"
           />
-        </div>
+        </TileGrid>
         <ProgressPoints points={points} />
         <Note>
           Net worth, assets and liabilities are derived from the values you
