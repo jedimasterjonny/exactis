@@ -12,7 +12,8 @@ const [pension, isa, cash, home, mortgage] = accounts;
 const [salary] = incomeLines;
 const [household] = expenseLines;
 
-const plan = { born: 1990, from: 2026, rate: 0.05 };
+// Read at the start of its first year, so every year is carried whole.
+const plan = { born: 1990, from: 2026, month: 0, rate: 0.05 };
 
 // No lines at all, so there is no spare money and every account is paid
 // its fixed sum alone.
@@ -139,6 +140,35 @@ describe("project", () => {
     expect(second?.free).toBe((first?.free ?? 0) + 20000);
     expect(last?.year).toBe(2049);
     expect(last?.free).toBe(286145 + 23 * 20000);
+  });
+
+  // Read in September, the first year has four months to run: £1,666.67
+  // in each is £6,666.67, then a whole year's £20,000 on top.
+  it("carries the first year from the month the plan is read in", () => {
+    expect(
+      project([spareIsa], schedule, { ...plan, month: 8, years: 2 }),
+    ).toStrictEqual([
+      { age: 36, deferred: 0, free: 286145, year: 2026 },
+      { age: 37, deferred: 0, free: 292812, year: 2027 },
+      { age: 38, deferred: 0, free: 312812, year: 2028 },
+    ]);
+  });
+
+  // The last year plotted is entered, not carried: a line paid only in
+  // that year lands in no point.
+  it("carries nothing through the last year, whose point is the balance entering it", () => {
+    const lastYearOnly = { ...salary, firstYear: 2027, lastYear: 2027 };
+
+    expect(
+      project(
+        [spareIsa],
+        { expenses: [], income: [lastYearOnly] },
+        { ...plan, years: 1 },
+      ),
+    ).toStrictEqual([
+      { age: 36, deferred: 0, free: 286145, year: 2026 },
+      { age: 37, deferred: 0, free: 286145, year: 2027 },
+    ]);
   });
 
   it("projects nothing when no account is a wrapper", () => {
