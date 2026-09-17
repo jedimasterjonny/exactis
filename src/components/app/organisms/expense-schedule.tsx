@@ -15,6 +15,7 @@ import type { Plan } from "@/engine/projection";
 
 import { saveExpenseLine } from "@/app/(app)/plan/actions";
 import { Note } from "@/components/app/atoms/note";
+import { SectionHeader } from "@/components/app/atoms/section-header";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import {
   isSound,
@@ -125,24 +126,22 @@ export function ExpenseSchedule({
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-wrap items-start justify-between gap-4">
-          <div className="grid gap-1">
-            <span className="label text-muted-foreground">
-              {subsectionLabel(planScreen, 2)}
-            </span>
-            <h2 className="font-heading text-base font-medium">
-              Expenses by year
-            </h2>
-          </div>
-          <Button
-            onClick={() => {
-              open(blank(plan), null);
-            }}
-            size="sm"
-          >
-            <Plus aria-hidden />
-            Add expense line
-          </Button>
+        <CardHeader>
+          <SectionHeader
+            actions={
+              <Button
+                onClick={() => {
+                  open(blank(plan), null);
+                }}
+                size="sm"
+              >
+                <Plus aria-hidden />
+                Add expense line
+              </Button>
+            }
+            label={subsectionLabel(planScreen, 2)}
+            title="Expenses by year"
+          />
         </CardHeader>
         <CardContent>
           <ScheduleRows
