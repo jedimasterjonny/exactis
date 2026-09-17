@@ -6,30 +6,26 @@ import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
 
-import { Switch } from "@/components/kit/switch";
+import { LabelledSwitch } from "@/components/app/atoms/labelled-switch";
 
 // Daylight is the default and the intended theme; night watch is opt-in,
-// as the reference has it. The switch fills with the sidebar's oxide when
-// on, since the registry's primary fill is ink, which vanishes on the ink
-// sidebar.
+// as the reference has it. The switch takes the sidebar tone, since it
+// sits on the ink sidebar.
 export function ThemeToggle(): JSX.Element {
   const { setTheme, theme } = useTheme();
   const isClient = useSyncExternalStore(subscribe, isHydrated, isServer);
   const isDark = isClient && theme === "dark";
-  const Icon = isDark ? Moon : Sun;
   return (
-    <label className="flex h-8 items-center gap-2 label text-sidebar-foreground/60">
-      <Icon aria-hidden className="size-3.5" />
-      <span className="flex-1">{isDark ? "Night watch" : "Daylight"}</span>
-      <Switch
-        checked={isDark}
-        className="data-checked:bg-sidebar-primary"
-        onCheckedChange={(isChecked) => {
-          setTheme(isChecked ? "dark" : "light");
-        }}
-        size="sm"
-      />
-    </label>
+    <LabelledSwitch
+      icon={isDark ? Moon : Sun}
+      isChecked={isDark}
+      onCheckedChange={(isChecked) => {
+        setTheme(isChecked ? "dark" : "light");
+      }}
+      tone="sidebar"
+    >
+      {isDark ? "Night watch" : "Daylight"}
+    </LabelledSwitch>
   );
 }
 

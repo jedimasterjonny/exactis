@@ -34,7 +34,7 @@ in the vendored file works until the next refresh silently discards it.
 
 | tier         | what it is                                       | here                                                                                                                                                              |
 | ------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `atoms/`     | one presentational job, composes nothing of ours | `delta-value`, `empty-state`, `field`, `figure-input`, `note`, `screen-header`, `section-header`, `span-bar`                                                      |
+| `atoms/`     | one presentational job, composes nothing of ours | `delta-value`, `empty-state`, `field`, `figure-input`, `labelled-switch`, `note`, `screen-header`, `section-header`, `span-bar`                                   |
 | `molecules/` | atoms combined into one reusable control         | `app-nav`, `edit-dialog`, `money-field`, `rate-field`, `select-field`, `stat-tile`, `text-field`, `theme-toggle`, `year-field`                                    |
 | `organisms/` | a whole region of a screen                       | `account-ledger`, `account-table`, `cash-flow-card`, `expense-schedule`, `income-schedule`, `line-fields`, `progress-points`, `projection-chart`, `schedule-rows` |
 | `templates/` | the shell a page sits in                         | `app-frame`                                                                                                                                                       |
@@ -52,8 +52,9 @@ Ask what it composes, not how big it is. Size correlates but does not decide.
    atom. An atom may wrap one primitive, from `kit/` or from Base UI directly as
    `field` does, to give it this app's grammar.
 2. Does it combine atoms, or more than one `kit/` primitive, into one control,
-   or give a control state of its own? It is a molecule. `theme-toggle` wraps
-   one primitive and is a molecule because it reads and sets the theme.
+   or give a control state of its own? It is a molecule. `theme-toggle` is one
+   atom, the labelled switch, and is a molecule because it reads and sets the
+   theme.
 3. Does it own a region of a screen - a table with its empty state, a schedule
    with its dialogs? It is an organism.
 4. Does it arrange regions without knowing what goes in them? It is a template.
