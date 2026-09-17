@@ -21,7 +21,7 @@ import {
 } from "@/components/kit/table";
 import { allowanceOf } from "@/data/accounts";
 import { cadenceAbbreviations } from "@/lib/cadence";
-import { formatGbp } from "@/lib/money";
+import { formatGbp, formatPercent } from "@/lib/money";
 
 interface AccountTableProps {
   readonly accounts: readonly Account[];
@@ -32,13 +32,6 @@ interface AccountTableProps {
 }
 
 type Treatment = "destructive" | "secondary";
-
-// A rate is shown to two places, so 0 reads 0.00% and 0.021 reads 2.10%.
-const percent = new Intl.NumberFormat("en-GB", {
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 2,
-  style: "percent",
-});
 
 // The kind's label and the badge tone it takes. Only a debt is coloured,
 // and it takes the loss tone, as its balance does everywhere else.
@@ -258,7 +251,7 @@ function formatContribution(account: Account): string {
 function formatGrowth(growth: Growth): string {
   switch (growth.kind) {
     case "fixed":
-      return percent.format(growth.rate);
+      return formatPercent(growth.rate);
     case "plan":
       return "Plan rate";
   }
