@@ -38,4 +38,22 @@ describe("RateField", () => {
       "Nominal, before inflation",
     );
   });
+
+  it("shows nothing for a rate it is given none of, and the error it is given", () => {
+    render(
+      <RateField
+        error="No rate clears the balance over the term."
+        label="Rate"
+        value={null}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Rate" });
+
+    expect(input).toHaveValue("");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(
+      screen.getByText("No rate clears the balance over the term."),
+    ).toHaveClass("text-destructive");
+  });
 });

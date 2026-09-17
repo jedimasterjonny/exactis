@@ -71,6 +71,55 @@ describe("FigureInput", () => {
     expect(input).toHaveValue("");
   });
 
+  // A figure given a value shows it, nothing for null, and follows it as
+  // it changes; what is typed over it still commits, and the caller says
+  // what the figure shows next.
+  it("shows the value it is given and commits what is typed over it", () => {
+    const onValueCommitted = vi.fn<(value: number) => void>();
+    const { rerender } = render(
+      <FigureInput
+        format={plain}
+        largeStep={10}
+        onValueCommitted={onValueCommitted}
+        step={1}
+        value={null}
+      />,
+    );
+
+    const input = screen.getByRole("textbox");
+
+    expect(input).toHaveValue("");
+
+    rerender(
+      <FigureInput
+        format={plain}
+        largeStep={10}
+        onValueCommitted={onValueCommitted}
+        step={1}
+        value={22}
+      />,
+    );
+
+    expect(input).toHaveValue("22");
+
+    fireEvent.change(input, { target: { value: "25" } });
+    fireEvent.blur(input);
+
+    expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(25);
+
+    rerender(
+      <FigureInput
+        format={plain}
+        largeStep={10}
+        onValueCommitted={onValueCommitted}
+        step={1}
+        value={25}
+      />,
+    );
+
+    expect(input).toHaveValue("25");
+  });
+
   it("steps by the step on an arrow key and by the large step with shift", () => {
     render(
       <FigureInput
