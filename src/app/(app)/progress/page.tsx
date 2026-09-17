@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import { Plus } from "lucide-react";
 
 import { Note } from "@/components/app/atoms/note";
+import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ProgressPoints } from "@/components/app/organisms/progress-points";
@@ -28,7 +29,7 @@ export default function Progress(): JSX.Element {
       >
         Newest first
       </ScreenHeader>
-      <div className="grid gap-5 p-8">
+      <ScreenBody>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-4">
           <StatTile
             caption="Monthly since Jan 2025"
@@ -58,7 +59,7 @@ export default function Progress(): JSX.Element {
           Net worth, assets and liabilities are derived from the values you
           record here.
         </Note>
-      </div>
+      </ScreenBody>
     </>
   );
 }
