@@ -25,10 +25,10 @@ when it applies only sometimes.
   surface and true atomicity.
 - "Accepted" on a review finding means acknowledged and closed. It is not an
   instruction to go and fix it.
-- Work lands by pull request, merged by rebase once both CI jobs are green.
-  Merge and squash commits are disabled in the repository settings. Branch
-  protection is deliberately not used, so CI is the gate and the discipline is
-  the lock.
+- Work lands by pull request, merged by rebase once CI is green: the check job
+  at the tip and a commit job for every commit beneath it. Merge and squash
+  commits are disabled in the repository settings. Branch protection is
+  deliberately not used, so CI is the gate and the discipline is the lock.
 - Node is pinned in `.node-version`, the only place the version is written.
   `engines.node` is a separate statement, the range the package supports, and
   Renovate is held to it.
