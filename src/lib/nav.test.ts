@@ -8,6 +8,7 @@ import {
   screens,
   sectionLabel,
   sectionNumeral,
+  subsectionLabel,
 } from "./nav";
 
 describe("sectionLabel", () => {
@@ -19,6 +20,12 @@ describe("sectionLabel", () => {
     expect(sectionLabel(plan)).toBe("Sect. III · Plan");
     expect(sectionLabel(progress)).toBe("Sect. IV · Progress");
     expect(sectionNumeral(progress)).toBe("IV");
+  });
+
+  it("numbers a card within a screen in lower case after the screen's", () => {
+    expect(subsectionLabel(plan, 1)).toBe("Sect. III.i");
+    expect(subsectionLabel(plan, 3)).toBe("Sect. III.iii");
+    expect(subsectionLabel(progress, 4)).toBe("Sect. IV.iv");
   });
 
   it("lists every screen with a distinct typed route", () => {

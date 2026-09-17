@@ -51,3 +51,10 @@ export function sectionLabel(screen: Screen): string {
 export function sectionNumeral(screen: Screen): string {
   return toRoman(screens.indexOf(screen) + 1);
 }
+
+// The label a card within a screen opens with, "Sect. III.ii": the
+// screen's numeral and the card's own in lower case, counted from one in
+// the order the cards are read down the screen.
+export function subsectionLabel(screen: Screen, place: number): string {
+  return `Sect. ${sectionNumeral(screen)}.${toRoman(place).toLowerCase()}`;
+}
