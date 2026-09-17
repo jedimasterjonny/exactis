@@ -225,13 +225,13 @@ export function IncomeSchedule({
                 <div className="grid grid-cols-3 gap-4">
                   <MoneyField
                     defaultValue={entry.initial.bonus}
-                    hint="Leave at nothing for none"
+                    hint="At the salary's cadence; nothing for none"
                     label="Bonus"
                     onValueCommitted={part(entry, "bonus")}
                   />
                   <MoneyField
                     defaultValue={entry.initial.rsu}
-                    hint="Value as it vests"
+                    hint="Vesting at the salary's cadence"
                     label="RSUs"
                     onValueCommitted={part(entry, "rsu")}
                   />

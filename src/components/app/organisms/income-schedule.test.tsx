@@ -124,6 +124,12 @@ describe("IncomeSchedule", () => {
     expect(
       within(dialog).getByRole("textbox", { name: "Base salary" }),
     ).toHaveValue("£0");
+    expect(
+      within(dialog).getByRole("textbox", { name: "Bonus" }),
+    ).toHaveAccessibleDescription("At the salary's cadence; nothing for none");
+    expect(
+      within(dialog).getByRole("textbox", { name: "RSUs" }),
+    ).toHaveAccessibleDescription("Vesting at the salary's cadence");
     expect(within(dialog).getByRole("textbox", { name: "Bonus" })).toHaveValue(
       "£0",
     );
