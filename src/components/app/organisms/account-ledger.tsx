@@ -22,6 +22,7 @@ import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { AccountFields } from "@/components/app/organisms/account-fields";
 import { AccountTable } from "@/components/app/organisms/account-table";
+import { HouseDialog } from "@/components/app/organisms/house-dialog";
 import { Button } from "@/components/kit/button";
 import {
   Tabs,
@@ -77,9 +78,11 @@ const blank: Draft = {
 // re-reads; the optimistic order is the page's again once it does. The
 // entry doubles as the dialog's open state, as the progress editor's
 // point does, and the tab is controlled so a saved account can bring
-// its own tab forward. The fields are uncontrolled and mount fresh with
-// the entry's opening values each time the dialog opens, and the draft
-// mirrors what they report.
+// its own tab forward, as a saved house does through the house dialog
+// beside the button, which enters a house as the asset and the mortgage
+// it is. The fields are uncontrolled and mount fresh with the entry's
+// opening values each time the dialog opens, and the draft mirrors what
+// they report.
 export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   const [tab, setTab] = useState<Tab>("accounts");
   const [entry, setEntry] = useState<Entry | null>(null);
@@ -180,15 +183,22 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
     <>
       <ScreenHeader
         actions={
-          <Button
-            onClick={() => {
-              open(blank, null);
-            }}
-            size="sm"
-          >
-            <Plus aria-hidden />
-            Add account
-          </Button>
+          <>
+            <HouseDialog
+              onSaved={() => {
+                setTab("assets");
+              }}
+            />
+            <Button
+              onClick={() => {
+                open(blank, null);
+              }}
+              size="sm"
+            >
+              <Plus aria-hidden />
+              Add account
+            </Button>
+          </>
         }
         label={sectionLabel(accountsAndAssets)}
         title="Accounts & assets"
