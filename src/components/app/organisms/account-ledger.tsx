@@ -18,20 +18,13 @@ import {
 } from "@/app/(app)/accounts/actions";
 import { Note } from "@/components/app/atoms/note";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
+import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { MoneyField } from "@/components/app/molecules/money-field";
 import { RateField } from "@/components/app/molecules/rate-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { AccountTable } from "@/components/app/organisms/account-table";
 import { Button } from "@/components/kit/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/kit/dialog";
 import {
   Tabs,
   TabsContent,
@@ -128,8 +121,6 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
     setEntry({ ...current, draft: { ...current.draft, ...patch } });
   }
 
-  // The dialog opens only from a button, so the only change it can report
-  // is a close: Cancel, Escape or a press outside.
   function dismiss(): void {
     setEntry(null);
   }
@@ -278,132 +269,117 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
           </TabsContent>
         </Tabs>
       </div>
-      <Dialog onOpenChange={dismiss} open={entry !== null}>
-        {entry !== null && (
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <span className="label text-brand">
-                {entry.id === null ? "New account" : "Edit account"}
-              </span>
-              <DialogTitle>
-                {entry.draft.name.trim() || "Untitled account"}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4">
-              <div className="grid grid-cols-[1.4fr_1fr] gap-4">
-                <TextField
-                  defaultValue={entry.initial.name}
-                  label="Name"
-                  onValueChange={(name) => {
-                    amend(entry, { name });
-                  }}
-                  placeholder="Lifetime ISA, car, loan…"
-                />
-                <SelectField
-                  defaultValue={entry.initial.kind}
-                  label="Treatment"
-                  onValueChange={(kind) => {
-                    treat(entry, kind);
-                  }}
-                  options={kinds}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <MoneyField
-                  defaultValue={entry.initial.balance}
-                  hint="A debt's is negative"
-                  label="Balance"
-                  onValueCommitted={(balance) => {
-                    amend(entry, { balance });
-                  }}
-                />
-                {!isAsset(entry.draft) && (
-                  <SelectField
-                    defaultValue={entry.initial.funding}
-                    hint="Spare money is what a month's income leaves after the expenses and every fixed sum"
-                    label="Contribution"
-                    onValueChange={(funding) => {
-                      fund(entry, funding);
-                    }}
-                    options={fundings}
-                  />
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {entry.draft.funding === "fixed" ? (
-                  <>
-                    <MoneyField
-                      defaultValue={entry.initial.contribution}
-                      hint="Leave at nothing for none"
-                      // Keyed apart from the cap, which takes its place:
-                      // the fragment is unwrapped and the two would be
-                      // one field, keeping what was typed into the other.
-                      key="contribution"
-                      label="Amount"
-                      onValueCommitted={(contribution) => {
-                        amend(entry, { contribution });
-                      }}
-                    />
-                    <SelectField
-                      defaultValue={entry.initial.cadence}
-                      label="Cadence"
-                      onValueChange={(cadence) => {
-                        amend(entry, { cadence });
-                      }}
-                      options={cadences}
-                    />
-                  </>
-                ) : (
-                  <MoneyField
-                    defaultValue={entry.initial.cap}
-                    hint={capHint(entry.draft.kind)}
-                    key="cap"
-                    label="Cap, a year"
-                    onValueCommitted={(cap) => {
-                      amend(entry, { cap });
-                    }}
-                  />
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <SelectField
-                  defaultValue={entry.initial.growth}
-                  hint="The plan rate is set on the assumptions screen"
-                  label="Growth"
-                  onValueChange={(growth) => {
-                    amend(entry, { growth, rate: entry.initial.rate });
-                  }}
-                  options={growths}
-                />
-                {entry.draft.growth === "fixed" && (
-                  <RateField
-                    defaultValue={entry.initial.rate}
-                    hint="Nominal, a year"
-                    label="Rate"
-                    onValueCommitted={(rate) => {
-                      amend(entry, { rate });
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose render={<Button size="sm" variant="outline" />}>
-                Cancel
-              </DialogClose>
-              <Button
-                disabled={isSaving || entry.draft.name.trim() === ""}
-                onClick={() => {
-                  save(entry);
+      {entry !== null && (
+        <EditDialog
+          canSave={!isSaving && entry.draft.name.trim() !== ""}
+          eyebrow={entry.id === null ? "New account" : "Edit account"}
+          isWide
+          onDismiss={dismiss}
+          onSave={() => {
+            save(entry);
+          }}
+          title={entry.draft.name.trim() || "Untitled account"}
+        >
+          <div className="grid gap-4">
+            <div className="grid grid-cols-[1.4fr_1fr] gap-4">
+              <TextField
+                defaultValue={entry.initial.name}
+                label="Name"
+                onValueChange={(name) => {
+                  amend(entry, { name });
                 }}
-                size="sm"
-              >
-                Save
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
+                placeholder="Lifetime ISA, car, loan…"
+              />
+              <SelectField
+                defaultValue={entry.initial.kind}
+                label="Treatment"
+                onValueChange={(kind) => {
+                  treat(entry, kind);
+                }}
+                options={kinds}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <MoneyField
+                defaultValue={entry.initial.balance}
+                hint="A debt's is negative"
+                label="Balance"
+                onValueCommitted={(balance) => {
+                  amend(entry, { balance });
+                }}
+              />
+              {!isAsset(entry.draft) && (
+                <SelectField
+                  defaultValue={entry.initial.funding}
+                  hint="Spare money is what a month's income leaves after the expenses and every fixed sum"
+                  label="Contribution"
+                  onValueChange={(funding) => {
+                    fund(entry, funding);
+                  }}
+                  options={fundings}
+                />
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {entry.draft.funding === "fixed" ? (
+                <>
+                  <MoneyField
+                    defaultValue={entry.initial.contribution}
+                    hint="Leave at nothing for none"
+                    // Keyed apart from the cap, which takes its place:
+                    // the fragment is unwrapped and the two would be
+                    // one field, keeping what was typed into the other.
+                    key="contribution"
+                    label="Amount"
+                    onValueCommitted={(contribution) => {
+                      amend(entry, { contribution });
+                    }}
+                  />
+                  <SelectField
+                    defaultValue={entry.initial.cadence}
+                    label="Cadence"
+                    onValueChange={(cadence) => {
+                      amend(entry, { cadence });
+                    }}
+                    options={cadences}
+                  />
+                </>
+              ) : (
+                <MoneyField
+                  defaultValue={entry.initial.cap}
+                  hint={capHint(entry.draft.kind)}
+                  key="cap"
+                  label="Cap, a year"
+                  onValueCommitted={(cap) => {
+                    amend(entry, { cap });
+                  }}
+                />
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <SelectField
+                defaultValue={entry.initial.growth}
+                hint="The plan rate is set on the assumptions screen"
+                label="Growth"
+                onValueChange={(growth) => {
+                  amend(entry, { growth, rate: entry.initial.rate });
+                }}
+                options={growths}
+              />
+              {entry.draft.growth === "fixed" && (
+                <RateField
+                  defaultValue={entry.initial.rate}
+                  hint="Nominal, a year"
+                  label="Rate"
+                  onValueCommitted={(rate) => {
+                    amend(entry, { rate });
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        </EditDialog>
+      )}
     </>
   );
 }
