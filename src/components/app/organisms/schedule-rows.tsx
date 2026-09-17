@@ -7,16 +7,10 @@ import type { Cadence } from "@/data/accounts";
 import type { LineGrowth, LineValues, Side } from "@/data/schedule";
 import type { Plan } from "@/engine/projection";
 
+import { EmptyState } from "@/components/app/atoms/empty-state";
 import { SpanBar } from "@/components/app/atoms/span-bar";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/kit/empty";
 import { endYear } from "@/engine/projection";
 import { formatGbp } from "@/lib/money";
 
@@ -83,17 +77,12 @@ export function ScheduleRows<TLine extends Line>({
   summarise,
 }: ScheduleRowsProps<TLine>): JSX.Element {
   if (lines.length === 0) {
-    const Icon = icons[side];
     return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <Icon aria-hidden />
-          </EmptyMedia>
-          <EmptyTitle>{emptyTitle}</EmptyTitle>
-          <EmptyDescription>{emptyDescription}</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <EmptyState
+        description={emptyDescription}
+        icon={icons[side]}
+        title={emptyTitle}
+      />
     );
   }
 
