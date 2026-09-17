@@ -187,7 +187,7 @@ export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
 export function ProjectionPending(): JSX.Element {
   return (
     <Frame>
-      <Note>Reading the store…</Note>
+      <Placeholder>Reading the store…</Placeholder>
     </Frame>
   );
 }
@@ -226,8 +226,9 @@ function MarkToggle({
   );
 }
 
-// The plot's place, holding a line of muted text instead.
-function Note({ children }: { readonly children: string }): JSX.Element {
+// The plot's place, holding a line of muted text instead. Not the note
+// atom, which closes a section with an icon; this is sized as the plot.
+function Placeholder({ children }: { readonly children: string }): JSX.Element {
   return (
     <p className="flex aspect-[3/1] w-full items-center justify-center text-sm text-muted-foreground">
       {children}
