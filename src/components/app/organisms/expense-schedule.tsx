@@ -15,6 +15,7 @@ import type { Plan } from "@/engine/projection";
 
 import { saveExpenseLine } from "@/app/(app)/plan/actions";
 import { Note } from "@/components/app/atoms/note";
+import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import {
   isSound,
   LineFields,
@@ -24,14 +25,6 @@ import {
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { plan as planScreen, sectionNumeral } from "@/lib/nav";
 
@@ -93,8 +86,6 @@ export function ExpenseSchedule({
     setEntry({ ...current, draft: { ...current.draft, ...patch } });
   }
 
-  // The dialog opens only from a button, so the only change it can report
-  // is a close: Cancel, Escape or a press outside.
   function dismiss(): void {
     setEntry(null);
   }
@@ -169,49 +160,34 @@ export function ExpenseSchedule({
         An open-ended line runs to the end of the plan: retirement living starts
         where household spending stops, as a line of its own.
       </Note>
-      <Dialog onOpenChange={dismiss} open={entry !== null}>
-        {entry !== null && (
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <span className="label text-brand">
-                {entry.id === null ? "New expense line" : "Edit expense line"}
-              </span>
-              <DialogTitle>
-                {entry.draft.name.trim() || "Untitled line"}
-              </DialogTitle>
-            </DialogHeader>
-            <LineFields
-              amountLabel="Amount"
-              draft={entry.draft}
-              initial={entry.initial}
-              kinds={kinds}
-              namePlaceholder="Childcare, mortgage, care…"
-              onAmend={(patch) => {
-                amend(entry, patch);
-              }}
-              onKindChange={(kind) => {
-                amend(entry, { kind });
-              }}
-              plan={plan}
-              side="expense"
-            />
-            <DialogFooter>
-              <DialogClose render={<Button size="sm" variant="outline" />}>
-                Cancel
-              </DialogClose>
-              <Button
-                disabled={isSaving || !isSound(entry.draft)}
-                onClick={() => {
-                  save(entry);
-                }}
-                size="sm"
-              >
-                Save
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
+      {entry !== null && (
+        <EditDialog
+          canSave={!isSaving && isSound(entry.draft)}
+          eyebrow={entry.id === null ? "New expense line" : "Edit expense line"}
+          isWide
+          onDismiss={dismiss}
+          onSave={() => {
+            save(entry);
+          }}
+          title={entry.draft.name.trim() || "Untitled line"}
+        >
+          <LineFields
+            amountLabel="Amount"
+            draft={entry.draft}
+            initial={entry.initial}
+            kinds={kinds}
+            namePlaceholder="Childcare, mortgage, care…"
+            onAmend={(patch) => {
+              amend(entry, patch);
+            }}
+            onKindChange={(kind) => {
+              amend(entry, { kind });
+            }}
+            plan={plan}
+            side="expense"
+          />
+        </EditDialog>
+      )}
     </>
   );
 }
