@@ -141,7 +141,7 @@ export function AccountTable({
 
   return (
     <Card className="py-0">
-      <Table className="[&_td]:px-4 [&_th]:px-4">
+      <Table>
         <TableHeader>
           <TableRow>
             {onMove !== undefined && (
