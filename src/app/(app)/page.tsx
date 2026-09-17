@@ -11,6 +11,7 @@ import { Suspense } from "react";
 
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
+import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ProjectionPending } from "@/components/app/organisms/projection-chart";
 import { Badge } from "@/components/kit/badge";
@@ -46,7 +47,7 @@ export default function Home(): JSX.Element {
         {"Figures in today's money"}
       </ScreenHeader>
       <ScreenBody>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-4">
+        <TileGrid>
           <StatTile
             caption="Last working year 58"
             icon={Flag}
@@ -76,7 +77,7 @@ export default function Home(): JSX.Element {
             label="Net legacy"
             value="£1,771,204"
           />
-        </div>
+        </TileGrid>
         <Suspense fallback={<ProjectionPending />}>
           <Projection />
         </Suspense>
