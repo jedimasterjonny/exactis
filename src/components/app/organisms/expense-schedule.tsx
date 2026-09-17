@@ -20,7 +20,6 @@ import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import {
   isSound,
   LineFields,
-  optionsOf,
   spanOf,
 } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
@@ -28,6 +27,7 @@ import { Button } from "@/components/kit/button";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
 import { toast } from "@/components/kit/toast";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
+import { optionsOf } from "@/lib/options";
 
 // What the dialog holds while it is open: the line's values, which are
 // flat already, with no last year for a line that runs to the end of the

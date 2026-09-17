@@ -17,7 +17,6 @@ import { MoneyField } from "@/components/app/molecules/money-field";
 import {
   isSound,
   LineFields,
-  optionsOf,
   spanOf,
 } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
@@ -27,6 +26,7 @@ import { toast } from "@/components/kit/toast";
 import { totalOf } from "@/data/income";
 import { formatGbp } from "@/lib/money";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
+import { optionsOf } from "@/lib/options";
 
 // What the dialog holds while it is open: the line's values, which are
 // flat already, with no last year for a line that runs to the end of the

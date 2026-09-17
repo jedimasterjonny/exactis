@@ -5,8 +5,9 @@ import type { LineValues } from "@/data/schedule";
 
 import { plan } from "@/data/income.fixture";
 import { lineGrowths } from "@/data/schedule";
+import { optionsOf } from "@/lib/options";
 
-import { isSound, LineFields, optionsOf, spanOf } from "./line-fields";
+import { isSound, LineFields, spanOf } from "./line-fields";
 
 type Kind = "employment" | "pension";
 
