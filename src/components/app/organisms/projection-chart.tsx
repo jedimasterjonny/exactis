@@ -19,6 +19,7 @@ import {
 import type { ProjectionPoint } from "@/engine/projection";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
+import { LabelledSwitch } from "@/components/app/atoms/labelled-switch";
 import { buttonVariants } from "@/components/kit/button";
 import { Card, CardContent } from "@/components/kit/card";
 import {
@@ -27,7 +28,6 @@ import {
   ChartLegendContent,
   ChartTooltip,
 } from "@/components/kit/chart";
-import { Switch } from "@/components/kit/switch";
 import { formatGbp } from "@/lib/money";
 import { accountsAndAssets } from "@/lib/nav";
 
@@ -201,10 +201,9 @@ function Frame({ children }: { readonly children: JSX.Element }): JSX.Element {
   );
 }
 
-// The switch between the two marks, drawn as the sidebar's theme toggle
-// is: an icon and the name of the mark drawn now, with the switch on for
-// the bars. It sits at the right of the plot's top row, where a screen
-// keeps its actions.
+// The switch between the two marks: the name of the mark drawn now, with
+// the switch on for the bars. It sits at the right of the plot's top row,
+// where a screen keeps its actions.
 function MarkToggle({
   mark,
   onMarkChange,
@@ -213,19 +212,17 @@ function MarkToggle({
   readonly onMarkChange: (mark: Mark) => void;
 }): JSX.Element {
   const isBars = mark === "bar";
-  const Icon = isBars ? ChartColumnStacked : ChartArea;
   return (
-    <label className="flex h-8 items-center gap-2 self-end label text-muted-foreground">
-      <Icon aria-hidden className="size-3.5" />
+    <LabelledSwitch
+      className="self-end"
+      icon={isBars ? ChartColumnStacked : ChartArea}
+      isChecked={isBars}
+      onCheckedChange={(isChecked) => {
+        onMarkChange(isChecked ? "bar" : "area");
+      }}
+    >
       {isBars ? "Bars" : "Areas"}
-      <Switch
-        checked={isBars}
-        onCheckedChange={(isChecked) => {
-          onMarkChange(isChecked ? "bar" : "area");
-        }}
-        size="sm"
-      />
-    </label>
+    </LabelledSwitch>
   );
 }
 
