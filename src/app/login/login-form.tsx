@@ -2,9 +2,9 @@
 
 import type { JSX } from "react";
 
-import { Field } from "@base-ui/react/field";
 import { useActionState } from "react";
 
+import { Field } from "@/components/app/atoms/field";
 import { Button } from "@/components/kit/button";
 import { Input } from "@/components/kit/input";
 
@@ -18,25 +18,14 @@ export function LoginForm(): JSX.Element {
   const [state, action, isPending] = useActionState(signIn, {});
   return (
     <form action={action} className="grid gap-4">
-      <Field.Root
-        className="grid content-start gap-1.5"
-        invalid={state.error !== undefined}
-      >
-        <Field.Label className="label text-muted-foreground">
-          Password
-        </Field.Label>
+      <Field error={state.error} label="Password">
         <Input
           autoComplete="current-password"
           name="password"
           required
           type="password"
         />
-        {state.error !== undefined && (
-          <Field.Error className="text-xs text-destructive" match>
-            {state.error}
-          </Field.Error>
-        )}
-      </Field.Root>
+      </Field>
       <Button
         className="justify-self-start"
         disabled={isPending}
