@@ -2,6 +2,9 @@ name: CI
 
 on:
   pull_request:
+    # The default three, and ready_for_review, which is when the commit
+    # checks below first run: a draft pays for the check job alone.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
@@ -245,6 +248,16 @@ jobs:
     # in order, so twelve were fifty minutes and the loop's timeout had to
     # grow with the longest series. Now a series pays in runners, all at
     # once, and takes as long as its slowest commit.
+    #
+    # Not while the pull request is a draft. A series is rewritten while it
+    # is one, and each rewrite would spend a runner a commit proving a tree
+    # the next push replaces; the check job still runs on every push, so a
+    # draft is never unchecked, only its middle. Marking it ready runs this
+    # for the first time, and every push after that runs it again. A push
+    # to main is never a draft and always runs it.
+    if:
+      ${{ github.event_name != 'pull_request' ||
+      !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # actions: read is for listing the cache, which is where the commit job
