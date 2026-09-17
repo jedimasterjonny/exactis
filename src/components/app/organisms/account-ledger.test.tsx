@@ -12,6 +12,7 @@ import type { Account } from "@/data/accounts";
 import {
   placeAccountsInOrder,
   saveAccount,
+  saveHouse,
 } from "@/app/(app)/accounts/actions";
 import { Toaster } from "@/components/kit/toast";
 import { isAsset } from "@/data/accounts";
@@ -22,6 +23,7 @@ import { AccountLedger } from "./account-ledger";
 vi.mock("@/app/(app)/accounts/actions", () => ({
   placeAccountsInOrder: vi.fn(),
   saveAccount: vi.fn(),
+  saveHouse: vi.fn(),
 }));
 
 const held = accounts.filter((account) => !isAsset(account));
@@ -263,6 +265,37 @@ describe("AccountLedger", () => {
       "true",
     );
     expect(rowsOf(screen.getByRole("tabpanel"))).toHaveLength(assets.length);
+  });
+
+  // The house dialog is the header's own; what it saves is its business,
+  // and the ledger's is to bring the assets forward once it has.
+  it("adds a house from the header and brings the assets tab forward", async () => {
+    renderLedger();
+    vi.mocked(saveHouse).mockResolvedValue({ ...home, id: 6, name: "Flat" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add house" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Untitled house" });
+
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
+      target: { value: "Flat" },
+    });
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Status" }), {
+      target: { value: "outright" },
+    });
+    commit(within(dialog).getByRole("textbox", { name: "Value" }), "250,000");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Flat" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(saveHouse).toHaveBeenCalledOnce();
+    expect(screen.getByRole("tab", { name: /^Assets/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("drops a cancelled draft and leaves a cleared figure as it was", () => {
