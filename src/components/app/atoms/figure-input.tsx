@@ -8,7 +8,7 @@ interface FigureInputProps {
   readonly defaultValue: number;
   readonly format: Intl.NumberFormatOptions;
   readonly largeStep: number;
-  readonly onValueCommitted?: ((value: null | number) => void) | undefined;
+  readonly onValueCommitted?: ((value: number) => void) | undefined;
   readonly step: number;
 }
 
@@ -17,8 +17,11 @@ interface FigureInputProps {
 // The number field owns parsing, formatting and stepping; the caller says
 // how the figure is written and how far a key steps it, with shift. The
 // value commits on blur, as fields do in the product, and never on the
-// wheel: a balance changing under a scroll is a hazard. Every money, rate
-// and year value is entered through this rather than a text input.
+// wheel: a balance changing under a scroll is a hazard. A figure cleared
+// to nothing commits null, which is dropped here rather than reported: a
+// cleared figure is left as it was, never written as nothing, and every
+// caller wanted the same. Every money, rate and year value is entered
+// through this rather than a text input.
 export function FigureInput({
   defaultValue,
   format,
@@ -32,7 +35,11 @@ export function FigureInput({
       format={format}
       largeStep={largeStep}
       locale="en-GB"
-      onValueCommitted={onValueCommitted}
+      onValueCommitted={(value) => {
+        if (value !== null) {
+          onValueCommitted?.(value);
+        }
+      }}
       step={step}
     >
       <NumberField.Group>

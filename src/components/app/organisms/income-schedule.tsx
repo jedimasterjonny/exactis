@@ -53,8 +53,6 @@ interface IncomeScheduleProps {
   readonly plan: Plan;
 }
 
-type Part = "bonus" | "rsu";
-
 // What each kind is called, on the badge and in the dialog's choice.
 const kindLabels: Record<IncomeKind, string> = {
   employment: "Employment",
@@ -122,16 +120,6 @@ export function IncomeSchedule({
 
   function open(draft: Draft, id: null | number): void {
     setEntry({ draft, id, initial: draft });
-  }
-
-  // A part's field commits null when cleared, and a cleared part is left
-  // as it was rather than written as nothing.
-  function part(current: Entry, key: Part): (value: null | number) => void {
-    return (value) => {
-      if (value !== null) {
-        amend(current, { [key]: value });
-      }
-    };
   }
 
   // The name is saved as typed less the space around it, which is what
@@ -227,13 +215,17 @@ export function IncomeSchedule({
                     defaultValue={entry.initial.bonus}
                     hint="At the salary's cadence; nothing for none"
                     label="Bonus"
-                    onValueCommitted={part(entry, "bonus")}
+                    onValueCommitted={(bonus) => {
+                      amend(entry, { bonus });
+                    }}
                   />
                   <MoneyField
                     defaultValue={entry.initial.rsu}
                     hint="Vesting at the salary's cadence"
                     label="RSUs"
-                    onValueCommitted={part(entry, "rsu")}
+                    onValueCommitted={(rsu) => {
+                      amend(entry, { rsu });
+                    }}
                   />
                 </div>
               )}

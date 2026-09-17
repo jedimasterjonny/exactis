@@ -15,8 +15,6 @@ import { endYear } from "@/engine/projection";
 // with the plan, so it has no last year.
 type Ending = "fixed" | "open";
 
-type Figure = "amount" | "firstYear" | "lastYear";
-
 // A line as the fields read it: what every line holds, and the kind,
 // whose choices are the schedule's own.
 type Line<TKind extends string> = LineValues & { readonly kind: TKind };
@@ -98,16 +96,6 @@ export function LineFields<TKind extends string>({
     onAmend({ lastYear: ending === "open" ? null : fixedYear });
   }
 
-  // A figure field commits null when cleared, and a cleared figure is
-  // left as it was rather than written as nothing.
-  function figure(key: Figure): (value: null | number) => void {
-    return (value) => {
-      if (value !== null) {
-        onAmend({ [key]: value });
-      }
-    };
-  }
-
   return (
     <div className="grid gap-4">
       <div className="grid grid-cols-[1.4fr_1fr] gap-4">
@@ -131,7 +119,9 @@ export function LineFields<TKind extends string>({
           defaultValue={initial.amount}
           hint="Today's money"
           label={amountLabel}
-          onValueCommitted={figure("amount")}
+          onValueCommitted={(amount) => {
+            onAmend({ amount });
+          }}
         />
         <SelectField
           defaultValue={initial.cadence}
@@ -156,7 +146,9 @@ export function LineFields<TKind extends string>({
           defaultValue={initial.firstYear}
           hint={ageIn(draft.firstYear, plan)}
           label="First year"
-          onValueCommitted={figure("firstYear")}
+          onValueCommitted={(firstYear) => {
+            onAmend({ firstYear });
+          }}
         />
         <div className="grid gap-4">
           <SelectField
@@ -174,7 +166,9 @@ export function LineFields<TKind extends string>({
               defaultValue={fixedYear}
               hint={ageIn(draft.lastYear, plan)}
               label="Last year"
-              onValueCommitted={figure("lastYear")}
+              onValueCommitted={(lastYear) => {
+                onAmend({ lastYear });
+              }}
             />
           )}
         </div>

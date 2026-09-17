@@ -137,9 +137,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
                   key={key}
                   label={label}
                   onValueCommitted={(value) => {
-                    if (value !== null) {
-                      setEdits({ ...edits, [key]: value });
-                    }
+                    setEdits({ ...edits, [key]: value });
                   }}
                 />
               ))}

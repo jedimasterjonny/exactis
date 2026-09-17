@@ -63,8 +63,6 @@ interface Entry {
   readonly initial: Draft;
 }
 
-type Figure = "balance" | "cap" | "contribution" | "rate";
-
 type Tab = "accounts" | "assets";
 
 const blank: Draft = {
@@ -140,16 +138,6 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   // writes back to it.
   function edit(account: Account): void {
     open(toValues(account), account.id);
-  }
-
-  // A figure field commits null when cleared, and a cleared figure is
-  // left as it was rather than written as nothing.
-  function figure(current: Entry, key: Figure): (value: null | number) => void {
-    return (value) => {
-      if (value !== null) {
-        amend(current, { [key]: value });
-      }
-    };
   }
 
   // The contribution choice: the fields the new choice shows mount with
@@ -325,7 +313,9 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
                   defaultValue={entry.initial.balance}
                   hint="A debt's is negative"
                   label="Balance"
-                  onValueCommitted={figure(entry, "balance")}
+                  onValueCommitted={(balance) => {
+                    amend(entry, { balance });
+                  }}
                 />
                 {!isAsset(entry.draft) && (
                   <SelectField
@@ -350,7 +340,9 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
                       // one field, keeping what was typed into the other.
                       key="contribution"
                       label="Amount"
-                      onValueCommitted={figure(entry, "contribution")}
+                      onValueCommitted={(contribution) => {
+                        amend(entry, { contribution });
+                      }}
                     />
                     <SelectField
                       defaultValue={entry.initial.cadence}
@@ -367,7 +359,9 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
                     hint={capHint(entry.draft.kind)}
                     key="cap"
                     label="Cap, a year"
-                    onValueCommitted={figure(entry, "cap")}
+                    onValueCommitted={(cap) => {
+                      amend(entry, { cap });
+                    }}
                   />
                 )}
               </div>
@@ -386,7 +380,9 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
                     defaultValue={entry.initial.rate}
                     hint="Nominal, a year"
                     label="Rate"
-                    onValueCommitted={figure(entry, "rate")}
+                    onValueCommitted={(rate) => {
+                      amend(entry, { rate });
+                    }}
                   />
                 )}
               </div>
