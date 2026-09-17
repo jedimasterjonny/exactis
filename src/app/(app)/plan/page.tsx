@@ -4,7 +4,6 @@ import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { CashFlowCard } from "@/components/app/organisms/cash-flow-card";
 import { ExpenseSchedule } from "@/components/app/organisms/expense-schedule";
 import { IncomeSchedule } from "@/components/app/organisms/income-schedule";
-import { cashFlow } from "@/engine/cash-flow";
 import { plan as planScreen, sectionLabel } from "@/lib/nav";
 
 import { getAccounts } from "../accounts/store";
@@ -16,11 +15,11 @@ import { getExpenseLines, getIncomeLines } from "./store";
 // own here and the events wait, so the schedules are what this screen is,
 // with no tab strip until there is a second tab to switch to: the income
 // lines, the expense lines beneath them, and beneath both what a month
-// of this year leaves once the accounts are paid, which is read from the
-// two schedules and the accounts together. The page reads all three from
-// the store, which reads the session first, so it renders behind the
-// loading screen beside it, and lays the lines over the plan the
-// projection runs on. The header counts both schedules, so it is the
+// of a year leaves once the accounts are paid, which the card reads from
+// the two schedules and the accounts together for whichever year it is
+// set to. The page reads all three from the store, which reads the
+// session first, so it renders behind the loading screen beside it, and
+// lays the lines over the plan the projection runs on. The header counts both schedules, so it is the
 // page's rather than either's. The plan is read after the lines, as the
 // projection reads it after the accounts: the reads behind the session
 // make the route dynamic, and the plan's year has to be read at request
@@ -32,11 +31,6 @@ export default async function Plan(): Promise<JSX.Element> {
     getAccounts(),
   ]);
   const plan = getPlan();
-  const flow = cashFlow(
-    accounts,
-    { expenses: expenseLines, income: incomeLines },
-    plan.from,
-  );
   return (
     <>
       <ScreenHeader label={sectionLabel(planScreen)} title="Income & expenses">
@@ -45,7 +39,11 @@ export default async function Plan(): Promise<JSX.Element> {
       <div className="grid gap-5 p-8">
         <IncomeSchedule lines={incomeLines} plan={plan} />
         <ExpenseSchedule lines={expenseLines} plan={plan} />
-        <CashFlowCard flow={flow} year={plan.from} />
+        <CashFlowCard
+          accounts={accounts}
+          plan={plan}
+          schedule={{ expenses: expenseLines, income: incomeLines }}
+        />
       </div>
     </>
   );
