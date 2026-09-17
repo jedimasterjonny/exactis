@@ -17,6 +17,7 @@ import {
   saveAccount,
 } from "@/app/(app)/accounts/actions";
 import { Note } from "@/components/app/atoms/note";
+import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { AccountFields } from "@/components/app/organisms/account-fields";
@@ -194,7 +195,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
       >
         {`${String(held.length)} accounts · ${String(assets.length)} assets`}
       </ScreenHeader>
-      <div className="grid gap-5 p-8">
+      <ScreenBody>
         <Tabs
           onValueChange={(value) => {
             setTab(value === "assets" ? "assets" : "accounts");
@@ -241,7 +242,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
             </Note>
           </TabsContent>
         </Tabs>
-      </div>
+      </ScreenBody>
       {entry !== null && (
         <EditDialog
           canSave={!isSaving && entry.draft.name.trim() !== ""}

@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 
+import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { CashFlowCard } from "@/components/app/organisms/cash-flow-card";
 import { ExpenseSchedule } from "@/components/app/organisms/expense-schedule";
@@ -36,7 +37,7 @@ export default async function Plan(): Promise<JSX.Element> {
       <ScreenHeader label={sectionLabel(planScreen)} title="Income & expenses">
         {`${counted(incomeLines.length, "income")} · ${counted(expenseLines.length, "expense")}`}
       </ScreenHeader>
-      <div className="grid gap-5 p-8">
+      <ScreenBody>
         <IncomeSchedule lines={incomeLines} plan={plan} />
         <ExpenseSchedule lines={expenseLines} plan={plan} />
         <CashFlowCard
@@ -44,7 +45,7 @@ export default async function Plan(): Promise<JSX.Element> {
           plan={plan}
           schedule={{ expenses: expenseLines, income: incomeLines }}
         />
-      </div>
+      </ScreenBody>
     </>
   );
 }
