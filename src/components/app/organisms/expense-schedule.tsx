@@ -17,15 +17,12 @@ import { saveExpenseLine } from "@/app/(app)/plan/actions";
 import { Note } from "@/components/app/atoms/note";
 import { SectionHeader } from "@/components/app/atoms/section-header";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
-import {
-  isSound,
-  LineFields,
-  spanOf,
-} from "@/components/app/organisms/line-fields";
+import { LineFields } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
 import { toast } from "@/components/kit/toast";
+import { isSound, spanOf } from "@/lib/lines";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 import { optionsOf } from "@/lib/options";
 

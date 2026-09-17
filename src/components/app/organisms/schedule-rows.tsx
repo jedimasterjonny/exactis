@@ -4,7 +4,7 @@ import type { JSX } from "react";
 import { Banknote, Pencil, Receipt } from "lucide-react";
 
 import type { Cadence } from "@/data/accounts";
-import type { LineGrowth, LineValues, Side } from "@/data/schedule";
+import type { LineValues, Side } from "@/data/schedule";
 import type { Plan } from "@/engine/projection";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
@@ -12,6 +12,7 @@ import { SpanBar } from "@/components/app/atoms/span-bar";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
 import { endYear } from "@/engine/projection";
+import { growthLabels } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 
 // What a schedule says of a line that the rows cannot read off it: the
@@ -42,17 +43,6 @@ interface ScheduleRowsProps<TLine extends Line> {
 type Tone = "caution" | "destructive" | "secondary";
 
 const cadences: Record<Cadence, string> = { month: "mo", year: "yr" };
-
-// What each growth choice is called, here and in the dialog that offers
-// them: the amount rises with inflation, a point or two over it, the
-// triple lock, or not at all.
-export const growthLabels: Record<LineGrowth, string> = {
-  inflation: "Inflation",
-  "inflation-plus-1": "Inflation +1%",
-  "inflation-plus-2": "Inflation +2%",
-  nominal: "Nominal, fixed",
-  "triple-lock": "Triple lock",
-};
 
 // The icon each schedule's empty state takes.
 const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
