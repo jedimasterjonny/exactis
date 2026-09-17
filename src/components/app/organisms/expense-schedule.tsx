@@ -26,7 +26,7 @@ import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
 import { toast } from "@/components/kit/toast";
-import { plan as planScreen, sectionNumeral } from "@/lib/nav";
+import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 
 // What the dialog holds while it is open: the line's values, which are
 // flat already, with no last year for a line that runs to the end of the
@@ -128,7 +128,7 @@ export function ExpenseSchedule({
         <CardHeader className="flex flex-wrap items-start justify-between gap-4">
           <div className="grid gap-1">
             <span className="label text-muted-foreground">
-              {`Sect. ${sectionNumeral(planScreen)}.ii`}
+              {subsectionLabel(planScreen, 2)}
             </span>
             <h2 className="font-heading text-base font-medium">
               Expenses by year
