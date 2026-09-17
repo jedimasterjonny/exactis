@@ -7,7 +7,7 @@ import { plan } from "@/data/income.fixture";
 import { lineGrowths } from "@/data/schedule";
 import { optionsOf } from "@/lib/options";
 
-import { isSound, LineFields, spanOf } from "./line-fields";
+import { LineFields } from "./line-fields";
 
 type Kind = "employment" | "pension";
 
@@ -165,21 +165,5 @@ describe("LineFields", () => {
     expect(
       screen.getByRole("textbox", { name: "Last year" }),
     ).toHaveAccessibleDescription("Age 60");
-  });
-});
-
-describe("isSound", () => {
-  it("takes a named line that does not end before it starts", () => {
-    expect(isSound(salary)).toBe(true);
-    expect(isSound({ ...salary, lastYear: 2030 })).toBe(true);
-    expect(isSound({ ...salary, name: "  " })).toBe(false);
-    expect(isSound({ ...salary, lastYear: 2029 })).toBe(false);
-  });
-});
-
-describe("spanOf", () => {
-  it("writes the years a line runs, an open-ended one to the end of the plan", () => {
-    expect(spanOf(salary)).toBe("2030–end of plan");
-    expect(spanOf({ ...salary, lastYear: 2040 })).toBe("2030–2040");
   });
 });

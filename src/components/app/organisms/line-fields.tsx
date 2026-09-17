@@ -9,8 +9,8 @@ import { MoneyField } from "@/components/app/molecules/money-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { YearField } from "@/components/app/molecules/year-field";
-import { growthLabels } from "@/components/app/organisms/schedule-rows";
 import { endYear } from "@/engine/projection";
+import { growthLabels } from "@/lib/lines";
 import { optionsOf } from "@/lib/options";
 
 // How a line ends: in a year typed into the field beneath the choice, or
@@ -53,15 +53,6 @@ const growths = optionsOf(growthLabels, [
   "triple-lock",
   "nominal",
 ]);
-
-// A draft the store would take: named, and not ending before it starts.
-// The save button holds until it is one.
-export function isSound(draft: LineValues): boolean {
-  return (
-    draft.name.trim() !== "" &&
-    (draft.lastYear === null || draft.lastYear >= draft.firstYear)
-  );
-}
 
 // The fields every line's dialog takes, in the shape of the reference's
 // new-line dialog: a name and a category on the first row, the amount,
@@ -183,12 +174,6 @@ export function LineFields<TKind extends string>({
       </div>
     </div>
   );
-}
-
-// The years a saved line runs, for the toast that reports it.
-export function spanOf(line: LineValues): string {
-  const last = line.lastYear === null ? "end of plan" : String(line.lastYear);
-  return `${String(line.firstYear)}–${last}`;
 }
 
 // The age reached in a year, for the hint beneath a year field.
