@@ -7,16 +7,10 @@ import { useState } from "react";
 
 import type { Account, AccountKind, Cadence, Growth } from "@/data/accounts";
 
+import { EmptyState } from "@/components/app/atoms/empty-state";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
 import { Card } from "@/components/kit/card";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/kit/empty";
 import {
   Table,
   TableBody,
@@ -136,15 +130,11 @@ export function AccountTable({
   if (accounts.length === 0) {
     return (
       <Card className="py-0">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Wallet aria-hidden />
-            </EmptyMedia>
-            <EmptyTitle>{emptyTitle}</EmptyTitle>
-            <EmptyDescription>{emptyDescription}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState
+          description={emptyDescription}
+          icon={Wallet}
+          title={emptyTitle}
+        />
       </Card>
     );
   }
