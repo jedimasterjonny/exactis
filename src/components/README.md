@@ -35,7 +35,7 @@ in the vendored file works until the next refresh silently discards it.
 | tier         | what it is                                       | here                                                                                                                                                              |
 | ------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `atoms/`     | one presentational job, composes nothing of ours | `delta-value`, `field`, `figure-input`, `note`, `screen-header`, `span-bar`                                                                                       |
-| `molecules/` | atoms combined into one reusable control         | `app-nav`, `money-field`, `rate-field`, `select-field`, `stat-tile`, `text-field`, `theme-toggle`, `year-field`                                                   |
+| `molecules/` | atoms combined into one reusable control         | `app-nav`, `edit-dialog`, `money-field`, `rate-field`, `select-field`, `stat-tile`, `text-field`, `theme-toggle`, `year-field`                                    |
 | `organisms/` | a whole region of a screen                       | `account-ledger`, `account-table`, `cash-flow-card`, `expense-schedule`, `income-schedule`, `line-fields`, `progress-points`, `projection-chart`, `schedule-rows` |
 | `templates/` | the shell a page sits in                         | `app-frame`                                                                                                                                                       |
 
