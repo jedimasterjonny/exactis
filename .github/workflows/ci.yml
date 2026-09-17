@@ -239,7 +239,12 @@ jobs:
     # red in the middle passes unnoticed - which is exactly what git bisect
     # later depends on not being true.
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # A guard against a hang, not a budget for the series: each commit pays
+    # a cold install and every script, about three and a half minutes, so
+    # eleven commits are forty and thirty cancelled a green run part way
+    # through. Ninety covers a series twice that long before it is read as
+    # stuck.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
