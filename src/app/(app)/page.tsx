@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Suspense } from "react";
 
+import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ProjectionPending } from "@/components/app/organisms/projection-chart";
@@ -44,7 +45,7 @@ export default function Home(): JSX.Element {
         <Badge variant="secondary">CMA-derived · Aug 26</Badge>
         {"Figures in today's money"}
       </ScreenHeader>
-      <div className="grid gap-5 p-8">
+      <ScreenBody>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-4">
           <StatTile
             caption="Last working year 58"
@@ -79,7 +80,7 @@ export default function Home(): JSX.Element {
         <Suspense fallback={<ProjectionPending />}>
           <Projection />
         </Suspense>
-      </div>
+      </ScreenBody>
     </>
   );
 }
