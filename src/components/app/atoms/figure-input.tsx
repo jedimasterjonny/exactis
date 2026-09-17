@@ -4,13 +4,22 @@ import { NumberField } from "@base-ui/react/number-field";
 
 import { Input } from "@/components/kit/input";
 
-interface FigureInputProps {
-  readonly defaultValue: number;
+// How a figure is held: uncontrolled, mounting with a default and holding
+// what is typed, or controlled, showing the value its caller gives, which
+// is what a caller that works a figure out from others passes. A value of
+// null shows nothing, for a figure that could not be worked out. Either
+// way, what is typed over it commits on blur, so a caller shown a figure
+// can take a typed one back.
+export type Figure =
+  | { readonly defaultValue: number; readonly value?: undefined }
+  | { readonly defaultValue?: undefined; readonly value: null | number };
+
+type FigureInputProps = Figure & {
   readonly format: Intl.NumberFormatOptions;
   readonly largeStep: number;
   readonly onValueCommitted?: ((value: number) => void) | undefined;
   readonly step: number;
-}
+};
 
 // The control every figure in the product is entered through: Base UI's
 // number field, drawing the input chrome as a mono right-aligned figure.
@@ -28,6 +37,7 @@ export function FigureInput({
   largeStep,
   onValueCommitted,
   step,
+  value,
 }: FigureInputProps): JSX.Element {
   return (
     <NumberField.Root
@@ -35,12 +45,13 @@ export function FigureInput({
       format={format}
       largeStep={largeStep}
       locale="en-GB"
-      onValueCommitted={(value) => {
-        if (value !== null) {
-          onValueCommitted?.(value);
+      onValueCommitted={(committed) => {
+        if (committed !== null) {
+          onValueCommitted?.(committed);
         }
       }}
       step={step}
+      value={value}
     >
       <NumberField.Group>
         <NumberField.Input render={<Input className="text-right figure" />} />
