@@ -20,14 +20,30 @@ describe("Field", () => {
   });
 
   it("leaves out the hint when a field has none", () => {
+    const control = (): HTMLElement =>
+      screen.getByRole("textbox", { name: "Name" });
     render(
       <Field label="Name">
         <Input />
       </Field>,
     );
 
-    expect(
-      screen.getByRole("textbox", { name: "Name" }),
-    ).not.toHaveAccessibleDescription();
+    expect(control()).not.toHaveAccessibleDescription();
+    expect(control()).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("marks the control invalid and shows the error it is given", () => {
+    render(
+      <Field error="That is not the password." label="Password">
+        <Input />
+      </Field>,
+    );
+
+    const control = screen.getByRole("textbox", { name: "Password" });
+
+    expect(control).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("That is not the password.")).toHaveClass(
+      "text-destructive",
+    );
   });
 });
