@@ -10,6 +10,7 @@ import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { YearField } from "@/components/app/molecules/year-field";
 import { endYear } from "@/engine/projection";
+import { cadenceOptions } from "@/lib/cadence";
 import { growthLabels } from "@/lib/lines";
 import { optionsOf } from "@/lib/options";
 
@@ -33,11 +34,6 @@ interface LineFieldsProps<TKind extends string> {
   readonly plan: Plan;
   readonly side: Side;
 }
-
-const cadences = [
-  { label: "A year", value: "year" },
-  { label: "A month", value: "month" },
-] as const;
 
 const endings = [
   { label: "In a fixed year", value: "fixed" },
@@ -117,7 +113,7 @@ export function LineFields<TKind extends string>({
           onValueChange={(cadence) => {
             onAmend({ cadence });
           }}
-          options={cadences}
+          options={cadenceOptions}
         />
         <SelectField
           defaultValue={initial.growth}

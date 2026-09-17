@@ -3,7 +3,6 @@ import type { JSX } from "react";
 
 import { Banknote, Pencil, Receipt } from "lucide-react";
 
-import type { Cadence } from "@/data/accounts";
 import type { LineValues, Side } from "@/data/schedule";
 import type { Plan } from "@/engine/projection";
 
@@ -12,6 +11,7 @@ import { SpanBar } from "@/components/app/atoms/span-bar";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
 import { endYear } from "@/engine/projection";
+import { cadenceAbbreviations } from "@/lib/cadence";
 import { growthLabels } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 
@@ -41,8 +41,6 @@ interface ScheduleRowsProps<TLine extends Line> {
 }
 
 type Tone = "caution" | "destructive" | "secondary";
-
-const cadences: Record<Cadence, string> = { month: "mo", year: "yr" };
 
 // The icon each schedule's empty state takes.
 const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
@@ -108,7 +106,7 @@ export function ScheduleRows<TLine extends Line>({
               <span className="figure font-medium">
                 {formatGbp(summary.total)}
                 <span className="text-xs font-normal text-muted-foreground">
-                  {` / ${cadences[line.cadence]}`}
+                  {` / ${cadenceAbbreviations[line.cadence]}`}
                 </span>
               </span>
               <span className="text-xs text-muted-foreground">
