@@ -1,16 +1,26 @@
+"use client";
+
 import type { JSX } from "react";
 
 import { cn } from "cn";
+import { useState } from "react";
 
-import type { CashFlow, Take } from "@/engine/cash-flow";
+import type { Account } from "@/data/accounts";
+import type { Schedule, Take } from "@/engine/cash-flow";
+import type { Plan } from "@/engine/projection";
 
+import { Field } from "@/components/app/atoms/field";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
+import { Slider } from "@/components/kit/slider";
+import { cashFlow } from "@/engine/cash-flow";
+import { endYear } from "@/engine/projection";
 import { formatGbp } from "@/lib/money";
 import { plan as planScreen, sectionNumeral } from "@/lib/nav";
 
 interface CashFlowCardProps {
-  readonly flow: CashFlow;
-  readonly year: number;
+  readonly accounts: readonly Account[];
+  readonly plan: Plan;
+  readonly schedule: Schedule;
 }
 
 interface RowProps {
@@ -21,25 +31,52 @@ interface RowProps {
 }
 
 // The plan screen's third card, beneath the two schedules it is read
-// from: a month of this year's money, as the engine works it out, laid
-// out as a ledger. The income comes in, the expenses and every account
-// paid go out, each account under its name with how it is paid, and
-// what is left closes the list, in the loss tone when the month does
-// not cover its outgoings. The card takes the next numeral off the
-// screen's after the expense card's.
-export function CashFlowCard({ flow, year }: CashFlowCardProps): JSX.Element {
+// from: a month of a year's money, as the engine works it out, laid out
+// as a ledger. The year is the card's own, opening on the plan's first
+// and moved along the plan's span by the slider under the title, since
+// lines start and end and overlap, so a month a decade on can leave
+// something else. The card runs the engine itself, which is pure and
+// cheap, rather than asking the page for every year. The income comes
+// in, the expenses and every account paid go out, each account under
+// its name with how it is paid, and what is left closes the list, in
+// the loss tone when the month does not cover its outgoings. The card
+// takes the next numeral off the screen's after the expense card's.
+export function CashFlowCard({
+  accounts,
+  plan,
+  schedule,
+}: CashFlowCardProps): JSX.Element {
+  const [year, setYear] = useState(plan.from);
+  const end = endYear(plan);
+  const flow = cashFlow(accounts, schedule, year);
   return (
     <Card>
-      <CardHeader className="grid gap-1">
-        <span className="label text-muted-foreground">
-          {`Sect. ${sectionNumeral(planScreen)}.iii`}
-        </span>
-        <h2 className="font-heading text-base font-medium">
-          Cash flow each month
-        </h2>
-        <span className="text-sm text-muted-foreground">
-          {`${String(year)}, in today's money`}
-        </span>
+      <CardHeader className="grid gap-4">
+        <div className="grid gap-1">
+          <span className="label text-muted-foreground">
+            {`Sect. ${sectionNumeral(planScreen)}.iii`}
+          </span>
+          <h2 className="font-heading text-base font-medium">
+            Cash flow each month
+          </h2>
+          <span className="text-sm text-muted-foreground">
+            {`${String(year)}, age ${String(year - plan.born)}, in today's money`}
+          </span>
+        </div>
+        <Field
+          hint={`${String(plan.from)} to ${String(end)}, the years of the plan`}
+          label="Year"
+        >
+          <Slider
+            max={end}
+            min={plan.from}
+            onValueChange={(value) => {
+              setYear(yearOf(value));
+            }}
+            step={1}
+            value={[year]}
+          />
+        </Field>
       </CardHeader>
       <CardContent>
         <ul className="divide-y">
@@ -113,4 +150,13 @@ function Row({
       </span>
     </li>
   );
+}
+
+// The slider holds one year, but Base UI types what it reports as a
+// number or a list of them, and the vendored slider draws a thumb per
+// entry of a list, so it is handed a list of one and the one is read
+// back. Flattened rather than narrowed, so there is no branch for a
+// shape it never takes.
+function yearOf(value: number | readonly number[]): number {
+  return Math.max(...[value].flat());
 }

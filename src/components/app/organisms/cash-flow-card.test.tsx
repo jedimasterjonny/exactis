@@ -1,53 +1,79 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { CashFlow } from "@/engine/cash-flow";
+import type { Account } from "@/data/accounts";
 
 import { accounts } from "@/data/accounts.fixture";
+import { expenseLines } from "@/data/expenses.fixture";
+import { incomeLines, plan } from "@/data/income.fixture";
 
 import { CashFlowCard } from "./cash-flow-card";
 
 const [pension, isa, cash, , mortgage] = accounts;
+const [salary] = incomeLines;
+const [household, , , retirement] = expenseLines;
 
-// A month with £12,250 coming in and £3,500 going out, the pension and
-// the mortgage paid fixed sums, the ISA and the current account paid
-// the spare money, the ISA to its allowance and the account uncapped,
-// and £1,673.33 left.
-const flow: CashFlow = {
-  expenses: 3500,
-  fixed: [
-    { account: pension, amount: 2266.25 },
-    { account: mortgage, amount: 2210 },
-  ],
-  income: 12250,
-  left: 1673.33,
-  spare: [
-    { account: isa, amount: 20000 / 12, cap: 20000 },
-    { account: cash, amount: 933.75, cap: null },
-  ],
+// The fixture's accounts with the ISA and the current account paid the
+// spare money, the ISA to its allowance and the account uncapped, so a
+// month in 2026 has the salary's £12,250 coming in and the household's
+// £3,500 going out, the pension and the mortgage paid their fixed sums,
+// the ISA £1,666.67 and the current account the £2,607.08 left.
+const spareIsa: Account = {
+  ...isa,
+  contribution: { cap: null, kind: "spare" },
 };
 
-function rows(): HTMLElement[] {
-  return screen.getAllByRole("listitem");
+const spareCash: Account = {
+  ...cash,
+  contribution: { cap: null, kind: "spare" },
+};
+
+const held = [pension, spareIsa, spareCash, mortgage];
+
+const schedule = { expenses: expenseLines, income: incomeLines };
+
+function rows(): string[] {
+  return screen.getAllByRole("listitem").map((row) => row.textContent);
+}
+
+// The slider is the range input inside the group the field labels. It
+// is asked for by the group, since the label's own text is what names
+// the group while jsdom's name computation gives the input nothing for
+// the same reference, and whether or not it is shown, since the thumb
+// is hidden until Base UI has measured a track jsdom lays out at no
+// width.
+function slider(): HTMLElement {
+  return within(screen.getByRole("group", { name: "Year" })).getByRole(
+    "slider",
+    { hidden: true },
+  );
 }
 
 describe("CashFlowCard", () => {
-  it("lays the month out as a ledger under the card's numeral and year", () => {
-    render(<CashFlowCard flow={flow} year={2026} />);
+  it("opens on the plan's first year and lays the month out as a ledger", () => {
+    render(<CashFlowCard accounts={held} plan={plan} schedule={schedule} />);
 
     expect(screen.getByText("Sect. III.iii")).toHaveClass("label");
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       "Cash flow each month",
     );
-    expect(screen.getByText("2026, in today's money")).toBeInTheDocument();
-    expect(rows().map((row) => row.textContent)).toStrictEqual([
+    expect(
+      screen.getByText("2026, age 36, in today's money"),
+    ).toBeInTheDocument();
+    expect(slider()).toHaveValue("2026");
+    expect(slider()).toHaveAttribute("min", "2026");
+    expect(slider()).toHaveAttribute("max", "2079");
+    expect(slider()).toHaveAccessibleDescription(
+      "2026 to 2079, the years of the plan",
+    );
+    expect(rows()).toStrictEqual([
       "Income£12,250",
       "Expenses−£3,500",
       "Workplace pensionA fixed sum−£2,266",
       "MortgageA fixed sum−£2,210",
       "Stocks & shares ISASpare money, to £20,000 / yr−£1,667",
-      "Current accountSpare money, uncapped−£934",
-      "Left over£1,673",
+      "Current accountSpare money, uncapped−£2,607",
+      "Left over£0",
     ]);
     expect(screen.getByText("£12,250")).toHaveClass("figure");
     expect(screen.getByText("Income")).not.toHaveClass("font-medium");
@@ -56,39 +82,79 @@ describe("CashFlowCard", () => {
     }
   });
 
-  it("weights what is left and tones a shortfall as a loss", () => {
-    const { rerender } = render(<CashFlowCard flow={flow} year={2026} />);
+  // A year on, the childcare has started and the current account takes
+  // £1,150 less; by 2049 the salaries have ended and the consulting's
+  // £2,000 a month is £6,201 short of the mortgage payment and the
+  // retirement living, so the ISA and the account take nothing.
+  it("moves the year along the plan with the slider and reads that year's month", () => {
+    render(<CashFlowCard accounts={held} plan={plan} schedule={schedule} />);
 
-    expect(screen.getByText("Left over")).toHaveClass("font-medium");
-    expect(screen.getByText("£1,673")).toHaveClass("figure", "font-medium");
-    expect(screen.getByText("£1,673")).not.toHaveClass("text-destructive");
+    fireEvent.keyDown(slider(), { key: "ArrowRight" });
 
-    rerender(<CashFlowCard flow={{ ...flow, left: -9701 }} year={2049} />);
+    expect(
+      screen.getByText("2027, age 37, in today's money"),
+    ).toBeInTheDocument();
+    expect(slider()).toHaveValue("2027");
+    expect(rows()[1]).toBe("Expenses−£4,650");
+    expect(rows()[5]).toBe("Current accountSpare money, uncapped−£1,457");
 
-    expect(screen.getByText("−£9,701")).toHaveClass(
-      "figure",
-      "font-medium",
-      "text-destructive",
-    );
+    fireEvent.change(slider(), { target: { value: "2049" } });
+
+    expect(
+      screen.getByText("2049, age 59, in today's money"),
+    ).toBeInTheDocument();
+    expect(rows()).toStrictEqual([
+      "Income£2,000",
+      "Expenses−£8,201",
+      "Workplace pensionA fixed sum−£2,266",
+      "MortgageA fixed sum−£2,210",
+      "Stocks & shares ISASpare money, to £20,000 / yr£0",
+      "Current accountSpare money, uncapped£0",
+      "Left over−£10,677",
+    ]);
   });
 
-  // A fraction of a pound going out would otherwise read as a signed
-  // nothing, and so would nothing at all.
-  it("writes what rounds to nothing as nothing, unsigned", () => {
+  // The salary alone until 2048, and the retirement living alone from
+  // 2049, with no account to pay.
+  it("weights what is left and tones a shortfall as a loss", () => {
     render(
       <CashFlowCard
-        flow={{
-          expenses: 0,
-          fixed: [],
-          income: 0,
-          left: -0.4,
-          spare: [{ account: isa, amount: 0, cap: 20000 }],
-        }}
-        year={2026}
+        accounts={[]}
+        plan={plan}
+        schedule={{ expenses: [retirement], income: [salary] }}
       />,
     );
 
-    expect(rows().map((row) => row.textContent)).toStrictEqual([
+    // The income and what is left are the same figure, the last of the
+    // two being the total.
+    const [, left] = screen.getAllByText("£12,250");
+
+    expect(screen.getByText("Left over")).toHaveClass("font-medium");
+    expect(left).toHaveClass("figure", "font-medium");
+    expect(left).not.toHaveClass("text-destructive");
+
+    fireEvent.change(slider(), { target: { value: "2049" } });
+
+    const [, short] = screen.getAllByText("−£5,000");
+
+    expect(short).toHaveClass("figure", "font-medium", "text-destructive");
+  });
+
+  // A fraction of a pound going out would otherwise read as a signed
+  // nothing, and so would nothing at all: £5 a year is 42p a month.
+  it("writes what rounds to nothing as nothing, unsigned", () => {
+    render(
+      <CashFlowCard
+        accounts={[spareIsa]}
+        plan={plan}
+        schedule={{
+          expenses: [{ ...household, amount: 5, cadence: "year" }],
+          income: [],
+        }}
+      />,
+    );
+
+    expect(rows()).toStrictEqual([
       "Income£0",
       "Expenses£0",
       "Stocks & shares ISASpare money, to £20,000 / yr£0",

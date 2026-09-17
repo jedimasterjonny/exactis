@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { accounts } from "@/data/accounts.fixture";
@@ -51,8 +51,16 @@ describe("Plan", () => {
     ]);
     expect(screen.getByText("Age 68–89")).toBeInTheDocument();
     expect(screen.getByText("Age 82–89")).toBeInTheDocument();
-    expect(screen.getAllByRole("paragraph")).toHaveLength(2);
-    expect(screen.getByText("2026, in today's money")).toBeInTheDocument();
+    // The two schedules' notes, and the hint under the cash flow's year.
+    expect(screen.getAllByRole("paragraph")).toHaveLength(3);
+    expect(
+      screen.getByText("2026, age 36, in today's money"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("group", { name: "Year" })).getByRole("slider", {
+        hidden: true,
+      }),
+    ).toHaveValue("2026");
     expect(screen.getByText("Left over")).toBeInTheDocument();
     expect(screen.getByText("£2,607")).toHaveClass("figure", "font-medium");
   });
