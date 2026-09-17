@@ -7,17 +7,10 @@ import { useState } from "react";
 
 import type { ProgressPoint } from "@/data/points";
 
+import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { MoneyField } from "@/components/app/molecules/money-field";
 import { Button } from "@/components/kit/button";
 import { Card } from "@/components/kit/card";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/kit/dialog";
 import {
   Table,
   TableBody,
@@ -60,8 +53,6 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
     setEdits({});
   }
 
-  // The dialog opens only from a row's button, so the only change it can
-  // report is a close: Cancel, Escape or a press outside.
   function dismiss(): void {
     setEditing(null);
   }
@@ -123,41 +114,29 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
           </TableBody>
         </Table>
       </Card>
-      <Dialog onOpenChange={dismiss} open={editing !== null}>
-        {editing !== null && (
-          <DialogContent>
-            <DialogHeader>
-              <span className="label text-brand">Edit point</span>
-              <DialogTitle>{editing.date}</DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-2 gap-4">
-              {balances.map(([label, key]) => (
-                <MoneyField
-                  defaultValue={editing[key]}
-                  key={key}
-                  label={label}
-                  onValueCommitted={(value) => {
-                    setEdits({ ...edits, [key]: value });
-                  }}
-                />
-              ))}
-            </div>
-            <DialogFooter>
-              <DialogClose render={<Button size="sm" variant="outline" />}>
-                Cancel
-              </DialogClose>
-              <Button
-                onClick={() => {
-                  save(editing);
+      {editing !== null && (
+        <EditDialog
+          eyebrow="Edit point"
+          onDismiss={dismiss}
+          onSave={() => {
+            save(editing);
+          }}
+          title={editing.date}
+        >
+          <div className="grid grid-cols-2 gap-4">
+            {balances.map(([label, key]) => (
+              <MoneyField
+                defaultValue={editing[key]}
+                key={key}
+                label={label}
+                onValueCommitted={(value) => {
+                  setEdits({ ...edits, [key]: value });
                 }}
-                size="sm"
-              >
-                Save
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
+              />
+            ))}
+          </div>
+        </EditDialog>
+      )}
     </>
   );
 }
