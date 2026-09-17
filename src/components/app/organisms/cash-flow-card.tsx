@@ -15,7 +15,7 @@ import { Slider } from "@/components/kit/slider";
 import { cashFlow } from "@/engine/cash-flow";
 import { endYear } from "@/engine/projection";
 import { formatGbp } from "@/lib/money";
-import { plan as planScreen, sectionNumeral } from "@/lib/nav";
+import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 
 interface CashFlowCardProps {
   readonly accounts: readonly Account[];
@@ -54,7 +54,7 @@ export function CashFlowCard({
       <CardHeader className="grid gap-4">
         <div className="grid gap-1">
           <span className="label text-muted-foreground">
-            {`Sect. ${sectionNumeral(planScreen)}.iii`}
+            {subsectionLabel(planScreen, 3)}
           </span>
           <h2 className="font-heading text-base font-medium">
             Cash flow each month
