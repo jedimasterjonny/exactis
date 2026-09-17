@@ -1,9 +1,7 @@
 import type { JSX } from "react";
 
-import { NumberField } from "@base-ui/react/number-field";
-
 import { Field } from "@/components/app/atoms/field";
-import { Input } from "@/components/kit/input";
+import { FigureInput } from "@/components/app/atoms/figure-input";
 
 interface RateFieldProps {
   readonly defaultValue: number;
@@ -14,17 +12,15 @@ interface RateFieldProps {
 
 // A rate is held as a fraction and shown as a percentage to two places,
 // so 0.021 reads 2.10% and a typed 2.1 commits as 0.021: Intl formats the
-// one way and the number field parses the other. The value commits on
-// blur, as fields do in the product. Arrow keys step by a tenth of a
-// point, a whole point with shift.
+// one way and the number field parses the other. Arrow keys step by a
+// tenth of a point, a whole point with shift.
 const format: Intl.NumberFormatOptions = {
   maximumFractionDigits: 2,
   minimumFractionDigits: 2,
   style: "percent",
 };
 
-// A rate input, drawn as the money field is: a mono right-aligned figure
-// in the input chrome.
+// A rate input, drawn as the money field is.
 export function RateField({
   defaultValue,
   hint,
@@ -33,18 +29,13 @@ export function RateField({
 }: RateFieldProps): JSX.Element {
   return (
     <Field hint={hint} label={label}>
-      <NumberField.Root
+      <FigureInput
         defaultValue={defaultValue}
         format={format}
         largeStep={0.01}
-        locale="en-GB"
         onValueCommitted={onValueCommitted}
         step={0.001}
-      >
-        <NumberField.Group>
-          <NumberField.Input render={<Input className="text-right figure" />} />
-        </NumberField.Group>
-      </NumberField.Root>
+      />
     </Field>
   );
 }
