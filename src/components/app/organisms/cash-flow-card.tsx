@@ -10,6 +10,7 @@ import type { Schedule, Take } from "@/engine/cash-flow";
 import type { Plan } from "@/engine/projection";
 
 import { Field } from "@/components/app/atoms/field";
+import { SectionHeader } from "@/components/app/atoms/section-header";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
 import { Slider } from "@/components/kit/slider";
 import { cashFlow } from "@/engine/cash-flow";
@@ -52,17 +53,12 @@ export function CashFlowCard({
   return (
     <Card>
       <CardHeader className="grid gap-4">
-        <div className="grid gap-1">
-          <span className="label text-muted-foreground">
-            {subsectionLabel(planScreen, 3)}
-          </span>
-          <h2 className="font-heading text-base font-medium">
-            Cash flow each month
-          </h2>
-          <span className="text-sm text-muted-foreground">
-            {`${String(year)}, age ${String(year - plan.born)}, in today's money`}
-          </span>
-        </div>
+        <SectionHeader
+          label={subsectionLabel(planScreen, 3)}
+          title="Cash flow each month"
+        >
+          {`${String(year)}, age ${String(year - plan.born)}, in today's money`}
+        </SectionHeader>
         <Field
           hint={`${String(plan.from)} to ${String(end)}, the years of the plan`}
           label="Year"
