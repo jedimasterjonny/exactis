@@ -10,7 +10,7 @@ import { getAccounts } from "./store";
 
 vi.mock("../plan/store", () => ({ getIncomeLines: vi.fn() }));
 vi.mock("./store", () => ({ getAccounts: vi.fn() }));
-vi.mock("./actions", () => ({ saveAccount: vi.fn() }));
+vi.mock("./actions", () => ({ removeAccount: vi.fn(), saveAccount: vi.fn() }));
 
 describe("Accounts", () => {
   // The fixture's salary feeds the workplace pension, which the ledger
