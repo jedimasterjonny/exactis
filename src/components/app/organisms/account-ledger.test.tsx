@@ -19,6 +19,7 @@ import {
 import { Toaster } from "@/components/kit/toast";
 import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
+import { incomeLines } from "@/data/income.fixture";
 
 import { AccountLedger } from "./account-ledger";
 
@@ -78,7 +79,7 @@ function openEntry(): HTMLElement {
 function renderLedger(): void {
   render(
     <Toaster>
-      <AccountLedger accounts={accounts} />
+      <AccountLedger accounts={accounts} lines={[]} />
     </Toaster>,
   );
 }
@@ -574,6 +575,7 @@ describe("AccountLedger", () => {
               contribution: { amount: 500, cadence: "month", kind: "fixed" },
             },
           ]}
+          lines={[]}
         />
       </Toaster>,
     );
@@ -631,6 +633,7 @@ describe("AccountLedger", () => {
       <Toaster>
         <AccountLedger
           accounts={[{ ...isa, contribution: { cap: 4000, kind: "spare" } }]}
+          lines={[]}
         />
       </Toaster>,
     );
@@ -781,7 +784,7 @@ describe("AccountLedger", () => {
   it("opens a house and the loan against it in the house dialog from either pencil", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[pension, house, loan]} />
+        <AccountLedger accounts={[pension, house, loan]} lines={[]} />
       </Toaster>,
     );
 
@@ -816,7 +819,7 @@ describe("AccountLedger", () => {
   it("opens a car and the finance on it in the car dialog from either pencil", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[pension, golf, finance]} />
+        <AccountLedger accounts={[pension, golf, finance]} lines={[]} />
       </Toaster>,
     );
 
@@ -846,7 +849,7 @@ describe("AccountLedger", () => {
   it("opens a house with no loan against it as owned outright", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[house]} />
+        <AccountLedger accounts={[house]} lines={[]} />
       </Toaster>,
     );
     fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
@@ -870,6 +873,7 @@ describe("AccountLedger", () => {
             { ...mortgage, secures: 99 },
             { ...finance, secures: home.id },
           ]}
+          lines={[]}
         />
       </Toaster>,
     );
@@ -938,7 +942,7 @@ describe("AccountLedger", () => {
   it("says a loan takes its payments and a house its mortgage and the payments", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[pension, house, loan]} />
+        <AccountLedger accounts={[pension, house, loan]} lines={[]} />
       </Toaster>,
     );
 
@@ -962,7 +966,7 @@ describe("AccountLedger", () => {
   it("says a car takes its finance and the payments", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[golf, finance]} />
+        <AccountLedger accounts={[golf, finance]} lines={[]} />
       </Toaster>,
     );
 
@@ -976,10 +980,44 @@ describe("AccountLedger", () => {
     );
   });
 
+  // The pension takes the sacrifice of every salary feeding it, named
+  // as a list, in the singular for one; an account nothing feeds says
+  // nothing of it.
+  it("says which salaries stop sacrificing into a pension", () => {
+    const [salary, stepUp] = incomeLines;
+    render(
+      <Toaster>
+        <AccountLedger
+          accounts={[pension, isa]}
+          lines={[salary, { ...stepUp, feeds: pension.id, sacrifice: 0.05 }]}
+        />
+      </Toaster>,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Workplace pension" }),
+    );
+
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete Workplace pension?" }),
+    ).toHaveAccessibleDescription(
+      "Salary and Salary step-up stop sacrificing into it and are earned whole, at the share lost with it.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Stocks & shares ISA" }),
+    );
+
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete Stocks & shares ISA?" }),
+    ).toHaveAccessibleDescription("It cannot be brought back.");
+  });
+
   it("says a house with no loan goes alone", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[house]} />
+        <AccountLedger accounts={[house]} lines={[]} />
       </Toaster>,
     );
 

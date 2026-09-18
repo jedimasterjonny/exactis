@@ -36,9 +36,10 @@ import {
   insertExpenseLine,
   updateExpenseLine,
 } from "@/db/expenses";
+import { stopFeeding } from "@/db/income";
 import { requireSession } from "@/lib/session";
 
-import { expenseLinesTag } from "../plan/store";
+import { expenseLinesTag, incomeLinesTag } from "../plan/store";
 import { getPlan } from "../store";
 import { accountsTag } from "./store";
 
@@ -157,8 +158,10 @@ export async function placeAccountsInOrder(
 // Deletes the account with that id, and what cannot stand without it: a
 // house takes the loan secured on it and that loan's payments, and a
 // loan takes its payments, each line before its loan since the store
-// holds the links. Checked and expired as a save is, both tags since a
-// line may have gone.
+// holds the links; a salary feeding the account stops, since the store
+// holds that link too, and is left earned whole. Checked and expired
+// as a save is, every tag since a line of either schedule may have
+// changed.
 export async function removeAccount(id: number): Promise<void> {
   await requireSession();
   const at = z.number().int().positive().parse(id);
@@ -167,8 +170,10 @@ export async function removeAccount(id: number): Promise<void> {
   if (loan !== null) {
     await removeWithPayments(db, loan.id);
   }
+  await stopFeeding(db, at);
   await removeWithPayments(db, at);
   updateTag(expenseLinesTag);
+  updateTag(incomeLinesTag);
   updateTag(accountsTag);
 }
 

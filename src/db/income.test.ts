@@ -6,8 +6,13 @@ import { describe, expect, it } from "vitest";
 // @vitest-environment node
 import type { Database } from "./accounts";
 
-import { insertAccount } from "./accounts";
-import { insertIncomeLine, listIncomeLines, updateIncomeLine } from "./income";
+import { deleteAccount, insertAccount } from "./accounts";
+import {
+  insertIncomeLine,
+  listIncomeLines,
+  stopFeeding,
+  updateIncomeLine,
+} from "./income";
 
 const salary = {
   amount: 120000,
@@ -37,6 +42,20 @@ const statePension = {
   name: "State pension",
   rsu: 0,
   sacrifice: 0,
+} as const;
+
+// A pension for a salary to feed, as the accounts store takes one.
+const workplace = {
+  balance: 412880,
+  balloon: 0,
+  cadence: "year",
+  cap: 0,
+  contribution: 0,
+  funding: "fixed",
+  growth: "plan",
+  kind: "tax-deferred",
+  name: "Workplace pension",
+  rate: 0,
 } as const;
 
 // A fresh Postgres in memory with the migrations applied, so every test
@@ -95,18 +114,7 @@ describe("income lines store", () => {
   // of the values, so a line may change the pension it feeds or stop.
   it("names the pension a salary feeds, holds the link through an edit and refuses one no account has", async () => {
     const db = await openStore();
-    const pension = await insertAccount(db, {
-      balance: 412880,
-      balloon: 0,
-      cadence: "year",
-      cap: 0,
-      contribution: 0,
-      funding: "fixed",
-      growth: "plan",
-      kind: "tax-deferred",
-      name: "Workplace pension",
-      rate: 0,
-    });
+    const pension = await insertAccount(db, workplace);
     const sacrificing = { ...salary, feeds: pension.id, sacrifice: 0.1 };
 
     const fed = await insertIncomeLine(db, sacrificing);
@@ -122,6 +130,29 @@ describe("income lines store", () => {
     await expect(
       insertIncomeLine(db, { ...sacrificing, feeds: 99 }),
     ).rejects.toThrow();
+  });
+
+  // The pension cannot go while a line feeds it; once every line feeding
+  // it stops, it can, and a line feeding another is left alone.
+  it("stops every line feeding an account, so the account can go", async () => {
+    const db = await openStore();
+    const pension = await insertAccount(db, { ...workplace, name: "One" });
+    const other = await insertAccount(db, { ...workplace, name: "Other" });
+    const fed = { ...salary, feeds: pension.id, sacrifice: 0.1 };
+    await insertIncomeLine(db, fed);
+    await insertIncomeLine(db, { ...fed, name: "Step-up" });
+    await insertIncomeLine(db, { ...fed, feeds: other.id });
+
+    await expect(deleteAccount(db, pension.id)).rejects.toThrow();
+
+    await stopFeeding(db, pension.id);
+    await deleteAccount(db, pension.id);
+
+    expect(await listIncomeLines(db)).toStrictEqual([
+      { ...salary, id: 1 },
+      { ...salary, id: 2, name: "Step-up" },
+      { ...fed, feeds: other.id, id: 3 },
+    ]);
   });
 
   it("refuses to update an id no line has", async () => {
