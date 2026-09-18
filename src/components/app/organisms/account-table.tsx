@@ -8,8 +8,8 @@ import { useState } from "react";
 import type { Account, AccountKind, Growth } from "@/data/accounts";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
+import { RowAction } from "@/components/app/atoms/row-action";
 import { Badge } from "@/components/kit/badge";
-import { Button } from "@/components/kit/button";
 import { Card } from "@/components/kit/card";
 import {
   Table,
@@ -178,10 +178,11 @@ export function AccountTable({
             >
               {onMove !== undefined && (
                 <TableCell className="py-1 pr-0">
-                  <Button
-                    aria-label={`Move ${account.name}`}
+                  <RowAction
                     className="cursor-grab"
                     draggable
+                    icon={GripVertical}
+                    name={`Move ${account.name}`}
                     onDragEnd={settle}
                     onDragStart={(event) => {
                       pickUp(event, account);
@@ -189,11 +190,7 @@ export function AccountTable({
                     onKeyDown={(event) => {
                       step(event, index);
                     }}
-                    size="icon-sm"
-                    variant="ghost"
-                  >
-                    <GripVertical aria-hidden />
-                  </Button>
+                  />
                 </TableCell>
               )}
               <TableCell className="font-medium">{account.name}</TableCell>
@@ -215,29 +212,23 @@ export function AccountTable({
                 <TableCell className="py-1">
                   <span className="flex gap-1">
                     {onEdit !== undefined && (
-                      <Button
-                        aria-label={`Edit ${account.name}`}
+                      <RowAction
+                        icon={Pencil}
+                        name={`Edit ${account.name}`}
                         onClick={() => {
                           onEdit(account);
                         }}
-                        size="icon-sm"
-                        variant="ghost"
-                      >
-                        <Pencil aria-hidden />
-                      </Button>
+                      />
                     )}
                     {onDelete !== undefined && (
-                      <Button
-                        aria-label={`Delete ${account.name}`}
-                        className="text-muted-foreground hover:text-destructive"
+                      <RowAction
+                        icon={Trash2}
+                        name={`Delete ${account.name}`}
                         onClick={() => {
                           onDelete(account);
                         }}
-                        size="icon-sm"
-                        variant="ghost"
-                      >
-                        <Trash2 aria-hidden />
-                      </Button>
+                        tone="destructive"
+                      />
                     )}
                   </span>
                 </TableCell>
