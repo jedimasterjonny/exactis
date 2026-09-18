@@ -4,6 +4,7 @@ import type { LineValues, Side } from "@/data/schedule";
 import type { Plan } from "@/engine/projection";
 import type { Option } from "@/lib/options";
 
+import { FieldRow } from "@/components/app/atoms/field-row";
 import { SpanBar } from "@/components/app/atoms/span-bar";
 import { MoneyField } from "@/components/app/molecules/money-field";
 import { SelectField } from "@/components/app/molecules/select-field";
@@ -82,7 +83,7 @@ export function LineFields<TKind extends string>({
 
   return (
     <div className="grid gap-4">
-      <div className="grid grid-cols-[1.4fr_1fr] gap-4">
+      <FieldRow layout="named">
         <TextField
           defaultValue={initial.name}
           label="Name"
@@ -97,8 +98,8 @@ export function LineFields<TKind extends string>({
           onValueChange={onKindChange}
           options={kinds}
         />
-      </div>
-      <div className="grid grid-cols-3 gap-4">
+      </FieldRow>
+      <FieldRow layout="triple">
         <MoneyField
           defaultValue={initial.amount}
           hint="Today's money"
@@ -123,9 +124,9 @@ export function LineFields<TKind extends string>({
           }}
           options={growths}
         />
-      </div>
+      </FieldRow>
       {children}
-      <div className="grid grid-cols-2 items-start gap-4">
+      <FieldRow layout="pair-top">
         <YearField
           defaultValue={initial.firstYear}
           hint={ageIn(draft.firstYear, plan)}
@@ -156,7 +157,7 @@ export function LineFields<TKind extends string>({
             />
           )}
         </div>
-      </div>
+      </FieldRow>
       <div className="grid gap-2">
         <span className="label text-muted-foreground">
           {`Plan · ${String(plan.from)}–${String(end)}`}

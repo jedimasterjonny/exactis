@@ -2,6 +2,7 @@ import type { JSX } from "react";
 
 import type { HouseDraft, MortgageFigure, Status } from "@/data/houses";
 
+import { FieldRow } from "@/components/app/atoms/field-row";
 import { MoneyField } from "@/components/app/molecules/money-field";
 import { RateField } from "@/components/app/molecules/rate-field";
 import { SelectField } from "@/components/app/molecules/select-field";
@@ -57,7 +58,7 @@ export function HouseFields({
 
   return (
     <div className="grid gap-4">
-      <div className="grid grid-cols-[1.4fr_1fr] gap-4">
+      <FieldRow layout="named">
         <TextField
           defaultValue={initial.name}
           label="Name"
@@ -74,8 +75,8 @@ export function HouseFields({
           }}
           options={statusOptions}
         />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+      </FieldRow>
+      <FieldRow layout="pair">
         <MoneyField
           defaultValue={initial.value}
           hint="What it would sell for today"
@@ -92,10 +93,10 @@ export function HouseFields({
             onAmend({ growth });
           }}
         />
-      </div>
+      </FieldRow>
       {draft.status === "mortgaged" && (
         <>
-          <div className="grid grid-cols-2 gap-4">
+          <FieldRow layout="pair">
             <MoneyField
               hint="What is owed today"
               label="Loan balance"
@@ -118,8 +119,8 @@ export function HouseFields({
               }}
               value={shown("rate")}
             />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+          </FieldRow>
+          <FieldRow layout="pair">
             <MoneyField
               hint={worked === "payment" ? workedHint : "A month"}
               label="Monthly payment"
@@ -136,7 +137,7 @@ export function HouseFields({
               }}
               value={shown("term")}
             />
-          </div>
+          </FieldRow>
         </>
       )}
     </div>

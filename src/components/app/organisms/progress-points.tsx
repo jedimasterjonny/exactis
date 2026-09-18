@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import type { ProgressPoint } from "@/data/points";
 
+import { FieldRow } from "@/components/app/atoms/field-row";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { MoneyField } from "@/components/app/molecules/money-field";
 import { Button } from "@/components/kit/button";
@@ -123,7 +124,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
           }}
           title={editing.date}
         >
-          <div className="grid grid-cols-2 gap-4">
+          <FieldRow layout="pair">
             {balances.map(([label, key]) => (
               <MoneyField
                 defaultValue={editing[key]}
@@ -134,7 +135,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
                 }}
               />
             ))}
-          </div>
+          </FieldRow>
         </EditDialog>
       )}
     </>
