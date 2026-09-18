@@ -5,28 +5,20 @@ import type { JSX } from "react";
 import { CarFront, HousePlus, Plus } from "lucide-react";
 import { startTransition, useOptimistic, useState } from "react";
 
-import type {
-  Account,
-  AccountKind,
-  AccountValues,
-  Funding,
-} from "@/data/accounts";
+import type { Account } from "@/data/accounts";
 import type { Car } from "@/data/cars";
 import type { House } from "@/data/houses";
 import type { IncomeLine } from "@/data/income";
-import type { Entry } from "@/hooks/use-editor";
 
 import {
   placeAccountsInOrder,
   removeAccount,
-  saveAccount,
 } from "@/app/(app)/accounts/actions";
 import { Note } from "@/components/app/atoms/note";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
-import { EditDialog } from "@/components/app/molecules/edit-dialog";
-import { AccountFields } from "@/components/app/organisms/account-fields";
+import { AccountDialog } from "@/components/app/organisms/account-dialog";
 import { AccountTable } from "@/components/app/organisms/account-table";
 import { CarDialog } from "@/components/app/organisms/car-dialog";
 import { HouseDialog } from "@/components/app/organisms/house-dialog";
@@ -37,10 +29,10 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/kit/tabs";
-import { isAsset, takesSpare, toValues } from "@/data/accounts";
-import { useEditor } from "@/hooks/use-editor";
+import { isAsset } from "@/data/accounts";
 import { useRemover } from "@/hooks/use-remover";
 import { counted } from "@/lib/count";
+import { feedersOf, listed } from "@/lib/feeders";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
@@ -48,16 +40,12 @@ interface AccountLedgerProps {
   readonly lines: readonly IncomeLine[];
 }
 
+// What the account dialog is open on: a new account, or one to edit.
+type AccountOpening = "new" | Account;
+
 // What the car dialog is open on: a new car, or one to edit with the
 // loan against it.
 type CarOpening = "new" | Car;
-
-// What the dialog holds while it is open: the account's values, flat, so
-// the rate sits beside the growth choice and the sum and the cap beside
-// the contribution choice, each reset to what it opened with when its
-// choice changes, and the field always mounts showing what the draft
-// holds.
-type Draft = AccountValues;
 
 // What the house dialog is open on: a new house, or one to edit with the
 // loan against it.
@@ -72,44 +60,31 @@ interface Secured {
 
 type Tab = "accounts" | "assets";
 
-const blank: Draft = {
-  balance: 0,
-  balloon: 0,
-  cadence: "year",
-  cap: 0,
-  contribution: 0,
-  funding: "fixed",
-  growth: "plan",
-  kind: "tax-deferred",
-  name: "",
-  rate: 0,
-};
-
-// The accounts screen's ledger and its dialog, which enters a new account
-// from the header's button or edits one from its row. The rows are the
-// store's, handed down by the page, and a save goes to the store and comes
-// back with the page re-read, so the tables reflect it without the ledger
-// holding rows of its own. The one thing the ledger holds is the order
-// while a move is on its way to the store, since a row dragged into
-// place has to stay there rather than spring back until the page
-// re-reads; the optimistic order is the page's again once it does. The
-// entry doubles as the dialog's open state, as the progress editor's
-// point does, and the tab is controlled so a saved account can bring
-// its own tab forward, as a saved house or car does through its own
-// dialog, which the header's Add house and Add car buttons open on a new
-// one and the pencil of a house or a car, or of the loan against either,
-// opens on that asset, so an edit from either side writes both. The fields are uncontrolled and mount fresh with the entry's
-// opening values each time the dialog opens, and the draft mirrors what
-// they report. A row's bin asks through the confirm dialog before the
-// account goes, saying what goes with it, since an asset takes its loan
-// and a loan its payments, and what stops, since a salary feeding a
-// pension stops when the pension goes; the income lines are handed
-// down for that alone, so the ledger can name the salaries.
+// The accounts screen's ledger and the three dialogs it edits through.
+// The rows are the store's, handed down by the page, and a save goes to
+// the store and comes back with the page re-read, so the tables reflect
+// it without the ledger holding rows of its own. The one thing the
+// ledger holds is the order while a move is on its way to the store,
+// since a row dragged into place has to stay there rather than spring
+// back until the page re-reads; the optimistic order is the page's again
+// once it does. A dialog is open for as long as it is mounted, so what
+// it is open on doubles as its open state, and the tab is controlled so
+// a saved account, house or car can bring its own tab forward as its
+// dialog reports it: the header's three buttons open each of them on a
+// new one, and a row's pencil opens the account as it is, unless it is a
+// house or a car, or the loan against either, which opens on that asset,
+// so an edit from either side writes both. A row's bin asks through the
+// confirm dialog before the account goes, saying what goes with it,
+// since an asset takes its loan and a loan its payments, and what stops,
+// since a salary feeding a pension stops when the pension goes; the
+// income lines are handed down for that and for the treatment such a
+// pension is held to, so both can name the salaries.
 export function AccountLedger({
   accounts,
   lines,
 }: AccountLedgerProps): JSX.Element {
   const [tab, setTab] = useState<Tab>("accounts");
+  const [account, setAccount] = useState<AccountOpening | null>(null);
   const [house, setHouse] = useState<HouseOpening | null>(null);
   const [car, setCar] = useState<CarOpening | null>(null);
   const { ask, cancel, confirm, doomed, isRemoving } = useRemover<Account>({
@@ -121,39 +96,21 @@ export function AccountLedger({
     accounts,
     (_current: readonly Account[], next: readonly Account[]) => next,
   );
-  const { amend, dismiss, entry, isSaving, open, save } = useEditor({
-    describe: (account) => account.name,
-    noun: "Account",
-    // A saved account brings its own tab forward, in the transition
-    // the dialog closes in, so the tab and the closed dialog land
-    // together.
-    onSaved: (account) => {
-      setTab(isAsset(account) ? "assets" : "accounts");
-    },
-    save: saveAccount,
-  });
   const held = order.filter((account) => !isAsset(account));
   const assets = order.filter(isAsset);
 
-  // A row's pencil opens its account as it is, with its id so a save
-  // writes back to it, unless the account is a house or a car, or the
-  // loan against one, which open as the asset they are part of.
+  // A row's pencil opens its account as it is, unless the account is a
+  // house or a car, or the loan against one, which open as the asset
+  // they are part of.
   function edit(account: Account): void {
     const found = securedFor(account, order);
     if (found === null) {
-      open(toValues(account), account.id);
+      setAccount(account);
     } else if (found.asset.kind === "car") {
       setCar(found);
     } else {
       setHouse(found);
     }
-  }
-
-  // The contribution choice: the fields the new choice shows mount with
-  // what the account opened with, so the draft takes the same, and the
-  // fields the choice leaves behind go back to nothing.
-  function fund(current: Entry<Draft>, funding: Funding): void {
-    amend(current, fundedBy(current, funding));
   }
 
   // A row moved onto another takes its place in the whole list: before
@@ -172,27 +129,6 @@ export function AccountLedger({
       placeOptimistically(next);
       await placeAccountsInOrder(next.map((a) => a.id));
     });
-  }
-
-  // The treatment choice: a real asset or a debt is paid only a fixed sum, so the
-  // contribution choice leaves with it and an account paid the spare
-  // money is paid a fixed sum instead, as it opened. The choice comes
-  // back when a wrapper or cash is chosen again, as the account opened
-  // with it, which is what the choice mounts showing. A change that
-  // stays on one side leaves the choice where it is.
-  function treat(current: Entry<Draft>, kind: AccountKind): void {
-    const willTakeSpare = takesSpare({ kind });
-    if (!willTakeSpare && current.draft.funding === "spare") {
-      amend(current, { kind, ...fundedBy(current, "fixed") });
-    } else if (
-      willTakeSpare &&
-      !takesSpare(current.draft) &&
-      current.initial.funding !== current.draft.funding
-    ) {
-      amend(current, { kind, ...fundedBy(current, current.initial.funding) });
-    } else {
-      amend(current, { kind });
-    }
   }
 
   return (
@@ -222,7 +158,7 @@ export function AccountLedger({
             </Button>
             <Button
               onClick={() => {
-                open(blank, null);
+                setAccount("new");
               }}
               size="sm"
             >
@@ -287,32 +223,21 @@ export function AccountLedger({
           </TabsContent>
         </Tabs>
       </ScreenBody>
-      {entry !== null && (
-        <EditDialog
-          canSave={!isSaving && entry.draft.name.trim() !== ""}
-          eyebrow={entry.id === null ? "New account" : "Edit account"}
-          isWide
-          onDismiss={dismiss}
-          onSave={() => {
-            save(entry);
+      {account !== null && (
+        <AccountDialog
+          account={account === "new" ? null : account}
+          lines={lines}
+          onDismiss={() => {
+            setAccount(null);
           }}
-          title={entry.draft.name.trim() || "Untitled account"}
-        >
-          <AccountFields
-            draft={entry.draft}
-            initial={entry.initial}
-            kindLock={kindLockOf(entry.id, lines)}
-            onAmend={(patch) => {
-              amend(entry, patch);
-            }}
-            onFundingChange={(funding) => {
-              fund(entry, funding);
-            }}
-            onKindChange={(kind) => {
-              treat(entry, kind);
-            }}
-          />
-        </EditDialog>
+          onSaved={(saved) => {
+            // A saved account brings its own tab forward, in the
+            // transition the dialog closes in, so the tab and the
+            // closed dialog land together.
+            setAccount(null);
+            setTab(isAsset(saved) ? "assets" : "accounts");
+          }}
+        />
       )}
       {doomed !== null && (
         <ConfirmDialog
@@ -354,29 +279,6 @@ export function AccountLedger({
   );
 }
 
-// The draft as a contribution choice leaves it: the fields the choice
-// shows at what the account opened with, since that is what they mount
-// showing, and the fields it hides at nothing.
-function fundedBy(current: Entry<Draft>, funding: Funding): Partial<Draft> {
-  return funding === "fixed"
-    ? {
-        cadence: current.initial.cadence,
-        cap: 0,
-        contribution: current.initial.contribution,
-        funding,
-      }
-    : { cadence: "year", cap: current.initial.cap, contribution: 0, funding };
-}
-
-// The names as a sentence lists them, "Salary and Salary step-up".
-const listed = new Intl.ListFormat("en-GB");
-
-// The names of the salaries feeding the account with that id, and none
-// for a new account, which has no id yet.
-function feedersOf(id: null | number, lines: readonly IncomeLine[]): string[] {
-  return lines.filter((line) => line.feeds === id).map((line) => line.name);
-}
-
 // What goes with an account when it is deleted, for the dialog to say:
 // a pension takes the sacrifice of every salary feeding it, which is
 // earned whole from then on, since the store stops the salaries before
@@ -409,20 +311,6 @@ function goesWith(
 // it and the loan against it as one.
 function hasDialog(account: Account): boolean {
   return account.kind === "car" || account.kind === "house";
-}
-
-// Why the treatment of the account being edited is held, if it is: a
-// pension a salary feeds stays a pension until the salary is unlinked,
-// which the reason says, naming the salaries. A new account, or one
-// nothing feeds, is held to nothing.
-function kindLockOf(
-  id: null | number,
-  lines: readonly IncomeLine[],
-): string | undefined {
-  const feeders = feedersOf(id, lines);
-  return feeders.length === 0
-    ? undefined
-    : `Fed by ${listed.format(feeders)}; set the pension to none on the salary to change it`;
 }
 
 // The asset an account is part of: a house or a car is its own, with

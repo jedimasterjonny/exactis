@@ -26,12 +26,15 @@ interface Editor<TDraft> {
 }
 
 // What the editor is given: the store action a save goes to, the noun the
-// toast reports under, how to describe what came back, and anything else
-// the caller does with the record it wrote.
+// toast reports under, how to describe what came back, anything else
+// the caller does with the record it wrote, and the entry it opens on
+// where the dialog is open for as long as it is mounted. A caller that
+// opens its dialog from a row gives none and starts closed.
 interface EditorProps<TDraft, TSaved> {
   readonly describe: (saved: TSaved) => string;
   readonly noun: string;
   readonly onSaved?: (saved: TSaved) => void;
+  readonly opening?: Entry<TDraft>;
   readonly save: (id: null | number, values: TDraft) => Promise<TSaved>;
 }
 
@@ -40,17 +43,20 @@ interface EditorProps<TDraft, TSaved> {
 // copy of. What differs between them is not the machine but what it is
 // pointed at: the draft is the caller's shape, named, since a save trims
 // the name; the action is the caller's, as are the words the toast
-// carries; and the ledger brings a tab forward as it closes, which is
-// what onSaved is for. What stays the caller's entirely is the fields,
-// what a blank draft opens as, and what each choice does to it, all of
-// which amend from here.
+// carries; and the account dialog brings a tab forward as it closes,
+// which is what onSaved is for. What stays the caller's entirely is the
+// fields, what a blank draft opens as, and what each choice does to it,
+// all of which amend from here. A dialog that is open for as long as it
+// is mounted opens on the entry it was mounted with rather than on a
+// later call, so the first render has the fields it will show.
 export function useEditor<TDraft extends { readonly name: string }, TSaved>({
   describe,
   noun,
   onSaved,
+  opening,
   save: store,
 }: EditorProps<TDraft, TSaved>): Editor<TDraft> {
-  const [entry, setEntry] = useState<Entry<TDraft> | null>(null);
+  const [entry, setEntry] = useState<Entry<TDraft> | null>(opening ?? null);
   const [isSaving, startSaving] = useTransition();
 
   function amend(current: Entry<TDraft>, patch: Partial<TDraft>): void {

@@ -66,6 +66,31 @@ describe("useEditor", () => {
     expect(store).not.toHaveBeenCalled();
   });
 
+  // A dialog that is open for as long as it is mounted is given its
+  // entry rather than opening one, and the entry it holds from then on
+  // is its own: dismissing drops it where being handed the same opening
+  // again would not.
+  it("mounts open on the entry it is given, and drops that on dismiss", () => {
+    const store = vi.fn<Store>();
+    const opening = { draft: blank, id: null, initial: blank };
+    const { result } = renderHook(() =>
+      useEditor({
+        describe: (record) => record.name,
+        noun: "Account",
+        opening,
+        save: store,
+      }),
+    );
+
+    expect(result.current.entry).toStrictEqual(opening);
+
+    act(() => {
+      result.current.dismiss();
+    });
+
+    expect(result.current.entry).toBeNull();
+  });
+
   it("amends the draft and leaves the values it opened with", () => {
     const store = vi.fn<Store>();
     const { result } = renderHook(() =>
