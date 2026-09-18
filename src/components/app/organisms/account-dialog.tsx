@@ -15,7 +15,7 @@ import { saveAccount } from "@/app/(app)/accounts/actions";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { AccountFields } from "@/components/app/organisms/account-fields";
 import { takesSpare, toValues } from "@/data/accounts";
-import { useEditor } from "@/hooks/use-editor";
+import { useMountedEditor } from "@/hooks/use-editor";
 import { feedersOf, listed } from "@/lib/feeders";
 
 interface AccountDialogProps {
@@ -66,7 +66,7 @@ export function AccountDialog({
   onDismiss,
   onSaved,
 }: AccountDialogProps): JSX.Element | null {
-  const { amend, entry, isSaving, save } = useEditor({
+  const { amend, entry, isSaving, save } = useMountedEditor({
     describe: (saved) => saved.name,
     noun: "Account",
     onSaved,

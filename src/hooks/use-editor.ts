@@ -13,29 +13,43 @@ export interface Entry<TDraft> {
   readonly initial: TDraft;
 }
 
-// What the caller gets back: the entry it renders the dialog on, the
-// four things that move it, and whether a save is in flight, which is
-// what holds the save button.
-interface Editor<TDraft> {
-  readonly amend: (current: Entry<TDraft>, patch: Partial<TDraft>) => void;
+// What a caller that opens from a row gets back: the entry it renders
+// the dialog on, the four things that move it, and whether a save is in
+// flight, which is what holds the save button.
+interface Editor<TDraft> extends MountedEditor<TDraft> {
   readonly dismiss: () => void;
-  readonly entry: Entry<TDraft> | null;
-  readonly isSaving: boolean;
   readonly open: (draft: TDraft, id: null | number) => void;
-  readonly save: (current: Entry<TDraft>) => void;
 }
 
 // What the editor is given: the store action a save goes to, the noun the
-// toast reports under, how to describe what came back, anything else
-// the caller does with the record it wrote, and the entry it opens on
-// where the dialog is open for as long as it is mounted. A caller that
-// opens its dialog from a row gives none and starts closed.
+// toast reports under, how to describe what came back, and anything else
+// the caller does with the record it wrote.
 interface EditorProps<TDraft, TSaved> {
   readonly describe: (saved: TSaved) => string;
   readonly noun: string;
   readonly onSaved?: (saved: TSaved) => void;
-  readonly opening?: Entry<TDraft>;
   readonly save: (id: null | number, values: TDraft) => Promise<TSaved>;
+}
+
+// What a dialog open for as long as it is mounted gets back: the same,
+// less the two it cannot use, since it is opened by being rendered and
+// closed by being dropped.
+interface MountedEditor<TDraft> {
+  readonly amend: (current: Entry<TDraft>, patch: Partial<TDraft>) => void;
+  readonly entry: Entry<TDraft> | null;
+  readonly isSaving: boolean;
+  readonly save: (current: Entry<TDraft>) => void;
+}
+
+// What such a dialog is given besides: the entry it opens on, which is
+// required rather than optional. An editor that started closed would
+// leave the dialog rendering nothing at all, which is a dead button and
+// no error, so the type asks for it rather than defaulting.
+interface MountedEditorProps<TDraft, TSaved> extends EditorProps<
+  TDraft,
+  TSaved
+> {
+  readonly opening: Entry<TDraft>;
 }
 
 // The entry every editor's dialog is opened, amended, dismissed and saved
@@ -49,14 +63,35 @@ interface EditorProps<TDraft, TSaved> {
 // all of which amend from here. A dialog that is open for as long as it
 // is mounted opens on the entry it was mounted with rather than on a
 // later call, so the first render has the fields it will show.
-export function useEditor<TDraft extends { readonly name: string }, TSaved>({
-  describe,
-  noun,
-  onSaved,
-  opening,
-  save: store,
-}: EditorProps<TDraft, TSaved>): Editor<TDraft> {
-  const [entry, setEntry] = useState<Entry<TDraft> | null>(opening ?? null);
+export function useEditor<TDraft extends { readonly name: string }, TSaved>(
+  props: EditorProps<TDraft, TSaved>,
+): Editor<TDraft> {
+  return useEntry(props, null);
+}
+
+// The same machine for a dialog that is open for as long as it is
+// mounted: it opens on the entry it was mounted with, so the first
+// render has the fields it will show, and it never opens or dismisses
+// itself, since the caller renders it while it holds something to edit
+// and drops it otherwise. The opening is required, which is the whole
+// point of the second entry point: a caller that forgot it would render
+// nothing and say nothing about why.
+export function useMountedEditor<
+  TDraft extends { readonly name: string },
+  TSaved,
+>(props: MountedEditorProps<TDraft, TSaved>): MountedEditor<TDraft> {
+  const { amend, entry, isSaving, save } = useEntry(props, props.opening);
+  return { amend, entry, isSaving, save };
+}
+
+// What both entry points are: the state, and the four or six things
+// that move it. The entry it starts on is the only difference between
+// them.
+function useEntry<TDraft extends { readonly name: string }, TSaved>(
+  { describe, noun, onSaved, save: store }: EditorProps<TDraft, TSaved>,
+  opening: Entry<TDraft> | null,
+): Editor<TDraft> {
+  const [entry, setEntry] = useState<Entry<TDraft> | null>(opening);
   const [isSaving, startSaving] = useTransition();
 
   function amend(current: Entry<TDraft>, patch: Partial<TDraft>): void {
