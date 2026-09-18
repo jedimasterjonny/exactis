@@ -71,6 +71,24 @@ describe("ScheduleRows", () => {
     expect(screen.getByText("Age 68–89")).toBeInTheDocument();
   });
 
+  // A line that ends part way through its last year names the month,
+  // while the ages stay whole years.
+  it("names the month a line ends in when it ends part way through a year", () => {
+    render(
+      <ScheduleRows
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        lines={[{ ...salary, lastMonth: 10 }]}
+        plan={plan}
+        side="income"
+        summarise={summarise}
+      />,
+    );
+
+    expect(screen.getByText("2026 – Nov 2048")).toHaveClass("figure");
+    expect(screen.getByText("Age 36–58")).toBeInTheDocument();
+  });
+
   it("draws each side's bars in its own colour", () => {
     const { rerender } = render(
       <ScheduleRows

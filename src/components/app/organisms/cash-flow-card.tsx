@@ -24,14 +24,8 @@ import { endYear } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { spanOf } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
+import { monthName } from "@/lib/months";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
-
-// The month's name alone, in UTC so the day the year opens on cannot
-// slip into the month before it.
-const months = new Intl.DateTimeFormat("en-GB", {
-  month: "long",
-  timeZone: "UTC",
-});
 
 interface CashFlowCardProps {
   readonly accounts: readonly Account[];
@@ -86,7 +80,7 @@ export function CashFlowCard({
           label={subsectionLabel(planScreen, 3)}
           title="Cash flow each month"
         >
-          {`${monthName(month)} ${String(year)}, age ${String(year - plan.born)}, in today's money`}
+          {`${monthName(month, "long")} ${String(year)}, age ${String(year - plan.born)}, in today's money`}
         </SectionHeader>
         <Field
           hint={`${String(plan.from)} to ${String(end)}, the years of the plan`}
@@ -212,12 +206,6 @@ function Figure({ amount, isTotal = false }: FigureProps): JSX.Element {
 // sign Intl gives a negative zero or a fraction of a pound going out.
 function isZero(amount: number): boolean {
   return Math.round(amount) === 0;
-}
-
-// The month's name in full, from Intl, so it is spelt as the locale
-// spells it; the year is any, since only the month is read.
-function monthName(month: number): string {
-  return months.format(Date.UTC(2000, month));
 }
 
 // A line of the ledger: the name and, beneath it, how the money is
