@@ -213,6 +213,7 @@ describe("saveHouse", () => {
     firstYear: 2026,
     growth: "nominal",
     kind: "debt",
+    lastMonth: null,
     lastYear: 2047,
     name: "Home mortgage",
   } as const;
@@ -433,6 +434,7 @@ describe("saveCar", () => {
     firstYear: 2026,
     growth: "nominal",
     kind: "debt",
+    lastMonth: null,
     lastYear: 2031,
     name: "Golf PCP",
   } as const;

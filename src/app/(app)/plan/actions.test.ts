@@ -39,6 +39,7 @@ const expense = {
   firstYear: 2027,
   growth: "inflation-plus-2",
   kind: "time-bound",
+  lastMonth: null,
   lastYear: 2035,
   name: " Nursery ",
 } as const;
@@ -50,6 +51,7 @@ const values = {
   firstYear: 2030,
   growth: "triple-lock",
   kind: "self-employment",
+  lastMonth: null,
   lastYear: 2035,
   name: " Bonus scheme ",
   rsu: 0,
@@ -130,6 +132,9 @@ describe("saveIncomeLine", () => {
       saveIncomeLine(null, { ...values, lastYear: 2029 }),
     ).rejects.toThrow(z.ZodError);
     await expect(
+      saveIncomeLine(null, { ...values, lastMonth: 3, lastYear: null }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
       saveIncomeLine(null, { ...values, bonus: -1, kind: "employment" }),
     ).rejects.toThrow(z.ZodError);
     await expect(
@@ -167,6 +172,18 @@ describe("saveExpenseLine", () => {
     expect(updateTag).toHaveBeenCalledExactlyOnceWith(expenseLinesTag);
   });
 
+  it("takes a line ending in a month of its last year", async () => {
+    vi.mocked(insertExpenseLine).mockResolvedValue(retirement);
+
+    await saveExpenseLine(null, { ...expense, lastMonth: 2 });
+
+    expect(insertExpenseLine).toHaveBeenCalledExactlyOnceWith(db, {
+      ...expense,
+      lastMonth: 2,
+      name: "Nursery",
+    });
+  });
+
   it("writes over the line with the id, open-ended, and expires the tag", async () => {
     vi.mocked(updateExpenseLine).mockResolvedValue(retirement);
 
@@ -192,6 +209,15 @@ describe("saveExpenseLine", () => {
     ).rejects.toThrow(z.ZodError);
     await expect(
       saveExpenseLine(null, { ...expense, lastYear: 2026 }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveExpenseLine(null, { ...expense, lastMonth: 12 }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveExpenseLine(null, { ...expense, lastMonth: -1 }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveExpenseLine(null, { ...expense, lastMonth: 3, lastYear: null }),
     ).rejects.toThrow(z.ZodError);
     expect(insertExpenseLine).not.toHaveBeenCalled();
     expect(updateExpenseLine).not.toHaveBeenCalled();

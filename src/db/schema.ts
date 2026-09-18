@@ -57,9 +57,10 @@ export const accounts = pgTable("accounts", {
 });
 
 // One row per income line: the line's values with an id, the parts held
-// as columns of their own, and no last year for a line that runs to the
-// end of the plan. The cadence is the accounts' own type, since a line is
-// paid as a contribution is. The two year columns are named, since the
+// as columns of their own, no last year for a line that runs to the end
+// of the plan and no last month for one that runs the whole of its last
+// year. The cadence is the accounts' own type, since a line is paid as a
+// contribution is. The year and month columns are named, since the
 // model's names are the dialog's words and the store's are snake case.
 export const incomeLines = pgTable("income_lines", {
   amount: integer().notNull(),
@@ -69,6 +70,7 @@ export const incomeLines = pgTable("income_lines", {
   growth: incomeGrowth().notNull(),
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   kind: incomeKind().notNull(),
+  lastMonth: integer("last_month"),
   lastYear: integer("last_year"),
   name: text().notNull(),
   rsu: integer().notNull(),
@@ -84,6 +86,7 @@ export const expenseLines = pgTable("expense_lines", {
   growth: expenseGrowth().notNull(),
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   kind: expenseKind().notNull(),
+  lastMonth: integer("last_month"),
   lastYear: integer("last_year"),
   name: text().notNull(),
   pays: integer().references(() => accounts.id),

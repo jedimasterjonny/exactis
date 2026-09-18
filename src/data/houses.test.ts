@@ -122,6 +122,7 @@ describe("toRecords", () => {
         firstYear: 2026,
         growth: "nominal",
         kind: "debt",
+        lastMonth: null,
         lastYear: 2047,
         name: "Home mortgage",
       },
