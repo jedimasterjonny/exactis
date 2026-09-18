@@ -142,6 +142,30 @@ describe("project", () => {
     expect(last?.free).toBe(271930 + 23 * 20000);
   });
 
+  // The household ends in March 2027, so an ISA with a cap above the
+  // whole month takes the £8,650 left in each of 2026's twelve months
+  // and 2027's first three, and the whole £12,000 in the nine after:
+  // 103,800 on the year, then 25,950 + 108,990.
+  it("pays a line to the month it ends in, reading each month's flow afresh", () => {
+    const wide: Account = {
+      ...spareIsa,
+      contribution: { cap: 240000, kind: "spare" },
+    };
+    const ending = { ...household, lastMonth: 2, lastYear: 2027 };
+
+    expect(
+      project(
+        [wide],
+        { expenses: [ending], income: [salary] },
+        { ...plan, years: 2 },
+      ),
+    ).toStrictEqual([
+      { age: 34, deferred: 0, free: 271930, year: 2026 },
+      { age: 35, deferred: 0, free: 376930, year: 2027 },
+      { age: 36, deferred: 0, free: 513430, year: 2028 },
+    ]);
+  });
+
   // Read in September, the first year has four months to run: £1,666.67
   // in each is £6,666.67, then a whole year's £20,000 on top.
   it("carries the first year from the month the plan is read in", () => {

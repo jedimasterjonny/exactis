@@ -21,6 +21,13 @@ export interface LineValues {
   readonly name: string;
 }
 
+// A month of a year, as the engine reads a plan a month at a time: the
+// year, and the month of it, January being nought as the date gives it.
+export interface Month {
+  readonly month: number;
+  readonly year: number;
+}
+
 // The two schedules a line belongs to: money coming in, or going out.
 export type Side = "expense" | "income";
 

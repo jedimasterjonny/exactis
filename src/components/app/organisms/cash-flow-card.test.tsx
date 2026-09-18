@@ -58,7 +58,7 @@ describe("CashFlowCard", () => {
       "Cash flow each month",
     );
     expect(
-      screen.getByText("2026, age 34, in today's money"),
+      screen.getByText("September 2026, age 34, in today's money"),
     ).toBeInTheDocument();
     expect(slider()).toHaveValue("2026");
     expect(slider()).toHaveAttribute("min", "2026");
@@ -92,7 +92,7 @@ describe("CashFlowCard", () => {
     fireEvent.keyDown(slider(), { key: "ArrowRight" });
 
     expect(
-      screen.getByText("2027, age 35, in today's money"),
+      screen.getByText("January 2027, age 35, in today's money"),
     ).toBeInTheDocument();
     expect(slider()).toHaveValue("2027");
     expect(rows()[1]).toBe("Expenses−£4,590");
@@ -101,7 +101,7 @@ describe("CashFlowCard", () => {
     fireEvent.change(slider(), { target: { value: "2053" } });
 
     expect(
-      screen.getByText("2053, age 61, in today's money"),
+      screen.getByText("January 2053, age 61, in today's money"),
     ).toBeInTheDocument();
     expect(rows()).toStrictEqual([
       "Income£2,000",
@@ -212,7 +212,7 @@ describe("CashFlowCard", () => {
     fireEvent.change(slider(), { target: { value: "2052" } });
     fireEvent.click(screen.getByRole("button", { name: /^Expenses/ }));
 
-    expect(rows()[1]).toBe("Expenses£0No expense line runs this year.");
+    expect(rows()[1]).toBe("Expenses£0No expense line runs this month.");
     expect(
       within(screen.getByRole("region", { name: /^Expenses/ })).getByRole(
         "paragraph",
