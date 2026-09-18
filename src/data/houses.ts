@@ -1,19 +1,10 @@
-import type { Account, AccountValues } from "@/data/accounts";
-import type { ExpenseLineValues } from "@/data/expenses";
+import type { AccountValues } from "@/data/accounts";
+import type { Secured, SecuredRecords } from "@/data/secured";
 import type { LoanFigure } from "@/lib/figures";
 import type { Owed } from "@/lib/loans";
 
 import { toValues } from "@/data/accounts";
 import { clearsIn, paymentOf, rateOf, termOf } from "@/lib/loans";
-
-// A house as the store holds it: its own account, and the loan secured
-// on it while it is mortgaged, which the ledger finds by the link the
-// loan carries. The line of payments is not needed to open the house,
-// since the payment is the loan's contribution as well.
-export interface House {
-  readonly asset: Account;
-  readonly loan: Account | null;
-}
 
 // The house as the dialog holds it: the values, and the years the
 // mortgage has left to run. The term is not saved, since the store reads
@@ -22,13 +13,6 @@ export interface House {
 // beside them and lets whichever was typed last stand.
 export interface HouseDraft extends HouseValues {
   readonly term: number;
-}
-
-// What the store writes for a house: the real asset, and for a mortgaged
-// house the loan against it and the line of payments that clears it.
-export interface HouseRecords {
-  readonly asset: AccountValues;
-  readonly mortgage: Mortgage | null;
 }
 
 // A house is a real asset and, while it is mortgaged, the loan against it
@@ -49,12 +33,6 @@ export interface HouseValues {
 }
 
 export type Status = (typeof statuses)[number];
-
-// The loan and its payments, named for the house they are against.
-interface Mortgage {
-  readonly account: AccountValues;
-  readonly line: ExpenseLineValues;
-}
 
 // The choices as a list, so the action's schema and the dialog's select
 // take the same words the type does and cannot drift from them.
@@ -80,7 +58,7 @@ export function derive(draft: HouseDraft, figure: LoanFigure): null | number {
 // balance is owed, so it comes back positive, its rate is the mortgage's
 // and its contribution the payment, a month as the records lay it. A
 // house with no loan against it is owned outright and owes nothing.
-export function houseOf({ asset, loan }: House): HouseValues {
+export function houseOf({ asset, loan }: Secured): HouseValues {
   const held = toValues(asset);
   const owed = loan === null ? null : toValues(loan);
   return {
@@ -121,7 +99,7 @@ export function isSound(house: HouseValues): boolean {
 export function toRecords(
   house: HouseValues,
   plan: { readonly from: number; readonly month: number },
-): HouseRecords {
+): SecuredRecords {
   const asset: AccountValues = {
     balance: house.value,
     balloon: 0,
@@ -135,14 +113,14 @@ export function toRecords(
     rate: house.growth,
   };
   if (house.status === "outright") {
-    return { asset, mortgage: null };
+    return { asset, loan: null };
   }
   const name = `${house.name} mortgage`;
   const term = termOf(owedOn(house), house.payment, house.rate);
   const end = term === null ? null : clearsIn(term, plan);
   return {
     asset,
-    mortgage: {
+    loan: {
       account: {
         balance: -house.balance,
         balloon: 0,

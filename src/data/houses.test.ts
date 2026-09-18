@@ -94,16 +94,16 @@ describe("toRecords", () => {
         name: "Home",
         rate: 0.02,
       },
-      mortgage: null,
+      loan: null,
     });
   });
 
   // The loan clears in 21.2 years from September 2026, which is 2047.
   it("writes a mortgaged house with the loan against it and the payments to the year it clears", () => {
-    const { asset, mortgage } = toRecords(home, plan);
+    const { asset, loan } = toRecords(home, plan);
 
     expect(asset.name).toBe("Home");
-    expect(mortgage).toStrictEqual({
+    expect(loan).toStrictEqual({
       account: {
         balance: -341810,
         balloon: 0,
@@ -133,19 +133,19 @@ describe("toRecords", () => {
   // of which falls in February 2036 from September 2026, with eight
   // months of the year gone.
   it("ends the payments in the month the last one falls, counted from the month the plan is read in", () => {
-    const { mortgage } = toRecords(
+    const { loan } = toRecords(
       { ...home, balance: 114000, payment: 1000, rate: 0 },
       plan,
     );
 
-    expect(mortgage?.line.lastYear).toBe(2036);
-    expect(mortgage?.line.lastMonth).toBe(1);
+    expect(loan?.line.lastYear).toBe(2036);
+    expect(loan?.line.lastMonth).toBe(1);
   });
 
   it("leaves the payments open-ended when they never clear the loan", () => {
-    const { mortgage } = toRecords({ ...home, payment: 1000 }, plan);
+    const { loan } = toRecords({ ...home, payment: 1000 }, plan);
 
-    expect(mortgage?.line.lastYear).toBeNull();
-    expect(mortgage?.line.lastMonth).toBeNull();
+    expect(loan?.line.lastYear).toBeNull();
+    expect(loan?.line.lastMonth).toBeNull();
   });
 });

@@ -4,7 +4,8 @@ import type { JSX } from "react";
 
 import { startTransition, useState, useTransition } from "react";
 
-import type { Agreement, Car, CarDraft, CarValues } from "@/data/cars";
+import type { Agreement, CarDraft, CarValues } from "@/data/cars";
+import type { Secured } from "@/data/secured";
 import type { LoanFigure, Stood } from "@/lib/figures";
 
 import { saveCar } from "@/app/(app)/accounts/actions";
@@ -16,7 +17,7 @@ import { reasonOf } from "@/lib/errors";
 import { stood, thirdOf } from "@/lib/figures";
 
 interface CarDialogProps {
-  readonly car: Car | null;
+  readonly car: null | Secured;
   readonly onDismiss: () => void;
   readonly onSaved: () => void;
 }
@@ -146,7 +147,7 @@ function described(name: string, agreement: Agreement): string {
 // the term worked out from them when it is financed, since the store
 // keeps the balance, the balloon, the rate and the payment and reads the
 // term off those, and the blank draft's term standing by otherwise.
-function entryOf(car: Car): Entry {
+function entryOf(car: Secured): Entry {
   const opening = { ...carOf(car), term: draft.term };
   return {
     draft: opening,

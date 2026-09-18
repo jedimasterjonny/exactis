@@ -1,5 +1,5 @@
-import type { Account, AccountValues } from "@/data/accounts";
-import type { ExpenseLineValues } from "@/data/expenses";
+import type { AccountValues } from "@/data/accounts";
+import type { Secured, SecuredRecords } from "@/data/secured";
 import type { LoanFigure } from "@/lib/figures";
 import type { Owed } from "@/lib/loans";
 
@@ -8,15 +8,6 @@ import { clearsIn, paymentOf, rateOf, termOf } from "@/lib/loans";
 
 export type Agreement = (typeof agreements)[number];
 
-// A car as the store holds it: its own account, and the loan secured on
-// it while it is financed, which the ledger finds by the link the loan
-// carries. The line of payments is not needed to open the car, since
-// the payment is the loan's contribution as well.
-export interface Car {
-  readonly asset: Account;
-  readonly loan: Account | null;
-}
-
 // The car as the dialog holds it: the values, and the years the
 // agreement has left to run. The term is not saved, since the store
 // reads it off the balance, the balloon, the rate and the payment, but
@@ -24,13 +15,6 @@ export interface Car {
 // dialog holds it beside them and lets whichever was typed last stand.
 export interface CarDraft extends CarValues {
   readonly term: number;
-}
-
-// What the store writes for a car: the real asset, and for a financed
-// car the loan against it and the line of payments that clears it.
-export interface CarRecords {
-  readonly asset: AccountValues;
-  readonly finance: Finance | null;
 }
 
 // A car is a real asset and, while it is financed, the loan against it
@@ -53,12 +37,6 @@ export interface CarValues {
   readonly value: number;
 }
 
-// The loan and its payments, named for the car they are on.
-interface Finance {
-  readonly account: AccountValues;
-  readonly line: ExpenseLineValues;
-}
-
 // The choices as a list, so the action's schema and the dialog's select
 // take the same words the type does and cannot drift from them.
 export const agreements = ["pcp", "loan", "outright"] as const;
@@ -70,7 +48,7 @@ export const agreements = ["pcp", "loan", "outright"] as const;
 // it, and its balloon the agreement's, which says whether the agreement
 // is a PCP or a loan. A car with no loan against it is owned outright
 // and owes nothing.
-export function carOf({ asset, loan }: Car): CarValues {
+export function carOf({ asset, loan }: Secured): CarValues {
   const held = toValues(asset);
   const owed = loan === null ? null : toValues(loan);
   return {
@@ -148,7 +126,7 @@ export function isSound(car: CarValues): boolean {
 export function toRecords(
   car: CarValues,
   plan: { readonly from: number; readonly month: number },
-): CarRecords {
+): SecuredRecords {
   const asset: AccountValues = {
     balance: car.value,
     balloon: 0,
@@ -162,14 +140,14 @@ export function toRecords(
     rate: negated(car.depreciation),
   };
   if (car.agreement === "outright") {
-    return { asset, finance: null };
+    return { asset, loan: null };
   }
   const name = `${car.name} ${car.agreement === "pcp" ? "PCP" : "loan"}`;
   const term = clearsAfter(car);
   const end = term === null ? null : clearsIn(term, plan);
   return {
     asset,
-    finance: {
+    loan: {
       account: {
         balance: -car.balance,
         balloon: car.balloon,
