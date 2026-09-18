@@ -35,6 +35,7 @@ import {
 } from "@/components/kit/tabs";
 import { toast } from "@/components/kit/toast";
 import { isAsset, takesSpare, toValues } from "@/data/accounts";
+import { counted } from "@/lib/count";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
@@ -351,11 +352,6 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
       )}
     </>
   );
-}
-
-// A tab's count for the header, one in the singular.
-function counted(count: number, noun: string): string {
-  return `${String(count)} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 // The draft as a contribution choice leaves it: the fields the choice
