@@ -139,23 +139,51 @@ describe("cashFlow", () => {
 
   // £12,250 less the £1,000 sacrificed, £3,500 and the mortgage's
   // £2,210 leaves £5,540; the ISA takes £1,666.67, a twelfth of its
-  // allowance, the pension £2,500, a twelfth of its cap, over what it
-  // is fed, and the current account the £1,373.33 left, leaving
-  // nothing.
+  // allowance, the pension £1,350, a twelfth of its cap less the £1,150
+  // the salary already feeds it, and the current account the £2,523.33
+  // left, leaving nothing.
   it("hands the spare money down the accounts that take it, each to a twelfth of its cap", () => {
     const flow = cashFlow(
       [spareIsa, sparePension, spareCash, home, mortgage],
       schedule,
       { month: 0, year: 2026 },
     );
+    const fedPension = (12000 * 1.15) / 12;
 
     expect(flow.fixed).toStrictEqual([{ account: mortgage, amount: 2210 }]);
     expect(flow.spare).toStrictEqual([
       { account: spareIsa, amount: 20000 / 12, cap: 20000 },
-      { account: sparePension, amount: 2500, cap: 30000 },
-      { account: spareCash, amount: 5540 - 20000 / 12 - 2500, cap: null },
+      { account: sparePension, amount: 2500 - fedPension, cap: 30000 },
+      {
+        account: spareCash,
+        amount: 5540 - 20000 / 12 - (2500 - fedPension),
+        cap: null,
+      },
     ]);
     expect(flow.left).toBe(0);
+  });
+
+  // A sacrifice is an employer contribution and counts against the
+  // pension's allowance: a pension at its £60,000 allowance fed £5,750
+  // a month off a £600,000 base takes nothing of the spare money,
+  // since the feeding alone is £69,000 a year, while one fed £1,150
+  // takes the £3,850 left of its £5,000 a month, and one fed nothing
+  // takes the whole twelfth.
+  it("counts what a salary feeds a pension against its allowance", () => {
+    const uncapped: Account = {
+      ...pension,
+      contribution: { cap: null, kind: "spare" },
+    };
+    const at = (amount: number, sacrifice: number): number =>
+      cashFlow(
+        [uncapped],
+        { expenses: [], income: [{ ...salary, amount, sacrifice }] },
+        { month: 0, year: 2026 },
+      ).spare.map((take) => take.amount)[0] ?? Number.NaN;
+
+    expect(at(600000, 0.1)).toBe(0);
+    expect(at(120000, 0.1)).toBeCloseTo(5000 - 1150, 10);
+    expect(at(120000, 0)).toBe(5000);
   });
 
   // £187,787 a year is £15,648.92 a month, less the household and the

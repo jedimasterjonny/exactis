@@ -41,8 +41,8 @@ export interface Spent {
 }
 
 // An account paid the spare money, what it takes a month, and the most
-// it takes a year: its cap, or the allowance its kind has, or nothing
-// at all for cash.
+// it takes a year from every source: its cap, or the allowance its kind
+// has, or nothing at all for cash.
 export interface Take extends Paid {
   readonly cap: null | number;
 }
@@ -116,6 +116,7 @@ export function cashFlow(
   const { left, takes } = spareMoney(
     accounts,
     income - sacrificed - expenses - total(fixed),
+    fed,
   );
   return { expenses, fed, fixed, income, left, spare: takes, spent };
 }
@@ -155,8 +156,11 @@ function runsIn(line: LineValues, at: Month): boolean {
 }
 
 // The spare money handed down the accounts that take it, each taking
-// what is left up to a twelfth of its cap, and none of it once there is
-// none left, with what is left after them. The remainder is the one the
+// what is left up to a twelfth of its cap less what a salary already
+// feeds it that month, since a sacrifice is an employer contribution
+// and counts against the pension's allowance as the spare money does,
+// and none of it once there is none left or the feeding has filled
+// it, with what is left after them. The remainder is the one the
 // hand-down keeps, rather than the sum taken back off the whole, so an
 // account that takes all there is leaves exactly nothing and not the
 // rounding of a subtraction. A real asset or a debt takes no spare
@@ -166,6 +170,7 @@ function runsIn(line: LineValues, at: Month): boolean {
 function spareMoney(
   accounts: readonly Account[],
   available: number,
+  fed: readonly Fed[],
 ): { readonly left: number; readonly takes: readonly Take[] } {
   const takes: Take[] = [];
   let left = available;
@@ -176,10 +181,11 @@ function spareMoney(
         throw new Error("A real asset or a debt takes no spare money");
       }
       const cap = contribution.cap ?? allowanceOf(account.kind);
-      const amount = Math.max(
-        0,
-        cap === null ? left : Math.min(left, cap / 12),
-      );
+      const room =
+        cap === null
+          ? left
+          : cap / 12 - total(fed.filter((entry) => entry.account === account));
+      const amount = Math.max(0, Math.min(left, room));
       takes.push({ account, amount, cap });
       left -= amount;
     }
