@@ -3,15 +3,18 @@ import type { Plan } from "@/engine/projection";
 
 // The reference kit's invented schedule: four income lines, in the order
 // the reference lists them, with the ids a store would have given them,
-// the salary paid in parts that sum to the reference's figure, and the
-// plan they are laid over, which runs from September 2026 to 2079 for
-// someone born in 1990. For tests, since the screen reads the store. A
+// the salary paid in parts that sum to the reference's figure and
+// sacrificing a tenth of its base into the reference's workplace
+// pension, which is the first of the accounts fixture, and the plan they
+// are laid over, which runs from September 2026 to 2079 for someone born
+// in 1990. For tests, since the screen reads the store. A
 // tuple, so a test reading a line by its place gets a line.
 export const incomeLines = [
   {
     amount: 120000,
     bonus: 15000,
     cadence: "year",
+    feeds: 1,
     firstYear: 2026,
     growth: "inflation-plus-1",
     id: 1,
@@ -20,11 +23,13 @@ export const incomeLines = [
     lastYear: 2048,
     name: "Salary",
     rsu: 12000,
+    sacrifice: 0.1,
   },
   {
     amount: 168000,
     bonus: 0,
     cadence: "year",
+    feeds: null,
     firstYear: 2031,
     growth: "inflation",
     id: 2,
@@ -33,11 +38,13 @@ export const incomeLines = [
     lastYear: 2048,
     name: "Salary step-up",
     rsu: 0,
+    sacrifice: 0,
   },
   {
     amount: 2000,
     bonus: 0,
     cadence: "month",
+    feeds: null,
     firstYear: 2049,
     growth: "nominal",
     id: 3,
@@ -46,11 +53,13 @@ export const incomeLines = [
     lastYear: 2054,
     name: "Part-time consulting",
     rsu: 0,
+    sacrifice: 0,
   },
   {
     amount: 23400,
     bonus: 0,
     cadence: "year",
+    feeds: null,
     firstYear: 2058,
     growth: "triple-lock",
     id: 4,
@@ -59,6 +68,7 @@ export const incomeLines = [
     lastYear: null,
     name: "State pension",
     rsu: 0,
+    sacrifice: 0,
   },
 ] as const satisfies readonly IncomeLine[];
 
