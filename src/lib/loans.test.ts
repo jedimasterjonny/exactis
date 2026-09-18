@@ -76,6 +76,13 @@ describe("clearsIn", () => {
     expect(clearsIn(1 / 12, { from: 2026, month: 11 })).toBe(2026);
   });
 
+  // A term of nothing, or one too short to be a month, is one payment,
+  // made in the plan's month; it never steps back before it.
+  it("counts a term of nothing as a single payment in the plan's month", () => {
+    expect(clearsIn(0, { from: 2026, month: 0 })).toBe(2026);
+    expect(clearsIn(1e-12, { from: 2026, month: 8 })).toBe(2026);
+  });
+
   // A term worked out from a loan's figures carries floating point, so
   // one a whisker over a whole number of months is that many payments.
   it("absorbs the floating point a worked-out term carries", () => {
