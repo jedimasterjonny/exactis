@@ -41,6 +41,7 @@ const treatments: Record<
 > = {
   cash: { label: "Cash", variant: "secondary" },
   debt: { label: "Debt", variant: "destructive" },
+  house: { label: "House", variant: "secondary" },
   "real-asset": { label: "Real asset", variant: "secondary" },
   "tax-deferred": { label: "Tax-deferred", variant: "secondary" },
   "tax-free": { label: "Tax-free", variant: "secondary" },

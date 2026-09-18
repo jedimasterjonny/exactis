@@ -17,14 +17,40 @@ type Row = typeof accounts.$inferSelect;
 // read in the insert itself so two inserts cannot read the same last.
 const nextPosition = sql<number>`(select coalesce(max(${accounts.position}), 0) + 1 from ${accounts})`;
 
-// A new account, with the id the store gives it, placed after the last.
+// The account with that id, gone. A loan secured on it has to go first,
+// since the store holds the link and refuses to leave it dangling.
+export async function deleteAccount(db: Database, id: number): Promise<void> {
+  const rows = await db.delete(accounts).where(eq(accounts.id, id)).returning();
+  single(rows);
+}
+
+// The loan secured on the asset with that id, or null when it has none.
+// An asset has at most one, since the house dialog writes one and
+// nothing else writes a link.
+export async function findLoanAgainst(
+  db: Database,
+  assetId: number,
+): Promise<Account | null> {
+  const rows = await db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.secures, assetId))
+    .limit(1);
+  const [row] = rows;
+  return row === undefined ? null : fromRow(row);
+}
+
+// A new account, with the id the store gives it, placed after the last,
+// and secured on the asset with the id given when it is a loan against
+// one.
 export async function insertAccount(
   db: Database,
   values: AccountValues,
+  secures: null | number = null,
 ): Promise<Account> {
   const rows = await db
     .insert(accounts)
-    .values({ ...values, position: nextPosition })
+    .values({ ...values, position: nextPosition, secures })
     .returning();
   return single(rows);
 }
@@ -69,7 +95,8 @@ export async function placeAccounts(
   );
 }
 
-// The account with that id, written over with the values.
+// The account with that id, written over with the values. What it
+// secures is not among them, so a loan stays against its asset.
 export async function updateAccount(
   db: Database,
   id: number,
@@ -83,8 +110,11 @@ export async function updateAccount(
   return single(rows);
 }
 
+// The link is on the account only when there is one, as the model lays
+// it.
 function fromRow(row: Row): Account {
-  return toAccount(row, row.id);
+  const account = toAccount(row, row.id);
+  return row.secures === null ? account : { ...account, secures: row.secures };
 }
 
 // A statement written for one account returns that account, or none when

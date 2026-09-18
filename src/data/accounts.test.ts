@@ -119,11 +119,19 @@ describe("accounts", () => {
   });
 });
 
+describe("isAsset", () => {
+  it("files a house with the real assets, paid a fixed sum only", () => {
+    expect(isAsset({ kind: "house" })).toBe(true);
+    expect(takesSpare({ kind: "house" })).toBe(false);
+  });
+});
+
 describe("allowanceOf", () => {
   it("gives the ISA and the pension the UK's yearly allowances and the rest none", () => {
     expect(allowanceOf("tax-free")).toBe(20000);
     expect(allowanceOf("tax-deferred")).toBe(60000);
     expect(allowanceOf("cash")).toBeNull();
+    expect(allowanceOf("house")).toBeNull();
     expect(allowanceOf("real-asset")).toBeNull();
     expect(allowanceOf("debt")).toBeNull();
   });

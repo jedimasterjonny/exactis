@@ -1,3 +1,5 @@
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
+
 import {
   doublePrecision,
   integer,
@@ -36,7 +38,8 @@ export const expenseKind = pgEnum("expense_kind", expenseKinds);
 // values with an id and nothing in it needs the model to read. The id is
 // an identity the store hands out. The position is the account's place
 // in the list, which the store sets after the last on insert, so it is
-// the order accounts were added until it is changed.
+// the order accounts were added until it is changed. A loan secured on
+// an asset names the asset; any other account names none.
 export const accounts = pgTable("accounts", {
   balance: integer().notNull(),
   cadence: cadence().notNull(),
@@ -49,6 +52,7 @@ export const accounts = pgTable("accounts", {
   name: text().notNull(),
   position: integer().notNull(),
   rate: doublePrecision().notNull(),
+  secures: integer().references((): AnyPgColumn => accounts.id),
 });
 
 // One row per income line: the line's values with an id, the parts held
@@ -70,7 +74,8 @@ export const incomeLines = pgTable("income_lines", {
 });
 
 // One row per expense line, laid out as the income table lays its lines,
-// less the parts an employment line alone is paid in.
+// less the parts an employment line alone is paid in. A line that is a
+// loan's payments names the loan; any other line names none.
 export const expenseLines = pgTable("expense_lines", {
   amount: integer().notNull(),
   cadence: cadence().notNull(),
@@ -80,4 +85,5 @@ export const expenseLines = pgTable("expense_lines", {
   kind: expenseKind().notNull(),
   lastYear: integer("last_year"),
   name: text().notNull(),
+  pays: integer().references(() => accounts.id),
 });

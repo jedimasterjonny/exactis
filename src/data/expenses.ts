@@ -10,9 +10,12 @@ export type ExpenseKind = (typeof expenseKinds)[number];
 // retirement living is a line that starts where household spending
 // stops, not an edit to it. The id is the line's identity, handed out by
 // the store in the order lines were added, which is the order they are
-// listed in.
+// listed in. A line that is a loan's payments carries that loan's id, so
+// the engine counts the payment once and the house dialog finds the
+// line; any other line carries none.
 export interface ExpenseLine extends ExpenseLineValues {
   readonly id: number;
+  readonly pays?: number;
 }
 
 // The line as a form or a row holds it, which is the line less its id:
