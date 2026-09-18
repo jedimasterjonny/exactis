@@ -2,6 +2,7 @@ import type { JSX } from "react";
 
 import type { AccountKind, AccountValues, Funding } from "@/data/accounts";
 
+import { FieldRow } from "@/components/app/atoms/field-row";
 import { MoneyField } from "@/components/app/molecules/money-field";
 import { RateField } from "@/components/app/molecules/rate-field";
 import { SelectField } from "@/components/app/molecules/select-field";
@@ -55,7 +56,7 @@ export function AccountFields({
 }: AccountFieldsProps): JSX.Element {
   return (
     <div className="grid gap-4">
-      <div className="grid grid-cols-[1.4fr_1fr] gap-4">
+      <FieldRow layout="named">
         <TextField
           defaultValue={initial.name}
           label="Name"
@@ -72,8 +73,8 @@ export function AccountFields({
           }}
           options={kinds}
         />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+      </FieldRow>
+      <FieldRow layout="pair">
         <MoneyField
           defaultValue={initial.balance}
           hint="A debt's is negative"
@@ -93,8 +94,8 @@ export function AccountFields({
             options={fundings}
           />
         )}
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+      </FieldRow>
+      <FieldRow layout="pair">
         {draft.funding === "fixed" ? (
           <>
             <MoneyField
@@ -129,8 +130,8 @@ export function AccountFields({
             }}
           />
         )}
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+      </FieldRow>
+      <FieldRow layout="pair">
         <SelectField
           defaultValue={initial.growth}
           hint="The plan rate is set on the assumptions screen"
@@ -150,7 +151,7 @@ export function AccountFields({
             }}
           />
         )}
-      </div>
+      </FieldRow>
     </div>
   );
 }
