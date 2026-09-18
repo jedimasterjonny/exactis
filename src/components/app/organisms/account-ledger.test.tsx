@@ -28,7 +28,12 @@ vi.mock("@/app/(app)/accounts/actions", () => ({
 
 const held = accounts.filter((account) => !isAsset(account));
 const assets = accounts.filter(isAsset);
-const [pension, isa, cash, home] = accounts;
+const [pension, isa, cash, home, mortgage] = accounts;
+
+// The fixture's home as a house, with its mortgage secured on it.
+const house: Account = { ...home, kind: "house" };
+
+const loan: Account = { ...mortgage, secures: home.id };
 
 function commit(field: HTMLElement, value: string): void {
   fireEvent.change(field, { target: { value } });
@@ -706,5 +711,69 @@ describe("AccountLedger", () => {
         2, 3, 1, 4, 5,
       ]);
     });
+  });
+
+  // A house and the loan against it are one house to the dialog, which
+  // opens on it from the pencil on either side; a loan whose house is
+  // not listed is edited as the account it is.
+  it("opens a house and the loan against it in the house dialog from either pencil", () => {
+    render(
+      <Toaster>
+        <AccountLedger accounts={[pension, house, loan]} />
+      </Toaster>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Mortgage" }));
+
+    let dialog = screen.getByRole("dialog", { name: "Home" });
+
+    expect(within(dialog).getByText("Edit house")).toHaveClass("text-brand");
+    expect(
+      within(dialog).getByRole("heading", { name: "Home" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("textbox", { name: "Loan balance" }),
+    ).toHaveValue("£182,940");
+    expect(
+      within(dialog).getByRole("textbox", { name: "Monthly payment" }),
+    ).toHaveValue("£2,210");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
+
+    dialog = openEditor("Home");
+
+    expect(within(dialog).getByText("Edit house")).toHaveClass("text-brand");
+    expect(
+      within(dialog).getByRole("textbox", { name: "Loan balance" }),
+    ).toHaveValue("£182,940");
+  });
+
+  it("opens a house with no loan against it as owned outright", () => {
+    render(
+      <Toaster>
+        <AccountLedger accounts={[house]} />
+      </Toaster>,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
+
+    const dialog = openEditor("Home");
+
+    expect(within(dialog).getByText("Edit house")).toHaveClass("text-brand");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Status" }),
+    ).toHaveValue("outright");
+  });
+
+  it("edits a loan whose house is not listed as the account it is", () => {
+    render(
+      <Toaster>
+        <AccountLedger accounts={[{ ...mortgage, secures: 99 }]} />
+      </Toaster>,
+    );
+
+    const dialog = openEditor("Mortgage");
+
+    expect(within(dialog).getByText("Edit account")).toHaveClass("text-brand");
   });
 });

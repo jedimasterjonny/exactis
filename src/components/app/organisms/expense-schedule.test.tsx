@@ -19,7 +19,7 @@ import { ExpenseSchedule } from "./expense-schedule";
 
 vi.mock("@/app/(app)/plan/actions", () => ({ saveExpenseLine: vi.fn() }));
 
-const [, , , retirement] = expenseLines;
+const [, , mortgagePayment, retirement] = expenseLines;
 
 function commit(field: HTMLElement, value: string): void {
   fireEvent.change(field, { target: { value } });
@@ -255,5 +255,30 @@ describe("ExpenseSchedule", () => {
       lastYear: null,
       name: "Retirement living",
     });
+  });
+
+  // A line that is a loan's payments is the house dialog's to write, so
+  // it is locked here, with the reason where its pencil would be.
+  it("locks a line that is a loan's payments", () => {
+    render(
+      <Toaster>
+        <ExpenseSchedule
+          lines={[retirement, { ...mortgagePayment, pays: 5 }]}
+          plan={plan}
+        />
+      </Toaster>,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Edit Retirement living" }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Edit Mortgage payment" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "Edited with its house on the accounts screen",
+      }),
+    ).toBeInTheDocument();
   });
 });

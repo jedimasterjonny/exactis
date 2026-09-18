@@ -205,10 +205,15 @@ function blank(plan: Plan): Draft {
 
 // What the rows say of an expense line: its kind's badge in the kind's
 // tone, and what it pays, which is its amount, since an expense is paid
-// in no parts.
+// in no parts. A line that is a loan's payments is locked, since the
+// house dialog writes it from the loan and would write over an edit
+// made here.
 function summarise(line: ExpenseLine): Summary {
   return {
     badge: { label: kindLabels[line.kind], variant: tones[line.kind] },
+    ...(line.pays !== undefined && {
+      lock: "Edited with its house on the accounts screen",
+    }),
     total: line.amount,
   };
 }

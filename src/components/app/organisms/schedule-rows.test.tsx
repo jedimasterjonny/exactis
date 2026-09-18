@@ -153,4 +153,32 @@ describe("ScheduleRows", () => {
 
     expect(onEdit).toHaveBeenCalledExactlyOnceWith(salary);
   });
+
+  // A line the schedule locks draws a lock where its pencil would be,
+  // saying why, and the others keep theirs.
+  it("locks a line the schedule says is locked, with the reason", () => {
+    const onEdit = vi.fn<(line: IncomeLine) => void>();
+    render(
+      <ScheduleRows
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        lines={[salary, statePension]}
+        onEdit={onEdit}
+        plan={plan}
+        side="income"
+        summarise={(line) => ({
+          ...summarise(line),
+          ...(line.kind === "pension" && { lock: "Set by the state" }),
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Edit Salary" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Edit State pension" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Set by the state" })).toHaveClass(
+      "text-muted-foreground/60",
+    );
+  });
 });

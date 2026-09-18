@@ -153,6 +153,20 @@ describe("cashFlow", () => {
     expect(flow.left).toBeCloseTo(8750 - 20000 / 12, 10);
   });
 
+  // The mortgage payment line paying the mortgage makes the line the
+  // mortgage's payment, so the mortgage's own contribution is left out of
+  // the month's fixed sums and the payment is counted once, as the line.
+  it("leaves a loan a line pays out of the fixed sums", () => {
+    const flow = cashFlow(
+      [pension, mortgage],
+      { expenses: [{ ...mortgagePayment, pays: mortgage.id }], income: [] },
+      2040,
+    );
+
+    expect(flow.fixed).toStrictEqual([{ account: pension, amount: 2266.25 }]);
+    expect(flow.expenses).toBe(3201);
+  });
+
   it("refuses to hand the spare money to a real asset or a debt", () => {
     const spareHome: Account = {
       ...home,

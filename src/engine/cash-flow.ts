@@ -49,7 +49,10 @@ interface Paid {
 // each account that takes it in the order they are listed, each up to
 // its cap and passing the rest on, and what is left after them, which
 // is negative when the month does not cover its outgoings. A yearly
-// figure is spread over the twelve months. Every line is taken at the
+// figure is spread over the twelve months. A loan whose payments are a
+// line pays nothing as a fixed sum, since the line is its payment and
+// the ledger shows the same figure against the loan: it is counted once,
+// as the line, and stops when the line does. Every line is taken at the
 // amount it states, in today's money; how it grows against inflation
 // waits on an inflation assumption the plan does not carry yet.
 export function cashFlow(
@@ -62,7 +65,14 @@ export function cashFlow(
     .filter((line) => runsIn(line, year))
     .map((line) => ({ amount: monthly(line.amount, line.cadence), line }));
   const expenses = total(spent);
-  const fixed = accounts.flatMap(fixedSum);
+  const paid = new Set(
+    schedule.expenses.flatMap((line) =>
+      line.pays === undefined ? [] : [line.pays],
+    ),
+  );
+  const fixed = accounts
+    .filter((account) => !paid.has(account.id))
+    .flatMap(fixedSum);
   const { left, takes } = spareMoney(
     accounts,
     income - expenses - total(fixed),
