@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { accounts } from "@/data/accounts.fixture";
+
 import type { HouseDraft, HouseValues } from "./houses";
 
 import {
   derive,
+  houseOf,
   isSound,
   paymentOf,
   rateOf,
@@ -106,6 +109,36 @@ describe("isSound", () => {
   });
 });
 
+describe("houseOf", () => {
+  const [, , , asset, loan] = accounts;
+
+  // The fixture's home as a house, with its mortgage secured on it: the
+  // loan's £182,940 owed comes back positive and its £2,210 a month is
+  // the payment; without the loan the house is owned outright.
+  it("reads a house's values back off its records", () => {
+    const house = { asset: { ...asset, kind: "house" as const }, loan };
+
+    expect(houseOf(house)).toStrictEqual({
+      balance: 182940,
+      growth: 0.021,
+      name: "Home",
+      payment: 2210,
+      rate: 0.0515,
+      status: "mortgaged",
+      value: 416386,
+    });
+    expect(houseOf({ ...house, loan: null })).toStrictEqual({
+      balance: 0,
+      growth: 0.021,
+      name: "Home",
+      payment: 0,
+      rate: 0,
+      status: "outright",
+      value: 416386,
+    });
+  });
+});
+
 describe("toRecords", () => {
   it("writes a house owned outright as a real asset growing at its own rate", () => {
     expect(
@@ -121,7 +154,7 @@ describe("toRecords", () => {
         contribution: 0,
         funding: "fixed",
         growth: "fixed",
-        kind: "real-asset",
+        kind: "house",
         name: "Home",
         rate: 0.02,
       },
@@ -137,9 +170,9 @@ describe("toRecords", () => {
     expect(mortgage).toStrictEqual({
       account: {
         balance: -341810,
-        cadence: "year",
+        cadence: "month",
         cap: 0,
-        contribution: 0,
+        contribution: 2210,
         funding: "fixed",
         growth: "fixed",
         kind: "debt",

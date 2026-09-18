@@ -5,9 +5,20 @@ import * as z from "zod";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
-import { insertAccount, placeAccounts, updateAccount } from "@/db/accounts";
+import {
+  deleteAccount,
+  findLoanAgainst,
+  insertAccount,
+  placeAccounts,
+  updateAccount,
+} from "@/db/accounts";
 import { getDb } from "@/db/client";
-import { insertExpenseLine } from "@/db/expenses";
+import {
+  deleteExpenseLine,
+  findLinePaying,
+  insertExpenseLine,
+  updateExpenseLine,
+} from "@/db/expenses";
 import { requireSession } from "@/lib/session";
 
 import { expenseLinesTag } from "../plan/store";
@@ -22,12 +33,19 @@ vi.mock("next/cache", () => ({
   updateTag: vi.fn(),
 }));
 vi.mock("@/db/accounts", () => ({
+  deleteAccount: vi.fn(),
+  findLoanAgainst: vi.fn(),
   insertAccount: vi.fn(),
   placeAccounts: vi.fn(),
   updateAccount: vi.fn(),
 }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
-vi.mock("@/db/expenses", () => ({ insertExpenseLine: vi.fn() }));
+vi.mock("@/db/expenses", () => ({
+  deleteExpenseLine: vi.fn(),
+  findLinePaying: vi.fn(),
+  insertExpenseLine: vi.fn(),
+  updateExpenseLine: vi.fn(),
+}));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 vi.mock("../store", () => ({ getPlan: vi.fn() }));
 
@@ -150,6 +168,43 @@ describe("saveAccount", () => {
 });
 
 describe("saveHouse", () => {
+  // The records the reference kit's house is written as: the house, the
+  // loan owing £341,810 and paying £2,210 a month, and the line of the
+  // same, ending in 2047.
+  const asset = {
+    balance: 416386,
+    cadence: "year",
+    cap: 0,
+    contribution: 0,
+    funding: "fixed",
+    growth: "fixed",
+    kind: "house",
+    name: "Home",
+    rate: 0.021,
+  } as const;
+
+  const loan = {
+    balance: -341810,
+    cadence: "month",
+    cap: 0,
+    contribution: 2210,
+    funding: "fixed",
+    growth: "fixed",
+    kind: "debt",
+    name: "Home mortgage",
+    rate: 0.0515,
+  } as const;
+
+  const line = {
+    amount: 2210,
+    cadence: "month",
+    firstYear: 2026,
+    growth: "nominal",
+    kind: "debt",
+    lastYear: 2047,
+    name: "Home mortgage",
+  } as const;
+
   beforeEach(() => {
     vi.mocked(getDb).mockReturnValue(db);
     vi.mocked(getPlan).mockReturnValue({
@@ -164,106 +219,155 @@ describe("saveHouse", () => {
   it("writes nothing without a session", async () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-    await expect(saveHouse(house)).rejects.toThrow("redirected");
+    await expect(saveHouse(null, house)).rejects.toThrow("redirected");
     expect(insertAccount).not.toHaveBeenCalled();
     expect(insertExpenseLine).not.toHaveBeenCalled();
     expect(updateTag).not.toHaveBeenCalled();
   });
 
-  it("writes a house owned outright as one real asset and expires the accounts", async () => {
+  it("writes a new house owned outright as one account and expires both tags", async () => {
     vi.mocked(insertAccount).mockResolvedValue(home);
 
-    expect(await saveHouse(outright)).toBe(home);
-    expect(insertAccount).toHaveBeenCalledExactlyOnceWith(db, {
-      balance: 416386,
-      cadence: "year",
-      cap: 0,
-      contribution: 0,
-      funding: "fixed",
-      growth: "fixed",
-      kind: "real-asset",
-      name: "Home",
-      rate: 0.021,
-    });
+    expect(await saveHouse(null, outright)).toBe(home);
+    expect(insertAccount).toHaveBeenCalledExactlyOnceWith(db, asset);
+    expect(findLoanAgainst).not.toHaveBeenCalled();
     expect(insertExpenseLine).not.toHaveBeenCalled();
-    expect(updateTag).toHaveBeenCalledExactlyOnceWith(accountsTag);
-  });
-
-  it("writes a mortgaged house as the asset, the loan and its payments, and expires both", async () => {
-    vi.mocked(insertAccount)
-      .mockResolvedValueOnce(home)
-      .mockResolvedValueOnce(mortgage);
-    vi.mocked(insertExpenseLine).mockResolvedValue(mortgagePayment);
-
-    expect(await saveHouse(house)).toBe(home);
-    expect(vi.mocked(insertAccount).mock.calls).toStrictEqual([
-      [
-        db,
-        {
-          balance: 416386,
-          cadence: "year",
-          cap: 0,
-          contribution: 0,
-          funding: "fixed",
-          growth: "fixed",
-          kind: "real-asset",
-          name: "Home",
-          rate: 0.021,
-        },
-      ],
-      [
-        db,
-        {
-          balance: -341810,
-          cadence: "year",
-          cap: 0,
-          contribution: 0,
-          funding: "fixed",
-          growth: "fixed",
-          kind: "debt",
-          name: "Home mortgage",
-          rate: 0.0515,
-        },
-      ],
-    ]);
-    expect(insertExpenseLine).toHaveBeenCalledExactlyOnceWith(db, {
-      amount: 2210,
-      cadence: "month",
-      firstYear: 2026,
-      growth: "nominal",
-      kind: "debt",
-      lastYear: 2047,
-      name: "Home mortgage",
-    });
     expect(vi.mocked(updateTag).mock.calls).toStrictEqual([
       [expenseLinesTag],
       [accountsTag],
     ]);
   });
 
-  it("refuses what the form could not have sent", async () => {
-    await expect(saveHouse({ ...house, name: "  " })).rejects.toThrow(
-      z.ZodError,
+  it("writes a new mortgaged house as the house, the loan secured on it and its payments", async () => {
+    vi.mocked(insertAccount)
+      .mockResolvedValueOnce(home)
+      .mockResolvedValueOnce(mortgage);
+    vi.mocked(insertExpenseLine).mockResolvedValue(mortgagePayment);
+
+    expect(await saveHouse(null, house)).toBe(home);
+    expect(vi.mocked(insertAccount).mock.calls).toStrictEqual([
+      [db, asset],
+      [db, loan, home.id],
+    ]);
+    expect(insertExpenseLine).toHaveBeenCalledExactlyOnceWith(
+      db,
+      line,
+      mortgage.id,
     );
-    await expect(saveHouse({ ...house, value: 0.5 })).rejects.toThrow(
-      z.ZodError,
-    );
-    await expect(saveHouse({ ...house, growth: -1.5 })).rejects.toThrow(
-      z.ZodError,
-    );
-    await expect(saveHouse({ ...house, rate: -0.01 })).rejects.toThrow(
-      z.ZodError,
-    );
-    await expect(saveHouse({ ...house, balance: 0 })).rejects.toThrow(
-      z.ZodError,
-    );
-    await expect(saveHouse({ ...house, payment: 0 })).rejects.toThrow(
-      z.ZodError,
-    );
-    await expect(saveHouse({ ...outright, payment: 2210 })).rejects.toThrow(
-      z.ZodError,
+    expect(updateAccount).not.toHaveBeenCalled();
+  });
+
+  it("writes over a house, the loan secured on it and its payments", async () => {
+    vi.mocked(updateAccount)
+      .mockResolvedValueOnce(home)
+      .mockResolvedValueOnce(mortgage);
+    vi.mocked(findLoanAgainst).mockResolvedValue(mortgage);
+    vi.mocked(findLinePaying).mockResolvedValue(mortgagePayment);
+
+    expect(await saveHouse(home.id, house)).toBe(home);
+    expect(vi.mocked(updateAccount).mock.calls).toStrictEqual([
+      [db, home.id, asset],
+      [db, mortgage.id, loan],
+    ]);
+    expect(findLoanAgainst).toHaveBeenCalledExactlyOnceWith(db, home.id);
+    expect(findLinePaying).toHaveBeenCalledExactlyOnceWith(db, mortgage.id);
+    expect(updateExpenseLine).toHaveBeenCalledExactlyOnceWith(
+      db,
+      mortgagePayment.id,
+      line,
     );
     expect(insertAccount).not.toHaveBeenCalled();
+    expect(insertExpenseLine).not.toHaveBeenCalled();
+    expect(deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it("adds the payments a loan is missing", async () => {
+    vi.mocked(updateAccount).mockResolvedValue(home);
+    vi.mocked(findLoanAgainst).mockResolvedValue(mortgage);
+    vi.mocked(findLinePaying).mockResolvedValue(null);
+
+    await saveHouse(home.id, house);
+
+    expect(insertExpenseLine).toHaveBeenCalledExactlyOnceWith(
+      db,
+      line,
+      mortgage.id,
+    );
+    expect(updateExpenseLine).not.toHaveBeenCalled();
+  });
+
+  it("mortgages a house owned outright", async () => {
+    vi.mocked(updateAccount).mockResolvedValue(home);
+    vi.mocked(findLoanAgainst).mockResolvedValue(null);
+    vi.mocked(insertAccount).mockResolvedValue(mortgage);
+
+    await saveHouse(home.id, house);
+
+    expect(updateAccount).toHaveBeenCalledExactlyOnceWith(db, home.id, asset);
+    expect(insertAccount).toHaveBeenCalledExactlyOnceWith(db, loan, home.id);
+    expect(insertExpenseLine).toHaveBeenCalledExactlyOnceWith(
+      db,
+      line,
+      mortgage.id,
+    );
+  });
+
+  it("sends a loan and its payments away when the house is owned outright now, the line first", async () => {
+    vi.mocked(updateAccount).mockResolvedValue(home);
+    vi.mocked(findLoanAgainst).mockResolvedValue(mortgage);
+    vi.mocked(findLinePaying).mockResolvedValue(mortgagePayment);
+
+    await saveHouse(home.id, outright);
+
+    expect(deleteExpenseLine).toHaveBeenCalledExactlyOnceWith(
+      db,
+      mortgagePayment.id,
+    );
+    expect(deleteAccount).toHaveBeenCalledExactlyOnceWith(db, mortgage.id);
+    expect(
+      vi.mocked(deleteExpenseLine).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(deleteAccount).mock.invocationCallOrder[0] ?? 0);
+  });
+
+  it("sends a loan with no payments away, and leaves a house with no loan alone", async () => {
+    vi.mocked(updateAccount).mockResolvedValue(home);
+    vi.mocked(findLoanAgainst)
+      .mockResolvedValueOnce(mortgage)
+      .mockResolvedValueOnce(null);
+    vi.mocked(findLinePaying).mockResolvedValue(null);
+
+    await saveHouse(home.id, outright);
+    await saveHouse(home.id, outright);
+
+    expect(deleteExpenseLine).not.toHaveBeenCalled();
+    expect(deleteAccount).toHaveBeenCalledExactlyOnceWith(db, mortgage.id);
+  });
+
+  it("refuses what the form could not have sent", async () => {
+    await expect(saveHouse(0, house)).rejects.toThrow(z.ZodError);
+    await expect(saveHouse(null, { ...house, name: "  " })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(saveHouse(null, { ...house, value: 0.5 })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(saveHouse(null, { ...house, growth: -1.5 })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(saveHouse(null, { ...house, rate: -0.01 })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(saveHouse(null, { ...house, balance: 0 })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(saveHouse(null, { ...house, payment: 0 })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(
+      saveHouse(null, { ...outright, payment: 2210 }),
+    ).rejects.toThrow(z.ZodError);
+    expect(insertAccount).not.toHaveBeenCalled();
+    expect(updateAccount).not.toHaveBeenCalled();
     expect(insertExpenseLine).not.toHaveBeenCalled();
     expect(updateTag).not.toHaveBeenCalled();
   });

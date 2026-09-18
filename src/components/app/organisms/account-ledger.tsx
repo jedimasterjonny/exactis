@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { Plus } from "lucide-react";
+import { HousePlus, Plus } from "lucide-react";
 import { startTransition, useOptimistic, useState, useTransition } from "react";
 
 import type {
@@ -11,6 +11,7 @@ import type {
   AccountValues,
   Funding,
 } from "@/data/accounts";
+import type { House } from "@/data/houses";
 
 import {
   placeAccountsInOrder,
@@ -54,6 +55,10 @@ interface Entry {
   readonly initial: Draft;
 }
 
+// What the house dialog is open on: a new house, or one to edit with the
+// loan against it.
+type HouseOpening = "new" | House;
+
 type Tab = "accounts" | "assets";
 
 const blank: Draft = {
@@ -78,14 +83,16 @@ const blank: Draft = {
 // re-reads; the optimistic order is the page's again once it does. The
 // entry doubles as the dialog's open state, as the progress editor's
 // point does, and the tab is controlled so a saved account can bring
-// its own tab forward, as a saved house does through the house dialog
-// beside the button, which enters a house as the asset and the mortgage
-// it is. The fields are uncontrolled and mount fresh with the entry's
+// its own tab forward, as a saved house does through the house dialog,
+// which the header's Add house button opens on a new house and the
+// pencil of a house or the loan against it opens on that house, so an
+// edit from either side writes both. The fields are uncontrolled and mount fresh with the entry's
 // opening values each time the dialog opens, and the draft mirrors what
 // they report.
 export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   const [tab, setTab] = useState<Tab>("accounts");
   const [entry, setEntry] = useState<Entry | null>(null);
+  const [house, setHouse] = useState<HouseOpening | null>(null);
   const [isSaving, startSaving] = useTransition();
   const [order, placeOptimistically] = useOptimistic(
     accounts,
@@ -103,9 +110,15 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   }
 
   // A row's pencil opens its account as it is, with its id so a save
-  // writes back to it.
+  // writes back to it, unless the account is a house or the loan against
+  // one, which open as the house they are part of.
   function edit(account: Account): void {
-    open(toValues(account), account.id);
+    const found = houseFor(account, order);
+    if (found === null) {
+      open(toValues(account), account.id);
+    } else {
+      setHouse(found);
+    }
   }
 
   // The contribution choice: the fields the new choice shows mount with
@@ -184,11 +197,16 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
       <ScreenHeader
         actions={
           <>
-            <HouseDialog
-              onSaved={() => {
-                setTab("assets");
+            <Button
+              onClick={() => {
+                setHouse("new");
               }}
-            />
+              size="sm"
+              variant="outline"
+            >
+              <HousePlus aria-hidden />
+              Add house
+            </Button>
             <Button
               onClick={() => {
                 open(blank, null);
@@ -280,6 +298,18 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
           />
         </EditDialog>
       )}
+      {house !== null && (
+        <HouseDialog
+          house={house === "new" ? null : house}
+          onDismiss={() => {
+            setHouse(null);
+          }}
+          onSaved={() => {
+            setHouse(null);
+            setTab("assets");
+          }}
+        />
+      )}
     </>
   );
 }
@@ -301,6 +331,24 @@ function fundedBy(current: Entry, funding: Funding): Partial<Draft> {
         funding,
       }
     : { cadence: "year", cap: current.initial.cap, contribution: 0, funding };
+}
+
+// The house an account is part of: a house is its own, with the loan
+// secured on it when there is one, and a loan secured on a house is that
+// house's; any other account is part of none, and so is a loan whose
+// asset is not listed, which opens as the account it is.
+function houseFor(
+  account: Account,
+  accounts: readonly Account[],
+): House | null {
+  if (account.kind === "house") {
+    return {
+      asset: account,
+      loan: accounts.find((a) => a.secures === account.id) ?? null,
+    };
+  }
+  const asset = accounts.find((a) => a.id === account.secures);
+  return asset === undefined ? null : { asset, loan: account };
 }
 
 // The row count beside a tab's label, in the micro-label face and faint.

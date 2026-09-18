@@ -2,23 +2,27 @@
 
 import type { JSX } from "react";
 
-import { House } from "lucide-react";
 import { startTransition, useState, useTransition } from "react";
 
-import type { HouseDraft, HouseValues, MortgageFigure } from "@/data/houses";
+import type {
+  House,
+  HouseDraft,
+  HouseValues,
+  MortgageFigure,
+} from "@/data/houses";
 
 import { saveHouse } from "@/app/(app)/accounts/actions";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { HouseFields } from "@/components/app/organisms/house-fields";
-import { Button } from "@/components/kit/button";
 import { toast } from "@/components/kit/toast";
-import { derive, isSound } from "@/data/houses";
+import { derive, houseOf, isSound } from "@/data/houses";
 
 // An open dialog: the draft as it is, the draft as it opened, which the
-// uncontrolled fields take as their defaults, and the two of the mortgage's three
-// figures typed last, the latest first, which stand while the third is
-// worked out from them. A figure typed moves to the front and pushes the
-// other out, so the one worked out is always the one left alone longest.
+// uncontrolled fields take as their defaults, and the two of the
+// mortgage's three figures typed last, the latest first, which stand
+// while the third is worked out from them. A figure typed moves to the
+// front and pushes the other out, so the one worked out is always the
+// one left alone longest.
 interface Entry {
   readonly draft: HouseDraft;
   readonly initial: HouseDraft;
@@ -26,6 +30,8 @@ interface Entry {
 }
 
 interface HouseDialogProps {
+  readonly house: House | null;
+  readonly onDismiss: () => void;
   readonly onSaved: () => void;
 }
 
@@ -49,97 +55,92 @@ const blank: Entry = { draft, initial: draft, typed: ["rate", "term"] };
 // The three figures, so a patch can be asked which it carries.
 const figures: readonly MortgageFigure[] = ["payment", "rate", "term"];
 
-// The button that adds a house and the dialog it opens, which enters the
-// house as the records it is and lets the store write them: the asset,
-// and for a mortgaged house the loan against it and its payments. The
-// entry doubles as the dialog's open state, as the ledger's does, and
-// the fields are uncontrolled but for the one figure worked out, which
-// the dialog shows by value. The save holds while the draft is not
-// sound, or a rate could not be worked out; a term that could not is
-// no bar, since a loan the payment never clears is paid to the end of
-// the plan and the store reads that off the figures it keeps. The caller
-// is told when a house has been saved, so the screen can bring the
-// assets forward.
-export function HouseDialog({ onSaved }: HouseDialogProps): JSX.Element {
-  const [entry, setEntry] = useState<Entry | null>(null);
+// The dialog a house is entered or edited in, which takes the house as
+// the records it is and lets the store write them: the asset, and for a
+// mortgaged house the loan against it and its payments. It is open for
+// as long as it is mounted, so the ledger renders it while it holds a
+// house to open on, or a new one, and the entry mounts from that. The
+// fields are uncontrolled but for the loan's figures, which the dialog
+// shows by value. The save holds while the draft is not sound, or a
+// rate could not be worked out; a term that could not is no bar, since
+// a loan the payment never clears is paid to the end of the plan and
+// the store reads that off the figures it keeps. The caller is told
+// when the house has been saved, so the screen can close the dialog and
+// bring the assets forward.
+export function HouseDialog({
+  house,
+  onDismiss,
+  onSaved,
+}: HouseDialogProps): JSX.Element {
+  const [entry, setEntry] = useState<Entry>(() =>
+    house === null ? blank : entryOf(house),
+  );
   const [isSaving, startSaving] = useTransition();
+  const { canSave, figure, values, worked } = workedOut(entry);
 
   // A patch to one of the three figures makes it one of the two that
   // stand; any other patch leaves them as they are.
-  function amend(current: Entry, patch: Partial<HouseDraft>): void {
-    const figure = figures.find((candidate) => candidate in patch);
+  function amend(patch: Partial<HouseDraft>): void {
+    const typed = figures.find((candidate) => candidate in patch);
     setEntry({
-      ...current,
-      draft: { ...current.draft, ...patch },
-      typed:
-        figure === undefined ? current.typed : stood(current.typed, figure),
+      ...entry,
+      draft: { ...entry.draft, ...patch },
+      typed: typed === undefined ? entry.typed : stood(entry.typed, typed),
     });
   }
 
-  function dismiss(): void {
-    setEntry(null);
-  }
-
   // The dialog stays open with its save held until the store answers,
-  // then closes and tells the caller; the close is a transition of its
-  // own, since a state update after an await is not part of the one it
-  // awaited in.
-  function save(values: HouseValues): void {
+  // then tells the caller; the telling is a transition of its own, since
+  // a state update after an await is not part of the one it awaited in.
+  function save(): void {
     startSaving(async () => {
-      const account = await saveHouse(values);
-      startTransition(() => {
-        setEntry(null);
-        onSaved();
-      });
+      const account = await saveHouse(
+        house === null ? null : house.asset.id,
+        values,
+      );
+      startTransition(onSaved);
       toast.add({
         description:
           values.status === "mortgaged"
-            ? `${account.name} · mortgage and payments added`
+            ? `${account.name} · with its mortgage and payments`
             : account.name,
-        title: "House added",
+        title: house === null ? "House added" : "House updated",
         type: "success",
       });
     });
   }
 
-  const open = entry === null ? null : { entry, ...workedOut(entry) };
-
   return (
-    <>
-      <Button
-        onClick={() => {
-          setEntry(blank);
-        }}
-        size="sm"
-        variant="outline"
-      >
-        <House aria-hidden />
-        Add house
-      </Button>
-      {open !== null && (
-        <EditDialog
-          canSave={!isSaving && open.canSave}
-          eyebrow="New house"
-          isWide
-          onDismiss={dismiss}
-          onSave={() => {
-            save(open.values);
-          }}
-          title={open.values.name || "Untitled house"}
-        >
-          <HouseFields
-            draft={open.entry.draft}
-            figure={open.figure}
-            initial={open.entry.initial}
-            onAmend={(patch) => {
-              amend(open.entry, patch);
-            }}
-            worked={open.worked}
-          />
-        </EditDialog>
-      )}
-    </>
+    <EditDialog
+      canSave={!isSaving && canSave}
+      eyebrow={house === null ? "New house" : "Edit house"}
+      isWide
+      onDismiss={onDismiss}
+      onSave={save}
+      title={values.name || "Untitled house"}
+    >
+      <HouseFields
+        draft={entry.draft}
+        figure={figure}
+        initial={entry.initial}
+        onAmend={amend}
+        worked={worked}
+      />
+    </EditDialog>
   );
+}
+
+// The entry a house opens on: its values as the records hold them, with
+// the term worked out from them when it is mortgaged, since the store
+// keeps the balance, the rate and the payment and reads the term off
+// those, and the blank draft's term standing by otherwise.
+function entryOf(house: House): Entry {
+  const opening = { ...houseOf(house), term: draft.term };
+  return {
+    draft: opening,
+    initial: opening,
+    typed: house.loan === null ? ["rate", "term"] : ["payment", "rate"],
+  };
 }
 
 // The two figures that stand once one is typed: the typed one first, and

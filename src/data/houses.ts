@@ -1,5 +1,16 @@
-import type { AccountValues } from "@/data/accounts";
+import type { Account, AccountValues } from "@/data/accounts";
 import type { ExpenseLineValues } from "@/data/expenses";
+
+import { toValues } from "@/data/accounts";
+
+// A house as the store holds it: its own account, and the loan secured
+// on it while it is mortgaged, which the ledger finds by the link the
+// loan carries. The line of payments is not needed to open the house,
+// since the payment is the loan's contribution as well.
+export interface House {
+  readonly asset: Account;
+  readonly loan: Account | null;
+}
 
 // The house as the dialog holds it: the values, and the years the
 // mortgage has left to run. The term is not saved, since the store reads
@@ -66,6 +77,25 @@ export function derive(
     case "term":
       return termOf(draft.balance, draft.payment, draft.rate);
   }
+}
+
+// The values a house's records hold, for the dialog to open on: the
+// house's balance is its value and its rate its growth, and the loan's
+// balance is owed, so it comes back positive, its rate is the mortgage's
+// and its contribution the payment, a month as the records lay it. A
+// house with no loan against it is owned outright and owes nothing.
+export function houseOf({ asset, loan }: House): HouseValues {
+  const held = toValues(asset);
+  const owed = loan === null ? null : toValues(loan);
+  return {
+    balance: owed === null ? 0 : -owed.balance,
+    growth: held.rate,
+    name: held.name,
+    payment: owed === null ? 0 : owed.contribution,
+    rate: owed === null ? 0 : owed.rate,
+    status: owed === null ? "outright" : "mortgaged",
+    value: held.balance,
+  };
 }
 
 // A house the store would take: named, and if mortgaged owing something,
@@ -157,16 +187,19 @@ export function termOf(
   return -Math.log(1 - interest / payment) / Math.log(1 + monthly) / 12;
 }
 
-// The records a house is written as. The house is a real asset growing
-// at its own fixed rate, since the plan rate is the wrappers'; it is paid
-// nothing, so its cadence is the one a contribution of nothing reads
-// back as. A mortgage is a debt owing the balance, charged the rate as
-// its growth and paid nothing as an account, since what is paid is the
-// line: a debt line of the payment a month, fixed in nominal terms as a
-// mortgage payment is, from the plan's first year to the year the last
-// payment falls in, counted from the month the plan is read in, or
-// open-ended when the payment never clears it. Stated once, on the
-// line, so the cash flow counts it once. Both are named for the house.
+// The records a house is written as. The house is an asset of its own
+// kind growing at its own fixed rate, since the plan rate is the
+// wrappers'; it is paid nothing, so its cadence is the one a contribution
+// of nothing reads back as. A mortgage is a debt owing the balance,
+// charged the rate as its growth and paid the payment a month as its
+// contribution, which is what the ledger shows against it, and its
+// payments are a debt line of the same a month, fixed in nominal terms
+// as a mortgage payment is, from the plan's first year to the year the
+// last payment falls in, counted from the month the plan is read in, or
+// open-ended when the payment never clears it. The engine counts the
+// payment once, as the line, since it leaves the contribution of a loan
+// a line pays out of the month's fixed sums. Both are named for the
+// house.
 export function toRecords(
   house: HouseValues,
   plan: { readonly from: number; readonly month: number },
@@ -178,7 +211,7 @@ export function toRecords(
     contribution: 0,
     funding: "fixed",
     growth: "fixed",
-    kind: "real-asset",
+    kind: "house",
     name: house.name,
     rate: house.growth,
   };
@@ -192,9 +225,9 @@ export function toRecords(
     mortgage: {
       account: {
         balance: -house.balance,
-        cadence: "year",
+        cadence: "month",
         cap: 0,
-        contribution: 0,
+        contribution: house.payment,
         funding: "fixed",
         growth: "fixed",
         kind: "debt",
