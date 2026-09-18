@@ -10,6 +10,7 @@ import type { Plan } from "@/engine/projection";
 import type { Entry } from "@/hooks/use-editor";
 
 import { saveIncomeLine } from "@/app/(app)/plan/actions";
+import { FieldRow } from "@/components/app/atoms/field-row";
 import { Note } from "@/components/app/atoms/note";
 import { SectionHeader } from "@/components/app/atoms/section-header";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
@@ -158,7 +159,7 @@ export function IncomeSchedule({
             side="income"
           >
             {entry.draft.kind === "employment" && (
-              <div className="grid grid-cols-3 gap-4">
+              <FieldRow layout="triple">
                 <MoneyField
                   defaultValue={entry.initial.bonus}
                   hint="At the salary's cadence; nothing for none"
@@ -175,7 +176,7 @@ export function IncomeSchedule({
                     amend(entry, { rsu });
                   }}
                 />
-              </div>
+              </FieldRow>
             )}
           </LineFields>
         </EditDialog>
