@@ -14,7 +14,11 @@ import { lineGrowths } from "@/data/schedule";
 import { findAccount } from "@/db/accounts";
 import { getDb } from "@/db/client";
 import { insertExpenseLine, updateExpenseLine } from "@/db/expenses";
-import { insertIncomeLine, updateIncomeLine } from "@/db/income";
+import {
+  deleteIncomeLine,
+  insertIncomeLine,
+  updateIncomeLine,
+} from "@/db/income";
 import { requireSession } from "@/lib/session";
 
 import { expenseLinesTag, incomeLinesTag } from "./store";
@@ -66,6 +70,15 @@ const incomeValues = z
   ) satisfies z.ZodType<IncomeLineValues>;
 
 const target = z.number().int().positive().nullable();
+
+// Deletes the income line with that id. Nothing hangs on a line, so it
+// goes alone. Checked and expired as a save is.
+export async function removeIncomeLine(id: number): Promise<void> {
+  await requireSession();
+  const at = z.number().int().positive().parse(id);
+  await deleteIncomeLine(getDb(), at);
+  updateTag(incomeLinesTag);
+}
 
 // Writes an expense line, as an income line is written below.
 export async function saveExpenseLine(

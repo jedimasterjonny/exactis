@@ -3,6 +3,7 @@
 import type { JSX } from "react";
 
 import { Plus } from "lucide-react";
+import { startTransition, useState, useTransition } from "react";
 
 import type { Summary } from "@/components/app/organisms/schedule-rows";
 import type { Account } from "@/data/accounts";
@@ -11,10 +12,11 @@ import type { Plan } from "@/engine/projection";
 import type { Entry } from "@/hooks/use-editor";
 import type { Option } from "@/lib/options";
 
-import { saveIncomeLine } from "@/app/(app)/plan/actions";
+import { removeIncomeLine, saveIncomeLine } from "@/app/(app)/plan/actions";
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { Note } from "@/components/app/atoms/note";
 import { SectionHeader } from "@/components/app/atoms/section-header";
+import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { MoneyField } from "@/components/app/molecules/money-field";
 import { RateField } from "@/components/app/molecules/rate-field";
@@ -23,6 +25,7 @@ import { LineFields } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
+import { toast } from "@/components/kit/toast";
 import { isPension } from "@/data/accounts";
 import { totalOf } from "@/data/income";
 import { useEditor } from "@/hooks/use-editor";
@@ -70,7 +73,9 @@ const kinds = optionsOf(kindLabels, [
 // on a row of their own that only an employment line shows, and
 // beneath them the pension it feeds, chosen from the pensions among the
 // accounts the page hands down, with the share of the base it
-// sacrifices beside it while a pension is chosen. The card takes a
+// sacrifices beside it while a pension is chosen. A row's bin asks
+// through the confirm dialog before the line goes, as the ledger's
+// does; nothing hangs on a line, so it goes alone. The card takes a
 // numeral of its own off the screen's, since the reference numbers
 // each of the schedule's cards that way, and the expense schedule
 // beneath it takes the next.
@@ -84,6 +89,8 @@ export function IncomeSchedule({
     noun: "Income line",
     save: saveIncomeLine,
   });
+  const [doomed, setDoomed] = useState<IncomeLine | null>(null);
+  const [isRemoving, startRemoving] = useTransition();
   const pensions = accounts.filter(isPension);
   // The pension choice's options: none, and each pension by its id,
   // as the select's string, since two may share a name.
@@ -118,6 +125,23 @@ export function IncomeSchedule({
   function edit(line: IncomeLine): void {
     const { id, ...values } = line;
     open(values, id);
+  }
+
+  // What the confirm dialog asked goes to the store; the dialog stays
+  // open with its confirm held until the store answers, then closes, as
+  // a save does, and the page re-read takes the row with it.
+  function remove(line: IncomeLine): void {
+    startRemoving(async () => {
+      await removeIncomeLine(line.id);
+      startTransition(() => {
+        setDoomed(null);
+      });
+      toast.add({
+        description: line.name,
+        title: "Income line deleted",
+        type: "success",
+      });
+    });
   }
 
   // The pension choice: a line feeding none gives up nothing, and the
@@ -163,6 +187,7 @@ export function IncomeSchedule({
             emptyDescription="Add a salary, a pension or a side line to see it scheduled here."
             emptyTitle="No income yet"
             lines={lines}
+            onDelete={setDoomed}
             onEdit={edit}
             plan={plan}
             side="income"
@@ -174,6 +199,20 @@ export function IncomeSchedule({
         Lines overlap freely: a step-up is a second line starting mid-way, not
         an edit to the first.
       </Note>
+      {doomed !== null && (
+        <ConfirmDialog
+          isBusy={isRemoving}
+          onCancel={() => {
+            setDoomed(null);
+          }}
+          onConfirm={() => {
+            remove(doomed);
+          }}
+          title={`Delete ${doomed.name}?`}
+        >
+          It cannot be brought back.
+        </ConfirmDialog>
+      )}
       {entry !== null && (
         <EditDialog
           canSave={!isSaving && isSound(entry.draft)}

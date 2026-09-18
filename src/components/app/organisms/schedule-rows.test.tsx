@@ -149,13 +149,15 @@ describe("ScheduleRows", () => {
     expect(screen.getByText("No expenses yet")).toBeInTheDocument();
   });
 
-  it("closes each row with a pencil when given an edit handler", () => {
+  it("closes each row with a pencil and a bin when given both handlers", () => {
+    const onDelete = vi.fn<(line: IncomeLine) => void>();
     const onEdit = vi.fn<(line: IncomeLine) => void>();
     render(
       <ScheduleRows
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={incomeLines}
+        onDelete={onDelete}
         onEdit={onEdit}
         plan={plan}
         side="income"
@@ -166,14 +168,63 @@ describe("ScheduleRows", () => {
     expect(screen.getAllByRole("button", { name: /^Edit / })).toHaveLength(
       incomeLines.length,
     );
+    expect(screen.getAllByRole("button", { name: /^Delete / })).toHaveLength(
+      incomeLines.length,
+    );
+    expect(screen.getByRole("button", { name: "Delete Salary" })).toHaveClass(
+      "hover:text-destructive",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Edit Salary" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Salary" }));
 
     expect(onEdit).toHaveBeenCalledExactlyOnceWith(salary);
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith(salary);
   });
 
-  // A line the schedule locks draws a lock where its pencil would be,
-  // saying why, and the others keep theirs.
+  it("draws the column for either handler alone", () => {
+    const onDelete = vi.fn<(line: IncomeLine) => void>();
+    const { unmount } = render(
+      <ScheduleRows
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        lines={[salary]}
+        onDelete={onDelete}
+        plan={plan}
+        side="income"
+        summarise={summarise}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Edit Salary" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Salary" }));
+
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith(salary);
+
+    unmount();
+    render(
+      <ScheduleRows
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        lines={[salary]}
+        onEdit={vi.fn<(line: IncomeLine) => void>()}
+        plan={plan}
+        side="income"
+        summarise={summarise}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Edit Salary" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Delete Salary" }),
+    ).not.toBeInTheDocument();
+  });
+
+  // A line the schedule locks draws a lock where its pencil and bin
+  // would be, saying why, and the others keep theirs.
   it("locks a line the schedule says is locked, with the reason", () => {
     const onEdit = vi.fn<(line: IncomeLine) => void>();
     render(
@@ -181,6 +232,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[salary, statePension]}
+        onDelete={vi.fn<(line: IncomeLine) => void>()}
         onEdit={onEdit}
         plan={plan}
         side="income"
@@ -194,6 +246,9 @@ describe("ScheduleRows", () => {
     expect(screen.getByRole("button", { name: "Edit Salary" })).toBeEnabled();
     expect(
       screen.queryByRole("button", { name: "Edit State pension" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Delete State pension" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Set by the state" })).toHaveClass(
       "text-muted-foreground/60",

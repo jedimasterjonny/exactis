@@ -9,10 +9,14 @@ import { incomeLines } from "@/data/income.fixture";
 import { findAccount } from "@/db/accounts";
 import { getDb } from "@/db/client";
 import { insertExpenseLine, updateExpenseLine } from "@/db/expenses";
-import { insertIncomeLine, updateIncomeLine } from "@/db/income";
+import {
+  deleteIncomeLine,
+  insertIncomeLine,
+  updateIncomeLine,
+} from "@/db/income";
 import { requireSession } from "@/lib/session";
 
-import { saveExpenseLine, saveIncomeLine } from "./actions";
+import { removeIncomeLine, saveExpenseLine, saveIncomeLine } from "./actions";
 import { expenseLinesTag, incomeLinesTag } from "./store";
 
 vi.mock("server-only", () => ({}));
@@ -28,6 +32,7 @@ vi.mock("@/db/expenses", () => ({
   updateExpenseLine: vi.fn(),
 }));
 vi.mock("@/db/income", () => ({
+  deleteIncomeLine: vi.fn(),
   insertIncomeLine: vi.fn(),
   updateIncomeLine: vi.fn(),
 }));
@@ -227,6 +232,33 @@ describe("saveIncomeLine", () => {
     ).rejects.toThrow(z.ZodError);
     expect(insertIncomeLine).not.toHaveBeenCalled();
     expect(updateIncomeLine).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+});
+
+describe("removeIncomeLine", () => {
+  beforeEach(() => {
+    vi.mocked(getDb).mockReturnValue(db);
+  });
+
+  it("deletes nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(removeIncomeLine(salary.id)).rejects.toThrow("redirected");
+    expect(deleteIncomeLine).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+
+  it("deletes the line with the id and expires the tag", async () => {
+    await removeIncomeLine(salary.id);
+
+    expect(deleteIncomeLine).toHaveBeenCalledExactlyOnceWith(db, salary.id);
+    expect(updateTag).toHaveBeenCalledExactlyOnceWith(incomeLinesTag);
+  });
+
+  it("refuses an id the schedule could not have sent", async () => {
+    await expect(removeIncomeLine(0)).rejects.toThrow(z.ZodError);
+    expect(deleteIncomeLine).not.toHaveBeenCalled();
     expect(updateTag).not.toHaveBeenCalled();
   });
 });

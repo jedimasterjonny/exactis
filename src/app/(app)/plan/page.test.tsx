@@ -17,6 +17,7 @@ vi.mock("./store", () => ({
   getIncomeLines: vi.fn(),
 }));
 vi.mock("./actions", () => ({
+  removeIncomeLine: vi.fn(),
   saveExpenseLine: vi.fn(),
   saveIncomeLine: vi.fn(),
 }));
