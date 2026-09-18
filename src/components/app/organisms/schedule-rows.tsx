@@ -7,9 +7,9 @@ import type { LineValues, Side } from "@/data/schedule";
 import type { Plan } from "@/engine/projection";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
+import { RowAction } from "@/components/app/atoms/row-action";
 import { SpanBar } from "@/components/app/atoms/span-bar";
 import { Badge } from "@/components/kit/badge";
-import { Button } from "@/components/kit/button";
 import { endYear } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { growthLabels } from "@/lib/lines";
@@ -122,16 +122,13 @@ export function ScheduleRows<TLine extends Line>({
             </div>
             {onEdit !== undefined &&
               (summary.lock === undefined ? (
-                <Button
-                  aria-label={`Edit ${line.name}`}
+                <RowAction
+                  icon={Pencil}
+                  name={`Edit ${line.name}`}
                   onClick={() => {
                     onEdit(line);
                   }}
-                  size="icon-sm"
-                  variant="ghost"
-                >
-                  <Pencil aria-hidden />
-                </Button>
+                />
               ) : (
                 <span
                   aria-label={summary.lock}

@@ -8,9 +8,9 @@ import { useState } from "react";
 import type { ProgressPoint } from "@/data/points";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
+import { RowAction } from "@/components/app/atoms/row-action";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { MoneyField } from "@/components/app/molecules/money-field";
-import { Button } from "@/components/kit/button";
 import { Card } from "@/components/kit/card";
 import {
   Table,
@@ -99,16 +99,13 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
                   </TableCell>
                 ))}
                 <TableCell className="py-1">
-                  <Button
-                    aria-label={`Edit ${point.date}`}
+                  <RowAction
+                    icon={Pencil}
+                    name={`Edit ${point.date}`}
                     onClick={() => {
                       open(point);
                     }}
-                    size="icon-sm"
-                    variant="ghost"
-                  >
-                    <Pencil aria-hidden />
-                  </Button>
+                  />
                 </TableCell>
               </TableRow>
             ))}
