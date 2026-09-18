@@ -43,6 +43,13 @@
       "when": 1789720687808,
       "tag": "0005_houses",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789739816285,
+      "tag": "0006_cars",
+      "breakpoints": true
     }
   ]
 }

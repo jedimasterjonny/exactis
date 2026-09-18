@@ -42,6 +42,7 @@ export const expenseKind = pgEnum("expense_kind", expenseKinds);
 // an asset names the asset; any other account names none.
 export const accounts = pgTable("accounts", {
   balance: integer().notNull(),
+  balloon: integer().notNull(),
   cadence: cadence().notNull(),
   cap: integer().notNull(),
   contribution: integer().notNull(),

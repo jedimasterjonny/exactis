@@ -7,8 +7,12 @@
 // accounts are listed in, which is the order they were added until it
 // is changed. A loan secured on an asset carries that asset's id, so
 // the two are read and edited as one; any other account carries none.
+// A loan on a PCP carries the balloon its agreement leaves owing at the
+// end, so the car it is on opens as the PCP it is; any other account
+// carries none.
 export interface Account {
   readonly balance: number;
+  readonly balloon?: number;
   readonly contribution?: Contribution;
   readonly growth: Growth;
   readonly id: number;
@@ -22,12 +26,14 @@ export type AccountKind = (typeof accountKinds)[number];
 // The account as a form or a table row holds it: flat, with every field
 // present. A contribution of nothing is a zero rather than an absence, the
 // cadence is kept beside it whether or not it applies, a cap of nothing
-// is the account's own allowance, and the rate sits beside the growth
-// choice whether or not that is fixed. So a value can be edited field by
-// field and stored column by column, and becomes an account by the rules
-// below.
+// is the account's own allowance, the rate sits beside the growth
+// choice whether or not that is fixed, and a balloon of nothing is a
+// loan with none, which is every account but a PCP's. So a value can be
+// edited field by field and stored column by column, and becomes an
+// account by the rules below.
 export interface AccountValues {
   readonly balance: number;
+  readonly balloon: number;
   readonly cadence: Cadence;
   readonly cap: number;
   readonly contribution: number;
@@ -64,6 +70,7 @@ type Contribution =
 // The choices as lists, so the store's columns take the same words the
 // types do and cannot drift from them.
 export const accountKinds = [
+  "car",
   "cash",
   "debt",
   "house",
@@ -80,10 +87,11 @@ export const growthKinds = ["fixed", "plan"] as const;
 
 // The most the kind may be paid a year, as the UK sets it: £20,000 into
 // an ISA and £60,000 into a pension. Cash has no allowance, and a house,
-// a real asset or a debt is paid only a fixed sum, so none has one
-// either.
+// a car, a real asset or a debt is paid only a fixed sum, so none has
+// one either.
 export function allowanceOf(kind: AccountKind): null | number {
   switch (kind) {
+    case "car":
     case "cash":
     case "debt":
     case "house":
@@ -96,13 +104,19 @@ export function allowanceOf(kind: AccountKind): null | number {
   }
 }
 
-// A house or another real asset is the side of the plan the progress
-// points reconcile as total assets. A house is a real asset the house
-// dialog writes and edits, with the mortgage against it. The loan
-// against either is a debt, listed with the accounts, since it is paid
-// as they are; the progress points reconcile it as an asset loan.
+// A house, a car or another real asset is the side of the plan the
+// progress points reconcile as total assets. A house is a real asset
+// the house dialog writes and edits, with the mortgage against it, and
+// a car one the car dialog writes and edits, with the finance on it.
+// The loan against any of them is a debt, listed with the accounts,
+// since it is paid as they are; the progress points reconcile it as an
+// asset loan.
 export function isAsset(account: { readonly kind: AccountKind }): boolean {
-  return account.kind === "house" || account.kind === "real-asset";
+  return (
+    account.kind === "car" ||
+    account.kind === "house" ||
+    account.kind === "real-asset"
+  );
 }
 
 // A wrapper or cash may be paid the spare money. An asset or a debt is
@@ -111,13 +125,15 @@ export function takesSpare(account: { readonly kind: AccountKind }): boolean {
   return account.kind !== "debt" && !isAsset(account);
 }
 
-// A contribution of nothing is an absence on the account, a cap of
-// nothing is the account's own allowance, and a growth choice becomes
-// the account's growth with the rate only where it applies.
+// A contribution of nothing is an absence on the account, as a balloon
+// of nothing is, a cap of nothing is the account's own allowance, and a
+// growth choice becomes the account's growth with the rate only where
+// it applies.
 export function toAccount(values: AccountValues, id: number): Account {
   const contribution = contributionOf(values);
   return {
     balance: values.balance,
+    ...(values.balloon > 0 && { balloon: values.balloon }),
     ...(contribution !== undefined && { contribution }),
     growth:
       values.growth === "plan"
@@ -130,12 +146,13 @@ export function toAccount(values: AccountValues, id: number): Account {
 }
 
 // The reverse: an absent contribution is a fixed sum of nothing a year,
-// a spare one carries no sum, a fixed one no cap, and a plan rate no
-// rate.
+// a spare one carries no sum, a fixed one no cap, a plan rate no rate,
+// and an absent balloon is one of nothing.
 export function toValues(account: Account): AccountValues {
   const { contribution } = account;
   return {
     balance: account.balance,
+    balloon: account.balloon ?? 0,
     cadence: contribution?.kind === "fixed" ? contribution.cadence : "year",
     cap: contribution?.kind === "spare" ? (contribution.cap ?? 0) : 0,
     contribution: contribution?.kind === "fixed" ? contribution.amount : 0,

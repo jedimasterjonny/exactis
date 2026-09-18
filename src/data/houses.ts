@@ -130,6 +130,7 @@ export function toRecords(
 ): HouseRecords {
   const asset: AccountValues = {
     balance: house.value,
+    balloon: 0,
     cadence: "year",
     cap: 0,
     contribution: 0,
@@ -149,6 +150,7 @@ export function toRecords(
     mortgage: {
       account: {
         balance: -house.balance,
+        balloon: 0,
         cadence: "month",
         cap: 0,
         contribution: house.payment,

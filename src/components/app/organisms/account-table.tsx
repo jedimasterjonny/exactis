@@ -40,6 +40,7 @@ const treatments: Record<
   AccountKind,
   { readonly label: string; readonly variant: Treatment }
 > = {
+  car: { label: "Car", variant: "secondary" },
   cash: { label: "Cash", variant: "secondary" },
   debt: { label: "Debt", variant: "destructive" },
   house: { label: "House", variant: "secondary" },
