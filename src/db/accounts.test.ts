@@ -9,6 +9,8 @@ import { accounts } from "@/db/schema";
 import type { Database } from "./accounts";
 
 import {
+  deleteAccount,
+  findLoanAgainst,
   insertAccount,
   listAccounts,
   placeAccounts,
@@ -189,5 +191,46 @@ describe("accounts store", () => {
     await expect(updateAccount(db, 99, pension)).rejects.toThrow(
       "No account was written",
     );
+  });
+
+  // A loan secured on an asset carries the asset's id, which is found by
+  // it and kept through an edit; an account secured on nothing carries
+  // none at all.
+  it("secures a loan on an asset, finds it by the asset and keeps the link through an edit", async () => {
+    const db = await openStore();
+    const home = await insertAccount(db, {
+      ...pension,
+      contribution: 0,
+      kind: "house",
+      name: "Home",
+    });
+    const loan = await insertAccount(db, mortgage, home.id);
+
+    expect(home).not.toHaveProperty("secures");
+    expect(loan.secures).toBe(home.id);
+    expect(await findLoanAgainst(db, home.id)).toStrictEqual(loan);
+    expect(await findLoanAgainst(db, 99)).toBeNull();
+    expect(
+      (await updateAccount(db, loan.id, { ...mortgage, balance: -1 })).secures,
+    ).toBe(home.id);
+    expect(
+      (await listAccounts(db)).map(({ secures }) => secures),
+    ).toStrictEqual([undefined, home.id]);
+  });
+
+  it("deletes an account, refusing one a loan is still secured on or an id no account has", async () => {
+    const db = await openStore();
+    const home = await insertAccount(db, { ...pension, kind: "house" });
+    const loan = await insertAccount(db, mortgage, home.id);
+
+    await expect(deleteAccount(db, home.id)).rejects.toThrow();
+    await expect(deleteAccount(db, 99)).rejects.toThrow(
+      "No account was written",
+    );
+
+    await deleteAccount(db, loan.id);
+    await deleteAccount(db, home.id);
+
+    expect(await listAccounts(db)).toStrictEqual([]);
   });
 });

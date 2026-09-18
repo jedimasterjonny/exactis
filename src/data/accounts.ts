@@ -5,7 +5,8 @@
 // to the account rather than to a place in a list, and two accounts may
 // share a name. The store hands the ids out, and holds the order the
 // accounts are listed in, which is the order they were added until it
-// is changed.
+// is changed. A loan secured on an asset carries that asset's id, so
+// the two are read and edited as one; any other account carries none.
 export interface Account {
   readonly balance: number;
   readonly contribution?: Contribution;
@@ -13,6 +14,7 @@ export interface Account {
   readonly id: number;
   readonly kind: AccountKind;
   readonly name: string;
+  readonly secures?: number;
 }
 
 export type AccountKind = (typeof accountKinds)[number];
@@ -64,6 +66,7 @@ type Contribution =
 export const accountKinds = [
   "cash",
   "debt",
+  "house",
   "real-asset",
   "tax-deferred",
   "tax-free",
@@ -76,12 +79,14 @@ export const fundings = ["fixed", "spare"] as const;
 export const growthKinds = ["fixed", "plan"] as const;
 
 // The most the kind may be paid a year, as the UK sets it: £20,000 into
-// an ISA and £60,000 into a pension. Cash has no allowance, and a real
-// asset or a debt is paid only a fixed sum, so neither has one either.
+// an ISA and £60,000 into a pension. Cash has no allowance, and a house,
+// a real asset or a debt is paid only a fixed sum, so none has one
+// either.
 export function allowanceOf(kind: AccountKind): null | number {
   switch (kind) {
     case "cash":
     case "debt":
+    case "house":
     case "real-asset":
       return null;
     case "tax-deferred":
@@ -91,18 +96,19 @@ export function allowanceOf(kind: AccountKind): null | number {
   }
 }
 
-// A real asset is the side of the plan the progress points reconcile as
-// total assets. The loan against one is a debt, listed with the accounts,
-// since it is paid as they are; the progress points reconcile it as an
-// asset loan.
+// A house or another real asset is the side of the plan the progress
+// points reconcile as total assets. A house is a real asset the house
+// dialog writes and edits, with the mortgage against it. The loan
+// against either is a debt, listed with the accounts, since it is paid
+// as they are; the progress points reconcile it as an asset loan.
 export function isAsset(account: { readonly kind: AccountKind }): boolean {
-  return account.kind === "real-asset";
+  return account.kind === "house" || account.kind === "real-asset";
 }
 
-// A wrapper or cash may be paid the spare money. A real asset or a debt
-// is paid a fixed sum or nothing: the spare money goes into savings.
+// A wrapper or cash may be paid the spare money. An asset or a debt is
+// paid a fixed sum or nothing: the spare money goes into savings.
 export function takesSpare(account: { readonly kind: AccountKind }): boolean {
-  return account.kind !== "debt" && account.kind !== "real-asset";
+  return account.kind !== "debt" && !isAsset(account);
 }
 
 // A contribution of nothing is an absence on the account, a cap of
