@@ -3,7 +3,7 @@
 import type { JSX } from "react";
 
 import { CarFront, HousePlus, Plus } from "lucide-react";
-import { startTransition, useOptimistic, useState, useTransition } from "react";
+import { startTransition, useOptimistic, useState } from "react";
 
 import type {
   Account,
@@ -37,11 +37,10 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/kit/tabs";
-import { toast } from "@/components/kit/toast";
 import { isAsset, takesSpare, toValues } from "@/data/accounts";
 import { useEditor } from "@/hooks/use-editor";
+import { useRemover } from "@/hooks/use-remover";
 import { counted } from "@/lib/count";
-import { reasonOf } from "@/lib/errors";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
@@ -113,8 +112,11 @@ export function AccountLedger({
   const [tab, setTab] = useState<Tab>("accounts");
   const [house, setHouse] = useState<HouseOpening | null>(null);
   const [car, setCar] = useState<CarOpening | null>(null);
-  const [doomed, setDoomed] = useState<Account | null>(null);
-  const [isRemoving, startRemoving] = useTransition();
+  const { ask, cancel, confirm, doomed, isRemoving } = useRemover<Account>({
+    describe: (account) => account.name,
+    noun: "Account",
+    remove: removeAccount,
+  });
   const [order, placeOptimistically] = useOptimistic(
     accounts,
     (_current: readonly Account[], next: readonly Account[]) => next,
@@ -169,33 +171,6 @@ export function AccountLedger({
     startTransition(async () => {
       placeOptimistically(next);
       await placeAccountsInOrder(next.map((a) => a.id));
-    });
-  }
-
-  // What the confirm dialog asked goes to the store; the dialog stays
-  // open with its confirm held until the store answers, then closes, as
-  // a save does, and the page re-read takes the row with it. A store
-  // that refuses leaves the question open and says why, as a refused
-  // save does.
-  function remove(account: Account): void {
-    startRemoving(async () => {
-      try {
-        await removeAccount(account.id);
-        startTransition(() => {
-          setDoomed(null);
-        });
-        toast.add({
-          description: account.name,
-          title: "Account deleted",
-          type: "success",
-        });
-      } catch (error: unknown) {
-        toast.add({
-          description: reasonOf(error),
-          title: "Account not deleted",
-          type: "error",
-        });
-      }
     });
   }
 
@@ -283,7 +258,7 @@ export function AccountLedger({
               accounts={held}
               emptyDescription="Add a pension, an ISA, a savings account or a debt to see it listed here."
               emptyTitle="No accounts yet"
-              onDelete={setDoomed}
+              onDelete={ask}
               onEdit={edit}
               onMove={move}
             />
@@ -301,7 +276,7 @@ export function AccountLedger({
               accounts={assets}
               emptyDescription="A house, a car, anything owned outright. Add one to see it listed here."
               emptyTitle="No assets yet"
-              onDelete={setDoomed}
+              onDelete={ask}
               onEdit={edit}
             />
             <Note>
@@ -342,11 +317,9 @@ export function AccountLedger({
       {doomed !== null && (
         <ConfirmDialog
           isBusy={isRemoving}
-          onCancel={() => {
-            setDoomed(null);
-          }}
+          onCancel={cancel}
           onConfirm={() => {
-            remove(doomed);
+            confirm(doomed);
           }}
           title={`Delete ${doomed.name}?`}
         >

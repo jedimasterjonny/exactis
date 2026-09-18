@@ -3,7 +3,6 @@
 import type { JSX } from "react";
 
 import { Plus } from "lucide-react";
-import { startTransition, useState, useTransition } from "react";
 
 import type { Summary } from "@/components/app/organisms/schedule-rows";
 import type { Account } from "@/data/accounts";
@@ -25,11 +24,10 @@ import { LineFields } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
-import { toast } from "@/components/kit/toast";
 import { isPension } from "@/data/accounts";
 import { totalOf } from "@/data/income";
 import { useEditor } from "@/hooks/use-editor";
-import { reasonOf } from "@/lib/errors";
+import { useRemover } from "@/hooks/use-remover";
 import { isSound, spanOf } from "@/lib/lines";
 import { formatGbp, formatPercent } from "@/lib/money";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
@@ -90,8 +88,11 @@ export function IncomeSchedule({
     noun: "Income line",
     save: saveIncomeLine,
   });
-  const [doomed, setDoomed] = useState<IncomeLine | null>(null);
-  const [isRemoving, startRemoving] = useTransition();
+  const { ask, cancel, confirm, doomed, isRemoving } = useRemover<IncomeLine>({
+    describe: (line) => line.name,
+    noun: "Income line",
+    remove: removeIncomeLine,
+  });
   const pensions = accounts.filter(isPension);
   // The pension choice's options: none, and each pension by its id,
   // as the select's string, since two may share a name.
@@ -126,33 +127,6 @@ export function IncomeSchedule({
   function edit(line: IncomeLine): void {
     const { id, ...values } = line;
     open(values, id);
-  }
-
-  // What the confirm dialog asked goes to the store; the dialog stays
-  // open with its confirm held until the store answers, then closes, as
-  // a save does, and the page re-read takes the row with it. A store
-  // that refuses leaves the question open and says why, as a refused
-  // save does.
-  function remove(line: IncomeLine): void {
-    startRemoving(async () => {
-      try {
-        await removeIncomeLine(line.id);
-        startTransition(() => {
-          setDoomed(null);
-        });
-        toast.add({
-          description: line.name,
-          title: "Income line deleted",
-          type: "success",
-        });
-      } catch (error: unknown) {
-        toast.add({
-          description: reasonOf(error),
-          title: "Income line not deleted",
-          type: "error",
-        });
-      }
-    });
   }
 
   // The pension choice: a line feeding none gives up nothing, and the
@@ -198,7 +172,7 @@ export function IncomeSchedule({
             emptyDescription="Add a salary, a pension or a side line to see it scheduled here."
             emptyTitle="No income yet"
             lines={lines}
-            onDelete={setDoomed}
+            onDelete={ask}
             onEdit={edit}
             plan={plan}
             side="income"
@@ -213,11 +187,9 @@ export function IncomeSchedule({
       {doomed !== null && (
         <ConfirmDialog
           isBusy={isRemoving}
-          onCancel={() => {
-            setDoomed(null);
-          }}
+          onCancel={cancel}
           onConfirm={() => {
-            remove(doomed);
+            confirm(doomed);
           }}
           title={`Delete ${doomed.name}?`}
         >
