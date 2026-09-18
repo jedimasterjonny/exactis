@@ -1,5 +1,6 @@
 import type { Account, AccountValues } from "@/data/accounts";
 import type { ExpenseLineValues } from "@/data/expenses";
+import type { LoanFigure } from "@/lib/figures";
 import type { Owed } from "@/lib/loans";
 
 import { toValues } from "@/data/accounts";
@@ -47,10 +48,6 @@ export interface HouseValues {
   readonly value: number;
 }
 
-// The three figures of a mortgage that fix each other, given what is
-// owed: what is paid a month, the rate, and the years it takes to clear.
-export type MortgageFigure = "payment" | "rate" | "term";
-
 export type Status = (typeof statuses)[number];
 
 // The loan and its payments, named for the house they are against.
@@ -67,10 +64,7 @@ export const statuses = ["mortgaged", "outright"] as const;
 // pound, since a line is paid in whole pounds; the rate as found; the
 // term to the month it lands in. Null where no figure fits, which the
 // two that can say so say in the loan maths.
-export function derive(
-  draft: HouseDraft,
-  figure: MortgageFigure,
-): null | number {
+export function derive(draft: HouseDraft, figure: LoanFigure): null | number {
   switch (figure) {
     case "payment":
       return Math.round(paymentOf(owedOn(draft), draft.rate, draft.term));

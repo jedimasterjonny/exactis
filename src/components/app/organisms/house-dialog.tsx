@@ -4,12 +4,8 @@ import type { JSX } from "react";
 
 import { startTransition, useState, useTransition } from "react";
 
-import type {
-  House,
-  HouseDraft,
-  HouseValues,
-  MortgageFigure,
-} from "@/data/houses";
+import type { House, HouseDraft, HouseValues } from "@/data/houses";
+import type { LoanFigure, Stood } from "@/lib/figures";
 
 import { saveHouse } from "@/app/(app)/accounts/actions";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
@@ -17,17 +13,16 @@ import { HouseFields } from "@/components/app/organisms/house-fields";
 import { toast } from "@/components/kit/toast";
 import { derive, houseOf, isSound } from "@/data/houses";
 import { reasonOf } from "@/lib/errors";
+import { stood, thirdOf } from "@/lib/figures";
 
 // An open dialog: the draft as it is, the draft as it opened, which the
 // uncontrolled fields take as their defaults, and the two of the
-// mortgage's three figures typed last, the latest first, which stand
-// while the third is worked out from them. A figure typed moves to the
-// front and pushes the other out, so the one worked out is always the
-// one left alone longest.
+// mortgage's three figures that stand while the third is worked out
+// from them.
 interface Entry {
   readonly draft: HouseDraft;
   readonly initial: HouseDraft;
-  readonly typed: readonly [MortgageFigure, MortgageFigure];
+  readonly typed: Stood;
 }
 
 interface HouseDialogProps {
@@ -53,9 +48,6 @@ const draft: HouseDraft = {
 
 const blank: Entry = { draft, initial: draft, typed: ["rate", "term"] };
 
-// The three figures, so a patch can be asked which it carries.
-const figures: readonly MortgageFigure[] = ["payment", "rate", "term"];
-
 // The dialog a house is entered or edited in, which takes the house as
 // the records it is and lets the store write them: the asset, and for a
 // mortgaged house the loan against it and its payments. It is open for
@@ -79,14 +71,11 @@ export function HouseDialog({
   const [isSaving, startSaving] = useTransition();
   const { canSave, figure, values, worked } = workedOut(entry);
 
-  // A patch to one of the three figures makes it one of the two that
-  // stand; any other patch leaves them as they are.
   function amend(patch: Partial<HouseDraft>): void {
-    const typed = figures.find((candidate) => candidate in patch);
     setEntry({
       ...entry,
       draft: { ...entry.draft, ...patch },
-      typed: typed === undefined ? entry.typed : stood(entry.typed, typed),
+      typed: stood(entry.typed, patch),
     });
   }
 
@@ -154,28 +143,6 @@ function entryOf(house: House): Entry {
   };
 }
 
-// The two figures that stand once one is typed: the typed one first, and
-// whichever of the two that stood is not it.
-function stood(
-  typed: readonly [MortgageFigure, MortgageFigure],
-  figure: MortgageFigure,
-): readonly [MortgageFigure, MortgageFigure] {
-  const [first, second] = typed;
-  return [figure, first === figure ? second : first];
-}
-
-// The figure the two given leave out.
-function thirdOf(one: MortgageFigure, other: MortgageFigure): MortgageFigure {
-  switch (one) {
-    case "payment":
-      return other === "rate" ? "term" : "rate";
-    case "rate":
-      return other === "payment" ? "term" : "payment";
-    case "term":
-      return other === "payment" ? "rate" : "payment";
-  }
-}
-
 // The house the draft would save: the name as typed less the space
 // around it, which is what the title shows; nothing owed, paid or
 // charged for a house owned outright, whatever the hidden fields hold;
@@ -185,7 +152,7 @@ function thirdOf(one: MortgageFigure, other: MortgageFigure): MortgageFigure {
 // leaves the draft's, which the held save never sends.
 function valuesOf(
   draft: HouseDraft,
-  worked: MortgageFigure,
+  worked: LoanFigure,
   figure: null | number,
 ): HouseValues {
   const values: HouseValues = {
@@ -217,7 +184,7 @@ function workedOut(entry: Entry): {
   readonly canSave: boolean;
   readonly figure: null | number;
   readonly values: HouseValues;
-  readonly worked: MortgageFigure;
+  readonly worked: LoanFigure;
 } {
   const worked = thirdOf(...entry.typed);
   const figure = derive(entry.draft, worked);
