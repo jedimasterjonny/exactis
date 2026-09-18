@@ -12,7 +12,7 @@ import { SpanBar } from "@/components/app/atoms/span-bar";
 import { Badge } from "@/components/kit/badge";
 import { endYear } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
-import { growthLabels } from "@/lib/lines";
+import { endOf, growthLabels } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 
 // What a schedule says of a line that the rows cannot read off it: the
@@ -49,8 +49,9 @@ const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
 // A schedule's rows, one per line: the name and the kind's badge, with the
 // line's detail beside them when its schedule gives one, over a bar
 // placing the line on the plan's span; what the line pays at its cadence
-// over what it grows with; the years it runs over the ages reached, an
-// open-ended line running to the end; and, when given an edit handler, a
+// over what it grows with; the years it runs over the ages reached, to
+// the month when it ends part way through a year and an open-ended line
+// running to the end; and, when given an edit handler, a
 // pencil that reports the row's line, whose id says where a save writes
 // back. The schedule reads its own lines, so what the rows cannot read
 // off one, the badge, the figure and the detail, comes from it. The
@@ -98,6 +99,7 @@ export function ScheduleRows<TLine extends Line>({
               </div>
               <SpanBar
                 firstYear={line.firstYear}
+                lastMonth={line.lastMonth}
                 lastYear={line.lastYear}
                 plan={plan}
                 side={side}
@@ -153,8 +155,8 @@ function formatAges(line: LineValues, plan: Plan): string {
   return `Age ${String(first)}–${String(last)}`;
 }
 
-// The years the line runs, an open-ended one to the end.
+// The years the line runs, to the month when it ends part way through
+// its last, and an open-ended one to the end.
 function formatYears(line: LineValues): string {
-  const last = line.lastYear === null ? "end" : String(line.lastYear);
-  return `${String(line.firstYear)} – ${last}`;
+  return `${String(line.firstYear)} – ${endOf(line) ?? "end"}`;
 }

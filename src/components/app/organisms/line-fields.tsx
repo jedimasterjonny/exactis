@@ -164,6 +164,7 @@ export function LineFields<TKind extends string>({
         </span>
         <SpanBar
           firstYear={draft.firstYear}
+          lastMonth={draft.lastMonth}
           lastYear={draft.lastYear}
           plan={plan}
           side={side}
