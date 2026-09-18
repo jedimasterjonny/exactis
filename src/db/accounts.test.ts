@@ -19,6 +19,7 @@ import {
 
 const pension = {
   balance: 412880,
+  balloon: 0,
   cadence: "year",
   cap: 0,
   contribution: 27195,
@@ -31,6 +32,7 @@ const pension = {
 
 const mortgage = {
   balance: -182940,
+  balloon: 0,
   cadence: "month",
   cap: 0,
   contribution: 2210,
@@ -216,6 +218,30 @@ describe("accounts store", () => {
     expect(
       (await listAccounts(db)).map(({ secures }) => secures),
     ).toStrictEqual([undefined, home.id]);
+  });
+
+  // A PCP's loan carries the balloon it is left owing, and a car is a
+  // kind of its own; a loan with no balloon carries none.
+  it("holds a car and the balloon on the loan against it", async () => {
+    const db = await openStore();
+    const car = await insertAccount(db, {
+      ...pension,
+      contribution: 0,
+      kind: "car",
+      name: "Golf",
+    });
+    const loan = await insertAccount(
+      db,
+      { ...mortgage, balloon: 8000, name: "Golf PCP" },
+      car.id,
+    );
+
+    expect(car.kind).toBe("car");
+    expect(loan.balloon).toBe(8000);
+    expect(await insertAccount(db, mortgage)).not.toHaveProperty("balloon");
+    expect(
+      (await updateAccount(db, loan.id, { ...mortgage, balloon: 0 })).balloon,
+    ).toBeUndefined();
   });
 
   it("deletes an account, refusing one a loan is still secured on or an id no account has", async () => {

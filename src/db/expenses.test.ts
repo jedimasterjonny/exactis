@@ -91,6 +91,7 @@ describe("expense lines store", () => {
     const db = await openStore();
     const loan = await insertAccount(db, {
       balance: -182940,
+      balloon: 0,
       cadence: "month",
       cap: 0,
       contribution: 2210,

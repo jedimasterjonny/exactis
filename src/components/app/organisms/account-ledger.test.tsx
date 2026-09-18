@@ -183,6 +183,7 @@ describe("AccountLedger", () => {
 
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(null, {
       balance: 4000,
+      balloon: 0,
       cadence: "month",
       cap: 0,
       contribution: 333,
@@ -258,6 +259,7 @@ describe("AccountLedger", () => {
     ).toHaveAccessibleDescription("Car");
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(null, {
       balance: 12500,
+      balloon: 0,
       cadence: "year",
       cap: 0,
       contribution: 0,
@@ -388,6 +390,7 @@ describe("AccountLedger", () => {
     ).toHaveAccessibleDescription("Home");
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(4, {
       balance: 420000,
+      balloon: 0,
       cadence: "year",
       cap: 0,
       contribution: 0,
@@ -441,6 +444,7 @@ describe("AccountLedger", () => {
     ).toHaveAccessibleDescription("Workplace pension");
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(1, {
       balance: 412880,
+      balloon: 0,
       cadence: "year",
       cap: 0,
       contribution: 30000,
@@ -493,6 +497,7 @@ describe("AccountLedger", () => {
     });
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(2, {
       balance: 286145,
+      balloon: 0,
       cadence: "year",
       cap: 4000,
       contribution: 0,
@@ -624,6 +629,7 @@ describe("AccountLedger", () => {
 
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(2, {
       balance: 286145,
+      balloon: 0,
       cadence: "year",
       cap: 0,
       contribution: 250,
