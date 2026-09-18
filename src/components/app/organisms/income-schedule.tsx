@@ -192,6 +192,7 @@ function blank(plan: Plan): Draft {
     amount: 0,
     bonus: 0,
     cadence: "year",
+    feeds: null,
     firstYear: plan.from,
     growth: "inflation",
     kind: "employment",
@@ -199,6 +200,7 @@ function blank(plan: Plan): Draft {
     lastYear: null,
     name: "",
     rsu: 0,
+    sacrifice: 0,
   };
 }
 

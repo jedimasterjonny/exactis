@@ -62,10 +62,14 @@ export const accounts = pgTable("accounts", {
 // year. The cadence is the accounts' own type, since a line is paid as a
 // contribution is. The year and month columns are named, since the
 // model's names are the dialog's words and the store's are snake case.
+// A salary paid through a salary sacrifice names the pension the
+// sacrifice goes into and holds the share of its base given up; any
+// other line names none and gives up nothing.
 export const incomeLines = pgTable("income_lines", {
   amount: integer().notNull(),
   bonus: integer().notNull(),
   cadence: cadence().notNull(),
+  feeds: integer().references(() => accounts.id),
   firstYear: integer("first_year").notNull(),
   growth: incomeGrowth().notNull(),
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -74,6 +78,7 @@ export const incomeLines = pgTable("income_lines", {
   lastYear: integer("last_year"),
   name: text().notNull(),
   rsu: integer().notNull(),
+  sacrifice: doublePrecision().notNull(),
 });
 
 // One row per expense line, laid out as the income table lays its lines,

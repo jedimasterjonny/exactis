@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   allowanceOf,
   isAsset,
+  isPension,
   takesSpare,
   toAccount,
   toValues,
@@ -129,6 +130,15 @@ describe("isAsset", () => {
     expect(takesSpare({ kind: "house" })).toBe(false);
     expect(isAsset({ kind: "car" })).toBe(true);
     expect(takesSpare({ kind: "car" })).toBe(false);
+  });
+});
+
+describe("isPension", () => {
+  it("names the tax-deferred wrapper alone as the one a salary may feed", () => {
+    expect(isPension({ kind: "tax-deferred" })).toBe(true);
+    expect(isPension({ kind: "tax-free" })).toBe(false);
+    expect(isPension({ kind: "cash" })).toBe(false);
+    expect(isPension({ kind: "debt" })).toBe(false);
   });
 });
 

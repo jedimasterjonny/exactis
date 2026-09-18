@@ -24,6 +24,20 @@ export async function deleteAccount(db: Database, id: number): Promise<void> {
   single(rows);
 }
 
+// The account with that id, or null when no account has it.
+export async function findAccount(
+  db: Database,
+  id: number,
+): Promise<Account | null> {
+  const rows = await db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.id, id))
+    .limit(1);
+  const [row] = rows;
+  return row === undefined ? null : fromRow(row);
+}
+
 // The loan secured on the asset with that id, or null when it has none.
 // An asset has at most one, since the house dialog writes one and
 // nothing else writes a link.

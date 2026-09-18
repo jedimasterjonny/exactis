@@ -7,10 +7,11 @@ import type { ExpenseLine, ExpenseLineValues } from "@/data/expenses";
 import type { IncomeLine, IncomeLineValues } from "@/data/income";
 import type { LineValues } from "@/data/schedule";
 
-import { cadences } from "@/data/accounts";
+import { cadences, isPension } from "@/data/accounts";
 import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
 import { lineGrowths } from "@/data/schedule";
+import { findAccount } from "@/db/accounts";
 import { getDb } from "@/db/client";
 import { insertExpenseLine, updateExpenseLine } from "@/db/expenses";
 import { insertIncomeLine, updateIncomeLine } from "@/db/income";
@@ -40,19 +41,28 @@ const expenseValues = z
   .refine(endsInAYear) satisfies z.ZodType<ExpenseLineValues>;
 
 // An income line adds its kind and its parts, whole and never negative,
-// with a bonus or RSUs only on an employment line.
+// with a bonus or RSUs only on an employment line, and the pension it
+// feeds and the share of its base it sacrifices, a fraction of the base
+// at most, only on an employment line, with a share given up only where
+// there is a pension to take it.
 const incomeValues = z
   .object({
     ...line,
     bonus: z.number().int().nonnegative(),
+    feeds: z.number().int().positive().nullable(),
     kind: z.enum(incomeKinds),
     rsu: z.number().int().nonnegative(),
+    sacrifice: z.number().min(0).max(1),
   })
   .refine(endsAfterItStarts)
   .refine(endsInAYear)
   .refine(
     (values) =>
-      values.kind === "employment" || (values.bonus === 0 && values.rsu === 0),
+      values.kind === "employment" ||
+      (values.bonus === 0 && values.rsu === 0 && values.feeds === null),
+  )
+  .refine(
+    (values) => values.feeds !== null || values.sacrifice === 0,
   ) satisfies z.ZodType<IncomeLineValues>;
 
 const target = z.number().int().positive().nullable();
@@ -78,8 +88,12 @@ export async function saveExpenseLine(
 // with that id, and hands back the line as the store now has it. An
 // action answers a POST from anywhere, so it checks the session for
 // itself and parses what it was sent rather than trusting the form; a
-// value the form could not have sent fails loudly. The tag is expired
-// before returning, so the same round trip carries the list re-read.
+// value the form could not have sent fails loudly. A pension the line
+// feeds is read before the line is written, since the form offers the
+// pensions alone and the store holds the id to an account rather than
+// to a pension: one that is no account, or an account of another kind,
+// is refused here. The tag is expired before returning, so the same
+// round trip carries the list re-read.
 export async function saveIncomeLine(
   id: null | number,
   draft: IncomeLineValues,
@@ -88,6 +102,15 @@ export async function saveIncomeLine(
   const at = target.parse(id);
   const parsed = incomeValues.parse(draft);
   const db = getDb();
+  if (parsed.feeds !== null) {
+    const pension = await findAccount(db, parsed.feeds);
+    if (pension === null) {
+      throw new Error("No account has the id the salary feeds");
+    }
+    if (!isPension(pension)) {
+      throw new Error("A salary feeds a pension alone");
+    }
+  }
   const saved =
     at === null
       ? await insertIncomeLine(db, parsed)
