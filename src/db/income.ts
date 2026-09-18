@@ -5,6 +5,18 @@ import type { Database } from "@/db/accounts";
 
 import { incomeLines } from "@/db/schema";
 
+// The line with that id, gone.
+export async function deleteIncomeLine(
+  db: Database,
+  id: number,
+): Promise<void> {
+  const rows = await db
+    .delete(incomeLines)
+    .where(eq(incomeLines.id, id))
+    .returning();
+  single(rows);
+}
+
 // A new income line, with the id the store gives it.
 export async function insertIncomeLine(
   db: Database,
