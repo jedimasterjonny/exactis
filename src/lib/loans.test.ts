@@ -1,61 +1,105 @@
 import { describe, expect, it } from "vitest";
 
+import type { Owed } from "./loans";
+
 import { clearsIn, paymentOf, rateOf, termOf } from "./loans";
+
+// What is owed, with no balloon unless one is given.
+function owed(balance: number, balloon = 0): Owed {
+  return { balance, balloon };
+}
 
 describe("paymentOf", () => {
   // £100,000 at 6% over 30 years is the textbook £599.55 a month.
   it("finds the annuity payment that clears the balance over the term", () => {
-    expect(paymentOf(100000, 0.06, 30)).toBeCloseTo(599.55, 2);
-    expect(paymentOf(341810, 0.0515, 22)).toBeCloseTo(2166.33, 2);
+    expect(paymentOf(owed(100000), 0.06, 30)).toBeCloseTo(599.55, 2);
+    expect(paymentOf(owed(341810), 0.0515, 22)).toBeCloseTo(2166.33, 2);
   });
 
   it("spreads the balance flat at no rate, and clears a term of nothing in one payment", () => {
-    expect(paymentOf(120000, 0, 10)).toBe(1000);
-    expect(paymentOf(1000, 0.12, 0)).toBeCloseTo(1010, 10);
+    expect(paymentOf(owed(120000), 0, 10)).toBe(1000);
+    expect(paymentOf(owed(1000), 0.12, 0)).toBeCloseTo(1010, 10);
+  });
+
+  // £20,000 at 6% paid down to an £8,000 balloon over four years is
+  // £321.82 a month; with no rate the £12,000 difference spreads flat,
+  // and a balloon the size of the balance leaves the interest alone to
+  // pay.
+  it("finds the payment that pays the balance down to a balloon over the term", () => {
+    expect(paymentOf(owed(20000, 8000), 0.06, 4)).toBeCloseTo(321.82, 2);
+    expect(paymentOf(owed(20000, 8000), 0, 4)).toBe(250);
+    expect(paymentOf(owed(20000, 20000), 0.06, 4)).toBeCloseTo(100, 10);
   });
 });
 
 describe("termOf", () => {
   it("finds the years the payment takes to clear the balance at the rate", () => {
-    expect(termOf(341810, 2210, 0.0515)).toBeCloseTo(21.21, 2);
-    expect(termOf(100000, 599.55, 0.06)).toBeCloseTo(30, 3);
+    expect(termOf(owed(341810), 2210, 0.0515)).toBeCloseTo(21.21, 2);
+    expect(termOf(owed(100000), 599.55, 0.06)).toBeCloseTo(30, 3);
   });
 
   // A rate too small to move one in floating point would have the
   // formula divide nothing by nothing, so it is spread flat as well.
   it("spreads the balance flat at no rate, or one too small to compound", () => {
-    expect(termOf(120000, 1000, 0)).toBe(10);
-    expect(termOf(120000, 1000, 1e-18)).toBe(10);
+    expect(termOf(owed(120000), 1000, 0)).toBe(10);
+    expect(termOf(owed(120000), 1000, 1e-18)).toBe(10);
   });
 
   it("clears nothing owed at once, and never clears with nothing paid or a payment the interest swallows", () => {
-    expect(termOf(0, 2210, 0.0515)).toBe(0);
-    expect(termOf(341810, 0, 0.0515)).toBeNull();
-    expect(termOf(100000, 500, 0.06)).toBeNull();
+    expect(termOf(owed(0), 2210, 0.0515)).toBe(0);
+    expect(termOf(owed(341810), 0, 0.0515)).toBeNull();
+    expect(termOf(owed(100000), 500, 0.06)).toBeNull();
+  });
+
+  // The payment that pays down to the balloon over four years takes four
+  // years to get there; the same payment carried on clears the whole
+  // balance in 6.2 years. A balance already at the balloon takes no
+  // time, and a payment the interest swallows never gets there.
+  it("finds the years the payment takes to pay the balance down to a balloon", () => {
+    const payment = paymentOf(owed(20000, 8000), 0.06, 4);
+
+    expect(termOf(owed(20000, 8000), payment, 0.06)).toBeCloseTo(4, 8);
+    expect(termOf(owed(20000), payment, 0.06)).toBeCloseTo(6.22, 2);
+    expect(termOf(owed(20000, 8000), 250, 0)).toBe(4);
+    expect(termOf(owed(8000, 8000), 300, 0.06)).toBe(0);
+    expect(termOf(owed(20000, 8000), 100, 0.06)).toBeNull();
   });
 });
 
 describe("rateOf", () => {
   it("finds the rate at which the payment clears the balance over the term", () => {
-    expect(rateOf(100000, 599.55, 30)).toBeCloseTo(0.06, 5);
-    expect(rateOf(341810, 2210, 22)).toBeCloseTo(0.0537, 4);
+    expect(rateOf(owed(100000), 599.55, 30)).toBeCloseTo(0.06, 5);
+    expect(rateOf(owed(341810), 2210, 22)).toBeCloseTo(0.0537, 4);
   });
 
   // £990 a month clears £1,000 in a year only at nearly twelve hundred per
   // cent, above the first ceiling tried, so the ceiling is raised until
   // it is enough.
   it("finds a rate above the first ceiling by raising it", () => {
-    const rate = rateOf(1000, 990, 1);
+    const rate = rateOf(owed(1000), 990, 1);
 
     expect(rate).not.toBeNull();
     expect(rate).toBeGreaterThan(1);
-    expect(paymentOf(1000, rate ?? 0, 1)).toBeCloseTo(990, 6);
+    expect(paymentOf(owed(1000), rate ?? 0, 1)).toBeCloseTo(990, 6);
   });
 
   it("finds no rate when the payments fall short of the balance, and none at all when they meet it", () => {
-    expect(rateOf(120000, 999, 10)).toBeNull();
-    expect(rateOf(120000, 1000, 10)).toBe(0);
-    expect(rateOf(0, 2210, 22)).toBe(0);
+    expect(rateOf(owed(120000), 999, 10)).toBeNull();
+    expect(rateOf(owed(120000), 1000, 10)).toBe(0);
+    expect(rateOf(owed(0), 2210, 22)).toBe(0);
+  });
+
+  // The rate the payment pays down to the balloon at is the one the
+  // payment was found at; £249 a month falls short of the £12,000 to pay
+  // down over four years, £250 meets it exactly, and a balance already at
+  // the balloon is paid down at no rate.
+  it("finds the rate at which the payment pays the balance down to a balloon", () => {
+    const pcp = owed(20000, 8000);
+
+    expect(rateOf(pcp, paymentOf(pcp, 0.06, 4), 4)).toBeCloseTo(0.06, 8);
+    expect(rateOf(owed(20000, 8000), 249, 4)).toBeNull();
+    expect(rateOf(owed(20000, 8000), 250, 4)).toBe(0);
+    expect(rateOf(owed(8000, 8000), 300, 4)).toBe(0);
   });
 });
 
