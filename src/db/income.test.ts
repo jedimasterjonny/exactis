@@ -10,6 +10,7 @@ import { deleteAccount, insertAccount } from "./accounts";
 import {
   deleteIncomeLine,
   insertIncomeLine,
+  isFed,
   listIncomeLines,
   stopFeeding,
   updateIncomeLine,
@@ -144,9 +145,15 @@ describe("income lines store", () => {
     await insertIncomeLine(db, { ...fed, name: "Step-up" });
     await insertIncomeLine(db, { ...fed, feeds: other.id });
 
+    expect(await isFed(db, pension.id)).toBe(true);
+    expect(await isFed(db, other.id)).toBe(true);
     await expect(deleteAccount(db, pension.id)).rejects.toThrow();
 
     await stopFeeding(db, pension.id);
+
+    expect(await isFed(db, pension.id)).toBe(false);
+    expect(await isFed(db, other.id)).toBe(true);
+
     await deleteAccount(db, pension.id);
 
     expect(await listIncomeLines(db)).toStrictEqual([

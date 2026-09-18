@@ -12,7 +12,8 @@ import {
 
 interface SelectFieldProps<TValue extends string> {
   readonly defaultValue: TValue;
-  readonly hint?: string;
+  readonly hint?: string | undefined;
+  readonly isDisabled?: boolean;
   readonly label: string;
   readonly onValueChange?: (value: TValue) => void;
   readonly options: readonly Option<TValue>[];
@@ -22,10 +23,12 @@ interface SelectFieldProps<TValue extends string> {
 // rendered as the native select, which is what ties it to the label the
 // field draws. The change is reported as the option's typed value rather
 // than the element's string, so a caller never parses what it already
-// gave.
+// gave. A disabled choice is shown as it stands and cannot be changed,
+// for a caller whose hint says why.
 export function SelectField<TValue extends string>({
   defaultValue,
   hint,
+  isDisabled = false,
   label,
   onValueChange,
   options,
@@ -43,7 +46,7 @@ export function SelectField<TValue extends string>({
           }
         }}
         render={
-          <NativeSelect className="w-full">
+          <NativeSelect className="w-full" disabled={isDisabled}>
             {options.map((option) => (
               <NativeSelectOption key={option.value} value={option.value}>
                 {option.label}
