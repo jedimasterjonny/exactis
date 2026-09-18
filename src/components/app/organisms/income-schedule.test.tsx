@@ -134,6 +134,25 @@ describe("IncomeSchedule", () => {
     ).toHaveAccessibleDescription("Salary");
   });
 
+  it("keeps the question open when the store refuses, and says why", async () => {
+    renderSchedule();
+    vi.mocked(removeIncomeLine).mockRejectedValue(
+      new Error("No income line was written"),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Salary" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Income line not deleted" }),
+      ).toHaveAccessibleDescription("No income line was written");
+    });
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete Salary?" }),
+    ).toBeVisible();
+  });
+
   it("drops the question on cancel and deletes nothing", () => {
     renderSchedule();
 

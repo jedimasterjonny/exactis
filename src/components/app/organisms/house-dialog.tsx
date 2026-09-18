@@ -16,6 +16,7 @@ import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { HouseFields } from "@/components/app/organisms/house-fields";
 import { toast } from "@/components/kit/toast";
 import { derive, houseOf, isSound } from "@/data/houses";
+import { reasonOf } from "@/lib/errors";
 
 // An open dialog: the draft as it is, the draft as it opened, which the
 // uncontrolled fields take as their defaults, and the two of the
@@ -92,21 +93,31 @@ export function HouseDialog({
   // The dialog stays open with its save held until the store answers,
   // then tells the caller; the telling is a transition of its own, since
   // a state update after an await is not part of the one it awaited in.
+  // A store that refuses leaves the dialog open and says why, as the
+  // editor hook does, rather than handing the route the rejection.
   function save(): void {
     startSaving(async () => {
-      const account = await saveHouse(
-        house === null ? null : house.asset.id,
-        values,
-      );
-      startTransition(onSaved);
-      toast.add({
-        description:
-          values.status === "mortgaged"
-            ? `${account.name} · with its mortgage and payments`
-            : account.name,
-        title: house === null ? "House added" : "House updated",
-        type: "success",
-      });
+      try {
+        const account = await saveHouse(
+          house === null ? null : house.asset.id,
+          values,
+        );
+        startTransition(onSaved);
+        toast.add({
+          description:
+            values.status === "mortgaged"
+              ? `${account.name} · with its mortgage and payments`
+              : account.name,
+          title: house === null ? "House added" : "House updated",
+          type: "success",
+        });
+      } catch (error: unknown) {
+        toast.add({
+          description: reasonOf(error),
+          title: "House not saved",
+          type: "error",
+        });
+      }
     });
   }
 

@@ -41,6 +41,7 @@ import { toast } from "@/components/kit/toast";
 import { isAsset, takesSpare, toValues } from "@/data/accounts";
 import { useEditor } from "@/hooks/use-editor";
 import { counted } from "@/lib/count";
+import { reasonOf } from "@/lib/errors";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
@@ -173,18 +174,28 @@ export function AccountLedger({
 
   // What the confirm dialog asked goes to the store; the dialog stays
   // open with its confirm held until the store answers, then closes, as
-  // a save does, and the page re-read takes the row with it.
+  // a save does, and the page re-read takes the row with it. A store
+  // that refuses leaves the question open and says why, as a refused
+  // save does.
   function remove(account: Account): void {
     startRemoving(async () => {
-      await removeAccount(account.id);
-      startTransition(() => {
-        setDoomed(null);
-      });
-      toast.add({
-        description: account.name,
-        title: "Account deleted",
-        type: "success",
-      });
+      try {
+        await removeAccount(account.id);
+        startTransition(() => {
+          setDoomed(null);
+        });
+        toast.add({
+          description: account.name,
+          title: "Account deleted",
+          type: "success",
+        });
+      } catch (error: unknown) {
+        toast.add({
+          description: reasonOf(error),
+          title: "Account not deleted",
+          type: "error",
+        });
+      }
     });
   }
 

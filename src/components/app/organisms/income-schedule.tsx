@@ -29,6 +29,7 @@ import { toast } from "@/components/kit/toast";
 import { isPension } from "@/data/accounts";
 import { totalOf } from "@/data/income";
 import { useEditor } from "@/hooks/use-editor";
+import { reasonOf } from "@/lib/errors";
 import { isSound, spanOf } from "@/lib/lines";
 import { formatGbp, formatPercent } from "@/lib/money";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
@@ -129,18 +130,28 @@ export function IncomeSchedule({
 
   // What the confirm dialog asked goes to the store; the dialog stays
   // open with its confirm held until the store answers, then closes, as
-  // a save does, and the page re-read takes the row with it.
+  // a save does, and the page re-read takes the row with it. A store
+  // that refuses leaves the question open and says why, as a refused
+  // save does.
   function remove(line: IncomeLine): void {
     startRemoving(async () => {
-      await removeIncomeLine(line.id);
-      startTransition(() => {
-        setDoomed(null);
-      });
-      toast.add({
-        description: line.name,
-        title: "Income line deleted",
-        type: "success",
-      });
+      try {
+        await removeIncomeLine(line.id);
+        startTransition(() => {
+          setDoomed(null);
+        });
+        toast.add({
+          description: line.name,
+          title: "Income line deleted",
+          type: "success",
+        });
+      } catch (error: unknown) {
+        toast.add({
+          description: reasonOf(error),
+          title: "Income line not deleted",
+          type: "error",
+        });
+      }
     });
   }
 
