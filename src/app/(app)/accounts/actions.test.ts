@@ -27,6 +27,7 @@ import {
   placeAccountsInOrder,
   removeAccount,
   saveAccount,
+  saveCar,
   saveHouse,
 } from "./actions";
 import { accountsTag } from "./store";
@@ -380,6 +381,164 @@ describe("saveHouse", () => {
     expect(insertAccount).not.toHaveBeenCalled();
     expect(updateAccount).not.toHaveBeenCalled();
     expect(insertExpenseLine).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+});
+
+describe("saveCar", () => {
+  // A Golf as the dialog would send it: worth £18,000 losing 15% a year,
+  // £14,000 owed at 7.9% on a PCP paying £290 a month towards a £6,000
+  // balloon, refinanced on the same terms and so cleared in 2031 from
+  // September 2026; and the records it is written as.
+  const golf = {
+    agreement: "pcp",
+    balance: 14000,
+    balloon: 6000,
+    depreciation: 0.15,
+    name: " Golf ",
+    payment: 290,
+    rate: 0.079,
+    value: 18000,
+  } as const;
+
+  const asset = {
+    balance: 18000,
+    balloon: 0,
+    cadence: "year",
+    cap: 0,
+    contribution: 0,
+    funding: "fixed",
+    growth: "fixed",
+    kind: "car",
+    name: "Golf",
+    rate: -0.15,
+  } as const;
+
+  const finance = {
+    balance: -14000,
+    balloon: 6000,
+    cadence: "month",
+    cap: 0,
+    contribution: 290,
+    funding: "fixed",
+    growth: "fixed",
+    kind: "debt",
+    name: "Golf PCP",
+    rate: 0.079,
+  } as const;
+
+  const line = {
+    amount: 290,
+    cadence: "month",
+    firstYear: 2026,
+    growth: "nominal",
+    kind: "debt",
+    lastYear: 2031,
+    name: "Golf PCP",
+  } as const;
+
+  const car = { ...home, id: 6, kind: "car", name: "Golf" } as const;
+
+  beforeEach(() => {
+    vi.mocked(getDb).mockReturnValue(db);
+    vi.mocked(getPlan).mockReturnValue({
+      born: 1990,
+      from: 2026,
+      month: 8,
+      rate: 0.05,
+      years: 30,
+    });
+  });
+
+  it("writes nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(saveCar(null, golf)).rejects.toThrow("redirected");
+    expect(insertAccount).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+
+  it("writes a new car on a PCP as the car, the finance secured on it and its payments, and expires both tags", async () => {
+    vi.mocked(insertAccount)
+      .mockResolvedValueOnce(car)
+      .mockResolvedValueOnce({ ...mortgage, id: 7 });
+    vi.mocked(insertExpenseLine).mockResolvedValue(mortgagePayment);
+
+    expect(await saveCar(null, golf)).toBe(car);
+    expect(vi.mocked(insertAccount).mock.calls).toStrictEqual([
+      [db, asset],
+      [db, finance, car.id],
+    ]);
+    expect(insertExpenseLine).toHaveBeenCalledExactlyOnceWith(db, line, 7);
+    expect(vi.mocked(updateTag).mock.calls).toStrictEqual([
+      [expenseLinesTag],
+      [accountsTag],
+    ]);
+  });
+
+  // The store finds the finance by the car and the line by the finance,
+  // as it does a mortgage, and a car owned outright now sends both away.
+  it("writes over a car and the finance secured on it, and sends the finance away when the car is owned outright now", async () => {
+    vi.mocked(updateAccount).mockResolvedValue(car);
+    vi.mocked(findLoanAgainst).mockResolvedValue({ ...mortgage, id: 7 });
+    vi.mocked(findLinePaying).mockResolvedValue(mortgagePayment);
+
+    await saveCar(car.id, golf);
+
+    expect(vi.mocked(updateAccount).mock.calls).toStrictEqual([
+      [db, car.id, asset],
+      [db, 7, finance],
+    ]);
+    expect(updateExpenseLine).toHaveBeenCalledExactlyOnceWith(
+      db,
+      mortgagePayment.id,
+      line,
+    );
+
+    await saveCar(car.id, {
+      ...golf,
+      agreement: "outright",
+      balance: 0,
+      balloon: 0,
+      payment: 0,
+      rate: 0,
+    });
+
+    expect(deleteExpenseLine).toHaveBeenCalledExactlyOnceWith(
+      db,
+      mortgagePayment.id,
+    );
+    expect(deleteAccount).toHaveBeenCalledExactlyOnceWith(db, 7);
+  });
+
+  it("refuses what the form could not have sent", async () => {
+    await expect(saveCar(0, golf)).rejects.toThrow(z.ZodError);
+    await expect(saveCar(null, { ...golf, name: "  " })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(saveCar(null, { ...golf, depreciation: 1.5 })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(saveCar(null, { ...golf, balloon: 0 })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(saveCar(null, { ...golf, balloon: 14000 })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(saveCar(null, { ...golf, agreement: "loan" })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(
+      saveCar(null, {
+        ...golf,
+        agreement: "outright",
+        balance: 0,
+        balloon: 0,
+        rate: 0,
+      }),
+    ).rejects.toThrow(z.ZodError);
+    expect(insertAccount).not.toHaveBeenCalled();
+    expect(updateAccount).not.toHaveBeenCalled();
     expect(updateTag).not.toHaveBeenCalled();
   });
 });

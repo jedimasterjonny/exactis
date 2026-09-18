@@ -32,18 +32,18 @@ in the vendored file works until the next refresh silently discards it.
 
 ## Tier: the app directory
 
-| tier         | what it is                                       | here                                                                                                                                                                                                                |
-| ------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `atoms/`     | one presentational job, composes nothing of ours | `delta-value`, `empty-state`, `field`, `field-row`, `figure-input`, `labelled-switch`, `note`, `row-action`, `screen-body`, `screen-header`, `section-header`, `span-bar`, `tile-grid`                              |
-| `molecules/` | atoms combined into one reusable control         | `app-nav`, `confirm-dialog`, `edit-dialog`, `money-field`, `rate-field`, `select-field`, `stat-tile`, `term-field`, `text-field`, `theme-toggle`, `year-field`                                                      |
-| `organisms/` | a whole region of a screen                       | `account-fields`, `account-ledger`, `account-table`, `cash-flow-card`, `expense-schedule`, `house-dialog`, `house-fields`, `income-schedule`, `line-fields`, `progress-points`, `projection-chart`, `schedule-rows` |
-| `templates/` | the shell a page sits in                         | `app-frame`                                                                                                                                                                                                         |
+| tier         | what it is                                       | here                                                                                                                                                                                                                                            |
+| ------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `atoms/`     | one presentational job, composes nothing of ours | `delta-value`, `empty-state`, `field`, `field-row`, `figure-input`, `labelled-switch`, `note`, `row-action`, `screen-body`, `screen-header`, `section-header`, `span-bar`, `tile-grid`                                                          |
+| `molecules/` | atoms combined into one reusable control         | `app-nav`, `confirm-dialog`, `edit-dialog`, `money-field`, `rate-field`, `select-field`, `stat-tile`, `term-field`, `text-field`, `theme-toggle`, `year-field`                                                                                  |
+| `organisms/` | a whole region of a screen                       | `account-fields`, `account-ledger`, `account-table`, `car-dialog`, `car-fields`, `cash-flow-card`, `expense-schedule`, `house-dialog`, `house-fields`, `income-schedule`, `line-fields`, `progress-points`, `projection-chart`, `schedule-rows` |
+| `templates/` | the shell a page sits in                         | `app-frame`                                                                                                                                                                                                                                     |
 
 A component composes what is below it, and beside it, never above.
-Organism-on-organism is the one same-tier edge this allows, and there are eight
-of them: `account-ledger` on `account-fields`, `account-table` and
-`house-dialog`, `house-dialog` on `house-fields`, and each of the two schedules
-on both `line-fields` and `schedule-rows`.
+Organism-on-organism is the one same-tier edge this allows, and there are ten of
+them: `account-ledger` on `account-fields`, `account-table`, `car-dialog` and
+`house-dialog`, `car-dialog` on `car-fields`, `house-dialog` on `house-fields`,
+and each of the two schedules on both `line-fields` and `schedule-rows`.
 
 ## Placing a new component
 

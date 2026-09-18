@@ -257,8 +257,9 @@ describe("ExpenseSchedule", () => {
     });
   });
 
-  // A line that is a loan's payments is the house dialog's to write, so
-  // it is locked here, with the reason where its pencil would be.
+  // A line that is a loan's payments is written by the dialog of the
+  // asset the loan is on, so it is locked here, with the reason where
+  // its pencil would be.
   it("locks a line that is a loan's payments", () => {
     render(
       <Toaster>
@@ -277,7 +278,7 @@ describe("ExpenseSchedule", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("img", {
-        name: "Edited with its house on the accounts screen",
+        name: "Edited with its asset on the accounts screen",
       }),
     ).toBeInTheDocument();
   });

@@ -13,6 +13,7 @@ import {
   placeAccountsInOrder,
   removeAccount,
   saveAccount,
+  saveCar,
   saveHouse,
 } from "@/app/(app)/accounts/actions";
 import { Toaster } from "@/components/kit/toast";
@@ -25,6 +26,7 @@ vi.mock("@/app/(app)/accounts/actions", () => ({
   placeAccountsInOrder: vi.fn(),
   removeAccount: vi.fn(),
   saveAccount: vi.fn(),
+  saveCar: vi.fn(),
   saveHouse: vi.fn(),
 }));
 
@@ -36,6 +38,26 @@ const [pension, isa, cash, home, mortgage] = accounts;
 const house: Account = { ...home, kind: "house" };
 
 const loan: Account = { ...mortgage, secures: home.id };
+
+// A Golf as a car, with the finance secured on it.
+const golf: Account = {
+  balance: 18000,
+  growth: { kind: "fixed", rate: -0.15 },
+  id: 6,
+  kind: "car",
+  name: "Golf",
+};
+
+const finance: Account = {
+  balance: -14000,
+  balloon: 6000,
+  contribution: { amount: 290, cadence: "month", kind: "fixed" },
+  growth: { kind: "fixed", rate: 0.079 },
+  id: 7,
+  kind: "debt",
+  name: "Golf PCP",
+  secures: golf.id,
+};
 
 function commit(field: HTMLElement, value: string): void {
   fireEvent.change(field, { target: { value } });
@@ -301,6 +323,38 @@ describe("AccountLedger", () => {
       ).not.toBeInTheDocument();
     });
     expect(saveHouse).toHaveBeenCalledOnce();
+    expect(screen.getByRole("tab", { name: /^Assets/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  // The car dialog is the header's own too, and the ledger's part is the
+  // same: to bring the assets forward once it has saved.
+  it("adds a car from the header and brings the assets tab forward", async () => {
+    renderLedger();
+    vi.mocked(saveCar).mockResolvedValue(golf);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add car" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Untitled car" });
+
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
+      target: { value: "Golf" },
+    });
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Agreement" }),
+      { target: { value: "outright" } },
+    );
+    commit(within(dialog).getByRole("textbox", { name: "Value" }), "18,000");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Golf" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(saveCar).toHaveBeenCalledOnce();
     expect(screen.getByRole("tab", { name: /^Assets/ })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -757,6 +811,38 @@ describe("AccountLedger", () => {
     ).toHaveValue("£182,940");
   });
 
+  // A car and the finance on it are one car to its dialog, which opens
+  // on it from the pencil on either side.
+  it("opens a car and the finance on it in the car dialog from either pencil", () => {
+    render(
+      <Toaster>
+        <AccountLedger accounts={[pension, golf, finance]} />
+      </Toaster>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Golf PCP" }));
+
+    let dialog = screen.getByRole("dialog", { name: "Golf" });
+
+    expect(within(dialog).getByText("Edit car")).toHaveClass("text-brand");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Agreement" }),
+    ).toHaveValue("pcp");
+    expect(
+      within(dialog).getByRole("textbox", { name: "Balloon" }),
+    ).toHaveValue("£6,000");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
+
+    dialog = openEditor("Golf");
+
+    expect(within(dialog).getByText("Edit car")).toHaveClass("text-brand");
+    expect(
+      within(dialog).getByRole("textbox", { name: "Balance owed" }),
+    ).toHaveValue("£14,000");
+  });
+
   it("opens a house with no loan against it as owned outright", () => {
     render(
       <Toaster>
@@ -773,14 +859,28 @@ describe("AccountLedger", () => {
     ).toHaveValue("outright");
   });
 
-  it("edits a loan whose house is not listed as the account it is", () => {
+  // A loan secured on an asset with no dialog of its own is edited as
+  // the account it is too, since no dialog would write it back.
+  it("edits a loan whose asset is not listed, or has no dialog, as the account it is", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[{ ...mortgage, secures: 99 }]} />
+        <AccountLedger
+          accounts={[
+            home,
+            { ...mortgage, secures: 99 },
+            { ...finance, secures: home.id },
+          ]}
+        />
       </Toaster>,
     );
 
-    const dialog = openEditor("Mortgage");
+    let dialog = openEditor("Mortgage");
+
+    expect(within(dialog).getByText("Edit account")).toHaveClass("text-brand");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    dialog = openEditor("Golf PCP");
 
     expect(within(dialog).getByText("Edit account")).toHaveClass("text-brand");
   });
@@ -856,6 +956,23 @@ describe("AccountLedger", () => {
       screen.getByRole("alertdialog", { name: "Delete Home?" }),
     ).toHaveAccessibleDescription(
       "Its mortgage, Mortgage, and the payments go with it.",
+    );
+  });
+
+  it("says a car takes its finance and the payments", () => {
+    render(
+      <Toaster>
+        <AccountLedger accounts={[golf, finance]} />
+      </Toaster>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Golf" }));
+
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete Golf?" }),
+    ).toHaveAccessibleDescription(
+      "Its finance, Golf PCP, and the payments go with it.",
     );
   });
 
