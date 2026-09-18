@@ -12,6 +12,7 @@ import type {
   Funding,
 } from "@/data/accounts";
 import type { House } from "@/data/houses";
+import type { Entry } from "@/hooks/use-editor";
 
 import {
   placeAccountsInOrder,
@@ -35,6 +36,7 @@ import {
 } from "@/components/kit/tabs";
 import { toast } from "@/components/kit/toast";
 import { isAsset, takesSpare, toValues } from "@/data/accounts";
+import { useEditor } from "@/hooks/use-editor";
 import { counted } from "@/lib/count";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
@@ -48,15 +50,6 @@ interface AccountLedgerProps {
 // choice changes, and the field always mounts showing what the draft
 // holds.
 type Draft = AccountValues;
-
-// An open dialog: the draft as it is, the draft as it opened, which the
-// uncontrolled fields take as their defaults, and the id of the account it
-// edits, or null for a new one.
-interface Entry {
-  readonly draft: Draft;
-  readonly id: null | number;
-  readonly initial: Draft;
-}
 
 // What the house dialog is open on: a new house, or one to edit with the
 // loan against it.
@@ -96,25 +89,26 @@ const blank: Draft = {
 // and a loan its payments.
 export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   const [tab, setTab] = useState<Tab>("accounts");
-  const [entry, setEntry] = useState<Entry | null>(null);
   const [house, setHouse] = useState<HouseOpening | null>(null);
   const [doomed, setDoomed] = useState<Account | null>(null);
-  const [isSaving, startSaving] = useTransition();
   const [isRemoving, startRemoving] = useTransition();
   const [order, placeOptimistically] = useOptimistic(
     accounts,
     (_current: readonly Account[], next: readonly Account[]) => next,
   );
+  const { amend, dismiss, entry, isSaving, open, save } = useEditor({
+    describe: (account) => account.name,
+    noun: "Account",
+    // A saved account brings its own tab forward, in the transition
+    // the dialog closes in, so the tab and the closed dialog land
+    // together.
+    onSaved: (account) => {
+      setTab(isAsset(account) ? "assets" : "accounts");
+    },
+    save: saveAccount,
+  });
   const held = order.filter((account) => !isAsset(account));
   const assets = order.filter(isAsset);
-
-  function amend(current: Entry, patch: Partial<Draft>): void {
-    setEntry({ ...current, draft: { ...current.draft, ...patch } });
-  }
-
-  function dismiss(): void {
-    setEntry(null);
-  }
 
   // A row's pencil opens its account as it is, with its id so a save
   // writes back to it, unless the account is a house or the loan against
@@ -131,7 +125,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   // The contribution choice: the fields the new choice shows mount with
   // what the account opened with, so the draft takes the same, and the
   // fields the choice leaves behind go back to nothing.
-  function fund(current: Entry, funding: Funding): void {
+  function fund(current: Entry<Draft>, funding: Funding): void {
     amend(current, fundedBy(current, funding));
   }
 
@@ -170,17 +164,13 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
     });
   }
 
-  function open(draft: Draft, id: null | number): void {
-    setEntry({ draft, id, initial: draft });
-  }
-
   // The treatment choice: a real asset or a debt is paid only a fixed sum, so the
   // contribution choice leaves with it and an account paid the spare
   // money is paid a fixed sum instead, as it opened. The choice comes
   // back when a wrapper or cash is chosen again, as the account opened
   // with it, which is what the choice mounts showing. A change that
   // stays on one side leaves the choice where it is.
-  function treat(current: Entry, kind: AccountKind): void {
+  function treat(current: Entry<Draft>, kind: AccountKind): void {
     const willTakeSpare = takesSpare({ kind });
     if (!willTakeSpare && current.draft.funding === "spare") {
       amend(current, { kind, ...fundedBy(current, "fixed") });
@@ -193,27 +183,6 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
     } else {
       amend(current, { kind });
     }
-  }
-
-  // The name is saved as typed less the space around it, which is what
-  // the title shows and what save waited for. The dialog stays open with
-  // its save held until the store answers, then closes onto the tab the
-  // account belongs to; the close is a transition of its own, since a
-  // state update after an await is not part of the one it awaited in.
-  function save(current: Entry): void {
-    const values = { ...current.draft, name: current.draft.name.trim() };
-    startSaving(async () => {
-      const account = await saveAccount(current.id, values);
-      startTransition(() => {
-        setTab(isAsset(account) ? "assets" : "accounts");
-        setEntry(null);
-      });
-      toast.add({
-        description: account.name,
-        title: current.id === null ? "Account added" : "Account updated",
-        type: "success",
-      });
-    });
   }
 
   return (
@@ -357,7 +326,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
 // The draft as a contribution choice leaves it: the fields the choice
 // shows at what the account opened with, since that is what they mount
 // showing, and the fields it hides at nothing.
-function fundedBy(current: Entry, funding: Funding): Partial<Draft> {
+function fundedBy(current: Entry<Draft>, funding: Funding): Partial<Draft> {
   return funding === "fixed"
     ? {
         cadence: current.initial.cadence,
