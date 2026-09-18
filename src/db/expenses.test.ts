@@ -6,7 +6,10 @@ import { describe, expect, it } from "vitest";
 // @vitest-environment node
 import type { Database } from "./accounts";
 
+import { insertAccount } from "./accounts";
 import {
+  deleteExpenseLine,
+  findLinePaying,
   insertExpenseLine,
   listExpenseLines,
   updateExpenseLine,
@@ -80,5 +83,50 @@ describe("expense lines store", () => {
     await expect(updateExpenseLine(db, 99, household)).rejects.toThrow(
       "No expense line was written",
     );
+  });
+
+  // A line that is a loan's payments carries the loan's id, which is
+  // found by it and kept through an edit; any other line carries none.
+  it("links a line to the loan it pays, finds it by the loan and keeps the link through an edit", async () => {
+    const db = await openStore();
+    const loan = await insertAccount(db, {
+      balance: -182940,
+      cadence: "month",
+      cap: 0,
+      contribution: 2210,
+      funding: "fixed",
+      growth: "fixed",
+      kind: "debt",
+      name: "Mortgage",
+      rate: 0.0515,
+    });
+    const payments = await insertExpenseLine(db, household, loan.id);
+    const other = await insertExpenseLine(db, care);
+
+    expect(payments.pays).toBe(loan.id);
+    expect(other).not.toHaveProperty("pays");
+    expect(await findLinePaying(db, loan.id)).toStrictEqual(payments);
+    expect(await findLinePaying(db, 99)).toBeNull();
+    expect(
+      (await updateExpenseLine(db, payments.id, { ...household, amount: 1 }))
+        .pays,
+    ).toBe(loan.id);
+    expect(await listExpenseLines(db)).toStrictEqual([
+      { ...payments, amount: 1 },
+      other,
+    ]);
+  });
+
+  it("deletes a line, refusing an id no line has", async () => {
+    const db = await openStore();
+    const line = await insertExpenseLine(db, household);
+
+    await expect(deleteExpenseLine(db, 99)).rejects.toThrow(
+      "No expense line was written",
+    );
+
+    await deleteExpenseLine(db, line.id);
+
+    expect(await listExpenseLines(db)).toStrictEqual([]);
   });
 });
