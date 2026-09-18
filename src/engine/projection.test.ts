@@ -96,11 +96,12 @@ describe("project", () => {
     ]);
   });
 
-  // The mortgage's £2,210 a month and the pension's £27,195 a year come
-  // out of the month before the spare money does, leaving £4,273.42, and
-  // the current account, listed first and uncapped, takes all of it,
-  // so the ISA is paid nothing; the pension is still paid its sum, a
-  // twelfth a month.
+  // The salary's £1,000 a month sacrificed, the mortgage's £2,210 a
+  // month and the pension's £27,195 a year come out of the month before
+  // the spare money does, leaving £3,273.42, and the current account,
+  // listed first and uncapped, takes all of it, so the ISA is paid
+  // nothing; the pension is still paid its sum, a twelfth a month, and
+  // fed the £1,150 that lands with the NI saved on top: 475,621.
   it("reads the cash flow over every account, in the order they are listed", () => {
     const spareCash: Account = {
       ...cash,
@@ -114,7 +115,28 @@ describe("project", () => {
 
     expect(a?.free).toBe(286145);
     expect(b?.free).toBe(286145);
-    expect(a?.deferred).toBe(461450);
+    expect(a?.deferred).toBe(475621);
+  });
+
+  // A pension paid nothing of its own and fed the salary's £1,000 a
+  // month, at no growth, is £13,800 up on the year: the sacrifice with
+  // the employer's fifteen per cent NI saved on it.
+  it("pays a salary's sacrifice into the pension it feeds, with the NI saved", () => {
+    const fed: Account = {
+      balance: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: pension.id,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+    };
+
+    expect(
+      project([fed], { expenses: [], income: [salary] }, { ...plan, years: 2 }),
+    ).toStrictEqual([
+      { age: 36, deferred: 0, free: 0, year: 2026 },
+      { age: 37, deferred: 13800, free: 0, year: 2027 },
+      { age: 38, deferred: 27600, free: 0, year: 2028 },
+    ]);
   });
 
   // Two ISAs that share an id, which the store never hands out, are

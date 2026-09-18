@@ -53,11 +53,13 @@ export function endYear(plan: Plan): number {
 // and the months before it are already in them; the last year is not
 // carried at all, since no point follows it. Each account is carried on
 // its own and the year sums them by wrapper. What an account is paid a
-// month is what that month's cash flow says, a fixed sum spread over
-// the months as the flow spreads it or the spare money's take, read
-// afresh each month since a line may end in one; and the flow is read
-// over every account, since a fixed sum into any of them is money the
-// month no longer has. Nothing is drawn out or taxed yet.
+// month is what that month's cash flow says, a salary's sacrifice with
+// the NI saved on it, a fixed sum spread over the months as the flow
+// spreads it or the spare money's take, read afresh each month since a
+// line may end in one; and the flow is read over every account, since
+// a fixed sum into any of them is money the month no longer has, and a
+// pension not listed would be fed nothing. Nothing is drawn out or
+// taxed yet.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -105,15 +107,15 @@ function carried(balance: number, paid: number, rate: number): number {
   return (balance + paid) * (1 + rate) ** (1 / 12);
 }
 
-// What lands in an account each month of the year: the fixed sum or
-// the spare money's take the flow lists for it, and nothing for an
-// account it lists nothing for. The entry is read off the flow as the
-// one listed for the account itself, the same object the flow was read
-// over, rather than for its id, which two accounts could share only by
-// a caller's mistake; a sum over the one entry, so a miss needs no
-// fallback that could never be reached.
+// What lands in an account each month of the year: what each salary
+// feeds it, the fixed sum or the spare money's take the flow lists for
+// it, and nothing for an account it lists nothing for. The entries are
+// read off the flow as the ones listed for the account itself, the same
+// object the flow was read over, rather than for its id, which two
+// accounts could share only by a caller's mistake; a sum over them, so
+// a miss needs no fallback that could never be reached.
 function paidIn(account: Account, flow: CashFlow): number {
-  return [...flow.fixed, ...flow.spare]
+  return [...flow.fed, ...flow.fixed, ...flow.spare]
     .filter((paid) => paid.account === account)
     .reduce((sum, paid) => sum + paid.amount, 0);
 }

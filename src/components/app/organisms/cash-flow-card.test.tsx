@@ -15,9 +15,10 @@ const [household, , , retirement] = expenseLines;
 
 // The fixture's accounts with the ISA and the current account paid the
 // spare money, the ISA to its allowance and the account uncapped, so a
-// month in 2026 has the salary's £12,250 coming in and the household's
-// £3,500 going out, the pension and the mortgage paid their fixed sums,
-// the ISA £1,666.67 and the current account the £2,607.08 left.
+// month in 2026 has the salary's £12,250 coming in, £1,000 of it
+// sacrificed into the pension, and the household's £3,500 going out,
+// the pension and the mortgage paid their fixed sums, the ISA £1,666.67
+// and the current account the £1,607.08 left.
 const spareIsa: Account = {
   ...isa,
   contribution: { cap: null, kind: "spare" },
@@ -68,24 +69,29 @@ describe("CashFlowCard", () => {
     );
     expect(rows()).toStrictEqual([
       "Income£12,250",
+      "Workplace pensionSalary sacrifice from Salary, paid in as £1,150 with the NI saved−£1,000",
       "Expenses−£3,500",
       "Workplace pensionA fixed sum−£2,266",
       "MortgageA fixed sum−£2,210",
       "Stocks & shares ISASpare money, to £20,000 / yr−£1,667",
-      "Current accountSpare money, uncapped−£2,607",
+      "Current accountSpare money, uncapped−£1,607",
       "Left over£0",
     ]);
     expect(screen.getByText("£12,250")).toHaveClass("figure");
     expect(screen.getByText("Income")).not.toHaveClass("font-medium");
+    expect(screen.getByText(/^Salary sacrifice from Salary/)).toHaveClass(
+      "text-muted-foreground",
+    );
     for (const detail of screen.getAllByText("A fixed sum")) {
       expect(detail).toHaveClass("text-muted-foreground");
     }
   });
 
   // A year on, the childcare has started and the current account takes
-  // £1,150 less; by 2049 the salaries have ended and the consulting's
-  // £2,000 a month is £6,201 short of the mortgage payment and the
-  // retirement living, so the ISA and the account take nothing.
+  // £1,150 less; by 2049 the salaries have ended, so nothing is
+  // sacrificed, and the consulting's £2,000 a month is £6,201 short of
+  // the mortgage payment and the retirement living, so the ISA and the
+  // account take nothing.
   it("moves the year along the plan with the slider and reads that year's month", () => {
     render(<CashFlowCard accounts={held} plan={plan} schedule={schedule} />);
 
@@ -95,8 +101,8 @@ describe("CashFlowCard", () => {
       screen.getByText("January 2027, age 37, in today's money"),
     ).toBeInTheDocument();
     expect(slider()).toHaveValue("2027");
-    expect(rows()[1]).toBe("Expenses−£4,650");
-    expect(rows()[5]).toBe("Current accountSpare money, uncapped−£1,457");
+    expect(rows()[2]).toBe("Expenses−£4,650");
+    expect(rows()[6]).toBe("Current accountSpare money, uncapped−£457");
 
     fireEvent.change(slider(), { target: { value: "2049" } });
 

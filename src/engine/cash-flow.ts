@@ -3,20 +3,29 @@ import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { LineValues, Month } from "@/data/schedule";
 
-import { allowanceOf, takesSpare } from "@/data/accounts";
-import { totalOf } from "@/data/income";
+import { allowanceOf, isPension, takesSpare } from "@/data/accounts";
+import { contributionOf, sacrificeOf, totalOf } from "@/data/income";
 
 // A month of a year's money, in pounds as the lines state them and
 // unrounded, formatted where it is rendered: what comes in, what goes
-// out, in sum and line by line, what each account is paid, and what is
-// left after all of it.
+// out, in sum and line by line, what each pension is fed and what each
+// account is paid, and what is left after all of it.
 export interface CashFlow {
   readonly expenses: number;
+  readonly fed: readonly Fed[];
   readonly fixed: readonly Paid[];
   readonly income: number;
   readonly left: number;
   readonly spare: readonly Take[];
   readonly spent: readonly Spent[];
+}
+
+// A pension a salary feeds: what lands in it a month, the sacrifice
+// with the employer's NI saved on it, the line it is fed from, and what
+// that line gives up a month, which is what the month is short by.
+export interface Fed extends Paid {
+  readonly line: IncomeLine;
+  readonly sacrificed: number;
 }
 
 // The two schedules the plan screen holds, as the engine reads them.
@@ -44,24 +53,54 @@ interface Paid {
   readonly amount: number;
 }
 
-// A month's money: the income lines running that month less the expense
-// lines, each kept as well as summed, and every fixed sum, then the
-// spare money to each account that takes it in the order they are
+// A month's money: the income lines running that month, as they are
+// earned, less what a salary sacrifices into its pension, less the
+// expense lines, each kept as well as summed, and every fixed sum, then
+// the spare money to each account that takes it in the order they are
 // listed, each up to its cap and passing the rest on, and what is left
 // after them, which is negative when the month does not cover its
 // outgoings. A yearly figure is spread over the twelve months. A loan
 // whose payments are a line pays nothing as a fixed sum, since the line
 // is its payment and the ledger shows the same figure against the loan:
-// it is counted once, as the line, and stops when the line does. Every
-// line is taken at the amount it states, in today's money; how it grows
-// against inflation waits on an inflation assumption the plan does not
-// carry yet.
+// it is counted once, as the line, and stops when the line does. A
+// salary feeding a pension among the accounts gives up its sacrifice
+// before the month sees it, and the pension is fed the sacrifice with
+// the employer's NI saved on it, over and above whatever fixed sum the
+// pension is paid in its own right; a salary naming a pension not
+// listed is earned whole, as a line paying a loan not listed pays
+// nothing off it. A salary naming an account that is no pension is
+// refused, as the spare money into a real asset is: the action holds
+// the link to a pension, so one that reached here is a caller's mistake
+// rather than a result, and the sacrifice would otherwise leave the
+// salary and land in no wrapper. Every line is taken at the amount it states, in
+// today's money; how it grows against inflation waits on an inflation
+// assumption the plan does not carry yet.
 export function cashFlow(
   accounts: readonly Account[],
   schedule: Schedule,
   at: Month,
 ): CashFlow {
   const income = sumOf(schedule.income, at, totalOf);
+  const fed = schedule.income
+    .filter((line) => runsIn(line, at))
+    .flatMap((line) => {
+      const account = accounts.find(({ id }) => id === line.feeds);
+      if (account !== undefined && !isPension(account)) {
+        throw new Error("A salary feeds a pension alone");
+      }
+      const sacrificed = monthly(sacrificeOf(line), line.cadence);
+      return account === undefined || sacrificed === 0
+        ? []
+        : [
+            {
+              account,
+              amount: monthly(contributionOf(line), line.cadence),
+              line,
+              sacrificed,
+            },
+          ];
+    });
+  const sacrificed = fed.reduce((sum, entry) => sum + entry.sacrificed, 0);
   const spent = schedule.expenses
     .filter((line) => runsIn(line, at))
     .map((line) => ({ amount: monthly(line.amount, line.cadence), line }));
@@ -76,9 +115,9 @@ export function cashFlow(
     .flatMap(fixedSum);
   const { left, takes } = spareMoney(
     accounts,
-    income - expenses - total(fixed),
+    income - sacrificed - expenses - total(fixed),
   );
-  return { expenses, fixed, income, left, spare: takes, spent };
+  return { expenses, fed, fixed, income, left, spare: takes, spent };
 }
 
 // The fixed sum an account is paid a month, or nothing for an account

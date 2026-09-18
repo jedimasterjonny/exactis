@@ -41,10 +41,30 @@ export const incomeKinds = [
   "self-employment",
 ] as const;
 
-// What a line pays at its cadence: the amount, with an employment line's
-// bonus and RSUs on top. The parts are summed here and nowhere else, so
-// the one place that knows which part is which is the one that reads
-// them apart.
+// The employer's National Insurance on pay, fifteen per cent from April
+// 2025, which a salary sacrifice saves the employer on what is given up
+// and which a scheme that reclaims it pays into the pension with the
+// sacrifice. The employee's own saving waits on the tax the plan does
+// not take yet.
+const employerNi = 0.15;
+
+// What lands in the pension a line feeds, at the line's cadence: the
+// sacrifice, and the employer's NI saved on it, passed on in full.
+export function contributionOf(line: IncomeLineValues): number {
+  return sacrificeOf(line) * (1 + employerNi);
+}
+
+// What a line gives up into its pension at its cadence: the share of
+// its base alone, since the bonus and RSUs are outside the sacrifice,
+// and nothing for a line that gives up none.
+export function sacrificeOf(line: IncomeLineValues): number {
+  return line.amount * line.sacrifice;
+}
+
+// What a line earns at its cadence: the amount, with an employment
+// line's bonus and RSUs on top, before any sacrifice comes off it. The
+// parts are summed here and nowhere else, so the one place that knows
+// which part is which is the one that reads them apart.
 export function totalOf(line: IncomeLineValues): number {
   return line.amount + line.bonus + line.rsu;
 }
