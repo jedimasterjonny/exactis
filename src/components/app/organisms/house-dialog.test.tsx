@@ -8,7 +8,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { House } from "@/data/houses";
+import type { Secured } from "@/data/secured";
 
 import { saveHouse } from "@/app/(app)/accounts/actions";
 import { Toaster } from "@/components/kit/toast";
@@ -23,7 +23,7 @@ const [, , , home, mortgage] = accounts;
 // The fixture's home as a house, with its mortgage secured on it: worth
 // £416,386 growing at 2.1%, owing £182,940 at 5.15% and paying £2,210 a
 // month, which clears it in 8.5 years.
-const house: House = {
+const house: Secured = {
   asset: { ...home, kind: "house" },
   loan: { ...mortgage, secures: home.id },
 };
@@ -47,7 +47,7 @@ function open(): HTMLElement {
 // with spies where the ledger listens. Save reports through the toast
 // manager, which needs its Toaster mounted.
 function renderDialog(
-  opening: House | null = null,
+  opening: null | Secured = null,
   onSaved: () => void = vi.fn<() => void>(),
   onDismiss: () => void = vi.fn<() => void>(),
 ): void {

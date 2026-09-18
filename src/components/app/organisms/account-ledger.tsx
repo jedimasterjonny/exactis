@@ -6,9 +6,8 @@ import { CarFront, HousePlus, Plus } from "lucide-react";
 import { startTransition, useOptimistic, useState } from "react";
 
 import type { Account } from "@/data/accounts";
-import type { Car } from "@/data/cars";
-import type { House } from "@/data/houses";
 import type { IncomeLine } from "@/data/income";
+import type { Secured } from "@/data/secured";
 
 import {
   placeAccountsInOrder,
@@ -43,21 +42,10 @@ interface AccountLedgerProps {
 // What the account dialog is open on: a new account, or one to edit.
 type AccountOpening = "new" | Account;
 
-// What the car dialog is open on: a new car, or one to edit with the
-// loan against it.
-type CarOpening = "new" | Car;
-
-// What the house dialog is open on: a new house, or one to edit with the
-// loan against it.
-type HouseOpening = "new" | House;
-
-// An asset and the loan secured on it, as the ledger finds them for the
-// dialog that edits them as one; a house and a car are the same to it.
-interface Secured {
-  readonly asset: Account;
-  readonly loan: Account | null;
-}
-
+// What the car or house dialog is open on: a new one, or an asset to
+// edit with the loan secured on it. One type for both, since a house
+// and a car are the same shape to the ledger.
+type AssetOpening = "new" | Secured;
 type Tab = "accounts" | "assets";
 
 // The accounts screen's ledger and the three dialogs it edits through.
@@ -85,8 +73,8 @@ export function AccountLedger({
 }: AccountLedgerProps): JSX.Element {
   const [tab, setTab] = useState<Tab>("accounts");
   const [account, setAccount] = useState<AccountOpening | null>(null);
-  const [house, setHouse] = useState<HouseOpening | null>(null);
-  const [car, setCar] = useState<CarOpening | null>(null);
+  const [house, setHouse] = useState<AssetOpening | null>(null);
+  const [car, setCar] = useState<AssetOpening | null>(null);
   const { ask, cancel, confirm, doomed, isRemoving } = useRemover<Account>({
     describe: (account) => account.name,
     noun: "Account",
