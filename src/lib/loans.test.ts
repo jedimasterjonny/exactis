@@ -111,25 +111,52 @@ describe("clearsIn", () => {
   // September: a term landing on a year end stays in the year it lands
   // in rather than running into the next. A single payment made in
   // December falls in the year it is made.
-  it("finds the year the last payment falls in, counted from the month the plan is read in", () => {
-    expect(clearsIn(9.5, { from: 2026, month: 0 })).toBe(2035);
-    expect(clearsIn(9.5, { from: 2026, month: 8 })).toBe(2036);
-    expect(clearsIn(10, { from: 2026, month: 0 })).toBe(2035);
-    expect(clearsIn(10, { from: 2026, month: 11 })).toBe(2036);
-    expect(clearsIn(124 / 12, { from: 2026, month: 8 })).toBe(2036);
-    expect(clearsIn(1 / 12, { from: 2026, month: 11 })).toBe(2026);
+  it("finds the month the last payment falls in, counted from the month the plan is read in", () => {
+    expect(clearsIn(9.5, { from: 2026, month: 0 })).toStrictEqual({
+      month: 5,
+      year: 2035,
+    });
+    expect(clearsIn(9.5, { from: 2026, month: 8 })).toStrictEqual({
+      month: 1,
+      year: 2036,
+    });
+    expect(clearsIn(10, { from: 2026, month: 0 })).toStrictEqual({
+      month: 11,
+      year: 2035,
+    });
+    expect(clearsIn(10, { from: 2026, month: 11 })).toStrictEqual({
+      month: 10,
+      year: 2036,
+    });
+    expect(clearsIn(124 / 12, { from: 2026, month: 8 })).toStrictEqual({
+      month: 11,
+      year: 2036,
+    });
+    expect(clearsIn(1 / 12, { from: 2026, month: 11 })).toStrictEqual({
+      month: 11,
+      year: 2026,
+    });
   });
 
   // A term of nothing, or one too short to be a month, is one payment,
   // made in the plan's month; it never steps back before it.
   it("counts a term of nothing as a single payment in the plan's month", () => {
-    expect(clearsIn(0, { from: 2026, month: 0 })).toBe(2026);
-    expect(clearsIn(1e-12, { from: 2026, month: 8 })).toBe(2026);
+    expect(clearsIn(0, { from: 2026, month: 0 })).toStrictEqual({
+      month: 0,
+      year: 2026,
+    });
+    expect(clearsIn(1e-12, { from: 2026, month: 8 })).toStrictEqual({
+      month: 8,
+      year: 2026,
+    });
   });
 
   // A term worked out from a loan's figures carries floating point, so
   // one a whisker over a whole number of months is that many payments.
   it("absorbs the floating point a worked-out term carries", () => {
-    expect(clearsIn(10 + 1e-12, { from: 2026, month: 0 })).toBe(2035);
+    expect(clearsIn(10 + 1e-12, { from: 2026, month: 0 })).toStrictEqual({
+      month: 11,
+      year: 2035,
+    });
   });
 });

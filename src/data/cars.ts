@@ -141,12 +141,12 @@ export function isSound(car: CarValues): boolean {
 // its contribution, which is what the ledger shows against it, and left
 // owing the balloon, and its payments are a debt line of the same a
 // month, fixed in nominal terms as a finance payment is, from the plan's
-// first year to the year the last payment falls in, counted from the
+// first year to the month the last payment falls in, counted from the
 // month the plan is read in. On a PCP the balloon is refinanced on the
 // same terms when the agreement ends, so the payments carry on past it
-// until the whole balance clears, and the line runs to that year rather
-// than the agreement's; it is open-ended when the payment never clears
-// it. The engine counts the payment once, as the line, since it leaves
+// until the whole balance clears, and the line runs to that month rather
+// than the agreement's end; it is open-ended when the payment never
+// clears it. The engine counts the payment once, as the line, since it leaves
 // the contribution of a loan a line pays out of the month's fixed sums.
 // Both are named for the car and the agreement it is on.
 export function toRecords(
@@ -170,6 +170,7 @@ export function toRecords(
   }
   const name = `${car.name} ${car.agreement === "pcp" ? "PCP" : "loan"}`;
   const term = clearsAfter(car);
+  const end = term === null ? null : clearsIn(term, plan);
   return {
     asset,
     finance: {
@@ -191,8 +192,8 @@ export function toRecords(
         firstYear: plan.from,
         growth: "nominal",
         kind: "debt",
-        lastMonth: null,
-        lastYear: term === null ? null : clearsIn(term, plan),
+        lastMonth: end?.month ?? null,
+        lastYear: end?.year ?? null,
         name,
       },
     },
