@@ -11,7 +11,7 @@ import {
   cadences,
   fundings,
   growthKinds,
-  isAsset,
+  takesSpare,
 } from "@/data/accounts";
 import { isSound, statuses, toRecords } from "@/data/houses";
 import { insertAccount, placeAccounts, updateAccount } from "@/db/accounts";
@@ -66,7 +66,7 @@ const values = z
     rate: z.number().min(-1),
   })
   .refine(
-    (draft) => draft.funding === "fixed" || !isAsset(draft),
+    (draft) => draft.funding === "fixed" || takesSpare(draft),
   ) satisfies z.ZodType<AccountValues>;
 
 // An order: every account's id once, so the store can place them all.

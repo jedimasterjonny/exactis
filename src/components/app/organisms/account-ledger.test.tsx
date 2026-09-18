@@ -79,7 +79,7 @@ describe("AccountLedger", () => {
     expect(screen.getByText("Sect. II · Accounts & assets")).toHaveClass(
       "label",
     );
-    expect(screen.getByText("3 accounts · 2 assets")).toBeInTheDocument();
+    expect(screen.getByText("4 accounts · 1 asset")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -90,8 +90,8 @@ describe("AccountLedger", () => {
     const assetsTab = screen.getByRole("tab", { name: /^Assets/ });
 
     expect(accountsTab).toHaveAttribute("aria-selected", "true");
-    expect(within(accountsTab).getByText("3")).toHaveClass("label");
-    expect(within(assetsTab).getByText("2")).toHaveClass("label");
+    expect(within(accountsTab).getByText("4")).toHaveClass("label");
+    expect(within(assetsTab).getByText("1")).toHaveClass("label");
 
     let panel = screen.getByRole("tabpanel");
 
@@ -115,7 +115,7 @@ describe("AccountLedger", () => {
     expect(assetsTab).toHaveAttribute("aria-selected", "true");
     expect(rowsOf(panel)).toHaveLength(assets.length);
     expect(within(panel).getByRole("paragraph")).toHaveTextContent(
-      "A loan is listed against the asset it secures.",
+      "A loan against an asset is listed with the accounts, since it is paid as they are.",
     );
     expect(
       within(panel).queryByRole("button", { name: /^Move / }),
@@ -319,7 +319,7 @@ describe("AccountLedger", () => {
     expect(
       within(dialog).getByRole("textbox", { name: "Balance" }),
     ).toHaveValue("£0");
-    expect(screen.getByText("3 accounts · 2 assets")).toBeInTheDocument();
+    expect(screen.getByText("4 accounts · 1 asset")).toBeInTheDocument();
   });
 
   it("opens a real asset as it is, keeps its rate across the growth choice and writes the edit back", async () => {
@@ -628,7 +628,8 @@ describe("AccountLedger", () => {
     });
   });
 
-  // The names down the accounts tab, as the rows now stand: each row's
+  // The names down the accounts tab, the mortgage last among them since a
+  // loan is listed with the accounts, as the rows now stand: each row's
   // grip is named for its account.
   function names(): string[] {
     return screen
@@ -653,6 +654,7 @@ describe("AccountLedger", () => {
       "Workplace pension",
       "Stocks & shares ISA",
       "Current account",
+      "Mortgage",
     ]);
 
     fireEvent.keyDown(
@@ -665,6 +667,7 @@ describe("AccountLedger", () => {
         "Stocks & shares ISA",
         "Workplace pension",
         "Current account",
+        "Mortgage",
       ]);
     });
     expect(placeAccountsInOrder).toHaveBeenCalledExactlyOnceWith([
@@ -678,6 +681,7 @@ describe("AccountLedger", () => {
         "Workplace pension",
         "Stocks & shares ISA",
         "Current account",
+        "Mortgage",
       ]);
     });
   });

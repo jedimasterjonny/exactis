@@ -31,7 +31,7 @@ import {
   TabsTrigger,
 } from "@/components/kit/tabs";
 import { toast } from "@/components/kit/toast";
-import { isAsset, toValues } from "@/data/accounts";
+import { isAsset, takesSpare, toValues } from "@/data/accounts";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
@@ -137,19 +137,19 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
     setEntry({ draft, id, initial: draft });
   }
 
-  // The treatment choice: an asset is paid only a fixed sum, so the
+  // The treatment choice: a real asset or a debt is paid only a fixed sum, so the
   // contribution choice leaves with it and an account paid the spare
   // money is paid a fixed sum instead, as it opened. The choice comes
   // back when a wrapper or cash is chosen again, as the account opened
   // with it, which is what the choice mounts showing. A change that
   // stays on one side leaves the choice where it is.
   function treat(current: Entry, kind: AccountKind): void {
-    const willBeAsset = isAsset({ kind });
-    if (willBeAsset && current.draft.funding === "spare") {
+    const willTakeSpare = takesSpare({ kind });
+    if (!willTakeSpare && current.draft.funding === "spare") {
       amend(current, { kind, ...fundedBy(current, "fixed") });
     } else if (
-      !willBeAsset &&
-      isAsset(current.draft) &&
+      willTakeSpare &&
+      !takesSpare(current.draft) &&
       current.initial.funding !== current.draft.funding
     ) {
       amend(current, { kind, ...fundedBy(current, current.initial.funding) });
@@ -203,7 +203,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
         label={sectionLabel(accountsAndAssets)}
         title="Accounts & assets"
       >
-        {`${String(held.length)} accounts · ${String(assets.length)} assets`}
+        {`${counted(held.length, "account")} · ${counted(assets.length, "asset")}`}
       </ScreenHeader>
       <ScreenBody>
         <Tabs
@@ -247,8 +247,9 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
               onEdit={edit}
             />
             <Note>
-              A loan is listed against the asset it secures. The progress points
-              reconcile the two as total assets and asset loans.
+              A loan against an asset is listed with the accounts, since it is
+              paid as they are. The progress points reconcile the two as total
+              assets and asset loans.
             </Note>
           </TabsContent>
         </Tabs>
@@ -281,6 +282,11 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
       )}
     </>
   );
+}
+
+// A tab's count for the header, one in the singular.
+function counted(count: number, noun: string): string {
+  return `${String(count)} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 // The draft as a contribution choice leaves it: the fields the choice
