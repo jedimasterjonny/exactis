@@ -1,5 +1,6 @@
 import type { Account, AccountValues } from "@/data/accounts";
 import type { ExpenseLineValues } from "@/data/expenses";
+import type { Owed } from "@/lib/loans";
 
 import { toValues } from "@/data/accounts";
 import { clearsIn, paymentOf, rateOf, termOf } from "@/lib/loans";
@@ -72,11 +73,11 @@ export function derive(
 ): null | number {
   switch (figure) {
     case "payment":
-      return Math.round(paymentOf(draft.balance, draft.rate, draft.term));
+      return Math.round(paymentOf(owedOn(draft), draft.rate, draft.term));
     case "rate":
-      return rateOf(draft.balance, draft.payment, draft.term);
+      return rateOf(owedOn(draft), draft.payment, draft.term);
     case "term":
-      return termOf(draft.balance, draft.payment, draft.rate);
+      return termOf(owedOn(draft), draft.payment, draft.rate);
   }
 }
 
@@ -142,7 +143,7 @@ export function toRecords(
     return { asset, mortgage: null };
   }
   const name = `${house.name} mortgage`;
-  const term = termOf(house.balance, house.payment, house.rate);
+  const term = termOf(owedOn(house), house.payment, house.rate);
   return {
     asset,
     mortgage: {
@@ -168,4 +169,10 @@ export function toRecords(
       },
     },
   };
+}
+
+// What a mortgage's payments are over: the balance, which they clear,
+// since a mortgage leaves no balloon standing.
+function owedOn({ balance }: { readonly balance: number }): Owed {
+  return { balance, balloon: 0 };
 }
