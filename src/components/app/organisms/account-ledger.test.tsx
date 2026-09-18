@@ -927,6 +927,30 @@ describe("AccountLedger", () => {
     ).toHaveAccessibleDescription("Current account");
   });
 
+  it("keeps the question open when the store refuses, and says why", async () => {
+    renderLedger();
+    vi.mocked(removeAccount).mockRejectedValue(new Error("Still secured"));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Current account" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Account not deleted" }),
+      ).toHaveAccessibleDescription("Still secured");
+    });
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete Current account?" }),
+    ).toBeVisible();
+    // The toast lands before the transition ends, so the confirm frees
+    // a beat after it.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
+    });
+  });
+
   it("drops the question on cancel and deletes nothing", () => {
     renderLedger();
 

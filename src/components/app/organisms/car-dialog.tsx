@@ -17,6 +17,7 @@ import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { CarFields } from "@/components/app/organisms/car-fields";
 import { toast } from "@/components/kit/toast";
 import { carOf, clearsAfter, derive, isSound } from "@/data/cars";
+import { reasonOf } from "@/lib/errors";
 
 interface CarDialogProps {
   readonly car: Car | null;
@@ -94,15 +95,28 @@ export function CarDialog({
   // The dialog stays open with its save held until the store answers,
   // then tells the caller; the telling is a transition of its own, since
   // a state update after an await is not part of the one it awaited in.
+  // A store that refuses leaves the dialog open and says why, as the
+  // editor hook does, rather than handing the route the rejection.
   function save(): void {
     startSaving(async () => {
-      const account = await saveCar(car === null ? null : car.asset.id, values);
-      startTransition(onSaved);
-      toast.add({
-        description: described(account.name, values.agreement),
-        title: car === null ? "Car added" : "Car updated",
-        type: "success",
-      });
+      try {
+        const account = await saveCar(
+          car === null ? null : car.asset.id,
+          values,
+        );
+        startTransition(onSaved);
+        toast.add({
+          description: described(account.name, values.agreement),
+          title: car === null ? "Car added" : "Car updated",
+          type: "success",
+        });
+      } catch (error: unknown) {
+        toast.add({
+          description: reasonOf(error),
+          title: "Car not saved",
+          type: "error",
+        });
+      }
     });
   }
 

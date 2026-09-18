@@ -139,6 +139,41 @@ describe("useEditor", () => {
     });
   });
 
+  // A refused save leaves the entry open and free to save again, and
+  // reports the refusal rather than throwing it to the route.
+  it("keeps a refused save open and says why", async () => {
+    const store = vi.fn<Store>();
+    store.mockRejectedValue(new Error("A salary feeds a pension alone"));
+    const { result } = renderHook(() =>
+      useEditor({
+        describe: (record) => record.name,
+        noun: "Income line",
+        save: store,
+      }),
+    );
+
+    act(() => {
+      result.current.open(typed, 3);
+    });
+    act(() => {
+      result.current.save({ draft: typed, id: 3, initial: typed });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSaving).toBe(false);
+    });
+    expect(result.current.entry).toStrictEqual({
+      draft: typed,
+      id: 3,
+      initial: typed,
+    });
+    expect(toast.add).toHaveBeenCalledExactlyOnceWith({
+      description: "A salary feeds a pension alone",
+      title: "Income line not saved",
+      type: "error",
+    });
+  });
+
   it("saves over a record, tells the caller what it wrote and reports it updated", async () => {
     const store = vi.fn<Store>().mockResolvedValue(saved);
     const onSaved = vi.fn<(record: Saved) => void>();

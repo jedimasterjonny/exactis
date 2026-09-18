@@ -1,6 +1,7 @@
 import { startTransition, useState, useTransition } from "react";
 
 import { toast } from "@/components/kit/toast";
+import { reasonOf } from "@/lib/errors";
 
 // An open dialog: the draft as it is, the draft as it opened, which the
 // uncontrolled fields take as their defaults, and the id of the record it
@@ -69,20 +70,31 @@ export function useEditor<TDraft extends { readonly name: string }, TSaved>({
   // its save held until the store answers, then closes, onto whatever
   // the caller makes of the record; the close is a transition of its
   // own, since a state update after an await is not part of the one it
-  // awaited in.
+  // awaited in. A store that refuses leaves the dialog open as it was,
+  // with the save free again, and says why under a toast: a rejection
+  // left to the transition would reach the nearest error boundary,
+  // which is the route's, and take the whole screen with it.
   function save(current: Entry<TDraft>): void {
     const values = { ...current.draft, name: current.draft.name.trim() };
     startSaving(async () => {
-      const record = await store(current.id, values);
-      startTransition(() => {
-        onSaved?.(record);
-        setEntry(null);
-      });
-      toast.add({
-        description: describe(record),
-        title: `${noun} ${current.id === null ? "added" : "updated"}`,
-        type: "success",
-      });
+      try {
+        const record = await store(current.id, values);
+        startTransition(() => {
+          onSaved?.(record);
+          setEntry(null);
+        });
+        toast.add({
+          description: describe(record),
+          title: `${noun} ${current.id === null ? "added" : "updated"}`,
+          type: "success",
+        });
+      } catch (error: unknown) {
+        toast.add({
+          description: reasonOf(error),
+          title: `${noun} not saved`,
+          type: "error",
+        });
+      }
     });
   }
 

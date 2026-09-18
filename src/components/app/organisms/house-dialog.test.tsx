@@ -343,6 +343,39 @@ describe("HouseDialog", () => {
     ).toHaveAccessibleDescription("Flat");
   });
 
+  it("keeps a refused save open and says why", async () => {
+    const onSaved = vi.fn<() => void>();
+    vi.mocked(saveHouse).mockRejectedValue(
+      new Error("A pension a salary feeds stays a pension"),
+    );
+    renderDialog(null, onSaved);
+    const dialog = open();
+
+    fireEvent.change(field(dialog, "Name"), { target: { value: "Flat" } });
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Status" }), {
+      target: { value: "outright" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "House not saved" }),
+      ).toHaveAccessibleDescription("A pension a salary feeds stays a pension");
+    });
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Flat" })).toBeVisible();
+    // The toast lands before the transition ends, so the save frees a
+    // beat after it.
+    await waitFor(() => {
+      expect(
+        within(screen.getByRole("dialog", { name: "Flat" })).getByRole(
+          "button",
+          { name: "Save" },
+        ),
+      ).toBeEnabled();
+    });
+  });
+
   it("tells the caller when it is dismissed, and saves nothing", () => {
     const onDismiss = vi.fn<() => void>();
     renderDialog(null, vi.fn<() => void>(), onDismiss);
