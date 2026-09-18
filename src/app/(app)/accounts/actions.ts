@@ -60,14 +60,16 @@ const house = z
   ) satisfies z.ZodType<HouseValues>;
 
 // What a save may carry, checked against the model's own lists so the
-// two cannot drift: the figures whole, a contribution and a cap never
-// negative, the spare money only into an account that takes it, a rate
+// two cannot drift: the figures whole, a contribution, a cap and a
+// balloon never negative, the spare money only into an account that
+// takes it, a rate
 // no lower than losing everything, since below that a year's growth is
 // not a number, and the name as typed less the space around it, which
 // the form also trims.
 const values = z
   .object({
     balance: z.number().int(),
+    balloon: z.number().int().nonnegative(),
     cadence: z.enum(cadences),
     cap: z.number().int().nonnegative(),
     contribution: z.number().int().nonnegative(),

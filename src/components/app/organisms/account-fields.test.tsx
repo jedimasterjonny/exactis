@@ -7,6 +7,7 @@ import { AccountFields } from "./account-fields";
 
 const isa: AccountValues = {
   balance: 12000,
+  balloon: 0,
   cadence: "month",
   cap: 0,
   contribution: 500,

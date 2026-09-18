@@ -79,6 +79,7 @@ const outright = {
 
 const values = {
   balance: 4000,
+  balloon: 0,
   cadence: "month",
   cap: 0,
   contribution: 333,
@@ -160,6 +161,9 @@ describe("saveAccount", () => {
     await expect(saveAccount(null, { ...values, cap: -1 })).rejects.toThrow(
       z.ZodError,
     );
+    await expect(saveAccount(null, { ...values, balloon: -1 })).rejects.toThrow(
+      z.ZodError,
+    );
     await expect(saveAccount(null, { ...values, rate: -1.5 })).rejects.toThrow(
       z.ZodError,
     );
@@ -178,6 +182,7 @@ describe("saveHouse", () => {
   // same, ending in 2047.
   const asset = {
     balance: 416386,
+    balloon: 0,
     cadence: "year",
     cap: 0,
     contribution: 0,
@@ -190,6 +195,7 @@ describe("saveHouse", () => {
 
   const loan = {
     balance: -341810,
+    balloon: 0,
     cadence: "month",
     cap: 0,
     contribution: 2210,

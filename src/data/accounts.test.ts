@@ -31,6 +31,7 @@ describe("accounts", () => {
   it("reads a contribution and a fixed rate off an account and back", () => {
     const values = {
       balance: -182940,
+      balloon: 0,
       cadence: "month",
       cap: 0,
       contribution: 2210,
@@ -51,6 +52,7 @@ describe("accounts", () => {
     const account = toAccount(
       {
         balance: 4000,
+        balloon: 0,
         cadence: "month",
         cap: 0,
         contribution: 0,
@@ -72,6 +74,7 @@ describe("accounts", () => {
     });
     expect(toValues(account)).toStrictEqual({
       balance: 4000,
+      balloon: 0,
       cadence: "year",
       cap: 0,
       contribution: 0,
@@ -90,6 +93,7 @@ describe("accounts", () => {
   it("reads the spare money off an account with and without a cap", () => {
     const values = {
       balance: 4000,
+      balloon: 0,
       cadence: "month",
       cap: 4000,
       contribution: 333,
@@ -120,9 +124,26 @@ describe("accounts", () => {
 });
 
 describe("isAsset", () => {
-  it("files a house with the real assets, paid a fixed sum only", () => {
+  it("files a house and a car with the real assets, paid a fixed sum only", () => {
     expect(isAsset({ kind: "house" })).toBe(true);
     expect(takesSpare({ kind: "house" })).toBe(false);
+    expect(isAsset({ kind: "car" })).toBe(true);
+    expect(takesSpare({ kind: "car" })).toBe(false);
+  });
+});
+
+describe("balloon", () => {
+  // A PCP's loan carries the balloon it is left owing; a balloon of
+  // nothing is no balloon on the account, and comes back as nothing.
+  it("reads a balloon off a loan and back, and drops one of nothing", () => {
+    const [, , , , mortgage] = accounts;
+    const values = { ...toValues(mortgage), balloon: 8000 };
+
+    expect(toAccount(values, 5)).toStrictEqual({ ...mortgage, balloon: 8000 });
+    expect(toValues(toAccount(values, 5))).toStrictEqual(values);
+    expect(toAccount({ ...values, balloon: 0 }, 5)).not.toHaveProperty(
+      "balloon",
+    );
   });
 });
 
@@ -130,6 +151,7 @@ describe("allowanceOf", () => {
   it("gives the ISA and the pension the UK's yearly allowances and the rest none", () => {
     expect(allowanceOf("tax-free")).toBe(20000);
     expect(allowanceOf("tax-deferred")).toBe(60000);
+    expect(allowanceOf("car")).toBeNull();
     expect(allowanceOf("cash")).toBeNull();
     expect(allowanceOf("house")).toBeNull();
     expect(allowanceOf("real-asset")).toBeNull();

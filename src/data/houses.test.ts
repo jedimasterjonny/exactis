@@ -84,6 +84,7 @@ describe("toRecords", () => {
     ).toStrictEqual({
       asset: {
         balance: 416386,
+        balloon: 0,
         cadence: "year",
         cap: 0,
         contribution: 0,
@@ -105,6 +106,7 @@ describe("toRecords", () => {
     expect(mortgage).toStrictEqual({
       account: {
         balance: -341810,
+        balloon: 0,
         cadence: "month",
         cap: 0,
         contribution: 2210,

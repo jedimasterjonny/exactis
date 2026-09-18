@@ -59,6 +59,7 @@ type Tab = "accounts" | "assets";
 
 const blank: Draft = {
   balance: 0,
+  balloon: 0,
   cadence: "year",
   cap: 0,
   contribution: 0,
