@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Account } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
 
-import { saveIncomeLine } from "@/app/(app)/plan/actions";
+import { removeIncomeLine, saveIncomeLine } from "@/app/(app)/plan/actions";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 import { incomeKinds } from "@/data/income";
@@ -19,7 +19,10 @@ import { lineGrowths } from "@/data/schedule";
 
 import { IncomeSchedule } from "./income-schedule";
 
-vi.mock("@/app/(app)/plan/actions", () => ({ saveIncomeLine: vi.fn() }));
+vi.mock("@/app/(app)/plan/actions", () => ({
+  removeIncomeLine: vi.fn(),
+  saveIncomeLine: vi.fn(),
+}));
 
 const [salary, , , statePension] = incomeLines;
 const [pension] = accounts;
@@ -81,6 +84,9 @@ describe("IncomeSchedule", () => {
     expect(screen.getAllByRole("button", { name: /^Edit / })).toHaveLength(
       incomeLines.length,
     );
+    expect(screen.getAllByRole("button", { name: /^Delete / })).toHaveLength(
+      incomeLines.length,
+    );
     expect(screen.getByText("£147,000")).toHaveTextContent("£147,000 / yr");
     expect(
       screen.getByText(
@@ -92,6 +98,52 @@ describe("IncomeSchedule", () => {
       "Lines overlap freely",
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  // A row's bin asks first, holds the confirm while the store answers,
+  // and closes on the answer; the row goes when the page re-reads.
+  it("asks before deleting a line, and deletes it on confirm", async () => {
+    renderSchedule();
+    let answer!: () => void;
+    vi.mocked(removeIncomeLine).mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Salary" }));
+
+    const dialog = screen.getByRole("alertdialog", { name: "Delete Salary?" });
+
+    expect(dialog).toHaveAccessibleDescription("It cannot be brought back.");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    expect(removeIncomeLine).toHaveBeenCalledExactlyOnceWith(salary.id);
+    expect(
+      within(dialog).getByRole("button", { name: "Delete" }),
+    ).toBeDisabled();
+
+    answer();
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("dialog", { name: "Income line deleted" }),
+    ).toHaveAccessibleDescription("Salary");
+  });
+
+  it("drops the question on cancel and deletes nothing", () => {
+    renderSchedule();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete State pension" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(removeIncomeLine).not.toHaveBeenCalled();
   });
 
   it("draws the empty state for none", () => {

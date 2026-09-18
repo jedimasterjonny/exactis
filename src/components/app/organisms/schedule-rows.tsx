@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
 
-import { Banknote, Lock, Pencil, Receipt } from "lucide-react";
+import { Banknote, Lock, Pencil, Receipt, Trash2 } from "lucide-react";
 
 import type { LineValues, Side } from "@/data/schedule";
 import type { Plan } from "@/engine/projection";
@@ -35,6 +35,7 @@ interface ScheduleRowsProps<TLine extends Line> {
   readonly emptyDescription: string;
   readonly emptyTitle: string;
   readonly lines: readonly TLine[];
+  readonly onDelete?: (line: TLine) => void;
   readonly onEdit?: (line: TLine) => void;
   readonly plan: Plan;
   readonly side: Side;
@@ -51,9 +52,12 @@ const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
 // placing the line on the plan's span; what the line pays at its cadence
 // over what it grows with; the years it runs over the ages reached, to
 // the month when it ends part way through a year and an open-ended line
-// running to the end; and, when given an edit handler, a
-// pencil that reports the row's line, whose id says where a save writes
-// back. The schedule reads its own lines, so what the rows cannot read
+// running to the end; and, when given an edit handler, a pencil that
+// reports the row's line, whose id says where a save writes back, and
+// when given a delete handler a bin beside it, in the one actions
+// column, which reports the line the schedule asks about before it
+// goes. A locked line draws its lock in place of both, since it is
+// neither edited nor deleted here. The schedule reads its own lines, so what the rows cannot read
 // off one, the badge, the figure and the detail, comes from it. The
 // figures are right-aligned mono, as in every ledger. A schedule holding
 // nothing draws its empty state instead of a list of nothing.
@@ -61,6 +65,7 @@ export function ScheduleRows<TLine extends Line>({
   emptyDescription,
   emptyTitle,
   lines,
+  onDelete,
   onEdit,
   plan,
   side,
@@ -122,15 +127,29 @@ export function ScheduleRows<TLine extends Line>({
                 {formatAges(line, plan)}
               </span>
             </div>
-            {onEdit !== undefined &&
+            {(onEdit !== undefined || onDelete !== undefined) &&
               (summary.lock === undefined ? (
-                <RowAction
-                  icon={Pencil}
-                  name={`Edit ${line.name}`}
-                  onClick={() => {
-                    onEdit(line);
-                  }}
-                />
+                <span className="flex gap-1">
+                  {onEdit !== undefined && (
+                    <RowAction
+                      icon={Pencil}
+                      name={`Edit ${line.name}`}
+                      onClick={() => {
+                        onEdit(line);
+                      }}
+                    />
+                  )}
+                  {onDelete !== undefined && (
+                    <RowAction
+                      icon={Trash2}
+                      name={`Delete ${line.name}`}
+                      onClick={() => {
+                        onDelete(line);
+                      }}
+                      tone="destructive"
+                    />
+                  )}
+                </span>
               ) : (
                 <span
                   aria-label={summary.lock}

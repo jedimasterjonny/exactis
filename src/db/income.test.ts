@@ -8,6 +8,7 @@ import type { Database } from "./accounts";
 
 import { deleteAccount, insertAccount } from "./accounts";
 import {
+  deleteIncomeLine,
   insertIncomeLine,
   listIncomeLines,
   stopFeeding,
@@ -153,6 +154,20 @@ describe("income lines store", () => {
       { ...salary, id: 2, name: "Step-up" },
       { ...fed, feeds: other.id, id: 3 },
     ]);
+  });
+
+  it("deletes the line with that id, refusing an id no line has", async () => {
+    const db = await openStore();
+    const line = await insertIncomeLine(db, salary);
+    const kept = await insertIncomeLine(db, statePension);
+
+    await expect(deleteIncomeLine(db, 99)).rejects.toThrow(
+      "No income line was written",
+    );
+
+    await deleteIncomeLine(db, line.id);
+
+    expect(await listIncomeLines(db)).toStrictEqual([kept]);
   });
 
   it("refuses to update an id no line has", async () => {
