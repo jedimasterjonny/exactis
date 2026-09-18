@@ -28,6 +28,7 @@ function commit(field: HTMLElement, value: string): void {
 function renderFields(
   initial: AccountValues,
   draft: AccountValues = initial,
+  kindLock?: string,
 ): {
   readonly onAmend: ReturnType<
     typeof vi.fn<(patch: Partial<AccountValues>) => void>
@@ -44,6 +45,7 @@ function renderFields(
     <AccountFields
       draft={draft}
       initial={initial}
+      kindLock={kindLock}
       onAmend={onAmend}
       onFundingChange={onFundingChange}
       onKindChange={onKindChange}
@@ -141,6 +143,17 @@ describe("AccountFields", () => {
     commit(screen.getByRole("textbox", { name: "Rate" }), "3");
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({ rate: 0.03 });
+  });
+
+  it("locks the treatment when given a reason, and says it", () => {
+    const pension: AccountValues = { ...isa, kind: "tax-deferred" };
+    renderFields(pension, pension, "Fed by Salary");
+
+    const treatment = screen.getByRole("combobox", { name: "Treatment" });
+
+    expect(treatment).toBeDisabled();
+    expect(treatment).toHaveValue("tax-deferred");
+    expect(treatment).toHaveAccessibleDescription("Fed by Salary");
   });
 
   it("offers an asset no contribution choice", () => {

@@ -315,6 +315,7 @@ export function AccountLedger({
           <AccountFields
             draft={entry.draft}
             initial={entry.initial}
+            kindLock={kindLockOf(entry.id, lines)}
             onAmend={(patch) => {
               amend(entry, patch);
             }}
@@ -386,6 +387,12 @@ function fundedBy(current: Entry<Draft>, funding: Funding): Partial<Draft> {
 // The names as a sentence lists them, "Salary and Salary step-up".
 const listed = new Intl.ListFormat("en-GB");
 
+// The names of the salaries feeding the account with that id, and none
+// for a new account, which has no id yet.
+function feedersOf(id: null | number, lines: readonly IncomeLine[]): string[] {
+  return lines.filter((line) => line.feeds === id).map((line) => line.name);
+}
+
 // What goes with an account when it is deleted, for the dialog to say:
 // a pension takes the sacrifice of every salary feeding it, which is
 // earned whole from then on, since the store stops the salaries before
@@ -398,9 +405,7 @@ function goesWith(
   accounts: readonly Account[],
   lines: readonly IncomeLine[],
 ): string {
-  const feeders = lines
-    .filter((line) => line.feeds === account.id)
-    .map((line) => line.name);
+  const feeders = feedersOf(account.id, lines);
   if (feeders.length > 0) {
     return `${listed.format(feeders)} ${feeders.length === 1 ? "stops" : "stop"} sacrificing into it and ${feeders.length === 1 ? "is" : "are"} earned whole, at the share lost with it.`;
   }
@@ -420,6 +425,20 @@ function goesWith(
 // it and the loan against it as one.
 function hasDialog(account: Account): boolean {
   return account.kind === "car" || account.kind === "house";
+}
+
+// Why the treatment of the account being edited is held, if it is: a
+// pension a salary feeds stays a pension until the salary is unlinked,
+// which the reason says, naming the salaries. A new account, or one
+// nothing feeds, is held to nothing.
+function kindLockOf(
+  id: null | number,
+  lines: readonly IncomeLine[],
+): string | undefined {
+  const feeders = feedersOf(id, lines);
+  return feeders.length === 0
+    ? undefined
+    : `Fed by ${listed.format(feeders)}; set the pension to none on the salary to change it`;
 }
 
 // The asset an account is part of: a house or a car is its own, with
