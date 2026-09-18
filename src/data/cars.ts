@@ -191,6 +191,7 @@ export function toRecords(
         firstYear: plan.from,
         growth: "nominal",
         kind: "debt",
+        lastMonth: null,
         lastYear: term === null ? null : clearsIn(term, plan),
         name,
       },

@@ -15,6 +15,7 @@ const salary = {
   firstYear: 2026,
   growth: "inflation-plus-1",
   kind: "employment",
+  lastMonth: null,
   lastYear: 2048,
   name: "Salary",
   rsu: 12000,
@@ -27,6 +28,7 @@ const statePension = {
   firstYear: 2058,
   growth: "triple-lock",
   kind: "pension",
+  lastMonth: null,
   lastYear: null,
   name: "State pension",
   rsu: 0,
@@ -73,6 +75,14 @@ describe("income lines store", () => {
     });
     expect(updated.bonus + updated.rsu).toBe(27000);
     expect(await listIncomeLines(db)).toHaveLength(2);
+  });
+
+  it("holds the month a line ends in", async () => {
+    const db = await openStore();
+    const ending = await insertIncomeLine(db, { ...salary, lastMonth: 2 });
+
+    expect(ending.lastMonth).toBe(2);
+    expect((await insertIncomeLine(db, salary)).lastMonth).toBeNull();
   });
 
   it("refuses to update an id no line has", async () => {

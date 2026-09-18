@@ -21,6 +21,7 @@ const household = {
   firstYear: 2026,
   growth: "inflation",
   kind: "core",
+  lastMonth: null,
   lastYear: 2047,
   name: "Household",
 } as const;
@@ -31,6 +32,7 @@ const care = {
   firstYear: 2072,
   growth: "inflation-plus-1",
   kind: "time-bound",
+  lastMonth: null,
   lastYear: null,
   name: "Care provision",
 } as const;
@@ -75,6 +77,19 @@ describe("expense lines store", () => {
       lastYear: null,
     });
     expect(await listExpenseLines(db)).toHaveLength(2);
+  });
+
+  // A line ending in a month of its last year holds the month, March
+  // being two, and one running the whole year holds none.
+  it("holds the month a line ends in", async () => {
+    const db = await openStore();
+    const ending = await insertExpenseLine(db, { ...household, lastMonth: 2 });
+
+    expect(ending.lastMonth).toBe(2);
+    expect((await insertExpenseLine(db, household)).lastMonth).toBeNull();
+    expect(
+      (await updateExpenseLine(db, ending.id, household)).lastMonth,
+    ).toBeNull();
   });
 
   it("refuses to update an id no line has", async () => {
