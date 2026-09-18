@@ -148,11 +148,17 @@ function fundedBy(current: Entry<Draft>, funding: Funding): Partial<Draft> {
 // Why the treatment of the account being edited is held, if it is: a
 // pension a salary feeds stays a pension until the salary is unlinked,
 // which the reason says, naming the salaries. A new account, or one
-// nothing feeds, is held to nothing.
+// nothing feeds, is held to nothing. The new one is answered here rather
+// than by the feeders, since nothing can feed an account the store has
+// not given an id yet, and a line feeding no pension holds null where an
+// id would be: the two nulls mean different things and must not meet.
 function kindLockOf(
   id: null | number,
   lines: readonly IncomeLine[],
 ): string | undefined {
+  if (id === null) {
+    return undefined;
+  }
   const feeders = feedersOf(id, lines);
   return feeders.length === 0
     ? undefined
