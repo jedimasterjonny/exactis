@@ -20,6 +20,20 @@ export async function listIncomeLines(db: Database): Promise<IncomeLine[]> {
   return await db.select().from(incomeLines).orderBy(asc(incomeLines.id));
 }
 
+// Every line feeding the account with that id, feeding none now and
+// giving up nothing, so the account can go: the store holds the link
+// and refuses to leave it dangling, and a share with nowhere to go is
+// refused too.
+export async function stopFeeding(
+  db: Database,
+  accountId: number,
+): Promise<void> {
+  await db
+    .update(incomeLines)
+    .set({ feeds: null, sacrifice: 0 })
+    .where(eq(incomeLines.feeds, accountId));
+}
+
 // The line with that id, written over with the values.
 export async function updateIncomeLine(
   db: Database,

@@ -13,6 +13,7 @@ import type {
 } from "@/data/accounts";
 import type { Car } from "@/data/cars";
 import type { House } from "@/data/houses";
+import type { IncomeLine } from "@/data/income";
 import type { Entry } from "@/hooks/use-editor";
 
 import {
@@ -44,6 +45,7 @@ import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
   readonly accounts: readonly Account[];
+  readonly lines: readonly IncomeLine[];
 }
 
 // What the car dialog is open on: a new car, or one to edit with the
@@ -100,8 +102,13 @@ const blank: Draft = {
 // opening values each time the dialog opens, and the draft mirrors what
 // they report. A row's bin asks through the confirm dialog before the
 // account goes, saying what goes with it, since an asset takes its loan
-// and a loan its payments.
-export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
+// and a loan its payments, and what stops, since a salary feeding a
+// pension stops when the pension goes; the income lines are handed
+// down for that alone, so the ledger can name the salaries.
+export function AccountLedger({
+  accounts,
+  lines,
+}: AccountLedgerProps): JSX.Element {
   const [tab, setTab] = useState<Tab>("accounts");
   const [house, setHouse] = useState<HouseOpening | null>(null);
   const [car, setCar] = useState<CarOpening | null>(null);
@@ -331,7 +338,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
           }}
           title={`Delete ${doomed.name}?`}
         >
-          {goesWith(doomed, order)}
+          {goesWith(doomed, order, lines)}
         </ConfirmDialog>
       )}
       {house !== null && (
@@ -376,11 +383,27 @@ function fundedBy(current: Entry<Draft>, funding: Funding): Partial<Draft> {
     : { cadence: "year", cap: current.initial.cap, contribution: 0, funding };
 }
 
+// The names as a sentence lists them, "Salary and Salary step-up".
+const listed = new Intl.ListFormat("en-GB");
+
 // What goes with an account when it is deleted, for the dialog to say:
-// a house or a car takes the loan secured on it and that loan's
-// payments, a loan takes its payments, and any other account, or an
-// asset with no loan, goes alone.
-function goesWith(account: Account, accounts: readonly Account[]): string {
+// a pension takes the sacrifice of every salary feeding it, which is
+// earned whole from then on, since the store stops the salaries before
+// the pension goes and the share typed against each is lost with it; a
+// house or a car takes the loan secured on it and that loan's payments,
+// a loan takes its payments, and any other account, or an asset with no
+// loan, goes alone.
+function goesWith(
+  account: Account,
+  accounts: readonly Account[],
+  lines: readonly IncomeLine[],
+): string {
+  const feeders = lines
+    .filter((line) => line.feeds === account.id)
+    .map((line) => line.name);
+  if (feeders.length > 0) {
+    return `${listed.format(feeders)} ${feeders.length === 1 ? "stops" : "stop"} sacrificing into it and ${feeders.length === 1 ? "is" : "are"} earned whole, at the share lost with it.`;
+  }
   const found = securedFor(account, accounts);
   const loan = found?.loan ?? null;
   if (found === null || loan === null) {
