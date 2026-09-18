@@ -19,9 +19,10 @@ import {
   insertExpenseLine,
   updateExpenseLine,
 } from "@/db/expenses";
+import { stopFeeding } from "@/db/income";
 import { requireSession } from "@/lib/session";
 
-import { expenseLinesTag } from "../plan/store";
+import { expenseLinesTag, incomeLinesTag } from "../plan/store";
 import { getPlan } from "../store";
 import {
   placeAccountsInOrder,
@@ -52,6 +53,7 @@ vi.mock("@/db/expenses", () => ({
   insertExpenseLine: vi.fn(),
   updateExpenseLine: vi.fn(),
 }));
+vi.mock("@/db/income", () => ({ stopFeeding: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 vi.mock("../store", () => ({ getPlan: vi.fn() }));
 
@@ -555,19 +557,27 @@ describe("removeAccount", () => {
 
     await expect(removeAccount(pension.id)).rejects.toThrow("redirected");
     expect(deleteAccount).not.toHaveBeenCalled();
+    expect(stopFeeding).not.toHaveBeenCalled();
     expect(updateTag).not.toHaveBeenCalled();
   });
 
-  it("deletes an account nothing hangs on, and expires both tags", async () => {
+  // A salary feeding the account stops before the account goes, since
+  // the store holds the link.
+  it("deletes an account nothing hangs on, stopping any salary feeding it first, and expires every tag", async () => {
     vi.mocked(findLoanAgainst).mockResolvedValue(null);
     vi.mocked(findLinePaying).mockResolvedValue(null);
 
     await removeAccount(pension.id);
 
+    expect(stopFeeding).toHaveBeenCalledExactlyOnceWith(db, pension.id);
     expect(deleteAccount).toHaveBeenCalledExactlyOnceWith(db, pension.id);
+    expect(vi.mocked(stopFeeding).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(deleteAccount).mock.invocationCallOrder[0] ?? 0,
+    );
     expect(deleteExpenseLine).not.toHaveBeenCalled();
     expect(vi.mocked(updateTag).mock.calls).toStrictEqual([
       [expenseLinesTag],
+      [incomeLinesTag],
       [accountsTag],
     ]);
   });
