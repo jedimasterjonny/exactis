@@ -9,17 +9,13 @@ import type { Account } from "@/data/accounts";
 import type { IncomeKind, IncomeLine, IncomeLineValues } from "@/data/income";
 import type { Plan } from "@/engine/projection";
 import type { Entry } from "@/hooks/use-editor";
-import type { Option } from "@/lib/options";
 
 import { removeIncomeLine, saveIncomeLine } from "@/app/(app)/plan/actions";
-import { FieldRow } from "@/components/app/atoms/field-row";
 import { Note } from "@/components/app/atoms/note";
 import { SectionHeader } from "@/components/app/atoms/section-header";
 import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
-import { MoneyField } from "@/components/app/molecules/money-field";
-import { RateField } from "@/components/app/molecules/rate-field";
-import { SelectField } from "@/components/app/molecules/select-field";
+import { EmploymentFields } from "@/components/app/organisms/employment-fields";
 import { LineFields } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
@@ -68,16 +64,13 @@ const kinds = optionsOf(kindLabels, [
 // open state, as the ledger's does. The fields are the ones every line's
 // dialog takes, mounted fresh with the entry's opening values each time
 // the dialog opens, and the draft mirrors what they report. An
-// employment line's amount is its base salary, with its bonus and RSUs
-// on a row of their own that only an employment line shows, and
-// beneath them the pension it feeds, chosen from the pensions among the
-// accounts the page hands down, with the share of the base it
-// sacrifices beside it while a pension is chosen. A row's bin asks
-// through the confirm dialog before the line goes, as the ledger's
-// does; nothing hangs on a line, so it goes alone. The card takes a
-// numeral of its own off the screen's, since the reference numbers
-// each of the schedule's cards that way, and the expense schedule
-// beneath it takes the next.
+// employment line's amount is its base salary, and the fields only it
+// takes sit in the slot beneath them, shown the pensions among the
+// accounts the page hands down. A row's bin asks through the confirm
+// dialog before the line goes, as the ledger's does; nothing hangs on a
+// line, so it goes alone. The card takes a numeral of its own off the
+// screen's, since the reference numbers each of the schedule's cards
+// that way, and the expense schedule beneath it takes the next.
 export function IncomeSchedule({
   accounts,
   lines,
@@ -94,15 +87,6 @@ export function IncomeSchedule({
     remove: removeIncomeLine,
   });
   const pensions = accounts.filter(isPension);
-  // The pension choice's options: none, and each pension by its id,
-  // as the select's string, since two may share a name.
-  const pensionChoices: readonly Option<string>[] = [
-    { label: "None", value: "none" },
-    ...pensions.map((pension) => ({
-      label: pension.name,
-      value: String(pension.id),
-    })),
-  ];
 
   // The category choice: an employment line's parts and its pension are
   // kept only while it is one, and come back as the line opened with
@@ -127,24 +111,6 @@ export function IncomeSchedule({
   function edit(line: IncomeLine): void {
     const { id, ...values } = line;
     open(values, id);
-  }
-
-  // The pension choice: a line feeding none gives up nothing, and the
-  // share goes with the field that shows it; a line given a pension
-  // keeps the share it has, or takes the one it opened with when the
-  // field comes back, which is what it mounts showing.
-  function feed(current: Entry<Draft>, choice: string): void {
-    const { draft, initial } = current;
-    amend(
-      current,
-      choice === "none"
-        ? { feeds: null, sacrifice: 0 }
-        : {
-            feeds: Number(choice),
-            sacrifice:
-              draft.feeds === null ? initial.sacrifice : draft.sacrifice,
-          },
-    );
   }
 
   return (
@@ -225,53 +191,14 @@ export function IncomeSchedule({
             side="income"
           >
             {entry.draft.kind === "employment" && (
-              <FieldRow layout="triple">
-                <MoneyField
-                  defaultValue={entry.initial.bonus}
-                  hint="At the salary's cadence; nothing for none"
-                  label="Bonus"
-                  onValueCommitted={(bonus) => {
-                    amend(entry, { bonus });
-                  }}
-                />
-                <MoneyField
-                  defaultValue={entry.initial.rsu}
-                  hint="Vesting at the salary's cadence"
-                  label="RSUs"
-                  onValueCommitted={(rsu) => {
-                    amend(entry, { rsu });
-                  }}
-                />
-              </FieldRow>
-            )}
-            {entry.draft.kind === "employment" && (
-              <FieldRow layout="pair">
-                <SelectField
-                  defaultValue={
-                    entry.initial.feeds === null
-                      ? "none"
-                      : String(entry.initial.feeds)
-                  }
-                  hint="Fed by salary sacrifice, with the employer's NI saved"
-                  label="Pension"
-                  onValueChange={(choice) => {
-                    feed(entry, choice);
-                  }}
-                  options={pensionChoices}
-                />
-                {entry.draft.feeds !== null && (
-                  <RateField
-                    defaultValue={entry.initial.sacrifice}
-                    hint="Of the base alone"
-                    label="Salary sacrifice"
-                    max={1}
-                    min={0}
-                    onValueCommitted={(sacrifice) => {
-                      amend(entry, { sacrifice });
-                    }}
-                  />
-                )}
-              </FieldRow>
+              <EmploymentFields
+                draft={entry.draft}
+                initial={entry.initial}
+                onAmend={(patch) => {
+                  amend(entry, patch);
+                }}
+                pensions={pensions}
+              />
             )}
           </LineFields>
         </EditDialog>
