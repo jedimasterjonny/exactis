@@ -1,5 +1,7 @@
 import type { LineGrowth, LineValues } from "@/data/schedule";
 
+import { monthName } from "@/lib/months";
+
 // What each growth choice is called, on the rows and in the dialog that
 // offers them: the amount rises with inflation, a point or two over it,
 // the triple lock, or not at all.
@@ -10,6 +12,20 @@ export const growthLabels: Record<LineGrowth, string> = {
   nominal: "Nominal, fixed",
   "triple-lock": "Triple lock",
 };
+
+// Where a line ends, for the rows and the toast: its last year, with
+// the month before it when it ends part way through, "Nov 2047", and
+// nothing for a line that runs to the end of the plan, which the caller
+// names in its own words.
+export function endOf(line: LineValues): null | string {
+  if (line.lastYear === null) {
+    return null;
+  }
+  const year = String(line.lastYear);
+  return line.lastMonth === null
+    ? year
+    : `${monthName(line.lastMonth, "short")} ${year}`;
+}
 
 // A draft the store would take: named, and not ending before it starts.
 // The save button holds until it is one.
@@ -22,6 +38,5 @@ export function isSound(draft: LineValues): boolean {
 
 // The years a saved line runs, for the toast that reports it.
 export function spanOf(line: LineValues): string {
-  const last = line.lastYear === null ? "end of plan" : String(line.lastYear);
-  return `${String(line.firstYear)}–${last}`;
+  return `${String(line.firstYear)}–${endOf(line) ?? "end of plan"}`;
 }

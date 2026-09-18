@@ -9,6 +9,7 @@ import { endYear } from "@/engine/projection";
 
 interface SpanBarProps {
   readonly firstYear: number;
+  readonly lastMonth: null | number;
   readonly lastYear: null | number;
   readonly plan: Plan;
   readonly side: Side;
@@ -26,19 +27,25 @@ const fills: Record<Side, string> = {
 const sliver = 1.2;
 
 // Where a line sits on the plan's span: a bar over a track, from the
-// line's first year to its last, or to the plan's end when it has none. A
-// year outside the span is held to its edge rather than drawn past it.
+// line's first year to its last, into it by the month it ends in when it
+// ends part way through, or to the plan's end when it has no last year.
+// A year outside the span is held to its edge rather than drawn past it.
 // Decorative, since the years are written beside it: the bar is hidden
 // from the accessibility tree.
 export function SpanBar({
   firstYear,
+  lastMonth,
   lastYear,
   plan,
   side,
 }: SpanBarProps): JSX.Element {
   const end = endYear(plan);
   const left = placed(firstYear, plan.from, end);
-  const right = placed(lastYear ?? end, plan.from, end);
+  const right = placed(
+    lastYear === null ? end : lastYear + (lastMonth ?? 0) / 12,
+    plan.from,
+    end,
+  );
   return (
     <div
       aria-hidden
