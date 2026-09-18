@@ -5,6 +5,7 @@ import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { CashFlowCard } from "@/components/app/organisms/cash-flow-card";
 import { ExpenseSchedule } from "@/components/app/organisms/expense-schedule";
 import { IncomeSchedule } from "@/components/app/organisms/income-schedule";
+import { counted } from "@/lib/count";
 import { plan as planScreen, sectionLabel } from "@/lib/nav";
 
 import { getAccounts } from "../accounts/store";
@@ -35,7 +36,7 @@ export default async function Plan(): Promise<JSX.Element> {
   return (
     <>
       <ScreenHeader label={sectionLabel(planScreen)} title="Income & expenses">
-        {`${counted(incomeLines.length, "income")} · ${counted(expenseLines.length, "expense")}`}
+        {`${counted(incomeLines.length, "income line")} · ${counted(expenseLines.length, "expense line")}`}
       </ScreenHeader>
       <ScreenBody>
         <IncomeSchedule lines={incomeLines} plan={plan} />
@@ -48,9 +49,4 @@ export default async function Plan(): Promise<JSX.Element> {
       </ScreenBody>
     </>
   );
-}
-
-// A schedule's count for the header, one line in the singular.
-function counted(count: number, side: string): string {
-  return `${String(count)} ${side} ${count === 1 ? "line" : "lines"}`;
 }
