@@ -2,7 +2,7 @@
 
 import type { DragEvent, JSX, KeyboardEvent } from "react";
 
-import { GripVertical, Pencil, Wallet } from "lucide-react";
+import { GripVertical, Pencil, Trash2, Wallet } from "lucide-react";
 import { useState } from "react";
 
 import type { Account, AccountKind, Growth } from "@/data/accounts";
@@ -27,6 +27,7 @@ interface AccountTableProps {
   readonly accounts: readonly Account[];
   readonly emptyDescription: string;
   readonly emptyTitle: string;
+  readonly onDelete?: (account: Account) => void;
   readonly onEdit?: (account: Account) => void;
   readonly onMove?: (account: Account, target: Account) => void;
 }
@@ -50,7 +51,9 @@ const treatments: Record<
 // A ledger of accounts: the name and its balance carry the weight, the
 // treatment is a badge, and the three figures are right-aligned mono. A
 // table given an edit handler closes each row with a pencil that reports
-// the row's account, whose id says where a save writes back. One given a
+// the row's account, whose id says where a save writes back, and one
+// given a delete handler with a bin that reports the account to delete,
+// which the caller asks about before it does anything. One given a
 // move handler opens each row with a grip: dragged onto another row, or
 // moved a row up or down with the arrow keys, it reports the account
 // and the row it takes the place of, and the caller decides what the
@@ -65,6 +68,7 @@ export function AccountTable({
   accounts,
   emptyDescription,
   emptyTitle,
+  onDelete,
   onEdit,
   onMove,
 }: AccountTableProps): JSX.Element {
@@ -147,9 +151,9 @@ export function AccountTable({
             <TableHead className="text-right">Contribution</TableHead>
             <TableHead className="text-right">Growth</TableHead>
             <TableHead className="text-right">Balance</TableHead>
-            {onEdit !== undefined && (
+            {(onEdit !== undefined || onDelete !== undefined) && (
               <TableHead className="w-0">
-                <span className="sr-only">Edit</span>
+                <span className="sr-only">Actions</span>
               </TableHead>
             )}
           </TableRow>
@@ -207,18 +211,35 @@ export function AccountTable({
               <TableCell className="text-right figure font-medium">
                 {formatGbp(account.balance)}
               </TableCell>
-              {onEdit !== undefined && (
+              {(onEdit !== undefined || onDelete !== undefined) && (
                 <TableCell className="py-1">
-                  <Button
-                    aria-label={`Edit ${account.name}`}
-                    onClick={() => {
-                      onEdit(account);
-                    }}
-                    size="icon-sm"
-                    variant="ghost"
-                  >
-                    <Pencil aria-hidden />
-                  </Button>
+                  <span className="flex gap-1">
+                    {onEdit !== undefined && (
+                      <Button
+                        aria-label={`Edit ${account.name}`}
+                        onClick={() => {
+                          onEdit(account);
+                        }}
+                        size="icon-sm"
+                        variant="ghost"
+                      >
+                        <Pencil aria-hidden />
+                      </Button>
+                    )}
+                    {onDelete !== undefined && (
+                      <Button
+                        aria-label={`Delete ${account.name}`}
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          onDelete(account);
+                        }}
+                        size="icon-sm"
+                        variant="ghost"
+                      >
+                        <Trash2 aria-hidden />
+                      </Button>
+                    )}
+                  </span>
                 </TableCell>
               )}
             </TableRow>

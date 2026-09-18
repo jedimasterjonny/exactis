@@ -11,6 +11,7 @@ import type { Account } from "@/data/accounts";
 
 import {
   placeAccountsInOrder,
+  removeAccount,
   saveAccount,
   saveHouse,
 } from "@/app/(app)/accounts/actions";
@@ -22,6 +23,7 @@ import { AccountLedger } from "./account-ledger";
 
 vi.mock("@/app/(app)/accounts/actions", () => ({
   placeAccountsInOrder: vi.fn(),
+  removeAccount: vi.fn(),
   saveAccount: vi.fn(),
   saveHouse: vi.fn(),
 }));
@@ -775,5 +777,94 @@ describe("AccountLedger", () => {
     const dialog = openEditor("Mortgage");
 
     expect(within(dialog).getByText("Edit account")).toHaveClass("text-brand");
+  });
+
+  // A row's bin asks first, holds the confirm while the store answers,
+  // and closes on the answer; the row goes when the page re-reads.
+  it("asks before deleting an account, and deletes it on confirm", async () => {
+    renderLedger();
+    let answer!: () => void;
+    vi.mocked(removeAccount).mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Current account" }),
+    );
+
+    const dialog = screen.getByRole("alertdialog", {
+      name: "Delete Current account?",
+    });
+
+    expect(dialog).toHaveAccessibleDescription("It cannot be brought back.");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    expect(removeAccount).toHaveBeenCalledExactlyOnceWith(cash.id);
+    expect(
+      within(dialog).getByRole("button", { name: "Delete" }),
+    ).toBeDisabled();
+
+    answer();
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("dialog", { name: "Account deleted" }),
+    ).toHaveAccessibleDescription("Current account");
+  });
+
+  it("drops the question on cancel and deletes nothing", () => {
+    renderLedger();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Stocks & shares ISA" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(removeAccount).not.toHaveBeenCalled();
+  });
+
+  it("says a loan takes its payments and a house its mortgage and the payments", () => {
+    render(
+      <Toaster>
+        <AccountLedger accounts={[pension, house, loan]} />
+      </Toaster>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Mortgage" }));
+
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete Mortgage?" }),
+    ).toHaveAccessibleDescription("Its payments go with it.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Home" }));
+
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete Home?" }),
+    ).toHaveAccessibleDescription(
+      "Its mortgage, Mortgage, and the payments go with it.",
+    );
+  });
+
+  it("says a house with no loan goes alone", () => {
+    render(
+      <Toaster>
+        <AccountLedger accounts={[house]} />
+      </Toaster>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Home" }));
+
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete Home?" }),
+    ).toHaveAccessibleDescription("It cannot be brought back.");
   });
 });

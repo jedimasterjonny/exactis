@@ -23,7 +23,12 @@ import { requireSession } from "@/lib/session";
 
 import { expenseLinesTag } from "../plan/store";
 import { getPlan } from "../store";
-import { placeAccountsInOrder, saveAccount, saveHouse } from "./actions";
+import {
+  placeAccountsInOrder,
+  removeAccount,
+  saveAccount,
+  saveHouse,
+} from "./actions";
 import { accountsTag } from "./store";
 
 vi.mock("server-only", () => ({}));
@@ -369,6 +374,63 @@ describe("saveHouse", () => {
     expect(insertAccount).not.toHaveBeenCalled();
     expect(updateAccount).not.toHaveBeenCalled();
     expect(insertExpenseLine).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+});
+
+describe("removeAccount", () => {
+  beforeEach(() => {
+    vi.mocked(getDb).mockReturnValue(db);
+  });
+
+  it("deletes nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(removeAccount(pension.id)).rejects.toThrow("redirected");
+    expect(deleteAccount).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+
+  it("deletes an account nothing hangs on, and expires both tags", async () => {
+    vi.mocked(findLoanAgainst).mockResolvedValue(null);
+    vi.mocked(findLinePaying).mockResolvedValue(null);
+
+    await removeAccount(pension.id);
+
+    expect(deleteAccount).toHaveBeenCalledExactlyOnceWith(db, pension.id);
+    expect(deleteExpenseLine).not.toHaveBeenCalled();
+    expect(vi.mocked(updateTag).mock.calls).toStrictEqual([
+      [expenseLinesTag],
+      [accountsTag],
+    ]);
+  });
+
+  // The house takes its loan and the loan its payments: the line, then
+  // the loan, then the house, since the store holds each link.
+  it("deletes a house with the loan secured on it and that loan's payments, in that order", async () => {
+    vi.mocked(findLoanAgainst).mockResolvedValue(mortgage);
+    vi.mocked(findLinePaying)
+      .mockResolvedValueOnce(mortgagePayment)
+      .mockResolvedValueOnce(null);
+
+    await removeAccount(home.id);
+
+    expect(deleteExpenseLine).toHaveBeenCalledExactlyOnceWith(
+      db,
+      mortgagePayment.id,
+    );
+    expect(vi.mocked(deleteAccount).mock.calls).toStrictEqual([
+      [db, mortgage.id],
+      [db, home.id],
+    ]);
+    expect(
+      vi.mocked(deleteExpenseLine).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(deleteAccount).mock.invocationCallOrder[0] ?? 0);
+  });
+
+  it("refuses an id the ledger could not have sent", async () => {
+    await expect(removeAccount(0)).rejects.toThrow(z.ZodError);
+    expect(deleteAccount).not.toHaveBeenCalled();
     expect(updateTag).not.toHaveBeenCalled();
   });
 });
