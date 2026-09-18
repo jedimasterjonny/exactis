@@ -8,13 +8,15 @@ interface PlanMonth {
 // The year the last payment falls in. The plan's month is a paying
 // month, as the projection carries the first year from it, so the first
 // payment lands in that month and the last one payments later, less
-// one: the term's months, whole, since a part of a month is a payment.
-// Counted in payments rather than time, since a term landing on a year
-// end would otherwise be read as the year after it. The whisker below
-// the count absorbs the floating point a worked-out term carries, so
-// a term that is a whole number of months bar a rounding is one.
+// one: the term's months, whole, since a part of a month is a payment,
+// and at least one, since a term of nothing is cleared in a single
+// payment, as the months a term runs are counted. Counted in payments
+// rather than time, since a term landing on a year end would otherwise
+// be read as the year after it. The whisker below the count absorbs the
+// floating point a worked-out term carries, so a term that is a whole
+// number of months bar a rounding is one.
 export function clearsIn(term: number, plan: PlanMonth): number {
-  const payments = Math.ceil(term * 12 - 1e-9);
+  const payments = Math.max(1, Math.ceil(term * 12 - 1e-9));
   return plan.from + Math.floor((plan.month + payments - 1) / 12);
 }
 
