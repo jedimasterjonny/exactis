@@ -3,13 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 
-import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 
 import { AccountTable } from "./account-table";
 
-const held = accounts.filter((account) => !isAsset(account));
-const assets = accounts.filter(isAsset);
+// The fixture in two lists, the wrappers and cash and then the house and
+// its mortgage: sample rows for the table, which lists whatever it is
+// given and does not decide the split itself.
+const held = accounts.slice(0, 3);
+const assets = accounts.slice(3);
 
 describe("AccountTable", () => {
   it("lists every account as a row with its treatment and three figures", () => {

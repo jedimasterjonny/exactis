@@ -18,6 +18,6 @@ describe("Accounts", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Accounts & assets",
     );
-    expect(screen.getByText("3 accounts · 2 assets")).toBeInTheDocument();
+    expect(screen.getByText("4 accounts · 1 asset")).toBeInTheDocument();
   });
 });

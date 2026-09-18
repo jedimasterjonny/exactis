@@ -91,11 +91,18 @@ export function allowanceOf(kind: AccountKind): null | number {
   }
 }
 
-// A real asset and the loan against it are the side of the plan the
-// progress points reconcile as total assets and asset loans. They are
-// paid a fixed sum or nothing: the spare money goes into savings.
+// A real asset is the side of the plan the progress points reconcile as
+// total assets. The loan against one is a debt, listed with the accounts,
+// since it is paid as they are; the progress points reconcile it as an
+// asset loan.
 export function isAsset(account: { readonly kind: AccountKind }): boolean {
-  return account.kind === "debt" || account.kind === "real-asset";
+  return account.kind === "real-asset";
+}
+
+// A wrapper or cash may be paid the spare money. A real asset or a debt
+// is paid a fixed sum or nothing: the spare money goes into savings.
+export function takesSpare(account: { readonly kind: AccountKind }): boolean {
+  return account.kind !== "debt" && account.kind !== "real-asset";
 }
 
 // A contribution of nothing is an absence on the account, a cap of

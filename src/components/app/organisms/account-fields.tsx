@@ -6,7 +6,7 @@ import { MoneyField } from "@/components/app/molecules/money-field";
 import { RateField } from "@/components/app/molecules/rate-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
-import { allowanceOf, isAsset } from "@/data/accounts";
+import { allowanceOf, takesSpare } from "@/data/accounts";
 import { cadenceOptions } from "@/lib/cadence";
 import { formatGbp } from "@/lib/money";
 
@@ -82,7 +82,7 @@ export function AccountFields({
             onAmend({ balance });
           }}
         />
-        {!isAsset(draft) && (
+        {takesSpare(draft) && (
           <SelectField
             defaultValue={initial.funding}
             hint="Spare money is what a month's income leaves after the expenses and every fixed sum"
