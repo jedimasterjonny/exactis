@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 
-import type { HouseDraft, MortgageFigure, Status } from "@/data/houses";
+import type { HouseDraft, Status } from "@/data/houses";
+import type { LoanFigure } from "@/lib/figures";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { MoneyField } from "@/components/app/molecules/money-field";
@@ -16,7 +17,7 @@ interface HouseFieldsProps {
   readonly figure: null | number;
   readonly initial: HouseDraft;
   readonly onAmend: (patch: Partial<HouseDraft>) => void;
-  readonly worked: MortgageFigure;
+  readonly worked: LoanFigure;
 }
 
 // What each status is called in the dialog's choice.
@@ -52,7 +53,7 @@ export function HouseFields({
   onAmend,
   worked,
 }: HouseFieldsProps): JSX.Element {
-  function shown(field: MortgageFigure): null | number {
+  function shown(field: LoanFigure): null | number {
     return worked === field ? figure : draft[field];
   }
 
@@ -146,7 +147,7 @@ export function HouseFields({
 
 // What the term field says beneath itself: that it was worked out, that
 // the payment never clears the loan, or what a typed term is.
-function termHint(worked: MortgageFigure, figure: null | number): string {
+function termHint(worked: LoanFigure, figure: null | number): string {
   if (worked !== "term") {
     return "Left to run";
   }

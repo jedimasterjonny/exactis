@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { HouseDraft, MortgageFigure } from "@/data/houses";
+import type { HouseDraft } from "@/data/houses";
+import type { LoanFigure } from "@/lib/figures";
 
 import { HouseFields } from "./house-fields";
 
@@ -33,7 +34,7 @@ function field(name: string): HTMLElement {
 // figure it worked out, with a spy where the dialog listens.
 function renderFields(
   draft: HouseDraft,
-  worked: MortgageFigure,
+  worked: LoanFigure,
   figure: null | number,
 ): {
   readonly onAmend: ReturnType<

@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 
-import type { Agreement, CarDraft, FinanceFigure } from "@/data/cars";
+import type { Agreement, CarDraft } from "@/data/cars";
+import type { LoanFigure } from "@/lib/figures";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { MoneyField } from "@/components/app/molecules/money-field";
@@ -17,7 +18,7 @@ interface CarFieldsProps {
   readonly figure: null | number;
   readonly initial: CarDraft;
   readonly onAmend: (patch: Partial<CarDraft>) => void;
-  readonly worked: FinanceFigure;
+  readonly worked: LoanFigure;
 }
 
 // What each agreement is called in the dialog's choice.
@@ -60,7 +61,7 @@ export function CarFields({
   onAmend,
   worked,
 }: CarFieldsProps): JSX.Element {
-  function shown(field: FinanceFigure): null | number {
+  function shown(field: LoanFigure): null | number {
     return worked === field ? figure : draft[field];
   }
 
@@ -179,7 +180,7 @@ function balloonHint(clears: null | number): string {
 // typed term is left of.
 function termHint(
   agreement: Agreement,
-  worked: FinanceFigure,
+  worked: LoanFigure,
   figure: null | number,
 ): string {
   const isPcp = agreement === "pcp";
