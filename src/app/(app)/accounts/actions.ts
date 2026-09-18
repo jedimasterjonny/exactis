@@ -4,6 +4,7 @@ import { updateTag } from "next/cache";
 import * as z from "zod";
 
 import type { Account, AccountValues } from "@/data/accounts";
+import type { CarValues } from "@/data/cars";
 import type { ExpenseLineValues } from "@/data/expenses";
 import type { HouseValues } from "@/data/houses";
 import type { Database } from "@/db/accounts";
@@ -15,6 +16,11 @@ import {
   growthKinds,
   takesSpare,
 } from "@/data/accounts";
+import {
+  agreements,
+  isSound as isSoundCar,
+  toRecords as toCarRecords,
+} from "@/data/cars";
 import { isSound, statuses, toRecords } from "@/data/houses";
 import {
   deleteAccount,
@@ -35,6 +41,36 @@ import { requireSession } from "@/lib/session";
 import { expenseLinesTag } from "../plan/store";
 import { getPlan } from "../store";
 import { accountsTag } from "./store";
+
+// What a car may carry, checked against the model's own list and its
+// own soundness so the two cannot drift: the figures whole and never
+// negative, the depreciation no more than losing everything, since
+// below that a year's growth is not a number, the finance's rate no
+// lower than nothing, a financed car owing and paying something, a PCP
+// owing more than a balloon of something and a loan no balloon, a car
+// owned outright owing, paying and charged nothing, since the form
+// zeroes what its agreement hides, and the name as typed less the space
+// around it.
+const car = z
+  .object({
+    agreement: z.enum(agreements),
+    balance: z.number().int().nonnegative(),
+    balloon: z.number().int().nonnegative(),
+    depreciation: z.number().max(1),
+    name: z.string().trim().min(1),
+    payment: z.number().int().nonnegative(),
+    rate: z.number().nonnegative(),
+    value: z.number().int().nonnegative(),
+  })
+  .refine(isSoundCar)
+  .refine(
+    (draft) =>
+      draft.agreement !== "outright" ||
+      (draft.balance === 0 &&
+        draft.balloon === 0 &&
+        draft.payment === 0 &&
+        draft.rate === 0),
+  ) satisfies z.ZodType<CarValues>;
 
 // What a house may carry, checked against the model's own list and its
 // own soundness so the two cannot drift: the figures whole and never
@@ -154,6 +190,26 @@ export async function saveAccount(
     at === null
       ? await insertAccount(db, parsed)
       : await updateAccount(db, at, parsed);
+  updateTag(accountsTag);
+  return account;
+}
+
+// Writes a car as the records it is, a new one when the id is null and
+// over the car with that id otherwise: the car's own account, and for a
+// financed car the loan secured on it and the line of its payments, so
+// the finance appears among the accounts and its payments among the
+// expenses with no more asked of the form, and hands back the car's own
+// account. Checked as a save is. Both tags expire, and the plan is read
+// for the year the payments start in.
+export async function saveCar(
+  id: null | number,
+  draft: CarValues,
+): Promise<Account> {
+  await requireSession();
+  const at = target.parse(id);
+  const { asset, finance } = toCarRecords(car.parse(draft), getPlan());
+  const account = await writeSecured(getDb(), at, { asset, loan: finance });
+  updateTag(expenseLinesTag);
   updateTag(accountsTag);
   return account;
 }

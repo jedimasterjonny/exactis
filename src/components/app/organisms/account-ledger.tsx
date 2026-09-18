@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { HousePlus, Plus } from "lucide-react";
+import { CarFront, HousePlus, Plus } from "lucide-react";
 import { startTransition, useOptimistic, useState, useTransition } from "react";
 
 import type {
@@ -11,6 +11,7 @@ import type {
   AccountValues,
   Funding,
 } from "@/data/accounts";
+import type { Car } from "@/data/cars";
 import type { House } from "@/data/houses";
 import type { Entry } from "@/hooks/use-editor";
 
@@ -26,6 +27,7 @@ import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { AccountFields } from "@/components/app/organisms/account-fields";
 import { AccountTable } from "@/components/app/organisms/account-table";
+import { CarDialog } from "@/components/app/organisms/car-dialog";
 import { HouseDialog } from "@/components/app/organisms/house-dialog";
 import { Button } from "@/components/kit/button";
 import {
@@ -44,6 +46,10 @@ interface AccountLedgerProps {
   readonly accounts: readonly Account[];
 }
 
+// What the car dialog is open on: a new car, or one to edit with the
+// loan against it.
+type CarOpening = "new" | Car;
+
 // What the dialog holds while it is open: the account's values, flat, so
 // the rate sits beside the growth choice and the sum and the cap beside
 // the contribution choice, each reset to what it opened with when its
@@ -54,6 +60,13 @@ type Draft = AccountValues;
 // What the house dialog is open on: a new house, or one to edit with the
 // loan against it.
 type HouseOpening = "new" | House;
+
+// An asset and the loan secured on it, as the ledger finds them for the
+// dialog that edits them as one; a house and a car are the same to it.
+interface Secured {
+  readonly asset: Account;
+  readonly loan: Account | null;
+}
 
 type Tab = "accounts" | "assets";
 
@@ -80,17 +93,18 @@ const blank: Draft = {
 // re-reads; the optimistic order is the page's again once it does. The
 // entry doubles as the dialog's open state, as the progress editor's
 // point does, and the tab is controlled so a saved account can bring
-// its own tab forward, as a saved house does through the house dialog,
-// which the header's Add house button opens on a new house and the
-// pencil of a house or the loan against it opens on that house, so an
-// edit from either side writes both. The fields are uncontrolled and mount fresh with the entry's
+// its own tab forward, as a saved house or car does through its own
+// dialog, which the header's Add house and Add car buttons open on a new
+// one and the pencil of a house or a car, or of the loan against either,
+// opens on that asset, so an edit from either side writes both. The fields are uncontrolled and mount fresh with the entry's
 // opening values each time the dialog opens, and the draft mirrors what
 // they report. A row's bin asks through the confirm dialog before the
-// account goes, saying what goes with it, since a house takes its loan
+// account goes, saying what goes with it, since an asset takes its loan
 // and a loan its payments.
 export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   const [tab, setTab] = useState<Tab>("accounts");
   const [house, setHouse] = useState<HouseOpening | null>(null);
+  const [car, setCar] = useState<CarOpening | null>(null);
   const [doomed, setDoomed] = useState<Account | null>(null);
   const [isRemoving, startRemoving] = useTransition();
   const [order, placeOptimistically] = useOptimistic(
@@ -112,12 +126,14 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   const assets = order.filter(isAsset);
 
   // A row's pencil opens its account as it is, with its id so a save
-  // writes back to it, unless the account is a house or the loan against
-  // one, which open as the house they are part of.
+  // writes back to it, unless the account is a house or a car, or the
+  // loan against one, which open as the asset they are part of.
   function edit(account: Account): void {
-    const found = houseFor(account, order);
+    const found = securedFor(account, order);
     if (found === null) {
       open(toValues(account), account.id);
+    } else if (found.asset.kind === "car") {
+      setCar(found);
     } else {
       setHouse(found);
     }
@@ -200,6 +216,16 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
             >
               <HousePlus aria-hidden />
               Add house
+            </Button>
+            <Button
+              onClick={() => {
+                setCar("new");
+              }}
+              size="sm"
+              variant="outline"
+            >
+              <CarFront aria-hidden />
+              Add car
             </Button>
             <Button
               onClick={() => {
@@ -320,6 +346,18 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
           }}
         />
       )}
+      {car !== null && (
+        <CarDialog
+          car={car === "new" ? null : car}
+          onDismiss={() => {
+            setCar(null);
+          }}
+          onSaved={() => {
+            setCar(null);
+            setTab("assets");
+          }}
+        />
+      )}
     </>
   );
 }
@@ -339,35 +377,47 @@ function fundedBy(current: Entry<Draft>, funding: Funding): Partial<Draft> {
 }
 
 // What goes with an account when it is deleted, for the dialog to say:
-// a house takes the loan secured on it and that loan's payments, a loan
-// takes its payments, and any other account, or a house with no loan,
-// goes alone.
+// a house or a car takes the loan secured on it and that loan's
+// payments, a loan takes its payments, and any other account, or an
+// asset with no loan, goes alone.
 function goesWith(account: Account, accounts: readonly Account[]): string {
-  const loan = houseFor(account, accounts)?.loan ?? null;
-  if (loan === null) {
+  const found = securedFor(account, accounts);
+  const loan = found?.loan ?? null;
+  if (found === null || loan === null) {
     return "It cannot be brought back.";
   }
-  return loan.secures === account.id
-    ? `Its mortgage, ${loan.name}, and the payments go with it.`
-    : "Its payments go with it.";
+  if (loan.secures !== account.id) {
+    return "Its payments go with it.";
+  }
+  const what = found.asset.kind === "house" ? "mortgage" : "finance";
+  return `Its ${what}, ${loan.name}, and the payments go with it.`;
 }
 
-// The house an account is part of: a house is its own, with the loan
-// secured on it when there is one, and a loan secured on a house is that
-// house's; any other account is part of none, and so is a loan whose
-// asset is not listed, which opens as the account it is.
-function houseFor(
+// Whether an account is an asset with a dialog of its own, which edits
+// it and the loan against it as one.
+function hasDialog(account: Account): boolean {
+  return account.kind === "car" || account.kind === "house";
+}
+
+// The asset an account is part of: a house or a car is its own, with
+// the loan secured on it when there is one, and a loan secured on either
+// is that asset's; any other account is part of none, and so is a loan
+// whose asset is not listed, or is listed as an asset with no dialog,
+// which opens as the account it is.
+function securedFor(
   account: Account,
   accounts: readonly Account[],
-): House | null {
-  if (account.kind === "house") {
+): null | Secured {
+  if (hasDialog(account)) {
     return {
       asset: account,
       loan: accounts.find((a) => a.secures === account.id) ?? null,
     };
   }
   const asset = accounts.find((a) => a.id === account.secures);
-  return asset === undefined ? null : { asset, loan: account };
+  return asset === undefined || !hasDialog(asset)
+    ? null
+    : { asset, loan: account };
 }
 
 // The row count beside a tab's label, in the micro-label face and faint.
