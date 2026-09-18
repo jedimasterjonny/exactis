@@ -6,15 +6,23 @@ import { cn } from "cn";
 import { useState } from "react";
 
 import type { Account } from "@/data/accounts";
-import type { Schedule, Take } from "@/engine/cash-flow";
+import type { Schedule, Spent, Take } from "@/engine/cash-flow";
 import type { Plan } from "@/engine/projection";
 
 import { Field } from "@/components/app/atoms/field";
 import { SectionHeader } from "@/components/app/atoms/section-header";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/kit/accordion";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
 import { Slider } from "@/components/kit/slider";
 import { cashFlow } from "@/engine/cash-flow";
 import { endYear } from "@/engine/projection";
+import { cadenceAbbreviations } from "@/lib/cadence";
+import { spanOf } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 
@@ -22,6 +30,11 @@ interface CashFlowCardProps {
   readonly accounts: readonly Account[];
   readonly plan: Plan;
   readonly schedule: Schedule;
+}
+
+interface FigureProps {
+  readonly amount: number;
+  readonly isTotal?: boolean;
 }
 
 interface RowProps {
@@ -40,8 +53,12 @@ interface RowProps {
 // cheap, rather than asking the page for every year. The income comes
 // in, the expenses and every account paid go out, each account under
 // its name with how it is paid, and what is left closes the list, in
-// the loss tone when the month does not cover its outgoings. The card
-// takes the next numeral off the screen's after the expense card's.
+// the loss tone when the month does not cover its outgoings. The
+// expenses figure opens into the lines behind it, each under its name
+// with what it is paid at and the years it runs, since a sum over a
+// schedule that starts and ends line by line is a question as often as
+// an answer. The card takes the next numeral off the screen's after the
+// expense card's.
 export function CashFlowCard({
   accounts,
   plan,
@@ -77,7 +94,7 @@ export function CashFlowCard({
       <CardContent>
         <ul className="divide-y">
           <Row amount={flow.income} label="Income" />
-          <Row amount={-flow.expenses} label="Expenses" />
+          <Expenses amount={flow.expenses} spent={flow.spent} />
           {flow.fixed.map((paid) => (
             <Row
               amount={-paid.amount}
@@ -101,12 +118,82 @@ export function CashFlowCard({
   );
 }
 
+// What a line is paid at and the years it runs, "£3,500 / mo ·
+// 2026–2047", beneath its name in the breakdown.
+function describeSpent({ line }: Spent): string {
+  return `${formatGbp(line.amount)} / ${cadenceAbbreviations[line.cadence]} · ${spanOf(line)}`;
+}
+
 // An account paid the spare money says the most it takes a year, so a
 // month's take is read against it.
 function describeTake(take: Take): string {
   return take.cap === null
     ? "Spare money, uncapped"
     : `Spare money, to ${formatGbp(take.cap)} / yr`;
+}
+
+// The expenses line of the ledger, which is a row until it is opened
+// and then the lines behind it as well, each a row of its own in a list
+// beneath the figure: the trigger is drawn as the row is, so the ledger
+// reads the same closed, and the panel lists what the year's month is
+// paying, or says when it is paying nothing.
+function Expenses({
+  amount,
+  spent,
+}: {
+  readonly amount: number;
+  readonly spent: readonly Spent[];
+}): JSX.Element {
+  return (
+    <li className="py-3">
+      <Accordion>
+        <AccordionItem value="expenses">
+          <AccordionTrigger className="gap-3 py-0 font-normal hover:no-underline">
+            <span className="flex flex-1 items-baseline justify-between gap-4">
+              <span>Expenses</span>
+              <Figure amount={-amount} />
+            </span>
+          </AccordionTrigger>
+          <AccordionContent className="pb-0">
+            {spent.length === 0 ? (
+              <p className="pt-3 text-xs text-muted-foreground">
+                No expense line runs this year.
+              </p>
+            ) : (
+              <ul className="mt-3 divide-y border-t pl-4">
+                {spent.map((entry) => (
+                  <Row
+                    amount={-entry.amount}
+                    detail={describeSpent(entry)}
+                    key={entry.line.id}
+                    label={entry.line.name}
+                  />
+                ))}
+              </ul>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </li>
+  );
+}
+
+// A figure of the ledger, in mono, with a real minus on what goes out
+// and none on nothing. The total is weighted, and in the loss tone when
+// it is a shortfall, which is read off the figure shown: a fraction of
+// a pound short is written as nothing and is not toned as a loss.
+function Figure({ amount, isTotal = false }: FigureProps): JSX.Element {
+  return (
+    <span
+      className={cn(
+        "figure",
+        isTotal && "font-medium",
+        isTotal && !isZero(amount) && amount < 0 && "text-destructive",
+      )}
+    >
+      {formatGbp(isZero(amount) ? 0 : amount)}
+    </span>
+  );
 }
 
 // A figure that rounds to nothing is written as nothing, without the
@@ -116,11 +203,8 @@ function isZero(amount: number): boolean {
 }
 
 // A line of the ledger: the name and, beneath it, how the money is
-// paid; the figure to the right in mono, a real minus on what goes
-// out and none on nothing. The total is the row that matters, so it is
-// weighted, and in the loss tone when it is a shortfall, which is read
-// off the figure shown: a fraction of a pound short is written as
-// nothing and is not toned as a loss.
+// paid; the figure to the right. The total is the row that matters, so
+// its name is weighted as its figure is.
 function Row({
   amount,
   detail,
@@ -135,15 +219,7 @@ function Row({
           <span className="text-xs text-muted-foreground">{detail}</span>
         )}
       </span>
-      <span
-        className={cn(
-          "figure",
-          isTotal && "font-medium",
-          isTotal && !isZero(amount) && amount < 0 && "text-destructive",
-        )}
-      >
-        {formatGbp(isZero(amount) ? 0 : amount)}
-      </span>
+      <Figure amount={amount} isTotal={isTotal} />
     </li>
   );
 }

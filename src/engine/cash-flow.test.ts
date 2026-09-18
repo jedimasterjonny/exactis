@@ -43,6 +43,7 @@ describe("cashFlow", () => {
 
     expect(flow.income).toBe(12250);
     expect(flow.expenses).toBe(3500);
+    expect(flow.spent).toStrictEqual([{ amount: 3500, line: household }]);
     expect(flow.fixed).toStrictEqual([
       { account: pension, amount: 2266.25 },
       { account: isa, amount: 20000 / 12 },
@@ -170,6 +171,7 @@ describe("cashFlow", () => {
       income: 0,
       left: 0,
       spare: [],
+      spent: [],
     });
   });
 });
