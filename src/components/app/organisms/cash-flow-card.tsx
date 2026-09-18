@@ -6,7 +6,7 @@ import { cn } from "cn";
 import { useState } from "react";
 
 import type { Account } from "@/data/accounts";
-import type { Schedule, Spent, Take } from "@/engine/cash-flow";
+import type { Fed, Schedule, Spent, Take } from "@/engine/cash-flow";
 import type { Plan } from "@/engine/projection";
 
 import { Field } from "@/components/app/atoms/field";
@@ -56,9 +56,12 @@ interface RowProps {
 // a year and a later month of it would leave something else again. The
 // card runs the engine itself, which is pure and cheap, rather than
 // asking the page for every year. The income comes
-// in, the expenses and every account paid go out, each account under
-// its name with how it is paid, and what is left closes the list, in
-// the loss tone when the month does not cover its outgoings. The
+// in, as it is earned, then what a salary sacrifices into its pension
+// comes off it, under the pension's name with the salary it is fed
+// from and what lands with the NI saved, then the expenses and every
+// account paid go out, each account under its name with how it is
+// paid, and what is left closes the list, in the loss tone when the
+// month does not cover its outgoings. The
 // expenses figure opens into the lines behind it, each under its name
 // with what it is paid at and the years it runs, since a sum over a
 // schedule that starts and ends line by line is a question as often as
@@ -100,6 +103,14 @@ export function CashFlowCard({
       <CardContent>
         <ul className="divide-y">
           <Row amount={flow.income} label="Income" />
+          {flow.fed.map((fed) => (
+            <Row
+              amount={-fed.sacrificed}
+              detail={describeFed(fed)}
+              key={`fed-${String(fed.line.id)}`}
+              label={fed.account.name}
+            />
+          ))}
           <Expenses amount={flow.expenses} spent={flow.spent} />
           {flow.fixed.map((paid) => (
             <Row
@@ -122,6 +133,13 @@ export function CashFlowCard({
       </CardContent>
     </Card>
   );
+}
+
+// Which salary a pension is fed from and what lands in it, which is
+// more than comes off the month by the NI saved, beneath the pension's
+// name.
+function describeFed({ amount, line }: Fed): string {
+  return `Salary sacrifice from ${line.name}, paid in as ${formatGbp(amount)} with the NI saved`;
 }
 
 // What a line is paid at and the years it runs, "£3,500 / mo ·

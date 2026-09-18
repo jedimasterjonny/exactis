@@ -24,9 +24,10 @@ vi.mock("./actions", () => ({
 const [salary] = incomeLines;
 
 describe("Plan", () => {
-  // The fixture's first year: the salary's £12,250 a month against the
-  // household's £3,500, the pension's, the ISA's and the mortgage's
-  // fixed sums, leaving £2,607.
+  // The fixture's first year: the salary's £12,250 a month, less the
+  // £1,000 sacrificed into the pension, against the household's £3,500,
+  // the pension's, the ISA's and the mortgage's fixed sums, leaving
+  // £1,607.
   it("hands the store's lines and the plan to both schedules under one header, and this year's cash flow beneath", async () => {
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
     vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
@@ -62,7 +63,7 @@ describe("Plan", () => {
       }),
     ).toHaveValue("2026");
     expect(screen.getByText("Left over")).toBeInTheDocument();
-    expect(screen.getByText("£2,607")).toHaveClass("figure", "font-medium");
+    expect(screen.getByText("£1,607")).toHaveClass("figure", "font-medium");
   });
 
   // The salary alone, with nothing going out and no account to pay,
