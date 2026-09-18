@@ -9,6 +9,7 @@ const salary: LineValues = {
   cadence: "year",
   firstYear: 2030,
   growth: "inflation",
+  lastMonth: null,
   lastYear: null,
   name: "Salary",
 };

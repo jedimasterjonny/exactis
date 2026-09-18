@@ -164,6 +164,7 @@ describe("ExpenseSchedule", () => {
       firstYear: 2031,
       growth: "inflation-plus-2",
       kind: "time-bound",
+      lastMonth: null,
       lastYear: 2039,
       name: "Nursery",
     });
@@ -176,6 +177,7 @@ describe("ExpenseSchedule", () => {
       growth: "inflation-plus-2",
       id: 6,
       kind: "time-bound",
+      lastMonth: null,
       lastYear: 2039,
       name: "Nursery",
     });
@@ -252,6 +254,7 @@ describe("ExpenseSchedule", () => {
       firstYear: 2052,
       growth: "inflation",
       kind: "other",
+      lastMonth: null,
       lastYear: null,
       name: "Retirement living",
     });

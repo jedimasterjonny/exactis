@@ -195,6 +195,7 @@ function blank(plan: Plan): Draft {
     firstYear: plan.from,
     growth: "inflation",
     kind: "employment",
+    lastMonth: null,
     lastYear: null,
     name: "",
     rsu: 0,

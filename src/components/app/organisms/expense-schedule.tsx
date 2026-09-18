@@ -158,6 +158,7 @@ function blank(plan: Plan): Draft {
     firstYear: plan.from,
     growth: "inflation",
     kind: "time-bound",
+    lastMonth: null,
     lastYear: plan.from + 10,
     name: "",
   };

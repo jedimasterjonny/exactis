@@ -24,6 +24,7 @@ const salary: Line = {
   firstYear: 2030,
   growth: "inflation",
   kind: "employment",
+  lastMonth: null,
   lastYear: null,
   name: "Salary",
 };
