@@ -26,6 +26,13 @@ import { spanOf } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 
+// The month's name alone, in UTC so the day the year opens on cannot
+// slip into the month before it.
+const months = new Intl.DateTimeFormat("en-GB", {
+  month: "long",
+  timeZone: "UTC",
+});
+
 interface CashFlowCardProps {
   readonly accounts: readonly Account[];
   readonly plan: Plan;
@@ -49,8 +56,12 @@ interface RowProps {
 // as a ledger. The year is the card's own, opening on the plan's first
 // and moved along the plan's span by the slider under the title, since
 // lines start and end and overlap, so a month a decade on can leave
-// something else. The card runs the engine itself, which is pure and
-// cheap, rather than asking the page for every year. The income comes
+// something else. The month shown is the first the plan runs in that
+// year, the month the plan is read in for its first year and January
+// after, and the title names it, since a line may end part way through
+// a year and a later month of it would leave something else again. The
+// card runs the engine itself, which is pure and cheap, rather than
+// asking the page for every year. The income comes
 // in, the expenses and every account paid go out, each account under
 // its name with how it is paid, and what is left closes the list, in
 // the loss tone when the month does not cover its outgoings. The
@@ -66,7 +77,8 @@ export function CashFlowCard({
 }: CashFlowCardProps): JSX.Element {
   const [year, setYear] = useState(plan.from);
   const end = endYear(plan);
-  const flow = cashFlow(accounts, schedule, year);
+  const month = year === plan.from ? plan.month : 0;
+  const flow = cashFlow(accounts, schedule, { month, year });
   return (
     <Card>
       <CardHeader className="grid gap-4">
@@ -74,7 +86,7 @@ export function CashFlowCard({
           label={subsectionLabel(planScreen, 3)}
           title="Cash flow each month"
         >
-          {`${String(year)}, age ${String(year - plan.born)}, in today's money`}
+          {`${monthName(month)} ${String(year)}, age ${String(year - plan.born)}, in today's money`}
         </SectionHeader>
         <Field
           hint={`${String(plan.from)} to ${String(end)}, the years of the plan`}
@@ -135,8 +147,8 @@ function describeTake(take: Take): string {
 // The expenses line of the ledger, which is a row until it is opened
 // and then the lines behind it as well, each a row of its own in a list
 // beneath the figure: the trigger is drawn as the row is, so the ledger
-// reads the same closed, and the panel lists what the year's month is
-// paying, or says when it is paying nothing.
+// reads the same closed, and the panel lists what the month is paying,
+// or says when it is paying nothing.
 function Expenses({
   amount,
   spent,
@@ -157,7 +169,7 @@ function Expenses({
           <AccordionContent className="pb-0">
             {spent.length === 0 ? (
               <p className="pt-3 text-xs text-muted-foreground">
-                No expense line runs this year.
+                No expense line runs this month.
               </p>
             ) : (
               <ul className="mt-3 divide-y border-t pl-4">
@@ -200,6 +212,12 @@ function Figure({ amount, isTotal = false }: FigureProps): JSX.Element {
 // sign Intl gives a negative zero or a fraction of a pound going out.
 function isZero(amount: number): boolean {
   return Math.round(amount) === 0;
+}
+
+// The month's name in full, from Intl, so it is spelt as the locale
+// spells it; the year is any, since only the month is read.
+function monthName(month: number): string {
+  return months.format(Date.UTC(2000, month));
 }
 
 // A line of the ledger: the name and, beneath it, how the money is

@@ -54,7 +54,7 @@ describe("Plan", () => {
     // The two schedules' notes, and the hint under the cash flow's year.
     expect(screen.getAllByRole("paragraph")).toHaveLength(3);
     expect(
-      screen.getByText("2026, age 36, in today's money"),
+      screen.getByText("September 2026, age 36, in today's money"),
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole("group", { name: "Year" })).getByRole("slider", {
