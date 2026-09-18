@@ -1,7 +1,7 @@
 import type { Account, Cadence } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
-import type { LineValues } from "@/data/schedule";
+import type { LineValues, Month } from "@/data/schedule";
 
 import { allowanceOf, takesSpare } from "@/data/accounts";
 import { totalOf } from "@/data/income";
@@ -44,25 +44,26 @@ interface Paid {
   readonly amount: number;
 }
 
-// A year's money, a month at a time: the income lines running that year
-// less the expense lines, each kept as well as summed, and every fixed sum, then the spare money to
-// each account that takes it in the order they are listed, each up to
-// its cap and passing the rest on, and what is left after them, which
-// is negative when the month does not cover its outgoings. A yearly
-// figure is spread over the twelve months. A loan whose payments are a
-// line pays nothing as a fixed sum, since the line is its payment and
-// the ledger shows the same figure against the loan: it is counted once,
-// as the line, and stops when the line does. Every line is taken at the
-// amount it states, in today's money; how it grows against inflation
-// waits on an inflation assumption the plan does not carry yet.
+// A month's money: the income lines running that month less the expense
+// lines, each kept as well as summed, and every fixed sum, then the
+// spare money to each account that takes it in the order they are
+// listed, each up to its cap and passing the rest on, and what is left
+// after them, which is negative when the month does not cover its
+// outgoings. A yearly figure is spread over the twelve months. A loan
+// whose payments are a line pays nothing as a fixed sum, since the line
+// is its payment and the ledger shows the same figure against the loan:
+// it is counted once, as the line, and stops when the line does. Every
+// line is taken at the amount it states, in today's money; how it grows
+// against inflation waits on an inflation assumption the plan does not
+// carry yet.
 export function cashFlow(
   accounts: readonly Account[],
   schedule: Schedule,
-  year: number,
+  at: Month,
 ): CashFlow {
-  const income = sumOf(schedule.income, year, totalOf);
+  const income = sumOf(schedule.income, at, totalOf);
   const spent = schedule.expenses
-    .filter((line) => runsIn(line, year))
+    .filter((line) => runsIn(line, at))
     .map((line) => ({ amount: monthly(line.amount, line.cadence), line }));
   const expenses = total(spent);
   const paid = new Set(
@@ -98,11 +99,19 @@ function monthly(amount: number, cadence: Cadence): number {
   }
 }
 
-// Whether a line is paid in the year: from its first year to its last,
-// or on for good when it has none.
-function runsIn(line: LineValues, year: number): boolean {
+// Whether a line is paid in the month: from its first year to its last,
+// or on for good when it has none, and in its last year to the month it
+// ends in, or through the whole of it when it has none.
+function runsIn(line: LineValues, at: Month): boolean {
+  if (line.firstYear > at.year) {
+    return false;
+  }
+  if (line.lastYear === null || at.year < line.lastYear) {
+    return true;
+  }
   return (
-    line.firstYear <= year && (line.lastYear === null || year <= line.lastYear)
+    at.year === line.lastYear &&
+    (line.lastMonth === null || at.month <= line.lastMonth)
   );
 }
 
@@ -139,15 +148,15 @@ function spareMoney(
   return { left, takes };
 }
 
-// What the lines running in the year pay a month, taking each at what
-// the schedule says it pays.
+// What the lines running in the month pay, taking each at what the
+// schedule says it pays.
 function sumOf<TLine extends LineValues>(
   lines: readonly TLine[],
-  year: number,
+  at: Month,
   amountOf: (line: TLine) => number,
 ): number {
   return lines
-    .filter((line) => runsIn(line, year))
+    .filter((line) => runsIn(line, at))
     .reduce((sum, line) => sum + monthly(amountOf(line), line.cadence), 0);
 }
 
