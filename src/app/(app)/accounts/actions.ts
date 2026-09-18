@@ -5,6 +5,7 @@ import * as z from "zod";
 
 import type { Account, AccountValues } from "@/data/accounts";
 import type { HouseValues } from "@/data/houses";
+import type { Database } from "@/db/accounts";
 
 import {
   accountKinds,
@@ -14,9 +15,20 @@ import {
   takesSpare,
 } from "@/data/accounts";
 import { isSound, statuses, toRecords } from "@/data/houses";
-import { insertAccount, placeAccounts, updateAccount } from "@/db/accounts";
+import {
+  deleteAccount,
+  findLoanAgainst,
+  insertAccount,
+  placeAccounts,
+  updateAccount,
+} from "@/db/accounts";
 import { getDb } from "@/db/client";
-import { insertExpenseLine } from "@/db/expenses";
+import {
+  deleteExpenseLine,
+  findLinePaying,
+  insertExpenseLine,
+  updateExpenseLine,
+} from "@/db/expenses";
 import { requireSession } from "@/lib/session";
 
 import { expenseLinesTag } from "../plan/store";
@@ -110,25 +122,59 @@ export async function saveAccount(
   return account;
 }
 
-// Writes a house as the records it is: the real asset and, for a
-// mortgaged one, the loan against it and the line of its payments, so
-// the mortgage appears among the accounts and its payments among the
-// expenses with no more asked of the form, and hands back the house's
-// own account. Checked as a save is. The three are written one after
-// another rather than in a transaction, since Neon's HTTP driver runs
-// none; a failure between them leaves what was written and reaches the
-// form as an error. Both tags expire, the lines' only when a line was
-// written, and the plan is read for the year the payments start in.
-export async function saveHouse(draft: HouseValues): Promise<Account> {
+// Writes a house as the records it is, a new one when the id is null
+// and over the house with that id otherwise: the house's own account,
+// and for a mortgaged house the loan secured on it and the line of its
+// payments, so the mortgage appears among the accounts and its payments
+// among the expenses with no more asked of the form, and hands back the
+// house's own account. An edit finds the loan by the house and the line
+// by the loan, writes over what is there and adds what is not, and a
+// house owned outright now sends its loan and the loan's line away.
+// Checked as a save is. The records are written one after another
+// rather than in a transaction, since Neon's HTTP driver runs none; a
+// failure between them leaves what was written and reaches the form as
+// an error. Both tags expire, and the plan is read for the year the
+// payments start in.
+export async function saveHouse(
+  id: null | number,
+  draft: HouseValues,
+): Promise<Account> {
   await requireSession();
+  const at = target.parse(id);
   const { asset, mortgage } = toRecords(house.parse(draft), getPlan());
   const db = getDb();
-  const account = await insertAccount(db, asset);
-  if (mortgage !== null) {
-    await insertAccount(db, mortgage.account);
-    await insertExpenseLine(db, mortgage.line);
-    updateTag(expenseLinesTag);
+  const account =
+    at === null
+      ? await insertAccount(db, asset)
+      : await updateAccount(db, at, asset);
+  const loan = at === null ? null : await findLoanAgainst(db, account.id);
+  if (mortgage === null) {
+    if (loan !== null) {
+      await removeLoan(db, loan.id);
+    }
+  } else if (loan === null) {
+    const written = await insertAccount(db, mortgage.account, account.id);
+    await insertExpenseLine(db, mortgage.line, written.id);
+  } else {
+    await updateAccount(db, loan.id, mortgage.account);
+    const line = await findLinePaying(db, loan.id);
+    if (line === null) {
+      await insertExpenseLine(db, mortgage.line, loan.id);
+    } else {
+      await updateExpenseLine(db, line.id, mortgage.line);
+    }
   }
+  updateTag(expenseLinesTag);
   updateTag(accountsTag);
   return account;
+}
+
+// A loan and its payments, gone: the line first, since the store holds
+// the link and refuses to leave it dangling.
+async function removeLoan(db: Database, loanId: number): Promise<void> {
+  const line = await findLinePaying(db, loanId);
+  if (line !== null) {
+    await deleteExpenseLine(db, line.id);
+  }
+  await deleteAccount(db, loanId);
 }

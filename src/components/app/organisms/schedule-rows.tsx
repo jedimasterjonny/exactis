@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
 
-import { Banknote, Pencil, Receipt } from "lucide-react";
+import { Banknote, Lock, Pencil, Receipt } from "lucide-react";
 
 import type { LineValues, Side } from "@/data/schedule";
 import type { Plan } from "@/engine/projection";
@@ -21,6 +21,7 @@ import { formatGbp } from "@/lib/money";
 export interface Summary {
   readonly badge: { readonly label: string; readonly variant: Tone };
   readonly detail?: string;
+  readonly lock?: string;
   readonly total: number;
 }
 
@@ -119,18 +120,27 @@ export function ScheduleRows<TLine extends Line>({
                 {formatAges(line, plan)}
               </span>
             </div>
-            {onEdit !== undefined && (
-              <Button
-                aria-label={`Edit ${line.name}`}
-                onClick={() => {
-                  onEdit(line);
-                }}
-                size="icon-sm"
-                variant="ghost"
-              >
-                <Pencil aria-hidden />
-              </Button>
-            )}
+            {onEdit !== undefined &&
+              (summary.lock === undefined ? (
+                <Button
+                  aria-label={`Edit ${line.name}`}
+                  onClick={() => {
+                    onEdit(line);
+                  }}
+                  size="icon-sm"
+                  variant="ghost"
+                >
+                  <Pencil aria-hidden />
+                </Button>
+              ) : (
+                <span
+                  aria-label={summary.lock}
+                  className="inline-flex size-7 items-center justify-center text-muted-foreground/60"
+                  role="img"
+                >
+                  <Lock aria-hidden className="size-4" />
+                </span>
+              ))}
           </li>
         );
       })}
