@@ -17,6 +17,8 @@ export type Figure =
 type FigureInputProps = Figure & {
   readonly format: Intl.NumberFormatOptions;
   readonly largeStep: number;
+  readonly max?: number | undefined;
+  readonly min?: number | undefined;
   readonly onValueCommitted?: ((value: number) => void) | undefined;
   readonly step: number;
 };
@@ -29,12 +31,17 @@ type FigureInputProps = Figure & {
 // wheel: a balance changing under a scroll is a hazard. A figure cleared
 // to nothing commits null, which is dropped here rather than reported: a
 // cleared figure is left as it was, never written as nothing, and every
-// caller wanted the same. Every money, rate and year value is entered
-// through this rather than a text input.
+// caller wanted the same. A figure with bounds is held inside them:
+// the number field clamps what is typed to the nearest bound when it
+// commits, so a share of the base is never more than the whole of it.
+// Every money, rate and year value is entered through this rather than
+// a text input.
 export function FigureInput({
   defaultValue,
   format,
   largeStep,
+  max,
+  min,
   onValueCommitted,
   step,
   value,
@@ -45,6 +52,8 @@ export function FigureInput({
       format={format}
       largeStep={largeStep}
       locale="en-GB"
+      max={max}
+      min={min}
       onValueCommitted={(committed) => {
         if (committed !== null) {
           onValueCommitted?.(committed);
