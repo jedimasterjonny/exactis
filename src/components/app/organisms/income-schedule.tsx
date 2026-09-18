@@ -3,11 +3,11 @@
 import type { JSX } from "react";
 
 import { Plus } from "lucide-react";
-import { startTransition, useState, useTransition } from "react";
 
 import type { Summary } from "@/components/app/organisms/schedule-rows";
 import type { IncomeKind, IncomeLine, IncomeLineValues } from "@/data/income";
 import type { Plan } from "@/engine/projection";
+import type { Entry } from "@/hooks/use-editor";
 
 import { saveIncomeLine } from "@/app/(app)/plan/actions";
 import { Note } from "@/components/app/atoms/note";
@@ -18,8 +18,8 @@ import { LineFields } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
-import { toast } from "@/components/kit/toast";
 import { totalOf } from "@/data/income";
+import { useEditor } from "@/hooks/use-editor";
 import { isSound, spanOf } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
@@ -29,15 +29,6 @@ import { optionsOf } from "@/lib/options";
 // flat already, with no last year for a line that runs to the end of the
 // plan.
 type Draft = IncomeLineValues;
-
-// An open dialog: the draft as it is, the draft as it opened, which the
-// uncontrolled fields take as their defaults, and the id of the line it
-// edits, or null for a new one.
-interface Entry {
-  readonly draft: Draft;
-  readonly id: null | number;
-  readonly initial: Draft;
-}
 
 interface IncomeScheduleProps {
   readonly lines: readonly IncomeLine[];
@@ -77,17 +68,16 @@ export function IncomeSchedule({
   lines,
   plan,
 }: IncomeScheduleProps): JSX.Element {
-  const [entry, setEntry] = useState<Entry | null>(null);
-  const [isSaving, startSaving] = useTransition();
-
-  function amend(current: Entry, patch: Partial<Draft>): void {
-    setEntry({ ...current, draft: { ...current.draft, ...patch } });
-  }
+  const { amend, dismiss, entry, isSaving, open, save } = useEditor({
+    describe: (line) => `${line.name} · ${spanOf(line)}`,
+    noun: "Income line",
+    save: saveIncomeLine,
+  });
 
   // The category choice: an employment line's parts are kept only while
   // it is one, and come back as the line opened with them when it is one
   // again, which is what the fields mount showing.
-  function categorise(current: Entry, kind: IncomeKind): void {
+  function categorise(current: Entry<Draft>, kind: IncomeKind): void {
     amend(current, {
       kind,
       ...(kind === "employment"
@@ -96,40 +86,11 @@ export function IncomeSchedule({
     });
   }
 
-  function dismiss(): void {
-    setEntry(null);
-  }
-
   // A row's pencil opens its line as it is, with its id so a save writes
   // back to it.
   function edit(line: IncomeLine): void {
     const { id, ...values } = line;
     open(values, id);
-  }
-
-  function open(draft: Draft, id: null | number): void {
-    setEntry({ draft, id, initial: draft });
-  }
-
-  // The name is saved as typed less the space around it, which is what
-  // the title shows and what save waited for. The dialog stays open with
-  // its save held until the store answers, then closes; the close is a
-  // transition of its own, since a state update after an await is not
-  // part of the one it awaited in.
-  function save(current: Entry): void {
-    const values = { ...current.draft, name: current.draft.name.trim() };
-    startSaving(async () => {
-      const line = await saveIncomeLine(current.id, values);
-      startTransition(() => {
-        setEntry(null);
-      });
-      toast.add({
-        description: `${line.name} · ${spanOf(line)}`,
-        title:
-          current.id === null ? "Income line added" : "Income line updated",
-        type: "success",
-      });
-    });
   }
 
   return (
