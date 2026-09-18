@@ -122,7 +122,7 @@ describe("toRecords", () => {
         firstYear: 2026,
         growth: "nominal",
         kind: "debt",
-        lastMonth: null,
+        lastMonth: 10,
         lastYear: 2047,
         name: "Home mortgage",
       },
@@ -132,16 +132,20 @@ describe("toRecords", () => {
   // £1,000 a month at no rate clears £114,000 in 114 payments, the last
   // of which falls in February 2036 from September 2026, with eight
   // months of the year gone.
-  it("ends the payments in the year the last one falls, counted from the month the plan is read in", () => {
-    expect(
-      toRecords({ ...home, balance: 114000, payment: 1000, rate: 0 }, plan)
-        .mortgage?.line.lastYear,
-    ).toBe(2036);
+  it("ends the payments in the month the last one falls, counted from the month the plan is read in", () => {
+    const { mortgage } = toRecords(
+      { ...home, balance: 114000, payment: 1000, rate: 0 },
+      plan,
+    );
+
+    expect(mortgage?.line.lastYear).toBe(2036);
+    expect(mortgage?.line.lastMonth).toBe(1);
   });
 
   it("leaves the payments open-ended when they never clear the loan", () => {
-    expect(
-      toRecords({ ...home, payment: 1000 }, plan).mortgage?.line.lastYear,
-    ).toBeNull();
+    const { mortgage } = toRecords({ ...home, payment: 1000 }, plan);
+
+    expect(mortgage?.line.lastYear).toBeNull();
+    expect(mortgage?.line.lastMonth).toBeNull();
   });
 });

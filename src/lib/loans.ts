@@ -1,3 +1,5 @@
+import type { Month } from "@/data/schedule";
+
 // What a loan's payments are over: the balance owed, whole pounds and
 // positive, and the balloon they leave standing at the end of the term,
 // which is nothing for a loan they clear and the final payment a PCP
@@ -14,7 +16,7 @@ interface PlanMonth {
   readonly month: number;
 }
 
-// The year the last payment falls in. The plan's month is a paying
+// The month the last payment falls in. The plan's month is a paying
 // month, as the projection carries the first year from it, so the first
 // payment lands in that month and the last one payments later, less
 // one: the term's months, whole, since a part of a month is a payment,
@@ -24,9 +26,10 @@ interface PlanMonth {
 // be read as the year after it. The whisker below the count absorbs the
 // floating point a worked-out term carries, so a term that is a whole
 // number of months bar a rounding is one.
-export function clearsIn(term: number, plan: PlanMonth): number {
+export function clearsIn(term: number, plan: PlanMonth): Month {
   const payments = Math.max(1, Math.ceil(term * 12 - 1e-9));
-  return plan.from + Math.floor((plan.month + payments - 1) / 12);
+  const last = plan.month + payments - 1;
+  return { month: last % 12, year: plan.from + Math.floor(last / 12) };
 }
 
 // What pays the balance down to the balloon over the term at the rate,

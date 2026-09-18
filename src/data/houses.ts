@@ -118,7 +118,7 @@ export function isSound(house: HouseValues): boolean {
 // charged the rate as its growth and paid the payment a month as its
 // contribution, which is what the ledger shows against it, and its
 // payments are a debt line of the same a month, fixed in nominal terms
-// as a mortgage payment is, from the plan's first year to the year the
+// as a mortgage payment is, from the plan's first year to the month the
 // last payment falls in, counted from the month the plan is read in, or
 // open-ended when the payment never clears it. The engine counts the
 // payment once, as the line, since it leaves the contribution of a loan
@@ -145,6 +145,7 @@ export function toRecords(
   }
   const name = `${house.name} mortgage`;
   const term = termOf(owedOn(house), house.payment, house.rate);
+  const end = term === null ? null : clearsIn(term, plan);
   return {
     asset,
     mortgage: {
@@ -166,8 +167,8 @@ export function toRecords(
         firstYear: plan.from,
         growth: "nominal",
         kind: "debt",
-        lastMonth: null,
-        lastYear: term === null ? null : clearsIn(term, plan),
+        lastMonth: end?.month ?? null,
+        lastYear: end?.year ?? null,
         name,
       },
     },
