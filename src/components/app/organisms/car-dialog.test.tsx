@@ -8,7 +8,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { Car } from "@/data/cars";
+import type { Secured } from "@/data/secured";
 
 import { saveCar } from "@/app/(app)/accounts/actions";
 import { Toaster } from "@/components/kit/toast";
@@ -45,7 +45,7 @@ const finance: Account = {
   name: "Golf PCP",
 };
 
-const car: Car = { asset: golf, loan: finance };
+const car: Secured = { asset: golf, loan: finance };
 
 const workedHint = "Worked out from the other two";
 
@@ -66,7 +66,7 @@ function open(): HTMLElement {
 // spies where the ledger listens. Save reports through the toast
 // manager, which needs its Toaster mounted.
 function renderDialog(
-  opening: Car | null = null,
+  opening: null | Secured = null,
   onSaved: () => void = vi.fn<() => void>(),
   onDismiss: () => void = vi.fn<() => void>(),
 ): void {

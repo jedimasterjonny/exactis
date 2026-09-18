@@ -151,7 +151,7 @@ describe("toRecords", () => {
         name: "Golf",
         rate: -0.15,
       },
-      finance: null,
+      loan: null,
     });
   });
 
@@ -159,10 +159,10 @@ describe("toRecords", () => {
   // 4.9 years, 59 payments, from September 2026: July 2031, not the
   // August 2029 the agreement ends in.
   it("writes a car on a PCP with the finance against it, left owing the balloon, and the payments to the year the whole clears", () => {
-    const { asset: written, finance } = toRecords(golf, plan);
+    const { asset: written, loan } = toRecords(golf, plan);
 
     expect(written.name).toBe("Golf");
-    expect(finance).toStrictEqual({
+    expect(loan).toStrictEqual({
       account: {
         balance: -14000,
         balloon: 6000,
@@ -192,19 +192,19 @@ describe("toRecords", () => {
   // for a 37th payment, which falls in September 2029 from September
   // 2026.
   it("writes a car on a loan with no balloon and the payments to the month it clears", () => {
-    const { finance } = toRecords(financed, plan);
+    const { loan } = toRecords(financed, plan);
 
-    expect(finance?.account.balloon).toBe(0);
-    expect(finance?.account.name).toBe("Golf loan");
-    expect(finance?.line.lastYear).toBe(2029);
-    expect(finance?.line.lastMonth).toBe(8);
+    expect(loan?.account.balloon).toBe(0);
+    expect(loan?.account.name).toBe("Golf loan");
+    expect(loan?.line.lastYear).toBe(2029);
+    expect(loan?.line.lastMonth).toBe(8);
   });
 
   it("leaves the payments open-ended when they never clear the finance", () => {
-    const { finance } = toRecords({ ...golf, payment: 90 }, plan);
+    const { loan } = toRecords({ ...golf, payment: 90 }, plan);
 
-    expect(finance?.line.lastYear).toBeNull();
-    expect(finance?.line.lastMonth).toBeNull();
+    expect(loan?.line.lastYear).toBeNull();
+    expect(loan?.line.lastMonth).toBeNull();
   });
 
   it("writes a car that loses nothing at a rate of nothing, not a negative nothing", () => {

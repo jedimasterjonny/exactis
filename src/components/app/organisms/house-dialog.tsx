@@ -4,7 +4,8 @@ import type { JSX } from "react";
 
 import { startTransition, useState, useTransition } from "react";
 
-import type { House, HouseDraft, HouseValues } from "@/data/houses";
+import type { HouseDraft, HouseValues } from "@/data/houses";
+import type { Secured } from "@/data/secured";
 import type { LoanFigure, Stood } from "@/lib/figures";
 
 import { saveHouse } from "@/app/(app)/accounts/actions";
@@ -26,7 +27,7 @@ interface Entry {
 }
 
 interface HouseDialogProps {
-  readonly house: House | null;
+  readonly house: null | Secured;
   readonly onDismiss: () => void;
   readonly onSaved: () => void;
 }
@@ -134,7 +135,7 @@ export function HouseDialog({
 // the term worked out from them when it is mortgaged, since the store
 // keeps the balance, the rate and the payment and reads the term off
 // those, and the blank draft's term standing by otherwise.
-function entryOf(house: House): Entry {
+function entryOf(house: Secured): Entry {
   const opening = { ...houseOf(house), term: draft.term };
   return {
     draft: opening,

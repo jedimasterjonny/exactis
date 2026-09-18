@@ -5,8 +5,8 @@ import * as z from "zod";
 
 import type { Account, AccountValues } from "@/data/accounts";
 import type { CarValues } from "@/data/cars";
-import type { ExpenseLineValues } from "@/data/expenses";
 import type { HouseValues } from "@/data/houses";
+import type { SecuredRecords } from "@/data/secured";
 import type { Database } from "@/db/accounts";
 
 import {
@@ -122,21 +122,6 @@ const values = z
     (draft) => draft.funding === "fixed" || takesSpare(draft),
   ) satisfies z.ZodType<AccountValues>;
 
-// A loan secured on an asset and the line of its payments, as an asset's
-// model lays them to be written together.
-interface Secured {
-  readonly account: AccountValues;
-  readonly line: ExpenseLineValues;
-}
-
-// What an asset's model lays out to be written together: the asset, and
-// the loan secured on it with its payments, or none for an asset owned
-// outright.
-interface SecuredRecords {
-  readonly asset: AccountValues;
-  readonly loan: null | Secured;
-}
-
 // An order: every account's id once, so the store can place them all.
 const order = z
   .array(z.number().int().positive())
@@ -215,8 +200,8 @@ export async function saveCar(
 ): Promise<Account> {
   await requireSession();
   const at = target.parse(id);
-  const { asset, finance } = toCarRecords(car.parse(draft), getPlan());
-  const account = await writeSecured(getDb(), at, { asset, loan: finance });
+  const records = toCarRecords(car.parse(draft), getPlan());
+  const account = await writeSecured(getDb(), at, records);
   updateTag(expenseLinesTag);
   updateTag(accountsTag);
   return account;
@@ -235,8 +220,8 @@ export async function saveHouse(
 ): Promise<Account> {
   await requireSession();
   const at = target.parse(id);
-  const { asset, mortgage } = toRecords(house.parse(draft), getPlan());
-  const account = await writeSecured(getDb(), at, { asset, loan: mortgage });
+  const records = toRecords(house.parse(draft), getPlan());
+  const account = await writeSecured(getDb(), at, records);
   updateTag(expenseLinesTag);
   updateTag(accountsTag);
   return account;
