@@ -52,6 +52,9 @@ describe("Plan", () => {
     ]);
     expect(screen.getByText("Age 68–89")).toBeInTheDocument();
     expect(screen.getByText("Age 82–89")).toBeInTheDocument();
+    expect(
+      screen.getByText(/10\.00% of the base into Workplace pension$/),
+    ).toBeInTheDocument();
     // The two schedules' notes, and the hint under the cash flow's year.
     expect(screen.getAllByRole("paragraph")).toHaveLength(3);
     expect(
