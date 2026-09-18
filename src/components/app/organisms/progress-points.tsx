@@ -2,15 +2,14 @@
 
 import type { JSX } from "react";
 
-import { Pencil } from "lucide-react";
 import { useState } from "react";
 
 import type { ProgressPoint } from "@/data/points";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
-import { RowAction } from "@/components/app/atoms/row-action";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { MoneyField } from "@/components/app/molecules/money-field";
+import { RowActions } from "@/components/app/molecules/row-actions";
 import { Card } from "@/components/kit/card";
 import {
   Table,
@@ -99,13 +98,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
                   </TableCell>
                 ))}
                 <TableCell className="py-1">
-                  <RowAction
-                    icon={Pencil}
-                    name={`Edit ${point.date}`}
-                    onClick={() => {
-                      open(point);
-                    }}
-                  />
+                  <RowActions name={point.date} onEdit={open} row={point} />
                 </TableCell>
               </TableRow>
             ))}

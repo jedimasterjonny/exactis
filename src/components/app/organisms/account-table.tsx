@@ -2,13 +2,14 @@
 
 import type { DragEvent, JSX, KeyboardEvent } from "react";
 
-import { GripVertical, Pencil, Trash2, Wallet } from "lucide-react";
+import { GripVertical, Wallet } from "lucide-react";
 import { useState } from "react";
 
 import type { Account, AccountKind, Growth } from "@/data/accounts";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { RowAction } from "@/components/app/atoms/row-action";
+import { RowActions } from "@/components/app/molecules/row-actions";
 import { Badge } from "@/components/kit/badge";
 import { Card } from "@/components/kit/card";
 import {
@@ -211,27 +212,12 @@ export function AccountTable({
               </TableCell>
               {(onEdit !== undefined || onDelete !== undefined) && (
                 <TableCell className="py-1">
-                  <span className="flex gap-1">
-                    {onEdit !== undefined && (
-                      <RowAction
-                        icon={Pencil}
-                        name={`Edit ${account.name}`}
-                        onClick={() => {
-                          onEdit(account);
-                        }}
-                      />
-                    )}
-                    {onDelete !== undefined && (
-                      <RowAction
-                        icon={Trash2}
-                        name={`Delete ${account.name}`}
-                        onClick={() => {
-                          onDelete(account);
-                        }}
-                        tone="destructive"
-                      />
-                    )}
-                  </span>
+                  <RowActions
+                    name={account.name}
+                    onDelete={onDelete}
+                    onEdit={onEdit}
+                    row={account}
+                  />
                 </TableCell>
               )}
             </TableRow>

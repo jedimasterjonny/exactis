@@ -1,14 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
 
-import { Banknote, Lock, Pencil, Receipt, Trash2 } from "lucide-react";
+import { Banknote, Lock, Receipt } from "lucide-react";
 
 import type { LineValues, Side } from "@/data/schedule";
 import type { Plan } from "@/engine/projection";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
-import { RowAction } from "@/components/app/atoms/row-action";
 import { SpanBar } from "@/components/app/atoms/span-bar";
+import { RowActions } from "@/components/app/molecules/row-actions";
 import { Badge } from "@/components/kit/badge";
 import { endYear } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
@@ -129,27 +129,12 @@ export function ScheduleRows<TLine extends Line>({
             </div>
             {(onEdit !== undefined || onDelete !== undefined) &&
               (summary.lock === undefined ? (
-                <span className="flex gap-1">
-                  {onEdit !== undefined && (
-                    <RowAction
-                      icon={Pencil}
-                      name={`Edit ${line.name}`}
-                      onClick={() => {
-                        onEdit(line);
-                      }}
-                    />
-                  )}
-                  {onDelete !== undefined && (
-                    <RowAction
-                      icon={Trash2}
-                      name={`Delete ${line.name}`}
-                      onClick={() => {
-                        onDelete(line);
-                      }}
-                      tone="destructive"
-                    />
-                  )}
-                </span>
+                <RowActions
+                  name={line.name}
+                  onDelete={onDelete}
+                  onEdit={onEdit}
+                  row={line}
+                />
               ) : (
                 <span
                   aria-label={summary.lock}
