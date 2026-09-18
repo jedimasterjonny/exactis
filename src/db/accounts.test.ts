@@ -10,6 +10,7 @@ import type { Database } from "./accounts";
 
 import {
   deleteAccount,
+  findAccount,
   findLoanAgainst,
   insertAccount,
   listAccounts,
@@ -185,6 +186,14 @@ describe("accounts store", () => {
       first.id,
       second.id,
     ]);
+  });
+
+  it("finds an account by its id, and none for an id no account has", async () => {
+    const db = await openStore();
+    const held = await insertAccount(db, pension);
+
+    expect(await findAccount(db, held.id)).toStrictEqual(held);
+    expect(await findAccount(db, 99)).toBeNull();
   });
 
   it("refuses to update an id no account has", async () => {

@@ -119,6 +119,13 @@ export function isAsset(account: { readonly kind: AccountKind }): boolean {
   );
 }
 
+// A pension is the wrapper paid before tax, which is the one a salary
+// may sacrifice into: the store, the action and the engine each hold a
+// salary to feeding one and nothing else.
+export function isPension(account: { readonly kind: AccountKind }): boolean {
+  return account.kind === "tax-deferred";
+}
+
 // A wrapper or cash may be paid the spare money. An asset or a debt is
 // paid a fixed sum or nothing: the spare money goes into savings.
 export function takesSpare(account: { readonly kind: AccountKind }): boolean {

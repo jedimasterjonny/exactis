@@ -215,6 +215,7 @@ describe("IncomeSchedule", () => {
       amount: 12000,
       bonus: 0,
       cadence: "month",
+      feeds: null,
       firstYear: 2030,
       growth: "triple-lock",
       kind: "self-employment",
@@ -222,6 +223,7 @@ describe("IncomeSchedule", () => {
       lastYear: 2035,
       name: "Bonus scheme",
       rsu: 0,
+      sacrifice: 0,
     });
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(screen.getByRole("dialog", { name: "Bonus scheme" })).toBeVisible();
@@ -230,6 +232,7 @@ describe("IncomeSchedule", () => {
       amount: 12000,
       bonus: 0,
       cadence: "month",
+      feeds: null,
       firstYear: 2030,
       growth: "triple-lock",
       id: 5,
@@ -238,6 +241,7 @@ describe("IncomeSchedule", () => {
       lastYear: 2035,
       name: "Bonus scheme",
       rsu: 0,
+      sacrifice: 0,
     });
 
     await waitFor(() => {
@@ -344,6 +348,7 @@ describe("IncomeSchedule", () => {
       amount: 23400,
       bonus: 0,
       cadence: "year",
+      feeds: null,
       firstYear: 2058,
       growth: "triple-lock",
       kind: "pension",
@@ -351,6 +356,7 @@ describe("IncomeSchedule", () => {
       lastYear: 2070,
       name: "State pension",
       rsu: 0,
+      sacrifice: 0,
     });
   });
 
@@ -409,6 +415,7 @@ describe("IncomeSchedule", () => {
       amount: 120000,
       bonus: 15000,
       cadence: "year",
+      feeds: 1,
       firstYear: 2026,
       growth: "inflation-plus-1",
       kind: "employment",
@@ -416,6 +423,7 @@ describe("IncomeSchedule", () => {
       lastYear: 2048,
       name: "Salary",
       rsu: 20000,
+      sacrifice: 0.1,
     });
   });
 
@@ -460,6 +468,7 @@ describe("IncomeSchedule", () => {
       amount: 120000,
       bonus: 15000,
       cadence: "year",
+      feeds: 1,
       firstYear: 2050,
       growth: "inflation-plus-1",
       kind: "employment",
@@ -467,6 +476,7 @@ describe("IncomeSchedule", () => {
       lastYear: null,
       name: "Salary",
       rsu: 12000,
+      sacrifice: 0.1,
     });
   });
 });

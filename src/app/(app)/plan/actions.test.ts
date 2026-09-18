@@ -3,8 +3,10 @@ import { updateTag } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
+import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { findAccount } from "@/db/accounts";
 import { getDb } from "@/db/client";
 import { insertExpenseLine, updateExpenseLine } from "@/db/expenses";
 import { insertIncomeLine, updateIncomeLine } from "@/db/income";
@@ -19,6 +21,7 @@ vi.mock("next/cache", () => ({
   cacheTag: vi.fn(),
   updateTag: vi.fn(),
 }));
+vi.mock("@/db/accounts", () => ({ findAccount: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
 vi.mock("@/db/expenses", () => ({
   insertExpenseLine: vi.fn(),
@@ -30,6 +33,7 @@ vi.mock("@/db/income", () => ({
 }));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 
+const [pension, isa, cash] = accounts;
 const [salary, , , statePension] = incomeLines;
 const [household, , , retirement] = expenseLines;
 
@@ -48,6 +52,7 @@ const values = {
   amount: 12000,
   bonus: 0,
   cadence: "month",
+  feeds: null,
   firstYear: 2030,
   growth: "triple-lock",
   kind: "self-employment",
@@ -55,6 +60,7 @@ const values = {
   lastYear: 2035,
   name: " Bonus scheme ",
   rsu: 0,
+  sacrifice: 0,
 } as const;
 
 // A database that answers nothing, standing in for the one the client
@@ -102,6 +108,60 @@ describe("saveIncomeLine", () => {
     });
   });
 
+  it("takes the pension an employment line feeds and the share of its base it sacrifices", async () => {
+    vi.mocked(findAccount).mockResolvedValue(pension);
+    vi.mocked(insertIncomeLine).mockResolvedValue(salary);
+    const sacrificing = {
+      ...values,
+      feeds: pension.id,
+      kind: "employment",
+      sacrifice: 0.1,
+    } as const;
+
+    expect(await saveIncomeLine(null, sacrificing)).toBe(salary);
+    expect(findAccount).toHaveBeenCalledExactlyOnceWith(db, pension.id);
+    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(db, {
+      ...sacrificing,
+      name: "Bonus scheme",
+    });
+  });
+
+  // The store holds the id to an account, so the action holds it to a
+  // pension: an ISA, cash, or an id no account has is refused before
+  // anything is written. A line feeding none reads no account.
+  it("refuses a pension that is no account or an account of another kind", async () => {
+    const sacrificing = {
+      ...values,
+      feeds: isa.id,
+      kind: "employment",
+      sacrifice: 0.1,
+    } as const;
+    vi.mocked(findAccount).mockResolvedValueOnce(isa);
+
+    await expect(saveIncomeLine(null, sacrificing)).rejects.toThrow(
+      "A salary feeds a pension alone",
+    );
+
+    vi.mocked(findAccount).mockResolvedValueOnce(cash);
+
+    await expect(
+      saveIncomeLine(null, { ...sacrificing, feeds: cash.id }),
+    ).rejects.toThrow("A salary feeds a pension alone");
+
+    vi.mocked(findAccount).mockResolvedValueOnce(null);
+
+    await expect(
+      saveIncomeLine(null, { ...sacrificing, feeds: 99 }),
+    ).rejects.toThrow("No account has the id the salary feeds");
+    expect(insertIncomeLine).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+
+    vi.mocked(insertIncomeLine).mockResolvedValue(salary);
+    await saveIncomeLine(null, values);
+
+    expect(findAccount).toHaveBeenCalledTimes(3);
+  });
+
   it("writes over the line with the id, open-ended, and expires the tag", async () => {
     vi.mocked(updateIncomeLine).mockResolvedValue(statePension);
 
@@ -139,6 +199,31 @@ describe("saveIncomeLine", () => {
     ).rejects.toThrow(z.ZodError);
     await expect(
       saveIncomeLine(null, { ...values, rsu: 12000 }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(saveIncomeLine(null, { ...values, feeds: 1 })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(
+      saveIncomeLine(null, { ...values, feeds: 0, kind: "employment" }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveIncomeLine(null, { ...values, kind: "employment", sacrifice: 0.1 }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveIncomeLine(null, {
+        ...values,
+        feeds: 1,
+        kind: "employment",
+        sacrifice: 1.5,
+      }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveIncomeLine(null, {
+        ...values,
+        feeds: 1,
+        kind: "employment",
+        sacrifice: -0.1,
+      }),
     ).rejects.toThrow(z.ZodError);
     expect(insertIncomeLine).not.toHaveBeenCalled();
     expect(updateIncomeLine).not.toHaveBeenCalled();
