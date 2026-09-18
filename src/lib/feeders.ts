@@ -6,11 +6,11 @@ import type { IncomeLine } from "@/data/income";
 // naming the ones that stop say them the same way.
 export const listed = new Intl.ListFormat("en-GB");
 
-// The names of the salaries feeding the account with that id, and none
-// for a new account, which has no id yet.
-export function feedersOf(
-  id: null | number,
-  lines: readonly IncomeLine[],
-): string[] {
+// The names of the salaries feeding the account with that id. The id is
+// an account's own and never null: a line feeding no pension holds null
+// where an id would be, so a null asked for here would name every line
+// that feeds none rather than none at all. A caller holding an account
+// that has no id yet answers for itself.
+export function feedersOf(id: number, lines: readonly IncomeLine[]): string[] {
   return lines.filter((line) => line.feeds === id).map((line) => line.name);
 }
