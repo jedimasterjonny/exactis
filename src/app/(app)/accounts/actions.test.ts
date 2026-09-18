@@ -213,7 +213,7 @@ describe("saveHouse", () => {
     firstYear: 2026,
     growth: "nominal",
     kind: "debt",
-    lastMonth: null,
+    lastMonth: 10,
     lastYear: 2047,
     name: "Home mortgage",
   } as const;
@@ -389,8 +389,8 @@ describe("saveHouse", () => {
 describe("saveCar", () => {
   // A Golf as the dialog would send it: worth £18,000 losing 15% a year,
   // £14,000 owed at 7.9% on a PCP paying £290 a month towards a £6,000
-  // balloon, refinanced on the same terms and so cleared in 2031 from
-  // September 2026; and the records it is written as.
+  // balloon, refinanced on the same terms and so cleared in July 2031
+  // from September 2026; and the records it is written as.
   const golf = {
     agreement: "pcp",
     balance: 14000,
@@ -434,7 +434,7 @@ describe("saveCar", () => {
     firstYear: 2026,
     growth: "nominal",
     kind: "debt",
-    lastMonth: null,
+    lastMonth: 6,
     lastYear: 2031,
     name: "Golf PCP",
   } as const;
