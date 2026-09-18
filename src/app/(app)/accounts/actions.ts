@@ -4,6 +4,7 @@ import { updateTag } from "next/cache";
 import * as z from "zod";
 
 import type { Account, AccountValues } from "@/data/accounts";
+import type { ExpenseLineValues } from "@/data/expenses";
 import type { HouseValues } from "@/data/houses";
 import type { Database } from "@/db/accounts";
 
@@ -83,6 +84,21 @@ const values = z
     (draft) => draft.funding === "fixed" || takesSpare(draft),
   ) satisfies z.ZodType<AccountValues>;
 
+// A loan secured on an asset and the line of its payments, as an asset's
+// model lays them to be written together.
+interface Secured {
+  readonly account: AccountValues;
+  readonly line: ExpenseLineValues;
+}
+
+// What an asset's model lays out to be written together: the asset, and
+// the loan secured on it with its payments, or none for an asset owned
+// outright.
+interface SecuredRecords {
+  readonly asset: AccountValues;
+  readonly loan: null | Secured;
+}
+
 // An order: every account's id once, so the store can place them all.
 const order = z
   .array(z.number().int().positive())
@@ -147,14 +163,8 @@ export async function saveAccount(
 // and for a mortgaged house the loan secured on it and the line of its
 // payments, so the mortgage appears among the accounts and its payments
 // among the expenses with no more asked of the form, and hands back the
-// house's own account. An edit finds the loan by the house and the line
-// by the loan, writes over what is there and adds what is not, and a
-// house owned outright now sends its loan and the loan's line away.
-// Checked as a save is. The records are written one after another
-// rather than in a transaction, since Neon's HTTP driver runs none; a
-// failure between them leaves what was written and reaches the form as
-// an error. Both tags expire, and the plan is read for the year the
-// payments start in.
+// house's own account. Checked as a save is. Both tags expire, and the
+// plan is read for the year the payments start in.
 export async function saveHouse(
   id: null | number,
   draft: HouseValues,
@@ -162,28 +172,7 @@ export async function saveHouse(
   await requireSession();
   const at = target.parse(id);
   const { asset, mortgage } = toRecords(house.parse(draft), getPlan());
-  const db = getDb();
-  const account =
-    at === null
-      ? await insertAccount(db, asset)
-      : await updateAccount(db, at, asset);
-  const loan = at === null ? null : await findLoanAgainst(db, account.id);
-  if (mortgage === null) {
-    if (loan !== null) {
-      await removeWithPayments(db, loan.id);
-    }
-  } else if (loan === null) {
-    const written = await insertAccount(db, mortgage.account, account.id);
-    await insertExpenseLine(db, mortgage.line, written.id);
-  } else {
-    await updateAccount(db, loan.id, mortgage.account);
-    const line = await findLinePaying(db, loan.id);
-    if (line === null) {
-      await insertExpenseLine(db, mortgage.line, loan.id);
-    } else {
-      await updateExpenseLine(db, line.id, mortgage.line);
-    }
-  }
+  const account = await writeSecured(getDb(), at, { asset, loan: mortgage });
   updateTag(expenseLinesTag);
   updateTag(accountsTag);
   return account;
@@ -198,4 +187,42 @@ async function removeWithPayments(db: Database, id: number): Promise<void> {
     await deleteExpenseLine(db, line.id);
   }
   await deleteAccount(db, id);
+}
+
+// An asset and the loan secured on it, written: the asset as a new
+// account when the id is null and over the one with that id otherwise,
+// and hands back the asset's account. An edit finds the loan by the
+// asset and the line by the loan, writes over what is there and adds
+// what is not, and an asset with no loan against it now sends its loan
+// and the loan's line away. The records are written one after another
+// rather than in a transaction, since Neon's HTTP driver runs none; a
+// failure between them leaves what was written and reaches the form as
+// an error.
+async function writeSecured(
+  db: Database,
+  at: null | number,
+  { asset, loan: secured }: SecuredRecords,
+): Promise<Account> {
+  const account =
+    at === null
+      ? await insertAccount(db, asset)
+      : await updateAccount(db, at, asset);
+  const loan = at === null ? null : await findLoanAgainst(db, account.id);
+  if (secured === null) {
+    if (loan !== null) {
+      await removeWithPayments(db, loan.id);
+    }
+  } else if (loan === null) {
+    const written = await insertAccount(db, secured.account, account.id);
+    await insertExpenseLine(db, secured.line, written.id);
+  } else {
+    await updateAccount(db, loan.id, secured.account);
+    const line = await findLinePaying(db, loan.id);
+    if (line === null) {
+      await insertExpenseLine(db, secured.line, loan.id);
+    } else {
+      await updateExpenseLine(db, line.id, secured.line);
+    }
+  }
+  return account;
 }
