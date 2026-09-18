@@ -164,4 +164,59 @@ describe("CashFlowCard", () => {
       "text-destructive",
     );
   });
+
+  // The expenses figure opens into the lines behind it, listed only while
+  // it is open: in 2026 the household alone, £3,350 a month running to
+  // 2051; in 2053 the mortgage payment and the retirement living, whose
+  // £58,000 a year is £4,833 a month.
+  it("opens the expenses figure into the lines behind it", () => {
+    render(<CashFlowCard accounts={[]} plan={plan} schedule={schedule} />);
+
+    const expenses = screen.getByRole("button", { name: /^Expenses/ });
+
+    expect(expenses).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(rows()[1]).toBe("Expenses−£3,350");
+
+    fireEvent.click(expenses);
+
+    const lines = (): string[] =>
+      within(screen.getByRole("region", { name: /^Expenses/ }))
+        .getAllByRole("listitem")
+        .map((row) => row.textContent);
+
+    expect(expenses).toHaveAttribute("aria-expanded", "true");
+    expect(lines()).toStrictEqual(["Household£3,350 / mo · 2026–2051−£3,350"]);
+
+    fireEvent.change(slider(), { target: { value: "2053" } });
+
+    expect(lines()).toStrictEqual([
+      "Mortgage payment£3,065 / mo · 2040–2064−£3,065",
+      "Retirement living£58,000 / yr · 2052–end of plan−£4,833",
+    ]);
+
+    fireEvent.click(expenses);
+
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+  });
+
+  it("says when no expense line runs in the year", () => {
+    render(
+      <CashFlowCard
+        accounts={[]}
+        plan={plan}
+        schedule={{ expenses: [household], income: [] }}
+      />,
+    );
+
+    fireEvent.change(slider(), { target: { value: "2052" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Expenses/ }));
+
+    expect(rows()[1]).toBe("Expenses£0No expense line runs this year.");
+    expect(
+      within(screen.getByRole("region", { name: /^Expenses/ })).getByRole(
+        "paragraph",
+      ),
+    ).toHaveClass("text-muted-foreground");
+  });
 });

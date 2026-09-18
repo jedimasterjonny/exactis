@@ -8,19 +8,27 @@ import { totalOf } from "@/data/income";
 
 // A month of a year's money, in pounds as the lines state them and
 // unrounded, formatted where it is rendered: what comes in, what goes
-// out, what each account is paid, and what is left after all of it.
+// out, in sum and line by line, what each account is paid, and what is
+// left after all of it.
 export interface CashFlow {
   readonly expenses: number;
   readonly fixed: readonly Paid[];
   readonly income: number;
   readonly left: number;
   readonly spare: readonly Take[];
+  readonly spent: readonly Spent[];
 }
 
 // The two schedules the plan screen holds, as the engine reads them.
 export interface Schedule {
   readonly expenses: readonly ExpenseLine[];
   readonly income: readonly IncomeLine[];
+}
+
+// An expense line running in the year and what it costs a month.
+export interface Spent {
+  readonly amount: number;
+  readonly line: ExpenseLine;
 }
 
 // An account paid the spare money, what it takes a month, and the most
@@ -37,7 +45,7 @@ interface Paid {
 }
 
 // A year's money, a month at a time: the income lines running that year
-// less the expense lines and every fixed sum, then the spare money to
+// less the expense lines, each kept as well as summed, and every fixed sum, then the spare money to
 // each account that takes it in the order they are listed, each up to
 // its cap and passing the rest on, and what is left after them, which
 // is negative when the month does not cover its outgoings. A yearly
@@ -50,13 +58,16 @@ export function cashFlow(
   year: number,
 ): CashFlow {
   const income = sumOf(schedule.income, year, totalOf);
-  const expenses = sumOf(schedule.expenses, year, (line) => line.amount);
+  const spent = schedule.expenses
+    .filter((line) => runsIn(line, year))
+    .map((line) => ({ amount: monthly(line.amount, line.cadence), line }));
+  const expenses = total(spent);
   const fixed = accounts.flatMap(fixedSum);
   const { left, takes } = spareMoney(
     accounts,
     income - expenses - total(fixed),
   );
-  return { expenses, fixed, income, left, spare: takes };
+  return { expenses, fixed, income, left, spare: takes, spent };
 }
 
 // The fixed sum an account is paid a month, or nothing for an account
@@ -130,6 +141,6 @@ function sumOf<TLine extends LineValues>(
     .reduce((sum, line) => sum + monthly(amountOf(line), line.cadence), 0);
 }
 
-function total(paid: readonly Paid[]): number {
-  return paid.reduce((sum, { amount }) => sum + amount, 0);
+function total(amounts: readonly { readonly amount: number }[]): number {
+  return amounts.reduce((sum, { amount }) => sum + amount, 0);
 }
