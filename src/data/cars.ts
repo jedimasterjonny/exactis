@@ -1,5 +1,6 @@
 import type { Account, AccountValues } from "@/data/accounts";
 import type { ExpenseLineValues } from "@/data/expenses";
+import type { LoanFigure } from "@/lib/figures";
 import type { Owed } from "@/lib/loans";
 
 import { toValues } from "@/data/accounts";
@@ -52,11 +53,6 @@ export interface CarValues {
   readonly value: number;
 }
 
-// The three figures of the finance that fix each other, given what is
-// owed and the balloon: what is paid a month, the rate, and the years
-// the agreement takes to reach the balloon.
-export type FinanceFigure = "payment" | "rate" | "term";
-
 // The loan and its payments, named for the car they are on.
 interface Finance {
   readonly account: AccountValues;
@@ -102,7 +98,7 @@ export function clearsAfter(car: CarValues): null | number {
 // owes: the payment to the pound, since a line is paid in whole pounds;
 // the rate as found; the term to the month it lands in. Null where no
 // figure fits, which the two that can say so say in the loan maths.
-export function derive(draft: CarDraft, figure: FinanceFigure): null | number {
+export function derive(draft: CarDraft, figure: LoanFigure): null | number {
   const owed = owedOn(draft);
   switch (figure) {
     case "payment":

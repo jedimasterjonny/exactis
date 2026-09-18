@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { CarDraft, FinanceFigure } from "@/data/cars";
+import type { CarDraft } from "@/data/cars";
+import type { LoanFigure } from "@/lib/figures";
 
 import { CarFields } from "./car-fields";
 
@@ -29,7 +30,7 @@ const workedHint = "Worked out from the other two";
 interface Shown {
   readonly clears?: null | number;
   readonly figure: null | number;
-  readonly worked: FinanceFigure;
+  readonly worked: LoanFigure;
 }
 
 function commit(field: HTMLElement, value: string): void {

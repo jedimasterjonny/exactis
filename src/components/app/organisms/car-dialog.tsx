@@ -4,13 +4,8 @@ import type { JSX } from "react";
 
 import { startTransition, useState, useTransition } from "react";
 
-import type {
-  Agreement,
-  Car,
-  CarDraft,
-  CarValues,
-  FinanceFigure,
-} from "@/data/cars";
+import type { Agreement, Car, CarDraft, CarValues } from "@/data/cars";
+import type { LoanFigure, Stood } from "@/lib/figures";
 
 import { saveCar } from "@/app/(app)/accounts/actions";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
@@ -18,6 +13,7 @@ import { CarFields } from "@/components/app/organisms/car-fields";
 import { toast } from "@/components/kit/toast";
 import { carOf, clearsAfter, derive, isSound } from "@/data/cars";
 import { reasonOf } from "@/lib/errors";
+import { stood, thirdOf } from "@/lib/figures";
 
 interface CarDialogProps {
   readonly car: Car | null;
@@ -27,14 +23,12 @@ interface CarDialogProps {
 
 // An open dialog: the draft as it is, the draft as it opened, which the
 // uncontrolled fields take as their defaults, and the two of the
-// finance's three figures typed last, the latest first, which stand
-// while the third is worked out from them. A figure typed moves to the
-// front and pushes the other out, so the one worked out is always the
-// one left alone longest.
+// finance's three figures that stand while the third is worked out from
+// them.
 interface Entry {
   readonly draft: CarDraft;
   readonly initial: CarDraft;
-  readonly typed: readonly [FinanceFigure, FinanceFigure];
+  readonly typed: Stood;
 }
 
 // A new car: on a PCP, since that is the case with the most to work out,
@@ -54,9 +48,6 @@ const draft: CarDraft = {
 };
 
 const blank: Entry = { draft, initial: draft, typed: ["rate", "term"] };
-
-// The three figures, so a patch can be asked which it carries.
-const figures: readonly FinanceFigure[] = ["payment", "rate", "term"];
 
 // The dialog a car is entered or edited in, which takes the car as the
 // records it is and lets the store write them: the asset, and for a
@@ -81,14 +72,11 @@ export function CarDialog({
   const [isSaving, startSaving] = useTransition();
   const { canSave, clears, figure, values, worked } = workedOut(entry);
 
-  // A patch to one of the three figures makes it one of the two that
-  // stand; any other patch leaves them as they are.
   function amend(patch: Partial<CarDraft>): void {
-    const typed = figures.find((candidate) => candidate in patch);
     setEntry({
       ...entry,
       draft: { ...entry.draft, ...patch },
-      typed: typed === undefined ? entry.typed : stood(entry.typed, typed),
+      typed: stood(entry.typed, patch),
     });
   }
 
@@ -167,28 +155,6 @@ function entryOf(car: Car): Entry {
   };
 }
 
-// The two figures that stand once one is typed: the typed one first, and
-// whichever of the two that stood is not it.
-function stood(
-  typed: readonly [FinanceFigure, FinanceFigure],
-  figure: FinanceFigure,
-): readonly [FinanceFigure, FinanceFigure] {
-  const [first, second] = typed;
-  return [figure, first === figure ? second : first];
-}
-
-// The figure the two given leave out.
-function thirdOf(one: FinanceFigure, other: FinanceFigure): FinanceFigure {
-  switch (one) {
-    case "payment":
-      return other === "rate" ? "term" : "rate";
-    case "rate":
-      return other === "payment" ? "term" : "payment";
-    case "term":
-      return other === "payment" ? "rate" : "payment";
-  }
-}
-
 // The car the draft would save: the name as typed less the space around
 // it, which is what the title shows; nothing owed, paid or charged and
 // no balloon for a car owned outright, and no balloon on a loan,
@@ -199,7 +165,7 @@ function thirdOf(one: FinanceFigure, other: FinanceFigure): FinanceFigure {
 // held save never sends.
 function valuesOf(
   draft: CarDraft,
-  worked: FinanceFigure,
+  worked: LoanFigure,
   figure: null | number,
 ): CarValues {
   const values: CarValues = {
@@ -234,7 +200,7 @@ function workedOut(entry: Entry): {
   readonly clears: null | number;
   readonly figure: null | number;
   readonly values: CarValues;
-  readonly worked: FinanceFigure;
+  readonly worked: LoanFigure;
 } {
   const worked = thirdOf(...entry.typed);
   const figure = derive(entry.draft, worked);
