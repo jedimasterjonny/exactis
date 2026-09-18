@@ -1,16 +1,31 @@
 import { describe, expect, it } from "vitest";
 
-import { allowanceOf, isAsset, toAccount, toValues } from "./accounts";
+import {
+  allowanceOf,
+  isAsset,
+  takesSpare,
+  toAccount,
+  toValues,
+} from "./accounts";
 import { accounts } from "./accounts.fixture";
 
 describe("accounts", () => {
-  it("files a real asset and a debt as assets and the rest as accounts", () => {
+  it("files a real asset as an asset and the rest, the loan against it among them, as accounts", () => {
     expect(
       accounts.filter(isAsset).map((account) => account.kind),
-    ).toStrictEqual(["real-asset", "debt"]);
+    ).toStrictEqual(["real-asset"]);
     expect(
       accounts.filter((account) => !isAsset(account)).map((a) => a.kind),
+    ).toStrictEqual(["tax-deferred", "tax-free", "cash", "debt"]);
+  });
+
+  it("pays a wrapper or cash the spare money and a real asset or a debt a fixed sum only", () => {
+    expect(
+      accounts.filter(takesSpare).map((account) => account.kind),
     ).toStrictEqual(["tax-deferred", "tax-free", "cash"]);
+    expect(
+      accounts.filter((account) => !takesSpare(account)).map((a) => a.kind),
+    ).toStrictEqual(["real-asset", "debt"]);
   });
 
   it("reads a contribution and a fixed rate off an account and back", () => {

@@ -3,7 +3,7 @@ import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { LineValues } from "@/data/schedule";
 
-import { allowanceOf, isAsset } from "@/data/accounts";
+import { allowanceOf, takesSpare } from "@/data/accounts";
 import { totalOf } from "@/data/income";
 
 // A month of a year's money, in pounds as the lines state them and
@@ -103,8 +103,8 @@ function spareMoney(
   for (const account of accounts) {
     const { contribution } = account;
     if (contribution?.kind === "spare") {
-      if (isAsset(account)) {
-        throw new Error("An asset takes no spare money");
+      if (!takesSpare(account)) {
+        throw new Error("A real asset or a debt takes no spare money");
       }
       const cap = contribution.cap ?? allowanceOf(account.kind);
       const amount = Math.max(

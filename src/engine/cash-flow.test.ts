@@ -159,7 +159,7 @@ describe("cashFlow", () => {
     };
 
     expect(() => cashFlow([spareHome], schedule, 2026)).toThrow(
-      "An asset takes no spare money",
+      "A real asset or a debt takes no spare money",
     );
   });
 
