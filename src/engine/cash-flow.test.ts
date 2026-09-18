@@ -34,14 +34,24 @@ const sparePension: Account = {
 
 describe("cashFlow", () => {
   // 2026 runs the salary alone, £144,000 a year with its parts, so
-  // £12,000 a month, against the household's £3,350 a month; the
+  // £12,000 a month, of which 12% of the £120,000 base, £1,200 a
+  // month, is sacrificed into the pension and lands there as £1,380
+  // with the NI saved, against the household's £3,350 a month; the
   // pension's £28,512 a year is £2,376 a month, the ISA's £20,000 is
   // £1,666.67 and the mortgage's £2,180 is monthly already, leaving
-  // £2,538.58 with no account to take it.
-  it("takes this year's lines a month at a time, less every fixed sum", () => {
+  // £1,538.58 with no account to take it.
+  it("takes this year's lines a month at a time, less every sacrifice and fixed sum", () => {
     const flow = cashFlow(accounts, schedule, { month: 0, year: 2026 });
 
     expect(flow.income).toBe(12000);
+    expect(flow.fed).toStrictEqual([
+      {
+        account: pension,
+        amount: (14400 * 1.15) / 12,
+        line: salary,
+        sacrificed: 1200,
+      },
+    ]);
     expect(flow.expenses).toBe(3350);
     expect(flow.spent).toStrictEqual([{ amount: 3350, line: household }]);
     expect(flow.fixed).toStrictEqual([
@@ -50,7 +60,53 @@ describe("cashFlow", () => {
       { account: mortgage, amount: 2180 },
     ]);
     expect(flow.spare).toStrictEqual([]);
-    expect(flow.left).toBeCloseTo(2538.58, 2);
+    expect(flow.left).toBeCloseTo(1538.58, 2);
+  });
+
+  // The salary's £1,200 a month comes off the month whether or not the
+  // pension is paid a fixed sum of its own, and is not the pension's
+  // own sum; a salary naming a pension not among the accounts is earned
+  // whole, and a line giving up nothing feeds nothing whichever pension
+  // it names.
+  it("feeds the pension a salary names when it is among the accounts", () => {
+    const unpaid: Account = {
+      balance: 391640,
+      growth: { kind: "plan" },
+      id: pension.id,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+    };
+    const income = [salary];
+    const fed = cashFlow(
+      [unpaid],
+      { expenses: [], income },
+      { month: 0, year: 2026 },
+    );
+    const unlisted = cashFlow(
+      [isa],
+      { expenses: [], income },
+      { month: 0, year: 2026 },
+    );
+    const nothing = cashFlow(
+      [pension],
+      { expenses: [], income: [{ ...salary, sacrifice: 0 }] },
+      { month: 0, year: 2026 },
+    );
+
+    expect(fed.fed).toStrictEqual([
+      {
+        account: unpaid,
+        amount: (14400 * 1.15) / 12,
+        line: salary,
+        sacrificed: 1200,
+      },
+    ]);
+    expect(fed.fixed).toStrictEqual([]);
+    expect(fed.left).toBe(10800);
+    expect(unlisted.fed).toStrictEqual([]);
+    expect(unlisted.left).toBeCloseTo(12000 - 20000 / 12, 10);
+    expect(nothing.fed).toStrictEqual([]);
+    expect(nothing.left).toBe(12000 - 2376);
   });
 
   // 2039 runs both salaries, £144,000 and £174,000 a year, against the
@@ -81,10 +137,11 @@ describe("cashFlow", () => {
     ]).toHaveLength(5);
   });
 
-  // £12,000 less £3,350 and the mortgage's £2,180 leaves £6,470; the
-  // ISA takes £1,666.67, a twelfth of its allowance, the pension £2,500,
-  // a twelfth of its cap, and the current account the £2,303.33 left,
-  // leaving nothing.
+  // £12,000 less the £1,200 sacrificed, £3,350 and the mortgage's
+  // £2,180 leaves £5,270; the ISA takes £1,666.67, a twelfth of its
+  // allowance, the pension £2,500, a twelfth of its cap, over what it
+  // is fed, and the current account the £1,103.33 left, leaving
+  // nothing.
   it("hands the spare money down the accounts that take it, each to a twelfth of its cap", () => {
     const flow = cashFlow(
       [spareIsa, sparePension, spareCash, home, mortgage],
@@ -96,7 +153,7 @@ describe("cashFlow", () => {
     expect(flow.spare).toStrictEqual([
       { account: spareIsa, amount: 20000 / 12, cap: 20000 },
       { account: sparePension, amount: 2500, cap: 30000 },
-      { account: spareCash, amount: 6470 - 20000 / 12 - 2500, cap: null },
+      { account: spareCash, amount: 5270 - 20000 / 12 - 2500, cap: null },
     ]);
     expect(flow.left).toBe(0);
   });
@@ -112,7 +169,16 @@ describe("cashFlow", () => {
       [spareIsa, sparePension, spareCash, mortgage],
       {
         expenses: [household],
-        income: [{ ...salary, amount: 187787, bonus: 0, rsu: 0 }],
+        income: [
+          {
+            ...salary,
+            amount: 187787,
+            bonus: 0,
+            feeds: null,
+            rsu: 0,
+            sacrifice: 0,
+          },
+        ],
       },
       { month: 0, year: 2026 },
     );
@@ -208,6 +274,31 @@ describe("cashFlow", () => {
     ).toBe(0);
   });
 
+  // The link is held to a pension by the action, so a salary feeding
+  // the ISA, the current account or the mortgage is a caller's mistake,
+  // whatever share it gives up.
+  it("refuses a salary feeding an account that is no pension", () => {
+    for (const account of [isa, cash, mortgage]) {
+      expect(() =>
+        cashFlow(
+          [account],
+          { expenses: [], income: [{ ...salary, feeds: account.id }] },
+          { month: 0, year: 2026 },
+        ),
+      ).toThrow("A salary feeds a pension alone");
+      expect(() =>
+        cashFlow(
+          [account],
+          {
+            expenses: [],
+            income: [{ ...salary, feeds: account.id, sacrifice: 0 }],
+          },
+          { month: 0, year: 2026 },
+        ),
+      ).toThrow("A salary feeds a pension alone");
+    }
+  });
+
   it("refuses to hand the spare money to a real asset or a debt", () => {
     const spareHome: Account = {
       ...home,
@@ -222,6 +313,7 @@ describe("cashFlow", () => {
   it("finds nothing in a year with no lines and no accounts", () => {
     expect(cashFlow([], schedule, { month: 0, year: 2025 })).toStrictEqual({
       expenses: 0,
+      fed: [],
       fixed: [],
       income: 0,
       left: 0,
