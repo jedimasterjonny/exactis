@@ -19,7 +19,7 @@ import {
   insertExpenseLine,
   updateExpenseLine,
 } from "@/db/expenses";
-import { stopFeeding } from "@/db/income";
+import { isFed, stopFeeding } from "@/db/income";
 import { requireSession } from "@/lib/session";
 
 import { expenseLinesTag, incomeLinesTag } from "../plan/store";
@@ -53,7 +53,7 @@ vi.mock("@/db/expenses", () => ({
   insertExpenseLine: vi.fn(),
   updateExpenseLine: vi.fn(),
 }));
-vi.mock("@/db/income", () => ({ stopFeeding: vi.fn() }));
+vi.mock("@/db/income", () => ({ isFed: vi.fn(), stopFeeding: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 vi.mock("../store", () => ({ getPlan: vi.fn() }));
 
@@ -132,6 +132,29 @@ describe("saveAccount", () => {
     });
     expect(insertAccount).not.toHaveBeenCalled();
     expect(updateTag).toHaveBeenCalledExactlyOnceWith(accountsTag);
+  });
+
+  // The pension's kind is held while a salary feeds it; any other edit
+  // to it, and any edit to an account nothing feeds, goes through, and
+  // a new account is asked nothing.
+  it("refuses to make a pension a salary feeds anything else", async () => {
+    vi.mocked(isFed).mockResolvedValue(true);
+    vi.mocked(updateAccount).mockResolvedValue(pension);
+    const workplace = { ...values, kind: "tax-deferred" } as const;
+
+    await expect(saveAccount(pension.id, values)).rejects.toThrow(
+      "A pension a salary feeds stays a pension",
+    );
+    expect(updateAccount).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+
+    expect(await saveAccount(pension.id, workplace)).toBe(pension);
+    expect(isFed).toHaveBeenCalledExactlyOnceWith(db, pension.id);
+
+    vi.mocked(isFed).mockResolvedValue(false);
+
+    expect(await saveAccount(pension.id, values)).toBe(pension);
+    expect(updateAccount).toHaveBeenCalledTimes(2);
   });
 
   it("takes the spare money into an account that takes it", async () => {
@@ -358,6 +381,24 @@ describe("saveHouse", () => {
     expect(deleteAccount).toHaveBeenCalledExactlyOnceWith(db, mortgage.id);
   });
 
+  // A house written over a pension's id is the pension made a house,
+  // which a salary feeding it forbids, as any other edit to its kind
+  // is forbidden; a new house asks nothing.
+  it("refuses to write a house over a pension a salary feeds", async () => {
+    vi.mocked(isFed).mockResolvedValue(true);
+    vi.mocked(insertAccount).mockResolvedValue(home);
+
+    await expect(saveHouse(pension.id, outright)).rejects.toThrow(
+      "A pension a salary feeds stays a pension",
+    );
+    expect(isFed).toHaveBeenCalledExactlyOnceWith(db, pension.id);
+    expect(updateAccount).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+
+    expect(await saveHouse(null, outright)).toBe(home);
+    expect(isFed).toHaveBeenCalledTimes(1);
+  });
+
   it("refuses what the form could not have sent", async () => {
     await expect(saveHouse(0, house)).rejects.toThrow(z.ZodError);
     await expect(saveHouse(null, { ...house, name: "  " })).rejects.toThrow(
@@ -513,6 +554,16 @@ describe("saveCar", () => {
       mortgagePayment.id,
     );
     expect(deleteAccount).toHaveBeenCalledExactlyOnceWith(db, 7);
+  });
+
+  it("refuses to write a car over a pension a salary feeds", async () => {
+    vi.mocked(isFed).mockResolvedValue(true);
+
+    await expect(saveCar(pension.id, golf)).rejects.toThrow(
+      "A pension a salary feeds stays a pension",
+    );
+    expect(updateAccount).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
   });
 
   it("refuses what the form could not have sent", async () => {

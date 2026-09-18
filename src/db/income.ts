@@ -26,6 +26,17 @@ export async function insertIncomeLine(
   return single(rows);
 }
 
+// Whether any line feeds the account with that id, which is what holds
+// the account to being a pension while one does.
+export async function isFed(db: Database, accountId: number): Promise<boolean> {
+  const rows = await db
+    .select({ id: incomeLines.id })
+    .from(incomeLines)
+    .where(eq(incomeLines.feeds, accountId))
+    .limit(1);
+  return rows.length > 0;
+}
+
 // Every income line, in the order they were added. A row is the line as
 // the model lays it, so nothing converts it.
 export async function listIncomeLines(db: Database): Promise<IncomeLine[]> {

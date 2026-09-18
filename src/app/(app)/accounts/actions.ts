@@ -14,6 +14,7 @@ import {
   cadences,
   fundings,
   growthKinds,
+  isPension,
   takesSpare,
 } from "@/data/accounts";
 import {
@@ -36,7 +37,7 @@ import {
   insertExpenseLine,
   updateExpenseLine,
 } from "@/db/expenses";
-import { stopFeeding } from "@/db/income";
+import { isFed, stopFeeding } from "@/db/income";
 import { requireSession } from "@/lib/session";
 
 import { expenseLinesTag, incomeLinesTag } from "../plan/store";
@@ -181,8 +182,10 @@ export async function removeAccount(id: number): Promise<void> {
 // with that id, and hands back the account as the store now has it. An
 // action answers a POST from anywhere, so it checks the session for
 // itself and parses what it was sent rather than trusting the form; a
-// value the form could not have sent fails loudly. The tag is expired
-// before returning, so the same round trip carries the list re-read.
+// value the form could not have sent fails loudly. A pension a salary
+// feeds stays a pension, so an edit that would make it anything else
+// is refused. The tag is expired before returning, so the same round
+// trip carries the list re-read.
 export async function saveAccount(
   id: null | number,
   draft: AccountValues,
@@ -194,7 +197,7 @@ export async function saveAccount(
   const account =
     at === null
       ? await insertAccount(db, parsed)
-      : await updateAccount(db, at, parsed);
+      : await writeOver(db, at, parsed);
   updateTag(accountsTag);
   return account;
 }
@@ -250,6 +253,25 @@ async function removeWithPayments(db: Database, id: number): Promise<void> {
   await deleteAccount(db, id);
 }
 
+// The account with that id, written over with the values, through the
+// one check every write over an account goes through: a pension a
+// salary feeds stays a pension, since the sacrifice would otherwise go
+// on leaving the salary and land in no wrapper, so an edit that would
+// make it anything else is refused and the salary is unlinked first.
+// The forms never offer such an edit, but each action answers a POST
+// from anywhere, and a house or a car written over a pension's id is
+// the same edit by another door.
+async function writeOver(
+  db: Database,
+  at: number,
+  values: AccountValues,
+): Promise<Account> {
+  if (!isPension(values) && (await isFed(db, at))) {
+    throw new Error("A pension a salary feeds stays a pension");
+  }
+  return updateAccount(db, at, values);
+}
+
 // An asset and the loan secured on it, written: the asset as a new
 // account when the id is null and over the one with that id otherwise,
 // and hands back the asset's account. An edit finds the loan by the
@@ -267,7 +289,7 @@ async function writeSecured(
   const account =
     at === null
       ? await insertAccount(db, asset)
-      : await updateAccount(db, at, asset);
+      : await writeOver(db, at, asset);
   const loan = at === null ? null : await findLoanAgainst(db, account.id);
   if (secured === null) {
     if (loan !== null) {

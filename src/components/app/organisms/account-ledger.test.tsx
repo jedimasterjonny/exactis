@@ -980,6 +980,45 @@ describe("AccountLedger", () => {
     );
   });
 
+  // A pension a salary feeds opens with its treatment held and the
+  // reason beneath it; an account nothing feeds opens free, as does a
+  // new one.
+  it("holds the treatment of a pension a salary feeds", () => {
+    const [salary] = incomeLines;
+    render(
+      <Toaster>
+        <AccountLedger accounts={[pension, isa]} lines={[salary]} />
+      </Toaster>,
+    );
+
+    let treatment = within(openEditor("Workplace pension")).getByRole(
+      "combobox",
+      { name: "Treatment" },
+    );
+
+    expect(treatment).toBeDisabled();
+    expect(treatment).toHaveAccessibleDescription(
+      "Fed by Salary; set the pension to none on the salary to change it",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    treatment = within(openEditor("Stocks & shares ISA")).getByRole(
+      "combobox",
+      { name: "Treatment" },
+    );
+
+    expect(treatment).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
+
+    expect(
+      within(screen.getByRole("dialog")).getByRole("combobox", {
+        name: "Treatment",
+      }),
+    ).toBeEnabled();
+  });
+
   // The pension takes the sacrifice of every salary feeding it, named
   // as a list, in the singular for one; an account nothing feeds says
   // nothing of it.

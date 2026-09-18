@@ -14,6 +14,7 @@ import { formatGbp } from "@/lib/money";
 interface AccountFieldsProps {
   readonly draft: AccountValues;
   readonly initial: AccountValues;
+  readonly kindLock?: string | undefined;
   readonly onAmend: (patch: Partial<AccountValues>) => void;
   readonly onFundingChange: (funding: Funding) => void;
   readonly onKindChange: (kind: AccountKind) => void;
@@ -46,10 +47,13 @@ const kinds = [
 // each change to the ledger, whose draft mirrors them. The treatment and
 // the contribution choices are reported apart from the rest, since each
 // changes more of the draft than its own value and the ledger decides
-// what.
+// what. The treatment is locked when the ledger gives a reason, which
+// it does for a pension a salary feeds, since the store refuses to
+// make one anything else and the reason says how to unlink it.
 export function AccountFields({
   draft,
   initial,
+  kindLock,
   onAmend,
   onFundingChange,
   onKindChange,
@@ -67,6 +71,8 @@ export function AccountFields({
         />
         <SelectField
           defaultValue={initial.kind}
+          hint={kindLock}
+          isDisabled={kindLock !== undefined}
           label="Treatment"
           onValueChange={(kind) => {
             onKindChange(kind);

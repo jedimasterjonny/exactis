@@ -34,6 +34,24 @@ describe("SelectField", () => {
     expect(control).toHaveValue("month");
   });
 
+  it("holds a disabled choice as it stands", () => {
+    render(
+      <SelectField
+        defaultValue="year"
+        hint="Held while a line pays at it"
+        isDisabled
+        label="Cadence"
+        options={options}
+      />,
+    );
+
+    const control = screen.getByRole("combobox", { name: "Cadence" });
+
+    expect(control).toBeDisabled();
+    expect(control).toHaveValue("year");
+    expect(control).toHaveAccessibleDescription("Held while a line pays at it");
+  });
+
   it("reports nothing for a value outside its options and shows a hint", () => {
     const onValueChange = vi.fn<(value: Cadence) => void>();
     render(
