@@ -10,6 +10,8 @@ type RateFieldProps = Figure & {
   readonly error?: string;
   readonly hint?: string;
   readonly label: string;
+  readonly max?: number;
+  readonly min?: number;
   readonly onValueCommitted?: (value: number) => void;
 };
 
@@ -18,12 +20,15 @@ type RateFieldProps = Figure & {
 // 2.1 commits as 0.021: Intl formats the one way, with the options the
 // ledger formats with, and the number field parses the other. Arrow keys
 // step by a tenth of a point, a whole point with shift. The figure is
-// held as the caller says, by default or by value, and an error is the
-// caller's, for a rate it could not work out.
+// held as the caller says, by default or by value, inside the bounds
+// it gives if any, and an error is the caller's, for a rate it could
+// not work out.
 export function RateField({
   error,
   hint,
   label,
+  max,
+  min,
   onValueCommitted,
   ...figure
 }: RateFieldProps): JSX.Element {
@@ -33,6 +38,8 @@ export function RateField({
         {...figure}
         format={percentFormat}
         largeStep={0.01}
+        max={max}
+        min={min}
         onValueCommitted={onValueCommitted}
         step={0.001}
       />
