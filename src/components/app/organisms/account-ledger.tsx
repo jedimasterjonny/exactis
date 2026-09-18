@@ -15,11 +15,13 @@ import type { House } from "@/data/houses";
 
 import {
   placeAccountsInOrder,
+  removeAccount,
   saveAccount,
 } from "@/app/(app)/accounts/actions";
 import { Note } from "@/components/app/atoms/note";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
+import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { AccountFields } from "@/components/app/organisms/account-fields";
 import { AccountTable } from "@/components/app/organisms/account-table";
@@ -88,12 +90,16 @@ const blank: Draft = {
 // pencil of a house or the loan against it opens on that house, so an
 // edit from either side writes both. The fields are uncontrolled and mount fresh with the entry's
 // opening values each time the dialog opens, and the draft mirrors what
-// they report.
+// they report. A row's bin asks through the confirm dialog before the
+// account goes, saying what goes with it, since a house takes its loan
+// and a loan its payments.
 export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
   const [tab, setTab] = useState<Tab>("accounts");
   const [entry, setEntry] = useState<Entry | null>(null);
   const [house, setHouse] = useState<HouseOpening | null>(null);
+  const [doomed, setDoomed] = useState<Account | null>(null);
   const [isSaving, startSaving] = useTransition();
+  const [isRemoving, startRemoving] = useTransition();
   const [order, placeOptimistically] = useOptimistic(
     accounts,
     (_current: readonly Account[], next: readonly Account[]) => next,
@@ -143,6 +149,23 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
     startTransition(async () => {
       placeOptimistically(next);
       await placeAccountsInOrder(next.map((a) => a.id));
+    });
+  }
+
+  // What the confirm dialog asked goes to the store; the dialog stays
+  // open with its confirm held until the store answers, then closes, as
+  // a save does, and the page re-read takes the row with it.
+  function remove(account: Account): void {
+    startRemoving(async () => {
+      await removeAccount(account.id);
+      startTransition(() => {
+        setDoomed(null);
+      });
+      toast.add({
+        description: account.name,
+        title: "Account deleted",
+        type: "success",
+      });
     });
   }
 
@@ -245,6 +268,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
               accounts={held}
               emptyDescription="Add a pension, an ISA, a savings account or a debt to see it listed here."
               emptyTitle="No accounts yet"
+              onDelete={setDoomed}
               onEdit={edit}
               onMove={move}
             />
@@ -262,6 +286,7 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
               accounts={assets}
               emptyDescription="A house, a car, anything owned outright. Add one to see it listed here."
               emptyTitle="No assets yet"
+              onDelete={setDoomed}
               onEdit={edit}
             />
             <Note>
@@ -298,6 +323,20 @@ export function AccountLedger({ accounts }: AccountLedgerProps): JSX.Element {
           />
         </EditDialog>
       )}
+      {doomed !== null && (
+        <ConfirmDialog
+          isBusy={isRemoving}
+          onCancel={() => {
+            setDoomed(null);
+          }}
+          onConfirm={() => {
+            remove(doomed);
+          }}
+          title={`Delete ${doomed.name}?`}
+        >
+          {goesWith(doomed, order)}
+        </ConfirmDialog>
+      )}
       {house !== null && (
         <HouseDialog
           house={house === "new" ? null : house}
@@ -331,6 +370,20 @@ function fundedBy(current: Entry, funding: Funding): Partial<Draft> {
         funding,
       }
     : { cadence: "year", cap: current.initial.cap, contribution: 0, funding };
+}
+
+// What goes with an account when it is deleted, for the dialog to say:
+// a house takes the loan secured on it and that loan's payments, a loan
+// takes its payments, and any other account, or a house with no loan,
+// goes alone.
+function goesWith(account: Account, accounts: readonly Account[]): string {
+  const loan = houseFor(account, accounts)?.loan ?? null;
+  if (loan === null) {
+    return "It cannot be brought back.";
+  }
+  return loan.secures === account.id
+    ? `Its mortgage, ${loan.name}, and the payments go with it.`
+    : "Its payments go with it.";
 }
 
 // The house an account is part of: a house is its own, with the loan

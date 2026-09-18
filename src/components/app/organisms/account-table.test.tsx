@@ -260,4 +260,47 @@ describe("AccountTable", () => {
 
     expect(onEdit).toHaveBeenCalledExactlyOnceWith(assets[1]);
   });
+
+  // The bin sits beside the pencil in the one actions column, and a
+  // table given only a delete handler still has the column.
+  it("closes each row with a bin when given a delete handler, and reports the row's account", () => {
+    const onDelete = vi.fn<(account: Account) => void>();
+    const onEdit = vi.fn<(account: Account) => void>();
+    const view = render(
+      <AccountTable
+        accounts={assets}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        onDelete={onDelete}
+        onEdit={onEdit}
+      />,
+    );
+
+    expect(screen.getAllByRole("columnheader")).toHaveLength(6);
+    expect(screen.getAllByRole("button", { name: /^Delete / })).toHaveLength(
+      assets.length,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Mortgage" }));
+
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith(assets[1]);
+    expect(onEdit).not.toHaveBeenCalled();
+
+    view.rerender(
+      <AccountTable
+        accounts={assets}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        onDelete={onDelete}
+      />,
+    );
+
+    expect(screen.getAllByRole("columnheader")).toHaveLength(6);
+    expect(
+      screen.queryByRole("button", { name: /^Edit / }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Delete / })).toHaveLength(
+      assets.length,
+    );
+  });
 });
