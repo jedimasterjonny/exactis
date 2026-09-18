@@ -100,6 +100,24 @@ export async function placeAccountsInOrder(
   updateTag(accountsTag);
 }
 
+// Deletes the account with that id, and what cannot stand without it: a
+// house takes the loan secured on it and that loan's payments, and a
+// loan takes its payments, each line before its loan since the store
+// holds the links. Checked and expired as a save is, both tags since a
+// line may have gone.
+export async function removeAccount(id: number): Promise<void> {
+  await requireSession();
+  const at = z.number().int().positive().parse(id);
+  const db = getDb();
+  const loan = await findLoanAgainst(db, at);
+  if (loan !== null) {
+    await removeWithPayments(db, loan.id);
+  }
+  await removeWithPayments(db, at);
+  updateTag(expenseLinesTag);
+  updateTag(accountsTag);
+}
+
 // Writes an account: a new one when the id is null, else over the one
 // with that id, and hands back the account as the store now has it. An
 // action answers a POST from anywhere, so it checks the session for
@@ -150,7 +168,7 @@ export async function saveHouse(
   const loan = at === null ? null : await findLoanAgainst(db, account.id);
   if (mortgage === null) {
     if (loan !== null) {
-      await removeLoan(db, loan.id);
+      await removeWithPayments(db, loan.id);
     }
   } else if (loan === null) {
     const written = await insertAccount(db, mortgage.account, account.id);
@@ -169,12 +187,13 @@ export async function saveHouse(
   return account;
 }
 
-// A loan and its payments, gone: the line first, since the store holds
-// the link and refuses to leave it dangling.
-async function removeLoan(db: Database, loanId: number): Promise<void> {
-  const line = await findLinePaying(db, loanId);
+// An account and the line of its payments, if it is a loan with one,
+// gone: the line first, since the store holds the link and refuses to
+// leave it dangling.
+async function removeWithPayments(db: Database, id: number): Promise<void> {
+  const line = await findLinePaying(db, id);
   if (line !== null) {
     await deleteExpenseLine(db, line.id);
   }
-  await deleteAccount(db, loanId);
+  await deleteAccount(db, id);
 }
