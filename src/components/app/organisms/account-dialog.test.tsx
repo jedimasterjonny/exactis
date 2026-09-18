@@ -276,6 +276,27 @@ describe("AccountDialog", () => {
     );
   });
 
+  // Nothing can feed an account the store has not given an id yet, and a
+  // line feeding no pension holds null where an id would be, so a new
+  // account asked under its absent id would be held by every such line.
+  // The fixture has three of them.
+  it("leaves a new account's treatment free beside lines that feed no pension", () => {
+    render(
+      <Toaster>
+        <AccountDialog
+          account={null}
+          lines={incomeLines}
+          onDismiss={vi.fn<() => void>()}
+          onSaved={vi.fn<(account: Account) => void>()}
+        />
+      </Toaster>,
+    );
+    const treatment = choice(open(), "Treatment");
+
+    expect(treatment).toBeEnabled();
+    expect(treatment).not.toHaveAccessibleDescription();
+  });
+
   it("keeps a refused save open and says why", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
     vi.mocked(saveAccount).mockRejectedValue(
