@@ -152,8 +152,11 @@ because the vocabulary is open by design.
 - Minimum diff surface. Formatter sweeps, drive-by renames and unrelated tidying
   get their own commit or do not happen.
 - Every commit stands alone. Regenerate `bun.lock` per commit, and check a
-  series with a throwaway worktree: `git worktree add`, then
-  `bun install --frozen-lockfile && bun run typecheck` at each commit.
+  series in throwaway worktrees, one per commit and all at once:
+  `git worktree add` at each commit, then `bun install --frozen-lockfile` and
+  every gate the hook runs in each, in parallel. A series checked one commit at
+  a time takes as long as all of them together; checked side by side it takes as
+  long as the slowest, and the machine has the cores.
 - Drop verification artefacts before the work lands: smoke-test files, scratch
   scripts, probe commits. Never fold them into a real commit.
 - The body says what was decided, what was rejected and why, and what was
@@ -170,8 +173,10 @@ reach:
 - IMPORTANT: never use `--no-verify`. CI runs the same checks on every push and
   pull request, so bypassing the hook defers the failure rather than avoiding
   it.
-- `git rebase` does not re-run the hook. After reordering or amending, every
-  commit in the series must still be green, not only the tip.
+- `git rebase` does not re-run the hook, and nor does `git cherry-pick`. After
+  reordering or amending, every commit in the series must still be green, not
+  only the tip, and the worktree check above is the only check those commits get
+  before CI.
 - Never suppress a diagnostic to clear a check, and never delete, skip or
   `.only` a test or loosen an assertion to match behaviour that is broken. A
   skipped test reports nothing, which is worse than red.
