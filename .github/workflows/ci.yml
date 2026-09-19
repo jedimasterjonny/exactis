@@ -187,6 +187,19 @@ jobs:
       # type error should fail in seconds rather than after a full build, and
       # the build catches what tsc alone does not.
       - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          echo "::group::runner parallelism"
+          echo "nproc: $(nproc)"
+          node -e "const os=require('node:os');console.log(JSON.stringify({cpus:os.cpus().length,avail:os.availableParallelism(),memGB:+(os.totalmem()/1e9).toFixed(1)}))"
+          cat /sys/fs/cgroup/cpu.max 2>/dev/null || echo "no cgroup cpu.max"
+          echo "::endgroup::"
+          echo "::group::explicit --maxWorkers=4"
+          s=$SECONDS
+          bunx vitest run --coverage --maxWorkers=4 > /tmp/w4.log 2>&1 || true
+          echo "W4_WALL=$((SECONDS-s))s"
+          grep -E "Duration|jsdom was created|Test Files|Tests " /tmp/w4.log | tail -6
+          echo "::endgroup::"
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bun run build
       # Nothing above reports a dependency that no file imports, or an export
       # that no file reads: both type check and lint perfectly. knip is the
