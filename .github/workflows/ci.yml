@@ -84,7 +84,9 @@ jobs:
           echo "dir=$dir" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          key: bun-check-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          key:
+            bun-check-${{ runner.os }}-${{ runner.arch }}-${{
+            hashFiles('bun.lock') }}
           # node_modules is deliberately not here and must not be added. bun
           # install --frozen-lockfile does not prune, so a restored tree
           # resolves a dependency the commit no longer declares and the run
@@ -100,7 +102,17 @@ jobs:
           # that exists is a no-op, so a shared prefix would race only on
           # identical content; the prefixes stay so a restore reads off its
           # key as the tip's or a commit's.
-          restore-keys: bun-check-${{ runner.os }}-
+          #
+          # The architecture is in the key because runner.os cannot tell
+          # one from the other - an x64 runner and an arm64 one both
+          # report Linux - and a prefix that stops at the OS would hand a
+          # restore from one to the other. What is in there today would
+          # survive that: bun's install cache is keyed by package
+          # identity, and a package with a native binary ships it as a
+          # separate optional dependency rather than as a variant of
+          # itself. That is a property of bun's cache rather than a
+          # promise it makes, so the key says which CPU filled it.
+          restore-keys: bun-check-${{ runner.os }}-${{ runner.arch }}-
 
       - id: install
         run: bun install --frozen-lockfile
@@ -405,10 +417,13 @@ jobs:
           # from. Most of a series shares one, so the first job to finish
           # saves the entry and the rest find it already there; a series
           # that changes the lockfile mid-way saves one entry per lockfile.
-          # node_modules stays out for the reason given in the check job.
-          key: bun-commits-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          # node_modules stays out, and the architecture is in the key,
+          # for the reasons given in the check job.
+          key:
+            bun-commits-${{ runner.os }}-${{ runner.arch }}-${{
+            hashFiles('bun.lock') }}
           path: ${{ steps.bun-cache.outputs.dir }}
-          restore-keys: bun-commits-${{ runner.os }}-
+          restore-keys: bun-commits-${{ runner.os }}-${{ runner.arch }}-
 
       # A fresh runner, so there is nothing to clean: no node_modules from
       # another commit for bun install to leave unpruned, no stale
