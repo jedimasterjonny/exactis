@@ -42,6 +42,12 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # actions: read is for looking up the tree's marker, as the range job
+    # does. Stated in full because a job's permissions replace the
+    # workflow's rather than adding to them.
+    permissions:
+      actions: read
+      contents: read
     steps:
       # Pinned to digests because renovate.json extends config:best-practices,
       # which includes helpers:pinGitHubActionDigests. Renovate keeps them
@@ -53,6 +59,31 @@ jobs:
           # Nothing here pushes, so there is no reason to leave a token in
           # .git/config where every later step can read it.
           persist-credentials: false
+
+      # A tree proven green once need not be proven again, which is the
+      # range job's rule for the commits it lists and holds for the tip
+      # too. A push to main lands by rebase, so its tip's tree is the one
+      # the pull request's run already checked whenever the request was up
+      # to date; marking a draft ready, or rewording a series, runs this
+      # on a tree the last push checked. So the marker is looked up for
+      # the tree checked out, and the scripts below are skipped when it is
+      # found. What is not skipped is what a tree does not settle: the
+      # audit reads an advisory database that moves, and commitlint reads
+      # messages, which a rebase keeps but a marker says nothing about.
+      # Both run every time, on an install that takes seconds.
+      - id: proven
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tree="$(git rev-parse 'HEAD^{tree}')"
+          found="$(gh cache list --key "green-tree-$tree" --limit 1 --json key --jq length 2>/dev/null || echo 0)"
+          if [ "$found" != "0" ]; then
+            echo "Tree $tree is already proven green; running only the audit and commitlint."
+            echo "proven=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "proven=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # Read from .node-version rather than written here, so the version
@@ -110,7 +141,9 @@ jobs:
       # --continue-on-error. A failed install is the exception: without
       # node_modules each of these fails on a missing binary rather than on
       # anything it was asked to check, so they are gated on it succeeding.
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - if:
+          ${{ !cancelled() && steps.install.outcome == 'success' &&
+          steps.proven.outputs.proven != 'true' }}
         run: bun run format:check
       # A misspelled option in .prettierrc.json is answered with
       # `[warn] Ignored unknown option { printWdith: 80 }. Did you mean
@@ -157,18 +190,26 @@ jobs:
             echo "::error::Prettier ignored an option in .prettierrc.json, so it is set to nothing. Fix the spelling."
             exit 1
           fi
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - if:
+          ${{ !cancelled() && steps.install.outcome == 'success' &&
+          steps.proven.outputs.proven != 'true' }}
         run: bun run lint
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - if:
+          ${{ !cancelled() && steps.install.outcome == 'success' &&
+          steps.proven.outputs.proven != 'true' }}
         run: bun run typecheck
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - if:
+          ${{ !cancelled() && steps.install.outcome == 'success' &&
+          steps.proven.outputs.proven != 'true' }}
         run: bun run test:coverage
       # vitest writes an HTML report alongside the text summary and nothing
       # has ever looked at it: the runner is thrown away, so a coverage
       # failure can only be read by reproducing the run locally. Gated on
       # the same condition as every other step rather than on the coverage
       # step succeeding, because a red run is the case this exists for.
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - if:
+          ${{ !cancelled() && steps.install.outcome == 'success' &&
+          steps.proven.outputs.proven != 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           # warn rather than error. A suite that died before writing a
@@ -186,13 +227,17 @@ jobs:
       # Kept alongside typecheck even though next build type checks too: a
       # type error should fail in seconds rather than after a full build, and
       # the build catches what tsc alone does not.
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - if:
+          ${{ !cancelled() && steps.install.outcome == 'success' &&
+          steps.proven.outputs.proven != 'true' }}
         run: bun run build
       # Nothing above reports a dependency that no file imports, or an export
       # that no file reads: both type check and lint perfectly. knip is the
       # only check here that looks for what is absent rather than what is
       # wrong.
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - if:
+          ${{ !cancelled() && steps.install.outcome == 'success' &&
+          steps.proven.outputs.proven != 'true' }}
         run: bun run knip
 
       # Dependabot alerts are on and Renovate raises a pull request for a
@@ -253,6 +298,24 @@ jobs:
           else
             bunx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
           fi
+
+      # The marker the lookup above reads, saved under the tree's hash once
+      # every step has passed and not otherwise: success() is false after
+      # any failure, and the steps above carry on past one only so that a
+      # red run reports everything. Not saved on the proven path, where it
+      # already exists. What is saved does not matter; that the key exists
+      # is the fact.
+      - if: ${{ success() && steps.proven.outputs.proven != 'true' }}
+        env:
+          TREE: ${{ steps.proven.outputs.tree }}
+        run: |
+          mkdir -p .green
+          echo "$TREE" > .green/tree
+      - if: ${{ success() && steps.proven.outputs.proven != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: green-tree-${{ steps.proven.outputs.tree }}
+          path: .green
 
   range:
     # AGENTS.md requires every commit to stand alone, not only the tip: each
@@ -335,7 +398,8 @@ jobs:
           # A commit is green standalone as a function of its tree alone,
           # so a tree proven once need not be proven again. The commit job
           # saves a marker under the tree's hash when every script passes,
-          # and the list leaves out each commit whose tree has one: a push
+          # as the check job does for the tree it checks, and the list
+          # leaves out each commit whose tree has one: a push
           # that adds or amends one commit checks one commit. The markers
           # are looked up over the API rather than restored, since a
           # restore is one key a step and this is a list, and the API sees
