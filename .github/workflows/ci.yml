@@ -11,9 +11,28 @@ on:
 # A superseded pull request run answers a question nobody is asking any more.
 # A push is not the same: its run is the only thing that ever looks at those
 # commits, and nothing revisits them, so cancelling one leaves them unchecked.
+#
+# cancel-in-progress: false does not promise that on its own, because a group
+# holds one pending run and no more. A third run arriving to find the first
+# still going and the second waiting cancels the second to take its place, and
+# three merges in a row is all that takes. It is not a race that usually
+# resolves in your favour either: 3ebd896 was queued at 22:37:52, and
+# cancelled at 22:39:35, one second after the run behind it was created and
+# having started no job at all. It reached main unchecked and was rerun by
+# hand once somebody noticed, which is the part that does not scale.
+#
+# So a push is grouped by the commit it checks rather than by the branch it
+# landed on. Alone in its group it waits for nothing and nothing waits for it,
+# and cancel-in-progress stays an expression rather than becoming false,
+# because what it says is still true of a pull request and now says it of a
+# push as well. Merges to main are serial in practice, so the parallelism
+# this allows is mostly theoretical; what it buys is that a run cannot be
+# cancelled by a merge that had nothing to do with it.
 concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group:
+    ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref
+    || github.sha }}
 
 # Nothing here writes to the repository.
 permissions:
