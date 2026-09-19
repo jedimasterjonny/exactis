@@ -1,11 +1,12 @@
 import { PGlite } from "@electric-sql/pglite";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import { accounts, expenseLines, incomeLines } from "@/db/schema";
 
 // @vitest-environment node
-import type { Database } from "./accounts";
-
 import { insertAccount } from "./accounts";
 import {
   deleteExpenseLine,
@@ -37,18 +38,30 @@ const care = {
   name: "Care provision",
 } as const;
 
-// A fresh Postgres in memory with the migrations applied, so every test
-// starts from the table as the store will have it.
-async function openStore(): Promise<Database> {
-  const db = drizzle({ client: new PGlite() });
-  await migrate(db, { migrationsFolder: "drizzle" });
-  return db;
-}
+// One Postgres in memory for the file, with the migrations applied once:
+// booting and migrating a fresh one costs about a second, and doing it
+// per test was most of what the suite spent. The tables are emptied and
+// their identities restarted before each test, so every test still
+// starts from the table as the store will have it, ids from one.
+const client = new PGlite();
+const db = drizzle({ client });
 
 describe("expense lines store", () => {
-  it("lists nothing until a line is added, then lists in order added", async () => {
-    const db = await openStore();
+  beforeAll(async () => {
+    await migrate(db, { migrationsFolder: "drizzle" });
+  });
 
+  beforeEach(async () => {
+    await db.execute(
+      sql`TRUNCATE ${accounts}, ${incomeLines}, ${expenseLines} RESTART IDENTITY`,
+    );
+  });
+
+  afterAll(async () => {
+    await client.close();
+  });
+
+  it("lists nothing until a line is added, then lists in order added", async () => {
     expect(await listExpenseLines(db)).toStrictEqual([]);
 
     const first = await insertExpenseLine(db, care);
@@ -60,7 +73,6 @@ describe("expense lines store", () => {
   });
 
   it("writes new values over the line with that id", async () => {
-    const db = await openStore();
     const { id } = await insertExpenseLine(db, household);
     await insertExpenseLine(db, care);
 
@@ -82,7 +94,6 @@ describe("expense lines store", () => {
   // A line ending in a month of its last year holds the month, March
   // being two, and one running the whole year holds none.
   it("holds the month a line ends in", async () => {
-    const db = await openStore();
     const ending = await insertExpenseLine(db, { ...household, lastMonth: 2 });
 
     expect(ending.lastMonth).toBe(2);
@@ -93,8 +104,6 @@ describe("expense lines store", () => {
   });
 
   it("refuses to update an id no line has", async () => {
-    const db = await openStore();
-
     await expect(updateExpenseLine(db, 99, household)).rejects.toThrow(
       "No expense line was written",
     );
@@ -103,7 +112,6 @@ describe("expense lines store", () => {
   // A line that is a loan's payments carries the loan's id, which is
   // found by it and kept through an edit; any other line carries none.
   it("links a line to the loan it pays, finds it by the loan and keeps the link through an edit", async () => {
-    const db = await openStore();
     const loan = await insertAccount(db, {
       balance: -182940,
       balloon: 0,
@@ -134,7 +142,6 @@ describe("expense lines store", () => {
   });
 
   it("deletes a line, refusing an id no line has", async () => {
-    const db = await openStore();
     const line = await insertExpenseLine(db, household);
 
     await expect(deleteExpenseLine(db, 99)).rejects.toThrow(
