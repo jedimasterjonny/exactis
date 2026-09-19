@@ -3,8 +3,9 @@ name: CI
 on:
   pull_request:
     # The default three, and ready_for_review, which is when the commit
-    # checks below first run: a draft pays for the provision job alone,
-    # every other job on a draft running on a runner GitHub does not bill.
+    # checks below first run: a draft pays for provision and teardown and
+    # nothing else, the gate itself running on runners GitHub does not
+    # bill for.
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
@@ -400,13 +401,13 @@ jobs:
   # and the work moves to n4a - Google Axion, arm64 - where the same gate
   # takes 102 seconds rather than 356 and Google bills it by the second.
   #
-  # A pool of VMs, made here, shared by every job below. What this job must
-  # never do is wait for any of them. A hosted job that waits on a
-  # self-hosted one is billed for the whole wait, which would put back
-  # every minute the move was made to save, so it creates the VMs and exits
-  # and GitHub's own queue is what joins the two halves: more jobs than
-  # runners simply drain in waves, and no job ever falls back to a runner
-  # GitHub bills for.
+  # A pool of VMs, made here, shared by every job below, and removed by the
+  # teardown job at the bottom. What this job must never do is wait for any
+  # of them. A hosted job that waits on a self-hosted one is billed for the
+  # whole wait, which would put back every minute the move was made to
+  # save, so it creates the VMs and exits and GitHub's own queue is what
+  # joins the two halves: more jobs than runners simply drain in waves, and
+  # no job ever falls back to a runner GitHub bills for.
   #
   # The runners are not --ephemeral, which is what makes the waves
   # possible, and that is a real trade rather than a free one. A job no
@@ -465,10 +466,13 @@ jobs:
       # Renovate's github-actions manager reads `uses:` and not this.
       RUNNER_VERSION: 2.337.0
       # The hard ceiling on a VM's life, armed at boot before anything
-      # that can fail. Forty-five minutes rather than more because the
-      # removal token the shutdown script deregisters with is minted in
-      # this job and lasts an hour: a VM that outlived the token would
-      # halt without deregistering and leave an offline runner behind.
+      # that can fail. It is a backstop and not the usual end of one:
+      # the teardown job removes the pool as soon as the last job is
+      # done, and this is what covers the runs where that never happens.
+      # Forty-five minutes rather than more because the removal token the
+      # shutdown script deregisters with is minted in this job and lasts
+      # an hour, and a VM that outlived the token would halt without
+      # deregistering and leave an offline runner behind.
       TTL_MINUTES: 45
     steps:
       # Workload Identity Federation rather than a service account key.
@@ -877,3 +881,77 @@ jobs:
         with:
           key: green-tree-${{ matrix.tree }}
           path: .green
+
+  # The TTL is a backstop rather than a plan. A run whose jobs are done in
+  # five minutes would otherwise leave its VMs idling out the other forty,
+  # which is the greater part of what moving off hosted runners was for -
+  # the bill only changes hands, from GitHub to Google. This job is what
+  # ends them at the moment there is nothing left to run.
+  #
+  # It is a hosted job and it costs hosted minutes, but only the twenty
+  # seconds it runs for: a job waiting on `needs` is queued rather than
+  # executing, and GitHub bills execution. That is a different thing from
+  # the provision job polling for a self-hosted job to finish, which would
+  # be execution and is what that job must never do.
+  #
+  # always(), because a red check job, a failed leg and a cancelled run
+  # all leave exactly the same VMs behind as a green one. Skipped when
+  # provision did not succeed, which is the one case where there is
+  # nothing of its making to remove.
+  teardown:
+    needs: [check, commit, provision]
+    if: ${{ always() && needs.provision.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      id-token: write
+    env:
+      GCP_PROJECT: jonnyoc-infra-shared
+      GCP_ZONE: europe-west1-b
+    steps:
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+          service_account:
+            exactis-ci-runner@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - env:
+          GH_TOKEN: ${{ secrets.RUNNER_REGISTRATION_PAT }}
+          REPO: ${{ github.repository }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -uo pipefail
+
+          # Deregistered from here rather than left to each VM's shutdown
+          # script, which gets a short and best-effort window when an
+          # instance is deleted out from under it. Removing a runner also
+          # tells its listener to stop, so a VM commonly halts and deletes
+          # itself before the delete below reaches it - which is why
+          # everything here tolerates a thing that has already gone. The
+          # shutdown script stays for every path this job does not cover:
+          # the TTL, a crash, a run cancelled before this could run.
+          #
+          # Nothing here can catch a busy runner. Every job that could be
+          # holding one is named in `needs` and has finished.
+          prefix="exactis-ci-${RUN_ID}-${RUN_ATTEMPT}-"
+          ids="$(gh api "repos/${REPO}/actions/runners" --paginate |
+            jq -r --arg p "$prefix" \
+              '.runners[] | select(.name | startswith($p)) | .id' || true)"
+          for id in $ids; do
+            gh api --method DELETE "repos/${REPO}/actions/runners/${id}" || true
+          done
+
+          mapfile -t made < <(gcloud compute instances list \
+            --filter="labels.purpose=exactis-ci AND labels.run_id=${RUN_ID} AND labels.run_attempt=${RUN_ATTEMPT}" \
+            --format='value(name)' \
+            --project="$GCP_PROJECT" \
+            --zones="$GCP_ZONE")
+          if [ "${#made[@]}" -gt 0 ]; then
+            gcloud compute instances delete "${made[@]}" \
+              --project="$GCP_PROJECT" --quiet --zone="$GCP_ZONE" || true
+          fi
+
+          echo "Removed ${#made[@]} instance(s) and the registrations for $prefix."
