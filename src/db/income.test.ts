@@ -1,11 +1,12 @@
 import { PGlite } from "@electric-sql/pglite";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import { accounts, expenseLines, incomeLines } from "@/db/schema";
 
 // @vitest-environment node
-import type { Database } from "./accounts";
-
 import { deleteAccount, insertAccount } from "./accounts";
 import {
   deleteIncomeLine,
@@ -60,18 +61,30 @@ const workplace = {
   rate: 0,
 } as const;
 
-// A fresh Postgres in memory with the migrations applied, so every test
-// starts from the table as the store will have it.
-async function openStore(): Promise<Database> {
-  const db = drizzle({ client: new PGlite() });
-  await migrate(db, { migrationsFolder: "drizzle" });
-  return db;
-}
+// One Postgres in memory for the file, with the migrations applied once:
+// booting and migrating a fresh one costs about a second, and doing it
+// per test was most of what the suite spent. The tables are emptied and
+// their identities restarted before each test, so every test still
+// starts from the table as the store will have it, ids from one.
+const client = new PGlite();
+const db = drizzle({ client });
 
 describe("income lines store", () => {
-  it("lists nothing until a line is added, then lists in order added", async () => {
-    const db = await openStore();
+  beforeAll(async () => {
+    await migrate(db, { migrationsFolder: "drizzle" });
+  });
 
+  beforeEach(async () => {
+    await db.execute(
+      sql`TRUNCATE ${accounts}, ${incomeLines}, ${expenseLines} RESTART IDENTITY`,
+    );
+  });
+
+  afterAll(async () => {
+    await client.close();
+  });
+
+  it("lists nothing until a line is added, then lists in order added", async () => {
     expect(await listIncomeLines(db)).toStrictEqual([]);
 
     const first = await insertIncomeLine(db, statePension);
@@ -83,7 +96,6 @@ describe("income lines store", () => {
   });
 
   it("writes new values over the line with that id", async () => {
-    const db = await openStore();
     const { id } = await insertIncomeLine(db, salary);
     await insertIncomeLine(db, statePension);
 
@@ -104,7 +116,6 @@ describe("income lines store", () => {
   });
 
   it("holds the month a line ends in", async () => {
-    const db = await openStore();
     const ending = await insertIncomeLine(db, { ...salary, lastMonth: 2 });
 
     expect(ending.lastMonth).toBe(2);
@@ -115,7 +126,6 @@ describe("income lines store", () => {
   // where there is one to hold to; an edit writes the link with the rest
   // of the values, so a line may change the pension it feeds or stop.
   it("names the pension a salary feeds, holds the link through an edit and refuses one no account has", async () => {
-    const db = await openStore();
     const pension = await insertAccount(db, workplace);
     const sacrificing = { ...salary, feeds: pension.id, sacrifice: 0.1 };
 
@@ -137,7 +147,6 @@ describe("income lines store", () => {
   // The pension cannot go while a line feeds it; once every line feeding
   // it stops, it can, and a line feeding another is left alone.
   it("stops every line feeding an account, so the account can go", async () => {
-    const db = await openStore();
     const pension = await insertAccount(db, { ...workplace, name: "One" });
     const other = await insertAccount(db, { ...workplace, name: "Other" });
     const fed = { ...salary, feeds: pension.id, sacrifice: 0.1 };
@@ -164,7 +173,6 @@ describe("income lines store", () => {
   });
 
   it("deletes the line with that id, refusing an id no line has", async () => {
-    const db = await openStore();
     const line = await insertIncomeLine(db, salary);
     const kept = await insertIncomeLine(db, statePension);
 
@@ -178,8 +186,6 @@ describe("income lines store", () => {
   });
 
   it("refuses to update an id no line has", async () => {
-    const db = await openStore();
-
     await expect(updateIncomeLine(db, 99, salary)).rejects.toThrow(
       "No income line was written",
     );

@@ -1,13 +1,12 @@
 import { PGlite } from "@electric-sql/pglite";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { accounts } from "@/db/schema";
+import { accounts, expenseLines, incomeLines } from "@/db/schema";
 
 // @vitest-environment node
-import type { Database } from "./accounts";
-
 import {
   deleteAccount,
   findAccount,
@@ -44,18 +43,30 @@ const mortgage = {
   rate: 0.0515,
 } as const;
 
-// A fresh Postgres in memory with the migrations applied, so every test
-// starts from the table as the store will have it.
-async function openStore(): Promise<Database> {
-  const db = drizzle({ client: new PGlite() });
-  await migrate(db, { migrationsFolder: "drizzle" });
-  return db;
-}
+// One Postgres in memory for the file, with the migrations applied once:
+// booting and migrating a fresh one costs about a second, and doing it
+// per test was most of what the suite spent. The tables are emptied and
+// their identities restarted before each test, so every test still
+// starts from the table as the store will have it, ids from one.
+const client = new PGlite();
+const db = drizzle({ client });
 
 describe("accounts store", () => {
-  it("lists nothing until an account is added, then lists in order added", async () => {
-    const db = await openStore();
+  beforeAll(async () => {
+    await migrate(db, { migrationsFolder: "drizzle" });
+  });
 
+  beforeEach(async () => {
+    await db.execute(
+      sql`TRUNCATE ${accounts}, ${incomeLines}, ${expenseLines} RESTART IDENTITY`,
+    );
+  });
+
+  afterAll(async () => {
+    await client.close();
+  });
+
+  it("lists nothing until an account is added, then lists in order added", async () => {
     expect(await listAccounts(db)).toStrictEqual([]);
 
     const first = await insertAccount(db, mortgage);
@@ -81,7 +92,6 @@ describe("accounts store", () => {
   });
 
   it("writes new values over the account with that id", async () => {
-    const db = await openStore();
     const { id } = await insertAccount(db, pension);
     await insertAccount(db, mortgage);
 
@@ -102,8 +112,6 @@ describe("accounts store", () => {
   });
 
   it("holds an account paid the spare money, with and without a cap", async () => {
-    const db = await openStore();
-
     const capped = await insertAccount(db, {
       ...pension,
       cap: 4000,
@@ -130,7 +138,6 @@ describe("accounts store", () => {
   // carries it: each new account after the last, so the list is the
   // order added, and an edit leaves it where it is.
   it("places each new account after the last and an edit where it was", async () => {
-    const db = await openStore();
     const first = await insertAccount(db, pension);
     await insertAccount(db, mortgage);
     await updateAccount(db, first.id, { ...pension, balance: 1 });
@@ -148,7 +155,6 @@ describe("accounts store", () => {
   });
 
   it("places every account in the order given and lists them so", async () => {
-    const db = await openStore();
     const first = await insertAccount(db, pension);
     const second = await insertAccount(db, mortgage);
     const third = await insertAccount(db, { ...pension, name: "ISA" });
@@ -172,7 +178,6 @@ describe("accounts store", () => {
   });
 
   it("refuses to place a list that leaves an account out or names an id no account has", async () => {
-    const db = await openStore();
     const first = await insertAccount(db, pension);
     const second = await insertAccount(db, mortgage);
 
@@ -189,7 +194,6 @@ describe("accounts store", () => {
   });
 
   it("finds an account by its id, and none for an id no account has", async () => {
-    const db = await openStore();
     const held = await insertAccount(db, pension);
 
     expect(await findAccount(db, held.id)).toStrictEqual(held);
@@ -197,8 +201,6 @@ describe("accounts store", () => {
   });
 
   it("refuses to update an id no account has", async () => {
-    const db = await openStore();
-
     await expect(updateAccount(db, 99, pension)).rejects.toThrow(
       "No account was written",
     );
@@ -208,7 +210,6 @@ describe("accounts store", () => {
   // it and kept through an edit; an account secured on nothing carries
   // none at all.
   it("secures a loan on an asset, finds it by the asset and keeps the link through an edit", async () => {
-    const db = await openStore();
     const home = await insertAccount(db, {
       ...pension,
       contribution: 0,
@@ -232,7 +233,6 @@ describe("accounts store", () => {
   // A PCP's loan carries the balloon it is left owing, and a car is a
   // kind of its own; a loan with no balloon carries none.
   it("holds a car and the balloon on the loan against it", async () => {
-    const db = await openStore();
     const car = await insertAccount(db, {
       ...pension,
       contribution: 0,
@@ -254,7 +254,6 @@ describe("accounts store", () => {
   });
 
   it("deletes an account, refusing one a loan is still secured on or an id no account has", async () => {
-    const db = await openStore();
     const home = await insertAccount(db, { ...pension, kind: "house" });
     const loan = await insertAccount(db, mortgage, home.id);
 
