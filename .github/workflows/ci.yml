@@ -3,7 +3,8 @@ name: CI
 on:
   pull_request:
     # The default three, and ready_for_review, which is when the commit
-    # checks below first run: a draft pays for the check job alone.
+    # checks below first run: a draft pays for the provision job alone,
+    # every other job on a draft running on a runner GitHub does not bill.
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
@@ -34,13 +35,23 @@ concurrency:
     ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref
     || github.sha }}
 
-# Nothing here writes to the repository.
+# Nothing here writes to the repository. The provision job replaces this
+# with id-token: write, which is not a write to the repository either: it
+# is the OIDC token Google exchanges for a short-lived credential, and it
+# is why there is no service account key in this repository at all.
 permissions:
   contents: read
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # The runners this asks for do not exist until the provision job below
+    # makes them, which is what this waits on rather than on anything the
+    # range job says. The label is scoped to the run, so the pool made for
+    # this run is the only thing that can answer and it can answer nothing
+    # else. This job and every commit job below share that one pool and
+    # queue against it.
+    needs: provision
+    runs-on: [self-hosted, "run-${{ github.run_id }}"]
     timeout-minutes: 10
     steps:
       # Pinned to digests because renovate.json extends config:best-practices,
@@ -91,7 +102,8 @@ jobs:
           # install --frozen-lockfile does not prune, so a restored tree
           # resolves a dependency the commit no longer declares and the run
           # goes green on a tree that cannot install - the false pass the
-          # commit job avoids by starting every commit on a fresh runner.
+          # commit job avoids by checking each commit out onto a cleaned
+          # tree.
           # The install cache cannot do that. It is content-addressed, keyed
           # by what was fetched rather than by what is wanted, so a stale
           # entry is dead weight rather than a wrong answer: it can only
@@ -274,11 +286,12 @@ jobs:
     # later depends on not being true.
     #
     # This job lists the commits to check and the commit job below checks
-    # them, one runner each. They used to be one job looping over the range,
+    # them, one job each. They used to be one job looping over the range,
     # and a series paid for its length in wall clock: four minutes a commit,
     # in order, so twelve were fifty minutes and the loop's timeout had to
-    # grow with the longest series. Now a series pays in runners, all at
-    # once, and takes as long as its slowest commit.
+    # grow with the longest series. Now a series pays in runners rather than
+    # in wall clock, as many at a time as the pool the provision job makes,
+    # so it costs its slowest wave rather than its sum.
     #
     # Not while the pull request is a draft. A series is rewritten while it
     # is one, and each rewrite would spend a runner a commit proving a tree
@@ -379,13 +392,382 @@ jobs:
           echo "Checking $(echo "$list" | jq length) commit(s), one job each."
           echo "commits=$list" >> "$GITHUB_OUTPUT"
 
-  commit:
+  # GitHub bills minutes for the runners it hosts and nothing at all for
+  # the ones it does not, and the gate is very nearly the whole bill: the
+  # per-commit matrix alone was two thirds of about 1,491 billable minutes
+  # a week against an allowance of 2,000 a month. So the orchestration
+  # stays where it is, on hosted runners that cost a minute or two a run,
+  # and the work moves to n4a - Google Axion, arm64 - where the same gate
+  # takes 102 seconds rather than 356 and Google bills it by the second.
+  #
+  # A pool of VMs, made here, shared by every job below. What this job must
+  # never do is wait for any of them. A hosted job that waits on a
+  # self-hosted one is billed for the whole wait, which would put back
+  # every minute the move was made to save, so it creates the VMs and exits
+  # and GitHub's own queue is what joins the two halves: more jobs than
+  # runners simply drain in waves, and no job ever falls back to a runner
+  # GitHub bills for.
+  #
+  # The runners are not --ephemeral, which is what makes the waves
+  # possible, and that is a real trade rather than a free one. A job no
+  # longer gets a runner to itself: an install runs whatever lifecycle
+  # scripts its dependencies declare, and on a reused VM those can outlive
+  # the job that ran them and be there for the next. What bounds it is the
+  # run - the pool is labelled for this run, is reachable by nothing else,
+  # and is destroyed with it - and that this is a private repository
+  # running its own commits rather than pull requests from strangers.
+  #
+  # What is not lost is the clean tree each commit is checked on.
+  # actions/checkout defaults to clean: true, which is
+  # `git clean -ffdx && git reset --hard HEAD` before it fetches - the same
+  # `git clean -xdff` the loop this design replaced paid per commit, and it
+  # takes node_modules and .next with it. The one thing that survives is
+  # bun's install cache, which the check job's comment already explains is
+  # content-addressed and so dead weight at worst.
+  #
+  # Rerunning a failed job on its own does not rerun this one, so the
+  # runners it made are long gone and the jobs below would queue against a
+  # label nothing answers. Rerun all jobs.
+  provision:
+    # Not for the range itself - nothing here reads a commit - but for its
+    # length, so that a run is provisioned once rather than a matrix leg at
+    # a time.
     needs: range
+    # range does not run while a pull request is a draft, and it can fail
+    # outright. Either way the check job still runs and still needs a
+    # runner, so this runs unless the run is cancelled and reads a missing
+    # count as nought.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Stated in full because a job's permissions replace the workflow's
+    # rather than adding to them. contents is not among them: this job
+    # never checks the repository out.
+    permissions:
+      id-token: write
+    env:
+      # The zone and the subnet are a pair - a subnet is regional, and
+      # this one is the region this zone sits in. n4a is in europe-west1 b
+      # and c and in neither of the region's other zones, so -d is not a
+      # fallback, and it is not in europe-north1 at all.
+      GCP_PROJECT: jonnyoc-infra-shared
+      GCP_SUBNET: ci-runners-europe-west1
+      GCP_ZONE: europe-west1-b
+      # Four n4a-standard-8 is the project's CPUS_ALL_REGIONS quota of 32
+      # exactly, and the pool is never larger. More jobs than that is not
+      # a problem to solve here: they queue and the pool drains them in
+      # waves.
+      POOL_MAX: 4
+      # Pinned rather than resolved at boot, so a runner release cannot
+      # change what a rerun of an old run does. The runner updates itself
+      # when GitHub requires a newer one, so this going stale costs a
+      # minute at boot rather than a failure. Nothing updates it for us:
+      # Renovate's github-actions manager reads `uses:` and not this.
+      RUNNER_VERSION: 2.337.0
+      # The hard ceiling on a VM's life, armed at boot before anything
+      # that can fail. Forty-five minutes rather than more because the
+      # removal token the shutdown script deregisters with is minted in
+      # this job and lasts an hour: a VM that outlived the token would
+      # halt without deregistering and leave an offline runner behind.
+      TTL_MINUTES: 45
+    steps:
+      # Workload Identity Federation rather than a service account key.
+      # The key would have to live in a repository secret, never expire
+      # until someone rotates it, and be readable by every workflow here;
+      # the OIDC token this exchanges is minted per run and lasts an hour.
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+          # The provisioning identity, created by the Terraform in
+          # lex-imperialis. It is not the identity the VMs run as: that is
+          # exactis-ci-runner-vm below, a separate and much narrower
+          # account. This one holds actAs on that one and deliberately not
+          # on itself, so naming it on --service-account would be refused
+          # for want of actAs rather than merely be too broad.
+          service_account:
+            exactis-ci-runner@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com
+          # The provider's resource name carries the project number, so it
+          # comes from a repository variable rather than being written
+          # here.
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      # ubuntu-latest stopped shipping the Google Cloud CLI when it moved
+      # to 24.04, so it is installed rather than assumed.
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - env:
+          COMMITS: ${{ needs.range.outputs.commits }}
+          # Minting a runner token needs Administration: write on this
+          # repository, which is not a permission GITHUB_TOKEN can be
+          # granted at all - hence a fine-grained token in a secret. What
+          # reaches a VM is the minted pair rather than this one: each
+          # lasts an hour, one registers a runner and the other removes
+          # it, and neither does anything else.
+          GH_TOKEN: ${{ secrets.RUNNER_REGISTRATION_PAT }}
+          REPO: ${{ github.repository }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -uo pipefail
+
+          # One job for the check job, which always runs, and one for each
+          # commit the range job listed - which says nothing at all when it
+          # was skipped for a draft or failed outright, and nothing is no
+          # commits. The pool is that or POOL_MAX, whichever is smaller:
+          # past it the jobs queue rather than the workflow spilling onto
+          # runners GitHub bills for.
+          legs="$(printf '%s' "${COMMITS:-[]}" | jq 'length' 2>/dev/null || echo 0)"
+          jobs=$(( 1 + legs ))
+          wanted="$jobs"
+          [ "$wanted" -le "$POOL_MAX" ] || wanted="$POOL_MAX"
+          label="run-${RUN_ID}"
+
+          names=()
+          for n in $(seq 1 "$wanted"); do
+            names+=("exactis-ci-${RUN_ID}-${RUN_ATTEMPT}-${n}")
+          done
+
+          # Two tokens, both minted here because both need a permission
+          # only this job's secret carries. The removal token goes to the
+          # VM unused and is spent by the shutdown script, which is why
+          # TTL_MINUTES has to stay inside the hour it is good for.
+          # `|| true` so that a refusal is answered by the message below
+          # rather than by errexit aborting the step on gh's own, which
+          # says 403 and nothing about which permission is missing.
+          token="$(gh api --method POST \
+            "repos/${REPO}/actions/runners/registration-token" --jq .token || true)"
+          removal="$(gh api --method POST \
+            "repos/${REPO}/actions/runners/remove-token" --jq .token || true)"
+          if [ -z "$token" ] || [ -z "$removal" ]; then
+            echo "::error::No runner token came back. RUNNER_REGISTRATION_PAT must be set and must hold Administration: write on this repository."
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "::add-mask::$removal"
+
+          # Written to a file rather than inlined into --metadata so the
+          # quoting has one layer rather than two, and with a quoted
+          # heredoc so that nothing in it is expanded by this shell: every
+          # value the script wants is read off the metadata server, which
+          # keeps the script the same bytes on every VM.
+          cat > "$RUNNER_TEMP/startup.sh" <<'STARTUP'
+          #!/usr/bin/env bash
+          # Root, at boot. GCE runs this on every boot rather than only
+          # the first, which for a VM that boots once and is then thrown
+          # away is a distinction without a difference - but nothing below
+          # assumes it, and --no-restart-on-failure means a crashed VM
+          # stays down rather than coming back to run this again.
+          #
+          # Not set -e. A step that fails must still reach the halt at the
+          # end, because a VM that survives its own failure is the only
+          # thing here that can quietly cost money.
+          set -uo pipefail
+
+          meta() {
+            curl -fsS -H 'Metadata-Flavor: Google' \
+              "http://metadata.google.internal/computeMetadata/v1/$1"
+          }
+
+          # The first thing that happens, and it depends on nothing
+          # afterwards succeeding: not on the apt below, not on GitHub
+          # ever assigning a job, not on the run that asked for this VM
+          # still existing. A cancelled run leaves an idle runner waiting
+          # for jobs that are never coming, and without this it waits for
+          # ever. The reaper on the Terraform side is a second backstop,
+          # not this one's replacement.
+          #
+          # A runner now serves a queue rather than one job, so the
+          # ceiling has to outlast the draining too. The provision job
+          # works out what the pool can drain inside it and refuses the
+          # run rather than let a leg be lost to the halt.
+          #
+          # Read from metadata so the number is written in one place, and
+          # +0 - halt now - if it cannot be read, because a VM that cannot
+          # reach its own metadata server cannot configure a runner
+          # either. Guessing at a ceiling would be the one failure this is
+          # here to prevent.
+          shutdown -h "+$(meta instance/attributes/ttl-minutes || echo 0)"
+
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get -qq update
+          # Ubuntu's cloud image ships curl, which is why the halt above
+          # could already be armed, and none of the rest. git is the one
+          # that fails quietly: without it actions/checkout falls back to
+          # a tarball of the tree, and fetch-depth has no history to
+          # fetch, so commitlint and the range walk would read an empty
+          # log rather than error. libatomic1 is Node 26's, unzip is the
+          # bun installer's, and jq reads the access token the shutdown
+          # script deletes this VM with.
+          apt-get -qq install -y git jq libatomic1 unzip
+
+          name="$(meta instance/name)"
+          runner_label="$(meta instance/attributes/runner-label)"
+          runner_token="$(meta instance/attributes/runner-token)"
+          runner_url="$(meta instance/attributes/runner-url)"
+          runner_version="$(meta instance/attributes/runner-version)"
+
+          # The runner refuses to run as root without being told to, and
+          # being told to would run the gate as root as well.
+          useradd --create-home --shell /bin/bash runner
+          install --directory --owner=runner --group=runner /opt/runner
+          cd /opt/runner
+          curl -fsSL "https://github.com/actions/runner/releases/download/v${runner_version}/actions-runner-linux-arm64-${runner_version}.tar.gz" |
+            tar --extract --gzip
+          ./bin/installdependencies.sh
+          chown --recursive runner:runner /opt/runner
+
+          as_runner() { runuser -u runner -- env HOME=/home/runner "$@"; }
+
+          # Not --ephemeral. An ephemeral runner deregisters after one job
+          # and would have to be a VM per job, which the quota caps at
+          # four; a registration that stays lets the pool drain a queue of
+          # any length in waves instead. What that costs is per-job
+          # isolation, which the provision job's comment sets out, and
+          # what deregisters the runner is the shutdown script rather than
+          # the runner itself.
+          as_runner ./config.sh --unattended \
+            --url "$runner_url" --token "$runner_token" \
+            --labels "$runner_label" --name "$name" \
+            --work /opt/runner/_work
+
+          # Serves jobs until something stops it. It returns only when the
+          # listener has stopped for good - a registration that failed, or
+          # the runner removed from the other end - and nothing more will
+          # be taken after that, so the VM goes rather than idling to its
+          # TTL. The halt is what runs the shutdown script.
+          as_runner ./run.sh
+          shutdown -h now
+          STARTUP
+
+          # Deregistering is the shutdown script's because, without
+          # --ephemeral, nothing else does it: a VM that simply vanished
+          # would leave an offline runner in the repository's list for
+          # every run ever provisioned. It runs on any halt - the TTL, the
+          # line above, an operator stopping the instance - and the halt
+          # continues whatever it returns.
+          cat > "$RUNNER_TEMP/shutdown.sh" <<'SHUTDOWN'
+          #!/usr/bin/env bash
+          set -uo pipefail
+
+          meta() {
+            curl -fsS -H 'Metadata-Flavor: Google' \
+              "http://metadata.google.internal/computeMetadata/v1/$1"
+          }
+
+          cd /opt/runner || exit 0
+          runuser -u runner -- env HOME=/home/runner ./config.sh remove \
+            --token "$(meta instance/attributes/removal-token)" || true
+
+          # Deleting the instance is the cleanup that actually happens,
+          # rather than leaving a TERMINATED VM for the reaper to find up
+          # to fifteen minutes later: the VM's service account is granted
+          # compute.instances.delete for exactly this. It is still written
+          # as best effort, because a grant that Terraform has but has not
+          # applied, or an API that is briefly unavailable, must strand
+          # nothing - and behind it the halt carries on and the reaper
+          # takes anything labelled purpose=exactis-ci that is over an
+          # hour old.
+          #
+          # Over the API rather than with gcloud, which Ubuntu's image
+          # does not ship.
+          access="$(meta instance/service-accounts/default/token | jq -r .access_token)"
+          curl -fsS -X DELETE -H "Authorization: Bearer $access" \
+            "https://compute.googleapis.com/compute/v1/projects/$(meta project/project-id)/zones/$(basename "$(meta instance/zone)")/instances/$(meta instance/name)" ||
+            echo "self-delete refused; halting for the reaper instead"
+          SHUTDOWN
+
+          # An external IP, which is the default and is left to be: the VM
+          # has to reach nodejs.org, the npm registry and github.com, and
+          # Cloud NAT costs more than the runners do. Nothing can reach
+          # back - the firewall rule on this network opens SSH to the IAP
+          # range and to nothing else - so administration is by IAP tunnel.
+          #
+          # purpose=exactis-ci is what the reaper keys off and is not
+          # optional. The run labels are this job's own, for the teardown
+          # below.
+          #
+          # The names are exactis-ci-<run id>-<attempt>-<n>, and the prefix
+          # is load-bearing rather than decorative: the IAM condition on
+          # the VM service account's delete permission is written against
+          # it, so a VM named outside the prefix could not delete itself.
+          #
+          # --service-account names the narrow VM identity rather than the
+          # account this job authenticated as. That one holds actAs on
+          # this one and not on itself, so naming itself here would be
+          # refused outright.
+          created="$(gcloud compute instances create "${names[@]}" \
+            --boot-disk-size=100GB \
+            --boot-disk-type=hyperdisk-balanced \
+            --format='value(name)' \
+            --image-family=ubuntu-2404-lts-arm64 \
+            --image-project=ubuntu-os-cloud \
+            --labels="purpose=exactis-ci,run_attempt=${RUN_ATTEMPT},run_id=${RUN_ID}" \
+            --machine-type=n4a-standard-8 \
+            --metadata="removal-token=${removal},runner-label=${label},runner-token=${token},runner-url=https://github.com/${REPO},runner-version=${RUNNER_VERSION},ttl-minutes=${TTL_MINUTES}" \
+            --metadata-from-file="shutdown-script=${RUNNER_TEMP}/shutdown.sh,startup-script=${RUNNER_TEMP}/startup.sh" \
+            --network=ci-runners \
+            --no-restart-on-failure \
+            --project="$GCP_PROJECT" \
+            --scopes=https://www.googleapis.com/auth/cloud-platform \
+            --service-account="exactis-ci-runner-vm@${GCP_PROJECT}.iam.gserviceaccount.com" \
+            --subnet="$GCP_SUBNET" \
+            --zone="$GCP_ZONE" || true)"
+          count="$(printf '%s\n' "$created" | grep -c . || true)"
+
+          # Nothing at all is the failure that matters, and it has to be
+          # loud: a job whose runner was never made does not fail, it
+          # queues for twenty-four hours and then reports something that
+          # reads nothing like "there was no runner". A short count is a
+          # different matter now that runners are not ephemeral - the
+          # jobs drain over however many there are - so it is reported and
+          # carried, and only an empty pool stops the run.
+          if [ "$count" -eq 0 ]; then
+            echo "::error::GCE created no runners at all, so every job below would queue against a label nothing answers. The usual cause is the CPUS_ALL_REGIONS quota of 32, which is four n4a-standard-8 and no more, with another run holding them. Rerun all jobs."
+            exit 1
+          fi
+          if [ "$count" -ne "$wanted" ]; then
+            echo "::warning::Asked GCE for $wanted runner(s) and got $count; the jobs will drain over the ones there are. The usual cause is another run holding part of the CPUS_ALL_REGIONS quota."
+          fi
+
+          # The pool has to be able to drain the queue inside the TTL,
+          # because a VM that halts mid-job takes the job with it and one
+          # that halts with legs still queued loses them to a
+          # twenty-four hour wait. Five minutes covers boot and the last
+          # job's overrun; three is what a leg takes with install and the
+          # whole gate, against the 102 seconds the suite alone measures.
+          # Four runners and forty-five minutes is fifty-three jobs,
+          # which is a far longer series than the green-tree markers ever
+          # leave to check - and if it is ever reached, it is reached
+          # here rather than discovered as a job that never ran.
+          capacity=$(( count * (TTL_MINUTES - 5) / 3 ))
+          if [ "$jobs" -gt "$capacity" ]; then
+            echo "::error::$jobs job(s) to run but $count runner(s) can only drain about $capacity inside the ${TTL_MINUTES}-minute TTL. Raise TTL_MINUTES - it must stay under the hour the removal token lasts - or split the push."
+            mapfile -t made < <(gcloud compute instances list \
+              --filter="labels.purpose=exactis-ci AND labels.run_id=${RUN_ID} AND labels.run_attempt=${RUN_ATTEMPT}" \
+              --format='value(name)' \
+              --project="$GCP_PROJECT" \
+              --zones="$GCP_ZONE")
+            if [ "${#made[@]}" -gt 0 ]; then
+              gcloud compute instances delete "${made[@]}" \
+                --project="$GCP_PROJECT" --quiet --zone="$GCP_ZONE"
+            fi
+            exit 1
+          fi
+
+          echo "$count runner(s) booting as $label for $jobs job(s), draining in waves and halting at ${TTL_MINUTES} minutes. Budget about 60-90 seconds before the first is ready."
+
+  commit:
+    needs: [provision, range]
     if: ${{ needs.range.outputs.commits != '[]' }}
     name: commit ${{ matrix.short }} ${{ matrix.subject }}
-    runs-on: ubuntu-latest
-    # A guard against a hang, not a budget: one commit is about four
-    # minutes, install and every script.
+    # The same pool the check job uses, and no leg ever falls back to a
+    # runner GitHub bills for: a series longer than the pool queues
+    # against it and drains in waves. What that costs in wall clock is a
+    # wave at a time; what it saves is the whole of the matrix's bill.
+    runs-on: [self-hosted, "run-${{ github.run_id }}"]
+    # A guard against a hang, not a budget: one commit was about four
+    # minutes on a GitHub runner and is under two on a provisioned one,
+    # install and every script. It counts from when a runner picks the job
+    # up, so the queueing above does not eat into it.
     timeout-minutes: 15
     strategy:
       # Every commit is reported, not only the first to fail, so a red
@@ -425,10 +807,20 @@ jobs:
           path: ${{ steps.bun-cache.outputs.dir }}
           restore-keys: bun-commits-${{ runner.os }}-${{ runner.arch }}-
 
-      # A fresh runner, so there is nothing to clean: no node_modules from
-      # another commit for bun install to leave unpruned, no stale
-      # .next/types for tsc to read. The loop this replaced paid a
-      # `git clean -xdff` per commit for exactly that.
+      # A clean tree, so there is nothing to clean here: no node_modules
+      # from another commit for bun install to leave unpruned, no stale
+      # .next/types for tsc to read. On a GitHub runner that is because
+      # the runner is fresh. On a provisioned one, which may already have
+      # run another leg of this same series, it is because the checkout
+      # above defaults to clean: true - `git clean -ffdx` and a hard
+      # reset before it fetches - which is the `git clean -xdff` the loop
+      # this design replaced paid per commit, done by the step that was
+      # going to run anyway.
+      #
+      # What that does not clean is anything outside the workspace: the
+      # tool cache, $HOME, and whatever a dependency's install script
+      # decided to write. The provision job's comment says what that
+      # costs and why it is accepted.
       - env:
           SHORT: ${{ matrix.short }}
           SUBJECT: ${{ matrix.subject }}
