@@ -203,9 +203,47 @@ describe("saveAccount", () => {
       [db, pension.id, shares[0]],
       [db, pension.id, shares[1]],
     ]);
-    expect(updateTag).toHaveBeenCalledTimes(3);
-    expect(updateTag).toHaveBeenLastCalledWith(accountsTag);
-    expect(updateTag).toHaveBeenCalledWith(incomeLinesTag);
+    expect(vi.mocked(updateTag).mock.calls).toStrictEqual([
+      [accountsTag],
+      [incomeLinesTag],
+      [incomeLinesTag],
+    ]);
+  });
+
+  // The accounts are expired as soon as the account is written, so a
+  // share refused after it leaves the account written and seen; the
+  // lines are left where they were, since no share was written.
+  it("expires the accounts once the account is written, even when a share is refused", async () => {
+    vi.mocked(updateAccount).mockResolvedValue(pension);
+    vi.mocked(updateSacrifice).mockRejectedValue(
+      new Error("No salary feeding the account has the id"),
+    );
+
+    await expect(
+      saveAccount(pension.id, {
+        ...account,
+        kind: "tax-deferred",
+        shares: [{ line: 2, sacrifice: 0.1 }],
+      }),
+    ).rejects.toThrow("No salary feeding the account has the id");
+    expect(updateAccount).toHaveBeenCalledOnce();
+    expect(vi.mocked(updateTag).mock.calls).toStrictEqual([[accountsTag]]);
+  });
+
+  // The shares wait on the account, so a refused account leaves the
+  // salaries as they were and nothing expired.
+  it("writes no share and expires nothing when the account is refused", async () => {
+    vi.mocked(updateAccount).mockRejectedValue(new Error("connection reset"));
+
+    await expect(
+      saveAccount(pension.id, {
+        ...account,
+        kind: "tax-deferred",
+        shares: [{ line: 1, sacrifice: 0.1 }],
+      }),
+    ).rejects.toThrow("connection reset");
+    expect(updateSacrifice).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
   });
 
   // A share is at most the whole of the base, and the whole of it is
@@ -367,17 +405,27 @@ describe("saveHouse", () => {
     expect(updateTag).not.toHaveBeenCalled();
   });
 
-  it("writes a new house owned outright as one account and expires both tags", async () => {
+  it("writes a new house owned outright as one account and expires the accounts alone", async () => {
     vi.mocked(insertAccount).mockResolvedValue(home);
 
     expect(await saveHouse(null, outright)).toBe(home);
     expect(insertAccount).toHaveBeenCalledExactlyOnceWith(db, asset);
     expect(findLoanAgainst).not.toHaveBeenCalled();
     expect(insertExpenseLine).not.toHaveBeenCalled();
-    expect(vi.mocked(updateTag).mock.calls).toStrictEqual([
-      [expenseLinesTag],
-      [accountsTag],
-    ]);
+    expect(vi.mocked(updateTag).mock.calls).toStrictEqual([[accountsTag]]);
+  });
+
+  // The house is expired as soon as it is written, so a mortgage that
+  // fails to follow it leaves the house seen rather than hidden.
+  it("expires the accounts once the house is written, even when its mortgage is refused", async () => {
+    vi.mocked(insertAccount)
+      .mockResolvedValueOnce(home)
+      .mockRejectedValueOnce(new Error("connection reset"));
+
+    await expect(saveHouse(null, house)).rejects.toThrow("connection reset");
+    expect(insertAccount).toHaveBeenCalledTimes(2);
+    expect(insertExpenseLine).not.toHaveBeenCalled();
+    expect(vi.mocked(updateTag).mock.calls).toStrictEqual([[accountsTag]]);
   });
 
   it("writes a new mortgaged house as the house, the loan secured on it and its payments", async () => {
@@ -607,7 +655,7 @@ describe("saveCar", () => {
     expect(updateTag).not.toHaveBeenCalled();
   });
 
-  it("writes a new car on a PCP as the car, the finance secured on it and its payments, and expires both tags", async () => {
+  it("writes a new car on a PCP as the car, the finance secured on it and its payments, expiring each read as it goes", async () => {
     vi.mocked(insertAccount)
       .mockResolvedValueOnce(car)
       .mockResolvedValueOnce({ ...mortgage, id: 7 });
@@ -620,8 +668,9 @@ describe("saveCar", () => {
     ]);
     expect(insertExpenseLine).toHaveBeenCalledExactlyOnceWith(db, line, 7);
     expect(vi.mocked(updateTag).mock.calls).toStrictEqual([
-      [expenseLinesTag],
       [accountsTag],
+      [accountsTag],
+      [expenseLinesTag],
     ]);
   });
 
@@ -731,10 +780,23 @@ describe("removeAccount", () => {
     );
     expect(deleteExpenseLine).not.toHaveBeenCalled();
     expect(vi.mocked(updateTag).mock.calls).toStrictEqual([
-      [expenseLinesTag],
       [incomeLinesTag],
       [accountsTag],
     ]);
+  });
+
+  // The salaries are stopped before the account goes, so a delete that
+  // fails after them leaves them stopped: the lines are expired with
+  // the stop, so the plan shows them stopped rather than feeding an
+  // account that still stands.
+  it("expires the lines once the salaries have stopped, even when the account cannot go", async () => {
+    vi.mocked(findLoanAgainst).mockResolvedValue(null);
+    vi.mocked(findLinePaying).mockResolvedValue(null);
+    vi.mocked(deleteAccount).mockRejectedValue(new Error("connection reset"));
+
+    await expect(removeAccount(pension.id)).rejects.toThrow("connection reset");
+    expect(stopFeeding).toHaveBeenCalledExactlyOnceWith(db, pension.id);
+    expect(vi.mocked(updateTag).mock.calls).toStrictEqual([[incomeLinesTag]]);
   });
 
   // The house takes its loan and the loan its payments: the line, then
