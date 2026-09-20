@@ -47,6 +47,10 @@ const finance: Account = {
 
 const car: Secured = { asset: golf, loan: finance };
 
+// The month the plan is read in, September 2026, which the end of the
+// term is counted from.
+const plan = { from: 2026, month: 8 };
+
 const workedHint = "Worked out from the other two";
 
 function commit(field: HTMLElement, value: string): void {
@@ -72,7 +76,12 @@ function renderDialog(
 ): void {
   render(
     <Toaster>
-      <CarDialog car={opening} onDismiss={onDismiss} onSaved={onSaved} />
+      <CarDialog
+        car={opening}
+        onDismiss={onDismiss}
+        onSaved={onSaved}
+        plan={plan}
+      />
     </Toaster>,
   );
 }

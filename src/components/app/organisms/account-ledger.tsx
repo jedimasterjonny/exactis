@@ -9,6 +9,7 @@ import type { Account } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
 import type { Month } from "@/data/schedule";
 import type { Secured } from "@/data/secured";
+import type { PlanMonth } from "@/lib/loans";
 
 import {
   placeAccountsInOrder,
@@ -96,6 +97,10 @@ export function AccountLedger({
   const held = order.filter((account) => !isAsset(account));
   const assets = order.filter(isAsset);
   const running = lines.filter((line) => runsIn(line, at));
+
+  // The month the plan is read in as the loan maths counts from it, for
+  // the two dialogs that let a loan's end be picked as a date.
+  const plan: PlanMonth = { from: at.year, month: at.month };
 
   // A row's pencil opens its account as it is, unless the account is a
   // house or a car, or the loan against one, which open as the asset
@@ -260,6 +265,7 @@ export function AccountLedger({
             setHouse(null);
             setTab("assets");
           }}
+          plan={plan}
         />
       )}
       {car !== null && (
@@ -272,6 +278,7 @@ export function AccountLedger({
             setCar(null);
             setTab("assets");
           }}
+          plan={plan}
         />
       )}
     </>
