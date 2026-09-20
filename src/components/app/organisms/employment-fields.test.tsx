@@ -2,14 +2,14 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { IncomeLineValues } from "@/data/income";
+import type { IncomeLineDraft } from "@/data/income";
 
 import { EmploymentFields } from "./employment-fields";
 
 // The reference's salary as a draft: £120,000 of base with £15,000 of
 // bonus and £12,000 of RSUs on top, sacrificing a tenth of the base into
 // the workplace pension.
-const salary: IncomeLineValues = {
+const salary: IncomeLineDraft = {
   amount: 120000,
   bonus: 15000,
   cadence: "year",
@@ -20,6 +20,7 @@ const salary: IncomeLineValues = {
   lastMonth: null,
   lastYear: 2048,
   name: "Salary",
+  opens: null,
   rsu: 12000,
   sacrifice: 0.1,
 };
@@ -54,14 +55,14 @@ function field(name: string): HTMLElement {
 // The fields as the dialog would mount them, opened on a line and shown
 // the draft that mirrors them, with a spy where the schedule listens.
 function renderFields(
-  initial: IncomeLineValues,
-  draft: IncomeLineValues = initial,
+  initial: IncomeLineDraft,
+  draft: IncomeLineDraft = initial,
 ): {
   readonly onAmend: ReturnType<
-    typeof vi.fn<(patch: Partial<IncomeLineValues>) => void>
+    typeof vi.fn<(patch: Partial<IncomeLineDraft>) => void>
   >;
 } {
-  const onAmend = vi.fn<(patch: Partial<IncomeLineValues>) => void>();
+  const onAmend = vi.fn<(patch: Partial<IncomeLineDraft>) => void>();
   render(
     <EmploymentFields
       draft={draft}
@@ -94,7 +95,7 @@ describe("EmploymentFields", () => {
       within(choice)
         .getAllByRole("option")
         .map((option) => option.textContent),
-    ).toStrictEqual(["None", "Workplace pension", "SIPP"]);
+    ).toStrictEqual(["None", "Workplace pension", "SIPP", "A new pension"]);
     expect(field("Salary sacrifice")).toHaveValue("10.00%");
     expect(field("Salary sacrifice")).toHaveAccessibleDescription(
       "Of the base alone",
@@ -141,6 +142,7 @@ describe("EmploymentFields", () => {
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
       feeds: null,
+      opens: null,
       sacrifice: 0,
     });
   });
@@ -161,6 +163,7 @@ describe("EmploymentFields", () => {
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
       feeds: 1,
+      opens: null,
       sacrifice: 0.1,
     });
   });
@@ -176,7 +179,69 @@ describe("EmploymentFields", () => {
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
       feeds: 6,
+      opens: null,
       sacrifice: 0.05,
     });
+  });
+
+  // A new pension is the choice after the pensions listed. Choosing it
+  // opens the pension unnamed and holding nothing, which is what its
+  // fields mount showing, and the share comes back as the line opened
+  // with it, as it does with a listed pension.
+  it("opens a new pension unnamed and holding nothing when one is chosen", () => {
+    const { onAmend } = renderFields(salary, {
+      ...salary,
+      feeds: null,
+      sacrifice: 0,
+    });
+
+    expect(
+      screen.queryByRole("textbox", { name: "Pension name" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Pension" }), {
+      target: { value: "new" },
+    });
+
+    expect(onAmend).toHaveBeenCalledExactlyOnceWith({
+      feeds: null,
+      opens: { balance: 0, name: "" },
+      sacrifice: 0.1,
+    });
+  });
+
+  // The pension's name and balance report together, since the draft
+  // holds the pension as one, each with the other as the draft has it.
+  it("mounts on the pension the line opens, reports its name and balance, and drops it for a listed pension", () => {
+    const opening = {
+      ...salary,
+      feeds: null,
+      opens: { balance: 500, name: "Aviva" },
+      sacrifice: 0.05,
+    };
+    const { onAmend } = renderFields(opening);
+
+    expect(screen.getByRole("combobox", { name: "Pension" })).toHaveValue(
+      "new",
+    );
+    expect(field("Salary sacrifice")).toHaveValue("5.00%");
+    expect(field("Pension name")).toHaveAccessibleDescription(
+      "Opened with the salary, growing at the plan rate",
+    );
+    expect(field("Pension balance")).toHaveAccessibleDescription(
+      "What it holds today; nothing for one just opened",
+    );
+
+    fireEvent.change(field("Pension name"), { target: { value: "Nest" } });
+    commit(field("Pension balance"), "1,000");
+    fireEvent.change(screen.getByRole("combobox", { name: "Pension" }), {
+      target: { value: "1" },
+    });
+
+    expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
+      { opens: { balance: 500, name: "Nest" } },
+      { opens: { balance: 1000, name: "Aviva" } },
+      { feeds: 1, opens: null, sacrifice: 0.05 },
+    ]);
   });
 });

@@ -3,10 +3,12 @@ import { updateTag } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
+import type { IncomeLineDraft, IncomeLineValues } from "@/data/income";
+
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
-import { findAccount } from "@/db/accounts";
+import { findAccount, insertAccount } from "@/db/accounts";
 import { getDb } from "@/db/client";
 import { insertExpenseLine, updateExpenseLine } from "@/db/expenses";
 import {
@@ -16,6 +18,7 @@ import {
 } from "@/db/income";
 import { requireSession } from "@/lib/session";
 
+import { accountsTag } from "../accounts/store";
 import { removeIncomeLine, saveExpenseLine, saveIncomeLine } from "./actions";
 import { expenseLinesTag, incomeLinesTag } from "./store";
 
@@ -25,7 +28,10 @@ vi.mock("next/cache", () => ({
   cacheTag: vi.fn(),
   updateTag: vi.fn(),
 }));
-vi.mock("@/db/accounts", () => ({ findAccount: vi.fn() }));
+vi.mock("@/db/accounts", () => ({
+  findAccount: vi.fn(),
+  insertAccount: vi.fn(),
+}));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
 vi.mock("@/db/expenses", () => ({
   insertExpenseLine: vi.fn(),
@@ -64,6 +70,7 @@ const values = {
   lastMonth: null,
   lastYear: 2035,
   name: " Bonus scheme ",
+  opens: null,
   rsu: 0,
   sacrifice: 0,
 } as const;
@@ -71,6 +78,26 @@ const values = {
 // A database that answers nothing, standing in for the one the client
 // would open; the queries are mocked, so it is only ever handed on.
 const db = drizzle.mock();
+
+// What the store is handed of a draft: the line less the pension it
+// opens, with the name trimmed as the action trims it. Spelled out key
+// by key, since a rest destructure would bind the pension to nothing.
+function lineOf(draft: IncomeLineDraft): IncomeLineValues {
+  return {
+    amount: draft.amount,
+    bonus: draft.bonus,
+    cadence: draft.cadence,
+    feeds: draft.feeds,
+    firstYear: draft.firstYear,
+    growth: draft.growth,
+    kind: draft.kind,
+    lastMonth: draft.lastMonth,
+    lastYear: draft.lastYear,
+    name: draft.name.trim(),
+    rsu: draft.rsu,
+    sacrifice: draft.sacrifice,
+  };
+}
 
 describe("saveIncomeLine", () => {
   beforeEach(() => {
@@ -89,10 +116,10 @@ describe("saveIncomeLine", () => {
     vi.mocked(insertIncomeLine).mockResolvedValue(salary);
 
     expect(await saveIncomeLine(null, values)).toBe(salary);
-    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(db, {
-      ...values,
-      name: "Bonus scheme",
-    });
+    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      db,
+      lineOf(values),
+    );
     expect(updateIncomeLine).not.toHaveBeenCalled();
     expect(updateTag).toHaveBeenCalledExactlyOnceWith(incomeLinesTag);
   });
@@ -107,10 +134,10 @@ describe("saveIncomeLine", () => {
     } as const;
 
     expect(await saveIncomeLine(null, employment)).toBe(salary);
-    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(db, {
-      ...employment,
-      name: "Bonus scheme",
-    });
+    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      db,
+      lineOf(employment),
+    );
   });
 
   it("takes the pension an employment line feeds and the share of its base it sacrifices", async () => {
@@ -125,10 +152,10 @@ describe("saveIncomeLine", () => {
 
     expect(await saveIncomeLine(null, sacrificing)).toBe(salary);
     expect(findAccount).toHaveBeenCalledExactlyOnceWith(db, pension.id);
-    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(db, {
-      ...sacrificing,
-      name: "Bonus scheme",
-    });
+    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      db,
+      lineOf(sacrificing),
+    );
   });
 
   // The store holds the id to an account, so the action holds it to a
@@ -167,17 +194,67 @@ describe("saveIncomeLine", () => {
     expect(findAccount).toHaveBeenCalledTimes(3);
   });
 
+  // The pension is written first, as the account a new pension is,
+  // named as typed less the space around it, and the line feeds it by
+  // the id the store gave; no account is read, since the pension was
+  // just written as one. Both tags expire, since the accounts changed
+  // too. A salary already listed opens one the same way.
+  it("opens the pension a salary opens, first, and feeds it by the id the store gave", async () => {
+    vi.mocked(insertAccount).mockResolvedValue({
+      ...pension,
+      id: 6,
+      name: "Aviva",
+    });
+    vi.mocked(insertIncomeLine).mockResolvedValue(salary);
+    vi.mocked(updateIncomeLine).mockResolvedValue(salary);
+    const opening = {
+      ...values,
+      kind: "employment",
+      opens: { balance: 2500, name: " Aviva " },
+      sacrifice: 0.1,
+    } as const;
+
+    expect(await saveIncomeLine(null, opening)).toBe(salary);
+    expect(insertAccount).toHaveBeenCalledExactlyOnceWith(db, {
+      balance: 2500,
+      balloon: 0,
+      cadence: "year",
+      cap: 0,
+      contribution: 0,
+      funding: "fixed",
+      growth: "plan",
+      kind: "tax-deferred",
+      name: "Aviva",
+      rate: 0,
+    });
+    expect(findAccount).not.toHaveBeenCalled();
+    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(db, {
+      ...lineOf(opening),
+      feeds: 6,
+    });
+    expect(updateTag).toHaveBeenCalledTimes(2);
+    expect(updateTag).toHaveBeenCalledWith(accountsTag);
+    expect(updateTag).toHaveBeenCalledWith(incomeLinesTag);
+
+    expect(await saveIncomeLine(salary.id, opening)).toBe(salary);
+    expect(updateIncomeLine).toHaveBeenCalledExactlyOnceWith(db, salary.id, {
+      ...lineOf(opening),
+      feeds: 6,
+    });
+    expect(insertAccount).toHaveBeenCalledTimes(2);
+  });
+
   it("writes over the line with the id, open-ended, and expires the tag", async () => {
     vi.mocked(updateIncomeLine).mockResolvedValue(statePension);
 
     expect(await saveIncomeLine(4, { ...values, lastYear: null })).toBe(
       statePension,
     );
-    expect(updateIncomeLine).toHaveBeenCalledExactlyOnceWith(db, 4, {
-      ...values,
-      lastYear: null,
-      name: "Bonus scheme",
-    });
+    expect(updateIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      db,
+      4,
+      lineOf({ ...values, lastYear: null }),
+    );
     expect(insertIncomeLine).not.toHaveBeenCalled();
     expect(updateTag).toHaveBeenCalledExactlyOnceWith(incomeLinesTag);
   });
@@ -230,6 +307,32 @@ describe("saveIncomeLine", () => {
         sacrifice: -0.1,
       }),
     ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveIncomeLine(null, { ...values, opens: { balance: 0, name: "Aviva" } }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveIncomeLine(null, {
+        ...values,
+        feeds: 1,
+        kind: "employment",
+        opens: { balance: 0, name: "Aviva" },
+      }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveIncomeLine(null, {
+        ...values,
+        kind: "employment",
+        opens: { balance: 0, name: "  " },
+      }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveIncomeLine(null, {
+        ...values,
+        kind: "employment",
+        opens: { balance: -1, name: "Aviva" },
+      }),
+    ).rejects.toThrow(z.ZodError);
+    expect(insertAccount).not.toHaveBeenCalled();
     expect(insertIncomeLine).not.toHaveBeenCalled();
     expect(updateIncomeLine).not.toHaveBeenCalled();
     expect(updateTag).not.toHaveBeenCalled();

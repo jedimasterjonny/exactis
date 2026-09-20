@@ -212,7 +212,7 @@ describe("IncomeSchedule", () => {
       within(choice)
         .getAllByRole("option")
         .map((option) => option.textContent),
-    ).toStrictEqual(["None", "Workplace pension", "SIPP"]);
+    ).toStrictEqual(["None", "Workplace pension", "SIPP", "A new pension"]);
     expect(
       within(dialog).queryByRole("textbox", { name: "Salary sacrifice" }),
     ).not.toBeInTheDocument();
@@ -258,8 +258,91 @@ describe("IncomeSchedule", () => {
       lastMonth: null,
       lastYear: null,
       name: "New job",
+      opens: null,
       rsu: 0,
       sacrifice: 0.08,
+    });
+  });
+
+  // A salary may open its pension with the save: the choice asks the
+  // pension's name and what it holds, the save holds until the pension
+  // is named as it holds until the line is, and the store is handed the
+  // pension to open with the line feeding none by id, since the id is
+  // the store's to give. The pension's name goes as typed, since the
+  // store trims it as it trims the line's.
+  it("adds a salary opening a pension of its own, with the save held until the pension is named", async () => {
+    renderSchedule();
+
+    const dialog = openEntry();
+    const save = (): HTMLElement =>
+      within(dialog).getByRole("button", { name: "Save" });
+
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
+      target: { value: "New job" },
+    });
+    commit(
+      within(dialog).getByRole("textbox", { name: "Base salary" }),
+      "80,000",
+    );
+
+    expect(save()).toBeEnabled();
+
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Pension" }),
+      { target: { value: "new" } },
+    );
+
+    const pensionName = within(dialog).getByRole("textbox", {
+      name: "Pension name",
+    });
+    const balance = within(dialog).getByRole("textbox", {
+      name: "Pension balance",
+    });
+
+    expect(save()).toBeDisabled();
+    expect(pensionName).toHaveValue("");
+    expect(pensionName).toHaveAccessibleDescription(
+      "Opened with the salary, growing at the plan rate",
+    );
+    expect(balance).toHaveValue("£0");
+    expect(balance).toHaveAccessibleDescription(
+      "What it holds today; nothing for one just opened",
+    );
+    expect(
+      within(dialog).getByRole("textbox", { name: "Salary sacrifice" }),
+    ).toHaveValue("0.00%");
+
+    fireEvent.change(pensionName, { target: { value: " Aviva " } });
+
+    expect(save()).toBeEnabled();
+
+    commit(balance, "2,500");
+    commit(
+      within(dialog).getByRole("textbox", { name: "Salary sacrifice" }),
+      "5",
+    );
+    saved({ ...salary, feeds: 7, id: 5 });
+    fireEvent.click(save());
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "New job" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(null, {
+      amount: 80000,
+      bonus: 0,
+      cadence: "year",
+      feeds: null,
+      firstYear: 2026,
+      growth: "inflation",
+      kind: "employment",
+      lastMonth: null,
+      lastYear: null,
+      name: "New job",
+      opens: { balance: 2500, name: " Aviva " },
+      rsu: 0,
+      sacrifice: 0.05,
     });
   });
 
@@ -338,6 +421,7 @@ describe("IncomeSchedule", () => {
       lastMonth: null,
       lastYear: 2048,
       name: "Salary",
+      opens: null,
       rsu: 12000,
       sacrifice: 0.05,
     });
@@ -469,6 +553,7 @@ describe("IncomeSchedule", () => {
       lastMonth: null,
       lastYear: 2035,
       name: "Bonus scheme",
+      opens: null,
       rsu: 0,
       sacrifice: 0,
     });
@@ -602,6 +687,7 @@ describe("IncomeSchedule", () => {
       lastMonth: null,
       lastYear: 2070,
       name: "State pension",
+      opens: null,
       rsu: 0,
       sacrifice: 0,
     });
@@ -669,6 +755,7 @@ describe("IncomeSchedule", () => {
       lastMonth: null,
       lastYear: 2048,
       name: "Salary",
+      opens: null,
       rsu: 20000,
       sacrifice: 0.1,
     });
@@ -722,6 +809,7 @@ describe("IncomeSchedule", () => {
       lastMonth: null,
       lastYear: null,
       name: "Salary",
+      opens: null,
       rsu: 12000,
       sacrifice: 0.1,
     });
