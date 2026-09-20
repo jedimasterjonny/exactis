@@ -18,9 +18,10 @@ export const listed = new Intl.ListFormat("en-GB");
 // read in, so a salary that has ended, or is yet to start, lands
 // nothing on the row. Nothing for an account nothing feeds.
 export function fedOf(id: number, lines: readonly IncomeLine[]): number {
-  return lines
-    .filter((line) => line.feeds === id)
-    .reduce((sum, line) => sum + yearly(contributionOf(line), line.cadence), 0);
+  return feeding(id, lines).reduce(
+    (sum, line) => sum + yearly(contributionOf(line), line.cadence),
+    0,
+  );
 }
 
 // The names of the salaries feeding the account with that id. The id is
@@ -29,5 +30,15 @@ export function fedOf(id: number, lines: readonly IncomeLine[]): number {
 // that feeds none rather than none at all. A caller holding an account
 // that has no id yet answers for itself.
 export function feedersOf(id: number, lines: readonly IncomeLine[]): string[] {
-  return lines.filter((line) => line.feeds === id).map((line) => line.name);
+  return feeding(id, lines).map((line) => line.name);
+}
+
+// The salaries feeding the account with that id, as the lines they
+// are, for the dialog that edits their shares beside the account. The
+// caveat above holds: the id is an account's own and never null.
+export function feeding(
+  id: number,
+  lines: readonly IncomeLine[],
+): IncomeLine[] {
+  return lines.filter((line) => line.feeds === id);
 }

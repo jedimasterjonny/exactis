@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { incomeLines } from "@/data/income.fixture";
 
-import { fedOf, feedersOf, listed } from "./feeders";
+import { fedOf, feedersOf, feeding, listed } from "./feeders";
 
 // The fixture's salary feeds the workplace pension, which is the first
 // of the accounts fixture; the step-up feeds none until a test says so.
@@ -45,6 +45,13 @@ describe("feedersOf", () => {
   it("names none for an account nothing feeds", () => {
     expect(feedersOf(2, incomeLines)).toStrictEqual([]);
     expect(feedersOf(1, [])).toStrictEqual([]);
+  });
+});
+
+describe("feeding", () => {
+  it("lists the lines feeding the account, as they are", () => {
+    expect(feeding(1, incomeLines)).toStrictEqual([salary]);
+    expect(feeding(2, incomeLines)).toStrictEqual([]);
   });
 });
 
