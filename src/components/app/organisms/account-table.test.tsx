@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Account } from "@/data/accounts";
 
 import { accounts } from "@/data/accounts.fixture";
+import { incomeLines } from "@/data/income.fixture";
 
 import { AccountTable } from "./account-table";
 
@@ -102,6 +103,54 @@ describe("AccountTable", () => {
     ).toBeInTheDocument();
     expect(
       within(table).getByRole("cell", { name: "Spare, uncapped" }),
+    ).toBeInTheDocument();
+  });
+
+  // The fixture's salary sacrifices a tenth of its £120,000 base into
+  // the workplace pension, £13,800 a year with the employer's NI saved,
+  // beneath the pension's own £27,195; the ISA is fed by nothing and
+  // shows its own alone. A pension paid nothing of its own shows what
+  // it is fed as its figure, naming every salary it is from.
+  it("writes what the salaries sacrifice into a pension beneath its own contribution", () => {
+    const [pension, isa, cash] = accounts;
+    const [salary, stepUp] = incomeLines;
+    render(
+      <AccountTable
+        accounts={[
+          pension,
+          isa,
+          { ...cash, id: 6, kind: "tax-deferred", name: "SIPP" },
+        ]}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        lines={[
+          salary,
+          { ...stepUp, feeds: 6, sacrifice: 0.05 },
+          { ...salary, feeds: 6, id: 5, name: "Second job" },
+        ]}
+      />,
+    );
+
+    const table = screen.getByRole("table");
+    const detail = within(table).getByText(
+      "+ £13,800 / yr sacrificed from Salary",
+    );
+
+    expect(detail).toHaveClass("block", "text-xs", "text-muted-foreground");
+    // The cell's name runs the figure and the detail together, since
+    // the break between them is the detail's own block and not text.
+    expect(
+      within(table).getByRole("cell", {
+        name: "£27,195 / yr+ £13,800 / yr sacrificed from Salary",
+      }),
+    ).toHaveClass("figure");
+    expect(
+      within(table).getByRole("cell", { name: "£20,000 / yr" }),
+    ).toBeInTheDocument();
+    expect(
+      within(table).getByRole("cell", {
+        name: "£23,460 / yrsacrificed from Salary step-up and Second job",
+      }),
     ).toBeInTheDocument();
   });
 

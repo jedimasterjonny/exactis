@@ -8,6 +8,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { Month } from "@/data/schedule";
 
 import {
   placeAccountsInOrder,
@@ -30,6 +31,10 @@ vi.mock("@/app/(app)/accounts/actions", () => ({
   saveCar: vi.fn(),
   saveHouse: vi.fn(),
 }));
+
+// The month the fixture's plan is read in, September 2026, in which the
+// salary runs.
+const at: Month = { month: 8, year: 2026 };
 
 const held = accounts.filter((account) => !isAsset(account));
 const assets = accounts.filter(isAsset);
@@ -79,7 +84,7 @@ function openEntry(): HTMLElement {
 function renderLedger(): void {
   render(
     <Toaster>
-      <AccountLedger accounts={accounts} lines={[]} />
+      <AccountLedger accounts={accounts} at={at} lines={[]} />
     </Toaster>,
   );
 }
@@ -575,6 +580,7 @@ describe("AccountLedger", () => {
               contribution: { amount: 500, cadence: "month", kind: "fixed" },
             },
           ]}
+          at={at}
           lines={[]}
         />
       </Toaster>,
@@ -633,6 +639,7 @@ describe("AccountLedger", () => {
       <Toaster>
         <AccountLedger
           accounts={[{ ...isa, contribution: { cap: 4000, kind: "spare" } }]}
+          at={at}
           lines={[]}
         />
       </Toaster>,
@@ -784,7 +791,7 @@ describe("AccountLedger", () => {
   it("opens a house and the loan against it in the house dialog from either pencil", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[pension, house, loan]} lines={[]} />
+        <AccountLedger accounts={[pension, house, loan]} at={at} lines={[]} />
       </Toaster>,
     );
 
@@ -819,7 +826,7 @@ describe("AccountLedger", () => {
   it("opens a car and the finance on it in the car dialog from either pencil", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[pension, golf, finance]} lines={[]} />
+        <AccountLedger accounts={[pension, golf, finance]} at={at} lines={[]} />
       </Toaster>,
     );
 
@@ -849,7 +856,7 @@ describe("AccountLedger", () => {
   it("opens a house with no loan against it as owned outright", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[house]} lines={[]} />
+        <AccountLedger accounts={[house]} at={at} lines={[]} />
       </Toaster>,
     );
     fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
@@ -873,6 +880,7 @@ describe("AccountLedger", () => {
             { ...mortgage, secures: 99 },
             { ...finance, secures: home.id },
           ]}
+          at={at}
           lines={[]}
         />
       </Toaster>,
@@ -966,7 +974,7 @@ describe("AccountLedger", () => {
   it("says a loan takes its payments and a house its mortgage and the payments", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[pension, house, loan]} lines={[]} />
+        <AccountLedger accounts={[pension, house, loan]} at={at} lines={[]} />
       </Toaster>,
     );
 
@@ -990,7 +998,7 @@ describe("AccountLedger", () => {
   it("says a car takes its finance and the payments", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[golf, finance]} lines={[]} />
+        <AccountLedger accounts={[golf, finance]} at={at} lines={[]} />
       </Toaster>,
     );
 
@@ -1007,11 +1015,51 @@ describe("AccountLedger", () => {
   // A pension a salary feeds opens with its treatment held and the
   // reason beneath it; an account nothing feeds opens free, as does a
   // new one.
+  // The accounts' table is handed the lines, so a fed pension's row
+  // says what lands in it; the assets' is not, since nothing feeds an
+  // asset.
+  it("writes what the salary sacrifices into the pension on its row", () => {
+    const [salary] = incomeLines;
+    render(
+      <Toaster>
+        <AccountLedger accounts={accounts} at={at} lines={[salary]} />
+      </Toaster>,
+    );
+
+    expect(
+      screen.getByText("+ £13,800 / yr sacrificed from Salary"),
+    ).toHaveClass("text-muted-foreground");
+  });
+
+  // The salary ends with 2048, so in 2049 it lands nothing on the row,
+  // though the link stands: the dialog still holds the treatment, since
+  // the store holds the link whether or not it runs.
+  it("counts a salary on the row only while it runs, and holds the link either way", () => {
+    const [salary] = incomeLines;
+    render(
+      <Toaster>
+        <AccountLedger
+          accounts={accounts}
+          at={{ month: 0, year: 2049 }}
+          lines={[salary]}
+        />
+      </Toaster>,
+    );
+
+    expect(screen.queryByText(/sacrificed from/)).not.toBeInTheDocument();
+
+    const dialog = openEditor("Workplace pension");
+
+    expect(
+      within(dialog).getByRole("combobox", { name: "Treatment" }),
+    ).toBeDisabled();
+  });
+
   it("holds the treatment of a pension a salary feeds", () => {
     const [salary] = incomeLines;
     render(
       <Toaster>
-        <AccountLedger accounts={[pension, isa]} lines={[salary]} />
+        <AccountLedger accounts={[pension, isa]} at={at} lines={[salary]} />
       </Toaster>,
     );
 
@@ -1052,6 +1100,7 @@ describe("AccountLedger", () => {
       <Toaster>
         <AccountLedger
           accounts={[pension, isa]}
+          at={at}
           lines={[salary, { ...stepUp, feeds: pension.id, sacrifice: 0.05 }]}
         />
       </Toaster>,
@@ -1080,7 +1129,7 @@ describe("AccountLedger", () => {
   it("says a house with no loan goes alone", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[house]} lines={[]} />
+        <AccountLedger accounts={[house]} at={at} lines={[]} />
       </Toaster>,
     );
 

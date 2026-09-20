@@ -1,4 +1,4 @@
-import type { LineGrowth, LineValues } from "@/data/schedule";
+import type { LineGrowth, LineValues, Month } from "@/data/schedule";
 
 import { monthName } from "@/lib/months";
 
@@ -33,6 +33,24 @@ export function isSound(draft: LineValues): boolean {
   return (
     draft.name.trim() !== "" &&
     (draft.lastYear === null || draft.lastYear >= draft.firstYear)
+  );
+}
+
+// Whether a line is paid in the month: from its first year to its last,
+// or on for good when it has none, and in its last year to the month it
+// ends in, or through the whole of it when it has none. The engine reads
+// a plan a month at a time by it, and the accounts screen asks it which
+// salaries feed a pension in the month the plan is read in.
+export function runsIn(line: LineValues, at: Month): boolean {
+  if (line.firstYear > at.year) {
+    return false;
+  }
+  if (line.lastYear === null || at.year < line.lastYear) {
+    return true;
+  }
+  return (
+    at.year === line.lastYear &&
+    (line.lastMonth === null || at.month <= line.lastMonth)
   );
 }
 
