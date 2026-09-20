@@ -428,6 +428,25 @@ describe("saveHouse", () => {
     expect(vi.mocked(updateTag).mock.calls).toStrictEqual([[accountsTag]]);
   });
 
+  // The loan against a house is written through the one check every
+  // write over an account goes through: a loan made a pension by a POST
+  // and fed by a salary is refused as a debt, as the house itself would
+  // be, and its payments are left as they were.
+  it("refuses to write a loan over a pension a salary feeds", async () => {
+    vi.mocked(isFed).mockImplementation(
+      async (_db, id) => await Promise.resolve(id === mortgage.id),
+    );
+    vi.mocked(updateAccount).mockResolvedValue(home);
+    vi.mocked(findLoanAgainst).mockResolvedValue(mortgage);
+
+    await expect(saveHouse(home.id, house)).rejects.toThrow(
+      "A pension a salary feeds stays a pension",
+    );
+    expect(updateAccount).toHaveBeenCalledExactlyOnceWith(db, home.id, asset);
+    expect(findLinePaying).not.toHaveBeenCalled();
+    expect(updateExpenseLine).not.toHaveBeenCalled();
+  });
+
   it("writes a new mortgaged house as the house, the loan secured on it and its payments", async () => {
     vi.mocked(insertAccount)
       .mockResolvedValueOnce(home)
