@@ -5,6 +5,7 @@ import type { LineValues, Month } from "@/data/schedule";
 
 import { allowanceOf, isPension, takesSpare } from "@/data/accounts";
 import { contributionOf, sacrificeOf, totalOf } from "@/data/income";
+import { runsIn } from "@/lib/lines";
 
 // A month of a year's money, in pounds as the lines state them and
 // unrounded, formatted where it is rendered: what comes in, what goes
@@ -137,22 +138,6 @@ function monthly(amount: number, cadence: Cadence): number {
     case "year":
       return amount / 12;
   }
-}
-
-// Whether a line is paid in the month: from its first year to its last,
-// or on for good when it has none, and in its last year to the month it
-// ends in, or through the whole of it when it has none.
-function runsIn(line: LineValues, at: Month): boolean {
-  if (line.firstYear > at.year) {
-    return false;
-  }
-  if (line.lastYear === null || at.year < line.lastYear) {
-    return true;
-  }
-  return (
-    at.year === line.lastYear &&
-    (line.lastMonth === null || at.month <= line.lastMonth)
-  );
 }
 
 // The spare money handed down the accounts that take it, each taking

@@ -19,3 +19,15 @@ export const cadenceOptions: readonly Option<Cadence>[] = optionsOf(labels, [
   "year",
   "month",
 ]);
+
+// What is paid a year at a cadence: the sum itself, or twelve of a
+// month's, for a figure stated a year beside figures stated at their
+// own cadences.
+export function yearly(amount: number, cadence: Cadence): number {
+  switch (cadence) {
+    case "month":
+      return amount * 12;
+    case "year":
+      return amount;
+  }
+}

@@ -7,6 +7,7 @@ import { startTransition, useOptimistic, useState } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
+import type { Month } from "@/data/schedule";
 import type { Secured } from "@/data/secured";
 
 import {
@@ -32,10 +33,12 @@ import { isAsset } from "@/data/accounts";
 import { useRemover } from "@/hooks/use-remover";
 import { counted } from "@/lib/count";
 import { feedersOf, listed } from "@/lib/feeders";
+import { runsIn } from "@/lib/lines";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
   readonly accounts: readonly Account[];
+  readonly at: Month;
   readonly lines: readonly IncomeLine[];
 }
 
@@ -65,10 +68,16 @@ type Tab = "accounts" | "assets";
 // confirm dialog before the account goes, saying what goes with it,
 // since an asset takes its loan and a loan its payments, and what stops,
 // since a salary feeding a pension stops when the pension goes; the
-// income lines are handed down for that and for the treatment such a
-// pension is held to, so both can name the salaries.
+// income lines are handed down for that, for the treatment such a
+// pension is held to, so both can name the salaries, and for the
+// accounts' table to write what the salaries feed each pension: the
+// table is handed the lines running in the month the plan is read in,
+// which the page hands down, so a salary that has ended or is yet to
+// start lands nothing on the row, while the dialog and the confirm
+// take every line, since the link stands whether or not it runs.
 export function AccountLedger({
   accounts,
+  at,
   lines,
 }: AccountLedgerProps): JSX.Element {
   const [tab, setTab] = useState<Tab>("accounts");
@@ -86,6 +95,7 @@ export function AccountLedger({
   );
   const held = order.filter((account) => !isAsset(account));
   const assets = order.filter(isAsset);
+  const running = lines.filter((line) => runsIn(line, at));
 
   // A row's pencil opens its account as it is, unless the account is a
   // house or a car, or the loan against one, which open as the asset
@@ -182,6 +192,7 @@ export function AccountLedger({
               accounts={held}
               emptyDescription="Add a pension, an ISA, a savings account or a debt to see it listed here."
               emptyTitle="No accounts yet"
+              lines={running}
               onDelete={ask}
               onEdit={edit}
               onMove={move}
