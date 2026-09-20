@@ -19,7 +19,7 @@ import {
   insertExpenseLine,
   updateExpenseLine,
 } from "@/db/expenses";
-import { isFed, stopFeeding } from "@/db/income";
+import { isFed, stopFeeding, updateSacrifice } from "@/db/income";
 import { requireSession } from "@/lib/session";
 
 import { expenseLinesTag, incomeLinesTag } from "../plan/store";
@@ -53,7 +53,11 @@ vi.mock("@/db/expenses", () => ({
   insertExpenseLine: vi.fn(),
   updateExpenseLine: vi.fn(),
 }));
-vi.mock("@/db/income", () => ({ isFed: vi.fn(), stopFeeding: vi.fn() }));
+vi.mock("@/db/income", () => ({
+  isFed: vi.fn(),
+  stopFeeding: vi.fn(),
+  updateSacrifice: vi.fn(),
+}));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 vi.mock("../store", () => ({ getPlan: vi.fn() }));
 
@@ -80,7 +84,9 @@ const outright = {
   status: "outright",
 } as const;
 
-const values = {
+// An ISA as the store writes it, and as the dialog sends it, with the
+// shares no ISA has.
+const account = {
   balance: 4000,
   balloon: 0,
   cadence: "month",
@@ -92,6 +98,8 @@ const values = {
   name: " Lifetime ISA ",
   rate: 0.03,
 } as const;
+
+const values = { ...account, shares: [] } as const;
 
 // A database that answers nothing, standing in for the one the client
 // would open; the queries are mocked, so it is only ever handed on.
@@ -115,7 +123,7 @@ describe("saveAccount", () => {
 
     expect(await saveAccount(null, values)).toBe(pension);
     expect(insertAccount).toHaveBeenCalledExactlyOnceWith(db, {
-      ...values,
+      ...account,
       name: "Lifetime ISA",
     });
     expect(updateAccount).not.toHaveBeenCalled();
@@ -127,9 +135,10 @@ describe("saveAccount", () => {
 
     expect(await saveAccount(4, values)).toBe(home);
     expect(updateAccount).toHaveBeenCalledExactlyOnceWith(db, 4, {
-      ...values,
+      ...account,
       name: "Lifetime ISA",
     });
+    expect(updateSacrifice).not.toHaveBeenCalled();
     expect(insertAccount).not.toHaveBeenCalled();
     expect(updateTag).toHaveBeenCalledExactlyOnceWith(accountsTag);
   });
@@ -159,18 +168,79 @@ describe("saveAccount", () => {
 
   it("takes the spare money into an account that takes it", async () => {
     const isa = {
-      ...values,
+      ...account,
       cap: 20000,
       contribution: 0,
       funding: "spare",
     } as const;
     vi.mocked(insertAccount).mockResolvedValue(pension);
 
-    expect(await saveAccount(null, isa)).toBe(pension);
+    expect(await saveAccount(null, { ...isa, shares: [] })).toBe(pension);
     expect(insertAccount).toHaveBeenCalledExactlyOnceWith(db, {
       ...isa,
       name: "Lifetime ISA",
     });
+  });
+
+  // The shares are written after the pension, each against its line
+  // and held by the store to one feeding the pension, and the lines
+  // are expired with each, so both screens see the share.
+  it("writes the shares the salaries sacrifice over theirs after the pension, and expires the lines", async () => {
+    vi.mocked(updateAccount).mockResolvedValue(pension);
+    const shares = [
+      { line: 1, sacrifice: 0.08 },
+      { line: 2, sacrifice: 0.05 },
+    ];
+    const workplace = { ...account, kind: "tax-deferred", shares } as const;
+
+    expect(await saveAccount(pension.id, workplace)).toBe(pension);
+    expect(updateAccount).toHaveBeenCalledExactlyOnceWith(db, pension.id, {
+      ...account,
+      kind: "tax-deferred",
+      name: "Lifetime ISA",
+    });
+    expect(vi.mocked(updateSacrifice).mock.calls).toStrictEqual([
+      [db, pension.id, shares[0]],
+      [db, pension.id, shares[1]],
+    ]);
+    expect(updateTag).toHaveBeenCalledTimes(3);
+    expect(updateTag).toHaveBeenLastCalledWith(accountsTag);
+    expect(updateTag).toHaveBeenCalledWith(incomeLinesTag);
+  });
+
+  // A share is at most the whole of the base, and the whole of it is
+  // taken: the bound is a bound, not a refusal of the figure at it.
+  it("takes a share of the whole of the base", async () => {
+    vi.mocked(updateAccount).mockResolvedValue(pension);
+    const share = { line: 1, sacrifice: 1 };
+
+    expect(
+      await saveAccount(pension.id, {
+        ...account,
+        kind: "tax-deferred",
+        shares: [share],
+      }),
+    ).toBe(pension);
+    expect(updateSacrifice).toHaveBeenCalledExactlyOnceWith(
+      db,
+      pension.id,
+      share,
+    );
+  });
+
+  // Nothing feeds an account the store has not given an id yet, so a
+  // share sent with a new one is a caller's mistake.
+  it("refuses a share on a new account before writing anything", async () => {
+    await expect(
+      saveAccount(null, {
+        ...account,
+        kind: "tax-deferred",
+        shares: [{ line: 1, sacrifice: 0.1 }],
+      }),
+    ).rejects.toThrow("Nothing feeds an account the store has not given an id");
+    expect(insertAccount).not.toHaveBeenCalled();
+    expect(updateSacrifice).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
   });
 
   it("refuses what the form could not have sent", async () => {
@@ -195,6 +265,40 @@ describe("saveAccount", () => {
     );
     await expect(
       saveAccount(null, { ...values, funding: "spare", kind: "debt" }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveAccount(1, { ...values, shares: [{ line: 1, sacrifice: 0.1 }] }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveAccount(1, {
+        ...values,
+        kind: "tax-deferred",
+        shares: [{ line: 1, sacrifice: 1.5 }],
+      }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveAccount(1, {
+        ...values,
+        kind: "tax-deferred",
+        shares: [{ line: 0, sacrifice: 0.1 }],
+      }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveAccount(1, {
+        ...values,
+        kind: "tax-deferred",
+        shares: [{ line: 1, sacrifice: -0.1 }],
+      }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveAccount(1, {
+        ...values,
+        kind: "tax-deferred",
+        shares: [
+          { line: 1, sacrifice: 0.1 },
+          { line: 1, sacrifice: 0.2 },
+        ],
+      }),
     ).rejects.toThrow(z.ZodError);
     expect(insertAccount).not.toHaveBeenCalled();
     expect(updateAccount).not.toHaveBeenCalled();

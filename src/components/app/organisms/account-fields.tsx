@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 
 import type { AccountKind, AccountValues, Funding } from "@/data/accounts";
 
@@ -12,6 +12,7 @@ import { cadenceOptions } from "@/lib/cadence";
 import { formatGbp } from "@/lib/money";
 
 interface AccountFieldsProps {
+  readonly children?: ReactNode;
   readonly draft: AccountValues;
   readonly initial: AccountValues;
   readonly kindLock?: string | undefined;
@@ -42,15 +43,23 @@ const kinds = [
 // schedules' dialogs: the name and the treatment on the first row, the
 // balance and, for a wrapper or cash, the contribution choice on the
 // second, what that choice asks for on the third, a sum and its cadence
-// or a cap, and the growth choice with its rate on the last. The fields
-// are uncontrolled and mount with the account as it opened, and report
-// each change to the ledger, whose draft mirrors them. The treatment and
-// the contribution choices are reported apart from the rest, since each
-// changes more of the draft than its own value and the ledger decides
-// what. The treatment is locked when the ledger gives a reason, which
-// it does for a pension a salary feeds, since the store refuses to
-// make one anything else and the reason says how to unlink it.
+// or a cap, and on the last the growth choice, with its rate stacked
+// beneath it while the growth is fixed, beside whatever the dialog
+// adds. The fields are uncontrolled and mount with the account as it
+// opened, and report each change to the ledger, whose draft mirrors
+// them. The treatment and the contribution choices are reported apart
+// from the rest, since each changes more of the draft than its own
+// value and the ledger decides what. The treatment is locked when the
+// ledger gives a reason, which it does for a pension a salary feeds,
+// since the store refuses to make one anything else and the reason
+// says how to unlink it. The slot beside the growth is where the dialog
+// puts what the salaries sacrifice into such a pension: the growth
+// row's other cell was the one cell the rows left empty, and the rate
+// stacks under the growth rather than taking it, so a fed pension's
+// six fields fill three rows and an account nothing feeds is laid out
+// as it was.
 export function AccountFields({
+  children,
   draft,
   initial,
   kindLock,
@@ -137,26 +146,29 @@ export function AccountFields({
           />
         )}
       </FieldRow>
-      <FieldRow layout="pair">
-        <SelectField
-          defaultValue={initial.growth}
-          hint="The plan rate is set on the assumptions screen"
-          label="Growth"
-          onValueChange={(growth) => {
-            onAmend({ growth, rate: initial.rate });
-          }}
-          options={growths}
-        />
-        {draft.growth === "fixed" && (
-          <RateField
-            defaultValue={initial.rate}
-            hint="Nominal, a year"
-            label="Rate"
-            onValueCommitted={(rate) => {
-              onAmend({ rate });
+      <FieldRow layout="pair-top">
+        <div className="grid gap-4">
+          <SelectField
+            defaultValue={initial.growth}
+            hint="The plan rate is set on the assumptions screen"
+            label="Growth"
+            onValueChange={(growth) => {
+              onAmend({ growth, rate: initial.rate });
             }}
+            options={growths}
           />
-        )}
+          {draft.growth === "fixed" && (
+            <RateField
+              defaultValue={initial.rate}
+              hint="Nominal, a year"
+              label="Rate"
+              onValueCommitted={(rate) => {
+                onAmend({ rate });
+              }}
+            />
+          )}
+        </div>
+        {children}
       </FieldRow>
     </div>
   );

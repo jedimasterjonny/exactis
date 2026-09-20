@@ -1,5 +1,6 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
+import type { Share } from "@/data/accounts";
 import type { IncomeLine, IncomeLineValues } from "@/data/income";
 import type { Database } from "@/db/accounts";
 
@@ -69,6 +70,31 @@ export async function updateIncomeLine(
     .where(eq(incomeLines.id, id))
     .returning();
   return single(rows);
+}
+
+// The share a salary sacrifices into the account with that id, written
+// over the line the share names, and the line as it now is. The
+// pension's dialog writes a share from its side, so the write is held
+// to a line feeding that account: a share written against a line
+// feeding another, or none, would land elsewhere or nowhere, and is
+// refused as a caller's mistake.
+export async function updateSacrifice(
+  db: Database,
+  accountId: number,
+  share: Share,
+): Promise<IncomeLine> {
+  const rows = await db
+    .update(incomeLines)
+    .set({ sacrifice: share.sacrifice })
+    .where(
+      and(eq(incomeLines.id, share.line), eq(incomeLines.feeds, accountId)),
+    )
+    .returning();
+  const [row] = rows;
+  if (row === undefined) {
+    throw new Error("No salary feeding the account has the id");
+  }
+  return row;
 }
 
 // A statement written for one line returns that line, or none when no

@@ -135,6 +135,7 @@ describe("AccountDialog", () => {
       kind: "tax-free",
       name: "Lifetime ISA",
       rate: 0,
+      shares: [],
     });
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(onSaved).not.toHaveBeenCalled();
@@ -183,6 +184,7 @@ describe("AccountDialog", () => {
       kind: "tax-deferred",
       name: "Workplace pension",
       rate: 0,
+      shares: [],
     });
     expect(
       screen.getByRole("dialog", { name: "Account updated" }),
@@ -295,6 +297,113 @@ describe("AccountDialog", () => {
 
     expect(treatment).toBeEnabled();
     expect(treatment).not.toHaveAccessibleDescription();
+  });
+
+  // A fed pension's dialog carries each salary's share beneath the
+  // account's own fields, mounted on the share the salary holds, with
+  // what it lands a year moving as the share is typed, and the shares
+  // go to the store with the account. An account nothing feeds, and a
+  // new one, carry none.
+  it("edits the share a salary sacrifices into the pension, and saves it with the account", async () => {
+    const onSaved = vi.fn<(account: Account) => void>();
+    vi.mocked(saveAccount).mockResolvedValue(pension);
+    render(
+      <Toaster>
+        <AccountDialog
+          account={pension}
+          lines={[salary, { ...salary, id: 5, name: "Second job" }]}
+          onDismiss={vi.fn<() => void>()}
+          onSaved={onSaved}
+        />
+      </Toaster>,
+    );
+    const dialog = open();
+
+    expect(field(dialog, "Sacrificed from Salary")).toHaveValue("10.00%");
+    expect(field(dialog, "Sacrificed from Salary")).toHaveAccessibleDescription(
+      "Of its £120,000 base; £13,800 a year lands with the NI saved",
+    );
+    expect(field(dialog, "Sacrificed from Second job")).toHaveValue("10.00%");
+
+    commit(field(dialog, "Sacrificed from Salary"), "8");
+
+    expect(field(dialog, "Sacrificed from Salary")).toHaveAccessibleDescription(
+      "Of its £120,000 base; £11,040 a year lands with the NI saved",
+    );
+    expect(
+      field(dialog, "Sacrificed from Second job"),
+    ).toHaveAccessibleDescription(
+      "Of its £120,000 base; £13,800 a year lands with the NI saved",
+    );
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(pension.id, {
+      balance: 412880,
+      balloon: 0,
+      cadence: "year",
+      cap: 0,
+      contribution: 27195,
+      funding: "fixed",
+      growth: "plan",
+      kind: "tax-deferred",
+      name: "Workplace pension",
+      rate: 0,
+      shares: [{ line: 1, sacrifice: 0.08 }],
+    });
+  });
+
+  // A share sent as it opened would write the opening back over an
+  // edit made to the salary meanwhile, so an edit to the account alone
+  // sends none, and a share typed back to what it opened with is not
+  // a change.
+  it("sends no share it did not change", async () => {
+    const onSaved = vi.fn<(account: Account) => void>();
+    vi.mocked(saveAccount).mockResolvedValue(pension);
+    render(
+      <Toaster>
+        <AccountDialog
+          account={pension}
+          lines={[salary]}
+          onDismiss={vi.fn<() => void>()}
+          onSaved={onSaved}
+        />
+      </Toaster>,
+    );
+    const dialog = open();
+
+    commit(field(dialog, "Balance"), "420,000");
+    commit(field(dialog, "Sacrificed from Salary"), "8");
+    commit(field(dialog, "Sacrificed from Salary"), "10");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(
+      pension.id,
+      expect.objectContaining({ balance: 420000, shares: [] }),
+    );
+  });
+
+  it("carries no shares for an account nothing feeds", () => {
+    render(
+      <Toaster>
+        <AccountDialog
+          account={isa}
+          lines={incomeLines}
+          onDismiss={vi.fn<() => void>()}
+          onSaved={vi.fn<(account: Account) => void>()}
+        />
+      </Toaster>,
+    );
+
+    expect(
+      within(open()).queryByRole("textbox", { name: /^Sacrificed from/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps a refused save open and says why", async () => {

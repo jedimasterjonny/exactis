@@ -28,7 +28,7 @@ function commit(field: HTMLElement, value: string): void {
 function renderFields(
   initial: AccountValues,
   draft: AccountValues = initial,
-  kindLock?: string,
+  { kindLock }: { kindLock?: string } = {},
 ): {
   readonly onAmend: ReturnType<
     typeof vi.fn<(patch: Partial<AccountValues>) => void>
@@ -49,7 +49,9 @@ function renderFields(
       onAmend={onAmend}
       onFundingChange={onFundingChange}
       onKindChange={onKindChange}
-    />,
+    >
+      <p>What the salaries sacrifice</p>
+    </AccountFields>,
   );
   return { onAmend, onFundingChange, onKindChange };
 }
@@ -147,13 +149,32 @@ describe("AccountFields", () => {
 
   it("locks the treatment when given a reason, and says it", () => {
     const pension: AccountValues = { ...isa, kind: "tax-deferred" };
-    renderFields(pension, pension, "Fed by Salary");
+    renderFields(pension, pension, { kindLock: "Fed by Salary" });
 
     const treatment = screen.getByRole("combobox", { name: "Treatment" });
 
     expect(treatment).toBeDisabled();
     expect(treatment).toHaveValue("tax-deferred");
     expect(treatment).toHaveAccessibleDescription("Fed by Salary");
+  });
+
+  it("puts what the dialog adds beside the growth, after every other field", () => {
+    renderFields(isa);
+
+    // The matches come in document order, which is the order read.
+    expect(
+      screen
+        .getAllByText(/^(Balance|Growth|What the salaries sacrifice)$/)
+        .map((element) => element.textContent),
+    ).toStrictEqual(["Balance", "Growth", "What the salaries sacrifice"]);
+    expect(
+      screen.getByRole("combobox", { name: "Contribution" }),
+    ).toHaveAccessibleDescription(
+      "Spare money is what a month's income leaves after the expenses and every fixed sum",
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Amount" }),
+    ).toHaveAccessibleDescription("Leave at nothing for none");
   });
 
   it("offers an asset no contribution choice", () => {
