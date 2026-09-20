@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Owed } from "./loans";
 
-import { clearsIn, paymentOf, rateOf, termOf } from "./loans";
+import { clearsIn, paymentOf, rateOf, termOf, termTo } from "./loans";
 
 // What is owed, with no balloon unless one is given.
 function owed(balance: number, balloon = 0): Owed {
@@ -158,5 +158,42 @@ describe("clearsIn", () => {
       month: 11,
       year: 2035,
     });
+  });
+});
+
+describe("termTo", () => {
+  // June 2035 is the 114th payment from January 2026 and February 2036
+  // the 114th from September; December 2036 is the 124th from
+  // September. A term is what clearsIn reads back as the month, so the
+  // two invert each other over every month of a decade.
+  it("finds the term whose last payment falls in the month, counted from the month the plan is read in", () => {
+    expect(
+      termTo({ month: 5, year: 2035 }, { from: 2026, month: 0 }),
+    ).toBeCloseTo(114 / 12, 10);
+    expect(
+      termTo({ month: 1, year: 2036 }, { from: 2026, month: 8 }),
+    ).toBeCloseTo(114 / 12, 10);
+    expect(
+      termTo({ month: 11, year: 2036 }, { from: 2026, month: 8 }),
+    ).toBeCloseTo(124 / 12, 10);
+    const plan = { from: 2026, month: 8 };
+    for (let payments = 1; payments <= 120; payments += 1) {
+      const end = clearsIn(payments / 12, plan);
+      expect(clearsIn(termTo(end, plan), plan)).toStrictEqual(end);
+    }
+  });
+
+  // The plan's month is the first payment, and a month before it, in
+  // the year or the year before, is read as it.
+  it("counts the plan's month, and any month before it, as a single payment", () => {
+    expect(
+      termTo({ month: 8, year: 2026 }, { from: 2026, month: 8 }),
+    ).toBeCloseTo(1 / 12, 10);
+    expect(
+      termTo({ month: 2, year: 2026 }, { from: 2026, month: 8 }),
+    ).toBeCloseTo(1 / 12, 10);
+    expect(
+      termTo({ month: 11, year: 2025 }, { from: 2026, month: 8 }),
+    ).toBeCloseTo(1 / 12, 10);
   });
 });
