@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AccountKind, AccountValues, Funding } from "@/data/accounts";
@@ -28,7 +28,7 @@ function commit(field: HTMLElement, value: string): void {
 function renderFields(
   initial: AccountValues,
   draft: AccountValues = initial,
-  { kindLock }: { kindLock?: string } = {},
+  { isFed = false, kindLock }: { isFed?: boolean; kindLock?: string } = {},
 ): {
   readonly onAmend: ReturnType<
     typeof vi.fn<(patch: Partial<AccountValues>) => void>
@@ -45,6 +45,7 @@ function renderFields(
     <AccountFields
       draft={draft}
       initial={initial}
+      isFed={isFed}
       kindLock={kindLock}
       onAmend={onAmend}
       onFundingChange={onFundingChange}
@@ -156,6 +157,31 @@ describe("AccountFields", () => {
     expect(treatment).toBeDisabled();
     expect(treatment).toHaveValue("tax-deferred");
     expect(treatment).toHaveAccessibleDescription("Fed by Salary");
+  });
+
+  // A fed pension's own contribution is paid on top of the sacrifice,
+  // and a fixed sum of nothing is the usual case rather than an
+  // unfilled field, so the choice and the sum say so; an account
+  // nothing feeds says what it did.
+  it("says a fed pension's own contribution is on top of the sacrifice", () => {
+    const workplace = { ...isa, kind: "tax-deferred" } as const;
+    renderFields(workplace, workplace, {
+      isFed: true,
+      kindLock: "Fed by Salary",
+    });
+    const choice = screen.getByRole("combobox", { name: "Contribution" });
+
+    expect(choice).toHaveAccessibleDescription(
+      "Paid in on top of the salary sacrifice",
+    );
+    expect(
+      within(choice)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual(["A fixed sum, or nothing", "Spare money"]);
+    expect(
+      screen.getByRole("textbox", { name: "Amount" }),
+    ).toHaveAccessibleDescription("Leave at nothing for none on top");
   });
 
   it("puts what the dialog adds beside the growth, after every other field", () => {
