@@ -44,4 +44,24 @@ describe("MoneyField", () => {
       "£2,210",
     );
   });
+
+  it("holds a typed sum inside its bounds", () => {
+    const onValueCommitted = vi.fn<(value: number) => void>();
+    render(
+      <MoneyField
+        defaultValue={2210}
+        label="Payment"
+        min={0}
+        onValueCommitted={onValueCommitted}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Payment" });
+
+    fireEvent.change(input, { target: { value: "-500" } });
+    fireEvent.blur(input);
+
+    expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(0);
+    expect(input).toHaveValue("£0");
+  });
 });
