@@ -270,7 +270,9 @@ async function removeWithPayments(db: Database, id: number): Promise<void> {
 // make it anything else is refused and the salary is unlinked first.
 // The forms never offer such an edit, but each action answers a POST
 // from anywhere, and a house or a car written over a pension's id is
-// the same edit by another door.
+// the same edit by another door, as is the loan against either written
+// over one: a loan made a pension by such a POST keeps its asset, and
+// the asset's next save would write a debt back over it.
 async function writeOver(
   db: Database,
   at: number,
@@ -314,7 +316,7 @@ async function writeSecured(
     await insertExpenseLine(db, secured.line, written.id);
     updateTag(expenseLinesTag);
   } else {
-    await updateAccount(db, loan.id, secured.account);
+    await writeOver(db, loan.id, secured.account);
     updateTag(accountsTag);
     const line = await findLinePaying(db, loan.id);
     if (line === null) {
