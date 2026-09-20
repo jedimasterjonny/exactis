@@ -164,9 +164,10 @@ export async function placeAccountsInOrder(
 // house takes the loan secured on it and that loan's payments, and a
 // loan takes its payments, each line before its loan since the store
 // holds the links; a salary feeding the account stops, since the store
-// holds that link too, and is left earned whole. Checked and expired
-// as a save is, every tag since a line of either schedule may have
-// changed.
+// holds that link too, and is left earned whole. Checked as a save is,
+// and each tag expired with the write it answers for, so a failure
+// part way leaves every screen reading what was written rather than
+// what the cache held.
 export async function removeAccount(id: number): Promise<void> {
   await requireSession();
   const at = z.number().int().positive().parse(id);
@@ -176,10 +177,8 @@ export async function removeAccount(id: number): Promise<void> {
     await removeWithPayments(db, loan.id);
   }
   await stopFeeding(db, at);
-  await removeWithPayments(db, at);
-  updateTag(expenseLinesTag);
   updateTag(incomeLinesTag);
-  updateTag(accountsTag);
+  await removeWithPayments(db, at);
 }
 
 // Writes an account: a new one when the id is null, else over the one
@@ -191,9 +190,11 @@ export async function removeAccount(id: number): Promise<void> {
 // is refused. The shares the dialog holds for the salaries feeding the
 // account are written over theirs after the account, each held to a
 // line feeding it; a new account is fed by nothing, so a share sent
-// with one is refused before anything is written. The tags are expired
-// before returning, so the same round trip carries the lists re-read,
-// the lines' only where a share was written.
+// with one is refused before anything is written. Each tag is expired
+// with the write it answers for, the accounts' as soon as the account
+// is written and the lines' with each share, so the same round trip
+// carries the lists re-read and a share refused after the account
+// leaves the account written and seen rather than written and hidden.
 export async function saveAccount(
   id: null | number,
   draft: AccountDraft,
@@ -209,8 +210,8 @@ export async function saveAccount(
     at === null
       ? await insertAccount(db, parsed)
       : await writeOver(db, at, parsed);
-  await writeShares(db, account.id, shares);
   updateTag(accountsTag);
+  await writeShares(db, account.id, shares);
   return account;
 }
 
@@ -219,8 +220,8 @@ export async function saveAccount(
 // financed car the loan secured on it and the line of its payments, so
 // the finance appears among the accounts and its payments among the
 // expenses with no more asked of the form, and hands back the car's own
-// account. Checked as a save is. Both tags expire, and the plan is read
-// for the year the payments start in.
+// account. Checked as a save is, each tag expired with the write it
+// answers for, and the plan read for the year the payments start in.
 export async function saveCar(
   id: null | number,
   draft: CarValues,
@@ -228,10 +229,7 @@ export async function saveCar(
   await requireSession();
   const at = target.parse(id);
   const records = toCarRecords(car.parse(draft), getPlan());
-  const account = await writeSecured(getDb(), at, records);
-  updateTag(expenseLinesTag);
-  updateTag(accountsTag);
-  return account;
+  return writeSecured(getDb(), at, records);
 }
 
 // Writes a house as the records it is, a new one when the id is null
@@ -239,8 +237,9 @@ export async function saveCar(
 // and for a mortgaged house the loan secured on it and the line of its
 // payments, so the mortgage appears among the accounts and its payments
 // among the expenses with no more asked of the form, and hands back the
-// house's own account. Checked as a save is. Both tags expire, and the
-// plan is read for the year the payments start in.
+// house's own account. Checked as a save is, each tag expired with the
+// write it answers for, and the plan read for the year the payments
+// start in.
 export async function saveHouse(
   id: null | number,
   draft: HouseValues,
@@ -248,21 +247,20 @@ export async function saveHouse(
   await requireSession();
   const at = target.parse(id);
   const records = toRecords(house.parse(draft), getPlan());
-  const account = await writeSecured(getDb(), at, records);
-  updateTag(expenseLinesTag);
-  updateTag(accountsTag);
-  return account;
+  return writeSecured(getDb(), at, records);
 }
 
 // An account and the line of its payments, if it is a loan with one,
 // gone: the line first, since the store holds the link and refuses to
-// leave it dangling.
+// leave it dangling, each expiring its own read as it goes.
 async function removeWithPayments(db: Database, id: number): Promise<void> {
   const line = await findLinePaying(db, id);
   if (line !== null) {
     await deleteExpenseLine(db, line.id);
+    updateTag(expenseLinesTag);
   }
   await deleteAccount(db, id);
+  updateTag(accountsTag);
 }
 
 // The account with that id, written over with the values, through the
@@ -292,7 +290,9 @@ async function writeOver(
 // and the loan's line away. The records are written one after another
 // rather than in a transaction, since Neon's HTTP driver runs none; a
 // failure between them leaves what was written and reaches the form as
-// an error.
+// an error, and each tag is expired with the write it answers for, so
+// what was written is seen rather than hidden behind the cache until
+// it next turns over.
 async function writeSecured(
   db: Database,
   at: null | number,
@@ -302,6 +302,7 @@ async function writeSecured(
     at === null
       ? await insertAccount(db, asset)
       : await writeOver(db, at, asset);
+  updateTag(accountsTag);
   const loan = at === null ? null : await findLoanAgainst(db, account.id);
   if (secured === null) {
     if (loan !== null) {
@@ -309,15 +310,19 @@ async function writeSecured(
     }
   } else if (loan === null) {
     const written = await insertAccount(db, secured.account, account.id);
+    updateTag(accountsTag);
     await insertExpenseLine(db, secured.line, written.id);
+    updateTag(expenseLinesTag);
   } else {
     await updateAccount(db, loan.id, secured.account);
+    updateTag(accountsTag);
     const line = await findLinePaying(db, loan.id);
     if (line === null) {
       await insertExpenseLine(db, secured.line, loan.id);
     } else {
       await updateExpenseLine(db, line.id, secured.line);
     }
+    updateTag(expenseLinesTag);
   }
   return account;
 }
