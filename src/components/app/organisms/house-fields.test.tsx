@@ -19,6 +19,10 @@ const home: HouseDraft = {
   value: 416386,
 };
 
+// The month the plan is read in, September 2026, which the end of the
+// term is counted from: the home's 22 years run to August 2048.
+const plan = { from: 2026, month: 8 };
+
 const workedHint = "Worked out from the other two";
 
 function commit(field: HTMLElement, value: string): void {
@@ -28,6 +32,10 @@ function commit(field: HTMLElement, value: string): void {
 
 function field(name: string): HTMLElement {
   return screen.getByRole("textbox", { name });
+}
+
+function month(name: string): HTMLElement {
+  return screen.getByRole("combobox", { name });
 }
 
 // The fields as the dialog would mount them, shown the draft and the
@@ -49,6 +57,7 @@ function renderFields(
       figure={figure}
       initial={draft}
       onAmend={onAmend}
+      plan={plan}
       worked={worked}
     />,
   );
@@ -61,6 +70,7 @@ function renderFields(
           figure={next}
           initial={draft}
           onAmend={onAmend}
+          plan={plan}
           worked={worked}
         />,
       );
@@ -89,6 +99,11 @@ describe("HouseFields", () => {
     expect(field("Years to pay off")).toHaveAccessibleDescription(
       "Left to run",
     );
+    expect(month("Last payment")).toHaveDisplayValue("August");
+    expect(month("Last payment")).toHaveAccessibleDescription(
+      "One with the years left",
+    );
+    expect(field("Year")).toHaveValue("2048");
 
     fireEvent.change(field("Name"), { target: { value: "Flat" } });
     commit(field("Value"), "420,000");
@@ -97,6 +112,8 @@ describe("HouseFields", () => {
     commit(field("Rate"), "4.5");
     commit(field("Monthly payment"), "2,000");
     commit(field("Years to pay off"), "20");
+    fireEvent.change(month("Last payment"), { target: { value: "1" } });
+    commit(field("Year"), "2047");
     fireEvent.change(screen.getByRole("combobox", { name: "Status" }), {
       target: { value: "outright" },
     });
@@ -109,6 +126,8 @@ describe("HouseFields", () => {
       { rate: 0.045 },
       { payment: 2000 },
       { term: 20 },
+      { term: 21.5 },
+      { term: 21 },
       { status: "outright" },
     ]);
   });
@@ -131,11 +150,21 @@ describe("HouseFields", () => {
     ).toHaveClass("text-destructive");
   });
 
+  // 21.21 years from September 2026 is 255 payments, the last of them in
+  // November 2047; a loan that never clears has no month to end in. A
+  // month or a year picked with no end to take the other from takes it
+  // from the plan: December is four payments from September, and a year
+  // on is thirteen.
   it("shows a worked-out term, and says when the payment never clears the loan", () => {
-    const { rerender } = renderFields(home, "term", 21.21);
+    const { onAmend, rerender } = renderFields(home, "term", 21.21);
 
     expect(field("Years to pay off")).toHaveValue("21.2");
     expect(field("Years to pay off")).toHaveAccessibleDescription(workedHint);
+    expect(month("Last payment")).toHaveDisplayValue("November");
+    expect(month("Last payment")).toHaveAccessibleDescription(
+      "Worked out with the years left",
+    );
+    expect(field("Year")).toHaveValue("2047");
 
     rerender(null);
 
@@ -143,6 +172,20 @@ describe("HouseFields", () => {
     expect(field("Years to pay off")).toHaveAccessibleDescription(
       "Never clears at this payment, so the payments run to the end of the plan",
     );
+    expect(month("Last payment")).toHaveDisplayValue("—");
+    expect(month("Last payment")).toHaveAccessibleDescription(
+      "Never, at this payment",
+    );
+    expect(field("Year")).toHaveValue("");
+
+    fireEvent.change(month("Last payment"), { target: { value: "11" } });
+    commit(field("Year"), "2027");
+
+    const [december, yearOn] = onAmend.mock.calls.map(([patch]) => patch);
+
+    expect(onAmend).toHaveBeenCalledTimes(2);
+    expect(december?.term).toBeCloseTo(4 / 12, 10);
+    expect(yearOn?.term).toBeCloseTo(13 / 12, 10);
   });
 
   it("shows no loan fields for a house owned outright", () => {
@@ -160,6 +203,12 @@ describe("HouseFields", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("textbox", { name: "Years to pay off" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", { name: "Last payment" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Year" }),
     ).not.toBeInTheDocument();
   });
 });

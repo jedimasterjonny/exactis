@@ -28,6 +28,10 @@ const house: Secured = {
   loan: { ...mortgage, secures: home.id },
 };
 
+// The month the plan is read in, September 2026, which the end of the
+// term is counted from.
+const plan = { from: 2026, month: 8 };
+
 const workedHint = "Worked out from the other two";
 
 function commit(field: HTMLElement, value: string): void {
@@ -53,7 +57,12 @@ function renderDialog(
 ): void {
   render(
     <Toaster>
-      <HouseDialog house={opening} onDismiss={onDismiss} onSaved={onSaved} />
+      <HouseDialog
+        house={opening}
+        onDismiss={onDismiss}
+        onSaved={onSaved}
+        plan={plan}
+      />
     </Toaster>,
   );
 }
@@ -184,6 +193,32 @@ describe("HouseDialog", () => {
     expect(
       screen.getByRole("dialog", { name: "House updated" }),
     ).toHaveAccessibleDescription("Home · with its mortgage and payments");
+  });
+
+  // The 8.5 years worked out when the house opens, a shade over, are 103
+  // payments and run to March 2035; August 2035 picked instead is nine
+  // years, which stands as the term and shows in the years, and the
+  // rate is worked out in its place.
+  it("ends the mortgage in a picked month, which stands as the term", () => {
+    renderDialog(house);
+    const dialog = open();
+    const lastPayment = within(dialog).getByRole("combobox", {
+      name: "Last payment",
+    });
+
+    expect(lastPayment).toHaveDisplayValue("March");
+    expect(field(dialog, "Year")).toHaveValue("2035");
+
+    fireEvent.change(lastPayment, { target: { value: "7" } });
+
+    expect(field(dialog, "Years to pay off")).toHaveValue("9");
+    expect(field(dialog, "Years to pay off")).toHaveAccessibleDescription(
+      "Left to run",
+    );
+    expect(lastPayment).toHaveDisplayValue("August");
+    expect(field(dialog, "Year")).toHaveValue("2035");
+    expect(field(dialog, "Rate")).toHaveAccessibleDescription(workedHint);
+    expect(field(dialog, "Monthly payment")).toHaveValue("£2,210");
   });
 
   it("opens a house owned outright with no loan fields", () => {
