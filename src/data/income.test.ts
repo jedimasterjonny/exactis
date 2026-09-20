@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { contributionOf, sacrificeOf, totalOf } from "./income";
+import {
+  contributionOf,
+  isFeeding,
+  isOpeningSound,
+  sacrificeOf,
+  toPension,
+  totalOf,
+} from "./income";
 import { incomeLines } from "./income.fixture";
 
 const [salary, stepUp, , statePension] = incomeLines;
@@ -27,5 +34,49 @@ describe("contributionOf", () => {
   it("pays the sacrifice into the pension with the employer's NI saved on it", () => {
     expect(contributionOf(salary)).toBeCloseTo(13800, 8);
     expect(contributionOf(stepUp)).toBe(0);
+  });
+});
+
+// The salary as its dialog holds it, feeding the pension it opened on
+// and opening none, and the same salary opening one instead.
+const feeding = { ...salary, opens: null };
+const opening = {
+  ...salary,
+  feeds: null,
+  opens: { balance: 2500, name: "Aviva" },
+};
+
+describe("isFeeding", () => {
+  it("says whether the line has a pension to sacrifice into, listed or opened", () => {
+    expect(isFeeding(feeding)).toBe(true);
+    expect(isFeeding(opening)).toBe(true);
+    expect(isFeeding({ ...feeding, feeds: null })).toBe(false);
+  });
+});
+
+describe("isOpeningSound", () => {
+  it("holds a pension the line opens to being named, and asks nothing of a line opening none", () => {
+    expect(isOpeningSound(opening)).toBe(true);
+    expect(isOpeningSound(feeding)).toBe(true);
+    expect(
+      isOpeningSound({ ...opening, opens: { balance: 0, name: "  " } }),
+    ).toBe(false);
+  });
+});
+
+describe("toPension", () => {
+  it("writes the pension as a wrapper paid before tax, at the plan rate, paid nothing of its own", () => {
+    expect(toPension({ balance: 2500, name: "Aviva" })).toStrictEqual({
+      balance: 2500,
+      balloon: 0,
+      cadence: "year",
+      cap: 0,
+      contribution: 0,
+      funding: "fixed",
+      growth: "plan",
+      kind: "tax-deferred",
+      name: "Aviva",
+      rate: 0,
+    });
   });
 });
