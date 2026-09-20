@@ -11,7 +11,7 @@ export interface Owed {
 
 // The years a plan's payments are counted from: its first year, and the
 // month of it the plan is read in, January being nought.
-interface PlanMonth {
+export interface PlanMonth {
   readonly from: number;
   readonly month: number;
 }
@@ -125,6 +125,16 @@ export function termOf(
     Math.log(1 + monthly) /
     12
   );
+}
+
+// The term whose last payment falls in the month: the payments from the
+// plan's month to it, both counted, over twelve, which is what clearsIn
+// reads back as that month. At least one payment, since the plan's
+// month is the first paying month and a month before it is read as it:
+// a term never steps back before the plan.
+export function termTo(end: Month, plan: PlanMonth): number {
+  const payments = (end.year - plan.from) * 12 + end.month - plan.month + 1;
+  return Math.max(1, payments) / 12;
 }
 
 // The months a term runs, whole, and at least one: a term of nothing is
