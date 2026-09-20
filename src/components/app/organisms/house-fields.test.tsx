@@ -132,6 +132,18 @@ describe("HouseFields", () => {
     ]);
   });
 
+  it("holds what is owed and paid at nothing or above", () => {
+    const { onAmend } = renderFields(home, "rate", 0.0537);
+
+    commit(field("Loan balance"), "-300,000");
+    commit(field("Monthly payment"), "-2,000");
+
+    expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
+      { balance: 0 },
+      { payment: 0 },
+    ]);
+  });
+
   it("shows a worked-out rate, and an error when none fits", () => {
     const { rerender } = renderFields(home, "rate", 0.0537);
 

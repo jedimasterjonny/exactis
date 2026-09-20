@@ -150,6 +150,20 @@ describe("CarFields", () => {
     ]);
   });
 
+  it("holds what is owed, paid and left as a balloon at nothing or above", () => {
+    const { onAmend } = renderFields(golf, { figure: 290, worked: "payment" });
+
+    commit(field("Balance owed"), "-10,000");
+    commit(field("Monthly payment"), "-250");
+    commit(field("Balloon"), "-4,000");
+
+    expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
+      { balance: 0 },
+      { payment: 0 },
+      { balloon: 0 },
+    ]);
+  });
+
   it("shows a worked-out rate, and an error when none fits", () => {
     const { rerender } = renderFields(golf, { figure: 0.0792, worked: "rate" });
 
