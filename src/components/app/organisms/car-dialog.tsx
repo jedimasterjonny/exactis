@@ -7,6 +7,7 @@ import { startTransition, useState, useTransition } from "react";
 import type { Agreement, CarDraft, CarValues } from "@/data/cars";
 import type { Secured } from "@/data/secured";
 import type { LoanFigure, Stood } from "@/lib/figures";
+import type { PlanMonth } from "@/lib/loans";
 
 import { saveCar } from "@/app/(app)/accounts/actions";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
@@ -20,6 +21,7 @@ interface CarDialogProps {
   readonly car: null | Secured;
   readonly onDismiss: () => void;
   readonly onSaved: () => void;
+  readonly plan: PlanMonth;
 }
 
 // An open dialog: the draft as it is, the draft as it opened, which the
@@ -59,13 +61,15 @@ const blank: Entry = { draft, initial: draft, typed: ["rate", "term"] };
 // by value. The save holds while the draft is not sound, or a rate could
 // not be worked out; a term that could not is no bar, since finance the
 // payment never clears is paid to the end of the plan and the store
-// reads that off the figures it keeps. The caller is told when the car
-// has been saved, so the screen can close the dialog and bring the
-// assets forward.
+// reads that off the figures it keeps. The plan's month is handed to
+// the fields, which count the term's end from it. The caller is told
+// when the car has been saved, so the screen can close the dialog and
+// bring the assets forward.
 export function CarDialog({
   car,
   onDismiss,
   onSaved,
+  plan,
 }: CarDialogProps): JSX.Element {
   const [entry, setEntry] = useState<Entry>(() =>
     car === null ? blank : entryOf(car),
@@ -124,6 +128,7 @@ export function CarDialog({
         figure={figure}
         initial={entry.initial}
         onAmend={amend}
+        plan={plan}
         worked={worked}
       />
     </EditDialog>

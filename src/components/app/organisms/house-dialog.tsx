@@ -7,6 +7,7 @@ import { startTransition, useState, useTransition } from "react";
 import type { HouseDraft, HouseValues } from "@/data/houses";
 import type { Secured } from "@/data/secured";
 import type { LoanFigure, Stood } from "@/lib/figures";
+import type { PlanMonth } from "@/lib/loans";
 
 import { saveHouse } from "@/app/(app)/accounts/actions";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
@@ -30,6 +31,7 @@ interface HouseDialogProps {
   readonly house: null | Secured;
   readonly onDismiss: () => void;
   readonly onSaved: () => void;
+  readonly plan: PlanMonth;
 }
 
 // A new house: mortgaged, since that is the case with something to work
@@ -58,13 +60,15 @@ const blank: Entry = { draft, initial: draft, typed: ["rate", "term"] };
 // shows by value. The save holds while the draft is not sound, or a
 // rate could not be worked out; a term that could not is no bar, since
 // a loan the payment never clears is paid to the end of the plan and
-// the store reads that off the figures it keeps. The caller is told
-// when the house has been saved, so the screen can close the dialog and
-// bring the assets forward.
+// the store reads that off the figures it keeps. The plan's month is
+// handed to the fields, which count the term's end from it. The caller
+// is told when the house has been saved, so the screen can close the
+// dialog and bring the assets forward.
 export function HouseDialog({
   house,
   onDismiss,
   onSaved,
+  plan,
 }: HouseDialogProps): JSX.Element {
   const [entry, setEntry] = useState<Entry>(() =>
     house === null ? blank : entryOf(house),
@@ -125,6 +129,7 @@ export function HouseDialog({
         figure={figure}
         initial={entry.initial}
         onAmend={amend}
+        plan={plan}
         worked={worked}
       />
     </EditDialog>
