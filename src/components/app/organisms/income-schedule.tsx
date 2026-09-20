@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 
 import type { Summary } from "@/components/app/organisms/schedule-rows";
 import type { Account } from "@/data/accounts";
-import type { IncomeKind, IncomeLine, IncomeLineValues } from "@/data/income";
+import type { IncomeKind, IncomeLine, IncomeLineDraft } from "@/data/income";
 import type { Plan } from "@/engine/projection";
 import type { Entry } from "@/hooks/use-editor";
 
@@ -21,7 +21,7 @@ import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
 import { isPension } from "@/data/accounts";
-import { totalOf } from "@/data/income";
+import { isOpeningSound, totalOf } from "@/data/income";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { isSound, spanOf } from "@/lib/lines";
@@ -31,8 +31,8 @@ import { optionsOf } from "@/lib/options";
 
 // What the dialog holds while it is open: the line's values, which are
 // flat already, with no last year for a line that runs to the end of the
-// plan.
-type Draft = IncomeLineValues;
+// plan, and the pension the save opens, if it opens one.
+type Draft = IncomeLineDraft;
 
 interface IncomeScheduleProps {
   readonly accounts: readonly Account[];
@@ -66,7 +66,9 @@ const kinds = optionsOf(kindLabels, [
 // the dialog opens, and the draft mirrors what they report. An
 // employment line's amount is its base salary, and the fields only it
 // takes sit in the slot beneath them, shown the pensions among the
-// accounts the page hands down. A row's bin asks through the confirm
+// accounts the page hands down; a salary may open a pension of its own
+// with the save, so the save holds while the one it opens is unnamed,
+// as it holds while the line is. A row's bin asks through the confirm
 // dialog before the line goes, as the ledger's does; nothing hangs on a
 // line, so it goes alone. The card takes a numeral of its own off the
 // screen's, since the reference numbers each of the schedule's cards
@@ -91,6 +93,9 @@ export function IncomeSchedule({
   // The category choice: an employment line's parts and its pension are
   // kept only while it is one, and come back as the line opened with
   // them when it is one again, which is what the fields mount showing.
+  // A pension the line was to open goes with the category, since a
+  // line opens one only while it is a salary, and no line opens with
+  // one to come back to.
   function categorise(current: Entry<Draft>, kind: IncomeKind): void {
     const { initial } = current;
     amend(current, {
@@ -99,18 +104,19 @@ export function IncomeSchedule({
         ? {
             bonus: initial.bonus,
             feeds: initial.feeds,
+            opens: initial.opens,
             rsu: initial.rsu,
             sacrifice: initial.sacrifice,
           }
-        : { bonus: 0, feeds: null, rsu: 0, sacrifice: 0 }),
+        : { bonus: 0, feeds: null, opens: null, rsu: 0, sacrifice: 0 }),
     });
   }
 
   // A row's pencil opens its line as it is, with its id so a save writes
-  // back to it.
+  // back to it. A saved line feeds its pension by id, so it opens none.
   function edit(line: IncomeLine): void {
     const { id, ...values } = line;
-    open(values, id);
+    open({ ...values, opens: null }, id);
   }
 
   return (
@@ -164,7 +170,9 @@ export function IncomeSchedule({
       )}
       {entry !== null && (
         <EditDialog
-          canSave={!isSaving && isSound(entry.draft)}
+          canSave={
+            !isSaving && isSound(entry.draft) && isOpeningSound(entry.draft)
+          }
           eyebrow={entry.id === null ? "New income line" : "Edit income line"}
           isWide
           onDismiss={dismiss}
@@ -208,8 +216,8 @@ export function IncomeSchedule({
 }
 
 // A new line: nothing a year from the plan's first year to its end,
-// growing with inflation and feeding no pension, as the reference's new
-// line opens.
+// growing with inflation and feeding no pension, listed or opened, as
+// the reference's new line opens.
 function blank(plan: Plan): Draft {
   return {
     amount: 0,
@@ -222,6 +230,7 @@ function blank(plan: Plan): Draft {
     lastMonth: null,
     lastYear: null,
     name: "",
+    opens: null,
     rsu: 0,
     sacrifice: 0,
   };

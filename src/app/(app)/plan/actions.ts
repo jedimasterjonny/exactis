@@ -4,14 +4,15 @@ import { updateTag } from "next/cache";
 import * as z from "zod";
 
 import type { ExpenseLine, ExpenseLineValues } from "@/data/expenses";
-import type { IncomeLine, IncomeLineValues } from "@/data/income";
+import type { IncomeLine, IncomeLineDraft, Opening } from "@/data/income";
 import type { LineValues } from "@/data/schedule";
+import type { Database } from "@/db/accounts";
 
 import { cadences, isPension } from "@/data/accounts";
 import { expenseKinds } from "@/data/expenses";
-import { incomeKinds } from "@/data/income";
+import { incomeKinds, toPension } from "@/data/income";
 import { lineGrowths } from "@/data/schedule";
-import { findAccount } from "@/db/accounts";
+import { findAccount, insertAccount } from "@/db/accounts";
 import { getDb } from "@/db/client";
 import { insertExpenseLine, updateExpenseLine } from "@/db/expenses";
 import {
@@ -21,6 +22,7 @@ import {
 } from "@/db/income";
 import { requireSession } from "@/lib/session";
 
+import { accountsTag } from "../accounts/store";
 import { expenseLinesTag, incomeLinesTag } from "./store";
 
 // What a save of either line may carry, checked against the model's own
@@ -48,13 +50,22 @@ const expenseValues = z
 // with a bonus or RSUs only on an employment line, and the pension it
 // feeds and the share of its base it sacrifices, a fraction of the base
 // at most, only on an employment line, with a share given up only where
-// there is a pension to take it.
+// there is a pension to take it, listed or opened. A pension the line
+// opens is named, as an account is, and holds nothing or more; a line
+// opens one only while it is a salary, and not while it feeds one by
+// id, since the id is the store's to give.
 const incomeValues = z
   .object({
     ...line,
     bonus: z.number().int().nonnegative(),
     feeds: z.number().int().positive().nullable(),
     kind: z.enum(incomeKinds),
+    opens: z
+      .object({
+        balance: z.number().int().nonnegative(),
+        name: z.string().trim().min(1),
+      })
+      .nullable(),
     rsu: z.number().int().nonnegative(),
     sacrifice: z.number().min(0).max(1),
   })
@@ -63,11 +74,16 @@ const incomeValues = z
   .refine(
     (values) =>
       values.kind === "employment" ||
-      (values.bonus === 0 && values.rsu === 0 && values.feeds === null),
+      (values.bonus === 0 &&
+        values.rsu === 0 &&
+        values.feeds === null &&
+        values.opens === null),
   )
+  .refine((values) => values.feeds === null || values.opens === null)
   .refine(
-    (values) => values.feeds !== null || values.sacrifice === 0,
-  ) satisfies z.ZodType<IncomeLineValues>;
+    (values) =>
+      values.feeds !== null || values.opens !== null || values.sacrifice === 0,
+  ) satisfies z.ZodType<IncomeLineDraft>;
 
 const target = z.number().int().positive().nullable();
 
@@ -105,15 +121,22 @@ export async function saveExpenseLine(
 // feeds is read before the line is written, since the form offers the
 // pensions alone and the store holds the id to an account rather than
 // to a pension: one that is no account, or an account of another kind,
-// is refused here. The tag is expired before returning, so the same
-// round trip carries the list re-read.
+// is refused here. A pension the line opens is written first, as the
+// account it is, and the line feeds it by the id the store gave, so
+// the pension appears among the accounts with no more asked of the
+// form; the two are written one after the other rather than in a
+// transaction, since Neon's HTTP driver runs none, and a failure
+// between them leaves the pension opened and the line unwritten, which
+// reaches the form as an error. The tags are expired before returning,
+// so the same round trip carries the lists re-read, the accounts' only
+// when a pension was opened.
 export async function saveIncomeLine(
   id: null | number,
-  draft: IncomeLineValues,
+  draft: IncomeLineDraft,
 ): Promise<IncomeLine> {
   await requireSession();
   const at = target.parse(id);
-  const parsed = incomeValues.parse(draft);
+  const { opens, ...parsed } = incomeValues.parse(draft);
   const db = getDb();
   if (parsed.feeds !== null) {
     const pension = await findAccount(db, parsed.feeds);
@@ -124,10 +147,14 @@ export async function saveIncomeLine(
       throw new Error("A salary feeds a pension alone");
     }
   }
+  const values =
+    opens === null
+      ? parsed
+      : { ...parsed, feeds: await openPension(db, opens) };
   const saved =
     at === null
-      ? await insertIncomeLine(db, parsed)
-      : await updateIncomeLine(db, at, parsed);
+      ? await insertIncomeLine(db, values)
+      : await updateIncomeLine(db, at, values);
   updateTag(incomeLinesTag);
   return saved;
 }
@@ -139,4 +166,14 @@ function endsAfterItStarts(values: LineValues): boolean {
 // A month to end in needs a year to end in.
 function endsInAYear(values: LineValues): boolean {
   return values.lastMonth === null || values.lastYear !== null;
+}
+
+// A pension opened with a line: written as the account it is, and the
+// id the store gave it, for the line to feed. The accounts are expired
+// here, where one is added, so the tag goes with the write it answers
+// for rather than with the line's.
+async function openPension(db: Database, opening: Opening): Promise<number> {
+  const { id } = await insertAccount(db, toPension(opening));
+  updateTag(accountsTag);
+  return id;
 }
