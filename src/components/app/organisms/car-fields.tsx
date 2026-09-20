@@ -58,12 +58,14 @@ const workedHint = "Worked out from the other two";
 // worked out says so beneath itself. The two that can have no answer
 // say so too: a rate none fits is an error, since the car cannot be
 // saved without one, and a term the payment never reaches is a hint,
-// since finance that never clears is paid to the end of the plan. The
-// month and the year are the term read the other way, counted from the
-// month the plan is read in: they show the month the term's last
-// payment falls in, and one picked is reported as the term whose last
-// payment falls in it, so a term can be typed as years or picked as a
-// date and the two never disagree. A car owned outright shows no
+// since finance that never clears is paid to the end of the plan. What
+// is owed, paid a month and left as a balloon is held at nothing or
+// above, since a sum below nothing is none of those and the store
+// would refuse it. The month and the year are the term read the other
+// way, counted from the month the plan is read in: they show the month
+// the term's last payment falls in, and one picked is reported as the
+// term whose last payment falls in it, so a term can be typed as years
+// or picked as a date and the two never disagree. A car owned outright shows no
 // finance fields at all.
 export function CarFields({
   clears,
@@ -134,6 +136,7 @@ export function CarFields({
             <MoneyField
               hint="What is owed today"
               label="Balance owed"
+              min={0}
               onValueCommitted={(balance) => {
                 onAmend({ balance });
               }}
@@ -158,6 +161,7 @@ export function CarFields({
             <MoneyField
               hint={worked === "payment" ? workedHint : "A month"}
               label="Monthly payment"
+              min={0}
               onValueCommitted={(payment) => {
                 onAmend({ payment });
               }}
@@ -199,6 +203,7 @@ export function CarFields({
           <MoneyField
             hint={balloonHint(clears)}
             label="Balloon"
+            min={0}
             onValueCommitted={(balloon) => {
               onAmend({ balloon });
             }}

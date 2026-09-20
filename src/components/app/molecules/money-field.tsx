@@ -8,6 +8,8 @@ import { FigureInput } from "@/components/app/atoms/figure-input";
 type MoneyFieldProps = Figure & {
   readonly hint?: string;
   readonly label: string;
+  readonly max?: number;
+  readonly min?: number;
   readonly onValueCommitted?: (value: number) => void;
 };
 
@@ -21,10 +23,14 @@ const format: Intl.NumberFormatOptions = {
 };
 
 // A money input: a figure input under a hint that carries the derivation.
-// The figure is held as the caller says, by default or by value.
+// The figure is held as the caller says, by default or by value, inside
+// the bounds it gives if any, which the number field clamps a typed sum
+// to when it commits: what is owed on a loan is never less than nothing.
 export function MoneyField({
   hint,
   label,
+  max,
+  min,
   onValueCommitted,
   ...figure
 }: MoneyFieldProps): JSX.Element {
@@ -34,6 +40,8 @@ export function MoneyField({
         {...figure}
         format={format}
         largeStep={1000}
+        max={max}
+        min={min}
         onValueCommitted={onValueCommitted}
         step={100}
       />

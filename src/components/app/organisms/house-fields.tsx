@@ -51,11 +51,13 @@ const workedHint = "Worked out from the other two";
 // says so beneath itself. The two that can have no answer say so too: a
 // rate none fits is an error, since the house cannot be saved without
 // one, and a term the payment never reaches is a hint, since a loan that
-// never clears is paid to the end of the plan. The month and the year
-// are the term read the other way, counted from the month the plan is
-// read in: they show the month the term's last payment falls in, and
-// one picked is reported as the term whose last payment falls in it,
-// so a term can be typed as years or picked as a date and the two
+// never clears is paid to the end of the plan. What is owed and paid a
+// month is held at nothing or above, since a sum below nothing is
+// neither and the store would refuse it. The month and the year are
+// the term read the other way, counted from the month the plan is read
+// in: they show the month the term's last payment falls in, and one
+// picked is reported as the term whose last payment falls in it, so a
+// term can be typed as years or picked as a date and the two
 // never disagree. A house owned outright shows no loan fields at all.
 export function HouseFields({
   draft,
@@ -125,6 +127,7 @@ export function HouseFields({
             <MoneyField
               hint="What is owed today"
               label="Loan balance"
+              min={0}
               onValueCommitted={(balance) => {
                 onAmend({ balance });
               }}
@@ -149,6 +152,7 @@ export function HouseFields({
             <MoneyField
               hint={worked === "payment" ? workedHint : "A month"}
               label="Monthly payment"
+              min={0}
               onValueCommitted={(payment) => {
                 onAmend({ payment });
               }}
