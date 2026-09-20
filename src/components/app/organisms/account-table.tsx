@@ -6,6 +6,7 @@ import { GripVertical, Wallet } from "lucide-react";
 import { useState } from "react";
 
 import type { Account, AccountKind, Growth } from "@/data/accounts";
+import type { IncomeLine } from "@/data/income";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { RowAction } from "@/components/app/atoms/row-action";
@@ -22,12 +23,14 @@ import {
 } from "@/components/kit/table";
 import { allowanceOf } from "@/data/accounts";
 import { cadenceAbbreviations } from "@/lib/cadence";
+import { fedOf, feedersOf, listed } from "@/lib/feeders";
 import { formatGbp, formatPercent } from "@/lib/money";
 
 interface AccountTableProps {
   readonly accounts: readonly Account[];
   readonly emptyDescription: string;
   readonly emptyTitle: string;
+  readonly lines?: readonly IncomeLine[];
   readonly onDelete?: (account: Account) => void;
   readonly onEdit?: (account: Account) => void;
   readonly onMove?: (account: Account, target: Account) => void;
@@ -52,7 +55,12 @@ const treatments: Record<
 
 // A ledger of accounts: the name and its balance carry the weight, the
 // treatment is a badge, and the three figures are right-aligned mono. A
-// table given an edit handler closes each row with a pencil that reports
+// table given the income lines writes what the salaries sacrifice into
+// a pension beneath the pension's own contribution, naming them, so
+// what lands in it is read off the row rather than off the salaries;
+// a table given none, as the assets' is, writes each account's own
+// contribution alone, since nothing feeds an asset. A table given an
+// edit handler closes each row with a pencil that reports
 // the row's account, whose id says where a save writes back, and one
 // given a delete handler with a bin that reports the account to delete,
 // which the caller asks about before it does anything. One given a
@@ -70,6 +78,7 @@ export function AccountTable({
   accounts,
   emptyDescription,
   emptyTitle,
+  lines = [],
   onDelete,
   onEdit,
   onMove,
@@ -202,7 +211,7 @@ export function AccountTable({
                 </Badge>
               </TableCell>
               <TableCell className="text-right figure">
-                {formatContribution(account)}
+                <Contribution account={account} lines={lines} />
               </TableCell>
               <TableCell className="text-right figure">
                 {formatGrowth(account.growth)}
@@ -225,6 +234,35 @@ export function AccountTable({
         </TableBody>
       </Table>
     </Card>
+  );
+}
+
+// What an account is paid: its own contribution, and beneath it, faint,
+// what the salaries sacrifice into it a year with the employer's NI
+// saved, naming them, for a pension one or more feed. A fed pension
+// paid nothing of its own shows the sacrifice as its figure, since
+// that is what lands in it, and says beneath where it is from.
+function Contribution({
+  account,
+  lines,
+}: {
+  readonly account: Account;
+  readonly lines: readonly IncomeLine[];
+}): JSX.Element {
+  const fed = fedOf(account.id, lines);
+  if (fed === 0) {
+    return <>{formatContribution(account)}</>;
+  }
+  const from = `sacrificed from ${listed.format(feedersOf(account.id, lines))}`;
+  const [figure, detail] =
+    account.contribution === undefined
+      ? [`${formatGbp(fed)} / yr`, from]
+      : [formatContribution(account), `+ ${formatGbp(fed)} / yr ${from}`];
+  return (
+    <>
+      {figure}
+      <span className="block text-xs text-muted-foreground">{detail}</span>
+    </>
   );
 }
 
