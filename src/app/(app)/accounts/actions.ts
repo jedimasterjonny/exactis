@@ -3,7 +3,12 @@
 import { updateTag } from "next/cache";
 import * as z from "zod";
 
-import type { Account, AccountValues } from "@/data/accounts";
+import type {
+  Account,
+  AccountDraft,
+  AccountValues,
+  Share,
+} from "@/data/accounts";
 import type { CarValues } from "@/data/cars";
 import type { HouseValues } from "@/data/houses";
 import type { SecuredRecords } from "@/data/secured";
@@ -37,7 +42,7 @@ import {
   insertExpenseLine,
   updateExpenseLine,
 } from "@/db/expenses";
-import { isFed, stopFeeding } from "@/db/income";
+import { isFed, stopFeeding, updateSacrifice } from "@/db/income";
 import { requireSession } from "@/lib/session";
 
 import { expenseLinesTag, incomeLinesTag } from "../plan/store";
@@ -103,8 +108,12 @@ const house = z
 // balloon never negative, the spare money only into an account that
 // takes it, a rate
 // no lower than losing everything, since below that a year's growth is
-// not a number, and the name as typed less the space around it, which
-// the form also trims.
+// not a number, the name as typed less the space around it, which
+// the form also trims, and the shares the salaries feeding the account
+// sacrifice, each a fraction of the base at most against a line by its
+// id, one share a line, since the dialog holds one and two would write
+// the same line twice, and none against anything but a pension, since
+// only a pension is fed.
 const values = z
   .object({
     balance: z.number().int(),
@@ -117,10 +126,20 @@ const values = z
     kind: z.enum(accountKinds),
     name: z.string().trim().min(1),
     rate: z.number().min(-1),
+    shares: z.array(
+      z.object({
+        line: z.number().int().positive(),
+        sacrifice: z.number().min(0).max(1),
+      }),
+    ),
   })
+  .refine((draft) => draft.funding === "fixed" || takesSpare(draft))
+  .refine((draft) => isPension(draft) || draft.shares.length === 0)
   .refine(
-    (draft) => draft.funding === "fixed" || takesSpare(draft),
-  ) satisfies z.ZodType<AccountValues>;
+    (draft) =>
+      new Set(draft.shares.map((share) => share.line)).size ===
+      draft.shares.length,
+  ) satisfies z.ZodType<AccountDraft>;
 
 // An order: every account's id once, so the store can place them all.
 const order = z
@@ -169,20 +188,28 @@ export async function removeAccount(id: number): Promise<void> {
 // itself and parses what it was sent rather than trusting the form; a
 // value the form could not have sent fails loudly. A pension a salary
 // feeds stays a pension, so an edit that would make it anything else
-// is refused. The tag is expired before returning, so the same round
-// trip carries the list re-read.
+// is refused. The shares the dialog holds for the salaries feeding the
+// account are written over theirs after the account, each held to a
+// line feeding it; a new account is fed by nothing, so a share sent
+// with one is refused before anything is written. The tags are expired
+// before returning, so the same round trip carries the lists re-read,
+// the lines' only where a share was written.
 export async function saveAccount(
   id: null | number,
-  draft: AccountValues,
+  draft: AccountDraft,
 ): Promise<Account> {
   await requireSession();
   const at = target.parse(id);
-  const parsed = values.parse(draft);
+  const { shares, ...parsed } = values.parse(draft);
+  if (at === null && shares.length > 0) {
+    throw new Error("Nothing feeds an account the store has not given an id");
+  }
   const db = getDb();
   const account =
     at === null
       ? await insertAccount(db, parsed)
       : await writeOver(db, at, parsed);
+  await writeShares(db, account.id, shares);
   updateTag(accountsTag);
   return account;
 }
@@ -293,4 +320,19 @@ async function writeSecured(
     }
   }
   return account;
+}
+
+// The shares written over the salaries' own, each against the line
+// it names and held by the store to one feeding the account. The lines
+// are expired with each share, since one changed, and left where they
+// are when there are none: the tag goes with the write it answers for.
+async function writeShares(
+  db: Database,
+  id: number,
+  shares: readonly Share[],
+): Promise<void> {
+  for (const share of shares) {
+    await updateSacrifice(db, id, share);
+    updateTag(incomeLinesTag);
+  }
 }

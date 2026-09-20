@@ -21,6 +21,16 @@ export interface Account {
   readonly secures?: number;
 }
 
+// The account as its dialog holds it: the values, and the share of its
+// base each salary feeding it sacrifices, by the line's id, so a share
+// is edited from the pension's side as it is from the salary's and
+// written with the account. An account nothing feeds carries none, and
+// so does a new one, since nothing feeds an account the store has not
+// given an id yet.
+export interface AccountDraft extends AccountValues {
+  readonly shares: readonly Share[];
+}
+
 export type AccountKind = (typeof accountKinds)[number];
 
 // The account as a form or a table row holds it: flat, with every field
@@ -52,6 +62,13 @@ export type Funding = (typeof fundings)[number];
 // to every wrapper, or a fixed rate the account carries itself.
 export type Growth =
   { readonly kind: "fixed"; readonly rate: number } | { readonly kind: "plan" };
+
+// A salary's share of its base sacrificed into the account, by the
+// line's id, as the account's dialog holds it beside the account.
+export interface Share {
+  readonly line: number;
+  readonly sacrifice: number;
+}
 
 // What is paid into the account: a fixed sum at its cadence, or the spare
 // money, what a month's income leaves after the expenses and every fixed

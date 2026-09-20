@@ -220,6 +220,7 @@ describe("AccountLedger", () => {
       kind: "tax-free",
       name: "Lifetime ISA",
       rate: 0.03,
+      shares: [],
     });
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(screen.getByRole("dialog", { name: "Lifetime ISA" })).toBeVisible();
@@ -296,6 +297,7 @@ describe("AccountLedger", () => {
       kind: "real-asset",
       name: "Car",
       rate: 0,
+      shares: [],
     });
     expect(screen.getByRole("tab", { name: /^Assets/ })).toHaveAttribute(
       "aria-selected",
@@ -459,6 +461,7 @@ describe("AccountLedger", () => {
       kind: "real-asset",
       name: "Home",
       rate: 0.021,
+      shares: [],
     });
     expect(screen.getByRole("tab", { name: /^Assets/ })).toHaveAttribute(
       "aria-selected",
@@ -513,6 +516,7 @@ describe("AccountLedger", () => {
       kind: "tax-deferred",
       name: "Workplace pension",
       rate: 0,
+      shares: [],
     });
     expect(screen.getByRole("tab", { name: /^Accounts/ })).toHaveAttribute(
       "aria-selected",
@@ -566,6 +570,7 @@ describe("AccountLedger", () => {
       kind: "tax-free",
       name: "Stocks & shares ISA",
       rate: 0,
+      shares: [],
     });
   });
 
@@ -702,6 +707,7 @@ describe("AccountLedger", () => {
       kind: "tax-free",
       name: "Stocks & shares ISA",
       rate: 0,
+      shares: [],
     });
   });
 
@@ -1032,8 +1038,8 @@ describe("AccountLedger", () => {
   });
 
   // The salary ends with 2048, so in 2049 it lands nothing on the row,
-  // though the link stands: the dialog still holds the treatment, since
-  // the store holds the link whether or not it runs.
+  // though the link stands: the dialog still holds the treatment and
+  // the share, since the store holds the link whether or not it runs.
   it("counts a salary on the row only while it runs, and holds the link either way", () => {
     const [salary] = incomeLines;
     render(
@@ -1053,6 +1059,9 @@ describe("AccountLedger", () => {
     expect(
       within(dialog).getByRole("combobox", { name: "Treatment" }),
     ).toBeDisabled();
+    expect(
+      within(dialog).getByRole("textbox", { name: "Sacrificed from Salary" }),
+    ).toHaveValue("10.00%");
   });
 
   it("holds the treatment of a pension a salary feeds", () => {

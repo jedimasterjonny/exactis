@@ -15,6 +15,7 @@ import {
   listIncomeLines,
   stopFeeding,
   updateIncomeLine,
+  updateSacrifice,
 } from "./income";
 
 const salary = {
@@ -169,6 +170,43 @@ describe("income lines store", () => {
       { ...salary, id: 1 },
       { ...salary, id: 2, name: "Step-up" },
       { ...fed, feeds: other.id, id: 3 },
+    ]);
+  });
+
+  // The share is written from the pension's side, so the write is held
+  // to a line feeding that pension: a line feeding another, or none,
+  // and an id no line has are each refused and left as they were.
+  it("writes a share over the line feeding the account, and refuses one feeding another or none", async () => {
+    const pension = await insertAccount(db, { ...workplace, name: "One" });
+    const other = await insertAccount(db, { ...workplace, name: "Other" });
+    const fed = await insertIncomeLine(db, {
+      ...salary,
+      feeds: pension.id,
+      sacrifice: 0.1,
+    });
+    const elsewhere = await insertIncomeLine(db, {
+      ...salary,
+      feeds: other.id,
+      sacrifice: 0.1,
+    });
+    const unfed = await insertIncomeLine(db, salary);
+
+    expect(
+      await updateSacrifice(db, pension.id, { line: fed.id, sacrifice: 0.08 }),
+    ).toStrictEqual({ ...fed, sacrifice: 0.08 });
+    await expect(
+      updateSacrifice(db, pension.id, { line: elsewhere.id, sacrifice: 0.08 }),
+    ).rejects.toThrow("No salary feeding the account has the id");
+    await expect(
+      updateSacrifice(db, pension.id, { line: unfed.id, sacrifice: 0.08 }),
+    ).rejects.toThrow("No salary feeding the account has the id");
+    await expect(
+      updateSacrifice(db, pension.id, { line: 99, sacrifice: 0.08 }),
+    ).rejects.toThrow("No salary feeding the account has the id");
+    expect(await listIncomeLines(db)).toStrictEqual([
+      { ...fed, sacrifice: 0.08 },
+      elsewhere,
+      unfed,
     ]);
   });
 

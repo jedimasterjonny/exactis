@@ -4,9 +4,10 @@ import type { JSX } from "react";
 
 import type {
   Account,
+  AccountDraft,
   AccountKind,
-  AccountValues,
   Funding,
+  Share,
 } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
 import type { Entry } from "@/hooks/use-editor";
@@ -14,9 +15,10 @@ import type { Entry } from "@/hooks/use-editor";
 import { saveAccount } from "@/app/(app)/accounts/actions";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { AccountFields } from "@/components/app/organisms/account-fields";
+import { SacrificeFields } from "@/components/app/organisms/sacrifice-fields";
 import { takesSpare, toValues } from "@/data/accounts";
 import { useMountedEditor } from "@/hooks/use-editor";
-import { feedersOf, listed } from "@/lib/feeders";
+import { feeding, listed } from "@/lib/feeders";
 
 interface AccountDialogProps {
   readonly account: Account | null;
@@ -29,8 +31,9 @@ interface AccountDialogProps {
 // the rate sits beside the growth choice and the sum and the cap beside
 // the contribution choice, each reset to what it opened with when its
 // choice changes, and the field always mounts showing what the draft
-// holds.
-type Draft = AccountValues;
+// holds; and the share each salary feeding the account sacrifices,
+// which is none for a new account.
+type Draft = AccountDraft;
 
 const blank: Draft = {
   balance: 0,
@@ -43,6 +46,7 @@ const blank: Draft = {
   kind: "tax-deferred",
   name: "",
   rate: 0,
+  shares: [],
 };
 
 // The dialog an account is entered or edited in, which takes the account
@@ -52,10 +56,16 @@ const blank: Draft = {
 // entry doubles as the open state, as the progress editor's point does,
 // so nothing is left to show once a save has dropped it. The fields are
 // uncontrolled and mount fresh with the entry's opening values, and the
-// draft mirrors what they report. The treatment is held where a salary
-// feeds the account, since the store refuses to make such a pension
-// anything else, which is what the income lines are handed down for.
-// The save holds while the account is unnamed or on its way to the
+// draft mirrors what they report. The income lines are handed down for
+// the salaries feeding the account: the treatment is held while one
+// does, since the store refuses to make such a pension anything else,
+// and each salary's share of its base is edited in the fields' slot
+// beside the growth and written with the account, so the sacrifice is
+// changed from the pension's side as it is from the salary's; an
+// account nothing feeds shows neither. Only a share that was changed
+// here goes to the store, since a share sent as it opened would write
+// over an edit made to the salary on the plan screen meanwhile. The
+// save holds while the account is unnamed or on its way to the
 // store, and a store that refuses leaves the dialog open and says why,
 // as the editor hook does, rather than handing the route the rejection.
 // The caller is told when the account has been saved, so the screen can
@@ -66,12 +76,18 @@ export function AccountDialog({
   onDismiss,
   onSaved,
 }: AccountDialogProps): JSX.Element | null {
+  const feeders = account === null ? [] : feeding(account.id, lines);
+  const opening = openingOf(account, feeders);
   const { amend, entry, isSaving, save } = useMountedEditor({
     describe: (saved) => saved.name,
     noun: "Account",
     onSaved,
-    opening: openingOf(account),
-    save: saveAccount,
+    opening,
+    save: async (id, draft) =>
+      saveAccount(id, {
+        ...draft,
+        shares: changedOf(draft.shares, opening.initial.shares),
+      }),
   });
 
   // The contribution choice: the fields the new choice shows mount with
@@ -116,7 +132,7 @@ export function AccountDialog({
       <AccountFields
         draft={entry.draft}
         initial={entry.initial}
-        kindLock={kindLockOf(entry.id, lines)}
+        kindLock={kindLockOf(feeders)}
         onAmend={(patch) => {
           amend(entry, patch);
         }}
@@ -126,8 +142,37 @@ export function AccountDialog({
         onKindChange={(kind) => {
           treat(entry, kind);
         }}
-      />
+      >
+        {feeders.length > 0 && (
+          <SacrificeFields
+            draft={entry.draft.shares}
+            feeders={feeders}
+            initial={entry.initial.shares}
+            onAmend={(shares) => {
+              amend(entry, { shares });
+            }}
+          />
+        )}
+      </AccountFields>
     </EditDialog>
+  );
+}
+
+// The shares the save sends: those that differ from what the account
+// opened with, by line and by share. The store writes every share it
+// is sent, so one sent as it opened would write the opening back over
+// whatever the salary holds now; one changed here is the user's last
+// word on it and goes.
+function changedOf(
+  shares: readonly Share[],
+  initial: readonly Share[],
+): Share[] {
+  return shares.filter(
+    (share) =>
+      !initial.some(
+        (held) =>
+          held.line === share.line && held.sacrifice === share.sacrifice,
+      ),
   );
 }
 
@@ -147,28 +192,34 @@ function fundedBy(current: Entry<Draft>, funding: Funding): Partial<Draft> {
 
 // Why the treatment of the account being edited is held, if it is: a
 // pension a salary feeds stays a pension until the salary is unlinked,
-// which the reason says, naming the salaries. A new account, or one
-// nothing feeds, is held to nothing. The new one is answered here rather
-// than by the feeders, since nothing can feed an account the store has
-// not given an id yet, and a line feeding no pension holds null where an
-// id would be: the two nulls mean different things and must not meet.
-function kindLockOf(
-  id: null | number,
-  lines: readonly IncomeLine[],
-): string | undefined {
-  if (id === null) {
-    return undefined;
-  }
-  const feeders = feedersOf(id, lines);
+// which the reason says, naming the salaries. An account nothing feeds
+// is held to nothing, and a new one is fed by nothing, since the store
+// has not given it an id yet: the dialog answers for it rather than
+// asking the feeders, since a line feeding no pension holds null where
+// an id would be, and the two nulls must not meet.
+function kindLockOf(feeders: readonly IncomeLine[]): string | undefined {
   return feeders.length === 0
     ? undefined
-    : `Fed by ${listed.format(feeders)}; set the pension to none on the salary to change it`;
+    : `Fed by ${listed.format(feeders.map((line) => line.name))}; set the pension to none on the salary to change it`;
 }
 
 // The entry the dialog mounts open on: the account as it is, under its
-// id so a save writes back to it, or a blank draft under none for a new
-// one, which the store gives an id of its own.
-function openingOf(account: Account | null): Entry<Draft> {
-  const draft = account === null ? blank : toValues(account);
+// id so a save writes back to it, with the share each salary feeding
+// it sacrifices, or a blank draft under none for a new one, which the
+// store gives an id of its own.
+function openingOf(
+  account: Account | null,
+  feeders: readonly IncomeLine[],
+): Entry<Draft> {
+  const draft =
+    account === null
+      ? blank
+      : {
+          ...toValues(account),
+          shares: feeders.map((line) => ({
+            line: line.id,
+            sacrifice: line.sacrifice,
+          })),
+        };
   return { draft, id: account?.id ?? null, initial: draft };
 }
