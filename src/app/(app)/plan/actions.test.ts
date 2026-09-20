@@ -194,6 +194,22 @@ describe("saveIncomeLine", () => {
     expect(findAccount).toHaveBeenCalledTimes(3);
   });
 
+  // A share is at most the whole of the base, and the whole of it is
+  // taken: the bound is a bound, not a refusal of the figure at it.
+  it("takes a sacrifice of the whole of the base", async () => {
+    vi.mocked(findAccount).mockResolvedValue(pension);
+    vi.mocked(insertIncomeLine).mockResolvedValue(salary);
+    const whole = {
+      ...values,
+      feeds: pension.id,
+      kind: "employment",
+      sacrifice: 1,
+    } as const;
+
+    expect(await saveIncomeLine(null, whole)).toBe(salary);
+    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(db, lineOf(whole));
+  });
+
   // The pension is written first, as the account a new pension is,
   // named as typed less the space around it, and the line feeds it by
   // the id the store gave; no account is read, since the pension was
