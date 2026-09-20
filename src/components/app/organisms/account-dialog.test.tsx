@@ -319,6 +319,9 @@ describe("AccountDialog", () => {
     );
     const dialog = open();
 
+    expect(choice(dialog, "Contribution")).toHaveAccessibleDescription(
+      "Paid in on top of the salary sacrifice",
+    );
     expect(field(dialog, "Sacrificed from Salary")).toHaveValue("10.00%");
     expect(field(dialog, "Sacrificed from Salary")).toHaveAccessibleDescription(
       "Of its £120,000 base; £13,800 a year lands with the NI saved",
@@ -404,6 +407,9 @@ describe("AccountDialog", () => {
     expect(
       within(open()).queryByRole("textbox", { name: /^Sacrificed from/ }),
     ).not.toBeInTheDocument();
+    expect(choice(open(), "Contribution")).toHaveAccessibleDescription(
+      "Spare money is what a month's income leaves after the expenses and every fixed sum",
+    );
   });
 
   it("keeps a refused save open and says why", async () => {

@@ -61,11 +61,12 @@ const blank: Draft = {
 // does, since the store refuses to make such a pension anything else,
 // and each salary's share of its base is edited in the fields' slot
 // beside the growth and written with the account, so the sacrifice is
-// changed from the pension's side as it is from the salary's; an
-// account nothing feeds shows neither. Only a share that was changed
-// here goes to the store, since a share sent as it opened would write
-// over an edit made to the salary on the plan screen meanwhile. The
-// save holds while the account is unnamed or on its way to the
+// changed from the pension's side as it is from the salary's, and the
+// account's own contribution is said to be on top of it; an account
+// nothing feeds shows neither. Only a share that was changed here goes
+// to the store, since a share sent as it opened would write over an
+// edit made to the salary on the plan screen meanwhile. The save holds
+// while the account is unnamed or on its way to the
 // store, and a store that refuses leaves the dialog open and says why,
 // as the editor hook does, rather than handing the route the rejection.
 // The caller is told when the account has been saved, so the screen can
@@ -132,6 +133,7 @@ export function AccountDialog({
       <AccountFields
         draft={entry.draft}
         initial={entry.initial}
+        isFed={feeders.length > 0}
         kindLock={kindLockOf(feeders)}
         onAmend={(patch) => {
           amend(entry, patch);

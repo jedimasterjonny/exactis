@@ -15,6 +15,7 @@ interface AccountFieldsProps {
   readonly children?: ReactNode;
   readonly draft: AccountValues;
   readonly initial: AccountValues;
+  readonly isFed?: boolean;
   readonly kindLock?: string | undefined;
   readonly onAmend: (patch: Partial<AccountValues>) => void;
   readonly onFundingChange: (funding: Funding) => void;
@@ -23,6 +24,13 @@ interface AccountFieldsProps {
 
 const fundings = [
   { label: "A fixed sum", value: "fixed" },
+  { label: "Spare money", value: "spare" },
+] as const;
+
+// The same choices for a pension a salary feeds, where a fixed sum of
+// nothing is the usual case rather than an unfilled field, and says so.
+const fundingsOnTop = [
+  { label: "A fixed sum, or nothing", value: "fixed" },
   { label: "Spare money", value: "spare" },
 ] as const;
 
@@ -57,11 +65,15 @@ const kinds = [
 // row's other cell was the one cell the rows left empty, and the rate
 // stacks under the growth rather than taking it, so a fed pension's
 // six fields fill three rows and an account nothing feeds is laid out
-// as it was.
+// as it was. A fed pension's own contribution is paid on top of the
+// sacrifice, and the choice and the sum say so, since a fixed sum of
+// nothing beside what a salary lands would otherwise read as nothing
+// paid in at all.
 export function AccountFields({
   children,
   draft,
   initial,
+  isFed = false,
   kindLock,
   onAmend,
   onFundingChange,
@@ -101,12 +113,16 @@ export function AccountFields({
         {takesSpare(draft) && (
           <SelectField
             defaultValue={initial.funding}
-            hint="Spare money is what a month's income leaves after the expenses and every fixed sum"
+            hint={
+              isFed
+                ? "Paid in on top of the salary sacrifice"
+                : "Spare money is what a month's income leaves after the expenses and every fixed sum"
+            }
             label="Contribution"
             onValueChange={(funding) => {
               onFundingChange(funding);
             }}
-            options={fundings}
+            options={isFed ? fundingsOnTop : fundings}
           />
         )}
       </FieldRow>
@@ -115,7 +131,11 @@ export function AccountFields({
           <>
             <MoneyField
               defaultValue={initial.contribution}
-              hint="Leave at nothing for none"
+              hint={
+                isFed
+                  ? "Leave at nothing for none on top"
+                  : "Leave at nothing for none"
+              }
               // Keyed apart from the cap, which takes its place:
               // the fragment is unwrapped and the two would be
               // one field, keeping what was typed into the other.
