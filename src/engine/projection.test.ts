@@ -139,6 +139,26 @@ describe("project", () => {
     ]);
   });
 
+  // The salary ends with 2027, so 2028 is carried with nothing fed and
+  // the pension holds what two years landed.
+  it("stops paying the sacrifice in when the salary ends", () => {
+    const fed: Account = {
+      balance: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: pension.id,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+    };
+
+    expect(
+      project(
+        [fed],
+        { expenses: [], income: [{ ...salary, lastYear: 2027 }] },
+        { ...plan, years: 3 },
+      ).map(({ deferred }) => deferred),
+    ).toStrictEqual([0, 13800, 27600, 27600]);
+  });
+
   // Two ISAs that share an id, which the store never hands out, are
   // each paid their own take and not each other's: £8,750 is left,
   // each takes £1,666.67, and each is £20,000 up on the year.

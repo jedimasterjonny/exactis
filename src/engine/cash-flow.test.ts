@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { IncomeLine } from "@/data/income";
+import type { Month } from "@/data/schedule";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
+
+import type { CashFlow } from "./cash-flow";
 
 import { cashFlow } from "./cash-flow";
 
@@ -107,6 +111,31 @@ describe("cashFlow", () => {
     expect(unlisted.left).toBeCloseTo(12250 - 20000 / 12, 10);
     expect(nothing.fed).toStrictEqual([]);
     expect(nothing.left).toBe(12250 - 2266.25);
+  });
+
+  // The feed runs with the line: before its first year, and after the
+  // month it ends in, the pension is fed nothing and the month is
+  // short by nothing, though the pension is listed and the line names
+  // it.
+  it("stops feeding the pension when the salary is not running", () => {
+    const unpaid: Account = {
+      balance: 412880,
+      growth: { kind: "plan" },
+      id: pension.id,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+    };
+    const ending = { ...salary, lastMonth: 5, lastYear: 2030 };
+    const flowAt = (income: IncomeLine, at: Month): CashFlow =>
+      cashFlow([unpaid], { expenses: [], income: [income] }, at);
+
+    expect(flowAt(salary, { month: 0, year: 2049 }).fed).toStrictEqual([]);
+    expect(flowAt(salary, { month: 0, year: 2049 }).left).toBe(0);
+    expect(flowAt(salary, { month: 11, year: 2025 }).fed).toStrictEqual([]);
+    expect(flowAt(ending, { month: 6, year: 2030 }).fed).toStrictEqual([]);
+    expect(flowAt(ending, { month: 6, year: 2030 }).left).toBe(0);
+    expect(flowAt(ending, { month: 5, year: 2030 }).fed).toHaveLength(1);
+    expect(flowAt(ending, { month: 5, year: 2030 }).left).toBe(11250);
   });
 
   // 2035 runs both salaries, £147,000 and £168,000 a year, against the
