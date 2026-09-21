@@ -45,7 +45,9 @@ export interface ProjectionPoint {
   readonly year: number;
 }
 
-// An account and the balance the projection has carried it to.
+// An account and the balance the projection has carried it to, which
+// opens at what the account holds and is never below nothing: only a
+// debt may be owed, and no debt is held.
 interface Held {
   readonly account: Account;
   readonly balance: number;
@@ -96,8 +98,14 @@ export function endYear(plan: Plan): number {
 // month. The flow refuses the same list where it is read, which is
 // the first thing a carried year does; it is refused here as well so
 // a plan of no years, which reads no month, is refused all the same
-// rather than plotting the twice-counted balance as its one point.
-// Nothing is taxed yet.
+// rather than plotting the twice-counted balance as its one point. A
+// held account opening below nothing is refused the same way: a
+// balance below nothing is a debt's, and no debt is held here, so a
+// wrapper or a cash account at one is a figure nothing can mean,
+// compounded deeper every month by the growth and never drawn on, the
+// draw taking the lesser of what the account holds and what the month
+// is short under a floor of nothing. The action refuses the same
+// balance where it is saved. Nothing is taxed yet.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -109,6 +117,9 @@ export function project(
   let held: readonly Held[] = accounts
     .filter(takesSpare)
     .map((account) => ({ account, balance: account.balance }));
+  if (held.some(({ balance }) => balance < 0)) {
+    throw new Error("A balance below nothing is a debt's");
+  }
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
     const age = year - plan.born;
