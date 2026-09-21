@@ -21,6 +21,27 @@ describe("paymentOf", () => {
     expect(paymentOf(owed(1000), 0.12, 0)).toBeCloseTo(1010, 10);
   });
 
+  // A term amortises over the payments its last one is counted to, so
+  // the payment a typed term gives is the payment the month it is read
+  // back as gives: 25.2 years is 303 payments and not 302, and 0.7
+  // years is nine and not eight. A whole term is the months it always
+  // was, and so is one a whisker over a whole number of them.
+  it("amortises over the payments the term's last one is counted to", () => {
+    const plan = { from: 2026, month: 8 };
+    const home = owed(240000);
+
+    expect(paymentOf(home, 0.05, 25.2)).toBe(
+      paymentOf(home, 0.05, termTo(clearsIn(25.2, plan), plan)),
+    );
+    expect(paymentOf(home, 0.05, 0.7)).toBe(
+      paymentOf(home, 0.05, termTo(clearsIn(0.7, plan), plan)),
+    );
+    expect(paymentOf(home, 0, 25.2)).toBeCloseTo(240000 / 303, 10);
+    expect(paymentOf(home, 0, 0.7)).toBeCloseTo(240000 / 9, 10);
+    expect(paymentOf(home, 0, 25)).toBeCloseTo(240000 / 300, 10);
+    expect(paymentOf(home, 0, 25 + 1e-12)).toBeCloseTo(240000 / 300, 10);
+  });
+
   // £20,000 at 6% paid down to an £8,000 balloon over four years is
   // £321.82 a month; with no rate the £12,000 difference spreads flat,
   // and a balloon the size of the balance leaves the interest alone to
