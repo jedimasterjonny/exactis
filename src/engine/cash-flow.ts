@@ -57,6 +57,18 @@ interface Paid {
   readonly amount: number;
 }
 
+// The least a month may be short by and be short at all. Tenths of a
+// pound do not add back to nothing in binary - £0.30 of income against
+// £0.10 and £0.20 of expenses leaves −5.55e-17 - and the projection
+// reads anything below nothing as a month the savings must cover, so
+// the residue of adding the lines up would draw a fraction of a
+// fraction of a penny out of a wrapper in every month of the plan. A
+// nanopound is far beneath the penny every figure here is read at and
+// far above the residue of any month's arithmetic. Both readers of what
+// the month has left are held to it: the shortfall the flow reports,
+// and the one the sacrifice is dropped for.
+const nanopound = 1e-9;
+
 // A month's money: the income lines running that month, as they are
 // earned, less what a salary sacrifices into its pension, less the
 // expense lines, each kept as well as summed. What that leaves pays the
@@ -65,7 +77,10 @@ interface Paid {
 // spare money to each account that takes it in the order they are
 // listed, each up to its cap and passing the rest on, and what is left
 // after them, which is negative by the expenses the income does not
-// cover and by nothing else. A fixed sum is a contribution out of what
+// cover and by nothing else. What is left within a nanopound of nothing
+// is nothing exactly: a month whose lines cancel to the penny need not
+// cancel in binary, and a shortfall too small to write down is no
+// shortfall to draw savings for. A fixed sum is a contribution out of what
 // the month has, not a drawdown: an account is paid only while the
 // income funding it lasts, and selling out of one wrapper to keep a
 // payment into another going would be a shortfall the ledger read back
@@ -79,9 +94,15 @@ interface Paid {
 // pension is paid in its own right; a salary naming a pension not
 // listed is earned whole, as a line paying a loan not listed pays
 // nothing off it. A sacrifice is given up only while what is left of
-// the income still covers the expenses: in a month it would not, no
-// line sacrifices at all, every line is earned whole and every pension
-// is fed nothing. All of them or none, rather than a share of each or
+// the income still covers the expenses, a month short of them by less
+// than a nanopound covering them as a month left with that much is left
+// with nothing: what the sacrifices are dropped for and what the month
+// is left with are the one figure, so the two are read against the one
+// rule and a plan whose month cancels to the penny does not give up
+// every sacrifice in every month of it over the residue of adding the
+// lines up. In a month that is really short, no line sacrifices at all,
+// every line is earned whole and every pension is fed nothing. All of
+// them or none, rather than a share of each or
 // the lines that fit, since a sacrifice a month cannot afford is a
 // drawdown by another name and the pension would be fed in the very
 // month a wrapper is sold to cover the spending. So a month that is
@@ -127,7 +148,7 @@ export function cashFlow(
     .map((line) => ({ amount: monthly(line.amount, line.cadence), line }));
   const expenses = total(spent);
   const givenUp = feeding.reduce((sum, entry) => sum + entry.sacrificed, 0);
-  const isEarnedWhole = income - givenUp - expenses < 0;
+  const isEarnedWhole = income - givenUp - expenses < -nanopound;
   const fed = isEarnedWhole ? [] : feeding;
   const sacrificed = isEarnedWhole ? 0 : givenUp;
   const paid = new Set(
@@ -140,7 +161,15 @@ export function cashFlow(
     income - sacrificed - expenses,
   );
   const { left, takes } = spareMoney(accounts, rest, fed);
-  return { expenses, fed, fixed, income, left, spare: takes, spent };
+  return {
+    expenses,
+    fed,
+    fixed,
+    income,
+    left: Math.abs(left) < nanopound ? 0 : left,
+    spare: takes,
+    spent,
+  };
 }
 
 // The account a link names, or none, since a link may name an account

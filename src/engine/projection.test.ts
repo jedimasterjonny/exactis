@@ -360,6 +360,39 @@ describe("project", () => {
     ]);
   });
 
+  // A month of tenths covers itself to the penny and leaves −5.55e-17
+  // in binary, which is a month to draw savings for only if a shortfall
+  // that small is one. The ISA holds fifty pence, the one balance where
+  // a residue this far below a penny still shows in a figure rounded to
+  // the pound: whole it rounds up to £1, and a picopound taken out of
+  // it twelve times rounds down to nothing.
+  it("draws nothing for a shortfall smaller than a nanopound", () => {
+    const tenths = {
+      expenses: [
+        { ...household, amount: 0.1 },
+        { ...household, amount: 0.2, id: 2 },
+      ],
+      income: [
+        {
+          ...salary,
+          amount: 0.3,
+          bonus: 0,
+          cadence: "month",
+          feeds: null,
+          rsu: 0,
+          sacrifice: 0,
+        },
+      ],
+    } as const;
+
+    expect(
+      project([{ ...flatIsa, balance: 0.5 }], tenths, { ...plan, years: 1 }),
+    ).toStrictEqual([
+      { age: 36, deferred: 0, free: 1, uncovered: 0, year: 2026 },
+      { age: 37, deferred: 0, free: 1, uncovered: 0, year: 2027 },
+    ]);
+  });
+
   // The £1,200 of cash covers January whole and £200 of February, so
   // 2026 goes short by 800 + 10 × 1,000 = 10,800 and 2027, with nothing
   // left anywhere, by all twelve of its £1,000. Each is reported on the
