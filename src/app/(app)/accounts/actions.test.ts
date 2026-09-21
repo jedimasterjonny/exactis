@@ -108,6 +108,7 @@ const db = drizzle.mock();
 describe("saveAccount", () => {
   beforeEach(() => {
     vi.mocked(getDb).mockReturnValue(db);
+    vi.mocked(findLinePaying).mockResolvedValue(null);
   });
 
   it("writes nothing without a session", async () => {
@@ -163,6 +164,31 @@ describe("saveAccount", () => {
     vi.mocked(isFed).mockResolvedValue(false);
 
     expect(await saveAccount(pension.id, values)).toBe(pension);
+    expect(updateAccount).toHaveBeenCalledTimes(2);
+  });
+
+  // The loan's kind is held while a line pays it: the line is that
+  // loan's payment, and the engine refuses a line paying anything but a
+  // debt, so the edit would leave every projection read throwing where
+  // the plan is worked out. A loan nothing pays is edited freely, and a
+  // new account is asked nothing.
+  it("refuses to make a debt a line pays anything else", async () => {
+    vi.mocked(findLinePaying).mockResolvedValue(mortgagePayment);
+    vi.mocked(updateAccount).mockResolvedValue(mortgage);
+    const owing = { ...values, kind: "debt" } as const;
+
+    await expect(saveAccount(mortgage.id, values)).rejects.toThrow(
+      "A debt a line pays stays a debt",
+    );
+    expect(updateAccount).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+
+    expect(await saveAccount(mortgage.id, owing)).toBe(mortgage);
+    expect(findLinePaying).toHaveBeenCalledExactlyOnceWith(db, mortgage.id);
+
+    vi.mocked(findLinePaying).mockResolvedValue(null);
+
+    expect(await saveAccount(mortgage.id, values)).toBe(mortgage);
     expect(updateAccount).toHaveBeenCalledTimes(2);
   });
 
@@ -408,6 +434,7 @@ describe("saveHouse", () => {
 
   beforeEach(() => {
     vi.mocked(getDb).mockReturnValue(db);
+    vi.mocked(findLinePaying).mockResolvedValue(null);
     vi.mocked(getPlan).mockReturnValue({
       born: 1990,
       from: 2026,
@@ -464,7 +491,7 @@ describe("saveHouse", () => {
       "A pension a salary feeds stays a pension",
     );
     expect(updateAccount).toHaveBeenCalledExactlyOnceWith(db, home.id, asset);
-    expect(findLinePaying).not.toHaveBeenCalled();
+    expect(findLinePaying).toHaveBeenCalledExactlyOnceWith(db, home.id);
     expect(updateExpenseLine).not.toHaveBeenCalled();
   });
 
@@ -492,7 +519,10 @@ describe("saveHouse", () => {
       .mockResolvedValueOnce(home)
       .mockResolvedValueOnce(mortgage);
     vi.mocked(findLoanAgainst).mockResolvedValue(mortgage);
-    vi.mocked(findLinePaying).mockResolvedValue(mortgagePayment);
+    vi.mocked(findLinePaying).mockImplementation(
+      async (_db, id) =>
+        await Promise.resolve(id === mortgage.id ? mortgagePayment : null),
+    );
 
     expect(await saveHouse(home.id, house)).toBe(home);
     expect(vi.mocked(updateAccount).mock.calls).toStrictEqual([
@@ -500,7 +530,10 @@ describe("saveHouse", () => {
       [db, mortgage.id, loan],
     ]);
     expect(findLoanAgainst).toHaveBeenCalledExactlyOnceWith(db, home.id);
-    expect(findLinePaying).toHaveBeenCalledExactlyOnceWith(db, mortgage.id);
+    expect(vi.mocked(findLinePaying).mock.calls).toStrictEqual([
+      [db, home.id],
+      [db, mortgage.id],
+    ]);
     expect(updateExpenseLine).toHaveBeenCalledExactlyOnceWith(
       db,
       mortgagePayment.id,
@@ -545,7 +578,10 @@ describe("saveHouse", () => {
   it("sends a loan and its payments away when the house is owned outright now, the line first", async () => {
     vi.mocked(updateAccount).mockResolvedValue(home);
     vi.mocked(findLoanAgainst).mockResolvedValue(mortgage);
-    vi.mocked(findLinePaying).mockResolvedValue(mortgagePayment);
+    vi.mocked(findLinePaying).mockImplementation(
+      async (_db, id) =>
+        await Promise.resolve(id === mortgage.id ? mortgagePayment : null),
+    );
 
     await saveHouse(home.id, outright);
 
@@ -678,6 +714,7 @@ describe("saveCar", () => {
 
   beforeEach(() => {
     vi.mocked(getDb).mockReturnValue(db);
+    vi.mocked(findLinePaying).mockResolvedValue(null);
     vi.mocked(getPlan).mockReturnValue({
       born: 1990,
       from: 2026,
@@ -719,7 +756,10 @@ describe("saveCar", () => {
   it("writes over a car and the finance secured on it, and sends the finance away when the car is owned outright now", async () => {
     vi.mocked(updateAccount).mockResolvedValue(car);
     vi.mocked(findLoanAgainst).mockResolvedValue({ ...mortgage, id: 7 });
-    vi.mocked(findLinePaying).mockResolvedValue(mortgagePayment);
+    vi.mocked(findLinePaying).mockImplementation(
+      async (_db, id) =>
+        await Promise.resolve(id === 7 ? mortgagePayment : null),
+    );
 
     await saveCar(car.id, golf);
 
