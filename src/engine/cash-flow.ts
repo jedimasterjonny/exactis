@@ -117,7 +117,15 @@ const nanopound = 1e-9;
 // drop the sum that wrapper states and pay it nowhere. Both links are
 // read over the whole schedule before any month is worked out, since a
 // link is wrong the day it is written rather than the year its line
-// starts in. Every line is taken at the amount it states, in
+// starts in. An account the plan lists twice is refused beside them:
+// the store hands out an id an account, so two entries sharing one are
+// a caller's mistake in the same way, and listed twice the account is
+// paid its fixed sum twice over in every month and takes the spare
+// money twice on the way down, while a projection carrying it counts
+// its balance twice in every year. Refused here rather than where the
+// plan is carried, since the plan card reads a month straight from the
+// flow and a list the store cannot produce is wrong wherever it is
+// read. Every line is taken at the amount it states, in
 // today's money; how it grows against inflation waits on an inflation
 // assumption the plan does not carry yet.
 export function cashFlow(
@@ -125,6 +133,9 @@ export function cashFlow(
   schedule: Schedule,
   at: Month,
 ): CashFlow {
+  if (new Set(accounts.map(({ id }) => id)).size !== accounts.length) {
+    throw new Error("An account is listed once");
+  }
   checkLinks(accounts, schedule);
   const income = sumOf(schedule.income, at, totalOf);
   const feeding = schedule.income
