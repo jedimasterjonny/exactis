@@ -190,8 +190,9 @@ export async function removeAccount(id: number): Promise<void> {
 // action answers a POST from anywhere, so it checks the session for
 // itself and parses what it was sent rather than trusting the form; a
 // value the form could not have sent fails loudly. A pension a salary
-// feeds stays a pension, so an edit that would make it anything else
-// is refused. The shares the dialog holds for the salaries feeding the
+// feeds stays a pension and a debt a line pays stays a debt, so an edit
+// that would make either anything else is refused. The shares the
+// dialog holds for the salaries feeding the
 // account are written over theirs after the account, each held to a
 // line feeding it; a new account is fed by nothing, so a share sent
 // with one is refused before anything is written. Each tag is expired
@@ -268,15 +269,19 @@ async function removeWithPayments(db: Database, id: number): Promise<void> {
 }
 
 // The account with that id, written over with the values, through the
-// one check every write over an account goes through: a pension a
+// two checks every write over an account goes through: a pension a
 // salary feeds stays a pension, since the sacrifice would otherwise go
-// on leaving the salary and land in no wrapper, so an edit that would
-// make it anything else is refused and the salary is unlinked first.
-// The forms never offer such an edit, but each action answers a POST
-// from anywhere, and a house or a car written over a pension's id is
-// the same edit by another door, as is the loan against either written
-// over one: a loan made a pension by such a POST keeps its asset, and
-// the asset's next save would write a debt back over it.
+// on leaving the salary and land in no wrapper, and a debt a line pays
+// stays a debt, since the line is that loan's payment and the engine
+// refuses a line paying anything else, so every projection read after
+// such an edit throws where the plan is worked out. An edit that would
+// make either anything else is refused, and the salary is unlinked or
+// the payments sent away first. The forms never offer such an edit, but
+// each action answers a POST from anywhere, and a house or a car
+// written over a pension's id is the same edit by another door, as is
+// the loan against either written over one: a loan made a pension by
+// such a POST keeps its asset, and the asset's next save would write a
+// debt back over it.
 async function writeOver(
   db: Database,
   at: number,
@@ -284,6 +289,9 @@ async function writeOver(
 ): Promise<Account> {
   if (!isPension(values) && (await isFed(db, at))) {
     throw new Error("A pension a salary feeds stays a pension");
+  }
+  if (values.kind !== "debt" && (await findLinePaying(db, at)) !== null) {
+    throw new Error("A debt a line pays stays a debt");
   }
   return updateAccount(db, at, values);
 }
