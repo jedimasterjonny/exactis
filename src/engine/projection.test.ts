@@ -413,6 +413,48 @@ describe("project", () => {
     ]);
   });
 
+  // A rate of minus one carries a balance to nothing in its first
+  // month and leaves it there, on the account's own rate and on the
+  // plan's alike; one below it takes the twelfth root of a negative, so
+  // every balance after it and every figure the year went short by is
+  // not a number and the year the money runs out is never marked. A
+  // rate that loses nine tenths of a balance a year is left to lose it,
+  // 20,000 × 0.1 = 2,000.
+  it("refuses a rate that loses more than everything, on either side", () => {
+    const rate = (fixed: number): Account => ({
+      ...flatIsa,
+      growth: { kind: "fixed", rate: fixed },
+    });
+
+    expect(
+      project([rate(-1)], funded, { ...plan, years: 1 }).at(-1),
+    ).toStrictEqual({
+      age: 37,
+      deferred: 0,
+      free: 0,
+      uncovered: 0,
+      year: 2027,
+    });
+    expect(
+      project([isa], funded, { ...plan, rate: -1, years: 1 }).at(-1)?.free,
+    ).toBe(0);
+    expect(() => project([rate(-1.5)], funded, { ...plan, years: 1 })).toThrow(
+      "A rate loses no more than everything",
+    );
+    expect(() =>
+      project([isa], funded, { ...plan, rate: -1.5, years: 1 }),
+    ).toThrow("A rate loses no more than everything");
+    expect(
+      project([rate(-0.9)], funded, { ...plan, years: 1 }).at(-1),
+    ).toStrictEqual({
+      age: 37,
+      deferred: 0,
+      free: 2000,
+      uncovered: 0,
+      year: 2027,
+    });
+  });
+
   it("projects nothing when no account is a wrapper", () => {
     expect(
       project([home, mortgage], funded, { ...plan, years: 1 }),
