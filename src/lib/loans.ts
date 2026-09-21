@@ -18,17 +18,12 @@ export interface PlanMonth {
 
 // The month the last payment falls in. The plan's month is a paying
 // month, as the projection carries the first year from it, so the first
-// payment lands in that month and the last one payments later, less
-// one: the term's months, whole, since a part of a month is a payment,
-// and at least one, since a term of nothing is cleared in a single
-// payment, as the months a term runs are counted. Counted in payments
+// payment lands in that month and the last one the term's months later,
+// less one, counted as the months a term runs are. Counted in payments
 // rather than time, since a term landing on a year end would otherwise
-// be read as the year after it. The whisker below the count absorbs the
-// floating point a worked-out term carries, so a term that is a whole
-// number of months bar a rounding is one.
+// be read as the year after it.
 export function clearsIn(term: number, plan: PlanMonth): Month {
-  const payments = Math.max(1, Math.ceil(term * 12 - 1e-9));
-  const last = plan.month + payments - 1;
+  const last = plan.month + monthsIn(term) - 1;
   return { month: last % 12, year: plan.from + Math.floor(last / 12) };
 }
 
@@ -137,8 +132,13 @@ export function termTo(end: Month, plan: PlanMonth): number {
   return Math.max(1, payments) / 12;
 }
 
-// The months a term runs, whole, and at least one: a term of nothing is
-// cleared in a single payment.
+// The months a term runs: whole and rounded up, since a part of a month
+// is a payment, and at least one, since a term of nothing is cleared in
+// a single payment. The whisker below the count absorbs the floating
+// point a worked-out term carries, so a term that is a whole number of
+// months bar a rounding is that many. What the term amortises over and
+// what clearsIn counts to the last payment are the one count, so a term
+// typed as years and the month it is read back as never disagree.
 function monthsIn(term: number): number {
-  return Math.max(1, Math.round(term * 12));
+  return Math.max(1, Math.ceil(term * 12 - 1e-9));
 }
