@@ -48,7 +48,10 @@ export interface Take extends Paid {
   readonly cap: null | number;
 }
 
-// An account and the fixed sum it is paid a month.
+// An account and what the month actually pays it, which for a fixed sum
+// is the sum it states or as much of it as the month had. The stated sum
+// is not carried alongside what was paid, since nothing reads it yet and
+// the account itself still holds it.
 interface Paid {
   readonly account: Account;
   readonly amount: number;
@@ -56,11 +59,17 @@ interface Paid {
 
 // A month's money: the income lines running that month, as they are
 // earned, less what a salary sacrifices into its pension, less the
-// expense lines, each kept as well as summed, and every fixed sum, then
-// the spare money to each account that takes it in the order they are
+// expense lines, each kept as well as summed. What that leaves pays the
+// fixed sums, in the order the accounts are listed, each taking its sum
+// or what the month still has when it no longer covers it, and then the
+// spare money to each account that takes it in the order they are
 // listed, each up to its cap and passing the rest on, and what is left
-// after them, which is negative when the month does not cover its
-// outgoings. A yearly figure is spread over the twelve months. A loan
+// after them, which is negative by the expenses the income does not
+// cover and by nothing else. A fixed sum is a contribution out of what
+// the month has, not a drawdown: an account is paid only while the
+// income funding it lasts, and selling out of one wrapper to keep a
+// payment into another going would be a shortfall the ledger read back
+// as saving. A yearly figure is spread over the twelve months. A loan
 // whose payments are a line pays nothing as a fixed sum, since the line
 // is its payment and the ledger shows the same figure against the loan:
 // it is counted once, as the line, and stops when the line does. A
@@ -111,24 +120,43 @@ export function cashFlow(
       line.pays === undefined ? [] : [line.pays],
     ),
   );
-  const fixed = accounts
-    .filter((account) => !paid.has(account.id))
-    .flatMap(fixedSum);
-  const { left, takes } = spareMoney(
-    accounts,
-    income - sacrificed - expenses - total(fixed),
-    fed,
+  const { left: rest, sums: fixed } = fixedSums(
+    accounts.filter((account) => !paid.has(account.id)),
+    income - sacrificed - expenses,
   );
+  const { left, takes } = spareMoney(accounts, rest, fed);
   return { expenses, fed, fixed, income, left, spare: takes, spent };
 }
 
-// The fixed sum an account is paid a month, or nothing for an account
-// paid the spare money or nothing.
+// The fixed sum an account states a month, before the month is asked
+// whether it has it, or nothing for an account paid the spare money or
+// nothing.
 function fixedSum(account: Account): Paid[] {
   const { contribution } = account;
   return contribution?.kind === "fixed"
     ? [{ account, amount: monthly(contribution.amount, contribution.cadence) }]
     : [];
+}
+
+// The fixed sums paid out of what the month has after the sacrifices and
+// the expenses, handed down the accounts in the order they are listed as
+// the spare money is: each takes its stated sum, or what is left when
+// the month no longer reaches it, and passes the rest on. An account the
+// month could not pay is still listed, at what it was paid and not at
+// what it asked for, so the ledger says which sum went short rather than
+// dropping the account out of the month altogether.
+function fixedSums(
+  accounts: readonly Account[],
+  available: number,
+): { readonly left: number; readonly sums: readonly Paid[] } {
+  const sums: Paid[] = [];
+  let left = available;
+  for (const { account, amount } of accounts.flatMap(fixedSum)) {
+    const sum = Math.max(0, Math.min(left, amount));
+    sums.push({ account, amount: sum });
+    left -= sum;
+  }
+  return { left, sums };
 }
 
 function monthly(amount: number, cadence: Cadence): number {
