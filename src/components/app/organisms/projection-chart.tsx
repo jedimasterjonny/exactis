@@ -12,6 +12,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ReferenceLine,
   XAxis,
   YAxis,
 } from "recharts";
@@ -62,13 +63,16 @@ const config = Object.fromEntries(
 // over it: a hairline grid, the years and the pounds as recessive ticks,
 // a legend naming the series, and a crosshair with the year's figures on
 // hover and on the arrow keys. The pounds are written in full, as money
-// is everywhere here. The toggle takes its row from inside the plot's
-// box rather than adding one over it, so the box is the same height as
-// the frames that stand in for it and nothing shifts when the chart
-// arrives. A projection of nothing, because no account is a wrapper yet,
-// says so in the plot's place rather than drawing a flat zero over a
-// column of £0 ticks, and points at the screen where the account is
-// added: the dashboard has no way to add one itself.
+// is everywhere here. The first year the plan cannot cover is marked
+// where it falls, a dashed hairline under either mark, and that year's
+// shortfall joins its figures under the crosshair rather than the
+// stack, which carries balances alone. The toggle takes its row from
+// inside the plot's box rather than adding one over it, so the box is
+// the same height as the frames that stand in for it and nothing shifts
+// when the chart arrives. A projection of nothing, because no account
+// is a wrapper yet, says so in the plot's place rather than drawing a
+// flat zero over a column of £0 ticks, and points at the screen where
+// the account is added: the dashboard has no way to add one itself.
 export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
   const [mark, setMark] = useState<Mark>("area");
 
@@ -96,6 +100,11 @@ export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
   // mark: recharts draws the crosshair as a band over the year's columns
   // only when the chart is a bar chart by name.
   const Plot = mark === "bar" ? BarChart : AreaChart;
+
+  // The first year that could not draw what it needed from anywhere,
+  // which is the year the money runs out. Undefined while every year
+  // covers itself, and the mark goes undrawn.
+  const runsOut = points.find((point) => point.uncovered > 0);
 
   return (
     <Frame>
@@ -175,6 +184,19 @@ export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
                 />
               ),
             )}
+            {runsOut !== undefined && (
+              <ReferenceLine
+                label={{
+                  fill: "var(--destructive)",
+                  fontSize: 12,
+                  position: "insideTopRight",
+                  value: "Runs out",
+                }}
+                stroke="var(--destructive)"
+                strokeDasharray="4 4"
+                x={runsOut.year}
+              />
+            )}
           </Plot>
         </ChartContainer>
       </div>
@@ -237,7 +259,8 @@ function Placeholder({ children }: { readonly children: string }): JSX.Element {
 }
 
 // The year under the crosshair, the age reached that year, and each
-// series' figure with the total beneath. The values lead, in mono, with
+// series' figure with the total beneath, and under that, for a year that
+// came up short, what it could not cover. The values lead, in mono, with
 // a stroke of the series' colour keying the name beside each. The point
 // is found by the year the crosshair names rather than read out of the
 // entry recharts hands over, which is untyped.
@@ -277,6 +300,14 @@ function ProjectionTooltip({
           {formatGbp(totalOf(point))}
         </span>
       </span>
+      {point.uncovered > 0 && (
+        <span className="flex items-center gap-2">
+          <span className="text-muted-foreground">Uncovered</span>
+          <span className="ml-auto figure font-medium text-destructive">
+            {formatGbp(point.uncovered)}
+          </span>
+        </span>
+      )}
     </div>
   );
 }
