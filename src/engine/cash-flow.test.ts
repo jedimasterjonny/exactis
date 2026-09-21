@@ -519,6 +519,64 @@ describe("cashFlow", () => {
     }
   });
 
+  // A line naming an account that is no debt would drop that account's
+  // fixed sum from the month, the line standing in for a payment the
+  // account never makes, so the ISA's £20,000 a year would leave the
+  // ledger and land nowhere. The action holds the link to a loan, so
+  // one that reached here is a caller's mistake, whatever the line
+  // costs.
+  it("refuses an expense line paying an account that is no debt", () => {
+    for (const account of [pension, isa, cash, home]) {
+      expect(() =>
+        cashFlow(
+          [account],
+          { expenses: [{ ...household, pays: account.id }], income: [plain] },
+          { month: 0, year: 2026 },
+        ),
+      ).toThrow("A line pays a debt alone");
+    }
+  });
+
+  // Both links are read over the whole schedule rather than over the
+  // lines running this month, so a plan carrying one is refused wherever
+  // it is read: the salary ended in 2048 and is refused in 2049, and a
+  // line that starts in 2040 is refused in 2026. Checked in the months
+  // they run alone, the projection would throw part way through the
+  // years while the month a screen shows stayed green.
+  it("refuses a link the schedule holds in a month the line is not running", () => {
+    const feeding = { ...salary, feeds: isa.id };
+    const paying = { ...household, firstYear: 2040, pays: isa.id };
+
+    expect(() =>
+      cashFlow(
+        [isa],
+        { expenses: [], income: [feeding] },
+        { month: 0, year: 2049 },
+      ),
+    ).toThrow("A salary feeds a pension alone");
+    expect(() =>
+      cashFlow(
+        [isa],
+        { expenses: [paying], income: [] },
+        { month: 0, year: 2026 },
+      ),
+    ).toThrow("A line pays a debt alone");
+  });
+
+  // A line paying a loan the plan does not list pays nothing off it and
+  // drops no account's sum, as a salary feeding a pension it does not
+  // list is earned whole: £12,250 a month less the household's £3,500
+  // leaves the ISA its £1,666.67.
+  it("leaves an expense line paying an account that is not listed alone", () => {
+    const flow = cashFlow(
+      [isa],
+      { expenses: [{ ...household, pays: 99 }], income: [salary] },
+      { month: 0, year: 2026 },
+    );
+
+    expect(flow.fixed).toStrictEqual([{ account: isa, amount: 20000 / 12 }]);
+  });
+
   it("refuses to hand the spare money to a real asset or a debt", () => {
     const spareHome: Account = {
       ...home,
