@@ -243,6 +243,28 @@ describe("project", () => {
     ).not.toThrow();
   });
 
+  // A balance below nothing is a debt's, and no debt is held: the ISA
+  // at minus £500 would be compounded deeper every month and never
+  // drawn on, since a draw takes the lesser of what an account holds
+  // and what the month is short and stops at nothing, so it would
+  // cover none of a month it was short and plot a wrapper owing money.
+  // A balance of nothing is carried as it stands, and the mortgage,
+  // owing £182,940 and held by nothing, is left where it is.
+  it("refuses a held account below nothing", () => {
+    expect(() =>
+      project([{ ...flatIsa, balance: -500 }], funded, { ...plan, years: 1 }),
+    ).toThrow("A balance below nothing is a debt's");
+    expect(
+      project([{ ...flatIsa, balance: 0 }, mortgage], funded, {
+        ...plan,
+        years: 1,
+      }),
+    ).toStrictEqual([
+      { age: 36, deferred: 0, free: 0, uncovered: 0, year: 2026 },
+      { age: 37, deferred: 0, free: 0, uncovered: 0, year: 2027 },
+    ]);
+  });
+
   // The household ends in 2047, so from 2048 the whole salary is spare,
   // and the ISA still takes no more than its allowance.
   it("reads each year's cash flow afresh", () => {
