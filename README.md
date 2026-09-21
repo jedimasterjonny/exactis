@@ -72,18 +72,33 @@ suite before it reaches a database.
 
 The engine is `src/engine/projection.ts`: a pure function over the accounts, the
 income and expense lines and a plan, giving a point per year to the plan's
-horizon, each the balance entering that year. So far it carries the two
-wrappers, tax-free and tax-deferred, each paid into a month at a time as its
-accounts say and grown at a plan rate held as a constant until there is an
-assumptions screen to set it on. The first year runs from the month the plan is
-read in, since the balances are that month's. An account paid the spare money is
-paid what `src/engine/cash-flow.ts` works out for the year: a month's income
-less the expenses and every fixed sum, handed down the accounts that take it in
-the order they are listed, each to a twelfth of its cap. Every line is taken at
-the amount it states, in today's money, until the plan carries an inflation
-assumption. The dashboard reads the projection through `src/app/(app)/store.ts`,
-a cached read keyed on the accounts and the lines, so a save on the accounts or
-the plan screen is a new projection on the next render.
+horizon, each the balance entering that year. So far it plots the two wrappers,
+tax-free and tax-deferred, each paid into a month at a time as its accounts say
+and grown at a plan rate held as a constant until there is an assumptions screen
+to set it on. Cash is carried beside them, so a short month can be drawn from
+it, but it is not plotted, since the progress points a projection is laid over
+carry no cash figure. The first year runs from the month the plan is read in,
+since the balances are that month's. What an account is paid in a month is what
+`src/engine/cash-flow.ts` works out: the month's income, less what the salaries
+sacrifice and the expense lines cost, pays the fixed sums, handed down the
+accounts in the order they are listed, and what survives them is the spare
+money, handed down the accounts that take it the same way, each to a twelfth of
+its cap. A fixed sum is therefore paid only out of what the month has, so a
+contribution stops when the income funding it ends.
+
+A month the income does not cover is drawn out of the savings at the start of
+it, before the month's growth: cash first, then the tax-free wrapper, then the
+tax-deferred one and only from the year its owner turns 57, an age held as a
+constant in the engine until that same assumptions screen exists, as the plan
+rate is held in the store. Each account is drawn to nothing and no lower, and
+what a year could not draw from anywhere is carried on its point, so the
+projection can say when the money runs out and the dashboard's chart marks that
+year. Nothing is taxed yet. Every line is taken at the amount it states, in
+today's money, until the plan carries an inflation assumption.
+
+The dashboard reads the projection through `src/app/(app)/store.ts`, a cached
+read keyed on the accounts and the lines, so a save on the accounts or the plan
+screen is a new projection on the next render.
 
 ## Signing in
 
