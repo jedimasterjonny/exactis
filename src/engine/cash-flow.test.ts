@@ -153,6 +153,46 @@ describe("cashFlow", () => {
     expect(flow.left).toBe(-6201);
   });
 
+  // £5,000 a month with a tenth of its £60,000 base sacrificed: against
+  // £4,500 of expenses the month covers itself with the £500 gone and
+  // the pension is fed as ever; against £4,800 it covers itself only by
+  // keeping the £500, so the salary is earned whole, the pension is fed
+  // nothing and £200 is left; and against £5,500 it covers itself
+  // neither way, so the month is short by the £500 the income does not
+  // cover rather than by the £1,000 a sacrifice on top of it would
+  // leave. A sacrifice the month cannot afford would be a drawdown by
+  // another name, and the pension would be fed in the very month a
+  // wrapper is sold to cover the spending.
+  it("sacrifices nothing at all in a month the income would not cover the expenses", () => {
+    const unpaid: Account = {
+      balance: 412880,
+      growth: { kind: "plan" },
+      id: pension.id,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+    };
+    const against = (amount: number): CashFlow =>
+      cashFlow(
+        [unpaid],
+        { expenses: [{ ...household, amount }], income: [lean] },
+        { month: 0, year: 2026 },
+      );
+
+    expect(against(4500).fed).toStrictEqual([
+      {
+        account: unpaid,
+        amount: (6000 * 1.15) / 12,
+        line: lean,
+        sacrificed: 500,
+      },
+    ]);
+    expect(against(4500).left).toBe(0);
+    expect(against(4800).fed).toStrictEqual([]);
+    expect(against(4800).left).toBe(200);
+    expect(against(5500).fed).toStrictEqual([]);
+    expect(against(5500).left).toBe(-500);
+  });
+
   // The spare money sees what the fixed sums leave and no more: the
   // £1,000 month is taken whole by the pension's trimmed sum, so the ISA
   // and the current account take nothing, while the £3,000 month leaves
