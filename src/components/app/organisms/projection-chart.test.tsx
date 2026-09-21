@@ -19,9 +19,9 @@ const bySlot =
     element?.getAttribute("data-slot") === slot;
 
 const points = [
-  { age: 34, deferred: 391640, free: 271930, year: 2026 },
-  { age: 35, deferred: 438308, free: 305483, year: 2027 },
-  { age: 36, deferred: 487309, free: 340714, year: 2028 },
+  { age: 34, deferred: 391640, free: 271930, uncovered: 0, year: 2026 },
+  { age: 35, deferred: 438308, free: 305483, uncovered: 0, year: 2027 },
+  { age: 36, deferred: 487309, free: 340714, uncovered: 0, year: 2028 },
 ];
 
 describe("ProjectionChart", () => {
@@ -89,8 +89,8 @@ describe("ProjectionChart", () => {
     render(
       <ProjectionChart
         points={[
-          { age: 34, deferred: 0, free: 0, year: 2026 },
-          { age: 35, deferred: 0, free: 0, year: 2027 },
+          { age: 34, deferred: 0, free: 0, uncovered: 0, year: 2026 },
+          { age: 35, deferred: 0, free: 0, uncovered: 0, year: 2027 },
         ]}
       />,
     );
