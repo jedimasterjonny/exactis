@@ -88,10 +88,15 @@ interface Paid {
 // short feeds nothing, pays no fixed sum and hands over no spare money,
 // and what is left is short by the expenses the income does not cover
 // and by nothing else. A salary naming an account that is no pension is
-// refused, as the spare money into a real asset is: the action holds
-// the link to a pension, so one that reached here is a caller's mistake
-// rather than a result, and the sacrifice would otherwise leave the
-// salary and land in no wrapper. Every line is taken at the amount it states, in
+// refused, as the spare money into a real asset is, and so is an
+// expense line naming an account that is no debt: the action holds each
+// link to the kind it may name, so one that reached here is a caller's
+// mistake rather than a result, and a sacrifice would otherwise leave
+// the salary and land in no wrapper while a line paying a wrapper would
+// drop the sum that wrapper states and pay it nowhere. Both links are
+// read over the whole schedule before any month is worked out, since a
+// link is wrong the day it is written rather than the year its line
+// starts in. Every line is taken at the amount it states, in
 // today's money; how it grows against inflation waits on an inflation
 // assumption the plan does not carry yet.
 export function cashFlow(
@@ -99,14 +104,12 @@ export function cashFlow(
   schedule: Schedule,
   at: Month,
 ): CashFlow {
+  checkLinks(accounts, schedule);
   const income = sumOf(schedule.income, at, totalOf);
   const feeding = schedule.income
     .filter((line) => runsIn(line, at))
     .flatMap((line) => {
-      const account = accounts.find(({ id }) => id === line.feeds);
-      if (account !== undefined && !isPension(account)) {
-        throw new Error("A salary feeds a pension alone");
-      }
+      const account = accountAt(accounts, line.feeds);
       const sacrificed = monthly(sacrificeOf(line), line.cadence);
       return account === undefined || sacrificed === 0
         ? []
@@ -138,6 +141,39 @@ export function cashFlow(
   );
   const { left, takes } = spareMoney(accounts, rest, fed);
   return { expenses, fed, fixed, income, left, spare: takes, spent };
+}
+
+// The account a link names, or none, since a link may name an account
+// the plan does not list and is sound when it does.
+function accountAt(
+  accounts: readonly Account[],
+  id: null | number | undefined,
+): Account | undefined {
+  return accounts.find((account) => account.id === id);
+}
+
+// Every link the schedule holds, whether or not the line holding it
+// runs in the month being worked out: a salary feeds a pension and
+// nothing else, and an expense line pays a debt and nothing else. Read
+// a month at a time, a link checked only where its line runs would be
+// refused part way through a projection, in the first year the line
+// reaches, while the screens reading a single month stayed green and
+// the plan looked sound. A line naming an account that is not listed
+// names nothing here and is sound: it is earned whole, or pays nothing
+// off a loan.
+function checkLinks(accounts: readonly Account[], schedule: Schedule): void {
+  for (const { feeds } of schedule.income) {
+    const account = accountAt(accounts, feeds);
+    if (account !== undefined && !isPension(account)) {
+      throw new Error("A salary feeds a pension alone");
+    }
+  }
+  for (const { pays } of schedule.expenses) {
+    const account = accountAt(accounts, pays);
+    if (account !== undefined && account.kind !== "debt") {
+      throw new Error("A line pays a debt alone");
+    }
+  }
 }
 
 // The fixed sum an account states a month, before the month is asked
