@@ -1,5 +1,5 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 // A deliberately unforgiving runner. Everything here turns something that
 // would otherwise pass quietly into a failure at the point it is written.
@@ -34,6 +34,14 @@ export default defineConfig({
       thresholds: { 100: true, perFile: true },
     },
     environment: "jsdom",
+    // The runner's own two exclusions, plus the worktrees an agent is
+    // given inside the checkout. .gitignore keeps those out of git and
+    // out of prettier, eslint and knip, each of which reads it; the
+    // suite's globs read no ignore file, so a second copy of every test
+    // file was collected and run, against this checkout's node_modules
+    // and this checkout's alias, and reported as failures of a tree
+    // nobody is committing.
+    exclude: [...configDefaults.exclude, "**/.claude/worktrees/**"],
     // A test that asserts nothing is not a test.
     expect: { requireAssertions: true },
     // No ambient describe/it/expect. Test files import what they use, like

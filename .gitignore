@@ -22,3 +22,9 @@
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# agent worktrees. An agent given a worktree of its own gets it here, inside
+# the checkout, and every repo-wide gate globs into it: knip reports its
+# exports, the suite runs its tests, prettier checks its vendored files.
+# Ignored, so the tree the gates see is the tree that is committed.
+/.claude/worktrees/
