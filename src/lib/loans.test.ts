@@ -16,8 +16,12 @@ describe("paymentOf", () => {
     expect(paymentOf(owed(341810), 0.0515, 22)).toBeCloseTo(2166.33, 2);
   });
 
-  it("spreads the balance flat at no rate, and clears a term of nothing in one payment", () => {
+  // A rate too small to move one in floating point leaves the discount
+  // at exactly one, so the formula would divide by nothing; it spreads
+  // flat as well, as the term the same rate gives does.
+  it("spreads the balance flat at no rate, or one too small to compound, and clears a term of nothing in one payment", () => {
     expect(paymentOf(owed(120000), 0, 10)).toBe(1000);
+    expect(paymentOf(owed(12000), 1e-18, 1)).toBe(1000);
     expect(paymentOf(owed(1000), 0.12, 0)).toBeCloseTo(1010, 10);
   });
 
@@ -104,10 +108,27 @@ describe("rateOf", () => {
     expect(paymentOf(owed(1000), rate ?? 0, 1)).toBeCloseTo(990, 6);
   });
 
-  it("finds no rate when the payments fall short of the balance, and none at all when they meet it", () => {
+  // A payment that is no number falls short of nothing and meets
+  // nothing, so it is no rate rather than the all but nothing the
+  // bisection would close on.
+  it("finds no rate when the payments fall short of the balance or are no number, and none at all when they meet it", () => {
     expect(rateOf(owed(120000), 999, 10)).toBeNull();
+    expect(rateOf(owed(120000), NaN, 10)).toBeNull();
     expect(rateOf(owed(120000), 1000, 10)).toBe(0);
     expect(rateOf(owed(0), 2210, 22)).toBe(0);
+  });
+
+  // A term that is no number spreads no flat payment to fall short of,
+  // so every payment cleared the guard and the bisection closed on all
+  // but nothing; a term without end spreads the balance over for ever,
+  // so any payment at all met it and the rate found was the one whose
+  // interest the payment covers. Neither is a term, and neither is a
+  // rate: an empty term field in a dialog types the first, and the
+  // rate it showed was a figure a house could be saved on.
+  it("finds no rate for a term that is no number or without end", () => {
+    expect(rateOf(owed(120000), 1000, NaN)).toBeNull();
+    expect(rateOf(owed(120000), 1000, Infinity)).toBeNull();
+    expect(rateOf(owed(0), 1000, NaN)).toBe(0);
   });
 
   // The rate the payment pays down to the balloon at is the one the

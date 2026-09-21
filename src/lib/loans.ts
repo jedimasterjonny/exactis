@@ -32,7 +32,9 @@ export function clearsIn(term: number, plan: PlanMonth): Month {
 // with interest compounding monthly at a twelfth of the rate, on the
 // balance less the balloon discounted back over the term, since the
 // balloon is the part of the balance the payments leave standing at the
-// end; or the difference spread flat when there is no rate.
+// end; or the difference spread flat when there is no rate, and when
+// there is one too small to move one in floating point, since the
+// discount is then exactly one and the formula would divide by nothing.
 export function paymentOf(
   { balance, balloon }: Owed,
   rate: number,
@@ -40,7 +42,7 @@ export function paymentOf(
 ): number {
   const months = monthsIn(term);
   const monthly = rate / 12;
-  if (monthly === 0) {
+  if (1 + monthly === 1) {
     return (balance - balloon) / months;
   }
   const discount = (1 + monthly) ** -months;
@@ -53,8 +55,18 @@ export function paymentOf(
 // from nothing and from a ceiling raised until the payment at it is
 // enough. Nothing at all when the payments spread flat fall short of
 // what is to be paid down, since no rate below nothing is a loan's, and
-// exactly nothing when they meet it. A balance at or below the balloon
-// is paid down at any rate, so at none.
+// exactly nothing when they meet it. Nothing at all for a payment that
+// is not a number either, since it neither falls short of the flat
+// payments nor meets them and the bisection would otherwise close on a
+// rate of all but nothing, and nothing at all for a term that is no
+// number or no length: the flat payments are worked out over the term,
+// so a term of no number makes them none and the same bisection closes
+// on the same all but nothing, and a term without end asks at what rate
+// a payment never stops, which the interest alone answers. A dialog
+// with an empty term field types both, and a rate is what a house is
+// saved on, so a nonsense figure reading as a rate is worse than none.
+// A balance at or below the balloon is paid down at any rate, so at
+// none.
 export function rateOf(
   owed: Owed,
   payment: number,
@@ -65,7 +77,7 @@ export function rateOf(
     return 0;
   }
   const flat = (balance - balloon) / monthsIn(term);
-  if (payment < flat) {
+  if (!Number.isFinite(term) || Number.isNaN(payment) || payment < flat) {
     return null;
   }
   if (payment === flat) {
