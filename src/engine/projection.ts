@@ -1,6 +1,7 @@
 import type { Account, AccountKind } from "@/data/accounts";
 import type { CashFlow, Schedule } from "@/engine/cash-flow";
 
+import { takesSpare } from "@/data/accounts";
 import { cashFlow } from "@/engine/cash-flow";
 
 // What the projection runs on: the rate every account on the plan rate
@@ -24,11 +25,23 @@ export interface Plan {
 // age as much as by year. The first point is the balances as they are,
 // at the month the plan is read in; each after it is the year before
 // carried to its end. The two wrappers are projected yet, each summed
-// over its accounts.
+// over its accounts; cash is carried, so a shortfall can be drawn from
+// it, but is not plotted, since the progress points these are laid over
+// carry no cash figure. Beside them is what the year could not draw
+// from anywhere, summed over its months: a point's balances are the
+// ones entering its year and its shortfall is what went uncovered
+// during it, so the two are read together rather than a year apart. It
+// is whole pounds as the balances are, rounded up rather than to the
+// nearest, since a year short by anything is short: a year that could
+// not find forty pence read as a year that covered itself, and the
+// chart's mark, which is the first year with anything uncovered on it,
+// landed a year late or not at all. The last year is never carried, so
+// its point is never short.
 export interface ProjectionPoint {
   readonly age: number;
   readonly deferred: number;
   readonly free: number;
+  readonly uncovered: number;
   readonly year: number;
 }
 
@@ -37,6 +50,11 @@ interface Held {
   readonly account: Account;
   readonly balance: number;
 }
+
+// The age the plan's owner may reach a pension at, which is the UK
+// normal minimum pension age from April 2028. A constant until there is
+// an assumptions screen to set it on, as the plan rate is in the store.
+const pensionAge = 57;
 
 // The last year the plan runs to, which is the last year plotted, whose
 // point is the balance entering it, and the year an open-ended line
@@ -58,31 +76,38 @@ export function endYear(plan: Plan): number {
 // spreads it or the spare money's take, read afresh each month since a
 // line may end in one; and the flow is read over every account, since
 // a fixed sum into any of them is money the month no longer has, and a
-// pension not listed would be fed nothing. Nothing is drawn out or
-// taxed yet.
+// pension not listed would be fed nothing. A month the income does not
+// cover is drawn from the savings: cash first, then the tax-free
+// wrapper, then the tax-deferred one from the year the pension age is
+// reached, at the start of the month and before its growth as a payment
+// lands, so what leaves earns nothing for the month it is gone. A draw
+// and a payment never meet in one month:
+// the flow pays a fixed sum and the spare money only out of what the
+// month has, so both are nothing in the month it is short. What no
+// account covered is the year's uncovered shortfall, summed over its
+// months and reported on the point the year's balances are read off, so
+// the loop reads the balances entering the year, carries it, and emits
+// the point after. Nothing is taxed yet.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
   plan: Plan,
 ): ProjectionPoint[] {
   let held: readonly Held[] = accounts
-    .filter(
-      (account) =>
-        account.kind === "tax-free" || account.kind === "tax-deferred",
-    )
+    .filter(takesSpare)
     .map((account) => ({ account, balance: account.balance }));
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
-    const point = {
-      age: year - plan.born,
-      deferred: total(held, "tax-deferred"),
-      free: total(held, "tax-free"),
-      year,
-    };
+    const age = year - plan.born;
+    const deferred = total(held, "tax-deferred");
+    const free = total(held, "tax-free");
+    let uncovered = 0;
     if (offset < plan.years) {
       for (let month = offset === 0 ? plan.month : 0; month < 12; month += 1) {
         const flow = cashFlow(accounts, schedule, { month, year });
-        held = held.map(({ account, balance }) => ({
+        const draw = drawnFrom(held, Math.max(0, -flow.left), age);
+        uncovered += draw.uncovered;
+        held = draw.held.map(({ account, balance }) => ({
           account,
           balance: carried(
             balance,
@@ -92,7 +117,7 @@ export function project(
         }));
       }
     }
-    return point;
+    return { age, deferred, free, uncovered: Math.ceil(uncovered), year };
   });
 }
 
@@ -105,6 +130,40 @@ export function project(
 // model's to know.
 function carried(balance: number, paid: number, rate: number): number {
   return (balance + paid) * (1 + rate) ** (1 / 12);
+}
+
+// What a month's shortfall takes out of the savings, and what is left
+// of it after them. The kinds are drawn in the order that is right
+// before there is any tax to model: cash first, since it is spent as it
+// stands and grows least; then the tax-free wrapper, which is reached
+// at any age and owes nothing on the way out; then the tax-deferred
+// one, and only from the year its owner reaches the pension age, since
+// before it the money cannot be had at all. Within a kind the accounts
+// are drawn in the order they are listed, each giving up what it holds
+// or what is still short, whichever is the lesser, so an account is
+// emptied and never overdrawn and what it could not cover passes to the
+// next. What the last of them leaves is uncovered: the plan is short by
+// it, and the projection says so rather than lending it.
+function drawnFrom(
+  held: readonly Held[],
+  shortfall: number,
+  age: number,
+): { readonly held: readonly Held[]; readonly uncovered: number } {
+  const kinds: readonly AccountKind[] =
+    age < pensionAge
+      ? ["cash", "tax-free"]
+      : ["cash", "tax-free", "tax-deferred"];
+  let drawn = held;
+  let left = shortfall;
+  for (const kind of kinds) {
+    drawn = drawn.map(({ account, balance }) => {
+      const taken =
+        account.kind === kind ? Math.max(0, Math.min(balance, left)) : 0;
+      left -= taken;
+      return { account, balance: balance - taken };
+    });
+  }
+  return { held: drawn, uncovered: left };
 }
 
 // What lands in an account each month of the year: what each salary
