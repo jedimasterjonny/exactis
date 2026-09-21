@@ -219,17 +219,28 @@ describe("project", () => {
     ).toStrictEqual([0, 13800, 27600, 27600]);
   });
 
-  // Two ISAs that share an id, which the store never hands out, are
-  // each paid their own take and not each other's: £8,750 is left,
-  // each takes £1,666.67, and each is £20,000 up on the year.
-  it("pays each account its own take, whatever its id", () => {
+  // The same ISA listed again would open the plan holding £572,290 of
+  // the £286,145 it has and be paid its take twice a month. The list
+  // is refused before anything is plotted, over a carried year and
+  // over no years at all, where no month is read and the flow would
+  // never see it.
+  it("refuses an account listed twice, carried or not", () => {
     const twin: Account = { ...spareIsa, name: "Twin ISA" };
-    const [, after] = project([spareIsa, twin], schedule, {
-      ...plan,
-      years: 1,
-    });
 
-    expect(after?.free).toBe(2 * 286145 + 2 * 20000);
+    for (const held of [
+      [spareIsa, spareIsa],
+      [spareIsa, twin],
+    ]) {
+      expect(() => project(held, schedule, { ...plan, years: 1 })).toThrow(
+        "An account is listed once",
+      );
+    }
+    expect(() =>
+      project([spareIsa, twin], schedule, { ...plan, years: 0 }),
+    ).toThrow("An account is listed once");
+    expect(() =>
+      project([spareIsa, flatIsa], schedule, { ...plan, years: 1 }),
+    ).not.toThrow();
   });
 
   // The household ends in 2047, so from 2048 the whole salary is spare,

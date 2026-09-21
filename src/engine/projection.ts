@@ -89,12 +89,23 @@ export function endYear(plan: Plan): number {
 // account covered is the year's uncovered shortfall, summed over its
 // months and reported on the point the year's balances are read off, so
 // the loop reads the balances entering the year, carries it, and emits
-// the point after. Nothing is taxed yet.
+// the point after. An account listed twice is refused: the store hands
+// out an id an account, so two entries sharing one are a caller's
+// mistake rather than a result, and carried as two the account's
+// balance is counted twice in every year and paid twice over in every
+// month. The flow refuses the same list where it is read, which is
+// the first thing a carried year does; it is refused here as well so
+// a plan of no years, which reads no month, is refused all the same
+// rather than plotting the twice-counted balance as its one point.
+// Nothing is taxed yet.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
   plan: Plan,
 ): ProjectionPoint[] {
+  if (new Set(accounts.map(({ id }) => id)).size !== accounts.length) {
+    throw new Error("An account is listed once");
+  }
   let held: readonly Held[] = accounts
     .filter(takesSpare)
     .map((account) => ({ account, balance: account.balance }));
@@ -172,9 +183,10 @@ function drawnFrom(
 // feeds it, the fixed sum or the spare money's take the flow lists for
 // it, and nothing for an account it lists nothing for. The entries are
 // read off the flow as the ones listed for the account itself, the same
-// object the flow was read over, rather than for its id, which two
-// accounts could share only by a caller's mistake; a sum over them, so
-// a miss needs no fallback that could never be reached.
+// object the flow was read over, rather than for its id, which no two
+// accounts carried here share, a plan listing one twice being refused
+// by the flow this is read off; a sum over them, so a miss needs no
+// fallback that could never be reached.
 function paidIn(account: Account, flow: CashFlow): number {
   return [...flow.fed, ...flow.fixed, ...flow.spare]
     .filter((paid) => paid.account === account)

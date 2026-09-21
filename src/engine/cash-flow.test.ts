@@ -620,6 +620,37 @@ describe("cashFlow", () => {
     expect(flow.fixed).toStrictEqual([{ account: isa, amount: 20000 / 12 }]);
   });
 
+  // The store hands out an id an account, so two entries sharing one
+  // are a caller's mistake: the ISA listed twice is paid its £1,666.67
+  // twice over in the one month, and the plan card reads the month
+  // straight from here, so the list is refused wherever it is read
+  // rather than only where a year is carried. Refused on the id, so two
+  // accounts that share one go with the one account listed again, and
+  // two accounts with ids of their own are left alone.
+  it("refuses an account the plan lists twice", () => {
+    const twin: Account = { ...isa, name: "Twin ISA" };
+
+    for (const held of [
+      [isa, isa],
+      [isa, twin],
+    ]) {
+      expect(() =>
+        cashFlow(
+          held,
+          { expenses: [], income: [plain] },
+          { month: 0, year: 2026 },
+        ),
+      ).toThrow("An account is listed once");
+    }
+    expect(() =>
+      cashFlow(
+        [isa, { ...twin, id: 9 }],
+        { expenses: [], income: [plain] },
+        { month: 0, year: 2026 },
+      ),
+    ).not.toThrow();
+  });
+
   it("refuses to hand the spare money to a real asset or a debt", () => {
     const spareHome: Account = {
       ...home,
