@@ -181,13 +181,33 @@ function paidIn(account: Account, flow: CashFlow): number {
     .reduce((sum, paid) => sum + paid.amount, 0);
 }
 
-function rateOf(account: Account, plan: Plan): number {
+// The rate the account grows at, its own or the plan's, whichever it is
+// carried on.
+function rateFrom(account: Account, plan: Plan): number {
   switch (account.growth.kind) {
     case "fixed":
       return account.growth.rate;
     case "plan":
       return plan.rate;
   }
+}
+
+// The rate a month is carried at, held to losing no more than
+// everything. At minus one the month's growth is the twelfth root of
+// nothing, so the balance is nothing from the first month on and stays
+// there, which is a rate that can be meant; below it the root is of a
+// negative, so every balance after it, and every figure the year went
+// short by, is not a number at all, no comparison against them holds
+// and the year the money runs out is never marked. The plan rate is
+// held to it as a fixed rate is, since the whole plan is carried on the
+// one and an account on the other, and the floor is the one the action
+// holds a saved rate to.
+function rateOf(account: Account, plan: Plan): number {
+  const rate = rateFrom(account, plan);
+  if (rate < -1) {
+    throw new Error("A rate loses no more than everything");
+  }
+  return rate;
 }
 
 // The wrapper's balance this year, whole pounds.
