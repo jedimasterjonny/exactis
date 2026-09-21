@@ -1,22 +1,10 @@
 import type { Account, AccountKind } from "@/data/accounts";
+import type { Plan } from "@/data/plan";
 import type { CashFlow, Schedule } from "@/engine/cash-flow";
 
 import { takesSpare } from "@/data/accounts";
+import { rateFrom } from "@/data/plan";
 import { cashFlow } from "@/engine/cash-flow";
-
-// What the projection runs on: the rate every account on the plan rate
-// grows at, the first year plotted, which holds today's balances, and
-// the month of it the plan is read in, January being nought as the
-// date gives it, so the first year runs from there rather than from
-// its start; how many years it runs forward; and the year the plan's
-// owner was born, which turns a year into an age.
-export interface Plan {
-  readonly born: number;
-  readonly from: number;
-  readonly month: number;
-  readonly rate: number;
-  readonly years: number;
-}
 
 // A year of the projection: the balance the plan expects entering it,
 // whole pounds, under the name the progress point gives the same
@@ -128,7 +116,10 @@ export function project(
     let uncovered = 0;
     if (offset < plan.years) {
       for (let month = offset === 0 ? plan.month : 0; month < 12; month += 1) {
-        const flow = cashFlow(accounts, schedule, { month, year });
+        const flow = cashFlow(accounts, schedule, {
+          at: { month, year },
+          plan,
+        });
         const draw = drawnFrom(held, Math.max(0, -flow.left), age);
         uncovered += draw.uncovered;
         held = draw.held.map(({ account, balance }) => ({
@@ -202,17 +193,6 @@ function paidIn(account: Account, flow: CashFlow): number {
   return [...flow.fed, ...flow.fixed, ...flow.spare]
     .filter((paid) => paid.account === account)
     .reduce((sum, paid) => sum + paid.amount, 0);
-}
-
-// The rate the account grows at, its own or the plan's, whichever it is
-// carried on.
-function rateFrom(account: Account, plan: Plan): number {
-  switch (account.growth.kind) {
-    case "fixed":
-      return account.growth.rate;
-    case "plan":
-      return plan.rate;
-  }
 }
 
 // The rate a month is carried at, held to losing no more than

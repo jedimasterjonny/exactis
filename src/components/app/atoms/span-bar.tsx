@@ -2,8 +2,8 @@ import type { JSX } from "react";
 
 import { cn } from "cn";
 
+import type { Plan } from "@/data/plan";
 import type { Side } from "@/data/schedule";
-import type { Plan } from "@/engine/projection";
 
 import { endYear } from "@/engine/projection";
 

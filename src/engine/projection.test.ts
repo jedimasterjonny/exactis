@@ -330,6 +330,49 @@ describe("project", () => {
     ]);
   });
 
+  // A £5,000 card at 22% paying £250 a month clears with its 26th
+  // payment, February 2028, and the ISA beside it takes whatever the
+  // month leaves. 2026 pays the card twelve times, so the ISA takes
+  // 12 × £2,750 = £33,000; 2027 the same, £66,000; 2028 pays it twice
+  // and the ISA takes 2 × £2,750 and then ten whole months of £3,000,
+  // £101,500. Charged for every month of the plan instead, as it was,
+  // the card would take £250 a month for ever and the ISA would be
+  // £2,750 light in every year after the debt was gone.
+  it("charges a debt's fixed sum only to the month its payments clear it", () => {
+    const card: Account = {
+      balance: -5000,
+      contribution: { amount: 250, cadence: "month", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0.22 },
+      id: 8,
+      kind: "debt",
+      name: "Credit card",
+    };
+    const earned = {
+      expenses: [],
+      income: [
+        {
+          ...salary,
+          amount: 36000,
+          bonus: 0,
+          feeds: null,
+          rsu: 0,
+          sacrifice: 0,
+        },
+      ],
+    };
+    const wide: Account = {
+      ...spareIsa,
+      balance: 0,
+      contribution: { cap: 240000, kind: "spare" },
+    };
+
+    expect(
+      project([card, wide], earned, { ...plan, years: 3 }).map(
+        ({ free }) => free,
+      ),
+    ).toStrictEqual([0, 33000, 66000, 101500]);
+  });
+
   // Read in December, so 2026 carries one month: the £1,000 going out
   // comes from the £1,200 of cash and the ISA is left whole, which is
   // why 2027 enters on the same £20,000. 2027 carries twelve: the £200

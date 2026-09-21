@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { Plan } from "@/engine/projection";
+import type { Plan } from "@/data/plan";
 
 import { SpanBar } from "./span-bar";
 

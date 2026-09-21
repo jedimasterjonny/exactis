@@ -2,8 +2,9 @@ import "server-only";
 import { cacheLife } from "next/cache";
 
 import type { Account } from "@/data/accounts";
+import type { Plan } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
-import type { Plan, ProjectionPoint } from "@/engine/projection";
+import type { ProjectionPoint } from "@/engine/projection";
 
 import { project } from "@/engine/projection";
 

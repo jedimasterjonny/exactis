@@ -90,9 +90,12 @@ describe("CashFlowCard", () => {
   // A year on, the childcare has started and the current account takes
   // £1,380 less; by 2053 the salaries have ended, so nothing is
   // sacrificed, and the consulting's £2,000 a month is £5,898 short of
-  // the mortgage payment and the retirement living, so the pension and
-  // the mortgage are paid nothing of their fixed sums, the ISA and the
-  // account take nothing, and the month is short by that £5,898 alone.
+  // the mortgage payment and the retirement living, so the pension is
+  // paid nothing of its fixed sum, the ISA and the account take
+  // nothing, and the month is short by that £5,898 alone. The mortgage
+  // has no row by then: its £2,180 a month cleared the £176,520 in
+  // November 2034, so the ledger stops charging it rather than writing it
+  // at nothing for the rest of the plan.
   it("moves the year along the plan with the slider and reads that year's month", () => {
     render(<CashFlowCard accounts={held} plan={plan} schedule={schedule} />);
 
@@ -114,7 +117,6 @@ describe("CashFlowCard", () => {
       "Income£2,000",
       "Expenses−£7,898",
       "Workplace pensionA fixed sum£0",
-      "MortgageA fixed sum£0",
       "Stocks & shares ISASpare money, to £20,000 / yr£0",
       "Current accountSpare money, uncapped£0",
       "Left over−£5,898",

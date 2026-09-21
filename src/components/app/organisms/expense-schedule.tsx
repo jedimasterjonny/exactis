@@ -10,7 +10,7 @@ import type {
   ExpenseLine,
   ExpenseLineValues,
 } from "@/data/expenses";
-import type { Plan } from "@/engine/projection";
+import type { Plan } from "@/data/plan";
 
 import { saveExpenseLine } from "@/app/(app)/plan/actions";
 import { Note } from "@/components/app/atoms/note";

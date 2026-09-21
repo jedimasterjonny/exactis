@@ -3,8 +3,8 @@ import type { JSX } from "react";
 
 import { Banknote, Lock, Receipt } from "lucide-react";
 
+import type { Plan } from "@/data/plan";
 import type { LineValues, Side } from "@/data/schedule";
-import type { Plan } from "@/engine/projection";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { SpanBar } from "@/components/app/atoms/span-bar";
