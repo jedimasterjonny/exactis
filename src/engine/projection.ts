@@ -81,9 +81,11 @@ export function endYear(plan: Plan): number {
 // wrapper, then the tax-deferred one from the year the pension age is
 // reached, at the start of the month and before its growth as a payment
 // lands, so what leaves earns nothing for the month it is gone. A draw
-// and a payment never meet in one month:
-// the flow pays a fixed sum and the spare money only out of what the
-// month has, so both are nothing in the month it is short. What no
+// and a payment never meet in one month: the flow pays a fixed sum and
+// the spare money only out of what the month has, and no salary
+// sacrifices at all in a month the income would not cover the expenses
+// without it, so a fixed sum, a take of the spare money and a pension
+// fed are each nothing in the month a wrapper is drawn on. What no
 // account covered is the year's uncovered shortfall, summed over its
 // months and reported on the point the year's balances are read off, so
 // the loop reads the balances entering the year, carries it, and emits

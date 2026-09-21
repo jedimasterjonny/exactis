@@ -78,7 +78,16 @@ interface Paid {
 // the employer's NI saved on it, over and above whatever fixed sum the
 // pension is paid in its own right; a salary naming a pension not
 // listed is earned whole, as a line paying a loan not listed pays
-// nothing off it. A salary naming an account that is no pension is
+// nothing off it. A sacrifice is given up only while what is left of
+// the income still covers the expenses: in a month it would not, no
+// line sacrifices at all, every line is earned whole and every pension
+// is fed nothing. All of them or none, rather than a share of each or
+// the lines that fit, since a sacrifice a month cannot afford is a
+// drawdown by another name and the pension would be fed in the very
+// month a wrapper is sold to cover the spending. So a month that is
+// short feeds nothing, pays no fixed sum and hands over no spare money,
+// and what is left is short by the expenses the income does not cover
+// and by nothing else. A salary naming an account that is no pension is
 // refused, as the spare money into a real asset is: the action holds
 // the link to a pension, so one that reached here is a caller's mistake
 // rather than a result, and the sacrifice would otherwise leave the
@@ -91,7 +100,7 @@ export function cashFlow(
   at: Month,
 ): CashFlow {
   const income = sumOf(schedule.income, at, totalOf);
-  const fed = schedule.income
+  const feeding = schedule.income
     .filter((line) => runsIn(line, at))
     .flatMap((line) => {
       const account = accounts.find(({ id }) => id === line.feeds);
@@ -110,11 +119,14 @@ export function cashFlow(
             },
           ];
     });
-  const sacrificed = fed.reduce((sum, entry) => sum + entry.sacrificed, 0);
   const spent = schedule.expenses
     .filter((line) => runsIn(line, at))
     .map((line) => ({ amount: monthly(line.amount, line.cadence), line }));
   const expenses = total(spent);
+  const givenUp = feeding.reduce((sum, entry) => sum + entry.sacrificed, 0);
+  const isEarnedWhole = income - givenUp - expenses < 0;
+  const fed = isEarnedWhole ? [] : feeding;
+  const sacrificed = isEarnedWhole ? 0 : givenUp;
   const paid = new Set(
     schedule.expenses.flatMap((line) =>
       line.pays === undefined ? [] : [line.pays],
