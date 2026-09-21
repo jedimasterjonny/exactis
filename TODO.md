@@ -20,14 +20,6 @@ fixed sum and a salary sacrifice are never held to it; and there is no taper,
 MPAA or carry-forward. Decide the allowance as a per-person figure across every
 account of the kind, what counts against it, and what happens to money past it.
 
-## Drawdown
-
-Nothing is ever drawn out. A month that does not cover its outgoings is computed
-and then dropped, so a plan that runs out plots wrappers that keep compounding,
-and a fixed contribution goes on being paid after the income funding it has
-ended. Decide where a shortfall is drawn from and in what order, so the
-projection can say when the money runs out.
-
 ## Today's money
 
 Lines are in today's money, a fixed account rate is hinted as nominal, and the
@@ -40,6 +32,13 @@ Nothing is taxed. Left over is gross, so every spare-money account is
 over-funded by the tax bill; a sacrifice is charged at its full cost, so its
 employee saving is zero; the employer's NI is credited at the full rate on the
 whole sacrifice, ignoring the threshold and what the scheme passes on; and a
-pension and an ISA are summed as if worth the same. Decide the tax the plan
-takes, income tax and both NIs, and where it comes off, so what is spare and
-what a pension is worth are both after it.
+pension and an ISA are summed as if worth the same. Drawing down needs it too: a
+pension draw is taxable income where an ISA's is not, so a tax year, April to
+April, has to sum the pension draws falling in it, which the engine can only do
+by keeping what each month drew rather than the balances a draw leaves behind,
+and a draw on a pension has to be grossed up so that what survives the tax is
+what the month was short by. The tax-efficient order, filling the personal
+allowance from the pension before the ISA is touched, is a second way of drawing
+down that waits on the same answer. Decide the tax the plan takes, income tax
+and both NIs, and where it comes off, so what is spare and what a pension is
+worth are both after it.
