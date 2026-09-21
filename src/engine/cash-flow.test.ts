@@ -193,6 +193,49 @@ describe("cashFlow", () => {
     expect(against(5500).left).toBe(-500);
   });
 
+  // £49,600 a year giving up a hundredth of its base against £49,104 a
+  // year of expenses covers itself to the penny and is £4.5e-13 short in
+  // binary, so the sacrifice was dropped and the pension fed nothing in
+  // every month of the plan, while the same residue left over was read
+  // as nothing at all. The month is not short: the pension is fed, and
+  // the ISA takes what the sacrifice leaves down to nothing exactly.
+  it("gives up the sacrifice in a month short of it by less than a nanopound", () => {
+    const fed: Account = {
+      balance: 0,
+      growth: { kind: "plan" },
+      id: pension.id,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+    };
+    const earner: IncomeLine = {
+      ...salary,
+      amount: 49600,
+      bonus: 0,
+      feeds: fed.id,
+      rsu: 0,
+      sacrifice: 0.01,
+    };
+    const flow = cashFlow(
+      [fed, spareIsa],
+      {
+        expenses: [{ ...household, amount: 49104, cadence: "year" }],
+        income: [earner],
+      },
+      { month: 0, year: 2026 },
+    );
+
+    expect(49600 / 12 - 496 / 12 - 49104 / 12).toBeLessThan(0);
+    expect(flow.fed).toStrictEqual([
+      {
+        account: fed,
+        amount: (496 * 1.15) / 12,
+        line: earner,
+        sacrificed: 496 / 12,
+      },
+    ]);
+    expect(Object.is(flow.left, 0)).toBe(true);
+  });
+
   // The spare money sees what the fixed sums leave and no more: the
   // £1,000 month is taken whole by the pension's trimmed sum, so the ISA
   // and the current account take nothing, while the £3,000 month leaves
@@ -586,6 +629,27 @@ describe("cashFlow", () => {
     expect(() =>
       cashFlow([spareHome], schedule, { month: 0, year: 2026 }),
     ).toThrow("A real asset or a debt takes no spare money");
+  });
+
+  // £0.30 a month against £0.10 and £0.20 covers itself to the penny
+  // and leaves −5.55e-17 in binary, which the projection would read as
+  // a month to sell savings for, every month of the plan. What is left
+  // is exactly nothing, sign and all.
+  it("reads a shortfall smaller than a nanopound as nothing at all", () => {
+    const flow = cashFlow(
+      [],
+      {
+        expenses: [
+          { ...household, amount: 0.1 },
+          { ...childcare, amount: 0.2, firstYear: 2026 },
+        ],
+        income: [{ ...plain, amount: 0.3, cadence: "month" }],
+      },
+      { month: 0, year: 2026 },
+    );
+
+    expect(0.3 - (0.1 + 0.2)).toBeLessThan(0);
+    expect(Object.is(flow.left, 0)).toBe(true);
   });
 
   it("finds nothing in a year with no lines and no accounts", () => {
