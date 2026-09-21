@@ -105,8 +105,11 @@ const house = z
 
 // What a save may carry, checked against the model's own lists so the
 // two cannot drift: the figures whole, a contribution, a cap and a
-// balloon never negative, the spare money only into an account that
-// takes it, a rate
+// balloon never negative, a balance below nothing only on a debt,
+// since a debt is the one kind a balance below nothing says anything
+// about and the engine carries a wrapper, cash or an asset held there
+// deeper without ever drawing on it, the spare money only into an
+// account that takes it, a rate
 // no lower than losing everything, since below that a year's growth is
 // not a number, the name as typed less the space around it, which
 // the form also trims, and the shares the salaries feeding the account
@@ -133,6 +136,7 @@ const values = z
       }),
     ),
   })
+  .refine((draft) => draft.kind === "debt" || draft.balance >= 0)
   .refine((draft) => draft.funding === "fixed" || takesSpare(draft))
   .refine((draft) => isPension(draft) || draft.shares.length === 0)
   .refine(

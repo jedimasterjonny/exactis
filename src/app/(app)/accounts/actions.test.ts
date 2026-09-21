@@ -281,6 +281,27 @@ describe("saveAccount", () => {
     expect(updateTag).not.toHaveBeenCalled();
   });
 
+  // A debt is the one kind a balance below nothing says anything
+  // about. A wrapper, cash or a real asset held there is a value
+  // nothing in the plan can mean, and the engine carries it deeper
+  // every month without ever drawing on it, so the save is where it
+  // stops.
+  it("refuses a balance below nothing on anything but a debt", async () => {
+    vi.mocked(insertAccount).mockResolvedValue(pension);
+
+    await expect(saveAccount(null, { ...values, balance: -1 })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(
+      saveAccount(null, { ...values, balance: -1, kind: "cash" }),
+    ).rejects.toThrow(z.ZodError);
+    expect(insertAccount).not.toHaveBeenCalled();
+
+    expect(
+      await saveAccount(null, { ...values, balance: -1, kind: "debt" }),
+    ).toBe(pension);
+  });
+
   it("refuses what the form could not have sent", async () => {
     await expect(saveAccount(0, values)).rejects.toThrow(z.ZodError);
     await expect(saveAccount(null, { ...values, name: "  " })).rejects.toThrow(
