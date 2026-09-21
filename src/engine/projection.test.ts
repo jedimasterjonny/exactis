@@ -15,9 +15,17 @@ const [household] = expenseLines;
 // Read at the start of its first year, so every year is carried whole.
 const plan = { born: 1990, from: 2026, month: 0, rate: 0.05 };
 
-// No lines at all, so there is no spare money and every account is paid
-// its fixed sum alone.
-const nothing = { expenses: [], income: [] };
+// Nothing going out and one line coming in wide enough to cover every
+// fixed sum these tests pay, feeding no pension and sacrificing nothing,
+// since a fixed sum is paid only out of what the month has: no account
+// here takes the spare money, so each is paid its fixed sum whole and
+// what the month does not use simply stays.
+const funded = {
+  expenses: [],
+  income: [
+    { ...salary, amount: 120000, bonus: 0, feeds: null, rsu: 0, sacrifice: 0 },
+  ],
+};
 
 // The salary against the household, which leaves £8,750 a month in
 // 2026, and the salary alone from 2048, when the household ends.
@@ -40,7 +48,7 @@ describe("project", () => {
   // The current account, the home and the mortgage are no wrapper and
   // are left out.
   it("pays a year's sum in a twelfth at a time, each month grown at the plan rate, by wrapper", () => {
-    expect(project(accounts, nothing, { ...plan, years: 2 })).toStrictEqual([
+    expect(project(accounts, funded, { ...plan, years: 2 })).toStrictEqual([
       { age: 36, deferred: 412880, free: 286145, year: 2026 },
       { age: 37, deferred: 461450, free: 320990, year: 2027 },
       { age: 38, deferred: 512449, free: 357577, year: 2028 },
@@ -59,7 +67,7 @@ describe("project", () => {
       name: "Regular saver",
     };
 
-    expect(project([monthly], nothing, { ...plan, years: 2 })).toStrictEqual([
+    expect(project([monthly], funded, { ...plan, years: 2 })).toStrictEqual([
       { age: 36, deferred: 0, free: 1000, year: 2026 },
       { age: 37, deferred: 0, free: 2200, year: 2027 },
       { age: 38, deferred: 0, free: 3400, year: 2028 },
@@ -78,7 +86,7 @@ describe("project", () => {
     };
 
     expect(
-      project([isa, lifetime], nothing, { ...plan, years: 1 }),
+      project([isa, lifetime], funded, { ...plan, years: 1 }),
     ).toStrictEqual([
       { age: 36, deferred: 0, free: 296145, year: 2026 },
       { age: 37, deferred: 0, free: 331190, year: 2027 },
@@ -239,7 +247,7 @@ describe("project", () => {
 
   it("projects nothing when no account is a wrapper", () => {
     expect(
-      project([home, mortgage], nothing, { ...plan, years: 1 }),
+      project([home, mortgage], funded, { ...plan, years: 1 }),
     ).toStrictEqual([
       { age: 36, deferred: 0, free: 0, year: 2026 },
       { age: 37, deferred: 0, free: 0, year: 2027 },
@@ -248,14 +256,14 @@ describe("project", () => {
 
   it("holds only today's balances over no years", () => {
     expect(
-      project([pension, isa], nothing, { ...plan, years: 0 }),
+      project([pension, isa], funded, { ...plan, years: 0 }),
     ).toStrictEqual([{ age: 36, deferred: 412880, free: 286145, year: 2026 }]);
   });
 });
 
 describe("endYear", () => {
   it("names the last year the plan runs to, which is the last year plotted", () => {
-    const [, , last] = project([], nothing, { ...plan, years: 2 });
+    const [, , last] = project([], funded, { ...plan, years: 2 });
 
     expect(endYear({ ...plan, years: 2 })).toBe(2028);
     expect(last?.year).toBe(endYear({ ...plan, years: 2 }));
