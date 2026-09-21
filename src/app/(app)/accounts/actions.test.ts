@@ -328,6 +328,74 @@ describe("saveAccount", () => {
     ).toBe(pension);
   });
 
+  // The engine charges a debt's fixed sum from the plan's month to the
+  // month the loan maths says the payments clear it in, so a payment
+  // the month's interest swallows has no month to stop at: £50 against
+  // £5,000 at 22% adds £91.67 of interest and owes more every month.
+  // The same £50 a year is smaller still. A debt paid £250 a month
+  // clears in two years and is written, and so is one paid nothing at
+  // all, which is a static figure nothing carries.
+  it("refuses a debt its own payments never clear", async () => {
+    vi.mocked(insertAccount).mockResolvedValue(mortgage);
+    const owing = {
+      ...values,
+      balance: -5000,
+      kind: "debt",
+      rate: 0.22,
+    } as const;
+
+    await expect(
+      saveAccount(null, { ...owing, contribution: 50 }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveAccount(null, { ...owing, cadence: "year", contribution: 50 }),
+    ).rejects.toThrow(z.ZodError);
+    expect(insertAccount).not.toHaveBeenCalled();
+
+    expect(await saveAccount(null, { ...owing, contribution: 250 })).toBe(
+      mortgage,
+    );
+    expect(await saveAccount(null, { ...owing, contribution: 0 })).toBe(
+      mortgage,
+    );
+  });
+
+  // A debt carried on the plan rate is worked out at the plan's rate,
+  // which is the rate the engine charges it at: £250 a month clears
+  // £5,000 at five per cent and is swallowed by the interest at
+  // seventy-five.
+  it("reads a debt on the plan rate at the plan's rate", async () => {
+    vi.mocked(insertAccount).mockResolvedValue(mortgage);
+    vi.mocked(getPlan).mockReturnValue({
+      born: 1990,
+      from: 2026,
+      month: 8,
+      rate: 0.05,
+      years: 30,
+    });
+    const owing = {
+      ...values,
+      balance: -5000,
+      contribution: 250,
+      growth: "plan",
+      kind: "debt",
+      rate: 0,
+    } as const;
+
+    expect(await saveAccount(null, owing)).toBe(mortgage);
+
+    vi.mocked(getPlan).mockReturnValue({
+      born: 1990,
+      from: 2026,
+      month: 8,
+      rate: 0.75,
+      years: 30,
+    });
+
+    await expect(saveAccount(null, owing)).rejects.toThrow(z.ZodError);
+    expect(insertAccount).toHaveBeenCalledOnce();
+  });
+
   it("refuses what the form could not have sent", async () => {
     await expect(saveAccount(0, values)).rejects.toThrow(z.ZodError);
     await expect(saveAccount(null, { ...values, name: "  " })).rejects.toThrow(

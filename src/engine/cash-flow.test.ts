@@ -18,6 +18,10 @@ const [household, childcare, mortgagePayment, retirement, care] = expenseLines;
 
 const schedule = { expenses: expenseLines, income: incomeLines };
 
+// Read at the start of 2026, so a debt's payments are counted from
+// January and the months a month is charged for are read off there.
+const plan = { born: 1990, from: 2026, month: 0, rate: 0.05, years: 53 };
+
 // The fixture's accounts, each paid the spare money instead: the ISA to
 // its £20,000 allowance, the pension to a cap under its own, and the
 // current account whatever is left, in the order they are listed.
@@ -60,7 +64,10 @@ describe("cashFlow", () => {
   // £1,666.67 and the mortgage's £2,210 is monthly already, leaving
   // £1,607.08 with no account to take it.
   it("takes this year's lines a month at a time, less every sacrifice and fixed sum", () => {
-    const flow = cashFlow(accounts, schedule, { month: 0, year: 2026 });
+    const flow = cashFlow(accounts, schedule, {
+      at: { month: 0, year: 2026 },
+      plan,
+    });
 
     expect(flow.income).toBe(12250);
     expect(flow.fed).toStrictEqual([
@@ -91,7 +98,7 @@ describe("cashFlow", () => {
     const flow = cashFlow(
       [pension],
       { expenses: [household], income: [lean] },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
 
     expect(flow.fed).toStrictEqual([
@@ -115,12 +122,12 @@ describe("cashFlow", () => {
     const flow = cashFlow(
       [pension, isa],
       { expenses: [], income: [plain] },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
     const reversed = cashFlow(
       [isa, pension],
       { expenses: [], income: [plain] },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
 
     expect(flow.fixed).toStrictEqual([
@@ -136,20 +143,20 @@ describe("cashFlow", () => {
   });
 
   // 2049's consulting is £2,000 a month against the mortgage payment
-  // and the retirement living, £8,201: the pension and the mortgage are
-  // paid nothing, each still listed at what it had, and the month is
-  // short by the £6,201 of expenses the income does not cover and by
-  // nothing else, the sums it could not pay adding nothing to it.
+  // and the retirement living, £8,201: the pension is paid nothing,
+  // still listed at what it had, and the month is short by the £6,201
+  // of expenses the income does not cover and by nothing else, the sum
+  // it could not pay adding nothing to it. The mortgage states no sum
+  // by then at all, its £2,210 a month having cleared the £182,940 it
+  // owes in July 2034, so it is out of the ledger rather than listed at
+  // nothing for another thirty years.
   it("pays no fixed sum at all when the expenses alone outrun the income", () => {
     const flow = cashFlow([pension, mortgage], schedule, {
-      month: 0,
-      year: 2049,
+      at: { month: 0, year: 2049 },
+      plan,
     });
 
-    expect(flow.fixed).toStrictEqual([
-      { account: pension, amount: 0 },
-      { account: mortgage, amount: 0 },
-    ]);
+    expect(flow.fixed).toStrictEqual([{ account: pension, amount: 0 }]);
     expect(flow.left).toBe(-6201);
   });
 
@@ -175,7 +182,7 @@ describe("cashFlow", () => {
       cashFlow(
         [unpaid],
         { expenses: [{ ...household, amount }], income: [lean] },
-        { month: 0, year: 2026 },
+        { at: { month: 0, year: 2026 }, plan },
       );
 
     expect(against(4500).fed).toStrictEqual([
@@ -221,7 +228,7 @@ describe("cashFlow", () => {
         expenses: [{ ...household, amount: 49104, cadence: "year" }],
         income: [earner],
       },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
 
     expect(49600 / 12 - 496 / 12 - 49104 / 12).toBeLessThan(0);
@@ -246,12 +253,12 @@ describe("cashFlow", () => {
     const short = cashFlow(
       held,
       { expenses: [household], income: [lean] },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
     const wide = cashFlow(
       held,
       { expenses: [], income: [plain] },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
 
     expect(short.fixed).toStrictEqual([{ account: pension, amount: 1000 }]);
@@ -284,17 +291,17 @@ describe("cashFlow", () => {
     const fed = cashFlow(
       [unpaid],
       { expenses: [], income },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
     const unlisted = cashFlow(
       [isa],
       { expenses: [], income },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
     const nothing = cashFlow(
       [pension],
       { expenses: [], income: [{ ...salary, sacrifice: 0 }] },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
 
     expect(fed.fed).toStrictEqual([
@@ -327,7 +334,7 @@ describe("cashFlow", () => {
     };
     const ending = { ...salary, lastMonth: 5, lastYear: 2030 };
     const flowAt = (income: IncomeLine, at: Month): CashFlow =>
-      cashFlow([unpaid], { expenses: [], income: [income] }, at);
+      cashFlow([unpaid], { expenses: [], income: [income] }, { at, plan });
 
     expect(flowAt(salary, { month: 0, year: 2049 }).fed).toStrictEqual([]);
     expect(flowAt(salary, { month: 0, year: 2049 }).left).toBe(0);
@@ -346,9 +353,18 @@ describe("cashFlow", () => {
   // pension alone against the two open-ended lines.
   it("runs a line from its first year to its last, or to the end when it has none", () => {
     const [, , , ...none] = accounts;
-    const earlier = cashFlow(none, schedule, { month: 0, year: 2035 });
-    const later = cashFlow(none, schedule, { month: 0, year: 2049 });
-    const last = cashFlow(none, schedule, { month: 0, year: 2079 });
+    const earlier = cashFlow(none, schedule, {
+      at: { month: 0, year: 2035 },
+      plan,
+    });
+    const later = cashFlow(none, schedule, {
+      at: { month: 0, year: 2049 },
+      plan,
+    });
+    const last = cashFlow(none, schedule, {
+      at: { month: 0, year: 2079 },
+      plan,
+    });
 
     expect(earlier.income).toBe(26250);
     expect(earlier.expenses).toBe(4650);
@@ -375,7 +391,7 @@ describe("cashFlow", () => {
     const flow = cashFlow(
       [spareIsa, sparePension, spareCash, home, mortgage],
       schedule,
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
     const fedPension = (12000 * 1.15) / 12;
 
@@ -407,7 +423,7 @@ describe("cashFlow", () => {
       cashFlow(
         [uncapped],
         { expenses: [], income: [{ ...salary, amount, sacrifice }] },
-        { month: 0, year: 2026 },
+        { at: { month: 0, year: 2026 }, plan },
       ).spare.map((take) => take.amount)[0] ?? Number.NaN;
 
     expect(at(600000, 0.1)).toBe(0);
@@ -437,7 +453,7 @@ describe("cashFlow", () => {
           },
         ],
       },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
 
     expect(flow.spare.map(({ amount }) => amount)).toStrictEqual([
@@ -453,8 +469,8 @@ describe("cashFlow", () => {
   // what is left.
   it("pays a spare-money account nothing when the month does not cover its outgoings", () => {
     const flow = cashFlow([spareIsa, spareCash], schedule, {
-      month: 0,
-      year: 2049,
+      at: { month: 0, year: 2049 },
+      plan,
     });
 
     expect(flow.spare).toStrictEqual([
@@ -470,7 +486,7 @@ describe("cashFlow", () => {
     const flow = cashFlow(
       [spareIsa],
       { expenses: [household], income: [salary] },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
 
     expect(flow.spare).toStrictEqual([
@@ -492,11 +508,114 @@ describe("cashFlow", () => {
         expenses: [{ ...mortgagePayment, pays: mortgage.id }],
         income: [salary],
       },
-      { month: 0, year: 2040 },
+      { at: { month: 0, year: 2040 }, plan },
     );
 
     expect(flow.fixed).toStrictEqual([{ account: pension, amount: 2266.25 }]);
     expect(flow.expenses).toBe(3201);
+  });
+
+  // A month of the debts below, against the plain salary's £3,000 and
+  // nothing going out, so what the month states is the debt's own sum
+  // and what the ISA beside it takes is the rest.
+  const owed = (held: readonly Account[], at: Month): CashFlow =>
+    cashFlow(held, { expenses: [], income: [plain] }, { at, plan });
+
+  // A £5,000 card at 22% paying £250 a month is cleared by its 26th
+  // payment, which from January 2026 falls in February 2028: the sum is
+  // charged in that month and in none after it, so the card costs
+  // £6,500 rather than the £90,000 thirty years of it would. The month
+  // after, the £250 is the ISA's to take.
+  it("charges a debt's fixed sum to the month its payments clear it and no further", () => {
+    const card: Account = {
+      balance: -5000,
+      contribution: { amount: 250, cadence: "month", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0.22 },
+      id: 6,
+      kind: "debt",
+      name: "Credit card",
+    };
+    const held = [card, spareIsa];
+
+    expect(owed(held, { month: 0, year: 2026 }).fixed).toStrictEqual([
+      { account: card, amount: 250 },
+    ]);
+    expect(owed(held, { month: 1, year: 2028 }).fixed).toStrictEqual([
+      { account: card, amount: 250 },
+    ]);
+    expect(owed(held, { month: 2, year: 2028 }).fixed).toStrictEqual([]);
+    expect(owed(held, { month: 1, year: 2028 }).spare).toStrictEqual([
+      { account: spareIsa, amount: 20000 / 12, cap: 20000 },
+    ]);
+    expect(owed(held, { month: 1, year: 2028 }).left).toBeCloseTo(1083.33, 2);
+    expect(owed(held, { month: 2, year: 2028 }).left).toBeCloseTo(1333.33, 2);
+  });
+
+  // £1,200 at no rate paying £100 a month spreads flat over twelve
+  // payments, so the last falls in December 2026 and January 2027 is
+  // charged nothing: a term that is a whole number of months ends on
+  // the month itself rather than a payment either side of it.
+  it("ends a debt at no rate on the month the flat payments reach", () => {
+    const owing: Account = {
+      balance: -1200,
+      contribution: { amount: 100, cadence: "month", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0 },
+      id: 6,
+      kind: "debt",
+      name: "Interest-free credit",
+    };
+    const charged = { account: owing, amount: 100 };
+
+    expect(owed([owing], { month: 10, year: 2026 }).fixed).toStrictEqual([
+      charged,
+    ]);
+    expect(owed([owing], { month: 11, year: 2026 }).fixed).toStrictEqual([
+      charged,
+    ]);
+    expect(owed([owing], { month: 0, year: 2027 }).fixed).toStrictEqual([]);
+  });
+
+  // A debt carried on the plan rate is charged at the plan rate: at the
+  // plan's five per cent £250 a month clears £5,000 with its 21st
+  // payment, September 2027, where the same payment against no interest
+  // at all would have been done in August.
+  it("works a debt on the plan rate out at the plan's rate", () => {
+    const owing: Account = {
+      balance: -5000,
+      contribution: { amount: 250, cadence: "month", kind: "fixed" },
+      growth: { kind: "plan" },
+      id: 6,
+      kind: "debt",
+      name: "Overdraft",
+    };
+    const charged = { account: owing, amount: 250 };
+
+    expect(owed([owing], { month: 7, year: 2027 }).fixed).toStrictEqual([
+      charged,
+    ]);
+    expect(owed([owing], { month: 8, year: 2027 }).fixed).toStrictEqual([
+      charged,
+    ]);
+    expect(owed([owing], { month: 9, year: 2027 }).fixed).toStrictEqual([]);
+  });
+
+  // £50 a month against £5,000 at 22% is less than the £91.67 of
+  // interest the month adds, so the payments never clear it and there
+  // is no month to stop charging them in. The action refuses to save
+  // such a debt, so one that reached here is a caller's mistake.
+  it("refuses a debt its payments never clear", () => {
+    const card: Account = {
+      balance: -5000,
+      contribution: { amount: 50, cadence: "month", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0.22 },
+      id: 6,
+      kind: "debt",
+      name: "Credit card",
+    };
+
+    expect(() => owed([card], { month: 0, year: 2026 })).toThrow(
+      "A debt's payments end",
+    );
   });
 
   // The household ending in March 2047 runs through March and not
@@ -508,8 +627,11 @@ describe("cashFlow", () => {
     const ending = { ...household, lastMonth: 2 };
     const ended = { ...salary, lastMonth: 5, lastYear: 2030 };
     const at = (month: number, year: number): number =>
-      cashFlow(none, { expenses: [ending], income: [ended] }, { month, year })
-        .expenses;
+      cashFlow(
+        none,
+        { expenses: [ending], income: [ended] },
+        { at: { month, year }, plan },
+      ).expenses;
 
     expect(at(2, 2047)).toBe(3500);
     expect(at(3, 2047)).toBe(0);
@@ -518,21 +640,21 @@ describe("cashFlow", () => {
       cashFlow(
         none,
         { expenses: [household], income: [] },
-        { month: 11, year: 2047 },
+        { at: { month: 11, year: 2047 }, plan },
       ).expenses,
     ).toBe(3500);
     expect(
       cashFlow(
         none,
         { expenses: [], income: [ended] },
-        { month: 5, year: 2030 },
+        { at: { month: 5, year: 2030 }, plan },
       ).income,
     ).toBe(12250);
     expect(
       cashFlow(
         none,
         { expenses: [], income: [ended] },
-        { month: 6, year: 2030 },
+        { at: { month: 6, year: 2030 }, plan },
       ).income,
     ).toBe(0);
   });
@@ -546,7 +668,7 @@ describe("cashFlow", () => {
         cashFlow(
           [account],
           { expenses: [], income: [{ ...salary, feeds: account.id }] },
-          { month: 0, year: 2026 },
+          { at: { month: 0, year: 2026 }, plan },
         ),
       ).toThrow("A salary feeds a pension alone");
       expect(() =>
@@ -556,7 +678,7 @@ describe("cashFlow", () => {
             expenses: [],
             income: [{ ...salary, feeds: account.id, sacrifice: 0 }],
           },
-          { month: 0, year: 2026 },
+          { at: { month: 0, year: 2026 }, plan },
         ),
       ).toThrow("A salary feeds a pension alone");
     }
@@ -574,7 +696,7 @@ describe("cashFlow", () => {
         cashFlow(
           [account],
           { expenses: [{ ...household, pays: account.id }], income: [plain] },
-          { month: 0, year: 2026 },
+          { at: { month: 0, year: 2026 }, plan },
         ),
       ).toThrow("A line pays a debt alone");
     }
@@ -594,14 +716,14 @@ describe("cashFlow", () => {
       cashFlow(
         [isa],
         { expenses: [], income: [feeding] },
-        { month: 0, year: 2049 },
+        { at: { month: 0, year: 2049 }, plan },
       ),
     ).toThrow("A salary feeds a pension alone");
     expect(() =>
       cashFlow(
         [isa],
         { expenses: [paying], income: [] },
-        { month: 0, year: 2026 },
+        { at: { month: 0, year: 2026 }, plan },
       ),
     ).toThrow("A line pays a debt alone");
   });
@@ -614,7 +736,7 @@ describe("cashFlow", () => {
     const flow = cashFlow(
       [isa],
       { expenses: [{ ...household, pays: 99 }], income: [salary] },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
 
     expect(flow.fixed).toStrictEqual([{ account: isa, amount: 20000 / 12 }]);
@@ -638,7 +760,7 @@ describe("cashFlow", () => {
         cashFlow(
           held,
           { expenses: [], income: [plain] },
-          { month: 0, year: 2026 },
+          { at: { month: 0, year: 2026 }, plan },
         ),
       ).toThrow("An account is listed once");
     }
@@ -646,7 +768,7 @@ describe("cashFlow", () => {
       cashFlow(
         [isa, { ...twin, id: 9 }],
         { expenses: [], income: [plain] },
-        { month: 0, year: 2026 },
+        { at: { month: 0, year: 2026 }, plan },
       ),
     ).not.toThrow();
   });
@@ -658,7 +780,7 @@ describe("cashFlow", () => {
     };
 
     expect(() =>
-      cashFlow([spareHome], schedule, { month: 0, year: 2026 }),
+      cashFlow([spareHome], schedule, { at: { month: 0, year: 2026 }, plan }),
     ).toThrow("A real asset or a debt takes no spare money");
   });
 
@@ -676,7 +798,7 @@ describe("cashFlow", () => {
         ],
         income: [{ ...plain, amount: 0.3, cadence: "month" }],
       },
-      { month: 0, year: 2026 },
+      { at: { month: 0, year: 2026 }, plan },
     );
 
     expect(0.3 - (0.1 + 0.2)).toBeLessThan(0);
@@ -684,7 +806,9 @@ describe("cashFlow", () => {
   });
 
   it("finds nothing in a year with no lines and no accounts", () => {
-    expect(cashFlow([], schedule, { month: 0, year: 2025 })).toStrictEqual({
+    expect(
+      cashFlow([], schedule, { at: { month: 0, year: 2025 }, plan }),
+    ).toStrictEqual({
       expenses: 0,
       fed: [],
       fixed: [],

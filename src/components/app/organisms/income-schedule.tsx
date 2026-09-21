@@ -7,7 +7,7 @@ import { Plus } from "lucide-react";
 import type { Summary } from "@/components/app/organisms/schedule-rows";
 import type { Account } from "@/data/accounts";
 import type { IncomeKind, IncomeLine, IncomeLineDraft } from "@/data/income";
-import type { Plan } from "@/engine/projection";
+import type { Plan } from "@/data/plan";
 import type { Entry } from "@/hooks/use-editor";
 
 import { removeIncomeLine, saveIncomeLine } from "@/app/(app)/plan/actions";
