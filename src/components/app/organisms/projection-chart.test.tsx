@@ -24,6 +24,21 @@ const points = [
   { age: 38, deferred: 513737, free: 358525, uncovered: 0, year: 2028 },
 ];
 
+// The same plan, short from its second year on, so the mark has a year
+// to fall on and a later short year to leave unmarked.
+const shortPoints = [
+  { age: 36, deferred: 412880, free: 286145, uncovered: 0, year: 2026 },
+  { age: 37, deferred: 41209, free: 0, uncovered: 18450, year: 2027 },
+  { age: 38, deferred: 0, free: 0, uncovered: 52310, year: 2028 },
+];
+
+// The vertical rule recharts draws for a ReferenceLine, which carries the
+// year it stands at as an attribute.
+const marks = (): HTMLElement[] =>
+  screen.queryAllByText(byClass("recharts-reference-line-line"), {
+    suggest: false,
+  });
+
 describe("ProjectionChart", () => {
   it("plots the years with a legend naming each series in stacking order", () => {
     render(<ProjectionChart points={points} />);
@@ -83,6 +98,52 @@ describe("ProjectionChart", () => {
     expect(
       screen.queryAllByText(byClass("recharts-bar"), { suggest: false }),
     ).toHaveLength(0);
+  });
+
+  it("marks no year and names nothing uncovered while the money lasts", async () => {
+    render(<ProjectionChart points={points} />);
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    await screen.findByText("2027 · Age 37");
+
+    expect(marks()).toHaveLength(0);
+    expect(screen.queryByText("Runs out")).not.toBeInTheDocument();
+    expect(screen.queryByText("Uncovered")).not.toBeInTheDocument();
+  });
+
+  it("marks the first year the money runs out, and only that year", () => {
+    render(<ProjectionChart points={shortPoints} />);
+
+    expect(marks()).toHaveLength(1);
+    expect(marks()[0]).toHaveAttribute("x", "2027");
+    expect(screen.getByText("Runs out")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("switch", { name: "Areas" }));
+
+    expect(marks()).toHaveLength(1);
+    expect(marks()[0]).toHaveAttribute("x", "2027");
+  });
+
+  it("names what a short year could not cover under the crosshair", async () => {
+    render(<ProjectionChart points={shortPoints} />);
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    expect(await screen.findByText("2027 · Age 37")).toHaveClass("font-medium");
+
+    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+
+    expect(tooltip.getByText("Uncovered")).toBeInTheDocument();
+    expect(tooltip.getByText("£18,450")).toHaveClass(
+      "figure",
+      "font-medium",
+      "text-destructive",
+    );
   });
 
   it("says so instead of plotting nothing when no account is a wrapper", () => {
