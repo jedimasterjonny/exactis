@@ -6,8 +6,8 @@ import { cn } from "cn";
 import { useState } from "react";
 
 import type { Account } from "@/data/accounts";
+import type { Plan } from "@/data/plan";
 import type { Fed, Schedule, Spent, Take } from "@/engine/cash-flow";
-import type { Plan } from "@/engine/projection";
 
 import { Field } from "@/components/app/atoms/field";
 import { SectionHeader } from "@/components/app/atoms/section-header";
@@ -75,7 +75,7 @@ export function CashFlowCard({
   const [year, setYear] = useState(plan.from);
   const end = endYear(plan);
   const month = year === plan.from ? plan.month : 0;
-  const flow = cashFlow(accounts, schedule, { month, year });
+  const flow = cashFlow(accounts, schedule, { at: { month, year }, plan });
   return (
     <Card>
       <CardHeader className="grid gap-4">

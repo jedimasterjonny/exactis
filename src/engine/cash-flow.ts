@@ -1,11 +1,14 @@
 import type { Account, Cadence } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
+import type { Plan } from "@/data/plan";
 import type { LineValues, Month } from "@/data/schedule";
 
 import { allowanceOf, isPension, takesSpare } from "@/data/accounts";
 import { contributionOf, sacrificeOf, totalOf } from "@/data/income";
+import { rateFrom } from "@/data/plan";
 import { runsIn } from "@/lib/lines";
+import { clearsIn, termOf } from "@/lib/loans";
 
 // A month of a year's money, in pounds as the lines state them and
 // unrounded, formatted where it is rendered: what comes in, what goes
@@ -57,6 +60,15 @@ interface Paid {
   readonly amount: number;
 }
 
+// The flow is asked for a month of a plan: the month being worked out,
+// and the plan it is a month of, which carries the rate an account on
+// the plan rate is charged at and the month the plan is read in, from
+// which a debt's payments are counted.
+interface Reading {
+  readonly at: Month;
+  readonly plan: Plan;
+}
+
 // The least a month may be short by and be short at all. Tenths of a
 // pound do not add back to nothing in binary - £0.30 of income against
 // £0.10 and £0.20 of expenses leaves −5.55e-17 - and the projection
@@ -88,6 +100,16 @@ const nanopound = 1e-9;
 // whose payments are a line pays nothing as a fixed sum, since the line
 // is its payment and the ledger shows the same figure against the loan:
 // it is counted once, as the line, and stops when the line does. A
+// debt paying its own fixed sum stops too, at the month the loan maths
+// says the payments clear it, read off the balance it owes, the balloon
+// it leaves standing, the rate it is charged at and the sum itself, and
+// counted from the month the plan is read in. A debt's payments have an
+// end, always: charged for every month of the plan instead, a £5,000
+// card at £250 a month costs £90,000 over thirty years and the money it
+// would have saved after the second is never saved. A payment that
+// never clears its debt has no such month, and the action refuses to
+// save one, so a debt that reaches here with one is a caller's mistake
+// rather than a debt paid for ever. A
 // salary feeding a pension among the accounts gives up its sacrifice
 // before the month sees it, and the pension is fed the sacrifice with
 // the employer's NI saved on it, over and above whatever fixed sum the
@@ -131,8 +153,9 @@ const nanopound = 1e-9;
 export function cashFlow(
   accounts: readonly Account[],
   schedule: Schedule,
-  at: Month,
+  reading: Reading,
 ): CashFlow {
+  const { at } = reading;
   if (new Set(accounts.map(({ id }) => id)).size !== accounts.length) {
     throw new Error("An account is listed once");
   }
@@ -170,6 +193,7 @@ export function cashFlow(
   const { left: rest, sums: fixed } = fixedSums(
     accounts.filter((account) => !paid.has(account.id)),
     income - sacrificed - expenses,
+    reading,
   );
   const { left, takes } = spareMoney(accounts, rest, fed);
   return {
@@ -218,12 +242,20 @@ function checkLinks(accounts: readonly Account[], schedule: Schedule): void {
 
 // The fixed sum an account states a month, before the month is asked
 // whether it has it, or nothing for an account paid the spare money or
-// nothing.
-function fixedSum(account: Account): Paid[] {
+// nothing. A debt states one only in the months its payments run, and
+// nothing at all once they have cleared it: a debt whose payments are
+// over states no sum, as a line that has ended costs nothing, rather
+// than standing in the ledger at nothing a month for the rest of the
+// plan.
+function fixedSum(account: Account, reading: Reading): Paid[] {
   const { contribution } = account;
-  return contribution?.kind === "fixed"
-    ? [{ account, amount: monthly(contribution.amount, contribution.cadence) }]
-    : [];
+  if (contribution?.kind !== "fixed") {
+    return [];
+  }
+  const amount = monthly(contribution.amount, contribution.cadence);
+  return account.kind === "debt" && !isPaying(account, amount, reading)
+    ? []
+    : [{ account, amount }];
 }
 
 // The fixed sums paid out of what the month has after the sacrifices and
@@ -236,15 +268,47 @@ function fixedSum(account: Account): Paid[] {
 function fixedSums(
   accounts: readonly Account[],
   available: number,
+  reading: Reading,
 ): { readonly left: number; readonly sums: readonly Paid[] } {
   const sums: Paid[] = [];
   let left = available;
-  for (const { account, amount } of accounts.flatMap(fixedSum)) {
+  const stated = accounts.flatMap((account) => fixedSum(account, reading));
+  for (const { account, amount } of stated) {
     const sum = Math.max(0, Math.min(left, amount));
     sums.push({ account, amount: sum });
     left -= sum;
   }
   return { left, sums };
+}
+
+// Whether a debt's payments still run in the month. What is owed is
+// the balance it holds, which a debt holds as a negative, down to the
+// balloon a PCP leaves standing, and the term is what that sum a month
+// takes to pay it down at the rate the debt is charged, its own fixed
+// one or the plan's. The last payment falls in the month clearsIn
+// counts to from the month the plan is read in, and the sum is charged
+// whole through that month and not at all after it, which is the test
+// runsIn makes of a line's last year and month, made here of the month
+// the loan maths gives rather than of one anybody typed. A payment the
+// interest swallows clears nothing and has no last month; the action
+// refuses to save such a debt, so one here is a caller's mistake.
+function isPaying(
+  account: Account,
+  payment: number,
+  { at, plan }: Reading,
+): boolean {
+  const term = termOf(
+    { balance: -account.balance, balloon: account.balloon ?? 0 },
+    payment,
+    rateFrom(account, plan),
+  );
+  if (term === null) {
+    throw new Error("A debt's payments end");
+  }
+  const last = clearsIn(term, plan);
+  return (
+    at.year < last.year || (at.year === last.year && at.month <= last.month)
+  );
 }
 
 function monthly(amount: number, cadence: Cadence): number {

@@ -43,6 +43,7 @@ import {
   updateExpenseLine,
 } from "@/db/expenses";
 import { isFed, stopFeeding, updateSacrifice } from "@/db/income";
+import { termOf } from "@/lib/loans";
 import { requireSession } from "@/lib/session";
 
 import { expenseLinesTag, incomeLinesTag } from "../plan/store";
@@ -116,7 +117,10 @@ const house = z
 // sacrifice, each a fraction of the base at most against a line by its
 // id, one share a line, since the dialog holds one and two would write
 // the same line twice, and none against anything but a pension, since
-// only a pension is fed.
+// only a pension is fed. A debt paying a fixed sum is held to one that
+// clears it, since the engine charges that sum to the month the loan
+// maths says the payments end in and a payment the interest swallows
+// gives it no such month.
 const values = z
   .object({
     balance: z.number().int(),
@@ -138,6 +142,7 @@ const values = z
   })
   .refine((draft) => draft.kind === "debt" || draft.balance >= 0)
   .refine((draft) => draft.funding === "fixed" || takesSpare(draft))
+  .refine(doesClear)
   .refine((draft) => isPension(draft) || draft.shares.length === 0)
   .refine(
     (draft) =>
@@ -253,6 +258,36 @@ export async function saveHouse(
   const at = target.parse(id);
   const records = toRecords(house.parse(draft), getPlan());
   return writeSecured(getDb(), at, records);
+}
+
+// Whether a debt's own fixed sum pays it off. The engine charges that
+// sum from the plan's month to the month the loan maths says the
+// payments clear the balance in, so a payment the month's interest
+// swallows has no month to stop at and no figure the plan can mean; the
+// save is where that stops, as it is where a balance below nothing on a
+// wrapper stops. Everything else is left alone. A debt paid nothing of
+// its own is a static figure nothing carries, one paid the spare money
+// is refused above, and the rate is the debt's own or the plan's, read
+// here as the engine reads it. Every other kind clears nothing and is
+// asked nothing.
+function doesClear(draft: AccountValues): boolean {
+  if (
+    draft.kind !== "debt" ||
+    draft.funding !== "fixed" ||
+    draft.contribution === 0
+  ) {
+    return true;
+  }
+  const payment =
+    draft.cadence === "year" ? draft.contribution / 12 : draft.contribution;
+  const rate = draft.growth === "plan" ? getPlan().rate : draft.rate;
+  return (
+    termOf(
+      { balance: -draft.balance, balloon: draft.balloon },
+      payment,
+      rate,
+    ) !== null
+  );
 }
 
 // An account and the line of its payments, if it is a loan with one,

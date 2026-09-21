@@ -1,7 +1,7 @@
 import type { JSX, ReactNode } from "react";
 
+import type { Plan } from "@/data/plan";
 import type { LineValues, Side } from "@/data/schedule";
-import type { Plan } from "@/engine/projection";
 import type { Option } from "@/lib/options";
 
 import { FieldRow } from "@/components/app/atoms/field-row";

@@ -86,6 +86,15 @@ money, handed down the accounts that take it the same way, each to a twelfth of
 its cap. A fixed sum is therefore paid only out of what the month has, so a
 contribution stops when the income funding it ends.
 
+A debt's own fixed sum is a loan's payments, so it runs only until the loan
+maths in `src/lib/loans.ts` says they clear what is owed: the term the payment
+takes at the debt's rate, counted from the month the plan is read in, and
+nothing charged after the month the last payment falls in. A debt whose payments
+an expense line carries is left out of the fixed sums as before, the line being
+the payment and carrying its own end. Saving a debt whose fixed payment never
+clears it is refused, since a payment the month's interest swallows gives the
+projection no month to stop at.
+
 A month the income does not cover is drawn out of the savings at the start of
 it, before the month's growth: cash first, then the tax-free wrapper, then the
 tax-deferred one and only from the year its owner turns 57, an age held as a
