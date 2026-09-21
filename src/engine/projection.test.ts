@@ -171,6 +171,34 @@ describe("project", () => {
     ]);
   });
 
+  // A pension is never fed in a month it could be drawn on. £5,000 a
+  // month against £5,200 of spending does not cover itself, so the
+  // £500 the salary would have sacrificed is earned and spent instead,
+  // the SIPP it feeds is fed nothing and stays at the nothing it opens
+  // with, and the year is short by the £200 a month the income does not
+  // cover, £2,400 over its twelve. Born in 1960, so the SIPP is
+  // drawable in every month of the year and has nothing to give.
+  it("feeds no pension in a year it is short, and leaves an empty one empty", () => {
+    const earner = {
+      ...salary,
+      amount: 60000,
+      bonus: 0,
+      feeds: sipp.id,
+      rsu: 0,
+    };
+
+    expect(
+      project(
+        [{ ...sipp, balance: 0 }],
+        { expenses: [{ ...household, amount: 5200 }], income: [earner] },
+        { ...plan, born: 1960, years: 1 },
+      ),
+    ).toStrictEqual([
+      { age: 66, deferred: 0, free: 0, uncovered: 2400, year: 2026 },
+      { age: 67, deferred: 0, free: 0, uncovered: 0, year: 2027 },
+    ]);
+  });
+
   // The salary ends with 2027, so 2028 is carried with nothing fed and
   // the pension holds what two years landed.
   it("stops paying the sacrifice in when the salary ends", () => {
