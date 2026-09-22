@@ -20,6 +20,18 @@ export const cadenceOptions: readonly Option<Cadence>[] = optionsOf(labels, [
   "month",
 ]);
 
+// What is paid a month at a cadence: the sum itself, or a twelfth of a
+// year's, for a figure stated a month beside figures stated at their
+// own cadences, and for the engine, which counts in months.
+export function monthly(amount: number, cadence: Cadence): number {
+  switch (cadence) {
+    case "month":
+      return amount;
+    case "year":
+      return amount / 12;
+  }
+}
+
 // What is paid a year at a cadence: the sum itself, or twelve of a
 // month's, for a figure stated a year beside figures stated at their
 // own cadences.
