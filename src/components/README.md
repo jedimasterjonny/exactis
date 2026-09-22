@@ -74,7 +74,10 @@ If a component seems to belong in two tiers it is usually two components.
 Nothing here relies on being remembered.
 
 - `no-restricted-imports` bars everything outside `kit/` from importing
-  `@/components/ui/*`, and bars each tier from importing a tier above it.
+  `@/components/ui/*`, bars each tier from importing a tier above it, and bars
+  everything outside `src/app` from importing `@/app/*`: the routes are the top
+  tier, so a server action lives under `src/actions` and a store under
+  `src/store`, where an organism or a template can reach them.
 - `import/no-cycle` catches the loop that the permitted same-tier edge makes
   possible.
 - `.github/workflows/vendor.yml` re-runs `shadcn add --overwrite` weekly and

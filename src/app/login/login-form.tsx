@@ -4,11 +4,10 @@ import type { JSX } from "react";
 
 import { useActionState } from "react";
 
+import { signIn } from "@/actions/auth";
 import { Field } from "@/components/app/atoms/field";
 import { Button } from "@/components/kit/button";
 import { Input } from "@/components/kit/input";
-
-import { signIn } from "./actions";
 
 // The one field the app asks for. The form posts to the sign-in action
 // and shows what it came back with, which is nothing on the way in and a

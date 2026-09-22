@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ExpenseLine } from "@/data/expenses";
 
-import { saveExpenseLine } from "@/app/(app)/plan/actions";
+import { saveExpenseLine } from "@/actions/schedule";
 import { Toaster } from "@/components/kit/toast";
 import { expenseKinds } from "@/data/expenses";
 import { expenseLines } from "@/data/expenses.fixture";
@@ -17,7 +17,7 @@ import { plan } from "@/data/income.fixture";
 
 import { ExpenseSchedule } from "./expense-schedule";
 
-vi.mock("@/app/(app)/plan/actions", () => ({ saveExpenseLine: vi.fn() }));
+vi.mock("@/actions/schedule", () => ({ saveExpenseLine: vi.fn() }));
 
 const [, , mortgagePayment, retirement] = expenseLines;
 

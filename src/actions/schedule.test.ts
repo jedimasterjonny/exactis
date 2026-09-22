@@ -17,10 +17,10 @@ import {
   updateIncomeLine,
 } from "@/db/income";
 import { requireSession } from "@/lib/session";
+import { accountsTag } from "@/store/accounts";
+import { expenseLinesTag, incomeLinesTag } from "@/store/schedule";
 
-import { accountsTag } from "../accounts/store";
-import { removeIncomeLine, saveExpenseLine, saveIncomeLine } from "./actions";
-import { expenseLinesTag, incomeLinesTag } from "./store";
+import { removeIncomeLine, saveExpenseLine, saveIncomeLine } from "./schedule";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({

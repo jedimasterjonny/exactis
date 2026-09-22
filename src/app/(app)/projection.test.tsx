@@ -1,10 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { Projection } from "./projection";
-import { getProjection } from "./store";
+import { getProjection } from "@/store/plan";
 
-vi.mock("./store", () => ({ getProjection: vi.fn() }));
+import { Projection } from "./projection";
+
+vi.mock("@/store/plan", () => ({ getProjection: vi.fn() }));
 
 describe("Projection", () => {
   it("hands the store's projection to the chart", async () => {

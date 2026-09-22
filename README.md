@@ -105,9 +105,12 @@ projection can say when the money runs out and the dashboard's chart marks that
 year. Nothing is taxed yet. Every line is taken at the amount it states, in
 today's money, until the plan carries an inflation assumption.
 
-The dashboard reads the projection through `src/app/(app)/store.ts`, a cached
-read keyed on the accounts and the lines, so a save on the accounts or the plan
-screen is a new projection on the next render.
+The dashboard reads the projection through `src/store/plan.ts`, a cached read
+keyed on the accounts and the lines, so a save on the accounts or the plan
+screen is a new projection on the next render. The cached reads every screen
+goes through live under `src/store`, and the server actions a save goes to under
+`src/actions`: neither is a route, and the organisms that save through an action
+sit beneath the routes.
 
 ## Signing in
 
