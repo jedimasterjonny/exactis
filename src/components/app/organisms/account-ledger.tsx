@@ -19,6 +19,7 @@ import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { AccountDialog } from "@/components/app/organisms/account-dialog";
 import { AccountTable } from "@/components/app/organisms/account-table";
+import { AssetTable } from "@/components/app/organisms/asset-table";
 import { CarDialog } from "@/components/app/organisms/car-dialog";
 import { HouseDialog } from "@/components/app/organisms/house-dialog";
 import { PaymentOrder } from "@/components/app/organisms/payment-order";
@@ -56,11 +57,11 @@ type AssetOpening = "new" | Secured;
 // lands in view wherever it lands. A dialog is open for as long as it
 // is mounted, so what it is open on doubles as its open state: each
 // section's buttons open the dialogs it lists on a new one, and a row's
-// pencil opens the account as it is, unless it is a
-// house or a car, or the loan against either, which opens on that asset,
-// so an edit from either side writes both. A row's bin asks through the
-// confirm dialog before the account goes, saying what goes with it,
-// since an asset takes its loan and a loan its payments, and what stops,
+// pencil opens the account as it is, unless it is a house or a car,
+// which shares its row with the loan secured on it and opens with it, so
+// an edit writes both. A row's bin asks through the confirm dialog
+// before the account goes, saying what goes with it, since an asset
+// takes its loan and the loan's payments, and what stops,
 // since a salary feeding a pension stops when the pension goes; the
 // income lines are handed down for that, for the treatment such a
 // pension is held to, so both can name the salaries, and for the
@@ -86,8 +87,19 @@ export function AccountLedger({
     accounts,
     (_current: readonly Account[], next: readonly Account[]) => next,
   );
-  const held = order.filter((account) => !isAsset(account));
-  const assets = order.filter(isAsset);
+  // Each asset with the loan it shares a row with, and the accounts paid
+  // out of the month, in the order they are paid: every one but an
+  // asset, a paired loan among them, since its payments are met in the
+  // order as any other's are. The accounts' section lists them less the
+  // paired loans, which are read on their assets' rows instead.
+  const assets = order
+    .filter(isAsset)
+    .map((asset) => securedFor(asset, order) ?? { asset, loan: null });
+  const paid = order.filter((account) => !isAsset(account));
+  const paired = new Set(
+    assets.flatMap(({ loan }) => (loan === null ? [] : [loan.id])),
+  );
+  const held = paid.filter((account) => !paired.has(account.id));
   const running = lines.filter((line) => runsIn(line, at));
 
   // The month the plan is read in as the loan maths counts from it, for
@@ -95,8 +107,7 @@ export function AccountLedger({
   const plan: PlanMonth = { from: at.year, month: at.month };
 
   // A row's pencil opens its account as it is, unless the account is a
-  // house or a car, or the loan against one, which open as the asset
-  // they are part of.
+  // house or a car, which opens with the loan secured on it.
   function edit(account: Account): void {
     const found = securedFor(account, order);
     if (found === null) {
@@ -193,21 +204,10 @@ export function AccountLedger({
           label={subsectionLabel(accountsAndAssets, 2)}
           title="Property and vehicles"
         >
-          <AccountTable
-            accounts={assets}
-            emptyDescription="A house, a car, anything owned outright. Add one to see it listed here."
-            emptyTitle="No assets yet"
-            onDelete={ask}
-            onEdit={edit}
-          />
+          <AssetTable assets={assets} onDelete={ask} onEdit={edit} />
         </SectionCard>
-        <Note>
-          A loan against an asset is listed with the accounts, since it is paid
-          as they are. The progress points reconcile the two as total assets and
-          asset loans.
-        </Note>
         <PaymentOrder
-          accounts={held}
+          accounts={paid}
           label={subsectionLabel(accountsAndAssets, 3)}
           onMove={move}
         />
@@ -269,8 +269,7 @@ export function AccountLedger({
 // earned whole from then on, since the store stops the salaries before
 // the pension goes and the share typed against each is lost with it; a
 // house or a car takes the loan secured on it and that loan's payments,
-// a loan takes its payments, and any other account, or an asset with no
-// loan, goes alone.
+// and any other account, or an asset with no loan, goes alone.
 function goesWith(
   account: Account,
   accounts: readonly Account[],
@@ -280,15 +279,11 @@ function goesWith(
   if (feeders.length > 0) {
     return `${listed.format(feeders)} ${feeders.length === 1 ? "stops" : "stop"} sacrificing into it and ${feeders.length === 1 ? "is" : "are"} earned whole, at the share lost with it.`;
   }
-  const found = securedFor(account, accounts);
-  const loan = found?.loan ?? null;
-  if (found === null || loan === null) {
+  const loan = securedFor(account, accounts)?.loan ?? null;
+  if (loan === null) {
     return "It cannot be brought back.";
   }
-  if (loan.secures !== account.id) {
-    return "Its payments go with it.";
-  }
-  const what = found.asset.kind === "house" ? "mortgage" : "finance";
+  const what = account.kind === "house" ? "mortgage" : "finance";
   return `Its ${what}, ${loan.name}, and the payments go with it.`;
 }
 
@@ -298,23 +293,21 @@ function hasDialog(account: Account): boolean {
   return account.kind === "car" || account.kind === "house";
 }
 
-// The asset an account is part of: a house or a car is its own, with
-// the loan secured on it when there is one, and a loan secured on either
-// is that asset's; any other account is part of none, and so is a loan
-// whose asset is not listed, or is listed as an asset with no dialog,
-// which opens as the account it is.
+// The pair a house or a car is, with the loan secured on it when there
+// is one, which its dialog edits as one and its row shows as one; any
+// other account is part of none, and so is a loan secured on an asset
+// with no dialog, or on one not listed, which is listed and opens as the
+// account it is. A loan secured on a house or a car is never asked
+// about, since it has no row of its own to ask from: the store holds an
+// asset to one loan, so every such loan is on its asset's row.
 function securedFor(
   account: Account,
   accounts: readonly Account[],
 ): null | Secured {
-  if (hasDialog(account)) {
-    return {
-      asset: account,
-      loan: accounts.find((a) => a.secures === account.id) ?? null,
-    };
-  }
-  const asset = accounts.find((a) => a.id === account.secures);
-  return asset === undefined || !hasDialog(asset)
-    ? null
-    : { asset, loan: account };
+  return hasDialog(account)
+    ? {
+        asset: account,
+        loan: accounts.find((a) => a.secures === account.id) ?? null,
+      }
+    : null;
 }
