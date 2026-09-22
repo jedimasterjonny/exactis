@@ -11,7 +11,6 @@ import { EmptyState } from "@/components/app/atoms/empty-state";
 import { RowAction } from "@/components/app/atoms/row-action";
 import { RowActions } from "@/components/app/molecules/row-actions";
 import { Badge } from "@/components/kit/badge";
-import { Card } from "@/components/kit/card";
 import {
   Table,
   TableBody,
@@ -69,7 +68,8 @@ const tones: Record<AccountKind, Tone> = {
 // empty state instead of the table, since a header row over no rows
 // states five column names and no information. The words are the
 // caller's, because accounts and assets are the same table and want
-// different sentences.
+// different sentences. The table draws no card of its own: it sits in
+// the caller's section, beneath the header naming it.
 export function AccountTable({
   accounts,
   emptyDescription,
@@ -88,103 +88,99 @@ export function AccountTable({
 
   if (accounts.length === 0) {
     return (
-      <Card className="py-0">
-        <EmptyState
-          description={emptyDescription}
-          icon={Wallet}
-          title={emptyTitle}
-        />
-      </Card>
+      <EmptyState
+        description={emptyDescription}
+        icon={Wallet}
+        title={emptyTitle}
+      />
     );
   }
 
   return (
-    <Card className="py-0">
-      <Table>
-        <TableHeader>
-          <TableRow>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          {onMove !== undefined && (
+            <TableHead className="w-0">
+              <span className="sr-only">Order</span>
+            </TableHead>
+          )}
+          <TableHead>Account</TableHead>
+          <TableHead>Treatment</TableHead>
+          <TableHead className="text-right">Contribution</TableHead>
+          <TableHead className="text-right">Growth</TableHead>
+          <TableHead className="text-right">Balance</TableHead>
+          {(onEdit !== undefined || onDelete !== undefined) && (
+            <TableHead className="w-0">
+              <span className="sr-only">Actions</span>
+            </TableHead>
+          )}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {accounts.map((account, index) => (
+          <TableRow
+            className="data-moving:opacity-50 data-over:bg-accent"
+            data-moving={moving?.id === account.id ? "" : undefined}
+            data-over={
+              over?.id === account.id && moving?.id !== account.id
+                ? ""
+                : undefined
+            }
+            key={account.id}
+            onDragOver={(event) => {
+              dragOver(event, account);
+            }}
+            onDrop={() => {
+              drop(account);
+            }}
+          >
             {onMove !== undefined && (
-              <TableHead className="w-0">
-                <span className="sr-only">Order</span>
-              </TableHead>
+              <TableCell className="py-1 pr-0">
+                <RowAction
+                  className="cursor-grab"
+                  draggable
+                  icon={GripVertical}
+                  name={`Move ${account.name}`}
+                  onDragEnd={settle}
+                  onDragStart={(event) => {
+                    pickUp(event, account);
+                  }}
+                  onKeyDown={(event) => {
+                    step(event, index);
+                  }}
+                />
+              </TableCell>
             )}
-            <TableHead>Account</TableHead>
-            <TableHead>Treatment</TableHead>
-            <TableHead className="text-right">Contribution</TableHead>
-            <TableHead className="text-right">Growth</TableHead>
-            <TableHead className="text-right">Balance</TableHead>
+            <TableCell className="font-medium">{account.name}</TableCell>
+            <TableCell>
+              <Badge variant={tones[account.kind]}>
+                {kindLabels[account.kind]}
+              </Badge>
+            </TableCell>
+            <TableCell className="text-right figure">
+              <Contribution account={account} lines={lines} />
+            </TableCell>
+            <TableCell className="text-right figure">
+              {formatGrowth(account.growth)}
+            </TableCell>
+            <TableCell className="text-right figure font-medium">
+              {formatGbp(account.balance)}
+            </TableCell>
             {(onEdit !== undefined || onDelete !== undefined) && (
-              <TableHead className="w-0">
-                <span className="sr-only">Actions</span>
-              </TableHead>
+              <TableCell className="py-1">
+                <RowActions
+                  name={account.name}
+                  onDelete={onDelete}
+                  onEdit={onEdit}
+                  row={account}
+                />
+              </TableCell>
             )}
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {accounts.map((account, index) => (
-            <TableRow
-              className="data-moving:opacity-50 data-over:bg-accent"
-              data-moving={moving?.id === account.id ? "" : undefined}
-              data-over={
-                over?.id === account.id && moving?.id !== account.id
-                  ? ""
-                  : undefined
-              }
-              key={account.id}
-              onDragOver={(event) => {
-                dragOver(event, account);
-              }}
-              onDrop={() => {
-                drop(account);
-              }}
-            >
-              {onMove !== undefined && (
-                <TableCell className="py-1 pr-0">
-                  <RowAction
-                    className="cursor-grab"
-                    draggable
-                    icon={GripVertical}
-                    name={`Move ${account.name}`}
-                    onDragEnd={settle}
-                    onDragStart={(event) => {
-                      pickUp(event, account);
-                    }}
-                    onKeyDown={(event) => {
-                      step(event, index);
-                    }}
-                  />
-                </TableCell>
-              )}
-              <TableCell className="font-medium">{account.name}</TableCell>
-              <TableCell>
-                <Badge variant={tones[account.kind]}>
-                  {kindLabels[account.kind]}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-right figure">
-                <Contribution account={account} lines={lines} />
-              </TableCell>
-              <TableCell className="text-right figure">
-                {formatGrowth(account.growth)}
-              </TableCell>
-              <TableCell className="text-right figure font-medium">
-                {formatGbp(account.balance)}
-              </TableCell>
-              {(onEdit !== undefined || onDelete !== undefined) && (
-                <TableCell className="py-1">
-                  <RowActions
-                    name={account.name}
-                    onDelete={onDelete}
-                    onEdit={onEdit}
-                    row={account}
-                  />
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </Card>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 

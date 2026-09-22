@@ -16,23 +16,18 @@ import { Note } from "@/components/app/atoms/note";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
+import { SectionCard } from "@/components/app/molecules/section-card";
 import { AccountDialog } from "@/components/app/organisms/account-dialog";
 import { AccountTable } from "@/components/app/organisms/account-table";
 import { CarDialog } from "@/components/app/organisms/car-dialog";
 import { HouseDialog } from "@/components/app/organisms/house-dialog";
 import { Button } from "@/components/kit/button";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/kit/tabs";
 import { isAsset } from "@/data/accounts";
 import { useRemover } from "@/hooks/use-remover";
 import { counted } from "@/lib/count";
 import { feedersOf, listed } from "@/lib/feeders";
 import { runsIn } from "@/lib/lines";
-import { accountsAndAssets, sectionLabel } from "@/lib/nav";
+import { accountsAndAssets, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
   readonly accounts: readonly Account[];
@@ -47,7 +42,6 @@ type AccountOpening = "new" | Account;
 // edit with the loan secured on it. One type for both, since a house
 // and a car are the same shape to the ledger.
 type AssetOpening = "new" | Secured;
-type Tab = "accounts" | "assets";
 
 // The accounts screen's ledger and the three dialogs it edits through.
 // The rows are the store's, handed down by the page, and a save goes to
@@ -56,11 +50,12 @@ type Tab = "accounts" | "assets";
 // ledger holds is the order while a move is on its way to the store,
 // since a row dragged into place has to stay there rather than spring
 // back until the page re-reads; the optimistic order is the page's again
-// once it does. A dialog is open for as long as it is mounted, so what
-// it is open on doubles as its open state, and the tab is controlled so
-// a saved account, house or car can bring its own tab forward as its
-// dialog reports it: the header's three buttons open each of them on a
-// new one, and a row's pencil opens the account as it is, unless it is a
+// once it does. The accounts and the assets are two sections of the
+// screen rather than two tabs, so both are read at once and a save
+// lands in view wherever it lands. A dialog is open for as long as it
+// is mounted, so what it is open on doubles as its open state: each
+// section's buttons open the dialogs it lists on a new one, and a row's
+// pencil opens the account as it is, unless it is a
 // house or a car, or the loan against either, which opens on that asset,
 // so an edit from either side writes both. A row's bin asks through the
 // confirm dialog before the account goes, saying what goes with it,
@@ -78,7 +73,6 @@ export function AccountLedger({
   at,
   lines,
 }: AccountLedgerProps): JSX.Element {
-  const [tab, setTab] = useState<Tab>("accounts");
   const [account, setAccount] = useState<AccountOpening | null>(null);
   const [house, setHouse] = useState<AssetOpening | null>(null);
   const [car, setCar] = useState<AssetOpening | null>(null);
@@ -134,28 +128,14 @@ export function AccountLedger({
   return (
     <>
       <ScreenHeader
-        actions={
-          <>
-            <Button
-              onClick={() => {
-                setHouse("new");
-              }}
-              size="sm"
-              variant="outline"
-            >
-              <HousePlus aria-hidden />
-              Add house
-            </Button>
-            <Button
-              onClick={() => {
-                setCar("new");
-              }}
-              size="sm"
-              variant="outline"
-            >
-              <CarFront aria-hidden />
-              Add car
-            </Button>
+        label={sectionLabel(accountsAndAssets)}
+        title="Accounts & assets"
+      >
+        {`${counted(held.length, "account")} · ${counted(assets.length, "asset")}`}
+      </ScreenHeader>
+      <ScreenBody>
+        <SectionCard
+          actions={
             <Button
               onClick={() => {
                 setAccount("new");
@@ -165,64 +145,71 @@ export function AccountLedger({
               <Plus aria-hidden />
               Add account
             </Button>
-          </>
-        }
-        label={sectionLabel(accountsAndAssets)}
-        title="Accounts & assets"
-      >
-        {`${counted(held.length, "account")} · ${counted(assets.length, "asset")}`}
-      </ScreenHeader>
-      <ScreenBody>
-        <Tabs
-          onValueChange={(value) => {
-            setTab(value === "assets" ? "assets" : "accounts");
-          }}
-          value={tab}
+          }
+          className="pb-0"
+          label={subsectionLabel(accountsAndAssets, 1)}
+          title="Accounts"
         >
-          <TabsList variant="line">
-            <TabsTrigger value="accounts">
-              Accounts
-              <TabCount count={held.length} />
-            </TabsTrigger>
-            <TabsTrigger value="assets">
-              Assets
-              <TabCount count={assets.length} />
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent className="grid gap-5" value="accounts">
-            <AccountTable
-              accounts={held}
-              emptyDescription="Add a pension, an ISA, a savings account or a debt to see it listed here."
-              emptyTitle="No accounts yet"
-              lines={running}
-              onDelete={ask}
-              onEdit={edit}
-              onMove={move}
-            />
-            <Note>
-              Spare money is handed down the accounts in this order. Drag a row
-              by its grip, or move it with the arrow keys.
-            </Note>
-            <Note>
-              Allocation is set once at plan level and applied pro rata to every
-              account.
-            </Note>
-          </TabsContent>
-          <TabsContent className="grid gap-5" value="assets">
-            <AccountTable
-              accounts={assets}
-              emptyDescription="A house, a car, anything owned outright. Add one to see it listed here."
-              emptyTitle="No assets yet"
-              onDelete={ask}
-              onEdit={edit}
-            />
-            <Note>
-              A loan against an asset is listed with the accounts, since it is
-              paid as they are. The progress points reconcile the two as total
-              assets and asset loans.
-            </Note>
-          </TabsContent>
-        </Tabs>
+          <AccountTable
+            accounts={held}
+            emptyDescription="Add a pension, an ISA, a savings account or a debt to see it listed here."
+            emptyTitle="No accounts yet"
+            lines={running}
+            onDelete={ask}
+            onEdit={edit}
+            onMove={move}
+          />
+        </SectionCard>
+        <Note>
+          Spare money is handed down the accounts in this order. Drag a row by
+          its grip, or move it with the arrow keys.
+        </Note>
+        <Note>
+          Allocation is set once at plan level and applied pro rata to every
+          account.
+        </Note>
+        <SectionCard
+          actions={
+            <>
+              <Button
+                onClick={() => {
+                  setHouse("new");
+                }}
+                size="sm"
+                variant="outline"
+              >
+                <HousePlus aria-hidden />
+                Add house
+              </Button>
+              <Button
+                onClick={() => {
+                  setCar("new");
+                }}
+                size="sm"
+                variant="outline"
+              >
+                <CarFront aria-hidden />
+                Add car
+              </Button>
+            </>
+          }
+          className="pb-0"
+          label={subsectionLabel(accountsAndAssets, 2)}
+          title="Property and vehicles"
+        >
+          <AccountTable
+            accounts={assets}
+            emptyDescription="A house, a car, anything owned outright. Add one to see it listed here."
+            emptyTitle="No assets yet"
+            onDelete={ask}
+            onEdit={edit}
+          />
+        </SectionCard>
+        <Note>
+          A loan against an asset is listed with the accounts, since it is paid
+          as they are. The progress points reconcile the two as total assets and
+          asset loans.
+        </Note>
       </ScreenBody>
       {account !== null && (
         <AccountDialog
@@ -231,12 +218,8 @@ export function AccountLedger({
           onDismiss={() => {
             setAccount(null);
           }}
-          onSaved={(saved) => {
-            // A saved account brings its own tab forward, in the
-            // transition the dialog closes in, so the tab and the
-            // closed dialog land together.
+          onSaved={() => {
             setAccount(null);
-            setTab(isAsset(saved) ? "assets" : "accounts");
           }}
         />
       )}
@@ -260,7 +243,6 @@ export function AccountLedger({
           }}
           onSaved={() => {
             setHouse(null);
-            setTab("assets");
           }}
           plan={plan}
         />
@@ -273,7 +255,6 @@ export function AccountLedger({
           }}
           onSaved={() => {
             setCar(null);
-            setTab("assets");
           }}
           plan={plan}
         />
@@ -335,11 +316,4 @@ function securedFor(
   return asset === undefined || !hasDialog(asset)
     ? null
     : { asset, loan: account };
-}
-
-// The row count beside a tab's label, in the micro-label face and faint.
-function TabCount({ count }: { readonly count: number }): JSX.Element {
-  return (
-    <span className="label text-muted-foreground/60">{String(count)}</span>
-  );
 }
