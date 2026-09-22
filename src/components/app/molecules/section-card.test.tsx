@@ -22,6 +22,24 @@ describe("SectionCard", () => {
     expect(within(region).queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("writes the caption beneath the title when given one", () => {
+    render(
+      <SectionCard
+        caption="Paid in this order."
+        label="Sect. II.iii"
+        title="Order of payment"
+      >
+        <p>Chain</p>
+      </SectionCard>,
+    );
+
+    expect(
+      within(
+        screen.getByRole("region", { name: "Order of payment" }),
+      ).getByText("Paid in this order."),
+    ).toHaveClass("text-muted-foreground");
+  });
+
   // Two cards on one screen are two regions, each named by its own
   // title rather than by the other's.
   it("names each card by its own title, and puts its actions in the header", () => {
