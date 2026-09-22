@@ -10,7 +10,7 @@ import { MoneyField } from "@/components/app/molecules/money-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { YearField } from "@/components/app/molecules/year-field";
-import { endYear } from "@/engine/projection";
+import { endYear } from "@/data/plan";
 import { cadenceOptions } from "@/lib/cadence";
 import { growthLabels } from "@/lib/lines";
 import { optionsOf } from "@/lib/options";

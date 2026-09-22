@@ -5,8 +5,9 @@ import type { Account } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { endYear } from "@/data/plan";
 
-import { endYear, project } from "./projection";
+import { project } from "./projection";
 
 const [pension, isa, cash, home, mortgage] = accounts;
 const [salary] = incomeLines;

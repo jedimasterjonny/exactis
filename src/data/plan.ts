@@ -17,6 +17,14 @@ export interface Plan {
   readonly years: number;
 }
 
+// The last year the plan runs to, which is the last year plotted, whose
+// point is the balance entering it, and the year an open-ended line
+// runs to. A fact about the plan rather than the engine, since a line's
+// span, the fields and the rows read it as the projection does.
+export function endYear(plan: Plan): number {
+  return plan.from + plan.years;
+}
+
 // The rate an account is carried at, its own fixed one or the plan's,
 // whichever it is carried on. A debt is charged at the same rate it
 // grows at, so its payments are worked out against this one too.

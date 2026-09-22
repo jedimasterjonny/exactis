@@ -5,7 +5,7 @@ import { cn } from "cn";
 import type { Plan } from "@/data/plan";
 import type { Side } from "@/data/schedule";
 
-import { endYear } from "@/engine/projection";
+import { endYear } from "@/data/plan";
 
 interface SpanBarProps {
   readonly firstYear: number;
