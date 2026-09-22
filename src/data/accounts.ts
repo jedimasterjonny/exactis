@@ -102,6 +102,18 @@ export const fundings = ["fixed", "spare"] as const;
 
 export const growthKinds = ["fixed", "plan"] as const;
 
+// What each kind is called, on the ledger's badge and in the dialog's
+// choice, so the two cannot drift from each other.
+export const kindLabels: Record<AccountKind, string> = {
+  car: "Car",
+  cash: "Cash",
+  debt: "Debt",
+  house: "House",
+  "real-asset": "Real asset",
+  "tax-deferred": "Tax-deferred",
+  "tax-free": "Tax-free",
+};
+
 // The most the kind may be paid a year, as the UK sets it: £20,000 into
 // an ISA and £60,000 into a pension. Cash has no allowance, and a house,
 // a car, a real asset or a debt is paid only a fixed sum, so none has
