@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/kit/table";
-import { allowanceOf } from "@/data/accounts";
+import { allowanceOf, kindLabels } from "@/data/accounts";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { fedOf, feedersOf, listed } from "@/lib/feeders";
 import { formatGbp, formatPercent } from "@/lib/money";
@@ -36,21 +36,18 @@ interface AccountTableProps {
   readonly onMove?: (account: Account, target: Account) => void;
 }
 
-type Treatment = "destructive" | "secondary";
+type Tone = "destructive" | "secondary";
 
-// The kind's label and the badge tone it takes. Only a debt is coloured,
-// and it takes the loss tone, as its balance does everywhere else.
-const treatments: Record<
-  AccountKind,
-  { readonly label: string; readonly variant: Treatment }
-> = {
-  car: { label: "Car", variant: "secondary" },
-  cash: { label: "Cash", variant: "secondary" },
-  debt: { label: "Debt", variant: "destructive" },
-  house: { label: "House", variant: "secondary" },
-  "real-asset": { label: "Real asset", variant: "secondary" },
-  "tax-deferred": { label: "Tax-deferred", variant: "secondary" },
-  "tax-free": { label: "Tax-free", variant: "secondary" },
+// The badge tone each kind takes. Only a debt is coloured, and it takes
+// the loss tone, as its balance does everywhere else.
+const tones: Record<AccountKind, Tone> = {
+  car: "secondary",
+  cash: "secondary",
+  debt: "destructive",
+  house: "secondary",
+  "real-asset": "secondary",
+  "tax-deferred": "secondary",
+  "tax-free": "secondary",
 };
 
 // A ledger of accounts: the name and its balance carry the weight, the
@@ -206,8 +203,8 @@ export function AccountTable({
               )}
               <TableCell className="font-medium">{account.name}</TableCell>
               <TableCell>
-                <Badge variant={treatments[account.kind].variant}>
-                  {treatments[account.kind].label}
+                <Badge variant={tones[account.kind]}>
+                  {kindLabels[account.kind]}
                 </Badge>
               </TableCell>
               <TableCell className="text-right figure">

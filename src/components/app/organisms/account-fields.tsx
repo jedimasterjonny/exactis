@@ -7,9 +7,10 @@ import { MoneyField } from "@/components/app/molecules/money-field";
 import { RateField } from "@/components/app/molecules/rate-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
-import { allowanceOf, takesSpare } from "@/data/accounts";
+import { allowanceOf, kindLabels, takesSpare } from "@/data/accounts";
 import { cadenceOptions } from "@/lib/cadence";
 import { formatGbp } from "@/lib/money";
+import { optionsOf } from "@/lib/options";
 
 interface AccountFieldsProps {
   readonly children?: ReactNode;
@@ -39,13 +40,16 @@ const growths = [
   { label: "Fixed rate", value: "fixed" },
 ] as const;
 
-const kinds = [
-  { label: "Tax-deferred", value: "tax-deferred" },
-  { label: "Tax-free", value: "tax-free" },
-  { label: "Cash", value: "cash" },
-  { label: "Real asset", value: "real-asset" },
-  { label: "Debt", value: "debt" },
-] as const;
+// The treatments the dialog offers, in the order the reference's offers
+// them: a house and a car are left out, since each is written from a
+// dialog of its own.
+const kinds = optionsOf(kindLabels, [
+  "tax-deferred",
+  "tax-free",
+  "cash",
+  "real-asset",
+  "debt",
+]);
 
 // The fields the account's dialog takes, as the line fields are to the
 // schedules' dialogs: the name and the treatment on the first row, the
