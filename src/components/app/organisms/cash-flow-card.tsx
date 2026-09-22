@@ -19,8 +19,8 @@ import {
 } from "@/components/kit/accordion";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
 import { Slider } from "@/components/kit/slider";
+import { endYear } from "@/data/plan";
 import { cashFlow } from "@/engine/cash-flow";
-import { endYear } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { spanOf } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";

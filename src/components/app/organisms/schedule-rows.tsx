@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/app/atoms/empty-state";
 import { SpanBar } from "@/components/app/atoms/span-bar";
 import { RowActions } from "@/components/app/molecules/row-actions";
 import { Badge } from "@/components/kit/badge";
-import { endYear } from "@/engine/projection";
+import { endYear } from "@/data/plan";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { endOf, growthLabels } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
