@@ -2,7 +2,7 @@ import type { JSX, ReactNode } from "react";
 
 interface SectionHeaderProps {
   readonly actions?: ReactNode;
-  readonly children?: string;
+  readonly children?: string | undefined;
   readonly id?: string;
   readonly label: string;
   readonly title: string;

@@ -122,8 +122,9 @@ describe("AccountLedger", () => {
   });
 
   // Both sections are read at once, each a region named by its title
-  // and opened with its own buttons, and each followed by its notes.
-  it("lays the accounts and the assets out as two sections, each with its notes", () => {
+  // and opened with its own buttons, and each followed by its notes; the
+  // order the accounts are paid in is a section of its own beneath them.
+  it("lays the accounts and the assets out as two sections, each with its notes, and the order beneath", () => {
     renderLedger();
 
     const accountsSection = screen.getByRole("region", { name: "Accounts" });
@@ -138,10 +139,7 @@ describe("AccountLedger", () => {
     expect(rowsOf(accountsSection)).toHaveLength(held.length);
     expect(rowsOf(assetsSection)).toHaveLength(assets.length);
     expect(
-      within(accountsSection).getAllByRole("button", { name: /^Move / }),
-    ).toHaveLength(held.length);
-    expect(
-      within(assetsSection).queryByRole("button", { name: /^Move / }),
+      screen.queryByRole("button", { name: /^Move / }),
     ).not.toBeInTheDocument();
     expect(
       within(accountsSection).getByRole("button", { name: "Add account" }),
@@ -155,10 +153,20 @@ describe("AccountLedger", () => {
     expect(
       screen.getAllByRole("paragraph").map((note) => note.textContent),
     ).toStrictEqual([
-      "Spare money is handed down the accounts in this order. Drag a row by its grip, or move it with the arrow keys.",
       "Allocation is set once at plan level and applied pro rata to every account.",
       "A loan against an asset is listed with the accounts, since it is paid as they are. The progress points reconcile the two as total assets and asset loans.",
     ]);
+    expect(
+      within(screen.getByRole("region", { name: "Order of payment" }))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toStrictEqual([
+      "1Workplace pension",
+      "2Stocks & shares ISA",
+      "3Current account",
+      "4Mortgage",
+    ]);
+    expect(screen.getByText("Sect. II.iii")).toHaveClass("label");
   });
 
   it("adds a named account and reports it", async () => {
@@ -696,9 +704,9 @@ describe("AccountLedger", () => {
     });
   });
 
-  // The names down the accounts section, the mortgage last among them since a
-  // loan is listed with the accounts, as the rows now stand: each row's
-  // grip is named for its account.
+  // The names down the reorder dialog, the mortgage last among them
+  // since a loan is paid as the accounts are, as the rows now stand: each
+  // row's grip is named for its account.
   function names(): string[] {
     return screen
       .getAllByRole("button", { name: /^Move / })
@@ -711,6 +719,7 @@ describe("AccountLedger", () => {
   // answers.
   it("moves a row onto another from the keyboard, shows the order at once and sends it whole to the store", async () => {
     renderLedger();
+    fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
     let answer!: () => void;
     vi.mocked(placeAccountsInOrder).mockReturnValue(
       new Promise((resolve) => {
@@ -759,6 +768,7 @@ describe("AccountLedger", () => {
   it("moves a row dropped on another after it when it came from above", async () => {
     renderLedger();
     vi.mocked(placeAccountsInOrder).mockResolvedValue();
+    fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
 
     const cashRow = screen.getByRole("row", { name: /Current account/ });
 

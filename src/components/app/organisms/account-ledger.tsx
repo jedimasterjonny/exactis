@@ -21,6 +21,7 @@ import { AccountDialog } from "@/components/app/organisms/account-dialog";
 import { AccountTable } from "@/components/app/organisms/account-table";
 import { CarDialog } from "@/components/app/organisms/car-dialog";
 import { HouseDialog } from "@/components/app/organisms/house-dialog";
+import { PaymentOrder } from "@/components/app/organisms/payment-order";
 import { Button } from "@/components/kit/button";
 import { isAsset } from "@/data/accounts";
 import { useRemover } from "@/hooks/use-remover";
@@ -108,8 +109,8 @@ export function AccountLedger({
   }
 
   // A row moved onto another takes its place in the whole list: before
-  // it when moved up, after it when moved down, so the spare money is
-  // handed down the accounts as the tab now shows them. The order shows
+  // it when moved up, after it when moved down, so the accounts are
+  // paid and drawn in the order the card now shows them. The order shows
   // at once and goes to the store behind it; the transition holds the
   // optimistic order until the store's answer brings the page re-read.
   function move(account: Account, target: Account): void {
@@ -157,13 +158,8 @@ export function AccountLedger({
             lines={running}
             onDelete={ask}
             onEdit={edit}
-            onMove={move}
           />
         </SectionCard>
-        <Note>
-          Spare money is handed down the accounts in this order. Drag a row by
-          its grip, or move it with the arrow keys.
-        </Note>
         <Note>
           Allocation is set once at plan level and applied pro rata to every
           account.
@@ -210,6 +206,11 @@ export function AccountLedger({
           as they are. The progress points reconcile the two as total assets and
           asset loans.
         </Note>
+        <PaymentOrder
+          accounts={held}
+          label={subsectionLabel(accountsAndAssets, 3)}
+          onMove={move}
+        />
       </ScreenBody>
       {account !== null && (
         <AccountDialog
