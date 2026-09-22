@@ -1,15 +1,28 @@
 import { describe, expect, it } from "vitest";
 
 import { accounts } from "@/data/accounts.fixture";
+import { incomeLines } from "@/data/income.fixture";
 
 import {
+  equityOf,
   fixedMonthly,
   formatContribution,
   formatGrowth,
   formatMonthly,
+  paidMonthly,
 } from "./ledger";
 
-const [pension, isa, cash, , mortgage] = accounts;
+const [pension, isa, cash, home, mortgage] = accounts;
+
+describe("equityOf", () => {
+  it("takes what is owed off the value, and holds all of one owned outright", () => {
+    expect(equityOf({ asset: home, loan: mortgage })).toBe(397512 - 176520);
+    expect(equityOf({ asset: home, loan: null })).toBe(397512);
+    expect(
+      equityOf({ asset: home, loan: { ...mortgage, balance: -500000 } }),
+    ).toBe(397512 - 500000);
+  });
+});
 
 describe("fixedMonthly", () => {
   it("takes a fixed sum a month at either cadence, and nothing for the spare money or none", () => {
@@ -19,6 +32,21 @@ describe("fixedMonthly", () => {
       fixedMonthly({ ...isa, contribution: { cap: null, kind: "spare" } }),
     ).toBe(0);
     expect(fixedMonthly(cash)).toBe(0);
+  });
+});
+
+// The fixture's salary sacrifices £16,560 a year into the pension, with
+// the employer's NI saved, on top of the pension's own £28,512.
+describe("paidMonthly", () => {
+  it("adds what the salaries sacrifice a month to an account's own fixed sum", () => {
+    const [salary] = incomeLines;
+
+    expect(paidMonthly(pension, [salary])).toBeCloseTo((28512 + 16560) / 12);
+    expect(paidMonthly(pension, [])).toBe(28512 / 12);
+    expect(paidMonthly(isa, [salary])).toBeCloseTo(20000 / 12);
+    expect(
+      paidMonthly({ ...cash, contribution: { cap: null, kind: "spare" } }, []),
+    ).toBe(0);
   });
 });
 

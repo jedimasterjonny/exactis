@@ -12,12 +12,18 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/kit/table";
 import { kindLabels } from "@/data/accounts";
-import { fixedMonthly, formatGrowth, formatMonthly } from "@/lib/ledger";
+import {
+  equityOf,
+  fixedMonthly,
+  formatGrowth,
+  formatMonthly,
+} from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
 
 interface AssetTableProps {
@@ -37,8 +43,9 @@ interface AssetTableProps {
 // it owes, rather than in a column of its own, and the loan's may wrap,
 // so the row fits a laptop's width with the equity in view. An asset owned outright owes nothing and is all
 // equity. The pencil and the bin report the asset, and the caller opens
-// or deletes the pair from it. A table of no assets draws its empty
-// state instead.
+// or deletes the pair from it. Beneath two rows or more it totals each
+// figure, a row alone being its own total. A table of no assets draws
+// its empty state instead.
 export function AssetTable({
   assets,
   onDelete,
@@ -69,8 +76,9 @@ export function AssetTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {assets.map(({ asset, loan }) => {
-          const equity = asset.balance + (loan?.balance ?? 0);
+        {assets.map((pair) => {
+          const { asset, loan } = pair;
+          const equity = equityOf(pair);
           return (
             <TableRow key={asset.id}>
               <TableCell>
@@ -98,7 +106,7 @@ export function AssetTable({
                 )}
               </TableCell>
               <TableCell className="text-right figure">
-                {paymentOf(asset, loan)}
+                {paymentOf(pair)}
               </TableCell>
               <TableCell className="text-right figure font-medium">
                 {formatGbp(equity)}
@@ -116,6 +124,26 @@ export function AssetTable({
           );
         })}
       </TableBody>
+      {assets.length > 1 && (
+        <TableFooter>
+          <TableRow>
+            <TableCell>Total</TableCell>
+            <TableCell className="text-right figure">
+              {formatGbp(totalOf(assets, ({ asset }) => asset.balance))}
+            </TableCell>
+            <TableCell className="text-right figure">
+              {formatGbp(totalOf(assets, ({ loan }) => loan?.balance ?? 0))}
+            </TableCell>
+            <TableCell className="text-right figure">
+              {formatMonthly(totalOf(assets, paidTowards))}
+            </TableCell>
+            <TableCell className="text-right figure">
+              {formatGbp(totalOf(assets, equityOf))}
+            </TableCell>
+            <TableCell />
+          </TableRow>
+        </TableFooter>
+      )}
     </Table>
   );
 }
@@ -144,13 +172,23 @@ function EquityBar({ share }: { readonly share: number }): JSX.Element {
 // What is paid towards the asset a month: the loan's payments, and the
 // asset's own fixed sum with them when it takes one, which only an asset
 // the account dialog writes may. Neither is paid the spare money, so
-// each is a fixed sum or nothing, and both a month's, so they add up;
-// nothing at all is a flat dash.
-function paymentOf(asset: Account, loan: Account | null): string {
-  const paying = [asset, loan].flatMap((account) =>
-    account?.contribution === undefined ? [] : [account],
+// each is a fixed sum or nothing, and both a month's, so they add up.
+function paidTowards({ asset, loan }: Secured): number {
+  return fixedMonthly(asset) + (loan === null ? 0 : fixedMonthly(loan));
+}
+
+// The payment as its cell writes it, a flat dash when nothing is paid.
+function paymentOf(pair: Secured): string {
+  const isPaid = [pair.asset, pair.loan].some(
+    (account) => account?.contribution !== undefined,
   );
-  return paying.length === 0
-    ? "—"
-    : formatMonthly(paying.reduce((sum, a) => sum + fixedMonthly(a), 0));
+  return isPaid ? formatMonthly(paidTowards(pair)) : "—";
+}
+
+// A figure summed down the rows, for the totals beneath them.
+function totalOf(
+  assets: readonly Secured[],
+  figure: (pair: Secured) => number,
+): number {
+  return assets.reduce((sum, pair) => sum + figure(pair), 0);
 }
