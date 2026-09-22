@@ -1047,7 +1047,7 @@ describe("AccountLedger", () => {
     );
 
     expect(
-      screen.getByText("+ £16,560 / yr sacrificed from Salary"),
+      screen.getByText("+ £1,380 / mo sacrificed from Salary"),
     ).toHaveClass("text-muted-foreground");
   });
 
