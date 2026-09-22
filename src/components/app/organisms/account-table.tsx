@@ -1,9 +1,8 @@
 "use client";
 
-import type { DragEvent, JSX, KeyboardEvent } from "react";
+import type { JSX } from "react";
 
 import { GripVertical, Wallet } from "lucide-react";
-import { useState } from "react";
 
 import type { Account, AccountKind, Growth } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
@@ -22,6 +21,7 @@ import {
   TableRow,
 } from "@/components/kit/table";
 import { allowanceOf, kindLabels } from "@/data/accounts";
+import { useReorder } from "@/hooks/use-reorder";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { fedOf, feedersOf, listed } from "@/lib/feeders";
 import { formatGbp, formatPercent } from "@/lib/money";
@@ -64,9 +64,8 @@ const tones: Record<AccountKind, Tone> = {
 // move handler opens each row with a grip: dragged onto another row, or
 // moved a row up or down with the arrow keys, it reports the account
 // and the row it takes the place of, and the caller decides what the
-// order means. The drag is held as state rather than on the event, so
-// the table knows which row is on the move and which it is over while
-// the pointer is still between them. A ledger holding nothing draws its
+// order means; the reordering hook holds which row is on the move and
+// which it is over. A ledger holding nothing draws its
 // empty state instead of the table, since a header row over no rows
 // states five column names and no information. The words are the
 // caller's, because accounts and assets are the same table and want
@@ -80,57 +79,12 @@ export function AccountTable({
   onEdit,
   onMove,
 }: AccountTableProps): JSX.Element {
-  const [moving, setMoving] = useState<Account | null>(null);
-  const [over, setOver] = useState<Account | null>(null);
-
-  // The row dropped on takes the drop, whichever row it was; a drop on
-  // the row on the move, or with nothing on the move, is nothing.
-  function drop(target: Account): void {
-    if (moving !== null && moving.id !== target.id) {
-      onMove?.(moving, target);
-    }
-    settle();
-  }
-
-  // A row is over another only while a drag crosses it; the browser
-  // takes a drop only where the drag over was claimed.
-  function dragOver(
-    event: DragEvent<HTMLTableRowElement>,
-    target: Account,
-  ): void {
-    if (moving !== null) {
-      event.preventDefault();
-      setOver(target);
-    }
-  }
-
-  // Firefox starts no drag without data on the event, so the id goes on
-  // it, though the state is what the drop reads.
-  function pickUp(event: DragEvent<HTMLButtonElement>, account: Account): void {
-    event.dataTransfer.setData("text/plain", String(account.id));
-    setMoving(account);
-  }
-
-  function settle(): void {
-    setMoving(null);
-    setOver(null);
-  }
-
-  // The arrow keys move the row one place, taking the place of the row
-  // above or below; at either end there is nothing to take, and any
-  // other key is the button's own.
-  function step(event: KeyboardEvent<HTMLButtonElement>, index: number): void {
-    const account = accounts[index];
-    const target = accounts[index + stepOf(event.key)];
-    if (
-      account !== undefined &&
-      target !== undefined &&
-      target.id !== account.id
-    ) {
-      event.preventDefault();
+  const { dragOver, drop, moving, over, pickUp, settle, step } = useReorder(
+    accounts,
+    (account, target) => {
       onMove?.(account, target);
-    }
-  }
+    },
+  );
 
   if (accounts.length === 0) {
     return (
@@ -289,17 +243,5 @@ function formatGrowth(growth: Growth): string {
       return formatPercent(growth.rate);
     case "plan":
       return "Plan rate";
-  }
-}
-
-// The place each arrow key moves a row by, and none for any other key.
-function stepOf(key: string): number {
-  switch (key) {
-    case "ArrowDown":
-      return 1;
-    case "ArrowUp":
-      return -1;
-    default:
-      return 0;
   }
 }
