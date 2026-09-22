@@ -38,7 +38,7 @@ describe("AccountTable", () => {
       "secondary",
     );
     expect(
-      within(table).getByRole("cell", { name: "£27,195 / yr" }),
+      within(table).getByRole("cell", { name: "£2,266 / mo" }),
     ).toHaveClass("figure", "text-right");
     expect(
       within(table).getAllByRole("cell", { name: "Plan rate" }),
@@ -108,8 +108,8 @@ describe("AccountTable", () => {
 
   // The fixture's salary sacrifices a tenth of its £120,000 base into
   // the workplace pension, £13,800 a year with the employer's NI saved,
-  // beneath the pension's own £27,195; the ISA is fed by nothing and
-  // shows its own alone. A pension paid nothing of its own shows what
+  // written £1,150 a month beneath the pension's own £27,195 a year,
+  // written £2,266; the ISA is fed by nothing and shows its own alone. A pension paid nothing of its own shows what
   // it is fed as its figure, naming every salary it is from.
   it("writes what the salaries sacrifice into a pension beneath its own contribution", () => {
     const [pension, isa, cash] = accounts;
@@ -133,7 +133,7 @@ describe("AccountTable", () => {
 
     const table = screen.getByRole("table");
     const detail = within(table).getByText(
-      "+ £13,800 / yr sacrificed from Salary",
+      "+ £1,150 / mo sacrificed from Salary",
     );
 
     expect(detail).toHaveClass("block", "text-xs", "text-muted-foreground");
@@ -141,15 +141,15 @@ describe("AccountTable", () => {
     // the break between them is the detail's own block and not text.
     expect(
       within(table).getByRole("cell", {
-        name: "£27,195 / yr+ £13,800 / yr sacrificed from Salary",
+        name: "£2,266 / mo+ £1,150 / mo sacrificed from Salary",
       }),
     ).toHaveClass("figure");
     expect(
-      within(table).getByRole("cell", { name: "£20,000 / yr" }),
+      within(table).getByRole("cell", { name: "£1,667 / mo" }),
     ).toBeInTheDocument();
     expect(
       within(table).getByRole("cell", {
-        name: "£23,460 / yrsacrificed from Salary step-up and Second job",
+        name: "£1,955 / mosacrificed from Salary step-up and Second job",
       }),
     ).toBeInTheDocument();
   });

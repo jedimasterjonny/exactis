@@ -2,13 +2,30 @@ import { describe, expect, it } from "vitest";
 
 import { accounts } from "@/data/accounts.fixture";
 
-import { formatContribution, formatGrowth } from "./ledger";
+import {
+  fixedMonthly,
+  formatContribution,
+  formatGrowth,
+  formatMonthly,
+} from "./ledger";
 
 const [pension, isa, cash, , mortgage] = accounts;
 
+describe("fixedMonthly", () => {
+  it("takes a fixed sum a month at either cadence, and nothing for the spare money or none", () => {
+    expect(fixedMonthly(pension)).toBe(27195 / 12);
+    expect(fixedMonthly(mortgage)).toBe(2210);
+    expect(
+      fixedMonthly({ ...isa, contribution: { cap: null, kind: "spare" } }),
+    ).toBe(0);
+    expect(fixedMonthly(cash)).toBe(0);
+  });
+});
+
 describe("formatContribution", () => {
-  it("writes a fixed sum at its cadence, and a flat dash for none", () => {
-    expect(formatContribution(pension)).toBe("£27,195 / yr");
+  // A year's sum is written as a twelfth of it, to the pound.
+  it("writes a fixed sum a month whatever its cadence, and a flat dash for none", () => {
+    expect(formatContribution(pension)).toBe("£2,266 / mo");
     expect(formatContribution(mortgage)).toBe("£2,210 / mo");
     expect(formatContribution(cash)).toBe("—");
   });
@@ -34,6 +51,13 @@ describe("formatContribution", () => {
         contribution: { cap: null, kind: "spare" },
       }),
     ).toBe("Spare, uncapped");
+  });
+});
+
+describe("formatMonthly", () => {
+  it("writes a month's money to the pound, with a real minus", () => {
+    expect(formatMonthly(1389.58)).toBe("£1,390 / mo");
+    expect(formatMonthly(-2243)).toBe("−£2,243 / mo");
   });
 });
 

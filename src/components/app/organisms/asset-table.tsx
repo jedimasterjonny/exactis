@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/kit/table";
 import { kindLabels } from "@/data/accounts";
-import { formatContribution, formatGrowth } from "@/lib/ledger";
+import { fixedMonthly, formatGrowth, formatMonthly } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
 
 interface AssetTableProps {
@@ -141,13 +141,16 @@ function EquityBar({ share }: { readonly share: number }): JSX.Element {
   );
 }
 
-// What is paid towards the asset: the loan's payments, and the asset's
-// own fixed sum beside them when it takes one, which only an asset the
-// account dialog writes may. Neither is paid the spare money, so each is
-// a fixed sum or nothing; nothing at all is a flat dash.
+// What is paid towards the asset a month: the loan's payments, and the
+// asset's own fixed sum with them when it takes one, which only an asset
+// the account dialog writes may. Neither is paid the spare money, so
+// each is a fixed sum or nothing, and both a month's, so they add up;
+// nothing at all is a flat dash.
 function paymentOf(asset: Account, loan: Account | null): string {
-  const paid = [asset, loan].flatMap((account) =>
-    account?.contribution === undefined ? [] : [formatContribution(account)],
+  const paying = [asset, loan].flatMap((account) =>
+    account?.contribution === undefined ? [] : [account],
   );
-  return paid.length === 0 ? "—" : paid.join(" + ");
+  return paying.length === 0
+    ? "—"
+    : formatMonthly(paying.reduce((sum, a) => sum + fixedMonthly(a), 0));
 }
