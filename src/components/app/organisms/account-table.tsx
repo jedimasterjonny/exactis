@@ -14,6 +14,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -21,7 +22,12 @@ import {
 import { kindLabels } from "@/data/accounts";
 import { monthly } from "@/lib/cadence";
 import { fedOf, feedersOf, listed } from "@/lib/feeders";
-import { formatContribution, formatGrowth, formatMonthly } from "@/lib/ledger";
+import {
+  formatContribution,
+  formatGrowth,
+  formatMonthly,
+  paidMonthly,
+} from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
 
 interface AccountTableProps {
@@ -63,6 +69,8 @@ const tones: Record<AccountKind, Tone> = {
 // words are the caller's, because accounts and assets are the same
 // table and want different sentences. The table draws no card of its
 // own: it sits in the caller's section, beneath the header naming it.
+// Beneath two rows or more it totals what they are paid a month and
+// what they hold; a row alone is its own total, so one row draws none.
 export function AccountTable({
   accounts,
   emptyDescription,
@@ -128,6 +136,24 @@ export function AccountTable({
           </TableRow>
         ))}
       </TableBody>
+      {accounts.length > 1 && (
+        <TableFooter>
+          <TableRow>
+            <TableCell>Total</TableCell>
+            <TableCell />
+            <TableCell className="text-right figure">
+              {paidInTotal(accounts, lines)}
+            </TableCell>
+            <TableCell />
+            <TableCell className="text-right figure">
+              {formatGbp(
+                accounts.reduce((sum, account) => sum + account.balance, 0),
+              )}
+            </TableCell>
+            {(onEdit !== undefined || onDelete !== undefined) && <TableCell />}
+          </TableRow>
+        </TableFooter>
+      )}
     </Table>
   );
 }
@@ -159,4 +185,20 @@ function Contribution({
       <span className="block text-xs text-muted-foreground">{detail}</span>
     </>
   );
+}
+
+// What the accounts are paid a month between them, as far as the month
+// decides it in advance: every fixed sum and sacrifice, with a word for
+// the spare money when any account takes it, since what the spare money
+// comes to is decided month by month from what is left.
+function paidInTotal(
+  accounts: readonly Account[],
+  lines: readonly IncomeLine[],
+): string {
+  const total = formatMonthly(
+    accounts.reduce((sum, account) => sum + paidMonthly(account, lines), 0),
+  );
+  return accounts.some((account) => account.contribution?.kind === "spare")
+    ? `${total} + spare`
+    : total;
 }

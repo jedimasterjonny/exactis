@@ -170,6 +170,46 @@ describe("AssetTable", () => {
     });
   });
 
+  // Every figure is totalled beneath two rows or more; a row alone is its
+  // own total, so one row draws none.
+  it("totals each figure beneath two rows or more", () => {
+    const view = render(
+      <AssetTable
+        assets={[
+          { asset: house, loan },
+          { asset: golf, loan: null },
+        ]}
+        onDelete={vi.fn<Report>()}
+        onEdit={vi.fn<Report>()}
+      />,
+    );
+
+    expect(
+      within(screen.getByRole("row", { name: /^Total/ }))
+        .getAllByRole("cell")
+        .map((cell) => cell.textContent),
+    ).toStrictEqual([
+      "Total",
+      "£434,386",
+      "−£182,940",
+      "£2,210 / mo",
+      "£251,446",
+      "",
+    ]);
+
+    view.rerender(
+      <AssetTable
+        assets={[{ asset: house, loan }]}
+        onDelete={vi.fn<Report>()}
+        onEdit={vi.fn<Report>()}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("row", { name: /^Total/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("reports the asset from its pencil and its bin", () => {
     const onDelete = vi.fn<Report>();
     const onEdit = vi.fn<Report>();
