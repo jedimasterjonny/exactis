@@ -154,7 +154,6 @@ describe("AccountLedger", () => {
       screen.getAllByRole("paragraph").map((note) => note.textContent),
     ).toStrictEqual([
       "Allocation is set once at plan level and applied pro rata to every account.",
-      "A loan against an asset is listed with the accounts, since it is paid as they are. The progress points reconcile the two as total assets and asset loans.",
     ]);
     expect(
       within(screen.getByRole("region", { name: "Order of payment" }))
@@ -786,24 +785,40 @@ describe("AccountLedger", () => {
     });
   });
 
-  // A house and the loan against it are one house to the dialog, which
-  // opens on it from the pencil on either side; a loan whose house is
-  // not listed is edited as the account it is.
-  it("opens a house and the loan against it in the house dialog from either pencil", () => {
+  // A house and the loan against it share a row, which opens both in the
+  // house dialog; the loan leaves the accounts' section for it, and stays
+  // in the order, since its payments are met in it as any other's are.
+  it("puts a house and the loan against it on one row, which opens both in the house dialog", () => {
     render(
       <Toaster>
         <AccountLedger accounts={[pension, house, loan]} at={at} lines={[]} />
       </Toaster>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Mortgage" }));
+    const accountsSection = screen.getByRole("region", { name: "Accounts" });
+    const assetsSection = screen.getByRole("region", {
+      name: "Property and vehicles",
+    });
 
-    let dialog = screen.getByRole("dialog", { name: "Home" });
+    expect(rowsOf(accountsSection)).toHaveLength(1);
+    expect(
+      within(accountsSection).queryByText("Mortgage"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(assetsSection).getByRole("row", { name: /Home/ }),
+    ).toHaveTextContent("Mortgage at 5.15%");
+    expect(
+      screen.queryByRole("button", { name: "Edit Mortgage" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Order of payment" }))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toStrictEqual(["1Workplace pension", "2Mortgage"]);
+
+    const dialog = openEditor("Home");
 
     expect(within(dialog).getByText("Edit house")).toHaveClass("text-brand");
-    expect(
-      within(dialog).getByRole("heading", { name: "Home" }),
-    ).toBeInTheDocument();
     expect(
       within(dialog).getByRole("textbox", { name: "Loan balance" }),
     ).toHaveValue("£182,940");
@@ -813,26 +828,23 @@ describe("AccountLedger", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
-    dialog = openEditor("Home");
-
-    expect(within(dialog).getByText("Edit house")).toHaveClass("text-brand");
-    expect(
-      within(dialog).getByRole("textbox", { name: "Loan balance" }),
-    ).toHaveValue("£182,940");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  // A car and the finance on it are one car to its dialog, which opens
-  // on it from the pencil on either side.
-  it("opens a car and the finance on it in the car dialog from either pencil", () => {
+  // A car and the finance on it share a row too, which opens both in the
+  // car dialog.
+  it("puts a car and the finance on it on one row, which opens both in the car dialog", () => {
     render(
       <Toaster>
         <AccountLedger accounts={[pension, golf, finance]} at={at} lines={[]} />
       </Toaster>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Golf PCP" }));
+    expect(
+      screen.queryByRole("button", { name: "Edit Golf PCP" }),
+    ).not.toBeInTheDocument();
 
-    let dialog = screen.getByRole("dialog", { name: "Golf" });
+    const dialog = openEditor("Golf");
 
     expect(within(dialog).getByText("Edit car")).toHaveClass("text-brand");
     expect(
@@ -841,15 +853,13 @@ describe("AccountLedger", () => {
     expect(
       within(dialog).getByRole("textbox", { name: "Balloon" }),
     ).toHaveValue("£6,000");
-
-    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
-
-    dialog = openEditor("Golf");
-
-    expect(within(dialog).getByText("Edit car")).toHaveClass("text-brand");
     expect(
       within(dialog).getByRole("textbox", { name: "Balance owed" }),
     ).toHaveValue("£14,000");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("opens a house with no loan against it as owned outright", () => {
@@ -969,20 +979,13 @@ describe("AccountLedger", () => {
     expect(removeAccount).not.toHaveBeenCalled();
   });
 
-  it("says a loan takes its payments and a house its mortgage and the payments", () => {
+  it("says a house takes its mortgage and the payments", () => {
     render(
       <Toaster>
         <AccountLedger accounts={[pension, house, loan]} at={at} lines={[]} />
       </Toaster>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete Mortgage" }));
-
-    expect(
-      screen.getByRole("alertdialog", { name: "Delete Mortgage?" }),
-    ).toHaveAccessibleDescription("Its payments go with it.");
-
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete Home" }));
 
     expect(
