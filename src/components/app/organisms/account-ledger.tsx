@@ -90,8 +90,10 @@ export function AccountLedger({
   // Each asset with the loan it shares a row with, and the accounts paid
   // out of the month, in the order they are paid: every one but an
   // asset, a paired loan among them, since its payments are met in the
-  // order as any other's are. The accounts' section lists them less the
-  // paired loans, which are read on their assets' rows instead.
+  // order as any other's are. The savings section lists them less the
+  // paired loans, which are read on their assets' rows instead, and less
+  // the debts left, which are secured on nothing with a row and have a
+  // section of their own, drawn only when there is one.
   const assets = order
     .filter(isAsset)
     .map((asset) => securedFor(asset, order) ?? { asset, loan: null });
@@ -100,6 +102,8 @@ export function AccountLedger({
     assets.flatMap(({ loan }) => (loan === null ? [] : [loan.id])),
   );
   const held = paid.filter((account) => !paired.has(account.id));
+  const savings = held.filter((account) => account.kind !== "debt");
+  const debts = held.filter((account) => account.kind === "debt");
   const running = lines.filter((line) => runsIn(line, at));
 
   // The month the plan is read in as the loan maths counts from it, for
@@ -160,11 +164,11 @@ export function AccountLedger({
           }
           className="pb-0"
           label={subsectionLabel(accountsAndAssets, 1)}
-          title="Accounts"
+          title="Savings and investments"
         >
           <AccountTable
-            accounts={held}
-            emptyDescription="Add a pension, an ISA, a savings account or a debt to see it listed here."
+            accounts={savings}
+            emptyDescription="Add a pension, an ISA or a savings account to see it listed here."
             emptyTitle="No accounts yet"
             lines={running}
             onDelete={ask}
@@ -206,9 +210,24 @@ export function AccountLedger({
         >
           <AssetTable assets={assets} onDelete={ask} onEdit={edit} />
         </SectionCard>
+        {debts.length > 0 && (
+          <SectionCard
+            className="pb-0"
+            label={subsectionLabel(accountsAndAssets, 3)}
+            title="Other debts"
+          >
+            <AccountTable
+              accounts={debts}
+              emptyDescription="A debt secured on nothing, a card or an overdraft, is listed here."
+              emptyTitle="No other debts"
+              onDelete={ask}
+              onEdit={edit}
+            />
+          </SectionCard>
+        )}
         <PaymentOrder
           accounts={paid}
-          label={subsectionLabel(accountsAndAssets, 3)}
+          label={subsectionLabel(accountsAndAssets, debts.length > 0 ? 4 : 3)}
           onMove={move}
         />
       </ScreenBody>

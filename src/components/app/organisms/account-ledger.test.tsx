@@ -121,28 +121,39 @@ describe("AccountLedger", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  // Both sections are read at once, each a region named by its title
-  // and opened with its own buttons, and each followed by its notes; the
-  // order the accounts are paid in is a section of its own beneath them.
-  it("lays the accounts and the assets out as two sections, each with its notes, and the order beneath", () => {
+  // Every section is read at once, each a region named by its title and
+  // opened with its own buttons, and each followed by its notes. The
+  // fixture's mortgage is secured on nothing, so it is listed with the
+  // other debts rather than with the savings, and the order the accounts
+  // are paid in is a section of its own beneath them all.
+  it("lays the savings, the assets and the other debts out as sections, each with its notes, and the order beneath", () => {
     renderLedger();
 
-    const accountsSection = screen.getByRole("region", { name: "Accounts" });
+    const savingsSection = screen.getByRole("region", {
+      name: "Savings and investments",
+    });
     const assetsSection = screen.getByRole("region", {
       name: "Property and vehicles",
     });
+    const debtsSection = screen.getByRole("region", { name: "Other debts" });
 
-    expect(within(accountsSection).getByText("Sect. II.i")).toHaveClass(
-      "label",
-    );
+    expect(within(savingsSection).getByText("Sect. II.i")).toHaveClass("label");
     expect(within(assetsSection).getByText("Sect. II.ii")).toHaveClass("label");
-    expect(rowsOf(accountsSection)).toHaveLength(held.length);
+    expect(within(debtsSection).getByText("Sect. II.iii")).toHaveClass("label");
+    expect(rowsOf(savingsSection)).toHaveLength(held.length - 1);
     expect(rowsOf(assetsSection)).toHaveLength(assets.length);
+    expect(rowsOf(debtsSection)).toHaveLength(1);
+    expect(
+      within(debtsSection).getByRole("row", { name: /Mortgage/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(debtsSection).queryByRole("button", { name: /^Add / }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /^Move / }),
     ).not.toBeInTheDocument();
     expect(
-      within(accountsSection).getByRole("button", { name: "Add account" }),
+      within(savingsSection).getByRole("button", { name: "Add account" }),
     ).toBeInTheDocument();
     expect(
       within(assetsSection).getByRole("button", { name: "Add house" }),
@@ -165,7 +176,11 @@ describe("AccountLedger", () => {
       "3Current account",
       "4Mortgage",
     ]);
-    expect(screen.getByText("Sect. II.iii")).toHaveClass("label");
+    expect(
+      within(
+        screen.getByRole("region", { name: "Order of payment" }),
+      ).getByText("Sect. II.iv"),
+    ).toHaveClass("label");
   });
 
   it("adds a named account and reports it", async () => {
@@ -795,14 +810,19 @@ describe("AccountLedger", () => {
       </Toaster>,
     );
 
-    const accountsSection = screen.getByRole("region", { name: "Accounts" });
+    const savingsSection = screen.getByRole("region", {
+      name: "Savings and investments",
+    });
     const assetsSection = screen.getByRole("region", {
       name: "Property and vehicles",
     });
 
-    expect(rowsOf(accountsSection)).toHaveLength(1);
+    expect(rowsOf(savingsSection)).toHaveLength(1);
     expect(
-      within(accountsSection).queryByText("Mortgage"),
+      within(savingsSection).queryByText("Mortgage"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Other debts" }),
     ).not.toBeInTheDocument();
     expect(
       within(assetsSection).getByRole("row", { name: /Home/ }),
@@ -815,6 +835,7 @@ describe("AccountLedger", () => {
         .getAllByRole("listitem")
         .map((item) => item.textContent),
     ).toStrictEqual(["1Workplace pension", "2Mortgage"]);
+    expect(screen.getByText("Sect. II.iii")).toHaveClass("label");
 
     const dialog = openEditor("Home");
 
