@@ -97,15 +97,15 @@ function rowsOf(panel: HTMLElement): HTMLElement[] {
 // The store's answer to a save: the account as it now has it. The ledger
 // shows it only once the page re-reads, which is the router's work and
 // not the ledger's, so the rows here stay as rendered. A test waits for
-// the dialog to close before reading the tabs, since the close is a
+// the dialog to close before reading the sections, since the close is a
 // transition that lands after the toast, and a modal dialog hides the
-// tabs from the accessibility tree while it is open.
+// sections from the accessibility tree while it is open.
 function saved(account: Account): void {
   vi.mocked(saveAccount).mockResolvedValue(account);
 }
 
 describe("AccountLedger", () => {
-  it("opens with the header, its counts and its action", () => {
+  it("opens with the header and its counts, and no actions of its own", () => {
     renderLedger();
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -115,53 +115,53 @@ describe("AccountLedger", () => {
       "label",
     );
     expect(screen.getByText("4 accounts · 1 asset")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner")).queryByRole("button"),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("opens on the accounts tab and switches to the assets tab", () => {
+  // Both sections are read at once, each a region named by its title
+  // and opened with its own buttons, and each followed by its notes.
+  it("lays the accounts and the assets out as two sections, each with its notes", () => {
     renderLedger();
 
-    const accountsTab = screen.getByRole("tab", { name: /^Accounts/ });
-    const assetsTab = screen.getByRole("tab", { name: /^Assets/ });
+    const accountsSection = screen.getByRole("region", { name: "Accounts" });
+    const assetsSection = screen.getByRole("region", {
+      name: "Property and vehicles",
+    });
 
-    expect(accountsTab).toHaveAttribute("aria-selected", "true");
-    expect(within(accountsTab).getByText("4")).toHaveClass("label");
-    expect(within(assetsTab).getByText("1")).toHaveClass("label");
-
-    let panel = screen.getByRole("tabpanel");
-
-    expect(rowsOf(panel)).toHaveLength(held.length);
+    expect(within(accountsSection).getByText("Sect. II.i")).toHaveClass(
+      "label",
+    );
+    expect(within(assetsSection).getByText("Sect. II.ii")).toHaveClass("label");
+    expect(rowsOf(accountsSection)).toHaveLength(held.length);
+    expect(rowsOf(assetsSection)).toHaveLength(assets.length);
     expect(
-      within(panel)
-        .getAllByRole("paragraph")
-        .map((note) => note.textContent),
+      within(accountsSection).getAllByRole("button", { name: /^Move / }),
+    ).toHaveLength(held.length);
+    expect(
+      within(assetsSection).queryByRole("button", { name: /^Move / }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(accountsSection).getByRole("button", { name: "Add account" }),
+    ).toBeInTheDocument();
+    expect(
+      within(assetsSection).getByRole("button", { name: "Add house" }),
+    ).toBeInTheDocument();
+    expect(
+      within(assetsSection).getByRole("button", { name: "Add car" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("paragraph").map((note) => note.textContent),
     ).toStrictEqual([
       "Spare money is handed down the accounts in this order. Drag a row by its grip, or move it with the arrow keys.",
       "Allocation is set once at plan level and applied pro rata to every account.",
+      "A loan against an asset is listed with the accounts, since it is paid as they are. The progress points reconcile the two as total assets and asset loans.",
     ]);
-    expect(
-      within(panel).getAllByRole("button", { name: /^Move / }),
-    ).toHaveLength(held.length);
-
-    fireEvent.click(assetsTab);
-
-    panel = screen.getByRole("tabpanel");
-
-    expect(assetsTab).toHaveAttribute("aria-selected", "true");
-    expect(rowsOf(panel)).toHaveLength(assets.length);
-    expect(within(panel).getByRole("paragraph")).toHaveTextContent(
-      "A loan against an asset is listed with the accounts, since it is paid as they are.",
-    );
-    expect(
-      within(panel).queryByRole("button", { name: /^Move / }),
-    ).not.toBeInTheDocument();
-
-    fireEvent.click(accountsTab);
-
-    expect(accountsTab).toHaveAttribute("aria-selected", "true");
   });
 
-  it("adds a named account to the accounts tab and reports it", async () => {
+  it("adds a named account and reports it", async () => {
     renderLedger();
 
     const dialog = openEntry();
@@ -242,13 +242,9 @@ describe("AccountLedger", () => {
     expect(
       screen.getByRole("dialog", { name: "Account added" }),
     ).toHaveAccessibleDescription("Lifetime ISA");
-    expect(screen.getByRole("tab", { name: /^Accounts/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
   });
 
-  it("saves a real asset and brings the assets tab forward", async () => {
+  it("saves a real asset through the account dialog and reports it", async () => {
     renderLedger();
     saved({
       balance: 12500,
@@ -299,20 +295,22 @@ describe("AccountLedger", () => {
       rate: 0,
       shares: [],
     });
-    expect(screen.getByRole("tab", { name: /^Assets/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(rowsOf(screen.getByRole("tabpanel"))).toHaveLength(assets.length);
+    expect(
+      rowsOf(screen.getByRole("region", { name: "Property and vehicles" })),
+    ).toHaveLength(assets.length);
   });
 
-  // The house dialog is the header's own; what it saves is its business,
-  // and the ledger's is to bring the assets forward once it has.
-  it("adds a house from the header and brings the assets tab forward", async () => {
+  // The house dialog opens from the property section; what it saves is
+  // its business, and the ledger's is to close it once it has.
+  it("adds a house from the property section and closes on the save", async () => {
     renderLedger();
     vi.mocked(saveHouse).mockResolvedValue({ ...home, id: 6, name: "Flat" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Add house" }));
+    fireEvent.click(
+      within(
+        screen.getByRole("region", { name: "Property and vehicles" }),
+      ).getByRole("button", { name: "Add house" }),
+    );
 
     const dialog = screen.getByRole("dialog", { name: "Untitled house" });
 
@@ -331,19 +329,19 @@ describe("AccountLedger", () => {
       ).not.toBeInTheDocument();
     });
     expect(saveHouse).toHaveBeenCalledOnce();
-    expect(screen.getByRole("tab", { name: /^Assets/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
   });
 
-  // The car dialog is the header's own too, and the ledger's part is the
-  // same: to bring the assets forward once it has saved.
-  it("adds a car from the header and brings the assets tab forward", async () => {
+  // The car dialog opens from the property section too, and the ledger's
+  // part is the same: to close it once it has saved.
+  it("adds a car from the property section and closes on the save", async () => {
     renderLedger();
     vi.mocked(saveCar).mockResolvedValue(golf);
 
-    fireEvent.click(screen.getByRole("button", { name: "Add car" }));
+    fireEvent.click(
+      within(
+        screen.getByRole("region", { name: "Property and vehicles" }),
+      ).getByRole("button", { name: "Add car" }),
+    );
 
     const dialog = screen.getByRole("dialog", { name: "Untitled car" });
 
@@ -363,10 +361,6 @@ describe("AccountLedger", () => {
       ).not.toBeInTheDocument();
     });
     expect(saveCar).toHaveBeenCalledOnce();
-    expect(screen.getByRole("tab", { name: /^Assets/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
   });
 
   it("drops a cancelled draft and leaves a cleared figure as it was", () => {
@@ -396,7 +390,6 @@ describe("AccountLedger", () => {
   it("opens a real asset as it is, keeps its rate across the growth choice and writes the edit back", async () => {
     renderLedger();
     saved({ ...home, balance: 420000 });
-    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
 
     const dialog = openEditor("Home");
 
@@ -463,10 +456,6 @@ describe("AccountLedger", () => {
       rate: 0.021,
       shares: [],
     });
-    expect(screen.getByRole("tab", { name: /^Assets/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
   });
 
   it("opens a wrapper with its contribution and no rate, and writes a new contribution back", async () => {
@@ -518,10 +507,6 @@ describe("AccountLedger", () => {
       rate: 0,
       shares: [],
     });
-    expect(screen.getByRole("tab", { name: /^Accounts/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
   });
 
   it("pays a wrapper the spare money up to a cap, and drops the sum with the choice", async () => {
@@ -711,7 +696,7 @@ describe("AccountLedger", () => {
     });
   });
 
-  // The names down the accounts tab, the mortgage last among them since a
+  // The names down the accounts section, the mortgage last among them since a
   // loan is listed with the accounts, as the rows now stand: each row's
   // grip is named for its account.
   function names(): string[] {
@@ -817,7 +802,6 @@ describe("AccountLedger", () => {
     ).toHaveValue("£2,210");
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
-    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
 
     dialog = openEditor("Home");
 
@@ -849,7 +833,6 @@ describe("AccountLedger", () => {
     ).toHaveValue("£6,000");
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
-    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
 
     dialog = openEditor("Golf");
 
@@ -865,7 +848,6 @@ describe("AccountLedger", () => {
         <AccountLedger accounts={[house]} at={at} lines={[]} />
       </Toaster>,
     );
-    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
 
     const dialog = openEditor("Home");
 
@@ -991,7 +973,6 @@ describe("AccountLedger", () => {
     ).toHaveAccessibleDescription("Its payments go with it.");
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
     fireEvent.click(screen.getByRole("button", { name: "Delete Home" }));
 
     expect(
@@ -1008,7 +989,6 @@ describe("AccountLedger", () => {
       </Toaster>,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
     fireEvent.click(screen.getByRole("button", { name: "Delete Golf" }));
 
     expect(
@@ -1142,7 +1122,6 @@ describe("AccountLedger", () => {
       </Toaster>,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: /^Assets/ }));
     fireEvent.click(screen.getByRole("button", { name: "Delete Home" }));
 
     expect(
