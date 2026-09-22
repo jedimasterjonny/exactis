@@ -1,4 +1,4 @@
-import type { Account, Cadence } from "@/data/accounts";
+import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Plan } from "@/data/plan";
@@ -7,6 +7,7 @@ import type { LineValues, Month } from "@/data/schedule";
 import { allowanceOf, isPension, takesSpare } from "@/data/accounts";
 import { contributionOf, sacrificeOf, totalOf } from "@/data/income";
 import { rateFrom } from "@/data/plan";
+import { monthly } from "@/lib/cadence";
 import { runsIn } from "@/lib/lines";
 import { clearsIn, termOf } from "@/lib/loans";
 
@@ -309,15 +310,6 @@ function isPaying(
   return (
     at.year < last.year || (at.year === last.year && at.month <= last.month)
   );
-}
-
-function monthly(amount: number, cadence: Cadence): number {
-  switch (cadence) {
-    case "month":
-      return amount;
-    case "year":
-      return amount / 12;
-  }
 }
 
 // The spare money handed down the accounts that take it, each taking
