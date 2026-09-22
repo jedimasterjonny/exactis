@@ -202,7 +202,7 @@ describe("useEditor", () => {
     const onSaved = vi.fn<(record: Saved) => void>();
     const { result } = renderHook(() =>
       useEditor({
-        describe: (record) => `${record.name} · ${String(record.amount)}`,
+        describe: (record, sent) => `${record.name} · ${String(sent.amount)}`,
         noun: "Income line",
         onSaved,
         save: store,

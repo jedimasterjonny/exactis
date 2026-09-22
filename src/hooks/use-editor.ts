@@ -22,10 +22,11 @@ interface Editor<TDraft> extends MountedEditor<TDraft> {
 }
 
 // What the editor is given: the store action a save goes to, the noun the
-// toast reports under, how to describe what came back, and anything else
-// the caller does with the record it wrote.
+// toast reports under, how to describe what came back, given what was
+// sent, since a record may not say what the draft did, and anything
+// else the caller does with the record it wrote.
 interface EditorProps<TDraft, TSaved> {
-  readonly describe: (saved: TSaved) => string;
+  readonly describe: (saved: TSaved, values: TDraft) => string;
   readonly noun: string;
   readonly onSaved?: (saved: TSaved) => void;
   readonly save: (id: null | number, values: TDraft) => Promise<TSaved>;
@@ -125,7 +126,7 @@ function useEntry<TDraft extends { readonly name: string }, TSaved>(
           setEntry(null);
         });
         toast.add({
-          description: describe(record),
+          description: describe(record, values),
           title: `${noun} ${current.id === null ? "added" : "updated"}`,
           type: "success",
         });
