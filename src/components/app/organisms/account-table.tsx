@@ -19,8 +19,9 @@ import {
   TableRow,
 } from "@/components/kit/table";
 import { kindLabels } from "@/data/accounts";
+import { monthly } from "@/lib/cadence";
 import { fedOf, feedersOf, listed } from "@/lib/feeders";
-import { formatContribution, formatGrowth } from "@/lib/ledger";
+import { formatContribution, formatGrowth, formatMonthly } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
 
 interface AccountTableProps {
@@ -132,7 +133,7 @@ export function AccountTable({
 }
 
 // What an account is paid: its own contribution, and beneath it, faint,
-// what the salaries sacrifice into it a year with the employer's NI
+// what the salaries sacrifice into it a month with the employer's NI
 // saved, naming them, for a pension one or more feed. A fed pension
 // paid nothing of its own shows the sacrifice as its figure, since
 // that is what lands in it, and says beneath where it is from.
@@ -143,15 +144,15 @@ function Contribution({
   readonly account: Account;
   readonly lines: readonly IncomeLine[];
 }): JSX.Element {
-  const fed = fedOf(account.id, lines);
+  const fed = monthly(fedOf(account.id, lines), "year");
   if (fed === 0) {
     return <>{formatContribution(account)}</>;
   }
   const from = `sacrificed from ${listed.format(feedersOf(account.id, lines))}`;
   const [figure, detail] =
     account.contribution === undefined
-      ? [`${formatGbp(fed)} / yr`, from]
-      : [formatContribution(account), `+ ${formatGbp(fed)} / yr ${from}`];
+      ? [formatMonthly(fed), from]
+      : [formatContribution(account), `+ ${formatMonthly(fed)} ${from}`];
   return (
     <>
       {figure}

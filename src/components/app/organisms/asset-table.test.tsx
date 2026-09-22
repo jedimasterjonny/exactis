@@ -131,16 +131,17 @@ describe("AssetTable", () => {
     );
     expect(fillOf(golfRow)).toHaveStyle({ width: "100%" });
     expect(
-      within(artRow).getByRole("cell", { name: "£600 / yr" }),
+      within(artRow).getByRole("cell", { name: "£50 / mo" }),
     ).toBeInTheDocument();
     expect(
       within(artRow).getByRole("cell", { name: "£5,000grows at Plan rate" }),
     ).toBeInTheDocument();
   });
 
-  // Both are paid a sum when each takes one, and a loan above the value
-  // leaves nothing held, as a value of nothing leaves no share of it.
-  it("writes both sums paid towards an asset, and draws no equity below nothing", () => {
+  // Both are paid a sum when each takes one, added up as a month's, and a
+  // loan above the value leaves nothing held, as a value of nothing
+  // leaves no share of it.
+  it("adds up both sums paid towards an asset a month, and draws no equity below nothing", () => {
     render(
       <AssetTable
         assets={[
@@ -158,7 +159,7 @@ describe("AssetTable", () => {
     const artRow = screen.getByRole("row", { name: /Prints/ });
 
     expect(
-      within(artRow).getByRole("cell", { name: "£600 / yr + £2,210 / mo" }),
+      within(artRow).getByRole("cell", { name: "£2,260 / mo" }),
     ).toBeInTheDocument();
     expect(
       within(artRow).getByRole("cell", { name: "−£50,000" }),

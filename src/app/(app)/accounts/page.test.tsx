@@ -20,7 +20,7 @@ vi.mock("@/actions/accounts", () => ({
 describe("Accounts", () => {
   // The fixture's salary feeds the workplace pension, which the ledger
   // says before the pension goes, and lands £13,800 a year in it in the
-  // month the plan is read in, which the row says.
+  // month the plan is read in, which the row says as £1,150 a month.
   it("hands the store's accounts and income lines to the ledger, in the plan's month", async () => {
     vi.mocked(getAccounts).mockResolvedValue([...accounts]);
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
@@ -29,7 +29,7 @@ describe("Accounts", () => {
     render(await Accounts());
 
     expect(
-      screen.getByText("+ £13,800 / yr sacrificed from Salary"),
+      screen.getByText("+ £1,150 / mo sacrificed from Salary"),
     ).toBeInTheDocument();
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
