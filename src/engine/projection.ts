@@ -46,13 +46,6 @@ interface Held {
 // an assumptions screen to set it on, as the plan rate is in the store.
 const pensionAge = 57;
 
-// The last year the plan runs to, which is the last year plotted, whose
-// point is the balance entering it, and the year an open-ended line
-// runs to.
-export function endYear(plan: Plan): number {
-  return plan.from + plan.years;
-}
-
 // The plan's years, the first holding the balances as they are and each
 // after it the year before carried to its end, a month at a time: what
 // the account is paid that month, then a month's growth at its rate, a
