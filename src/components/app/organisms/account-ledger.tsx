@@ -11,10 +11,7 @@ import type { Month } from "@/data/schedule";
 import type { Secured } from "@/data/secured";
 import type { PlanMonth } from "@/lib/loans";
 
-import {
-  placeAccountsInOrder,
-  removeAccount,
-} from "@/app/(app)/accounts/actions";
+import { placeAccountsInOrder, removeAccount } from "@/actions/accounts";
 import { Note } from "@/components/app/atoms/note";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";

@@ -9,7 +9,7 @@ import type { Secured } from "@/data/secured";
 import type { LoanFigure, Stood } from "@/lib/figures";
 import type { PlanMonth } from "@/lib/loans";
 
-import { saveHouse } from "@/app/(app)/accounts/actions";
+import { saveHouse } from "@/actions/accounts";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { HouseFields } from "@/components/app/organisms/house-fields";
 import { toast } from "@/components/kit/toast";

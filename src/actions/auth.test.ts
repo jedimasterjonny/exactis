@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { hashPassword } from "@/lib/password";
 import { endSession, startSession } from "@/lib/session";
 
-import { signIn, signInAsDeveloper, signOut } from "./actions";
+import { signIn, signInAsDeveloper, signOut } from "./auth";
 
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/session", () => ({

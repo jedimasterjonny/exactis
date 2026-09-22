@@ -12,7 +12,7 @@ import type {
 } from "@/data/expenses";
 import type { Plan } from "@/data/plan";
 
-import { saveExpenseLine } from "@/app/(app)/plan/actions";
+import { saveExpenseLine } from "@/actions/schedule";
 import { Note } from "@/components/app/atoms/note";
 import { SectionHeader } from "@/components/app/atoms/section-header";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";

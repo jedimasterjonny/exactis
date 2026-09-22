@@ -1,10 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { signIn } from "./actions";
+import { signIn } from "@/actions/auth";
+
 import { LoginForm } from "./login-form";
 
-vi.mock("./actions", () => ({ signIn: vi.fn() }));
+vi.mock("@/actions/auth", () => ({ signIn: vi.fn() }));
 
 describe("LoginForm", () => {
   it("asks for the password and posts it to the sign-in action", async () => {

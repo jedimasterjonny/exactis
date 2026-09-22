@@ -21,9 +21,8 @@ import {
   updateIncomeLine,
 } from "@/db/income";
 import { requireSession } from "@/lib/session";
-
-import { accountsTag } from "../accounts/store";
-import { expenseLinesTag, incomeLinesTag } from "./store";
+import { accountsTag } from "@/store/accounts";
+import { expenseLinesTag, incomeLinesTag } from "@/store/schedule";
 
 // What a save of either line may carry, checked against the model's own
 // lists so the two cannot drift: the amount whole and never negative;

@@ -3,16 +3,19 @@ import { describe, expect, it, vi } from "vitest";
 
 import { accounts } from "@/data/accounts.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
+import { getAccounts } from "@/store/accounts";
+import { getPlan } from "@/store/plan";
+import { getIncomeLines } from "@/store/schedule";
 
-import { getIncomeLines } from "../plan/store";
-import { getPlan } from "../store";
 import Accounts from "./page";
-import { getAccounts } from "./store";
 
-vi.mock("../plan/store", () => ({ getIncomeLines: vi.fn() }));
-vi.mock("../store", () => ({ getPlan: vi.fn() }));
-vi.mock("./store", () => ({ getAccounts: vi.fn() }));
-vi.mock("./actions", () => ({ removeAccount: vi.fn(), saveAccount: vi.fn() }));
+vi.mock("@/store/schedule", () => ({ getIncomeLines: vi.fn() }));
+vi.mock("@/store/plan", () => ({ getPlan: vi.fn() }));
+vi.mock("@/store/accounts", () => ({ getAccounts: vi.fn() }));
+vi.mock("@/actions/accounts", () => ({
+  removeAccount: vi.fn(),
+  saveAccount: vi.fn(),
+}));
 
 describe("Accounts", () => {
   // The fixture's salary feeds the workplace pension, which the ledger

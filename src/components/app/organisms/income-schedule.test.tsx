@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Account } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
 
-import { removeIncomeLine, saveIncomeLine } from "@/app/(app)/plan/actions";
+import { removeIncomeLine, saveIncomeLine } from "@/actions/schedule";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 import { incomeKinds } from "@/data/income";
@@ -19,7 +19,7 @@ import { lineGrowths } from "@/data/schedule";
 
 import { IncomeSchedule } from "./income-schedule";
 
-vi.mock("@/app/(app)/plan/actions", () => ({
+vi.mock("@/actions/schedule", () => ({
   removeIncomeLine: vi.fn(),
   saveIncomeLine: vi.fn(),
 }));

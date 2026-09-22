@@ -7,10 +7,9 @@ import { ExpenseSchedule } from "@/components/app/organisms/expense-schedule";
 import { IncomeSchedule } from "@/components/app/organisms/income-schedule";
 import { counted } from "@/lib/count";
 import { plan as planScreen, sectionLabel } from "@/lib/nav";
-
-import { getAccounts } from "../accounts/store";
-import { getPlan } from "../store";
-import { getExpenseLines, getIncomeLines } from "./store";
+import { getAccounts } from "@/store/accounts";
+import { getPlan } from "@/store/plan";
+import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 
 // The reference's plan screen holds accounts, events and the income and
 // expense schedules on three tabs. The accounts have a screen of their

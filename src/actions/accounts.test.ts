@@ -21,17 +21,17 @@ import {
 } from "@/db/expenses";
 import { isFed, stopFeeding, updateSacrifice } from "@/db/income";
 import { requireSession } from "@/lib/session";
+import { accountsTag } from "@/store/accounts";
+import { getPlan } from "@/store/plan";
+import { expenseLinesTag, incomeLinesTag } from "@/store/schedule";
 
-import { expenseLinesTag, incomeLinesTag } from "../plan/store";
-import { getPlan } from "../store";
 import {
   placeAccountsInOrder,
   removeAccount,
   saveAccount,
   saveCar,
   saveHouse,
-} from "./actions";
-import { accountsTag } from "./store";
+} from "./accounts";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({
@@ -59,7 +59,7 @@ vi.mock("@/db/income", () => ({
   updateSacrifice: vi.fn(),
 }));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
-vi.mock("../store", () => ({ getPlan: vi.fn() }));
+vi.mock("@/store/plan", () => ({ getPlan: vi.fn() }));
 
 const [pension, , , home, mortgage] = accounts;
 const [, , mortgagePayment] = expenseLines;

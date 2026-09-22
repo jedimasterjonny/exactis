@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import Login from "./page";
 
-vi.mock("./actions", () => ({ signIn: vi.fn(), signInAsDeveloper: vi.fn() }));
+vi.mock("@/actions/auth", () => ({
+  signIn: vi.fn(),
+  signInAsDeveloper: vi.fn(),
+}));
 
 describe("Login", () => {
   it("opens with the sign-in card and the form, and no other door", () => {

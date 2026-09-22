@@ -10,7 +10,7 @@ import type { IncomeKind, IncomeLine, IncomeLineDraft } from "@/data/income";
 import type { Plan } from "@/data/plan";
 import type { Entry } from "@/hooks/use-editor";
 
-import { removeIncomeLine, saveIncomeLine } from "@/app/(app)/plan/actions";
+import { removeIncomeLine, saveIncomeLine } from "@/actions/schedule";
 import { Note } from "@/components/app/atoms/note";
 import { SectionHeader } from "@/components/app/atoms/section-header";
 import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";

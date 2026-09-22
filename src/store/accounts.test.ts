@@ -6,7 +6,7 @@ import { listAccounts } from "@/db/accounts";
 import { getDb } from "@/db/client";
 import { requireSession } from "@/lib/session";
 
-import { accountsTag, getAccounts } from "./store";
+import { accountsTag, getAccounts } from "./accounts";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ cacheLife: vi.fn(), cacheTag: vi.fn() }));

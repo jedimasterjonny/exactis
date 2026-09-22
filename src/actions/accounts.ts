@@ -45,10 +45,9 @@ import {
 import { isFed, stopFeeding, updateSacrifice } from "@/db/income";
 import { termOf } from "@/lib/loans";
 import { requireSession } from "@/lib/session";
-
-import { expenseLinesTag, incomeLinesTag } from "../plan/store";
-import { getPlan } from "../store";
-import { accountsTag } from "./store";
+import { accountsTag } from "@/store/accounts";
+import { getPlan } from "@/store/plan";
+import { expenseLinesTag, incomeLinesTag } from "@/store/schedule";
 
 // What a car may carry, checked against the model's own list and its
 // own soundness so the two cannot drift: the figures whole and never

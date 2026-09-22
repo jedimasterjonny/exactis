@@ -10,13 +10,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { Account } from "@/data/accounts";
 import type { Secured } from "@/data/secured";
 
-import { saveHouse } from "@/app/(app)/accounts/actions";
+import { saveHouse } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 
 import { HouseDialog } from "./house-dialog";
 
-vi.mock("@/app/(app)/accounts/actions", () => ({ saveHouse: vi.fn() }));
+vi.mock("@/actions/accounts", () => ({ saveHouse: vi.fn() }));
 
 const [, , , home, mortgage] = accounts;
 

@@ -46,6 +46,17 @@ const vendoredPattern = {
     "Only src/components/kit may import a vendored component. Import the wrapper from @/components/kit instead.",
 };
 
+// The routes are the top tier: a page composes organisms and templates
+// and reads the store, and nothing beneath it reaches back up. The server
+// actions and the stores live under src/actions and src/store rather than
+// beside the routes for this reason, since an organism saves through an
+// action and a template signs out through one.
+const routesPattern = {
+  group: ["@/app/*"],
+  message:
+    "Nothing beneath the routes imports them. A server action lives under @/actions and a store under @/store.",
+};
+
 // Atomic design's one mechanical rule: a component composes what is below it,
 // and beside it, never above. Written as what each tier may not reach, so a
 // new tier is one entry rather than an edit to every other.
@@ -277,10 +288,10 @@ const eslintConfig = defineConfig([
   // reaches app code that the wrapper existed to shield.
   //
   // ui/ is exempt because the vendored files import each other, and kit/
-  // because wrapping them is what it is for.
+  // because wrapping them is what it is for. The routes are exempt from the
+  // second pattern, since it names them.
   {
-    files: ["src/**/*.{ts,tsx}"],
-    ignores: ["src/components/kit/**", "src/components/ui/**"],
+    files: ["src/app/**/*.{ts,tsx}"],
     rules: {
       "@typescript-eslint/no-restricted-imports": [
         "error",
@@ -288,8 +299,28 @@ const eslintConfig = defineConfig([
       ],
     },
   },
-  // Templates are the top tier, so they ban nothing and do not appear here.
-  // src/app composes organisms and templates and is above both.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/app/**", "src/components/kit/**", "src/components/ui/**"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { patterns: [vendoredPattern, routesPattern] },
+      ],
+    },
+  },
+  {
+    files: ["src/components/kit/**"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { patterns: [routesPattern] },
+      ],
+    },
+  },
+  // Templates ban no tier, so they take only the two patterns above from
+  // the block before this one. src/app composes organisms and templates
+  // and is above both.
   ...Object.entries(tierBans).map(([tier, above]) => ({
     files: [`src/components/app/${tier}/**`],
     rules: {
@@ -298,6 +329,7 @@ const eslintConfig = defineConfig([
         {
           patterns: [
             vendoredPattern,
+            routesPattern,
             {
               group: above.map((t) => `@/components/app/${t}/*`),
               message: `A component composes what is below it, never above: ${tier} cannot import ${above.join(", ")}.`,

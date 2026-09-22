@@ -12,7 +12,7 @@ import type {
 import type { IncomeLine } from "@/data/income";
 import type { Entry } from "@/hooks/use-editor";
 
-import { saveAccount } from "@/app/(app)/accounts/actions";
+import { saveAccount } from "@/actions/accounts";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { AccountFields } from "@/components/app/organisms/account-fields";
 import { SacrificeFields } from "@/components/app/organisms/sacrifice-fields";
