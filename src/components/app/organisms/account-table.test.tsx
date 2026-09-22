@@ -25,9 +25,9 @@ describe("AccountTable", () => {
     );
 
     const table = screen.getByRole("table");
-    const [, ...rows] = within(table).getAllByRole("row");
 
-    expect(rows).toHaveLength(held.length);
+    // The header, a row for each account, and the totals beneath them.
+    expect(within(table).getAllByRole("row")).toHaveLength(held.length + 2);
     expect(within(table).getAllByRole("columnheader")).toHaveLength(5);
     expect(within(table).queryByRole("button")).not.toBeInTheDocument();
     expect(
@@ -69,7 +69,9 @@ describe("AccountTable", () => {
     );
     expect(within(table).getAllByRole("cell", { name: "—" })).toHaveLength(1);
     expect(
-      within(table).getByRole("cell", { name: "£2,210 / mo" }),
+      within(screen.getByRole("row", { name: /Mortgage/ })).getByRole("cell", {
+        name: "£2,210 / mo",
+      }),
     ).toBeInTheDocument();
     expect(
       within(table).getByRole("cell", { name: "2.10%" }),
@@ -152,6 +154,65 @@ describe("AccountTable", () => {
         name: "£1,955 / mosacrificed from Salary step-up and Second job",
       }),
     ).toBeInTheDocument();
+  });
+
+  // The fixture's pension is paid £27,195 a year and fed £13,800 by the
+  // salary, £3,416 a month between them, and the ISA £20,000 a year,
+  // £1,667 a month; cash is paid nothing, and between them they hold
+  // £717,325.
+  it("totals what the rows are paid a month and what they hold, beneath two rows or more", () => {
+    const [salary] = incomeLines;
+    const view = render(
+      <AccountTable
+        accounts={held}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        lines={[salary]}
+        onEdit={vi.fn<(account: Account) => void>()}
+      />,
+    );
+
+    const totals = screen.getByRole("row", { name: /^Total/ });
+
+    expect(
+      within(totals)
+        .getAllByRole("cell")
+        .map((cell) => cell.textContent),
+    ).toStrictEqual(["Total", "", "£5,083 / mo", "", "£717,325", ""]);
+
+    view.rerender(
+      <AccountTable
+        accounts={accounts.slice(0, 1)}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+      />,
+    );
+
+    expect(
+      screen.queryByRole("row", { name: /^Total/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  // What the spare money takes is the month's to decide, so the total
+  // says it is on top rather than putting a figure to it.
+  it("says the spare money is on top of the total when any row takes it", () => {
+    const [pension, isa] = accounts;
+    render(
+      <AccountTable
+        accounts={[
+          pension,
+          { ...isa, contribution: { cap: null, kind: "spare" } },
+        ]}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+      />,
+    );
+
+    expect(
+      within(screen.getByRole("row", { name: /^Total/ })).getByRole("cell", {
+        name: "£2,266 / mo + spare",
+      }),
+    ).toHaveClass("figure");
   });
 
   it("draws its empty state rather than a header over no rows", () => {

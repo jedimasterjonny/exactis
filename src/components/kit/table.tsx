@@ -7,7 +7,13 @@ import {
   TableHead as TableHeadBase,
 } from "@/components/ui/table";
 
-export { Table, TableBody, TableHeader, TableRow } from "@/components/ui/table";
+export {
+  Table,
+  TableBody,
+  TableFooter,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // Every table in the product sits in a card with no vertical padding of
 // its own, and its cells take the card's horizontal inset rather than the

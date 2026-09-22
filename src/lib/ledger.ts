@@ -1,8 +1,18 @@
 import type { Account, Growth } from "@/data/accounts";
+import type { IncomeLine } from "@/data/income";
+import type { Secured } from "@/data/secured";
 
 import { allowanceOf } from "@/data/accounts";
 import { cadenceAbbreviations, monthly } from "@/lib/cadence";
+import { fedOf } from "@/lib/feeders";
 import { formatGbp, formatPercent } from "@/lib/money";
+
+// What an asset is worth to the plan once the loan secured on it is
+// paid: its value less what is owed, all of it for one owned outright.
+// A loan above the value leaves the equity below nothing.
+export function equityOf({ asset, loan }: Secured): number {
+  return asset.balance + (loan?.balance ?? 0);
+}
 
 // What an account is paid a month in a fixed sum, at whatever cadence
 // the sum is stated; nothing for one paid the spare money, whose take is
@@ -50,4 +60,15 @@ export function formatGrowth(growth: Growth): string {
 // A month's worth of money as the ledger writes it, "£1,390 / mo".
 export function formatMonthly(amount: number): string {
   return `${formatGbp(amount)} / ${cadenceAbbreviations.month}`;
+}
+
+// What lands in an account a month that the month decides in advance:
+// its own fixed sum, and what the salaries running then sacrifice into
+// it with the employer's NI saved. The spare money's take is left out,
+// since it is decided month by month from what is left.
+export function paidMonthly(
+  account: Account,
+  lines: readonly IncomeLine[],
+): number {
+  return fixedMonthly(account) + monthly(fedOf(account.id, lines), "year");
 }

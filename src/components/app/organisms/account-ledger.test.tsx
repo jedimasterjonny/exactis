@@ -89,9 +89,11 @@ function renderLedger(): void {
   );
 }
 
+// The rows a section lists: its body's, less the header above them and
+// the totals beneath them when it has any.
 function rowsOf(panel: HTMLElement): HTMLElement[] {
-  const [, ...rows] = within(panel).getAllByRole("row");
-  return rows;
+  const [, body] = within(panel).getAllByRole("rowgroup");
+  return body === undefined ? [] : within(body).getAllByRole("row");
 }
 
 // The store's answer to a save: the account as it now has it. The ledger
