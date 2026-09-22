@@ -65,6 +65,11 @@ const finance: Account = {
   secures: golf.id,
 };
 
+const bySlot =
+  (slot: string) =>
+  (_content: string, element: Element | null): boolean =>
+    element?.getAttribute("data-slot") === slot;
+
 function commit(field: HTMLElement, value: string): void {
   fireEvent.change(field, { target: { value } });
   fireEvent.blur(field);
@@ -107,7 +112,7 @@ function saved(account: Account): void {
 }
 
 describe("AccountLedger", () => {
-  it("opens with the header and its counts, and no actions of its own", () => {
+  it("opens with the header and the month it starts from, and no actions of its own", () => {
     renderLedger();
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -116,7 +121,9 @@ describe("AccountLedger", () => {
     expect(screen.getByText("Sect. II · Accounts & assets")).toHaveClass(
       "label",
     );
-    expect(screen.getByText("4 accounts · 1 asset")).toBeInTheDocument();
+    expect(
+      screen.getByText("Starting balances for the plan · September 2026"),
+    ).toBeInTheDocument();
     expect(
       within(screen.getByRole("banner")).queryByRole("button"),
     ).not.toBeInTheDocument();
@@ -183,6 +190,53 @@ describe("AccountLedger", () => {
         screen.getByRole("region", { name: "Order of payment" }),
       ).getByText("Sect. II.iv"),
     ).toHaveClass("label");
+  });
+
+  // The fixture's balances come to £901,462, its mortgage taking away,
+  // £680,470 of it in its three savings; its home, owned outright, is
+  // all equity; and it pays in £6,223 a month between the pension's
+  // £28,512 and the ISA's £20,000 a year and the mortgage's £2,180 a
+  // month. The tiles are the first four cards on the screen, the net
+  // worth the one that matters most.
+  it("opens on the starting net worth, the savings, the equity and what is paid in a month", () => {
+    renderLedger();
+
+    const [worth, savings, equity, paidIn] = screen.getAllByText(
+      bySlot("card"),
+    );
+
+    expect(worth).toHaveAttribute("data-tone", "inverse");
+    expect(worth).toHaveTextContent(
+      "Starting net worth£901,462The balances the plan starts from",
+    );
+    expect(savings).toHaveTextContent("Savings£717,3253 accounts");
+    expect(equity).toHaveTextContent("Equity£397,512£397,512 owned · £0 owed");
+    expect(paidIn).toHaveTextContent(
+      "Paid in£6,223/ moSacrifice and fixed payments",
+    );
+  });
+
+  // A salary running in the plan's month pays in what it sacrifices, and
+  // a loan on a house owes against it, so the equity is what is left.
+  it("counts the sacrifice in what is paid in, and the loan against the equity", () => {
+    const [salary] = incomeLines;
+    render(
+      <Toaster>
+        <AccountLedger
+          accounts={[pension, house, loan]}
+          at={at}
+          lines={[salary]}
+        />
+      </Toaster>,
+    );
+
+    const [worth, , equity, paidIn] = screen.getAllByText(bySlot("card"));
+
+    expect(worth).toHaveTextContent("£612,632");
+    expect(equity).toHaveTextContent(
+      "Equity£220,992£397,512 owned · £176,520 owed",
+    );
+    expect(paidIn).toHaveTextContent("£5,936");
   });
 
   it("adds a named account and reports it", async () => {
@@ -408,7 +462,12 @@ describe("AccountLedger", () => {
     expect(
       within(dialog).getByRole("textbox", { name: "Balance" }),
     ).toHaveValue("£0");
-    expect(screen.getByText("4 accounts · 1 asset")).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(
+      rowsOf(screen.getByRole("region", { name: "Savings and investments" })),
+    ).toHaveLength(held.length - 1);
   });
 
   it("opens a real asset as it is, keeps its rate across the growth choice and writes the edit back", async () => {

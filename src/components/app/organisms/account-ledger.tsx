@@ -15,8 +15,10 @@ import { placeAccountsInOrder, removeAccount } from "@/actions/accounts";
 import { Note } from "@/components/app/atoms/note";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
+import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { SectionCard } from "@/components/app/molecules/section-card";
+import { StatTile } from "@/components/app/molecules/stat-tile";
 import { AccountDialog } from "@/components/app/organisms/account-dialog";
 import { AccountTable } from "@/components/app/organisms/account-table";
 import { AssetTable } from "@/components/app/organisms/asset-table";
@@ -28,7 +30,10 @@ import { isAsset } from "@/data/accounts";
 import { useRemover } from "@/hooks/use-remover";
 import { counted } from "@/lib/count";
 import { feedersOf, listed } from "@/lib/feeders";
+import { equityOf, paidMonthly } from "@/lib/ledger";
 import { runsIn } from "@/lib/lines";
+import { formatGbp } from "@/lib/money";
+import { monthName } from "@/lib/months";
 import { accountsAndAssets, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
@@ -106,6 +111,22 @@ export function AccountLedger({
   const debts = held.filter((account) => account.kind === "debt");
   const running = lines.filter((line) => runsIn(line, at));
 
+  // The figures the screen opens on, read off the rows the sections
+  // list: what every balance comes to, a debt's taking away, which is
+  // the net worth the plan starts from; the savings among them; the
+  // equity the assets hold once their loans are paid, of what they are
+  // worth; and what the month pays in, every fixed sum and sacrifice
+  // the salaries running then make, the spare money's take being the
+  // month's to decide.
+  const worth = order.reduce((sum, account) => sum + account.balance, 0);
+  const saved = savings.reduce((sum, account) => sum + account.balance, 0);
+  const owned = assets.reduce((sum, { asset }) => sum + asset.balance, 0);
+  const equity = assets.reduce((sum, pair) => sum + equityOf(pair), 0);
+  const paidIn = order.reduce(
+    (sum, account) => sum + paidMonthly(account, running),
+    0,
+  );
+
   // The month the plan is read in as the loan maths counts from it, for
   // the two dialogs that let a loan's end be picked as a date.
   const plan: PlanMonth = { from: at.year, month: at.month };
@@ -147,9 +168,33 @@ export function AccountLedger({
         label={sectionLabel(accountsAndAssets)}
         title="Accounts & assets"
       >
-        {`${counted(held.length, "account")} · ${counted(assets.length, "asset")}`}
+        {`Starting balances for the plan · ${monthName(at.month, "long")} ${String(at.year)}`}
       </ScreenHeader>
       <ScreenBody>
+        <TileGrid>
+          <StatTile
+            caption="The balances the plan starts from"
+            label="Starting net worth"
+            tone="inverse"
+            value={formatGbp(worth)}
+          />
+          <StatTile
+            caption={counted(savings.length, "account")}
+            label="Savings"
+            value={formatGbp(saved)}
+          />
+          <StatTile
+            caption={`${formatGbp(owned)} owned · ${formatGbp(owned - equity)} owed`}
+            label="Equity"
+            value={formatGbp(equity)}
+          />
+          <StatTile
+            caption="Sacrifice and fixed payments"
+            label="Paid in"
+            unit="/ mo"
+            value={formatGbp(paidIn)}
+          />
+        </TileGrid>
         <SectionCard
           actions={
             <Button
