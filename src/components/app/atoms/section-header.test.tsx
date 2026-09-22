@@ -12,6 +12,16 @@ describe("SectionHeader", () => {
       "Income by year",
     );
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2 })).not.toHaveAttribute("id");
+  });
+
+  it("gives the heading the id it is given, for a card to be named by", () => {
+    render(<SectionHeader id="savings" label="Sect. II.i" title="Accounts" />);
+
+    expect(screen.getByRole("heading", { level: 2 })).toHaveAttribute(
+      "id",
+      "savings",
+    );
   });
 
   it("renders the meta line beneath and the actions beside when given", () => {
