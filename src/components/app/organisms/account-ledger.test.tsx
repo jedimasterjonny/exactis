@@ -16,7 +16,7 @@ import {
   saveAccount,
   saveCar,
   saveHouse,
-} from "@/app/(app)/accounts/actions";
+} from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
 import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
@@ -24,7 +24,7 @@ import { incomeLines } from "@/data/income.fixture";
 
 import { AccountLedger } from "./account-ledger";
 
-vi.mock("@/app/(app)/accounts/actions", () => ({
+vi.mock("@/actions/accounts", () => ({
   placeAccountsInOrder: vi.fn(),
   removeAccount: vi.fn(),
   saveAccount: vi.fn(),

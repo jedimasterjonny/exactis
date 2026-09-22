@@ -10,12 +10,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { Account } from "@/data/accounts";
 import type { Secured } from "@/data/secured";
 
-import { saveCar } from "@/app/(app)/accounts/actions";
+import { saveCar } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
 
 import { CarDialog } from "./car-dialog";
 
-vi.mock("@/app/(app)/accounts/actions", () => ({ saveCar: vi.fn() }));
+vi.mock("@/actions/accounts", () => ({ saveCar: vi.fn() }));
 
 // A Golf worth £18,000 losing 15% a year, with the finance secured on
 // it: £14,000 owed at 7.9%, paying £290 a month towards a £6,000

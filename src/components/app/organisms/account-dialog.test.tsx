@@ -9,14 +9,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 
-import { saveAccount } from "@/app/(app)/accounts/actions";
+import { saveAccount } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 import { incomeLines } from "@/data/income.fixture";
 
 import { AccountDialog } from "./account-dialog";
 
-vi.mock("@/app/(app)/accounts/actions", () => ({ saveAccount: vi.fn() }));
+vi.mock("@/actions/accounts", () => ({ saveAccount: vi.fn() }));
 
 const [pension, isa] = accounts;
 

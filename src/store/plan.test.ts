@@ -5,16 +5,16 @@ import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { project } from "@/engine/projection";
+import { getAccounts } from "@/store/accounts";
+import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 
-import { getAccounts } from "./accounts/store";
-import { getExpenseLines, getIncomeLines } from "./plan/store";
-import { getPlan, getProjection } from "./store";
+import { getPlan, getProjection } from "./plan";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ cacheLife: vi.fn() }));
 vi.mock("@/engine/projection", () => ({ project: vi.fn() }));
-vi.mock("./accounts/store", () => ({ getAccounts: vi.fn() }));
-vi.mock("./plan/store", () => ({
+vi.mock("@/store/accounts", () => ({ getAccounts: vi.fn() }));
+vi.mock("@/store/schedule", () => ({
   getExpenseLines: vi.fn(),
   getIncomeLines: vi.fn(),
 }));

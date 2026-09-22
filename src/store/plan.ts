@@ -7,9 +7,8 @@ import type { Schedule } from "@/engine/cash-flow";
 import type { ProjectionPoint } from "@/engine/projection";
 
 import { project } from "@/engine/projection";
-
-import { getAccounts } from "./accounts/store";
-import { getExpenseLines, getIncomeLines } from "./plan/store";
+import { getAccounts } from "@/store/accounts";
+import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 
 // The plan, until there is an assumptions screen to set it on: five per
 // cent a year, thirty years out from this one, for someone born in 1990.

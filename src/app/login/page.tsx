@@ -1,10 +1,10 @@
 import type { JSX } from "react";
 
+import { signInAsDeveloper } from "@/actions/auth";
 import { Button } from "@/components/kit/button";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
 import { isDevSignInOpen } from "@/lib/dev-sign-in";
 
-import { signInAsDeveloper } from "./actions";
 import { LoginForm } from "./login-form";
 
 // The screen the app sends anyone to who is not signed in, and the only

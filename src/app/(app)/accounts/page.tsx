@@ -1,10 +1,9 @@
 import type { JSX } from "react";
 
 import { AccountLedger } from "@/components/app/organisms/account-ledger";
-
-import { getIncomeLines } from "../plan/store";
-import { getPlan } from "../store";
-import { getAccounts } from "./store";
+import { getAccounts } from "@/store/accounts";
+import { getPlan } from "@/store/plan";
+import { getIncomeLines } from "@/store/schedule";
 
 // The reference's plan screen opened on its accounts tab, with that tab
 // split in two: the wrappers, cash and the loans on one, the real assets on the

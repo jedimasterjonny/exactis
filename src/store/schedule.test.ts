@@ -13,7 +13,7 @@ import {
   getExpenseLines,
   getIncomeLines,
   incomeLinesTag,
-} from "./store";
+} from "./schedule";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ cacheLife: vi.fn(), cacheTag: vi.fn() }));
