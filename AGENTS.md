@@ -152,11 +152,11 @@ because the vocabulary is open by design.
 - Minimum diff surface. Formatter sweeps, drive-by renames and unrelated tidying
   get their own commit or do not happen.
 - Every commit stands alone. Regenerate `bun.lock` per commit, and check a
-  series in throwaway worktrees, one per commit and all at once:
-  `git worktree add` at each commit, then `bun install --frozen-lockfile` and
-  every gate the hook runs in each, in parallel. A series checked one commit at
-  a time takes as long as all of them together; checked side by side it takes as
-  long as the slowest, and the machine has the cores.
+  series in throwaway worktrees, one per commit: `git worktree add` at each
+  commit, then `bun install --frozen-lockfile` and every gate the hook runs in
+  each, one worktree after another. Not in parallel: the worktrees checked side
+  by side report failures that are not there, so a series takes as long as all
+  of its commits together and that is the price of a result worth reading.
 - Drop verification artefacts before the work lands: smoke-test files, scratch
   scripts, probe commits. Never fold them into a real commit.
 - The body says what was decided, what was rejected and why, and what was
