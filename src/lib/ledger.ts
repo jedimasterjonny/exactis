@@ -2,7 +2,7 @@ import type { Account, Growth } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
 import type { Secured } from "@/data/secured";
 
-import { allowanceOf } from "@/data/accounts";
+import { capOf } from "@/data/accounts";
 import { cadenceAbbreviations, monthly } from "@/lib/cadence";
 import { fedOf } from "@/lib/feeders";
 import { formatGbp, formatPercent } from "@/lib/money";
@@ -27,8 +27,9 @@ export function fixedMonthly(account: Account): number {
 // An account with nothing paid in shows a flat dash, as a flat delta does.
 // A fixed sum is written a month whatever cadence it was stated at, so a
 // column of them reads down and adds up. One paid the spare money says
-// the most it takes a year, which is its own allowance when it was given
-// no cap, since an allowance is a year's.
+// the most it takes a year, which is its cap held beneath its allowance,
+// or the allowance when it was given no cap, since an allowance is a
+// year's.
 export function formatContribution(account: Account): string {
   const { contribution } = account;
   if (contribution === undefined) {
@@ -38,7 +39,7 @@ export function formatContribution(account: Account): string {
     case "fixed":
       return formatMonthly(fixedMonthly(account));
     case "spare": {
-      const cap = contribution.cap ?? allowanceOf(account.kind);
+      const cap = capOf(account.kind, contribution.cap);
       return cap === null
         ? "Spare, uncapped"
         : `Spare, to ${formatGbp(cap)} / yr`;

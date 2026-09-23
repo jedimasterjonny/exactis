@@ -83,16 +83,32 @@ const plans = 40;
 // The month a tax year opens in, April, January being nought.
 const april = 3;
 
-// The ISA an earning plan keeps what is left in: at no growth, with
-// room for all of it, and opening on a sum wide enough to cover any
-// April a settlement owes more than the month has.
-const wideIsa: Account = {
-  balance: 10000000,
-  contribution: { cap: 1000000000000, kind: "spare" },
+// The ISA an earning plan keeps what is left in, at no growth, up to
+// its allowance, a twelfth of £20,000 a month.
+const isa: Account = {
+  balance: 0,
+  contribution: { cap: null, kind: "spare" },
   growth: { kind: "fixed", rate: 0 },
   id: 99,
   kind: "tax-free",
   name: "ISA",
+};
+
+// The ISA's twelfth of its allowance.
+const isaRoom = 20000 / 12;
+
+// The cash an earning plan keeps what the ISA has no room for in,
+// uncapped and opening on a sum wide enough to cover any April a
+// settlement owes more than the month has, so a draw never reaches the
+// ISA. It is carried but not plotted, so the ISA's balance is what the
+// oracle reads.
+const deepCash: Account = {
+  balance: 10000000,
+  contribution: { cap: null, kind: "spare" },
+  growth: { kind: "fixed", rate: 0 },
+  id: 98,
+  kind: "cash",
+  name: "Cash",
 };
 
 // A month of a drawing plan: what the month earns and spends, the
@@ -126,7 +142,8 @@ function drawnIn(
 // A month of an earning plan: the refund settled into it, the month's
 // income less its tax, sacrificing only while that covers the month,
 // the pension paid its fixed sum out of what is left and fed what is
-// sacrificed, and the ISA the rest.
+// sacrificed, and the ISA the rest up to its allowance, what is past it
+// going to cash.
 function earnedFrom(
   earning: Earning,
   at: Month,
@@ -152,7 +169,7 @@ function earnedFrom(
   const paid = Math.max(0, Math.min(fixed, net));
   return {
     fed: earning.fed + sacrificed * 1.15 + paid * 1.25,
-    kept: earning.kept + net - paid,
+    kept: earning.kept + Math.max(0, Math.min(net - paid, isaRoom)),
     year: yearWith(year, earnedIn(income, at, everyKind) - sacrificed, profit),
   };
 }
@@ -383,8 +400,8 @@ function yearWith(year: TaxYear, taxable: number, profit: number): TaxYear {
 
 describe("project against the law", () => {
   // Earning years: lines of every kind, salaries sacrificing into a
-  // pension that is also paid a fixed sum out of the month, and an ISA
-  // with room for everything left.
+  // pension that is also paid a fixed sum out of the month, an ISA
+  // taking what is left up to its allowance, and cash taking the rest.
   it("keeps what the law leaves of every month's income, a tax year settled at a time", () => {
     const random = seeded(20260923);
     for (let run = 0; run < plans; run += 1) {
@@ -404,14 +421,14 @@ describe("project against the law", () => {
         { length: 1 + Math.floor(random() * 4) },
         (_, index) => lineFrom(random, index + 1, plan.from),
       );
-      let earning: Earning = { fed: 0, kept: wideIsa.balance, year: opened };
+      let earning: Earning = { fed: 0, kept: isa.balance, year: opened };
       const expected = [earning];
       for (const { at, isLast } of monthsOf(plan)) {
         earning = earnedFrom(earning, at, { fixed, income });
         expected.push(...(isLast ? [earning] : []));
       }
 
-      project([pension, wideIsa], { expenses: [], income }, plan).forEach(
+      project([pension, isa, deepCash], { expenses: [], income }, plan).forEach(
         (point, index) => {
           expect(isNear(point.free, expected[index]?.kept)).toBe(true);
           expect(isNear(point.deferred, expected[index]?.fed)).toBe(true);

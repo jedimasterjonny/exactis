@@ -122,7 +122,9 @@ describe("AccountFields", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("textbox", { name: "Cap, a year" }),
-    ).toHaveAccessibleDescription("Leave at nothing for the £20,000 allowance");
+    ).toHaveAccessibleDescription(
+      "Up to the £20,000 allowance, or nothing for all of it",
+    );
 
     commit(screen.getByRole("textbox", { name: "Cap, a year" }), "4,000");
 

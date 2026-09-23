@@ -75,7 +75,7 @@ export interface Share {
 // contribution, up to a cap a year. The spare money goes to the accounts
 // that take it in the order they are listed, each taking up to its cap
 // and passing the rest on. A cap of null is the account's own allowance,
-// which for cash is none.
+// which for cash is none, and a cap above the allowance is held to it.
 type Contribution =
   | {
       readonly amount: number;
@@ -131,6 +131,19 @@ export function allowanceOf(kind: AccountKind): null | number {
     case "tax-free":
       return 20000;
   }
+}
+
+// The most the spare money pays an account a year: the cap typed on it,
+// held beneath its kind's allowance, since a cap says how much of the
+// allowance the account may use and not that it has more than the law
+// gives it; the allowance when no cap is typed; and no limit at all for
+// cash with no cap.
+export function capOf(kind: AccountKind, cap: null | number): null | number {
+  const allowance = allowanceOf(kind);
+  if (cap === null || allowance === null) {
+    return cap ?? allowance;
+  }
+  return Math.min(cap, allowance);
 }
 
 // A house, a car or another real asset is the side of the plan the

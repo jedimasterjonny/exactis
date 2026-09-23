@@ -60,8 +60,8 @@ describe("formatContribution", () => {
   });
 
   // A cap of nothing is the account's own allowance, which cash has
-  // none of.
-  it("writes the most the spare money takes a year, its allowance when uncapped", () => {
+  // none of, and a cap above the allowance is held to it.
+  it("writes the most the spare money takes a year, its allowance when uncapped or capped above it", () => {
     expect(
       formatContribution({
         ...pension,
@@ -74,6 +74,12 @@ describe("formatContribution", () => {
         contribution: { cap: 4000, kind: "spare" },
       }),
     ).toBe("Spare, to £4,000 / yr");
+    expect(
+      formatContribution({
+        ...isa,
+        contribution: { cap: 50000, kind: "spare" },
+      }),
+    ).toBe("Spare, to £20,000 / yr");
     expect(
       formatContribution({
         ...cash,
