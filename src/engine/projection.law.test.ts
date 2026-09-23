@@ -97,6 +97,11 @@ const isa: Account = {
 // The ISA's twelfth of its allowance.
 const isaRoom = 20000 / 12;
 
+// The pension's twelfth of its allowance, which what lands in it is
+// held to: a sacrifice with the employer's NI on it, and a fixed sum
+// with the basic rate claimed back.
+const pensionRoom = 60000 / 12;
+
 // The cash an earning plan keeps what the ISA has no room for in,
 // uncapped and opening on a sum wide enough to cover any April a
 // settlement owes more than the month has, so a draw never reaches the
@@ -140,10 +145,11 @@ function drawnIn(
 }
 
 // A month of an earning plan: the refund settled into it, the month's
-// income less its tax, sacrificing only while that covers the month,
-// the pension paid its fixed sum out of what is left and fed what is
-// sacrificed, and the ISA the rest up to its allowance, what is past it
-// going to cash.
+// income less its tax, sacrificing only while that covers the month
+// and only as much as the pension's allowance takes, the pension paid
+// its fixed sum out of what is left and what its allowance has left,
+// and the ISA the rest up to its allowance, what is past it going to
+// cash.
 function earnedFrom(
   earning: Earning,
   at: Month,
@@ -152,7 +158,7 @@ function earnedFrom(
   const refund = at.month === april ? refundOf(earning.year) : 0;
   const year = at.month === april ? opened : earning.year;
   const profit = earnedIn(income, at, ["self-employment"]);
-  const sacrifice = givenUpIn(income, at);
+  const sacrifice = Math.min(givenUpIn(income, at), pensionRoom / 1.15);
   const netOf = (sacrificed: number): number => {
     const taxable = earnedIn(income, at, everyKind) - sacrificed;
     const pay = earnedIn(income, at, ["employment"]) - sacrificed;
@@ -166,7 +172,10 @@ function earnedFrom(
   };
   const sacrificed = netOf(sacrifice) >= -1e-9 ? sacrifice : 0;
   const net = netOf(sacrificed);
-  const paid = Math.max(0, Math.min(fixed, net));
+  const paid = Math.max(
+    0,
+    Math.min(fixed, net, (pensionRoom - sacrificed * 1.15) / 1.25),
+  );
   return {
     fed: earning.fed + sacrificed * 1.15 + paid * 1.25,
     kept: earning.kept + Math.max(0, Math.min(net - paid, isaRoom)),
