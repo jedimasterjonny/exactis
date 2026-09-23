@@ -194,6 +194,15 @@ jobs:
           ${{ !cancelled() && steps.install.outcome == 'success' &&
           steps.proven.outputs.proven != 'true' }}
         run: bun run lint
+      # The cycle check eslint-plugin-import's no-cycle used to do inside the
+      # lint step, at 76% of that step's entire rule budget. It runs its own
+      # canary first, so a green line here means the gate proved it can still
+      # fail before it said anything about this tree; scripts/cycles.sh says
+      # why that is not paranoia.
+      - if:
+          ${{ !cancelled() && steps.install.outcome == 'success' &&
+          steps.proven.outputs.proven != 'true' }}
+        run: bun run cycles
       - if:
           ${{ !cancelled() && steps.install.outcome == 'success' &&
           steps.proven.outputs.proven != 'true' }}
@@ -495,7 +504,7 @@ jobs:
             # that cannot be parsed into a commit with nothing to run.
             # Any other status is the probe breaking, which is a failure
             # rather than a reason to skip.
-            for script in format:check lint typecheck test:coverage build knip; do
+            for script in format:check lint cycles typecheck test:coverage build knip; do
               # The probe must not run bare: GitHub runs this with
               # `bash -e`, so a non-zero exit would abort the whole loop
               # before the code could be read. `|| probe=$?` puts it in an

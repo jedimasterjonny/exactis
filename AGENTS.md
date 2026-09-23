@@ -112,11 +112,14 @@ to place a new one, and what enforces each rule. It carries the detail so this
 file does not have to restate it.
 
 `no-restricted-imports` enforces both rules rather than trusting them - the
-vendored boundary and the tier direction - and `import/no-cycle` covers the loop
-that the permitted same-tier edge makes possible. A customisation that has to
-survive belongs in the wrapper, never in the vendored file, and taking a
-component by hand means `shadcn add`, nothing more: no formatting pass, no
-return types, no pruning.
+vendored boundary and the tier direction - and `bun run cycles` covers the loop
+that the permitted same-tier edge makes possible. That check is oxlint rather
+than an ESLint rule, because `import/no-cycle` cost 76% of the entire lint run;
+it carries a canary proving it can still fail, since a cycle checker that
+resolves nothing reports a clean tree. A customisation that has to survive
+belongs in the wrapper, never in the vendored file, and taking a component by
+hand means `shadcn add`, nothing more: no formatting pass, no return types, no
+pruning.
 
 The premise that `ui/` is byte-identical to the registry is what the exemptions
 rest on, so it is checked weekly by `.github/workflows/vendor.yml` rather than

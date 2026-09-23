@@ -341,9 +341,17 @@ const eslintConfig = defineConfig([
   })),
   // A tier rule cannot see a cycle. Two organisms importing each other both
   // point sideways, which the rule above allows and should: organism on
-  // organism is the one same-tier edge atomic design permits. This is the
-  // companion that catches the case where that freedom closes a loop.
-  { files: codeFiles, rules: { "import/no-cycle": "error" } },
+  // organism is the one same-tier edge atomic design permits. The companion
+  // that catches the case where that freedom closes a loop is no longer a rule
+  // here: it is `bun run cycles`, which is oxlint, and scripts/cycles.sh says
+  // why. The check is not optional and has not been weakened - what moved is
+  // where it runs.
+  //
+  // import/no-cycle walked the import graph once per file, and TIMING=25 put
+  // it at 103s of a 136s rule budget: 76% of every rule in this config put
+  // together, and forty times the next one. oxlint does the whole graph in
+  // 0.4s. Nothing else in eslint-plugin-import is affected; only this rule is
+  // gone, and the plugin still ships the rest through eslint-config-next.
   {
     // Type-only imports must say so, so they are erased at compile time
     // rather than left as a runtime import of a module needed only for
