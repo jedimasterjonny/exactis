@@ -69,6 +69,20 @@ export async function insertAccount(
   return single(rows);
 }
 
+// Whether any account names the owner with that id, which is what holds
+// the owner in the store while one does.
+export async function isOwning(
+  db: Database,
+  ownerId: number,
+): Promise<boolean> {
+  const rows = await db
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(eq(accounts.owner, ownerId))
+    .limit(1);
+  return rows.length > 0;
+}
+
 // Every account, in the order they are placed, which is the order they
 // were added until it is changed.
 export async function listAccounts(db: Database): Promise<Account[]> {

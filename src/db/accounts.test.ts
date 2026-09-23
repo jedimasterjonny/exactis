@@ -4,7 +4,8 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { accounts, expenseLines, incomeLines } from "@/db/schema";
+import { accountKinds, isOwned } from "@/data/accounts";
+import { accounts, expenseLines, incomeLines, owners } from "@/db/schema";
 
 // @vitest-environment node
 import {
@@ -12,6 +13,7 @@ import {
   findAccount,
   findLoanAgainst,
   insertAccount,
+  isOwning,
   listAccounts,
   placeAccounts,
   updateAccount,
@@ -27,6 +29,7 @@ const pension = {
   growth: "plan",
   kind: "tax-deferred",
   name: "Workplace pension",
+  owner: 1,
   rate: 0,
 } as const;
 
@@ -40,6 +43,7 @@ const mortgage = {
   growth: "fixed",
   kind: "debt",
   name: "Mortgage",
+  owner: null,
   rate: 0.0515,
 } as const;
 
@@ -47,7 +51,8 @@ const mortgage = {
 // booting and migrating a fresh one costs about a second, and doing it
 // per test was most of what the suite spent. The tables are emptied and
 // their identities restarted before each test, so every test still
-// starts from the table as the store will have it, ids from one.
+// starts from the table as the store will have it, ids from one, with
+// the one owner the pension belongs to.
 const client = new PGlite();
 const db = drizzle({ client });
 
@@ -58,8 +63,9 @@ describe("accounts store", () => {
 
   beforeEach(async () => {
     await db.execute(
-      sql`TRUNCATE ${accounts}, ${incomeLines}, ${expenseLines} RESTART IDENTITY`,
+      sql`TRUNCATE ${accounts}, ${incomeLines}, ${expenseLines}, ${owners} RESTART IDENTITY`,
     );
+    await db.insert(owners).values({ name: "Me" });
   });
 
   afterAll(async () => {
@@ -87,6 +93,7 @@ describe("accounts store", () => {
       id: 2,
       kind: "tax-deferred",
       name: "Workplace pension",
+      owner: 1,
     });
     expect(await listAccounts(db)).toStrictEqual([first, second]);
   });
@@ -107,6 +114,7 @@ describe("accounts store", () => {
       id,
       kind: "tax-deferred",
       name: "Workplace pension",
+      owner: 1,
     });
     expect(await listAccounts(db)).toHaveLength(2);
   });
@@ -127,6 +135,7 @@ describe("accounts store", () => {
       funding: "spare",
       kind: "cash",
       name: "Savings",
+      owner: null,
     });
 
     expect(capped.contribution).toStrictEqual({ cap: 4000, kind: "spare" });
@@ -215,6 +224,7 @@ describe("accounts store", () => {
       contribution: 0,
       kind: "house",
       name: "Home",
+      owner: null,
     });
     const loan = await insertAccount(db, mortgage, home.id);
 
@@ -238,6 +248,7 @@ describe("accounts store", () => {
       contribution: 0,
       kind: "car",
       name: "Golf",
+      owner: null,
     });
     const loan = await insertAccount(
       db,
@@ -254,7 +265,11 @@ describe("accounts store", () => {
   });
 
   it("deletes an account, refusing one a loan is still secured on or an id no account has", async () => {
-    const home = await insertAccount(db, { ...pension, kind: "house" });
+    const home = await insertAccount(db, {
+      ...pension,
+      kind: "house",
+      owner: null,
+    });
     const loan = await insertAccount(db, mortgage, home.id);
 
     await expect(deleteAccount(db, home.id)).rejects.toThrow();
@@ -266,5 +281,53 @@ describe("accounts store", () => {
     await deleteAccount(db, home.id);
 
     expect(await listAccounts(db)).toStrictEqual([]);
+  });
+
+  // An ISA or a pension names its owner and nothing else names one, and
+  // the table holds both halves of that rather than the action alone:
+  // a wrapper with nobody to charge its allowance to, or an account
+  // nobody owns naming somebody, is refused, as is an owner the store
+  // does not have.
+  it("holds a wrapper to an owner and every other account to none", async () => {
+    await expect(
+      insertAccount(db, { ...pension, owner: null }),
+    ).rejects.toThrow();
+    await expect(
+      insertAccount(db, { ...mortgage, owner: 1 }),
+    ).rejects.toThrow();
+    await expect(
+      insertAccount(db, { ...pension, owner: 99 }),
+    ).rejects.toThrow();
+    expect(await listAccounts(db)).toStrictEqual([]);
+  });
+
+  // The check names the two kinds in SQL while the model reads them off
+  // the allowance, so the two are held to each other kind by kind: each
+  // kind the model gives an owner is written with one and refused
+  // without, and each it gives none the other way round. A kind added
+  // with an allowance and not to the check would fail here rather than
+  // at the first save.
+  it("holds every kind to an owner exactly where the model gives it one", async () => {
+    for (const kind of accountKinds) {
+      const owned = { ...pension, kind, owner: 1 };
+      const unowned = { ...pension, kind, owner: null };
+      const [kept, refused] = isOwned({ kind })
+        ? [owned, unowned]
+        : [unowned, owned];
+
+      await expect(insertAccount(db, refused)).rejects.toMatchObject({
+        cause: { constraint: "accounts_owned" },
+      });
+      expect((await insertAccount(db, kept)).kind).toBe(kind);
+    }
+  });
+
+  it("says whether an account names an owner, which holds the owner in the store", async () => {
+    expect(await isOwning(db, 1)).toBe(false);
+
+    await insertAccount(db, pension);
+
+    expect(await isOwning(db, 1)).toBe(true);
+    expect(await isOwning(db, 2)).toBe(false);
   });
 });

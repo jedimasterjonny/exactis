@@ -150,6 +150,7 @@ describe("toRecords", () => {
         growth: "fixed",
         kind: "car",
         name: "Golf",
+        owner: null,
         rate: -0.15,
       },
       loan: null,
@@ -174,6 +175,7 @@ describe("toRecords", () => {
         growth: "fixed",
         kind: "debt",
         name: "Golf PCP",
+        owner: null,
         rate: 0.079,
       },
       line: {

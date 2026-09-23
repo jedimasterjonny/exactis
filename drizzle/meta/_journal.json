@@ -71,6 +71,13 @@
       "when": 1790195769091,
       "tag": "0009_owners",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790196262238,
+      "tag": "0010_account_owners",
+      "breakpoints": true
     }
   ]
 }

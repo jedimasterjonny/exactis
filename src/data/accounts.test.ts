@@ -5,6 +5,7 @@ import {
   allowanceOf,
   capOf,
   isAsset,
+  isOwned,
   isPension,
   takesSpare,
   toAccount,
@@ -42,6 +43,7 @@ describe("accounts", () => {
       growth: "fixed",
       kind: "debt",
       name: "Mortgage",
+      owner: null,
       rate: 0.0515,
     } as const;
 
@@ -51,7 +53,7 @@ describe("accounts", () => {
     expect(toValues(account)).toStrictEqual(values);
   });
 
-  it("drops a contribution of nothing and a plan rate's rate", () => {
+  it("drops a contribution of nothing and a plan rate's rate, and keeps a wrapper's owner", () => {
     const account = toAccount(
       {
         balance: 4000,
@@ -63,6 +65,7 @@ describe("accounts", () => {
         growth: "plan",
         kind: "tax-free",
         name: "Lifetime ISA",
+        owner: 1,
         rate: 0.03,
       },
       6,
@@ -74,6 +77,7 @@ describe("accounts", () => {
       id: 6,
       kind: "tax-free",
       name: "Lifetime ISA",
+      owner: 1,
     });
     expect(toValues(account)).toStrictEqual({
       balance: 4000,
@@ -85,6 +89,7 @@ describe("accounts", () => {
       growth: "plan",
       kind: "tax-free",
       name: "Lifetime ISA",
+      owner: 1,
       rate: 0,
     });
   });
@@ -104,6 +109,7 @@ describe("accounts", () => {
       growth: "plan",
       kind: "tax-free",
       name: "Lifetime ISA",
+      owner: 1,
       rate: 0,
     } as const;
 
@@ -132,6 +138,14 @@ describe("isAsset", () => {
     expect(takesSpare({ kind: "house" })).toBe(false);
     expect(isAsset({ kind: "car" })).toBe(true);
     expect(takesSpare({ kind: "car" })).toBe(false);
+  });
+});
+
+describe("isOwned", () => {
+  it("gives an owner to the ISA and the pension, the kinds with an allowance, and to nothing else", () => {
+    expect(
+      accounts.filter(isOwned).map((account) => account.kind),
+    ).toStrictEqual(["tax-deferred", "tax-free"]);
   });
 });
 

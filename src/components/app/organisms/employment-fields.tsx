@@ -2,6 +2,7 @@ import type { JSX } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { IncomeLineDraft } from "@/data/income";
+import type { Owner } from "@/data/owners";
 import type { Option } from "@/lib/options";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
@@ -10,11 +11,13 @@ import { RateField } from "@/components/app/molecules/rate-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { isFeeding } from "@/data/income";
+import { ownerFor, ownerOptions } from "@/lib/owners";
 
 interface EmploymentFieldsProps {
   readonly draft: IncomeLineDraft;
   readonly initial: IncomeLineDraft;
   readonly onAmend: (patch: Partial<IncomeLineDraft>) => void;
+  readonly owners: readonly Owner[];
   readonly pensions: readonly Account[];
 }
 
@@ -28,9 +31,11 @@ const opened = "new";
 // of their own, and beneath them the pension it feeds, chosen from the
 // pensions among the accounts the page hands down, or none, or a new
 // one the save opens, with the share of the base it sacrifices beside
-// it while there is a pension to take it. A new pension asks its name
-// and what it holds today on a row of its own beneath, since the
-// accounts list it by name; the rest of what an account carries is
+// it while there is a pension to take it. A new pension asks its name,
+// what it holds today and its owner on a row of its own beneath, since
+// the accounts list it by name and every pension belongs to an owner,
+// the first the page hands down until another is chosen; the rest of
+// what an account carries is
 // left at what a new pension is and edited from the accounts. The
 // fields are uncontrolled and mount with the line as it opened, and
 // report each change to the schedule, whose draft mirrors them, as the
@@ -39,6 +44,7 @@ export function EmploymentFields({
   draft,
   initial,
   onAmend,
+  owners,
   pensions,
 }: EmploymentFieldsProps): JSX.Element {
   const { opens } = draft;
@@ -58,8 +64,9 @@ export function EmploymentFields({
   // share goes with the field that shows it; a line given a pension,
   // listed or new, keeps the share it has, or takes the one it opened
   // with when the field comes back, which is what it mounts showing. A
-  // new pension opens unnamed and holding nothing, which its fields
-  // mount showing, and a listed one opens none.
+  // new pension opens unnamed, holding nothing and belonging to the
+  // first owner, which its fields mount showing, and a listed one opens
+  // none.
   function feed(choice: string): void {
     if (choice === none) {
       onAmend({ feeds: null, opens: null, sacrifice: 0 });
@@ -68,7 +75,11 @@ export function EmploymentFields({
     const sacrifice = isFeeding(draft) ? draft.sacrifice : initial.sacrifice;
     onAmend(
       choice === opened
-        ? { feeds: null, opens: { balance: 0, name: "" }, sacrifice }
+        ? {
+            feeds: null,
+            opens: { balance: 0, name: "", owner: ownerFor(null, owners) },
+            sacrifice,
+          }
         : { feeds: Number(choice), opens: null, sacrifice },
     );
   }
@@ -115,13 +126,13 @@ export function EmploymentFields({
         )}
       </FieldRow>
       {opens !== null && (
-        <FieldRow layout="pair">
+        <FieldRow layout="triple">
           <TextField
             defaultValue=""
             hint="Opened with the salary, growing at the plan rate"
             label="Pension name"
             onValueChange={(name) => {
-              onAmend({ opens: { balance: opens.balance, name } });
+              onAmend({ opens: { ...opens, name } });
             }}
             placeholder="Aviva, Nest, People's Pension…"
           />
@@ -130,8 +141,22 @@ export function EmploymentFields({
             hint="What it holds today; nothing for one just opened"
             label="Pension balance"
             onValueCommitted={(balance) => {
-              onAmend({ opens: { balance, name: opens.name } });
+              onAmend({ opens: { ...opens, balance } });
             }}
+          />
+          <SelectField
+            defaultValue={String(ownerFor(null, owners) ?? "")}
+            hint={
+              owners.length === 0
+                ? "Add one on the accounts screen first"
+                : "Whose allowance it is paid under"
+            }
+            isDisabled={owners.length === 0}
+            label="Pension owner"
+            onValueChange={(owner) => {
+              onAmend({ opens: { ...opens, owner: Number(owner) } });
+            }}
+            options={ownerOptions(owners)}
           />
         </FieldRow>
       )}

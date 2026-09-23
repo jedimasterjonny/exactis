@@ -227,7 +227,7 @@ describe("saveIncomeLine", () => {
     const opening = {
       ...values,
       kind: "employment",
-      opens: { balance: 2500, name: " Aviva " },
+      opens: { balance: 2500, name: " Aviva ", owner: 1 },
       sacrifice: 0.1,
     } as const;
 
@@ -242,6 +242,7 @@ describe("saveIncomeLine", () => {
       growth: "plan",
       kind: "tax-deferred",
       name: "Aviva",
+      owner: 1,
       rate: 0,
     });
     expect(findAccount).not.toHaveBeenCalled();
@@ -325,28 +326,38 @@ describe("saveIncomeLine", () => {
       }),
     ).rejects.toThrow(z.ZodError);
     await expect(
-      saveIncomeLine(null, { ...values, opens: { balance: 0, name: "Aviva" } }),
+      saveIncomeLine(null, {
+        ...values,
+        opens: { balance: 0, name: "Aviva", owner: 1 },
+      }),
     ).rejects.toThrow(z.ZodError);
     await expect(
       saveIncomeLine(null, {
         ...values,
         feeds: 1,
         kind: "employment",
-        opens: { balance: 0, name: "Aviva" },
+        opens: { balance: 0, name: "Aviva", owner: 1 },
       }),
     ).rejects.toThrow(z.ZodError);
     await expect(
       saveIncomeLine(null, {
         ...values,
         kind: "employment",
-        opens: { balance: 0, name: "  " },
+        opens: { balance: 0, name: "  ", owner: 1 },
       }),
     ).rejects.toThrow(z.ZodError);
     await expect(
       saveIncomeLine(null, {
         ...values,
         kind: "employment",
-        opens: { balance: -1, name: "Aviva" },
+        opens: { balance: -1, name: "Aviva", owner: 1 },
+      }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveIncomeLine(null, {
+        ...values,
+        kind: "employment",
+        opens: { balance: 0, name: "Aviva", owner: null },
       }),
     ).rejects.toThrow(z.ZodError);
     expect(insertAccount).not.toHaveBeenCalled();

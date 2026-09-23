@@ -4,6 +4,7 @@ import { updateTag } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
+import { isOwning } from "@/db/accounts";
 import { getDb } from "@/db/client";
 import { deleteOwner, insertOwner, updateOwner } from "@/db/owners";
 import { requireSession } from "@/lib/session";
@@ -17,6 +18,7 @@ vi.mock("next/cache", () => ({
   cacheTag: vi.fn(),
   updateTag: vi.fn(),
 }));
+vi.mock("@/db/accounts", () => ({ isOwning: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
 vi.mock("@/db/owners", () => ({
   deleteOwner: vi.fn(),
@@ -90,10 +92,26 @@ describe("removeOwner", () => {
   });
 
   it("deletes the owner with the id and expires the tag", async () => {
+    vi.mocked(isOwning).mockResolvedValue(false);
+
     await removeOwner(me.id);
 
+    expect(isOwning).toHaveBeenCalledExactlyOnceWith(db, me.id);
     expect(deleteOwner).toHaveBeenCalledExactlyOnceWith(db, me.id);
     expect(updateTag).toHaveBeenCalledExactlyOnceWith(ownersTag);
+  });
+
+  // An ISA or a pension belongs to an owner, so an owner an account
+  // names stays until the account is given to another or deleted, and
+  // the refusal says so rather than the store's broken link.
+  it("refuses to delete an owner an account names", async () => {
+    vi.mocked(isOwning).mockResolvedValue(true);
+
+    await expect(removeOwner(me.id)).rejects.toThrow(
+      "An owner who holds an account stays",
+    );
+    expect(deleteOwner).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
   });
 
   it("refuses an id the list could not have sent", async () => {

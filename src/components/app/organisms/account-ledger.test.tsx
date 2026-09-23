@@ -21,6 +21,7 @@ import { Toaster } from "@/components/kit/toast";
 import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { owners } from "@/data/owners.fixture";
 
 import { AccountLedger } from "./account-ledger";
 
@@ -93,7 +94,7 @@ function openEntry(): HTMLElement {
 function renderLedger(): void {
   render(
     <Toaster>
-      <AccountLedger accounts={accounts} at={at} lines={[]} owners={[]} />
+      <AccountLedger accounts={accounts} at={at} lines={[]} owners={owners} />
     </Toaster>,
   );
 }
@@ -258,7 +259,7 @@ describe("AccountLedger", () => {
           accounts={[pension, house, loan]}
           at={at}
           lines={[salary]}
-          owners={[]}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -330,6 +331,7 @@ describe("AccountLedger", () => {
       growth: "fixed",
       kind: "tax-free",
       name: "Lifetime ISA",
+      owner: 1,
       rate: 0.03,
       shares: [],
     });
@@ -403,6 +405,7 @@ describe("AccountLedger", () => {
       growth: "plan",
       kind: "real-asset",
       name: "Car",
+      owner: null,
       rate: 0,
       shares: [],
     });
@@ -569,6 +572,7 @@ describe("AccountLedger", () => {
       growth: "fixed",
       kind: "real-asset",
       name: "Home",
+      owner: null,
       rate: 0.021,
       shares: [],
     });
@@ -620,6 +624,7 @@ describe("AccountLedger", () => {
       growth: "plan",
       kind: "tax-deferred",
       name: "Workplace pension",
+      owner: 1,
       rate: 0,
       shares: [],
     });
@@ -672,6 +677,7 @@ describe("AccountLedger", () => {
       growth: "plan",
       kind: "tax-free",
       name: "Stocks & shares ISA",
+      owner: 1,
       rate: 0,
       shares: [],
     });
@@ -690,7 +696,7 @@ describe("AccountLedger", () => {
           ]}
           at={at}
           lines={[]}
-          owners={[]}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -750,7 +756,7 @@ describe("AccountLedger", () => {
           accounts={[{ ...isa, contribution: { cap: 4000, kind: "spare" } }]}
           at={at}
           lines={[]}
-          owners={[]}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -811,6 +817,7 @@ describe("AccountLedger", () => {
       growth: "plan",
       kind: "tax-free",
       name: "Stocks & shares ISA",
+      owner: 1,
       rate: 0,
       shares: [],
     });
@@ -908,7 +915,7 @@ describe("AccountLedger", () => {
           accounts={[pension, house, loan]}
           at={at}
           lines={[]}
-          owners={[]}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -964,7 +971,7 @@ describe("AccountLedger", () => {
           accounts={[pension, golf, finance]}
           at={at}
           lines={[]}
-          owners={[]}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -994,7 +1001,7 @@ describe("AccountLedger", () => {
   it("opens a house with no loan against it as owned outright", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[house]} at={at} lines={[]} owners={[]} />
+        <AccountLedger accounts={[house]} at={at} lines={[]} owners={owners} />
       </Toaster>,
     );
 
@@ -1019,7 +1026,7 @@ describe("AccountLedger", () => {
           ]}
           at={at}
           lines={[]}
-          owners={[]}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -1116,7 +1123,7 @@ describe("AccountLedger", () => {
           accounts={[pension, house, loan]}
           at={at}
           lines={[]}
-          owners={[]}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -1137,7 +1144,7 @@ describe("AccountLedger", () => {
           accounts={[golf, finance]}
           at={at}
           lines={[]}
-          owners={[]}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -1165,7 +1172,7 @@ describe("AccountLedger", () => {
           accounts={accounts}
           at={at}
           lines={[salary]}
-          owners={[]}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -1186,7 +1193,7 @@ describe("AccountLedger", () => {
           accounts={accounts}
           at={{ month: 0, year: 2049 }}
           lines={[salary]}
-          owners={[]}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -1211,7 +1218,7 @@ describe("AccountLedger", () => {
           accounts={[pension, isa]}
           at={at}
           lines={[salary]}
-          owners={[]}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -1255,7 +1262,7 @@ describe("AccountLedger", () => {
           accounts={[pension, isa]}
           at={at}
           lines={[salary, { ...stepUp, feeds: pension.id, sacrifice: 0.05 }]}
-          owners={[]}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -1283,7 +1290,7 @@ describe("AccountLedger", () => {
   it("says a house with no loan goes alone", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[house]} at={at} lines={[]} owners={[]} />
+        <AccountLedger accounts={[house]} at={at} lines={[]} owners={owners} />
       </Toaster>,
     );
 

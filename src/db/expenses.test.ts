@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { accounts, expenseLines, incomeLines } from "@/db/schema";
+import { accounts, expenseLines, incomeLines, owners } from "@/db/schema";
 
 // @vitest-environment node
 import { insertAccount } from "./accounts";
@@ -53,8 +53,9 @@ describe("expense lines store", () => {
 
   beforeEach(async () => {
     await db.execute(
-      sql`TRUNCATE ${accounts}, ${incomeLines}, ${expenseLines} RESTART IDENTITY`,
+      sql`TRUNCATE ${accounts}, ${incomeLines}, ${expenseLines}, ${owners} RESTART IDENTITY`,
     );
+    await db.insert(owners).values({ name: "Me" });
   });
 
   afterAll(async () => {
@@ -122,6 +123,7 @@ describe("expense lines store", () => {
       growth: "fixed",
       kind: "debt",
       name: "Mortgage",
+      owner: null,
       rate: 0.0515,
     });
     const payments = await insertExpenseLine(db, household, loan.id);

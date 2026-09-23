@@ -13,6 +13,7 @@ import { saveAccount } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { owners } from "@/data/owners.fixture";
 
 import { AccountDialog } from "./account-dialog";
 
@@ -61,6 +62,7 @@ function renderDialog(
         lines={[]}
         onDismiss={onDismiss}
         onSaved={onSaved}
+        owners={owners}
       />
     </Toaster>,
   );
@@ -134,6 +136,7 @@ describe("AccountDialog", () => {
       growth: "plan",
       kind: "tax-free",
       name: "Lifetime ISA",
+      owner: 1,
       rate: 0,
       shares: [],
     });
@@ -183,6 +186,7 @@ describe("AccountDialog", () => {
       growth: "plan",
       kind: "tax-deferred",
       name: "Workplace pension",
+      owner: 1,
       rate: 0,
       shares: [],
     });
@@ -267,6 +271,7 @@ describe("AccountDialog", () => {
           lines={[salary]}
           onDismiss={vi.fn<() => void>()}
           onSaved={vi.fn<(account: Account) => void>()}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -290,6 +295,7 @@ describe("AccountDialog", () => {
           lines={incomeLines}
           onDismiss={vi.fn<() => void>()}
           onSaved={vi.fn<(account: Account) => void>()}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -314,6 +320,7 @@ describe("AccountDialog", () => {
           lines={[salary, { ...salary, id: 5, name: "Second job" }]}
           onDismiss={vi.fn<() => void>()}
           onSaved={onSaved}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -354,6 +361,7 @@ describe("AccountDialog", () => {
       growth: "plan",
       kind: "tax-deferred",
       name: "Workplace pension",
+      owner: 1,
       rate: 0,
       shares: [{ line: 1, sacrifice: 0.08 }],
     });
@@ -373,6 +381,7 @@ describe("AccountDialog", () => {
           lines={[salary]}
           onDismiss={vi.fn<() => void>()}
           onSaved={onSaved}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -400,6 +409,7 @@ describe("AccountDialog", () => {
           lines={incomeLines}
           onDismiss={vi.fn<() => void>()}
           onSaved={vi.fn<(account: Account) => void>()}
+          owners={owners}
         />
       </Toaster>,
     );
@@ -443,5 +453,118 @@ describe("AccountDialog", () => {
 
     expect(onDismiss).toHaveBeenCalledOnce();
     expect(saveAccount).not.toHaveBeenCalled();
+  });
+
+  // An ISA or a pension names its owner, a new one the first; a wrapper
+  // made another keeps the owner chosen, one made cash sheds it with
+  // its field, and the save sends what the draft is left with.
+  it("names a wrapper's owner, keeps it between wrappers and drops it with cash", async () => {
+    const onSaved = vi.fn<(account: Account) => void>();
+    render(
+      <Toaster>
+        <AccountDialog
+          account={null}
+          lines={[]}
+          onDismiss={vi.fn<() => void>()}
+          onSaved={onSaved}
+          owners={[...owners, { id: 2, name: "Sam" }]}
+        />
+      </Toaster>,
+    );
+    const dialog = open();
+    vi.mocked(saveAccount).mockResolvedValue(pension);
+
+    expect(choice(dialog, "Owner")).toHaveValue("1");
+
+    fireEvent.change(field(dialog, "Name"), { target: { value: "ISA" } });
+    fireEvent.change(choice(dialog, "Owner"), { target: { value: "2" } });
+    fireEvent.change(choice(dialog, "Treatment"), {
+      target: { value: "tax-free" },
+    });
+
+    expect(choice(dialog, "Owner")).toHaveValue("2");
+
+    fireEvent.change(choice(dialog, "Treatment"), {
+      target: { value: "cash" },
+    });
+
+    expect(
+      within(dialog).queryByRole("combobox", { name: "Owner" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(vi.mocked(saveAccount).mock.calls[0]?.[1]).toMatchObject({
+      kind: "cash",
+      owner: null,
+    });
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+  });
+
+  // A cash account made a wrapper takes the first owner, which its field
+  // mounts showing.
+  it("gives an account made a wrapper the first owner", async () => {
+    const onSaved = vi.fn<(account: Account) => void>();
+    renderDialog(
+      {
+        balance: 18300,
+        growth: { kind: "fixed", rate: 0 },
+        id: 3,
+        kind: "cash",
+        name: "Current account",
+      },
+      onSaved,
+    );
+    const dialog = open();
+    vi.mocked(saveAccount).mockResolvedValue(isa);
+
+    fireEvent.change(choice(dialog, "Treatment"), {
+      target: { value: "tax-free" },
+    });
+
+    expect(choice(dialog, "Owner")).toHaveValue("1");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(vi.mocked(saveAccount).mock.calls[0]?.[1]).toMatchObject({
+      kind: "tax-free",
+      owner: 1,
+    });
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+  });
+
+  // With no owner to give it, a wrapper cannot be saved, and the field
+  // says where one is added; an account nobody owns saves as it did.
+  it("holds a wrapper's save while the plan has no owner", () => {
+    render(
+      <Toaster>
+        <AccountDialog
+          account={null}
+          lines={[]}
+          onDismiss={vi.fn<() => void>()}
+          onSaved={vi.fn<(account: Account) => void>()}
+          owners={[]}
+        />
+      </Toaster>,
+    );
+    const dialog = open();
+
+    fireEvent.change(field(dialog, "Name"), { target: { value: "Premium" } });
+
+    expect(choice(dialog, "Owner")).toBeDisabled();
+    expect(choice(dialog, "Owner")).toHaveAccessibleDescription(
+      "Add one in the owners section first",
+    );
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+
+    fireEvent.change(choice(dialog, "Treatment"), {
+      target: { value: "cash" },
+    });
+
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
   });
 });
