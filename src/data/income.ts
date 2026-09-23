@@ -15,7 +15,7 @@ export type IncomeKind = (typeof incomeKinds)[number];
 // gives up nothing, as every other kind of line does. Lines overlap
 // freely: a step-up is a second line starting mid-way, not an edit to
 // the first, and both may feed the one pension. The kind says what the
-// money is, for the badge now and for tax later. The id is the line's
+// money is, for the badge and for the tax it pays. The id is the line's
 // identity, handed out by the store in the order lines were added, which
 // is the order they are listed in.
 export interface IncomeLine extends IncomeLineValues {
@@ -64,8 +64,8 @@ export const incomeKinds = [
 // The employer's National Insurance on pay, fifteen per cent from April
 // 2025, which a salary sacrifice saves the employer on what is given up
 // and which a scheme that reclaims it pays into the pension with the
-// sacrifice. The employee's own saving waits on the tax the plan does
-// not take yet.
+// sacrifice. The employee's own saving is the flow's to find, since a
+// sacrifice comes off the salary before its tax is charged.
 const employerNi = 0.15;
 
 // What lands in the pension a line feeds, at the line's cadence: the

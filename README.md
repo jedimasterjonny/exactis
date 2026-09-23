@@ -80,11 +80,20 @@ it, but it is not plotted, since the progress points a projection is laid over
 carry no cash figure. The first year runs from the month the plan is read in,
 since the balances are that month's. What an account is paid in a month is what
 `src/engine/cash-flow.ts` works out: the month's income, less what the salaries
-sacrifice and the expense lines cost, pays the fixed sums, handed down the
-accounts in the order they are listed, and what survives them is the spare
-money, handed down the accounts that take it the same way, each to a twelfth of
-its cap. A fixed sum is therefore paid only out of what the month has, so a
-contribution stops when the income funding it ends.
+sacrifice, the tax on the rest and what the expense lines cost, pays the fixed
+sums, handed down the accounts in the order they are listed, and what survives
+them is the spare money, handed down the accounts that take it the same way,
+each to a twelfth of its cap. A fixed sum is therefore paid only out of what the
+month has, so a contribution stops when the income funding it ends.
+
+The income is taxed as the UK outside Scotland taxes it for 2026/27, the rates
+held in `src/lib/tax.ts`: income tax on every kind of line, with the personal
+allowance withdrawn over £100,000, Class 1 National Insurance on a salary and
+Class 4 on self-employed profit, and none on a pension or other income. A
+sacrifice comes off the salary before either, so what it saves in tax is what it
+saves the month. Each month is taxed as a twelfth of a year, which is the year's
+tax exactly when its months are alike. The bands are held as they stand, in
+today's money as the lines are, until the plan carries an inflation assumption.
 
 A debt's own fixed sum is a loan's payments, so it runs only until the loan
 maths in `src/lib/loans.ts` says they clear what is owed: the term the payment
@@ -102,7 +111,7 @@ constant in the engine until that same assumptions screen exists, as the plan
 rate is held in the store. Each account is drawn to nothing and no lower, and
 what a year could not draw from anywhere is carried on its point, so the
 projection can say when the money runs out and the dashboard's chart marks that
-year. Nothing is taxed yet. Every line is taken at the amount it states, in
+year. A draw is not taxed yet. Every line is taken at the amount it states, in
 today's money, until the plan carries an inflation assumption.
 
 The dashboard reads the projection through `src/store/plan.ts`, a cached read
