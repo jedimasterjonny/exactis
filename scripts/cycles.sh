@@ -19,14 +19,21 @@
 # that cannot exist before trusting what it says about .prettierrc.json.
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Both paths oxlint is handed are resolved with `pwd -P`, because oxlint lints
+# nothing at all through a symlink: no files, no summary, exit 0. On macOS
+# mktemp's directory is under /var/folders, and /var is a symlink to
+# /private/var, so the canary was never read and every run there called this
+# check dead. The root is resolved for the worse half of the same thing: a
+# checkout reached through a symlink would be read as empty and pass whatever
+# cycles it holds, with no canary to say so.
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 oxlint="$root/node_modules/.bin/oxlint"
 # -A all so this is the cycle gate and nothing else: oxlint's own correctness
 # rules would otherwise fail this check for things ESLint already owns, and
 # report them under a command that says it is about cycles.
 args=(-A all -D import/no-cycle --import-plugin)
 
-canary="$(mktemp -d)"
+canary="$(cd "$(mktemp -d)" && pwd -P)"
 trap 'rm -rf "$canary"' EXIT
 # Outside the repository on purpose. A fixture pair carrying a real cycle
 # inside src/ would be found by this very check, and would also have to answer
