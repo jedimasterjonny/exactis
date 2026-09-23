@@ -7,6 +7,7 @@ import { startTransition, useOptimistic, useState } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
+import type { Owner } from "@/data/owners";
 import type { Month } from "@/data/schedule";
 import type { Secured } from "@/data/secured";
 import type { PlanMonth } from "@/lib/loans";
@@ -24,6 +25,7 @@ import { AccountTable } from "@/components/app/organisms/account-table";
 import { AssetTable } from "@/components/app/organisms/asset-table";
 import { CarDialog } from "@/components/app/organisms/car-dialog";
 import { HouseDialog } from "@/components/app/organisms/house-dialog";
+import { OwnerList } from "@/components/app/organisms/owner-list";
 import { PaymentOrder } from "@/components/app/organisms/payment-order";
 import { Button } from "@/components/kit/button";
 import { isAsset } from "@/data/accounts";
@@ -40,6 +42,7 @@ interface AccountLedgerProps {
   readonly accounts: readonly Account[];
   readonly at: Month;
   readonly lines: readonly IncomeLine[];
+  readonly owners: readonly Owner[];
 }
 
 // What the account dialog is open on: a new account, or one to edit.
@@ -74,11 +77,13 @@ type AssetOpening = "new" | Secured;
 // table is handed the lines running in the month the plan is read in,
 // which the page hands down, so a salary that has ended or is yet to
 // start lands nothing on the row, while the dialog and the confirm
-// take every line, since the link stands whether or not it runs.
+// take every line, since the link stands whether or not it runs. The
+// owners close the screen, a section of their own beneath the order.
 export function AccountLedger({
   accounts,
   at,
   lines,
+  owners,
 }: AccountLedgerProps): JSX.Element {
   const [account, setAccount] = useState<AccountOpening | null>(null);
   const [house, setHouse] = useState<AssetOpening | null>(null);
@@ -126,6 +131,12 @@ export function AccountLedger({
     (sum, account) => sum + paidMonthly(account, running),
     0,
   );
+
+  // Where the order and the owners sit among the sections: the order
+  // after the debts when there are any, and the owners after the order
+  // when it is drawn, which it is not for fewer than two accounts.
+  const orderPlace = debts.length > 0 ? 4 : 3;
+  const ownersPlace = paid.length < 2 ? orderPlace : orderPlace + 1;
 
   // The month the plan is read in as the loan maths counts from it, for
   // the two dialogs that let a loan's end be picked as a date.
@@ -272,8 +283,12 @@ export function AccountLedger({
         )}
         <PaymentOrder
           accounts={paid}
-          label={subsectionLabel(accountsAndAssets, debts.length > 0 ? 4 : 3)}
+          label={subsectionLabel(accountsAndAssets, orderPlace)}
           onMove={move}
+        />
+        <OwnerList
+          label={subsectionLabel(accountsAndAssets, ownersPlace)}
+          owners={owners}
         />
       </ScreenBody>
       {account !== null && (

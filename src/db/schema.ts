@@ -56,6 +56,13 @@ export const accounts = pgTable("accounts", {
   secures: integer().references((): AnyPgColumn => accounts.id),
 });
 
+// One row per owner: the name, with an id the store hands out, which is
+// the order the owners were added in and the order they are listed in.
+export const owners = pgTable("owners", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  name: text().notNull(),
+});
+
 // One row per income line: the line's values with an id, the parts held
 // as columns of their own, no last year for a line that runs to the end
 // of the plan and no last month for one that runs the whole of its last
