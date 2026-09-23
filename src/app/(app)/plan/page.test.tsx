@@ -4,13 +4,16 @@ import { describe, expect, it, vi } from "vitest";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
+import { owners } from "@/data/owners.fixture";
 import { getAccounts } from "@/store/accounts";
+import { getOwners } from "@/store/owners";
 import { getPlan } from "@/store/plan";
 import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 
 import Plan from "./page";
 
 vi.mock("@/store/accounts", () => ({ getAccounts: vi.fn() }));
+vi.mock("@/store/owners", () => ({ getOwners: vi.fn() }));
 vi.mock("@/store/plan", () => ({ getPlan: vi.fn() }));
 vi.mock("@/store/schedule", () => ({
   getExpenseLines: vi.fn(),
@@ -34,6 +37,7 @@ describe("Plan", () => {
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
     vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
     vi.mocked(getAccounts).mockResolvedValue([...accounts]);
+    vi.mocked(getOwners).mockResolvedValue([...owners]);
     vi.mocked(getPlan).mockReturnValue(plan);
 
     render(await Plan());

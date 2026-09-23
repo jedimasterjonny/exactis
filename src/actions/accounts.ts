@@ -19,6 +19,7 @@ import {
   cadences,
   fundings,
   growthKinds,
+  isOwned,
   isPension,
   takesSpare,
 } from "@/data/accounts";
@@ -116,7 +117,9 @@ const house = z
 // sacrifice, each a fraction of the base at most against a line by its
 // id, one share a line, since the dialog holds one and two would write
 // the same line twice, and none against anything but a pension, since
-// only a pension is fed. A debt paying a fixed sum is held to one that
+// only a pension is fed. An ISA or a pension names its owner by id and
+// no other account names one; the store holds the id to an owner it
+// has. A debt paying a fixed sum is held to one that
 // clears it, since the engine charges that sum to the month the loan
 // maths says the payments end in and a payment the interest swallows
 // gives it no such month.
@@ -131,6 +134,7 @@ const values = z
     growth: z.enum(growthKinds),
     kind: z.enum(accountKinds),
     name: z.string().trim().min(1),
+    owner: z.number().int().positive().nullable(),
     rate: z.number().min(-1),
     shares: z.array(
       z.object({
@@ -141,6 +145,7 @@ const values = z
   })
   .refine((draft) => draft.kind === "debt" || draft.balance >= 0)
   .refine((draft) => draft.funding === "fixed" || takesSpare(draft))
+  .refine((draft) => isOwned(draft) === (draft.owner !== null))
   .refine(doesClear)
   .refine((draft) => isPension(draft) || draft.shares.length === 0)
   .refine(

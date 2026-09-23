@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import type { Summary } from "@/components/app/organisms/schedule-rows";
 import type { Account } from "@/data/accounts";
 import type { IncomeKind, IncomeLine, IncomeLineDraft } from "@/data/income";
+import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
 import type { Entry } from "@/hooks/use-editor";
 
@@ -37,6 +38,7 @@ type Draft = IncomeLineDraft;
 interface IncomeScheduleProps {
   readonly accounts: readonly Account[];
   readonly lines: readonly IncomeLine[];
+  readonly owners: readonly Owner[];
   readonly plan: Plan;
 }
 
@@ -67,8 +69,9 @@ const kinds = optionsOf(kindLabels, [
 // employment line's amount is its base salary, and the fields only it
 // takes sit in the slot beneath them, shown the pensions among the
 // accounts the page hands down; a salary may open a pension of its own
-// with the save, so the save holds while the one it opens is unnamed,
-// as it holds while the line is. A row's bin asks through the confirm
+// with the save, belonging to one of the owners the page hands down,
+// so the save holds while the one it opens is unnamed or has no owner,
+// as it holds while the line is unnamed. A row's bin asks through the confirm
 // dialog before the line goes, as the ledger's does; nothing hangs on a
 // line, so it goes alone. The card takes a numeral of its own off the
 // screen's, since the reference numbers each of the schedule's cards
@@ -76,6 +79,7 @@ const kinds = optionsOf(kindLabels, [
 export function IncomeSchedule({
   accounts,
   lines,
+  owners,
   plan,
 }: IncomeScheduleProps): JSX.Element {
   const { amend, dismiss, entry, isSaving, open, save } = useEditor({
@@ -205,6 +209,7 @@ export function IncomeSchedule({
                 onAmend={(patch) => {
                   amend(entry, patch);
                 }}
+                owners={owners}
                 pensions={pensions}
               />
             )}

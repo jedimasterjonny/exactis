@@ -44,7 +44,7 @@ const feeding = { ...salary, opens: null };
 const opening = {
   ...salary,
   feeds: null,
-  opens: { balance: 2500, name: "Aviva" },
+  opens: { balance: 2500, name: "Aviva", owner: 1 },
 };
 
 describe("isFeeding", () => {
@@ -56,28 +56,40 @@ describe("isFeeding", () => {
 });
 
 describe("isOpeningSound", () => {
-  it("holds a pension the line opens to being named, and asks nothing of a line opening none", () => {
+  it("holds a pension the line opens to being named and owned, and asks nothing of a line opening none", () => {
     expect(isOpeningSound(opening)).toBe(true);
     expect(isOpeningSound(feeding)).toBe(true);
     expect(
-      isOpeningSound({ ...opening, opens: { balance: 0, name: "  " } }),
+      isOpeningSound({
+        ...opening,
+        opens: { balance: 0, name: "  ", owner: 1 },
+      }),
+    ).toBe(false);
+    expect(
+      isOpeningSound({
+        ...opening,
+        opens: { balance: 0, name: "Aviva", owner: null },
+      }),
     ).toBe(false);
   });
 });
 
 describe("toPension", () => {
-  it("writes the pension as a wrapper paid before tax, at the plan rate, paid nothing of its own", () => {
-    expect(toPension({ balance: 2500, name: "Aviva" })).toStrictEqual({
-      balance: 2500,
-      balloon: 0,
-      cadence: "year",
-      cap: 0,
-      contribution: 0,
-      funding: "fixed",
-      growth: "plan",
-      kind: "tax-deferred",
-      name: "Aviva",
-      rate: 0,
-    });
+  it("writes the pension as a wrapper paid before tax, at the plan rate, paid nothing of its own, for its owner", () => {
+    expect(toPension({ balance: 2500, name: "Aviva", owner: 1 })).toStrictEqual(
+      {
+        balance: 2500,
+        balloon: 0,
+        cadence: "year",
+        cap: 0,
+        contribution: 0,
+        funding: "fixed",
+        growth: "plan",
+        kind: "tax-deferred",
+        name: "Aviva",
+        owner: 1,
+        rate: 0,
+      },
+    );
   });
 });

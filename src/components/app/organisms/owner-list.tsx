@@ -4,6 +4,7 @@ import type { JSX } from "react";
 
 import { UserPlus, Users } from "lucide-react";
 
+import type { Account } from "@/data/accounts";
 import type { Owner, OwnerValues } from "@/data/owners";
 
 import { removeOwner, saveOwner } from "@/actions/owners";
@@ -17,8 +18,10 @@ import { Button } from "@/components/kit/button";
 import { Table, TableBody, TableCell, TableRow } from "@/components/kit/table";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
+import { listed } from "@/lib/feeders";
 
 interface OwnerListProps {
+  readonly accounts: readonly Account[];
   readonly label: string;
   readonly owners: readonly Owner[];
 }
@@ -35,8 +38,15 @@ const blank: OwnerValues = { name: "" };
 // order holds its reordering. The rows are the store's, handed down by
 // the page, and a save or a deletion comes back with the page re-read.
 // A section holding no owners draws its empty state instead of the
-// table.
-export function OwnerList({ label, owners }: OwnerListProps): JSX.Element {
+// table. An owner an account names says which beneath its name and has
+// its bin held, since the store refuses to delete it while the account
+// is theirs: offered, the bin would ask and then fail on a refusal the
+// production build hides, where the row can say why before it is asked.
+export function OwnerList({
+  accounts,
+  label,
+  owners,
+}: OwnerListProps): JSX.Element {
   const { amend, dismiss, entry, isSaving, open, save } = useEditor({
     describe: (owner) => owner.name,
     noun: "Owner",
@@ -63,7 +73,7 @@ export function OwnerList({ label, owners }: OwnerListProps): JSX.Element {
             Add owner
           </Button>
         }
-        caption="The people the plan is for."
+        caption="The people the plan is for. Each ISA and pension belongs to one of them."
         className="pb-0"
         label={label}
         title="Owners"
@@ -79,9 +89,13 @@ export function OwnerList({ label, owners }: OwnerListProps): JSX.Element {
             <TableBody>
               {owners.map((owner) => (
                 <TableRow key={owner.id}>
-                  <TableCell className="font-medium">{owner.name}</TableCell>
+                  <TableCell className="font-medium">
+                    {owner.name}
+                    <Holdings accounts={accounts} owner={owner} />
+                  </TableCell>
                   <TableCell className="w-px py-1">
                     <RowActions
+                      deleteLock={deleteLockOf(owner, accounts)}
                       name={owner.name}
                       onDelete={ask}
                       onEdit={({ id, name }) => {
@@ -129,5 +143,42 @@ export function OwnerList({ label, owners }: OwnerListProps): JSX.Element {
         </ConfirmDialog>
       )}
     </>
+  );
+}
+
+// Why an owner's bin is held, if it is: the accounts naming them are
+// given to another owner or deleted first. An owner holding none can go.
+function deleteLockOf(
+  owner: Owner,
+  accounts: readonly Account[],
+): string | undefined {
+  const held = heldBy(owner, accounts);
+  return held.length === 0
+    ? undefined
+    : `Give ${listed.format(held)} to another owner first`;
+}
+
+// The names of the accounts naming the owner, in the order listed.
+function heldBy(owner: Owner, accounts: readonly Account[]): string[] {
+  return accounts
+    .filter((account) => account.owner === owner.id)
+    .map((account) => account.name);
+}
+
+// What an owner holds, beneath their name, faint: the accounts naming
+// them, which are why they cannot be deleted, or nothing for an owner
+// who holds none.
+function Holdings({
+  accounts,
+  owner,
+}: {
+  readonly accounts: readonly Account[];
+  readonly owner: Owner;
+}): JSX.Element | null {
+  const held = heldBy(owner, accounts);
+  return held.length === 0 ? null : (
+    <span className="block text-xs font-normal text-muted-foreground">
+      {`Holds ${listed.format(held)}`}
+    </span>
   );
 }

@@ -50,7 +50,8 @@ const expenseValues = z
 // feeds and the share of its base it sacrifices, a fraction of the base
 // at most, only on an employment line, with a share given up only where
 // there is a pension to take it, listed or opened. A pension the line
-// opens is named, as an account is, and holds nothing or more; a line
+// opens is named, as an account is, holds nothing or more, and names
+// its owner, as every pension does; a line
 // opens one only while it is a salary, and not while it feeds one by
 // id, since the id is the store's to give.
 const incomeValues = z
@@ -63,6 +64,7 @@ const incomeValues = z
       .object({
         balance: z.number().int().nonnegative(),
         name: z.string().trim().min(1),
+        owner: z.number().int().positive(),
       })
       .nullable(),
     rsu: z.number().int().nonnegative(),

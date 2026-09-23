@@ -8,6 +8,7 @@ import { IncomeSchedule } from "@/components/app/organisms/income-schedule";
 import { counted } from "@/lib/count";
 import { plan as planScreen, sectionLabel } from "@/lib/nav";
 import { getAccounts } from "@/store/accounts";
+import { getOwners } from "@/store/owners";
 import { getPlan } from "@/store/plan";
 import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 
@@ -21,17 +22,19 @@ import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 // set to. The page reads all three from the store, which reads the
 // session first, so it renders behind the loading screen beside it, and
 // lays the lines over the plan the projection runs on; the income
-// schedule takes the accounts too, for the pension a salary may feed.
+// schedule takes the accounts too, for the pension a salary may feed,
+// and the owners, for the one a salary opens to belong to.
 // The header counts both schedules, so it is the page's rather than
 // either's. The plan is read after the lines, as the
 // projection reads it after the accounts: the reads behind the session
 // make the route dynamic, and the plan's year has to be read at request
 // time rather than while the shell is prerendered.
 export default async function Plan(): Promise<JSX.Element> {
-  const [incomeLines, expenseLines, accounts] = await Promise.all([
+  const [incomeLines, expenseLines, accounts, owners] = await Promise.all([
     getIncomeLines(),
     getExpenseLines(),
     getAccounts(),
+    getOwners(),
   ]);
   const plan = getPlan();
   return (
@@ -40,7 +43,12 @@ export default async function Plan(): Promise<JSX.Element> {
         {`${counted(incomeLines.length, "income line")} · ${counted(expenseLines.length, "expense line")}`}
       </ScreenHeader>
       <ScreenBody>
-        <IncomeSchedule accounts={accounts} lines={incomeLines} plan={plan} />
+        <IncomeSchedule
+          accounts={accounts}
+          lines={incomeLines}
+          owners={owners}
+          plan={plan}
+        />
         <ExpenseSchedule lines={expenseLines} plan={plan} />
         <CashFlowCard
           accounts={accounts}

@@ -44,12 +44,15 @@ export interface IncomeLineValues extends LineValues {
 }
 
 // A pension opened with the salary that feeds it, as the dialog takes
-// it: named, since that is how the accounts list it, and holding what
-// it holds today, which is nothing for one the job has just opened.
-// What else an account carries is left to the account's own dialog.
+// it: named, since that is how the accounts list it, holding what it
+// holds today, which is nothing for one the job has just opened, and
+// belonging to an owner, as every pension does, or to none while the
+// plan has no owner to give it. What else an account carries is left
+// to the account's own dialog.
 export interface Opening {
   readonly balance: number;
   readonly name: string;
+  readonly owner: null | number;
 }
 
 // The kinds as a list, so the store's column takes the same words the
@@ -83,10 +86,12 @@ export function isFeeding(draft: IncomeLineDraft): boolean {
 }
 
 // A draft the store would take beyond what every line needs: a pension
-// it opens is named, since the accounts list it by name. The save
-// button holds until it is.
+// it opens is named, since the accounts list it by name, and has an
+// owner, since the store holds every pension to one. The save button
+// holds until it does.
 export function isOpeningSound(draft: IncomeLineDraft): boolean {
-  return draft.opens?.name.trim() !== "";
+  const { opens } = draft;
+  return opens === null || (opens.name.trim() !== "" && opens.owner !== null);
 }
 
 // What a line gives up into its pension at its cadence: the share of
@@ -101,8 +106,8 @@ export function sacrificeOf(line: IncomeLineValues): number {
 // until it is told otherwise, and paid nothing of its own, since what
 // it is paid is the salary's sacrifice, which the engine reads off the
 // line. Its cadence is the one a contribution of nothing reads back
-// as, and it has no cap or balloon, as nothing but the spare money and
-// a PCP has.
+// as, it has no cap or balloon, as nothing but the spare money and a
+// PCP has, and it belongs to the owner the dialog gave it.
 export function toPension(opening: Opening): AccountValues {
   return {
     balance: opening.balance,
@@ -114,6 +119,7 @@ export function toPension(opening: Opening): AccountValues {
     growth: "plan",
     kind: "tax-deferred",
     name: opening.name,
+    owner: opening.owner,
     rate: 0,
   };
 }

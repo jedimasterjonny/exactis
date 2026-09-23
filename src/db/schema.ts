@@ -1,6 +1,8 @@
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
+import { sql } from "drizzle-orm";
 import {
+  check,
   doublePrecision,
   integer,
   pgEnum,
@@ -32,6 +34,13 @@ export const expenseGrowth = pgEnum("expense_growth", lineGrowths);
 
 export const expenseKind = pgEnum("expense_kind", expenseKinds);
 
+// One row per owner: the name, with an id the store hands out, which is
+// the order the owners were added in and the order they are listed in.
+export const owners = pgTable("owners", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  name: text().notNull(),
+});
+
 // One row per account, holding the account's values as the model lays
 // them flat: every column present, a contribution of nothing as a zero,
 // a cap of nothing as one and a plan rate's rate as one, so a row is the
@@ -39,29 +48,36 @@ export const expenseKind = pgEnum("expense_kind", expenseKinds);
 // an identity the store hands out. The position is the account's place
 // in the list, which the store sets after the last on insert, so it is
 // the order accounts were added until it is changed. A loan secured on
-// an asset names the asset; any other account names none.
-export const accounts = pgTable("accounts", {
-  balance: integer().notNull(),
-  balloon: integer().notNull(),
-  cadence: cadence().notNull(),
-  cap: integer().notNull(),
-  contribution: integer().notNull(),
-  funding: funding().notNull(),
-  growth: growthKind().notNull(),
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  kind: accountKind().notNull(),
-  name: text().notNull(),
-  position: integer().notNull(),
-  rate: doublePrecision().notNull(),
-  secures: integer().references((): AnyPgColumn => accounts.id),
-});
-
-// One row per owner: the name, with an id the store hands out, which is
-// the order the owners were added in and the order they are listed in.
-export const owners = pgTable("owners", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  name: text().notNull(),
-});
+// an asset names the asset; any other account names none. An ISA or a
+// pension names its owner and any other account none, which the table
+// holds as a check rather than leaving to the action, since an account
+// with an allowance and nobody to charge it to is a figure the engine
+// cannot place.
+export const accounts = pgTable(
+  "accounts",
+  {
+    balance: integer().notNull(),
+    balloon: integer().notNull(),
+    cadence: cadence().notNull(),
+    cap: integer().notNull(),
+    contribution: integer().notNull(),
+    funding: funding().notNull(),
+    growth: growthKind().notNull(),
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    kind: accountKind().notNull(),
+    name: text().notNull(),
+    owner: integer().references(() => owners.id),
+    position: integer().notNull(),
+    rate: doublePrecision().notNull(),
+    secures: integer().references((): AnyPgColumn => accounts.id),
+  },
+  (table) => [
+    check(
+      "accounts_owned",
+      sql`(${table.kind} in ('tax-deferred', 'tax-free')) = (${table.owner} is not null)`,
+    ),
+  ],
+);
 
 // One row per income line: the line's values with an id, the parts held
 // as columns of their own, no last year for a line that runs to the end

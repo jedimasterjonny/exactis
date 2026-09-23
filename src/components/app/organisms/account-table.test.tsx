@@ -5,6 +5,7 @@ import type { Account } from "@/data/accounts";
 
 import { accounts } from "@/data/accounts.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { owners } from "@/data/owners.fixture";
 
 import { AccountTable } from "./account-table";
 
@@ -50,6 +51,33 @@ describe("AccountTable", () => {
       "figure",
       "font-medium",
     );
+  });
+
+  // The fixture's pension and ISA belong to its one owner, who is named
+  // beneath each; the current account belongs to nobody and names none.
+  it("writes whose a wrapper is beneath its name", () => {
+    render(
+      <AccountTable
+        accounts={held}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        owners={owners}
+      />,
+    );
+
+    expect(
+      within(
+        screen.getByRole("cell", { name: /^Workplace pension/ }),
+      ).getByText("Me"),
+    ).toHaveClass("text-muted-foreground");
+    expect(
+      within(
+        screen.getByRole("cell", { name: /^Stocks & shares ISA/ }),
+      ).getByText("Me"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("cell", { name: "Current account" }),
+    ).toBeInTheDocument();
   });
 
   it("shows a flat dash for no contribution and a real minus on a debt", () => {

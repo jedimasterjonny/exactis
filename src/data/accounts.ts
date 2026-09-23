@@ -9,6 +9,8 @@
 // the two are read and edited as one; any other account carries none.
 // A loan on a PCP carries the balloon its agreement leaves owing at the
 // end, so the car it is on opens as the PCP it is; any other account
+// carries none. An ISA or a pension carries the id of the owner it
+// belongs to, whose allowance it is paid under; any other account
 // carries none.
 export interface Account {
   readonly balance: number;
@@ -18,6 +20,7 @@ export interface Account {
   readonly id: number;
   readonly kind: AccountKind;
   readonly name: string;
+  readonly owner?: number;
   readonly secures?: number;
 }
 
@@ -37,10 +40,11 @@ export type AccountKind = (typeof accountKinds)[number];
 // present. A contribution of nothing is a zero rather than an absence, the
 // cadence is kept beside it whether or not it applies, a cap of nothing
 // is the account's own allowance, the rate sits beside the growth
-// choice whether or not that is fixed, and a balloon of nothing is a
-// loan with none, which is every account but a PCP's. So a value can be
-// edited field by field and stored column by column, and becomes an
-// account by the rules below.
+// choice whether or not that is fixed, a balloon of nothing is a loan
+// with none, which is every account but a PCP's, and an owner of null
+// is an account nobody owns, which is every account but an ISA and a
+// pension. So a value can be edited field by field and stored column
+// by column, and becomes an account by the rules below.
 export interface AccountValues {
   readonly balance: number;
   readonly balloon: number;
@@ -51,6 +55,7 @@ export interface AccountValues {
   readonly growth: (typeof growthKinds)[number];
   readonly kind: AccountKind;
   readonly name: string;
+  readonly owner: null | number;
   readonly rate: number;
 }
 
@@ -161,6 +166,14 @@ export function isAsset(account: { readonly kind: AccountKind }): boolean {
   );
 }
 
+// An ISA or a pension belongs to one owner, since an allowance is a
+// person's and neither can be held jointly: the kinds with an allowance
+// are the kinds with an owner. Cash, an asset and a debt belong to
+// nobody here, since nothing the plan works out reads whose they are.
+export function isOwned(account: { readonly kind: AccountKind }): boolean {
+  return allowanceOf(account.kind) !== null;
+}
+
 // A pension is the wrapper paid before tax, which is the one a salary
 // may sacrifice into: the store, the action and the engine each hold a
 // salary to feeding one and nothing else.
@@ -175,9 +188,9 @@ export function takesSpare(account: { readonly kind: AccountKind }): boolean {
 }
 
 // A contribution of nothing is an absence on the account, as a balloon
-// of nothing is, a cap of nothing is the account's own allowance, and a
-// growth choice becomes the account's growth with the rate only where
-// it applies.
+// of nothing is, and so is an owner of null, a cap of nothing is the
+// account's own allowance, and a growth choice becomes the account's
+// growth with the rate only where it applies.
 export function toAccount(values: AccountValues, id: number): Account {
   const contribution = contributionOf(values);
   return {
@@ -191,12 +204,13 @@ export function toAccount(values: AccountValues, id: number): Account {
     id,
     kind: values.kind,
     name: values.name,
+    ...(values.owner !== null && { owner: values.owner }),
   };
 }
 
 // The reverse: an absent contribution is a fixed sum of nothing a year,
 // a spare one carries no sum, a fixed one no cap, a plan rate no rate,
-// and an absent balloon is one of nothing.
+// an absent balloon is one of nothing, and an absent owner is null.
 export function toValues(account: Account): AccountValues {
   const { contribution } = account;
   return {
@@ -209,6 +223,7 @@ export function toValues(account: Account): AccountValues {
     growth: account.growth.kind,
     kind: account.kind,
     name: account.name,
+    owner: account.owner ?? null,
     rate: account.growth.kind === "fixed" ? account.growth.rate : 0,
   };
 }

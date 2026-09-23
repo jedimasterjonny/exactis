@@ -110,6 +110,7 @@ export function toRecords(
     growth: "fixed",
     kind: "house",
     name: house.name,
+    owner: null,
     rate: house.growth,
   };
   if (house.status === "outright") {
@@ -131,6 +132,7 @@ export function toRecords(
         growth: "fixed",
         kind: "debt",
         name,
+        owner: null,
         rate: house.rate,
       },
       line: {

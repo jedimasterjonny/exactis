@@ -68,4 +68,29 @@ describe("RowActions", () => {
 
     expect(container).toBeEmptyDOMElement();
   });
+
+  // A bin given a reason stays where it is, so the column of pairs holds,
+  // but is disabled and says why, and a press reports nothing.
+  it("holds the bin when given a reason, and says it", () => {
+    const onDelete = vi.fn<(deleted: typeof row) => void>();
+    render(
+      <RowActions
+        deleteLock="Pay it off first"
+        name={row.name}
+        onDelete={onDelete}
+        onEdit={vi.fn<(edited: typeof row) => void>()}
+        row={row}
+      />,
+    );
+
+    const bin = screen.getByRole("button", { name: "Delete Mortgage" });
+
+    expect(bin).toBeDisabled();
+    expect(bin).toHaveAttribute("title", "Pay it off first");
+    expect(screen.getByRole("button", { name: "Edit Mortgage" })).toBeEnabled();
+
+    fireEvent.click(bin);
+
+    expect(onDelete).not.toHaveBeenCalled();
+  });
 });

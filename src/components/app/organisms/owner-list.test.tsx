@@ -7,10 +7,12 @@ import {
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { Account } from "@/data/accounts";
 import type { Owner } from "@/data/owners";
 
 import { removeOwner, saveOwner } from "@/actions/owners";
 import { Toaster } from "@/components/kit/toast";
+import { accounts } from "@/data/accounts.fixture";
 
 import { OwnerList } from "./owner-list";
 
@@ -25,10 +27,13 @@ const sam: Owner = { id: 2, name: "Sam" };
 
 // Save and delete report through the toast manager, which needs its
 // Toaster mounted.
-function renderList(owners: readonly Owner[]): void {
+function renderList(
+  owners: readonly Owner[],
+  held: readonly Account[] = [],
+): void {
   render(
     <Toaster>
-      <OwnerList label="Sect. II.v" owners={owners} />
+      <OwnerList accounts={held} label="Sect. II.v" owners={owners} />
     </Toaster>,
   );
 }
@@ -156,5 +161,32 @@ describe("OwnerList", () => {
 
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(removeOwner).not.toHaveBeenCalled();
+  });
+
+  // The fixture's pension and ISA are the first owner's, so the store
+  // would refuse to delete them: the row says what they hold and holds
+  // the bin, saying what has to happen first, while an owner holding
+  // nothing can still go.
+  it("says what an owner holds and holds the bin while they hold anything", () => {
+    renderList([me, sam], accounts);
+
+    const held = screen.getByRole("button", { name: "Delete Me" });
+
+    expect(
+      within(screen.getByRole("cell", { name: /^Me/ })).getByText(
+        "Holds Workplace pension and Stocks & shares ISA",
+      ),
+    ).toHaveClass("text-muted-foreground");
+    expect(held).toBeDisabled();
+    expect(held).toHaveAttribute(
+      "title",
+      "Give Workplace pension and Stocks & shares ISA to another owner first",
+    );
+    expect(screen.getByRole("button", { name: "Edit Me" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Delete Sam" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Delete Sam" }),
+    ).not.toHaveAttribute("title");
+    expect(screen.getByRole("cell", { name: "Sam" })).toBeInTheDocument();
   });
 });

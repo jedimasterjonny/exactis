@@ -4,14 +4,15 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { owners } from "@/db/schema";
+import { accounts, expenseLines, incomeLines, owners } from "@/db/schema";
 
 // @vitest-environment node
 import { deleteOwner, insertOwner, listOwners, updateOwner } from "./owners";
 
 // One Postgres in memory for the file, with the migrations applied once,
 // and the table emptied and its identity restarted before each test, as
-// the other stores' tests do.
+// the other stores' tests do, with every table that may name an owner or
+// an account naming one.
 const client = new PGlite();
 const db = drizzle({ client });
 
@@ -21,7 +22,9 @@ describe("owners store", () => {
   });
 
   beforeEach(async () => {
-    await db.execute(sql`TRUNCATE ${owners} RESTART IDENTITY`);
+    await db.execute(
+      sql`TRUNCATE ${accounts}, ${incomeLines}, ${expenseLines}, ${owners} RESTART IDENTITY`,
+    );
   });
 
   afterAll(async () => {

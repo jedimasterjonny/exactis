@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { AccountKind, AccountValues, Funding } from "@/data/accounts";
 
+import { owners } from "@/data/owners.fixture";
+
 import { AccountFields } from "./account-fields";
 
 const isa: AccountValues = {
@@ -15,6 +17,7 @@ const isa: AccountValues = {
   growth: "plan",
   kind: "tax-free",
   name: "ISA",
+  owner: 1,
   rate: 0,
 };
 
@@ -50,6 +53,7 @@ function renderFields(
       onAmend={onAmend}
       onFundingChange={onFundingChange}
       onKindChange={onKindChange}
+      owners={[...owners, { id: 2, name: "Sam" }]}
     >
       <p>What the salaries sacrifice</p>
     </AccountFields>,
@@ -109,6 +113,32 @@ describe("AccountFields", () => {
     ]);
     expect(onKindChange).toHaveBeenCalledExactlyOnceWith("cash");
     expect(onFundingChange).toHaveBeenCalledExactlyOnceWith("spare");
+  });
+
+  // An ISA or a pension is asked whose it is, beside its name and
+  // treatment, and the choice reports as the owner's id; cash is asked
+  // nothing.
+  it("asks a wrapper's owner and reports the choice, and asks cash nothing", () => {
+    const { onAmend } = renderFields(isa);
+
+    expect(screen.getByRole("combobox", { name: "Owner" })).toHaveValue("1");
+    expect(
+      screen.getByRole("combobox", { name: "Owner" }),
+    ).toHaveAccessibleDescription("Whose allowance it is paid under");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Owner" }), {
+      target: { value: "2" },
+    });
+
+    expect(onAmend).toHaveBeenCalledExactlyOnceWith({ owner: 2 });
+  });
+
+  it("asks nothing of an account nobody owns", () => {
+    renderFields({ ...isa, kind: "cash", owner: null });
+
+    expect(
+      screen.queryByRole("combobox", { name: "Owner" }),
+    ).not.toBeInTheDocument();
   });
 
   it("asks for a cap with the kind's allowance when the draft is paid the spare money", () => {
