@@ -81,10 +81,13 @@ interface Reading {
 }
 
 // What the month's income pays in tax: the income tax on all of it,
-// and the National Insurance on the kinds that pay it.
+// and the National Insurance on the kinds that pay it, and the income
+// the tax is charged on, which is what a draw on a pension that month
+// is taxed on top of.
 interface Taxed {
   readonly incomeTax: number;
   readonly insurance: number;
+  readonly taxable: number;
 }
 
 // The least a month may be short by and be short at all. Tenths of a
@@ -241,6 +244,7 @@ export function cashFlow(
     left: Math.abs(left) < nanopound ? 0 : left,
     spare: takes,
     spent,
+    taxable: taxed.taxable,
   };
 }
 
@@ -427,12 +431,14 @@ function taxOn(lines: readonly IncomeLine[], fed: readonly Fed[]): Taxed {
           (fed.find((entry) => entry.line === line)?.sacrificed ?? 0),
         0,
       );
+  const taxable = payOf(incomeKinds);
   return {
-    incomeTax: incomeTaxOn(payOf(incomeKinds), 1),
+    incomeTax: incomeTaxOn(taxable, 1),
     insurance: incomeKinds.reduce(
       (sum, kind) => sum + insuranceOn(kind, payOf([kind]), 1),
       0,
     ),
+    taxable,
   };
 }
 

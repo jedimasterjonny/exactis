@@ -3,6 +3,28 @@ import type { IncomeKind } from "@/data/income";
 
 import { isPension } from "@/data/accounts";
 
+// A draw on a pension: what leaves it, what is left of that once taxed,
+// and the two parts the tax reads it as, the quarter that is free of tax
+// while the lump sum allowance lasts and the rest, which is taxed as
+// income.
+export interface Draw {
+  readonly gross: number;
+  readonly net: number;
+  readonly taxable: number;
+  readonly taxFree: number;
+}
+
+// Where a draw on a pension stands when it is taxed: what is left of the
+// lump sum allowance, which its free quarter comes out of; the taxable
+// income already had over the months it is taxed with, which it is
+// taxed on top of; and how many months those are, whose share of each
+// band it is charged against.
+export interface Standing {
+  readonly allowance: number;
+  readonly below: number;
+  readonly months: number;
+}
+
 // A band of a tax: the rate charged on each pound of a year's income
 // from where the band starts to where the next one does, and on every
 // pound above it for the last. The first starts at nothing. Income over
@@ -55,6 +77,38 @@ const classFour: readonly Band[] = [
 // The basic rate, which a pension claims back on what is paid into it
 // out of taxed money.
 const basicRate = 0.2;
+
+// The most a life's draws on a pension may take free of tax, which
+// replaced the lifetime allowance in April 2024.
+export const lumpSumAllowance = 268275;
+
+// The share of a draw on a pension that is free of tax while the lump
+// sum allowance lasts, the rest being taxed as income, as a draw that
+// takes its tax-free cash a piece at a time is.
+const taxFreeShare = 0.25;
+
+// The draw that leaves `net` once it is taxed, grossed up through the
+// bands from where the income below it stands.
+export function drawFor(net: number, standing: Standing): Draw {
+  checkCharge(standing.months, net, standing.allowance, standing.below);
+  return drawOf(grossFor(net, standing), standing);
+}
+
+// What a draw of `gross` leaves once it is taxed: a quarter of it free
+// of tax as far as the allowance reaches, and the rest taxed as income
+// on top of what was taxable below it, so a draw beside a salary is
+// taxed at the salary's rate and one beside nothing uses the personal
+// allowance first.
+export function drawOf(
+  gross: number,
+  { allowance, below, months }: Standing,
+): Draw {
+  checkCharge(months, gross, allowance, below);
+  const taxFree = Math.min(gross * taxFreeShare, allowance);
+  const taxable = gross - taxFree;
+  const tax = incomeTaxOn(below + taxable, months) - incomeTaxOn(below, months);
+  return { gross, net: gross - tax, taxable, taxFree };
+}
 
 // The income tax on what so many months of the year earned, which is
 // everything the lines pay less what a salary gives up into a pension,
@@ -124,4 +178,51 @@ function checkCharge(months: number, ...sums: readonly number[]): void {
   if (!sums.every((sum) => Number.isFinite(sum) && sum >= 0)) {
     throw new Error("A tax is charged on nothing or more");
   }
+}
+
+// The draw whose net is `net`, walked up the bands a stretch at a time.
+// Within a stretch the rate is one band's, and the part of each pound
+// that is taxed is three quarters while the allowance lasts and the
+// whole pound after it, so each pound drawn keeps a fixed share of
+// itself. A stretch ends where the income taxed reaches the next band or
+// the allowance is used up, and the draw ends in the stretch that keeps
+// what is still wanted. No rate takes a whole pound, so every stretch
+// keeps something and the walk ends, the last band running for ever;
+// and the draw is found exactly rather than searched for. What it walks
+// from is checked before the first step, since a figure that is not a
+// number compares false against every band and would walk for ever.
+function grossFor(net: number, standing: Standing): number {
+  const { allowance, below, months } = standing;
+  const share = months / 12;
+  const { rate, to } = incomeTax.reduce(
+    (found, band, index) =>
+      band.from * share <= below
+        ? {
+            rate: band.rate,
+            to:
+              (incomeTax[index + 1]?.from ?? Number.POSITIVE_INFINITY) * share,
+          }
+        : found,
+    { rate: 0, to: 0 },
+  );
+  const isFree = allowance > 0;
+  const part = isFree ? 1 - taxFreeShare : 1;
+  const kept = 1 - part * rate;
+  const toBand = (to - below) / part;
+  const toFree = isFree ? allowance / taxFreeShare : Number.POSITIVE_INFINITY;
+  const stretch = Math.min(toBand, toFree);
+  if (net <= stretch * kept) {
+    return net / kept;
+  }
+  return (
+    stretch +
+    grossFor(net - stretch * kept, {
+      allowance:
+        stretch === toFree
+          ? 0
+          : Math.max(0, allowance - stretch * taxFreeShare),
+      below: stretch === toBand ? to : below + stretch * part,
+      months,
+    })
+  );
 }

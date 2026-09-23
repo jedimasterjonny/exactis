@@ -2,10 +2,10 @@ import type { Account, AccountKind } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
 import type { CashFlow, Paid, Schedule } from "@/engine/cash-flow";
 
-import { takesSpare } from "@/data/accounts";
+import { isPension, takesSpare } from "@/data/accounts";
 import { rateFrom } from "@/data/plan";
 import { cashFlow } from "@/engine/cash-flow";
-import { reliefOf } from "@/lib/tax";
+import { drawFor, drawOf, lumpSumAllowance, reliefOf } from "@/lib/tax";
 
 // A year of the projection: the balance the plan expects entering it,
 // whole pounds, under the name the progress point gives the same
@@ -24,14 +24,27 @@ import { reliefOf } from "@/lib/tax";
 // nearest, since a year short by anything is short: a year that could
 // not find forty pence read as a year that covered itself, and the
 // chart's mark, which is the first year with anything uncovered on it,
-// landed a year late or not at all. The last year is never carried, so
-// its point is never short.
+// landed a year late or not at all. It is read to the penny before it
+// is rounded up, since a pension grossed up to cover a month exactly
+// leaves a residue of the order of a billionth of a pound, which read
+// whole marked a year short that covered itself to the last penny. The
+// last year is never carried, so its point is never short.
 export interface ProjectionPoint {
   readonly age: number;
   readonly deferred: number;
   readonly free: number;
   readonly uncovered: number;
   readonly year: number;
+}
+
+// The month a shortfall is drawn in, as the draw reads it: the age
+// reached that year, which says whether a pension may be drawn; what is
+// left of the lump sum allowance; and what the month earned that the
+// tax is charged on, which a draw on a pension is taxed on top of.
+interface Drawing {
+  readonly age: number;
+  readonly allowance: number;
+  readonly below: number;
 }
 
 // An account and the balance the projection has carried it to, which
@@ -63,8 +76,11 @@ const pensionAge = 57;
 // pension not listed would be fed nothing. A month the income does not
 // cover is drawn from the savings: cash first, then the tax-free
 // wrapper, then the tax-deferred one from the year the pension age is
-// reached, at the start of the month and before its growth as a payment
-// lands, so what leaves earns nothing for the month it is gone. A draw
+// reached, grossed up for its tax, at the start of the month and before
+// its growth as a payment lands, so what leaves earns nothing for the
+// month it is gone. The lump sum allowance a pension's tax-free quarter
+// comes out of is the plan's owner's for life, so what is left of it is
+// carried from month to month rather than read afresh. A draw
 // and a payment never meet in one month: the flow pays a fixed sum and
 // the spare money only out of what the month has, and no salary
 // sacrifices at all in a month the income would not cover the expenses
@@ -87,8 +103,7 @@ const pensionAge = 57;
 // compounded deeper every month by the growth and never drawn on, the
 // draw taking the lesser of what the account holds and what the month
 // is short under a floor of nothing. The action refuses the same
-// balance where it is saved. The flow taxes the month's income; a draw
-// is not taxed yet.
+// balance where it is saved.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -103,6 +118,7 @@ export function project(
   if (held.some(({ balance }) => balance < 0)) {
     throw new Error("A balance below nothing is a debt's");
   }
+  let allowance = lumpSumAllowance;
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
     const age = year - plan.born;
@@ -115,7 +131,12 @@ export function project(
           at: { month, year },
           plan,
         });
-        const draw = drawnFrom(held, Math.max(0, -flow.left), age);
+        const draw = drawnFrom(held, Math.max(0, -flow.left), {
+          age,
+          allowance,
+          below: flow.taxable,
+        });
+        allowance = draw.allowance;
         uncovered += draw.uncovered;
         held = draw.held.map(({ account, balance }) => ({
           account,
@@ -127,7 +148,7 @@ export function project(
         }));
       }
     }
-    return { age, deferred, free, uncovered: Math.ceil(uncovered), year };
+    return { age, deferred, free, uncovered: upToPound(uncovered), year };
   });
 }
 
@@ -143,37 +164,62 @@ function carried(balance: number, paid: number, rate: number): number {
 }
 
 // What a month's shortfall takes out of the savings, and what is left
-// of it after them. The kinds are drawn in the order that is right
-// while a draw is taxed nothing: cash first, since it is spent as it
-// stands and grows least; then the tax-free wrapper, which is reached
-// at any age and owes nothing on the way out; then the tax-deferred
-// one, and only from the year its owner reaches the pension age, since
-// before it the money cannot be had at all. Within a kind the accounts
-// are drawn in the order they are listed, each giving up what it holds
-// or what is still short, whichever is the lesser, so an account is
-// emptied and never overdrawn and what it could not cover passes to the
-// next. What the last of them leaves is uncovered: the plan is short by
-// it, and the projection says so rather than lending it.
+// of it after them, with what is left of the lump sum allowance. The
+// kinds are drawn cash first, since it is spent as it stands and grows
+// least; then the tax-free wrapper, which is reached at any age and
+// owes nothing on the way out; then the tax-deferred one, and only from
+// the year its owner reaches the pension age, since before it the money
+// cannot be had at all. Within a kind the accounts are drawn in the
+// order they are listed, each giving up what it holds or what the month
+// is still short, whichever is the lesser, so an account is emptied and
+// never overdrawn and what it could not cover passes to the next. A
+// pension is taxed on the way out, so what it gives up is grossed up
+// until what is left of it covers what is short: a quarter free of tax
+// while the allowance lasts, and the rest taxed as income on top of what
+// the month earned and what any pension drawn before it gave up, so a
+// second pension in the same month is taxed from where the first left
+// off. One that holds less than that gives up all it holds and covers
+// what that leaves once taxed. Taking the pension before the ISA to use
+// the personal allowance first would pay less tax over a life, and is a
+// second way of drawing down rather than this one. What the last of
+// them leaves is uncovered: the plan is short by it, and the projection
+// says so rather than lending it.
 function drawnFrom(
   held: readonly Held[],
   shortfall: number,
-  age: number,
-): { readonly held: readonly Held[]; readonly uncovered: number } {
+  { age, allowance, below }: Drawing,
+): {
+  readonly allowance: number;
+  readonly held: readonly Held[];
+  readonly uncovered: number;
+} {
   const kinds: readonly AccountKind[] =
     age < pensionAge
       ? ["cash", "tax-free"]
       : ["cash", "tax-free", "tax-deferred"];
   let drawn = held;
   let left = shortfall;
+  let taxed = { allowance, below, months: 1 };
   for (const kind of kinds) {
     drawn = drawn.map(({ account, balance }) => {
-      const taken =
-        account.kind === kind ? Math.max(0, Math.min(balance, left)) : 0;
-      left -= taken;
-      return { account, balance: balance - taken };
+      if (account.kind !== kind || !isPension(account)) {
+        const taken =
+          account.kind === kind ? Math.max(0, Math.min(balance, left)) : 0;
+        left -= taken;
+        return { account, balance: balance - taken };
+      }
+      const wanted = drawFor(left, taxed);
+      const draw = wanted.gross <= balance ? wanted : drawOf(balance, taxed);
+      left = draw === wanted ? 0 : Math.max(0, left - draw.net);
+      taxed = {
+        ...taxed,
+        allowance: taxed.allowance - draw.taxFree,
+        below: taxed.below + draw.taxable,
+      };
+      return { account, balance: balance - draw.gross };
     });
   }
-  return { held: drawn, uncovered: left };
+  return { allowance: taxed.allowance, held: drawn, uncovered: left };
 }
 
 // What lands in an account each month of the year: what each salary
@@ -222,4 +268,12 @@ function total(held: readonly Held[], kind: AccountKind): number {
       .filter(({ account }) => account.kind === kind)
       .reduce((sum, { balance }) => sum + balance, 0),
   );
+}
+
+// A sum a year's point carries, read to the penny and then rounded up
+// to the pound: to the penny, since a figure summed over months of
+// grossed-up draws carries the residue of arithmetic that does not add
+// in binary, and up, since a year short by anything is short.
+function upToPound(amount: number): number {
+  return Math.ceil(Math.round(amount * 100) / 100);
 }

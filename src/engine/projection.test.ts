@@ -7,6 +7,7 @@ import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { endYear } from "@/data/plan";
+import { drawFor, lumpSumAllowance } from "@/lib/tax";
 
 import { project } from "./projection";
 
@@ -461,7 +462,8 @@ describe("project", () => {
   // 57 is reached in 2027, and a pension is drawable in every month of
   // that year rather than from a birthday the plan does not hold: the
   // £12,000 covers 2027's twelve months exactly, where 2026's twelve
-  // went uncovered.
+  // went uncovered. A month's £1,000 is taxed nothing, a quarter of it
+  // free and the £750 left under a twelfth of the personal allowance.
   it("draws a pension from the year the access age is reached", () => {
     expect(
       project([sipp], short, { ...plan, born: 1970, years: 2 }),
@@ -470,6 +472,102 @@ describe("project", () => {
       { age: 57, deferred: 12000, free: 0, uncovered: 0, year: 2027 },
       { age: 58, deferred: 0, free: 0, uncovered: 0, year: 2028 },
     ]);
+  });
+
+  // Born in 1960, so the SIPP is drawable from the first month. £3,000
+  // a month with nothing coming in grosses up to £3,282.94: the first
+  // £1,396.67 is taxed nothing, its taxed three quarters inside a
+  // twelfth of the personal allowance, and each pound after keeps 85p,
+  // the basic rate taken off three quarters of it. Twelve of them are
+  // £39,395.29, leaving 60,604.71.
+  it("grosses a pension draw up so what is left of it once taxed covers the month", () => {
+    const drawn: Account = { ...sipp, balance: 100000 };
+
+    expect(
+      project(
+        [drawn],
+        { expenses: [{ ...household, amount: 3000 }], income: [] },
+        { ...plan, born: 1960, years: 1 },
+      ),
+    ).toStrictEqual([
+      { age: 66, deferred: 100000, free: 0, uncovered: 0, year: 2026 },
+      { age: 67, deferred: 60605, free: 0, uncovered: 0, year: 2027 },
+    ]);
+  });
+
+  // A pension of £12,570 a year fills the personal allowance, so the
+  // £850 a month it leaves short is drawn at the basic rate: £1,000,
+  // £250 of it free and £150 of tax on the other £750. Twelve of them
+  // take £12,000 of the £20,000.
+  it("taxes a draw on top of what the month earned", () => {
+    const drawn: Account = { ...sipp, balance: 20000 };
+    const pension = {
+      ...salary,
+      amount: 12570,
+      bonus: 0,
+      feeds: null,
+      kind: "pension",
+      rsu: 0,
+      sacrifice: 0,
+    } as const;
+
+    expect(
+      project(
+        [drawn],
+        {
+          expenses: [{ ...household, amount: 12570 / 12 + 850 }],
+          income: [pension],
+        },
+        { ...plan, born: 1960, years: 1 },
+      ).at(-1)?.deferred,
+    ).toBe(8000);
+  });
+
+  // £2,800 a month grosses up to £3,047.65, and a SIPP holding twelve of
+  // them, £36,571.76, covers the year to the last penny. Drawn a month
+  // at a time it is left a residue of the order of a billionth of a
+  // pound short, which rounded up whole marked the year short by £1 and
+  // put the chart's mark on a year that covered itself.
+  it("reports no shortfall in a year a pension covers exactly", () => {
+    const { gross } = drawFor(2800, {
+      allowance: lumpSumAllowance,
+      below: 0,
+      months: 1,
+    });
+    const exact: Account = {
+      ...sipp,
+      balance: Array.from({ length: 12 }, () => gross).reduce(
+        (sum, month) => sum + month,
+        0,
+      ),
+    };
+
+    expect(
+      project(
+        [exact],
+        { expenses: [{ ...household, amount: 2800 }], income: [] },
+        { ...plan, born: 1960, years: 1 },
+      ).map(({ uncovered }) => uncovered),
+    ).toStrictEqual([0, 0]);
+  });
+
+  // The lump sum allowance is the owner's for life. £100,000 a month
+  // grosses up to £149,207.92 while a quarter of each draw is free,
+  // which takes £37,301.98 of the £268,275 a month; seven months leave
+  // £7,161.13 of it, which the eighth uses up, and every month after it
+  // is taxed whole and draws £179,727.73. So 2026 draws £1,937,235 and
+  // 2027, with nothing free in any month of it, twelve of the last,
+  // £2,156,733.
+  it("frees a quarter of each draw only until the lump sum allowance is used up, over the plan", () => {
+    const drawn: Account = { ...sipp, balance: 5000000 };
+
+    expect(
+      project(
+        [drawn],
+        { expenses: [{ ...household, amount: 100000 }], income: [] },
+        { ...plan, born: 1960, years: 2 },
+      ).map(({ deferred }) => deferred),
+    ).toStrictEqual([5000000, 3062765, 906032]);
   });
 
   // £400 of cash covers £400 of January and stops there rather than

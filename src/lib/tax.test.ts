@@ -1,7 +1,141 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { incomeTaxOn, insuranceOn, reliefOf } from "./tax";
+import {
+  drawFor,
+  drawOf,
+  incomeTaxOn,
+  insuranceOn,
+  lumpSumAllowance,
+  reliefOf,
+} from "./tax";
+
+// A month's draw with the whole allowance to come and nothing else
+// earned, and one beside a salary at the top of the basic rate band, a
+// twelfth of £50,270, so the draw is taxed at the higher rate.
+const alone = { allowance: lumpSumAllowance, below: 0, months: 1 };
+
+const beside = { allowance: lumpSumAllowance, below: 50270 / 12, months: 1 };
+
+describe("drawOf", () => {
+  // £1,000 is £250 free and £750 taxed, which alone sits under a twelfth
+  // of the personal allowance and pays nothing, and beside the salary
+  // pays 40% of the £750, £300, leaving £700.
+  it("takes a quarter free of tax and taxes the rest on top of the income below it", () => {
+    expect(drawOf(1000, alone)).toStrictEqual({
+      gross: 1000,
+      net: 1000,
+      taxable: 750,
+      taxFree: 250,
+    });
+    expect(drawOf(1000, beside).net).toBeCloseTo(700, 10);
+  });
+
+  // £100 of the allowance left frees £100 of the £1,100 and no more, so
+  // £1,000 is taxed at 40% and £700 is left.
+  it("frees no more than the allowance has left", () => {
+    const draw = drawOf(1100, { ...beside, allowance: 100 });
+
+    expect(draw.taxFree).toBe(100);
+    expect(draw.taxable).toBe(1000);
+    expect(draw.net).toBeCloseTo(700, 10);
+  });
+});
+
+describe("drawFor", () => {
+  // Alone, the first £1,396.67 is taxed nothing, its taxed three
+  // quarters filling the month's £1,047.50 of the allowance; every pound
+  // after keeps 85p, the basic rate taken off three quarters of it, so
+  // the £1,603.33 still wanted takes £1,886.27 more: £3,282.94, of which
+  // £282.94 is tax. Beside the salary each pound keeps 70p from the
+  // first, so £700 takes £1,000.
+  it("grosses a draw up so what is left of it once taxed is what was asked for", () => {
+    const draw = drawFor(3000, alone);
+
+    expect(draw.gross).toBeCloseTo(3282.94, 2);
+    expect(draw.net).toBeCloseTo(3000, 10);
+    expect(draw.taxFree).toBeCloseTo(draw.gross / 4, 10);
+    expect(drawFor(700, beside).gross).toBeCloseTo(1000, 10);
+  });
+
+  // With the allowance gone every pound is taxed, a year at a time
+  // here. £50,270 fills the basic rate band and keeps £42,730; £10,000
+  // over £100,000 keeps 40p a pound, £4,000; and £2,000 from £1,000 under
+  // £125,140 keeps 40p a pound on the first £1,000 and 55p on the next,
+  // £950.
+  it("grosses up through the bands a stretch at a time", () => {
+    const year = { allowance: 0, below: 0, months: 12 };
+
+    expect(drawFor(42730, year).gross).toBeCloseTo(50270, 10);
+    expect(drawFor(4000, { ...year, below: 100000 }).gross).toBeCloseTo(
+      10000,
+      10,
+    );
+    expect(drawFor(950, { ...year, below: 124140 }).gross).toBeCloseTo(
+      2000,
+      10,
+    );
+  });
+
+  // £100 of the allowance frees a quarter of the first £400, which
+  // keeps 70p a pound, £280; the £420 still wanted is taxed whole at
+  // 40% and takes £700 more, so £1,100 is drawn and £100 of it is free.
+  it("frees a quarter of the draw only until the allowance runs out", () => {
+    const draw = drawFor(700, { ...beside, allowance: 100 });
+
+    expect(draw.gross).toBeCloseTo(1100, 10);
+    expect(draw.taxFree).toBe(100);
+  });
+
+  it("draws nothing for nothing", () => {
+    expect(drawFor(0, alone).gross).toBe(0);
+  });
+
+  // Every band's edge, a pound either side of it and on it, with the
+  // allowance whole, all but gone and gone: what a draw grossed up to
+  // leaves is what was asked for, to a millionth of a penny, and a pound
+  // more asked for always draws more.
+  it("inverts what a draw leaves at every band's edge and the allowance's end", () => {
+    const edges = [0, 12570, 50270, 100000, 125140].flatMap((edge) =>
+      [edge / 12 - 1, edge / 12, edge / 12 + 1].filter((below) => below >= 0),
+    );
+    for (const below of edges) {
+      for (const allowance of [0, 100, lumpSumAllowance]) {
+        const standing = { ...alone, allowance, below };
+        for (const net of [0.01, 1, 999, 20000, 1000000]) {
+          const draw = drawFor(net, standing);
+
+          expect(drawOf(draw.gross, standing).net).toBeCloseTo(net, 8);
+          expect(drawFor(net + 1, standing).gross).toBeGreaterThan(draw.gross);
+        }
+      }
+    }
+  });
+
+  // A figure that is not a number compares false against every band, so
+  // the walk would never find the stretch it ends in; one below nothing
+  // would free a quarter of nothing less than nothing. Both are refused
+  // before the first step.
+  it("refuses a draw from a standing no pension is in", () => {
+    for (const standing of [
+      { ...alone, below: Number.NaN },
+      { ...alone, below: -1 },
+      { ...alone, allowance: -50 },
+      { ...alone, months: 0 },
+    ]) {
+      expect(() => drawFor(1000, standing)).toThrow();
+      expect(() => drawOf(1000, standing)).toThrow();
+    }
+    for (const net of [-100, Number.NaN]) {
+      expect(() => drawFor(net, alone)).toThrow(
+        "A tax is charged on nothing or more",
+      );
+      expect(() => drawOf(net, alone)).toThrow(
+        "A tax is charged on nothing or more",
+      );
+    }
+  });
+});
 
 describe("incomeTaxOn", () => {
   // Nothing on the allowance; £36,000 is 20% on the £23,430 above it;
