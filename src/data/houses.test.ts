@@ -93,6 +93,7 @@ describe("toRecords", () => {
         growth: "fixed",
         kind: "house",
         name: "Home",
+        owner: null,
         rate: 0.02,
       },
       loan: null,
@@ -115,6 +116,7 @@ describe("toRecords", () => {
         growth: "fixed",
         kind: "debt",
         name: "Home mortgage",
+        owner: null,
         rate: 0.0515,
       },
       line: {

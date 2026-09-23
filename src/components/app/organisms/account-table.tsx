@@ -6,6 +6,7 @@ import { Wallet } from "lucide-react";
 
 import type { Account, AccountKind } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
+import type { Owner } from "@/data/owners";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { RowActions } from "@/components/app/molecules/row-actions";
@@ -37,6 +38,7 @@ interface AccountTableProps {
   readonly lines?: readonly IncomeLine[];
   readonly onDelete?: (account: Account) => void;
   readonly onEdit?: (account: Account) => void;
+  readonly owners?: readonly Owner[];
 }
 
 type Tone = "destructive" | "secondary";
@@ -59,7 +61,9 @@ const tones: Record<AccountKind, Tone> = {
 // a pension beneath the pension's own contribution, naming them, so
 // what lands in it is read off the row rather than off the salaries;
 // a table given none, as the assets' is, writes each account's own
-// contribution alone, since nothing feeds an asset. A table given an
+// contribution alone, since nothing feeds an asset. A table given the
+// owners writes whose an ISA or a pension is beneath its name, faint,
+// as the sacrifice is beneath the contribution. A table given an
 // edit handler closes each row with a pencil that reports
 // the row's account, whose id says where a save writes back, and one
 // given a delete handler with a bin that reports the account to delete,
@@ -78,6 +82,7 @@ export function AccountTable({
   lines = [],
   onDelete,
   onEdit,
+  owners = [],
 }: AccountTableProps): JSX.Element {
   if (accounts.length === 0) {
     return (
@@ -108,7 +113,10 @@ export function AccountTable({
       <TableBody>
         {accounts.map((account) => (
           <TableRow key={account.id}>
-            <TableCell className="font-medium">{account.name}</TableCell>
+            <TableCell className="font-medium">
+              {account.name}
+              <OwnerName account={account} owners={owners} />
+            </TableCell>
             <TableCell>
               <Badge variant={tones[account.kind]}>
                 {kindLabels[account.kind]}
@@ -184,6 +192,24 @@ function Contribution({
       {figure}
       <span className="block text-xs text-muted-foreground">{detail}</span>
     </>
+  );
+}
+
+// Whose an account is, beneath its name: the name of the owner it names,
+// or nothing for an account that names none or an owner the table was
+// not given.
+function OwnerName({
+  account,
+  owners,
+}: {
+  readonly account: Account;
+  readonly owners: readonly Owner[];
+}): JSX.Element | null {
+  const owner = owners.find(({ id }) => id === account.owner);
+  return owner === undefined ? null : (
+    <span className="block text-xs font-normal text-muted-foreground">
+      {owner.name}
+    </span>
   );
 }
 

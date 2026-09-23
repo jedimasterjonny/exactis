@@ -137,6 +137,7 @@ export function toRecords(
     growth: "fixed",
     kind: "car",
     name: car.name,
+    owner: null,
     rate: negated(car.depreciation),
   };
   if (car.agreement === "outright") {
@@ -158,6 +159,7 @@ export function toRecords(
         growth: "fixed",
         kind: "debt",
         name,
+        owner: null,
         rate: car.rate,
       },
       line: {

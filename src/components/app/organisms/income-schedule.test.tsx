@@ -15,6 +15,7 @@ import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 import { incomeKinds } from "@/data/income";
 import { incomeLines, plan } from "@/data/income.fixture";
+import { owners } from "@/data/owners.fixture";
 import { lineGrowths } from "@/data/schedule";
 
 import { IncomeSchedule } from "./income-schedule";
@@ -59,6 +60,7 @@ function renderSchedule(lines: readonly IncomeLine[] = incomeLines): void {
       <IncomeSchedule
         accounts={[...accounts, sipp]}
         lines={lines}
+        owners={owners}
         plan={plan}
       />
     </Toaster>,
@@ -166,7 +168,14 @@ describe("IncomeSchedule", () => {
   });
 
   it("draws the empty state for none", () => {
-    render(<IncomeSchedule accounts={accounts} lines={[]} plan={plan} />);
+    render(
+      <IncomeSchedule
+        accounts={accounts}
+        lines={[]}
+        owners={owners}
+        plan={plan}
+      />,
+    );
 
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
     expect(screen.getByText("No income yet")).toBeInTheDocument();
@@ -183,6 +192,7 @@ describe("IncomeSchedule", () => {
           { ...salary, id: 6, rsu: 0 },
           { ...salary, bonus: 0, id: 7, rsu: 0, sacrifice: 0 },
         ]}
+        owners={owners}
         plan={plan}
       />,
     );
@@ -270,7 +280,7 @@ describe("IncomeSchedule", () => {
   // pension to open with the line feeding none by id, since the id is
   // the store's to give. The pension's name goes as typed, since the
   // store trims it as it trims the line's.
-  it("adds a salary opening a pension of its own, with the save held until the pension is named", async () => {
+  it("adds a salary opening a pension of its own, the first owner's, with the save held until the pension is named", async () => {
     renderSchedule();
 
     const dialog = openEntry();
@@ -311,6 +321,9 @@ describe("IncomeSchedule", () => {
     expect(
       within(dialog).getByRole("textbox", { name: "Salary sacrifice" }),
     ).toHaveValue("0.00%");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Pension owner" }),
+    ).toHaveValue("1");
 
     fireEvent.change(pensionName, { target: { value: " Aviva " } });
 
@@ -340,7 +353,7 @@ describe("IncomeSchedule", () => {
       lastMonth: null,
       lastYear: null,
       name: "New job",
-      opens: { balance: 2500, name: " Aviva " },
+      opens: { balance: 2500, name: " Aviva ", owner: 1 },
       rsu: 0,
       sacrifice: 0.05,
     });
@@ -813,5 +826,36 @@ describe("IncomeSchedule", () => {
       rsu: 12000,
       sacrifice: 0.1,
     });
+  });
+
+  // With no owner to give it, a pension the salary opens cannot be
+  // saved, however it is named.
+  it("holds the save of a salary opening a pension while the plan has no owner", () => {
+    render(
+      <Toaster>
+        <IncomeSchedule
+          accounts={accounts}
+          lines={incomeLines}
+          owners={[]}
+          plan={plan}
+        />
+      </Toaster>,
+    );
+
+    const dialog = openEntry();
+
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
+      target: { value: "New job" },
+    });
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Pension" }),
+      { target: { value: "new" } },
+    );
+    fireEvent.change(
+      within(dialog).getByRole("textbox", { name: "Pension name" }),
+      { target: { value: "Aviva" } },
+    );
+
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
   });
 });

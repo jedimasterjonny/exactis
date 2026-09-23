@@ -1,7 +1,8 @@
 import type { Account } from "@/data/accounts";
 
 // The reference kit's invented plan: five accounts, in the order the
-// reference lists them, with the ids a store would have given them. For
+// reference lists them, with the ids a store would have given them, the
+// two wrappers belonging to the owners fixture's one owner. For
 // tests, since the screens read the store now and the engine is still to
 // come. A tuple, so a test reading one by its place gets an account.
 export const accounts = [
@@ -12,6 +13,7 @@ export const accounts = [
     id: 1,
     kind: "tax-deferred",
     name: "Workplace pension",
+    owner: 1,
   },
   {
     balance: 286145,
@@ -20,6 +22,7 @@ export const accounts = [
     id: 2,
     kind: "tax-free",
     name: "Stocks & shares ISA",
+    owner: 1,
   },
   {
     balance: 18300,

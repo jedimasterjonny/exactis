@@ -5,6 +5,7 @@ import * as z from "zod";
 
 import type { Owner, OwnerValues } from "@/data/owners";
 
+import { isOwning } from "@/db/accounts";
 import { getDb } from "@/db/client";
 import { deleteOwner, insertOwner, updateOwner } from "@/db/owners";
 import { requireSession } from "@/lib/session";
@@ -18,11 +19,19 @@ const values = z.object({
 
 const target = z.number().int().positive().nullable();
 
-// Deletes the owner with that id. Checked and expired as a save is.
+// Deletes the owner with that id, unless an account names it: an ISA or
+// a pension belongs to an owner, and the store refuses to leave it
+// belonging to none, so the account is given to another owner or
+// deleted first, and the refusal says so rather than surfacing as the
+// store's broken link. Checked and expired as a save is.
 export async function removeOwner(id: number): Promise<void> {
   await requireSession();
   const at = z.number().int().positive().parse(id);
-  await deleteOwner(getDb(), at);
+  const db = getDb();
+  if (await isOwning(db, at)) {
+    throw new Error("An owner who holds an account stays");
+  }
+  await deleteOwner(db, at);
   updateTag(ownersTag);
 }
 

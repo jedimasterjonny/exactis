@@ -86,7 +86,7 @@ const outright = {
 } as const;
 
 // An ISA as the store writes it, and as the dialog sends it, with the
-// shares no ISA has.
+// shares no ISA has, belonging to the first owner.
 const account = {
   balance: 4000,
   balloon: 0,
@@ -97,6 +97,7 @@ const account = {
   growth: "fixed",
   kind: "tax-free",
   name: " Lifetime ISA ",
+  owner: 1,
   rate: 0.03,
 } as const;
 
@@ -176,7 +177,7 @@ describe("saveAccount", () => {
   it("refuses to make a debt a line pays anything else", async () => {
     vi.mocked(findLinePaying).mockResolvedValue(mortgagePayment);
     vi.mocked(updateAccount).mockResolvedValue(mortgage);
-    const owing = { ...values, kind: "debt" } as const;
+    const owing = { ...values, kind: "debt", owner: null } as const;
 
     await expect(saveAccount(mortgage.id, values)).rejects.toThrow(
       "A debt a line pays stays a debt",
@@ -320,12 +321,17 @@ describe("saveAccount", () => {
       z.ZodError,
     );
     await expect(
-      saveAccount(null, { ...values, balance: -1, kind: "cash" }),
+      saveAccount(null, { ...values, balance: -1, kind: "cash", owner: null }),
     ).rejects.toThrow(z.ZodError);
     expect(insertAccount).not.toHaveBeenCalled();
 
     expect(
-      await saveAccount(null, { ...values, balance: -1, kind: "debt" }),
+      await saveAccount(null, {
+        ...values,
+        balance: -1,
+        kind: "debt",
+        owner: null,
+      }),
     ).toBe(pension);
   });
 
@@ -342,6 +348,7 @@ describe("saveAccount", () => {
       ...values,
       balance: -5000,
       kind: "debt",
+      owner: null,
       rate: 0.22,
     } as const;
 
@@ -380,6 +387,7 @@ describe("saveAccount", () => {
       contribution: 250,
       growth: "plan",
       kind: "debt",
+      owner: null,
       rate: 0,
     } as const;
 
@@ -395,6 +403,31 @@ describe("saveAccount", () => {
 
     await expect(saveAccount(null, owing)).rejects.toThrow(z.ZodError);
     expect(insertAccount).toHaveBeenCalledOnce();
+  });
+
+  // An allowance is a person's, so an ISA or a pension names the owner
+  // it is paid under, and an account nobody owns names none; the store
+  // holds the same, and the save is refused before it gets there.
+  it("holds an ISA or a pension to an owner and every other account to none", async () => {
+    vi.mocked(insertAccount).mockResolvedValue(pension);
+
+    await expect(saveAccount(null, { ...values, owner: null })).rejects.toThrow(
+      z.ZodError,
+    );
+    await expect(
+      saveAccount(null, { ...values, kind: "tax-deferred", owner: null }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveAccount(null, { ...values, kind: "cash", owner: 1 }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(saveAccount(null, { ...values, owner: 0 })).rejects.toThrow(
+      z.ZodError,
+    );
+    expect(insertAccount).not.toHaveBeenCalled();
+
+    expect(
+      await saveAccount(null, { ...values, kind: "cash", owner: null }),
+    ).toBe(pension);
   });
 
   it("refuses what the form could not have sent", async () => {
@@ -418,7 +451,12 @@ describe("saveAccount", () => {
       z.ZodError,
     );
     await expect(
-      saveAccount(null, { ...values, funding: "spare", kind: "debt" }),
+      saveAccount(null, {
+        ...values,
+        funding: "spare",
+        kind: "debt",
+        owner: null,
+      }),
     ).rejects.toThrow(z.ZodError);
     await expect(
       saveAccount(1, { ...values, shares: [{ line: 1, sacrifice: 0.1 }] }),
@@ -474,6 +512,7 @@ describe("saveHouse", () => {
     growth: "fixed",
     kind: "house",
     name: "Home",
+    owner: null,
     rate: 0.021,
   } as const;
 
@@ -487,6 +526,7 @@ describe("saveHouse", () => {
     growth: "fixed",
     kind: "debt",
     name: "Home mortgage",
+    owner: null,
     rate: 0.0515,
   } as const;
 
@@ -752,6 +792,7 @@ describe("saveCar", () => {
     growth: "fixed",
     kind: "car",
     name: "Golf",
+    owner: null,
     rate: -0.15,
   } as const;
 
@@ -765,6 +806,7 @@ describe("saveCar", () => {
     growth: "fixed",
     kind: "debt",
     name: "Golf PCP",
+    owner: null,
     rate: 0.079,
   } as const;
 

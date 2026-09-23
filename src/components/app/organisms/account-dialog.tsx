@@ -10,21 +10,24 @@ import type {
   Share,
 } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
+import type { Owner } from "@/data/owners";
 import type { Entry } from "@/hooks/use-editor";
 
 import { saveAccount } from "@/actions/accounts";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { AccountFields } from "@/components/app/organisms/account-fields";
 import { SacrificeFields } from "@/components/app/organisms/sacrifice-fields";
-import { takesSpare, toValues } from "@/data/accounts";
+import { isOwned, takesSpare, toValues } from "@/data/accounts";
 import { useMountedEditor } from "@/hooks/use-editor";
 import { feeding, listed } from "@/lib/feeders";
+import { ownerFor } from "@/lib/owners";
 
 interface AccountDialogProps {
   readonly account: Account | null;
   readonly lines: readonly IncomeLine[];
   readonly onDismiss: () => void;
   readonly onSaved: (account: Account) => void;
+  readonly owners: readonly Owner[];
 }
 
 // What the dialog holds while it is open: the account's values, flat, so
@@ -45,6 +48,7 @@ const blank: Draft = {
   growth: "plan",
   kind: "tax-deferred",
   name: "",
+  owner: null,
   rate: 0,
   shares: [],
 };
@@ -65,9 +69,12 @@ const blank: Draft = {
 // account's own contribution is said to be on top of it; an account
 // nothing feeds shows neither. Only a share that was changed here goes
 // to the store, since a share sent as it opened would write over an
-// edit made to the salary on the plan screen meanwhile. The save holds
-// while the account is unnamed or on its way to the
-// store, and a store that refuses leaves the dialog open and says why,
+// edit made to the salary on the plan screen meanwhile. The owners are
+// handed down for an ISA or a pension to name its own, a new one
+// opening on the first. The save holds while the account is unnamed,
+// while it is a wrapper with no owner, which is only while the plan has
+// none to give it, or while it is on its way to the store, and a store
+// that refuses leaves the dialog open and says why,
 // as the editor hook does, rather than handing the route the rejection.
 // The caller is told when the account has been saved, so the screen can
 // close the dialog and bring the account's own tab forward.
@@ -76,9 +83,10 @@ export function AccountDialog({
   lines,
   onDismiss,
   onSaved,
+  owners,
 }: AccountDialogProps): JSX.Element | null {
   const feeders = account === null ? [] : feeding(account.id, lines);
-  const opening = openingOf(account, feeders);
+  const opening = openingOf(account, feeders, owners);
   const { amend, entry, isSaving, save } = useMountedEditor({
     describe: (saved) => saved.name,
     noun: "Account",
@@ -103,25 +111,35 @@ export function AccountDialog({
   // money is paid a fixed sum instead, as it opened. The choice comes
   // back when a wrapper or cash is chosen again, as the account opened
   // with it, which is what the choice mounts showing. A change that
-  // stays on one side leaves the choice where it is.
+  // stays on one side leaves the choice where it is. The owner goes with
+  // a treatment nobody owns and comes back with a wrapper's, as below.
   function treat(current: Entry<Draft>, kind: AccountKind): void {
     const willTakeSpare = takesSpare({ kind });
+    const owner = ownerAfter(current, kind, owners);
     if (!willTakeSpare && current.draft.funding === "spare") {
-      amend(current, { kind, ...fundedBy(current, "fixed") });
+      amend(current, { kind, owner, ...fundedBy(current, "fixed") });
     } else if (
       willTakeSpare &&
       !takesSpare(current.draft) &&
       current.initial.funding !== current.draft.funding
     ) {
-      amend(current, { kind, ...fundedBy(current, current.initial.funding) });
+      amend(current, {
+        kind,
+        owner,
+        ...fundedBy(current, current.initial.funding),
+      });
     } else {
-      amend(current, { kind });
+      amend(current, { kind, owner });
     }
   }
 
   return entry === null ? null : (
     <EditDialog
-      canSave={!isSaving && entry.draft.name.trim() !== ""}
+      canSave={
+        !isSaving &&
+        entry.draft.name.trim() !== "" &&
+        (!isOwned(entry.draft) || entry.draft.owner !== null)
+      }
       eyebrow={entry.id === null ? "New account" : "Edit account"}
       isWide
       onDismiss={onDismiss}
@@ -144,6 +162,7 @@ export function AccountDialog({
         onKindChange={(kind) => {
           treat(entry, kind);
         }}
+        owners={owners}
       >
         {feeders.length > 0 && (
           <SacrificeFields
@@ -208,14 +227,15 @@ function kindLockOf(feeders: readonly IncomeLine[]): string | undefined {
 // The entry the dialog mounts open on: the account as it is, under its
 // id so a save writes back to it, with the share each salary feeding
 // it sacrifices, or a blank draft under none for a new one, which the
-// store gives an id of its own.
+// store gives an id of its own, a pension belonging to the first owner.
 function openingOf(
   account: Account | null,
   feeders: readonly IncomeLine[],
+  owners: readonly Owner[],
 ): Entry<Draft> {
   const draft =
     account === null
-      ? blank
+      ? { ...blank, owner: ownerFor(null, owners) }
       : {
           ...toValues(account),
           shares: feeders.map((line) => ({
@@ -224,4 +244,21 @@ function openingOf(
           })),
         };
   return { draft, id: account?.id ?? null, initial: draft };
+}
+
+// The owner the draft is left with by a treatment: none for a kind
+// nobody owns; the one it has for a wrapper made another, since the
+// owner field stays where it is; and for an account made a wrapper the
+// one the field mounts showing, the account's own or the first owner.
+function ownerAfter(
+  current: Entry<Draft>,
+  kind: AccountKind,
+  owners: readonly Owner[],
+): null | number {
+  if (!isOwned({ kind })) {
+    return null;
+  }
+  return isOwned(current.draft)
+    ? current.draft.owner
+    : ownerFor(current.initial.owner, owners);
 }

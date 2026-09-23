@@ -78,7 +78,9 @@ type AssetOpening = "new" | Secured;
 // which the page hands down, so a salary that has ended or is yet to
 // start lands nothing on the row, while the dialog and the confirm
 // take every line, since the link stands whether or not it runs. The
-// owners close the screen, a section of their own beneath the order.
+// owners close the screen, a section of their own beneath the order,
+// and are handed to the savings' table, to say whose each wrapper is,
+// and to the account dialog, to choose it.
 export function AccountLedger({
   accounts,
   at,
@@ -229,6 +231,7 @@ export function AccountLedger({
             lines={running}
             onDelete={ask}
             onEdit={edit}
+            owners={owners}
           />
         </SectionCard>
         <Note>
@@ -287,6 +290,7 @@ export function AccountLedger({
           onMove={move}
         />
         <OwnerList
+          accounts={order}
           label={subsectionLabel(accountsAndAssets, ownersPlace)}
           owners={owners}
         />
@@ -301,6 +305,7 @@ export function AccountLedger({
           onSaved={() => {
             setAccount(null);
           }}
+          owners={owners}
         />
       )}
       {doomed !== null && (

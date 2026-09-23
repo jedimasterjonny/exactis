@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { Account } from "@/data/accounts";
 import type { IncomeLineDraft } from "@/data/income";
 
+import { owners } from "@/data/owners.fixture";
+
 import { EmploymentFields } from "./employment-fields";
 
 // The reference's salary as a draft: £120,000 of base with £15,000 of
@@ -57,6 +59,10 @@ function field(name: string): HTMLElement {
 function renderFields(
   initial: IncomeLineDraft,
   draft: IncomeLineDraft = initial,
+  held: readonly { readonly id: number; readonly name: string }[] = [
+    ...owners,
+    { id: 2, name: "Sam" },
+  ],
 ): {
   readonly onAmend: ReturnType<
     typeof vi.fn<(patch: Partial<IncomeLineDraft>) => void>
@@ -68,6 +74,7 @@ function renderFields(
       draft={draft}
       initial={initial}
       onAmend={onAmend}
+      owners={held}
       pensions={pensions}
     />,
   );
@@ -205,7 +212,7 @@ describe("EmploymentFields", () => {
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
       feeds: null,
-      opens: { balance: 0, name: "" },
+      opens: { balance: 0, name: "", owner: 1 },
       sacrifice: 0.1,
     });
   });
@@ -216,7 +223,7 @@ describe("EmploymentFields", () => {
     const opening = {
       ...salary,
       feeds: null,
-      opens: { balance: 500, name: "Aviva" },
+      opens: { balance: 500, name: "Aviva", owner: 1 },
       sacrifice: 0.05,
     };
     const { onAmend } = renderFields(opening);
@@ -239,9 +246,64 @@ describe("EmploymentFields", () => {
     });
 
     expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
-      { opens: { balance: 500, name: "Nest" } },
-      { opens: { balance: 1000, name: "Aviva" } },
+      { opens: { balance: 500, name: "Nest", owner: 1 } },
+      { opens: { balance: 1000, name: "Aviva", owner: 1 } },
       { feeds: 1, opens: null, sacrifice: 0.05 },
     ]);
+  });
+
+  // A pension the line opens belongs to an owner, the first until
+  // another is chosen, and the choice reports with the rest of the
+  // pension as the draft has it.
+  it("asks whose the pension the line opens is, and reports the choice", () => {
+    const opening = {
+      ...salary,
+      feeds: null,
+      opens: { balance: 0, name: "Aviva", owner: 1 },
+    };
+    const { onAmend } = renderFields(opening);
+
+    expect(screen.getByRole("combobox", { name: "Pension owner" })).toHaveValue(
+      "1",
+    );
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Pension owner" }), {
+      target: { value: "2" },
+    });
+
+    expect(onAmend).toHaveBeenCalledExactlyOnceWith({
+      opens: { balance: 0, name: "Aviva", owner: 2 },
+    });
+  });
+
+  // With no owner to give it, the pension opens belonging to none, and
+  // the field says where one is added.
+  it("opens a pension belonging to none while the plan has no owner", () => {
+    const { onAmend } = renderFields(salary, salary, []);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Pension" }), {
+      target: { value: "new" },
+    });
+
+    expect(onAmend).toHaveBeenCalledExactlyOnceWith({
+      feeds: null,
+      opens: { balance: 0, name: "", owner: null },
+      sacrifice: 0.1,
+    });
+  });
+
+  it("holds the owner choice while the plan has no owner, and says where one is added", () => {
+    renderFields(
+      { ...salary, feeds: null, opens: { balance: 0, name: "", owner: null } },
+      undefined,
+      [],
+    );
+
+    expect(
+      screen.getByRole("combobox", { name: "Pension owner" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("combobox", { name: "Pension owner" }),
+    ).toHaveAccessibleDescription("Add one on the accounts screen first");
   });
 });

@@ -1,16 +1,18 @@
 import type { JSX, ReactNode } from "react";
 
 import type { AccountKind, AccountValues, Funding } from "@/data/accounts";
+import type { Owner } from "@/data/owners";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { MoneyField } from "@/components/app/molecules/money-field";
 import { RateField } from "@/components/app/molecules/rate-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
-import { allowanceOf, kindLabels, takesSpare } from "@/data/accounts";
+import { allowanceOf, isOwned, kindLabels, takesSpare } from "@/data/accounts";
 import { cadenceOptions } from "@/lib/cadence";
 import { formatGbp } from "@/lib/money";
 import { optionsOf } from "@/lib/options";
+import { ownerFor, ownerOptions } from "@/lib/owners";
 
 interface AccountFieldsProps {
   readonly children?: ReactNode;
@@ -21,6 +23,7 @@ interface AccountFieldsProps {
   readonly onAmend: (patch: Partial<AccountValues>) => void;
   readonly onFundingChange: (funding: Funding) => void;
   readonly onKindChange: (kind: AccountKind) => void;
+  readonly owners: readonly Owner[];
 }
 
 const fundings = [
@@ -52,7 +55,9 @@ const kinds = optionsOf(kindLabels, [
 ]);
 
 // The fields the account's dialog takes, as the line fields are to the
-// schedules' dialogs: the name and the treatment on the first row, the
+// schedules' dialogs: the name and the treatment on the first row, with
+// the owner beside them for an ISA or a pension, chosen from the owners
+// the ledger hands down and held until there is one to choose, the
 // balance and, for a wrapper or cash, the contribution choice on the
 // second, what that choice asks for on the third, a sum and its cadence
 // or a cap, and on the last the growth choice, with its rate stacked
@@ -82,10 +87,11 @@ export function AccountFields({
   onAmend,
   onFundingChange,
   onKindChange,
+  owners,
 }: AccountFieldsProps): JSX.Element {
   return (
     <div className="grid gap-4">
-      <FieldRow layout="named">
+      <FieldRow layout={isOwned(draft) ? "triple" : "named"}>
         <TextField
           defaultValue={initial.name}
           label="Name"
@@ -104,6 +110,22 @@ export function AccountFields({
           }}
           options={kinds}
         />
+        {isOwned(draft) && (
+          <SelectField
+            defaultValue={String(ownerFor(initial.owner, owners) ?? "")}
+            hint={
+              owners.length === 0
+                ? "Add one in the owners section first"
+                : "Whose allowance it is paid under"
+            }
+            isDisabled={owners.length === 0}
+            label="Owner"
+            onValueChange={(owner) => {
+              onAmend({ owner: Number(owner) });
+            }}
+            options={ownerOptions(owners)}
+          />
+        )}
       </FieldRow>
       <FieldRow layout="pair">
         <MoneyField
