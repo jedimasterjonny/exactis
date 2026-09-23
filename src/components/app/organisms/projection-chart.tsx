@@ -66,7 +66,14 @@ const config = Object.fromEntries(
 // is everywhere here. The first year the plan cannot cover is marked
 // where it falls, a dashed hairline under either mark, and that year's
 // shortfall joins its figures under the crosshair rather than the
-// stack, which carries balances alone. The toggle takes its row from
+// stack, which carries balances alone. The first year that draws on a
+// pension before the pension age is marked the same way in the caution
+// tone, since a plan that lasts only by paying the charge on that is not
+// one that works, and what a year drew so joins its figures too. The
+// early mark's label sits a line beneath the run-out mark's and to the
+// right of its own line where the other's is to the left, so neither
+// writes over the other a year apart or in the one year. The toggle
+// takes its row from
 // inside the plot's box rather than adding one over it, so the box is
 // the same height as the frames that stand in for it and nothing shifts
 // when the chart arrives. A projection of nothing, because no account
@@ -105,6 +112,11 @@ export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
   // which is the year the money runs out. Undefined while every year
   // covers itself, and the mark goes undrawn.
   const runsOut = points.find((point) => point.uncovered > 0);
+
+  // The first year that drew on a pension before it could be drawn as
+  // income, at the charge on taking it early. Undefined while no year
+  // does, and the mark goes undrawn.
+  const drawsEarly = points.find((point) => point.early > 0);
 
   return (
     <Frame>
@@ -184,6 +196,20 @@ export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
                 />
               ),
             )}
+            {drawsEarly !== undefined && (
+              <ReferenceLine
+                label={{
+                  dy: 16,
+                  fill: "var(--caution)",
+                  fontSize: 12,
+                  position: "insideTopLeft",
+                  value: "Early pension",
+                }}
+                stroke="var(--caution)"
+                strokeDasharray="4 4"
+                x={drawsEarly.year}
+              />
+            )}
             {runsOut !== undefined && (
               <ReferenceLine
                 label={{
@@ -260,7 +286,8 @@ function Placeholder({ children }: { readonly children: string }): JSX.Element {
 
 // The year under the crosshair, the age reached that year, and each
 // series' figure with the total beneath, and under that, for a year that
-// came up short, what it could not cover. The values lead, in mono, with
+// drew on a pension early, what it drew so, and for a year that came up
+// short, what it could not cover. The values lead, in mono, with
 // a stroke of the series' colour keying the name beside each. The point
 // is found by the year the crosshair names rather than read out of the
 // entry recharts hands over, which is untyped.
@@ -300,6 +327,14 @@ function ProjectionTooltip({
           {formatGbp(totalOf(point))}
         </span>
       </span>
+      {point.early > 0 && (
+        <span className="flex items-center gap-2">
+          <span className="text-muted-foreground">Drawn early</span>
+          <span className="ml-auto figure font-medium text-caution">
+            {formatGbp(point.early)}
+          </span>
+        </span>
+      )}
       {point.uncovered > 0 && (
         <span className="flex items-center gap-2">
           <span className="text-muted-foreground">Uncovered</span>
