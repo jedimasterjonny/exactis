@@ -4,7 +4,13 @@ import type { IncomeKind, IncomeLine } from "@/data/income";
 import type { Plan } from "@/data/plan";
 import type { LineValues, Month } from "@/data/schedule";
 
-import { allowanceOf, capOf, isPension, takesSpare } from "@/data/accounts";
+import {
+  allowanceOf,
+  capOf,
+  isOwned,
+  isPension,
+  takesSpare,
+} from "@/data/accounts";
 import {
   contributionOf,
   incomeKinds,
@@ -86,11 +92,11 @@ interface Reading {
   readonly settlement?: number;
 }
 
-// What is left of each allowance in the month, by the account it is
-// held for, in what lands: a twelfth of the allowance until something
-// is paid under it. An account whose kind has no allowance has no room
-// to run out of and is never entered.
-type Rooms = Map<number, number>;
+// What is left of each allowance in the month, by the owner and the
+// kind it is held for, in what lands: a twelfth of the allowance until
+// something is paid under it. An account whose kind has no allowance has
+// no room to run out of and is never entered.
+type Rooms = Map<string, number>;
 
 // What the month's income pays in tax: the income tax on all of it,
 // and the National Insurance on the kinds that pay it, and the income
@@ -200,11 +206,20 @@ const nanopound = 1e-9;
 // its balance twice in every year. Refused here rather than where the
 // plan is carried, since the plan card reads a month straight from the
 // flow and a list the store cannot produce is wrong wherever it is
-// read. Every account with an allowance is held to a twelfth of it in
-// what lands there each month, from every source and in the order the
-// month pays them: what the salaries feed it, then its fixed sum, then
-// its take of the spare money, each taking only what the ones before
-// it left. A sacrifice past it is not given up, so the salary is paid
+// read. An allowance is its owner's, one of each kind shared across
+// every account of that kind they hold, so each owner's ISAs are held
+// together to a twelfth of the ISA allowance in what lands in them each
+// month, and their pensions to a twelfth of the pension allowance, from
+// every source and in the order the month pays them: what the salaries
+// feed each, then the fixed sums in the order the accounts are listed,
+// then the spare money's takes in the same order, each taking only
+// what the ones before it left. A wrapper naming no owner is refused
+// with the rest, since the store holds every wrapper to one and an
+// allowance with nobody to hold it to is a figure the flow cannot
+// place; read as a number rather than as present, so an owner of null
+// from a caller that skipped the model is refused too rather than
+// pooling every such wrapper into one allowance. An account nobody
+// owns naming an owner is refused beside it, as the store refuses it. A sacrifice past it is not given up, so the salary is paid
 // and taxed on that part as on the rest; a fixed sum past it is not
 // paid, and stays in the month to pay the sums and the spare money
 // after it, and what none of them takes is left, which the plan takes
@@ -221,6 +236,15 @@ export function cashFlow(
   const { at, settlement = 0 } = reading;
   if (new Set(accounts.map(({ id }) => id)).size !== accounts.length) {
     throw new Error("An account is listed once");
+  }
+  if (
+    accounts.some(
+      (account) => isOwned(account) !== (typeof account.owner === "number"),
+    )
+  ) {
+    throw new Error(
+      "An ISA or a pension belongs to an owner, and nothing else",
+    );
   }
   checkLinks(accounts, schedule);
   const income = sumOf(schedule.income, at, totalOf);
@@ -407,29 +431,40 @@ function isPaying(
   );
 }
 
-// What lands in an account, taken off what is left of its allowance in
-// the month, never below nothing, so the residue of grossing a pension's
-// payment up for its relief and back cannot leave a room a fraction of a
-// penny short of empty. An account with no allowance is left out.
+// What lands in an account, taken off what is left of its owner's
+// allowance for its kind in the month, never below nothing, so the
+// residue of grossing a pension's payment up for its relief and back
+// cannot leave a room a fraction of a penny short of empty. An account
+// with no allowance is left out.
 function landIn(rooms: Rooms, account: Account, landed: number): void {
   if (allowanceOf(account.kind) !== null) {
-    rooms.set(account.id, Math.max(0, roomIn(rooms, account) - landed));
+    rooms.set(roomOf(account), Math.max(0, roomIn(rooms, account) - landed));
   }
 }
 
 // What is left of an account's allowance in the month, in what lands:
-// a twelfth of it until something has been paid under it, and no limit
-// at all for an account whose kind has none.
+// its owner's for its kind, a twelfth of it until something has been
+// paid under it into any of the owner's accounts of the kind, and no
+// limit at all for an account whose kind has none.
 function roomIn(rooms: Rooms, account: Account): number {
   const allowance = allowanceOf(account.kind);
   return allowance === null
     ? Number.POSITIVE_INFINITY
-    : (rooms.get(account.id) ?? allowance / 12);
+    : (rooms.get(roomOf(account)) ?? allowance / 12);
+}
+
+// The allowance an account is paid under, named by its owner and its
+// kind, since an owner has one of each kind shared across every account
+// of it they hold.
+function roomOf(account: Account): string {
+  return `${String(account.owner)} ${account.kind}`;
 }
 
 // The spare money handed down the accounts that take it, each taking
 // what is left up to a twelfth of its own cap less what a salary
-// already feeds it that month, and up to what is left of its allowance,
+// already feeds it that month, and up to what is left of its owner's
+// allowance for its kind, after what that owner's other accounts of it
+// were fed, paid and handed before it,
 // since a sacrifice is an employer contribution and counts against the
 // pension's allowance as the spare money does, and none of it once
 // there is none left or the feeding has filled it, with what is left
