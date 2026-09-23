@@ -74,19 +74,27 @@ export interface Take extends Paid {
 // The flow is asked for a month of a plan: the month being worked out,
 // and the plan it is a month of, which carries the rate an account on
 // the plan rate is charged at and the month the plan is read in, from
-// which a debt's payments are counted.
+// which a debt's payments are counted. A month that settles the tax
+// year before it carries what that year is refunded, or what it still
+// owes as a negative, which only the projection knows, having carried
+// the year; a month read on its own settles nothing.
 interface Reading {
   readonly at: Month;
   readonly plan: Plan;
+  readonly settlement?: number;
 }
 
 // What the month's income pays in tax: the income tax on all of it,
 // and the National Insurance on the kinds that pay it, and the income
 // the tax is charged on, which is what a draw on a pension that month
-// is taxed on top of.
+// is taxed on top of. Beside them is the self-employed profit the
+// month's Class 4 is charged on, since Class 4 is due on the year's
+// profit as income tax is on the year's income, and the projection
+// settles the one as it settles the other.
 interface Taxed {
   readonly incomeTax: number;
   readonly insurance: number;
+  readonly profit: number;
   readonly taxable: number;
 }
 
@@ -118,7 +126,10 @@ const nanopound = 1e-9;
 // months like it would pay, which is the year's tax exactly whenever
 // the year's months are alike and more than it when they are not,
 // since a month earning more than the rest meets a twelfth of each
-// band that the quieter months leave unused. What is left within a
+// band that the quieter months leave unused. The projection settles
+// the difference in the April after the tax year, which comes into
+// that month's money as income does, untaxed, and is spent, saved or
+// drawn for with the rest of it. What is left within a
 // nanopound of nothing is nothing exactly: a month whose lines cancel
 // to the penny need not
 // cancel in binary, and a shortfall too small to write down is no
@@ -189,7 +200,7 @@ export function cashFlow(
   schedule: Schedule,
   reading: Reading,
 ): CashFlow {
-  const { at } = reading;
+  const { at, settlement = 0 } = reading;
   if (new Set(accounts.map(({ id }) => id)).size !== accounts.length) {
     throw new Error("An account is listed once");
   }
@@ -219,7 +230,7 @@ export function cashFlow(
   const running = schedule.income.filter((line) => runsIn(line, at));
   const sacrificing = taxOn(running, feeding);
   const isEarnedWhole =
-    income - givenUp - taxOf(sacrificing) - expenses < -nanopound;
+    income - givenUp - taxOf(sacrificing) + settlement - expenses < -nanopound;
   const fed = isEarnedWhole ? [] : feeding;
   const sacrificed = isEarnedWhole ? 0 : givenUp;
   const taxed = isEarnedWhole ? taxOn(running, []) : sacrificing;
@@ -230,7 +241,7 @@ export function cashFlow(
   );
   const { left: rest, sums: fixed } = fixedSums(
     accounts.filter((account) => !paid.has(account.id)),
-    income - sacrificed - taxOf(taxed) - expenses,
+    income - sacrificed - taxOf(taxed) + settlement - expenses,
     reading,
   );
   const { left, takes } = spareMoney(accounts, rest, fed);
@@ -242,6 +253,7 @@ export function cashFlow(
     incomeTax: taxed.incomeTax,
     insurance: taxed.insurance,
     left: Math.abs(left) < nanopound ? 0 : left,
+    profit: taxed.profit,
     spare: takes,
     spent,
     taxable: taxed.taxable,
@@ -438,6 +450,7 @@ function taxOn(lines: readonly IncomeLine[], fed: readonly Fed[]): Taxed {
       (sum, kind) => sum + insuranceOn(kind, payOf([kind]), 1),
       0,
     ),
+    profit: payOf(["self-employment"]),
     taxable,
   };
 }

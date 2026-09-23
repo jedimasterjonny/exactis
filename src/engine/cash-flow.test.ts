@@ -140,6 +140,7 @@ describe("cashFlow", () => {
     );
 
     expect(flow.income).toBe(8450);
+    expect(flow.profit).toBe(2000);
     expect(flow.incomeTax).toBeCloseTo(2356, 10);
     expect(flow.insurance).toBeCloseTo(293.35, 10);
     expect(flow.left).toBeCloseTo(8450 - 2356 - 293.35, 10);
@@ -856,6 +857,23 @@ describe("cashFlow", () => {
     ).toThrow("A real asset or a debt takes no spare money");
   });
 
+  // What the tax year before refunds comes into the month untaxed, as
+  // money it has, so the ISA takes the £838; and what it still owes
+  // goes out of it, so a month with nothing else is short by the £500.
+  // A month read on its own settles nothing.
+  it("adds what the tax year before settles to the month's money", () => {
+    const at = { month: 3, year: 2027 };
+    const nothing = { expenses: [], income: [] };
+
+    expect(
+      cashFlow([spareIsa], nothing, { at, plan, settlement: 838 }).spare,
+    ).toStrictEqual([{ account: spareIsa, amount: 838, cap: 20000 }]);
+    expect(
+      cashFlow([spareIsa], nothing, { at, plan, settlement: -500 }).left,
+    ).toBe(-500);
+    expect(cashFlow([spareIsa], nothing, { at, plan }).left).toBe(0);
+  });
+
   // £0.30 a month against £0.10 and £0.20 covers itself to the penny
   // and leaves −5.55e-17 in binary, which the projection would read as
   // a month to sell savings for, every month of the plan. What is left
@@ -888,6 +906,7 @@ describe("cashFlow", () => {
       incomeTax: 0,
       insurance: 0,
       left: 0,
+      profit: 0,
       spare: [],
       spent: [],
       taxable: 0,
