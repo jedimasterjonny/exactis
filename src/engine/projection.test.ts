@@ -18,10 +18,11 @@ const [household] = expenseLines;
 const plan = { born: 1992, from: 2026, month: 0, rate: 0.05 };
 
 // Nothing going out and one line coming in wide enough to cover every
-// fixed sum these tests pay, feeding no pension and sacrificing nothing,
-// since a fixed sum is paid only out of what the month has: no account
-// here takes the spare money, so each is paid its fixed sum whole and
-// what the month does not use simply stays.
+// fixed sum these tests pay, £6,346.45 a month once its tax is paid,
+// feeding no pension and sacrificing nothing, since a fixed sum is paid
+// only out of what the month has: no account here takes the spare
+// money, so each is paid its fixed sum whole and what the month does
+// not use simply stays.
 const funded = {
   expenses: [],
   income: [
@@ -29,8 +30,11 @@ const funded = {
   ],
 };
 
-// The salary against the household, which leaves £8,650 a month in
-// 2026, and the salary alone from 2052, when the household ends.
+// The salary against the household. The pension it feeds is not among
+// the accounts these tests hold, so it is earned whole, £7,342.20 a
+// month after £4,250.25 of income tax and £407.55 of NI, which leaves
+// £3,992.20 a month in 2026, and all of it from 2052, when the
+// household ends.
 const schedule = { expenses: [household], income: [salary] };
 
 // The ISA paid the spare money to its allowance, at no growth so what
@@ -119,9 +123,9 @@ describe("project", () => {
     ]);
   });
 
-  // £8,650 a month is left, of which the ISA takes £1,666.67, a twelfth
-  // of its £20,000 allowance, so a year adds £20,000: 291,930, then
-  // 311,930.
+  // £3,992.20 a month is left, of which the ISA takes £1,666.67, a
+  // twelfth of its £20,000 allowance, so a year adds £20,000: 291,930,
+  // then 311,930.
   it("pays a spare-money account its take of the year's cash flow, every month", () => {
     expect(project([spareIsa], schedule, { ...plan, years: 2 })).toStrictEqual([
       { age: 34, deferred: 0, free: 271930, uncovered: 0, year: 2026 },
@@ -130,12 +134,15 @@ describe("project", () => {
     ]);
   });
 
-  // The salary's £1,200 a month sacrificed, the mortgage's £2,180 a
-  // month and the pension's £28,512 a year come out of the month before
-  // the spare money does, leaving £3,204.92, and the current account,
-  // listed first and uncapped, takes all of it, so the ISA is paid
-  // nothing; the pension is still paid its sum, a twelfth a month, and
-  // fed the £1,380 that lands with the NI saved on top: 455,893.
+  // The salary's £1,200 a month sacrificed, the tax on the rest and the
+  // household leave £3,356.20, and the fixed sums come out of it before
+  // the spare money does, in the order the accounts are listed: the
+  // pension's £28,512 a year, £2,376 a month, whole, and the
+  // mortgage the £980.20 left of its £2,180. The current account,
+  // listed first and uncapped, would take whatever was left, and
+  // nothing is, so the ISA is paid nothing either; the pension is paid
+  // its sum and fed the £1,380 that lands with the NI saved on top:
+  // 455,893.
   it("reads the cash flow over every account, in the order they are listed", () => {
     const spareCash: Account = {
       ...cash,
@@ -174,12 +181,14 @@ describe("project", () => {
   });
 
   // A pension is never fed in a month it could be drawn on. £5,000 a
-  // month against £5,200 of spending does not cover itself, so the
-  // £600 the salary would have sacrificed is earned and spent instead,
-  // the SIPP it feeds is fed nothing and stays at the nothing it opens
-  // with, and the year is short by the £200 a month the income does not
-  // cover, £2,400 over its twelve. Born in 1960, so the SIPP is
-  // drawable in every month of the year and has nothing to give.
+  // month is £3,431.78 after the sacrifice and the tax on the rest, and
+  // against £4,000 of spending does not cover itself, so the £600 the
+  // salary would have sacrificed is earned and spent instead, the SIPP
+  // it feeds is fed nothing and stays at the nothing it opens with, and
+  // the year is short by the £220.22 a month the whole income, £3,779.78
+  // after its tax, does not cover, £2,642.60 over its twelve and so
+  // £2,643. Born in 1960, so the SIPP is drawable in every month of the
+  // year and has nothing to give.
   it("feeds no pension in a year it is short, and leaves an empty one empty", () => {
     const earner = {
       ...salary,
@@ -192,11 +201,11 @@ describe("project", () => {
     expect(
       project(
         [{ ...sipp, balance: 0 }],
-        { expenses: [{ ...household, amount: 5200 }], income: [earner] },
+        { expenses: [{ ...household, amount: 4000 }], income: [earner] },
         { ...plan, born: 1960, years: 1 },
       ),
     ).toStrictEqual([
-      { age: 66, deferred: 0, free: 0, uncovered: 2400, year: 2026 },
+      { age: 66, deferred: 0, free: 0, uncovered: 2643, year: 2026 },
       { age: 67, deferred: 0, free: 0, uncovered: 0, year: 2027 },
     ]);
   });
@@ -280,9 +289,9 @@ describe("project", () => {
   });
 
   // The household ends in March 2027, so an ISA with a cap above the
-  // whole month takes the £8,650 left in each of 2026's twelve months
-  // and 2027's first three, and the whole £12,000 in the nine after:
-  // 103,800 on the year, then 25,950 + 108,990.
+  // whole month takes the £3,992.20 left in each of 2026's twelve months
+  // and 2027's first three, and the whole £7,342.20 after tax in the
+  // nine after: 47,906.40 on the year, then 11,976.60 + 66,079.80.
   it("pays a line to the month it ends in, reading each month's flow afresh", () => {
     const wide: Account = {
       ...spareIsa,
@@ -298,8 +307,8 @@ describe("project", () => {
       ),
     ).toStrictEqual([
       { age: 34, deferred: 0, free: 271930, uncovered: 0, year: 2026 },
-      { age: 35, deferred: 0, free: 376930, uncovered: 0, year: 2027 },
-      { age: 36, deferred: 0, free: 513430, uncovered: 0, year: 2028 },
+      { age: 35, deferred: 0, free: 317256, uncovered: 0, year: 2027 },
+      { age: 36, deferred: 0, free: 392519, uncovered: 0, year: 2028 },
     ]);
   });
 
@@ -334,12 +343,13 @@ describe("project", () => {
 
   // A £5,000 card at 22% paying £250 a month clears with its 26th
   // payment, February 2028, and the ISA beside it takes whatever the
-  // month leaves. 2026 pays the card twelve times, so the ISA takes
-  // 12 × £2,750 = £33,000; 2027 the same, £66,000; 2028 pays it twice
-  // and the ISA takes 2 × £2,750 and then ten whole months of £3,000,
-  // £101,500. Charged for every month of the plan instead, as it was,
-  // the card would take £250 a month for ever and the ISA would be
-  // £2,750 light in every year after the debt was gone.
+  // month leaves of the £2,453.30 the salary pays after its tax. 2026
+  // pays the card twelve times, so the ISA takes 12 × £2,203.30 =
+  // £26,439.60; 2027 the same, £52,879.20; 2028 pays it twice and the
+  // ISA takes 2 × £2,203.30 and then ten whole months of £2,453.30,
+  // £81,818.80. Charged for every month of the plan instead, as it
+  // was, the card would take £250 a month for ever and the ISA would be
+  // held to £2,203.30 a month in every year after the debt was gone.
   it("charges a debt's fixed sum only to the month its payments clear it", () => {
     const card: Account = {
       balance: -5000,
@@ -372,7 +382,7 @@ describe("project", () => {
       project([card, wide], earned, { ...plan, years: 3 }).map(
         ({ free }) => free,
       ),
-    ).toStrictEqual([0, 33000, 66000, 101500]);
+    ).toStrictEqual([0, 26440, 52879, 81819]);
   });
 
   // Read in December, so 2026 carries one month: the £1,000 going out

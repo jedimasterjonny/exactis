@@ -58,7 +58,8 @@ interface RowProps {
 // asking the page for every year. The income comes
 // in, as it is earned, then what a salary sacrifices into its pension
 // comes off it, under the pension's name with the salary it is fed
-// from and what lands with the NI saved, then the expenses and every
+// from and what lands with the NI saved, then the income tax and the
+// National Insurance on what is left of it, then the expenses and every
 // account paid go out, each account under its name with how it is
 // paid, and what is left closes the list, in the loss tone when the
 // month does not cover its outgoings. The
@@ -111,6 +112,8 @@ export function CashFlowCard({
               label={fed.account.name}
             />
           ))}
+          <Row amount={-flow.incomeTax} label="Income tax" />
+          <Row amount={-flow.insurance} label="National Insurance" />
           <Expenses amount={flow.expenses} spent={flow.spent} />
           {flow.fixed.map((paid) => (
             <Row

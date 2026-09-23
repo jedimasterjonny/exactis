@@ -1,21 +1,28 @@
 import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
-import type { IncomeLine } from "@/data/income";
+import type { IncomeKind, IncomeLine } from "@/data/income";
 import type { Plan } from "@/data/plan";
 import type { LineValues, Month } from "@/data/schedule";
 
 import { allowanceOf, isPension, takesSpare } from "@/data/accounts";
-import { contributionOf, sacrificeOf, totalOf } from "@/data/income";
+import {
+  contributionOf,
+  incomeKinds,
+  sacrificeOf,
+  totalOf,
+} from "@/data/income";
 import { rateFrom } from "@/data/plan";
 import { monthly } from "@/lib/cadence";
 import { runsIn } from "@/lib/lines";
 import { clearsIn, termOf } from "@/lib/loans";
+import { incomeTaxOn, insuranceOn } from "@/lib/tax";
 
 // A month of a year's money, in pounds as the lines state them and
 // unrounded, formatted where it is rendered: what comes in, what goes
-// out, in sum and line by line, what each pension is fed and what each
-// account is paid, and what is left after all of it.
-export interface CashFlow {
+// out, in sum and line by line, what each pension is fed, the income
+// tax and the National Insurance the month pays, what each account is
+// paid, and what is left after all of it.
+export interface CashFlow extends Taxed {
   readonly expenses: number;
   readonly fed: readonly Fed[];
   readonly fixed: readonly Paid[];
@@ -27,7 +34,8 @@ export interface CashFlow {
 
 // A pension a salary feeds: what lands in it a month, the sacrifice
 // with the employer's NI saved on it, the line it is fed from, and what
-// that line gives up a month, which is what the month is short by.
+// that line gives up a month, which comes off the month before the
+// month is taxed.
 export interface Fed extends Paid {
   readonly line: IncomeLine;
   readonly sacrificed: number;
@@ -70,6 +78,13 @@ interface Reading {
   readonly plan: Plan;
 }
 
+// What the month's income pays in tax: the income tax on all of it,
+// and the National Insurance on the kinds that pay it.
+interface Taxed {
+  readonly incomeTax: number;
+  readonly insurance: number;
+}
+
 // The least a month may be short by and be short at all. Tenths of a
 // pound do not add back to nothing in binary - £0.30 of income against
 // £0.10 and £0.20 of expenses leaves −5.55e-17 - and the projection
@@ -84,14 +99,23 @@ const nanopound = 1e-9;
 
 // A month's money: the income lines running that month, as they are
 // earned, less what a salary sacrifices into its pension, less the
-// expense lines, each kept as well as summed. What that leaves pays the
-// fixed sums, in the order the accounts are listed, each taking its sum
-// or what the month still has when it no longer covers it, and then the
+// income tax and the National Insurance on the rest, less the expense
+// lines, each kept as well as summed. What that leaves pays the fixed
+// sums, in the order the accounts are listed, each taking its sum or
+// what the month still has when it no longer covers it, and then the
 // spare money to each account that takes it in the order they are
 // listed, each up to its cap and passing the rest on, and what is left
-// after them, which is negative by the expenses the income does not
-// cover and by nothing else. What is left within a nanopound of nothing
-// is nothing exactly: a month whose lines cancel to the penny need not
+// after them, which is negative by the expenses the income after its
+// tax does not cover and by nothing else. So the spare money is what
+// the month has after tax, and an account taking it is paid money the
+// month really has rather than the tax bill on top. The tax is charged
+// on the month as a twelfth of a year, a twelfth of what a year of
+// months like it would pay, which is the year's tax exactly whenever
+// the year's months are alike and more than it when they are not,
+// since a month earning more than the rest meets a twelfth of each
+// band that the quieter months leave unused. What is left within a
+// nanopound of nothing is nothing exactly: a month whose lines cancel
+// to the penny need not
 // cancel in binary, and a shortfall too small to write down is no
 // shortfall to draw savings for. A fixed sum is a contribution out of what
 // the month has, not a drawdown: an account is paid only while the
@@ -116,16 +140,20 @@ const nanopound = 1e-9;
 // the employer's NI saved on it, over and above whatever fixed sum the
 // pension is paid in its own right; a salary naming a pension not
 // listed is earned whole, as a line paying a loan not listed pays
-// nothing off it. A sacrifice is given up only while what is left of
-// the income still covers the expenses, a month short of them by less
-// than a nanopound covering them as a month left with that much is left
-// with nothing: what the sacrifices are dropped for and what the month
+// nothing off it. A sacrifice is given up before the tax is charged,
+// since it is never paid to its owner at all, so the salary pays
+// income tax and National Insurance on what is left of it and the
+// sacrifice costs the month less than it puts in the pension. It is
+// given up only while what is left of the income after the tax on it
+// still covers the expenses, a month short of them by less than a
+// nanopound covering them as a month left with that much is left with
+// nothing: what the sacrifices are dropped for and what the month
 // is left with are the one figure, so the two are read against the one
 // rule and a plan whose month cancels to the penny does not give up
 // every sacrifice in every month of it over the residue of adding the
 // lines up. In a month that is really short, no line sacrifices at all,
-// every line is earned whole and every pension is fed nothing. All of
-// them or none, rather than a share of each or
+// every line is earned and taxed whole and every pension is fed
+// nothing. All of them or none, rather than a share of each or
 // the lines that fit, since a sacrifice a month cannot afford is a
 // drawdown by another name and the pension would be fed in the very
 // month a wrapper is sold to cover the spending. So a month that is
@@ -183,9 +211,13 @@ export function cashFlow(
     .map((line) => ({ amount: monthly(line.amount, line.cadence), line }));
   const expenses = total(spent);
   const givenUp = feeding.reduce((sum, entry) => sum + entry.sacrificed, 0);
-  const isEarnedWhole = income - givenUp - expenses < -nanopound;
+  const running = schedule.income.filter((line) => runsIn(line, at));
+  const sacrificing = taxOn(running, feeding);
+  const isEarnedWhole =
+    income - givenUp - taxOf(sacrificing) - expenses < -nanopound;
   const fed = isEarnedWhole ? [] : feeding;
   const sacrificed = isEarnedWhole ? 0 : givenUp;
+  const taxed = isEarnedWhole ? taxOn(running, []) : sacrificing;
   const paid = new Set(
     schedule.expenses.flatMap((line) =>
       line.pays === undefined ? [] : [line.pays],
@@ -193,7 +225,7 @@ export function cashFlow(
   );
   const { left: rest, sums: fixed } = fixedSums(
     accounts.filter((account) => !paid.has(account.id)),
-    income - sacrificed - expenses,
+    income - sacrificed - taxOf(taxed) - expenses,
     reading,
   );
   const { left, takes } = spareMoney(accounts, rest, fed);
@@ -202,6 +234,8 @@ export function cashFlow(
     fed,
     fixed,
     income,
+    incomeTax: taxed.incomeTax,
+    insurance: taxed.insurance,
     left: Math.abs(left) < nanopound ? 0 : left,
     spare: takes,
     spent,
@@ -360,6 +394,39 @@ function sumOf<TLine extends LineValues>(
   return lines
     .filter((line) => runsIn(line, at))
     .reduce((sum, line) => sum + monthly(amountOf(line), line.cadence), 0);
+}
+
+// What the month pays in tax, all of it.
+function taxOf({ incomeTax, insurance }: Taxed): number {
+  return incomeTax + insurance;
+}
+
+// The tax on the lines running in the month, each as it is earned less
+// what it gives up into the pension it feeds: income tax on the whole
+// of it, and National Insurance on each kind of income that pays it,
+// the lines of a kind summed first, since a step-up is a second line
+// of the one job rather than a second job with a threshold of its own.
+// Each is charged on the month alone against a twelfth of each band,
+// which is a twelfth of what a year of the month would pay, so a month
+// is charged the same whenever in the year it falls.
+function taxOn(lines: readonly IncomeLine[], fed: readonly Fed[]): Taxed {
+  const payOf = (kinds: readonly IncomeKind[]): number =>
+    lines
+      .filter((line) => kinds.includes(line.kind))
+      .reduce(
+        (sum, line) =>
+          sum +
+          monthly(totalOf(line), line.cadence) -
+          (fed.find((entry) => entry.line === line)?.sacrificed ?? 0),
+        0,
+      );
+  return {
+    incomeTax: incomeTaxOn(payOf(incomeKinds), 1),
+    insurance: incomeKinds.reduce(
+      (sum, kind) => sum + insuranceOn(kind, payOf([kind]), 1),
+      0,
+    ),
+  };
 }
 
 function total(amounts: readonly { readonly amount: number }[]): number {
