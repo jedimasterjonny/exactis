@@ -4,7 +4,7 @@ import type { IncomeKind, IncomeLine } from "@/data/income";
 import type { Plan } from "@/data/plan";
 import type { LineValues, Month } from "@/data/schedule";
 
-import { capOf, isPension, takesSpare } from "@/data/accounts";
+import { allowanceOf, capOf, isPension, takesSpare } from "@/data/accounts";
 import {
   contributionOf,
   incomeKinds,
@@ -35,7 +35,9 @@ export interface CashFlow extends Taxed {
 // A pension a salary feeds: what lands in it a month, the sacrifice
 // with the employer's NI saved on it, the line it is fed from, and what
 // that line gives up a month, which comes off the month before the
-// month is taxed.
+// month is taxed. Both are as much of the line's sacrifice as the
+// pension's allowance takes, which is all of it until the allowance is
+// full.
 export interface Fed extends Paid {
   readonly line: IncomeLine;
   readonly sacrificed: number;
@@ -83,6 +85,12 @@ interface Reading {
   readonly plan: Plan;
   readonly settlement?: number;
 }
+
+// What is left of each allowance in the month, by the account it is
+// held for, in what lands: a twelfth of the allowance until something
+// is paid under it. An account whose kind has no allowance has no room
+// to run out of and is never entered.
+type Rooms = Map<number, number>;
 
 // What the month's income pays in tax: the income tax on all of it,
 // and the National Insurance on the kinds that pay it, and the income
@@ -192,9 +200,19 @@ const nanopound = 1e-9;
 // its balance twice in every year. Refused here rather than where the
 // plan is carried, since the plan card reads a month straight from the
 // flow and a list the store cannot produce is wrong wherever it is
-// read. Every line is taken at the amount it states, in
-// today's money; how it grows against inflation waits on an inflation
-// assumption the plan does not carry yet.
+// read. Every account with an allowance is held to a twelfth of it in
+// what lands there each month, from every source and in the order the
+// month pays them: what the salaries feed it, then its fixed sum, then
+// its take of the spare money, each taking only what the ones before
+// it left. A sacrifice past it is not given up, so the salary is paid
+// and taxed on that part as on the rest; a fixed sum past it is not
+// paid, and stays in the month to pay the sums and the spare money
+// after it, and what none of them takes is left, which the plan takes
+// as spent rather than saved. A twelfth rather than what is left of the tax year, so a
+// month reads the same whenever in the year it falls and needs nothing
+// the projection carries. Every line is taken at the amount it states,
+// in today's money; how it grows against inflation waits on an
+// inflation assumption the plan does not carry yet.
 export function cashFlow(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -206,19 +224,25 @@ export function cashFlow(
   }
   checkLinks(accounts, schedule);
   const income = sumOf(schedule.income, at, totalOf);
+  const offered: Rooms = new Map();
   const feeding = schedule.income
     .filter((line) => runsIn(line, at))
     .flatMap((line) => {
       const account = accountAt(accounts, line.feeds);
-      const sacrificed = monthly(sacrificeOf(line), line.cadence);
-      return account === undefined || sacrificed === 0
+      const wanted = monthly(contributionOf(line), line.cadence);
+      if (account === undefined || wanted === 0) {
+        return [];
+      }
+      const share = Math.min(1, roomIn(offered, account) / wanted);
+      landIn(offered, account, wanted * share);
+      return share === 0
         ? []
         : [
             {
               account,
-              amount: monthly(contributionOf(line), line.cadence),
+              amount: wanted * share,
               line,
-              sacrificed,
+              sacrificed: monthly(sacrificeOf(line), line.cadence) * share,
             },
           ];
     });
@@ -234,6 +258,10 @@ export function cashFlow(
   const fed = isEarnedWhole ? [] : feeding;
   const sacrificed = isEarnedWhole ? 0 : givenUp;
   const taxed = isEarnedWhole ? taxOn(running, []) : sacrificing;
+  const rooms: Rooms = new Map();
+  for (const entry of fed) {
+    landIn(rooms, entry.account, entry.amount);
+  }
   const paid = new Set(
     schedule.expenses.flatMap((line) =>
       line.pays === undefined ? [] : [line.pays],
@@ -242,9 +270,9 @@ export function cashFlow(
   const { left: rest, sums: fixed } = fixedSums(
     accounts.filter((account) => !paid.has(account.id)),
     income - sacrificed - taxOf(taxed) + settlement - expenses,
-    reading,
+    { reading, rooms },
   );
-  const { left, takes } = spareMoney(accounts, rest, fed);
+  const { left, takes } = spareMoney(accounts, rest, { fed, rooms });
   return {
     expenses,
     fed,
@@ -277,12 +305,19 @@ function accountAt(
 // reaches, while the screens reading a single month stayed green and
 // the plan looked sound. A line naming an account that is not listed
 // names nothing here and is sound: it is earned whole, or pays nothing
-// off a loan.
+// off a loan. A salary gives up a share of its base, from none of it to
+// all of it, and the action holds it there: a share below nothing
+// would be a feed below nothing, which the allowance's room divided by
+// would turn into the whole room fed from nothing given up, and a share
+// past the whole would give up pay the salary never paid.
 function checkLinks(accounts: readonly Account[], schedule: Schedule): void {
-  for (const { feeds } of schedule.income) {
+  for (const { feeds, sacrifice } of schedule.income) {
     const account = accountAt(accounts, feeds);
     if (account !== undefined && !isPension(account)) {
       throw new Error("A salary feeds a pension alone");
+    }
+    if (!(sacrifice >= 0 && sacrifice <= 1)) {
+      throw new Error("A salary gives up a share of its base");
     }
   }
   for (const { pays } of schedule.expenses) {
@@ -314,20 +349,28 @@ function fixedSum(account: Account, reading: Reading): Paid[] {
 // The fixed sums paid out of what the month has after the sacrifices and
 // the expenses, handed down the accounts in the order they are listed as
 // the spare money is: each takes its stated sum, or what is left when
-// the month no longer reaches it, and passes the rest on. An account the
-// month could not pay is still listed, at what it was paid and not at
-// what it asked for, so the ledger says which sum went short rather than
-// dropping the account out of the month altogether.
+// the month no longer reaches it, or what is left of its allowance when
+// that no longer does, and passes the rest on. A pension lands a quarter
+// more than it is paid, the basic rate it claims back, so what it is
+// paid is four fifths of the room it has. An account the month could
+// not pay is still listed, at what it was paid and not at what it asked
+// for, so the ledger says which sum went short rather than dropping the
+// account out of the month altogether.
 function fixedSums(
   accounts: readonly Account[],
   available: number,
-  reading: Reading,
+  { reading, rooms }: { readonly reading: Reading; readonly rooms: Rooms },
 ): { readonly left: number; readonly sums: readonly Paid[] } {
   const sums: Paid[] = [];
   let left = available;
   const stated = accounts.flatMap((account) => fixedSum(account, reading));
   for (const { account, amount } of stated) {
-    const sum = Math.max(0, Math.min(left, amount));
+    const lands = 1 + reliefOf(account);
+    const sum = Math.max(
+      0,
+      Math.min(left, amount, roomIn(rooms, account) / lands),
+    );
+    landIn(rooms, account, sum * lands);
     sums.push({ account, amount: sum });
     left -= sum;
   }
@@ -364,15 +407,36 @@ function isPaying(
   );
 }
 
+// What lands in an account, taken off what is left of its allowance in
+// the month, never below nothing, so the residue of grossing a pension's
+// payment up for its relief and back cannot leave a room a fraction of a
+// penny short of empty. An account with no allowance is left out.
+function landIn(rooms: Rooms, account: Account, landed: number): void {
+  if (allowanceOf(account.kind) !== null) {
+    rooms.set(account.id, Math.max(0, roomIn(rooms, account) - landed));
+  }
+}
+
+// What is left of an account's allowance in the month, in what lands:
+// a twelfth of it until something has been paid under it, and no limit
+// at all for an account whose kind has none.
+function roomIn(rooms: Rooms, account: Account): number {
+  const allowance = allowanceOf(account.kind);
+  return allowance === null
+    ? Number.POSITIVE_INFINITY
+    : (rooms.get(account.id) ?? allowance / 12);
+}
+
 // The spare money handed down the accounts that take it, each taking
-// what is left up to a twelfth of its cap less what a salary already
-// feeds it that month, since a sacrifice is an employer contribution
-// and counts against the pension's allowance as the spare money does,
-// and none of it once there is none left or the feeding has filled
-// it, with what is left after them. The cap holds what lands in the
-// account, and a pension lands a quarter more than it is paid, the
-// basic rate it claims back, so what it takes out of the month is four
-// fifths of the room it has. The remainder is the one the
+// what is left up to a twelfth of its own cap less what a salary
+// already feeds it that month, and up to what is left of its allowance,
+// since a sacrifice is an employer contribution and counts against the
+// pension's allowance as the spare money does, and none of it once
+// there is none left or the feeding has filled it, with what is left
+// after them. The cap holds what lands in the account, and a pension
+// lands a quarter more than it is paid, the basic rate it claims back,
+// so what it takes out of the month is four fifths of the room it has.
+// The remainder is the one the
 // hand-down keeps, rather than the sum taken back off the whole, so an
 // account that takes all there is leaves exactly nothing and not the
 // rounding of a subtraction. A real asset or a debt takes no spare
@@ -382,7 +446,7 @@ function isPaying(
 function spareMoney(
   accounts: readonly Account[],
   available: number,
-  fed: readonly Fed[],
+  { fed, rooms }: { readonly fed: readonly Fed[]; readonly rooms: Rooms },
 ): { readonly left: number; readonly takes: readonly Take[] } {
   const takes: Take[] = [];
   let left = available;
@@ -392,15 +456,22 @@ function spareMoney(
       if (!takesSpare(account)) {
         throw new Error("A real asset or a debt takes no spare money");
       }
-      const cap = capOf(account.kind, contribution.cap);
-      const room =
-        cap === null
-          ? left
-          : (cap / 12 -
-              total(fed.filter((entry) => entry.account === account))) /
-            (1 + reliefOf(account));
-      const amount = Math.max(0, Math.min(left, room));
-      takes.push({ account, amount, cap });
+      const own =
+        contribution.cap === null
+          ? Number.POSITIVE_INFINITY
+          : contribution.cap / 12 -
+            total(fed.filter((entry) => entry.account === account));
+      const lands = 1 + reliefOf(account);
+      const amount = Math.max(
+        0,
+        Math.min(left, Math.min(own, roomIn(rooms, account)) / lands),
+      );
+      landIn(rooms, account, amount * lands);
+      takes.push({
+        account,
+        amount,
+        cap: capOf(account.kind, contribution.cap),
+      });
       left -= amount;
     }
   }
