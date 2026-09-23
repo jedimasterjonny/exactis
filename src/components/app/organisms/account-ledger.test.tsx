@@ -31,6 +31,10 @@ vi.mock("@/actions/accounts", () => ({
   saveCar: vi.fn(),
   saveHouse: vi.fn(),
 }));
+vi.mock("@/actions/owners", () => ({
+  removeOwner: vi.fn(),
+  saveOwner: vi.fn(),
+}));
 
 // The month the fixture's plan is read in, September 2026, in which the
 // salary runs.
@@ -89,7 +93,7 @@ function openEntry(): HTMLElement {
 function renderLedger(): void {
   render(
     <Toaster>
-      <AccountLedger accounts={accounts} at={at} lines={[]} />
+      <AccountLedger accounts={accounts} at={at} lines={[]} owners={[]} />
     </Toaster>,
   );
 }
@@ -190,6 +194,34 @@ describe("AccountLedger", () => {
         screen.getByRole("region", { name: "Order of payment" }),
       ).getByText("Sect. II.iv"),
     ).toHaveClass("label");
+    expect(
+      within(screen.getByRole("region", { name: "Owners" })).getByText(
+        "Sect. II.v",
+      ),
+    ).toHaveClass("label");
+  });
+
+  // An order of fewer than two accounts is no order and draws nothing,
+  // so the owners take its place rather than leaving a numeral out.
+  it("puts the owners where the order would be when there is no order", () => {
+    render(
+      <Toaster>
+        <AccountLedger
+          accounts={[isa]}
+          at={at}
+          lines={[]}
+          owners={[{ id: 1, name: "Me" }]}
+        />
+      </Toaster>,
+    );
+
+    const owners = screen.getByRole("region", { name: "Owners" });
+
+    expect(
+      screen.queryByRole("region", { name: "Order of payment" }),
+    ).not.toBeInTheDocument();
+    expect(within(owners).getByText("Sect. II.iii")).toHaveClass("label");
+    expect(within(owners).getByRole("row", { name: /Me/ })).toBeInTheDocument();
   });
 
   // The fixture's balances come to £950,771, its mortgage taking away,
@@ -226,6 +258,7 @@ describe("AccountLedger", () => {
           accounts={[pension, house, loan]}
           at={at}
           lines={[salary]}
+          owners={[]}
         />
       </Toaster>,
     );
@@ -657,6 +690,7 @@ describe("AccountLedger", () => {
           ]}
           at={at}
           lines={[]}
+          owners={[]}
         />
       </Toaster>,
     );
@@ -716,6 +750,7 @@ describe("AccountLedger", () => {
           accounts={[{ ...isa, contribution: { cap: 4000, kind: "spare" } }]}
           at={at}
           lines={[]}
+          owners={[]}
         />
       </Toaster>,
     );
@@ -869,7 +904,12 @@ describe("AccountLedger", () => {
   it("puts a house and the loan against it on one row, which opens both in the house dialog", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[pension, house, loan]} at={at} lines={[]} />
+        <AccountLedger
+          accounts={[pension, house, loan]}
+          at={at}
+          lines={[]}
+          owners={[]}
+        />
       </Toaster>,
     );
 
@@ -920,7 +960,12 @@ describe("AccountLedger", () => {
   it("puts a car and the finance on it on one row, which opens both in the car dialog", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[pension, golf, finance]} at={at} lines={[]} />
+        <AccountLedger
+          accounts={[pension, golf, finance]}
+          at={at}
+          lines={[]}
+          owners={[]}
+        />
       </Toaster>,
     );
 
@@ -949,7 +994,7 @@ describe("AccountLedger", () => {
   it("opens a house with no loan against it as owned outright", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[house]} at={at} lines={[]} />
+        <AccountLedger accounts={[house]} at={at} lines={[]} owners={[]} />
       </Toaster>,
     );
 
@@ -974,6 +1019,7 @@ describe("AccountLedger", () => {
           ]}
           at={at}
           lines={[]}
+          owners={[]}
         />
       </Toaster>,
     );
@@ -1066,7 +1112,12 @@ describe("AccountLedger", () => {
   it("says a house takes its mortgage and the payments", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[pension, house, loan]} at={at} lines={[]} />
+        <AccountLedger
+          accounts={[pension, house, loan]}
+          at={at}
+          lines={[]}
+          owners={[]}
+        />
       </Toaster>,
     );
 
@@ -1082,7 +1133,12 @@ describe("AccountLedger", () => {
   it("says a car takes its finance and the payments", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[golf, finance]} at={at} lines={[]} />
+        <AccountLedger
+          accounts={[golf, finance]}
+          at={at}
+          lines={[]}
+          owners={[]}
+        />
       </Toaster>,
     );
 
@@ -1105,7 +1161,12 @@ describe("AccountLedger", () => {
     const [salary] = incomeLines;
     render(
       <Toaster>
-        <AccountLedger accounts={accounts} at={at} lines={[salary]} />
+        <AccountLedger
+          accounts={accounts}
+          at={at}
+          lines={[salary]}
+          owners={[]}
+        />
       </Toaster>,
     );
 
@@ -1125,6 +1186,7 @@ describe("AccountLedger", () => {
           accounts={accounts}
           at={{ month: 0, year: 2049 }}
           lines={[salary]}
+          owners={[]}
         />
       </Toaster>,
     );
@@ -1145,7 +1207,12 @@ describe("AccountLedger", () => {
     const [salary] = incomeLines;
     render(
       <Toaster>
-        <AccountLedger accounts={[pension, isa]} at={at} lines={[salary]} />
+        <AccountLedger
+          accounts={[pension, isa]}
+          at={at}
+          lines={[salary]}
+          owners={[]}
+        />
       </Toaster>,
     );
 
@@ -1188,6 +1255,7 @@ describe("AccountLedger", () => {
           accounts={[pension, isa]}
           at={at}
           lines={[salary, { ...stepUp, feeds: pension.id, sacrifice: 0.05 }]}
+          owners={[]}
         />
       </Toaster>,
     );
@@ -1215,7 +1283,7 @@ describe("AccountLedger", () => {
   it("says a house with no loan goes alone", () => {
     render(
       <Toaster>
-        <AccountLedger accounts={[house]} at={at} lines={[]} />
+        <AccountLedger accounts={[house]} at={at} lines={[]} owners={[]} />
       </Toaster>,
     );
 
