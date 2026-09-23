@@ -41,6 +41,7 @@ a second file repeating it.
 | `format`, `format:check`              | Prettier, rewriting and reporting                                 |
 | `typecheck`                           | `next typegen`, then `tsc --noEmit`                               |
 | `test`, `test:watch`, `test:coverage` | Vitest; coverage enforces the per-file 100% gate                  |
+| `test:e2e`                            | Serve the last `build` and sign in to it over HTTP                |
 | `db:generate`, `db:migrate`           | Write a migration from the schema, then apply the pending ones    |
 | `hash-password`                       | Hash the password piped in, for `APP_PASSWORD_HASH`               |
 | `mcp:next`, `mcp:shadcn`              | The Next devtools and shadcn MCP servers, launched by `.mcp.json` |
