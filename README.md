@@ -115,7 +115,11 @@ constant in the engine until that same assumptions screen exists, as the plan
 rate is held in the store. Each account is drawn to nothing and no lower, and
 what a year could not draw from anywhere is carried on its point, so the
 projection can say when the money runs out and the dashboard's chart marks that
-year. A draw is not taxed yet. Every line is taken at the amount it states, in
+year. Cash and the tax-free wrapper give up what the month is short, and a
+pension is grossed up so that what is left of the draw once taxed is what the
+month is short: a quarter of each draw is free of tax until the £268,275 lump
+sum allowance is used up over the plan, and the rest is taxed as income on top
+of what the month earned. Every line is taken at the amount it states, in
 today's money, until the plan carries an inflation assumption.
 
 The dashboard reads the projection through `src/store/plan.ts`, a cached read
