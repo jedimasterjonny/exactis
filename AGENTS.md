@@ -169,9 +169,11 @@ because the vocabulary is open by design.
 
 ## Never commit red
 
-The pre-commit hook already blocks unformatted, unlinted and mistyped code, and
-a failing or uncovered test suite, so what matters here is what the hook cannot
-reach:
+The pre-commit hook already blocks unformatted, unlinted and mistyped code, a
+cycle in the import graph, and a dependency or export nothing uses. The suite
+under coverage is the one check not in it: that is `.husky/pre-push`, which runs
+it once for a series rather than once for every commit in one. So what matters
+here is what neither hook reaches:
 
 - IMPORTANT: never use `--no-verify`. CI runs the same checks on every push and
   pull request, so bypassing the hook defers the failure rather than avoiding
@@ -179,7 +181,9 @@ reach:
 - `git rebase` does not re-run the hook, and nor does `git cherry-pick`. After
   reordering or amending, every commit in the series must still be green, not
   only the tip, and the worktree check above is the only check those commits get
-  before CI.
+  before CI. The pre-push hook does not stand in for it either: it runs the
+  suite at the tip, so a middle commit can be red under a green push, and the
+  commit job is what finds it.
 - Never suppress a diagnostic to clear a check, and never delete, skip or
   `.only` a test or loosen an assertion to match behaviour that is broken. A
   skipped test reports nothing, which is worse than red.
