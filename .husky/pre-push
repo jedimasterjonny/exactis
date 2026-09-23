@@ -1,0 +1,12 @@
+# The suite under coverage, once per push rather than once per commit. It was 83s
+# of an 88s pre-commit, and AGENTS.md asks for one decision per commit, so a
+# five-commit series paid for it five times over to be pushed once. Every other
+# check stayed in the pre-commit hook: none of them costs more than a few
+# seconds, and knip is a whole-project check like this one but takes about one.
+#
+# What this tier gives up is that the suite is proven at the tip rather than at
+# each commit, so a middle commit can be red while the tip is green. That gap is
+# what the commit job in ci.yml already closes - it checks every commit in the
+# range on a runner of its own - and the throwaway worktrees AGENTS.md asks for
+# are how it is closed locally before the push rather than after it.
+bun run test:coverage
