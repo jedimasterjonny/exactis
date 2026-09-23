@@ -79,8 +79,9 @@ Nothing here relies on being remembered.
   everything outside `src/app` from importing `@/app/*`: the routes are the top
   tier, so a server action lives under `src/actions` and a store under
   `src/store`, where an organism or a template can reach them.
-- `import/no-cycle` catches the loop that the permitted same-tier edge makes
-  possible.
+- `bun run cycles` catches the loop that the permitted same-tier edge makes
+  possible. It is oxlint rather than ESLint's `import/no-cycle`, which walked
+  the import graph once per file and cost 76% of the whole lint run.
 - `.github/workflows/vendor.yml` re-runs `shadcn add --overwrite` weekly and
   opens a pull request if `ui/` has drifted from the registry. That check is
   what the style exemptions rest on.
