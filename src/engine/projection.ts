@@ -86,7 +86,8 @@ const pensionAge = 57;
 // compounded deeper every month by the growth and never drawn on, the
 // draw taking the lesser of what the account holds and what the month
 // is short under a floor of nothing. The action refuses the same
-// balance where it is saved. Nothing is taxed yet.
+// balance where it is saved. The flow taxes the month's income; a draw
+// is not taxed yet.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -142,7 +143,7 @@ function carried(balance: number, paid: number, rate: number): number {
 
 // What a month's shortfall takes out of the savings, and what is left
 // of it after them. The kinds are drawn in the order that is right
-// before there is any tax to model: cash first, since it is spent as it
+// while a draw is taxed nothing: cash first, since it is spent as it
 // stands and grows least; then the tax-free wrapper, which is reached
 // at any age and owes nothing on the way out; then the tax-deferred
 // one, and only from the year its owner reaches the pension age, since

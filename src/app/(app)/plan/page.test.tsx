@@ -26,9 +26,10 @@ const [salary] = incomeLines;
 
 describe("Plan", () => {
   // The fixture's first year: the salary's £12,250 a month, less the
-  // £1,000 sacrificed into the pension, against the household's £3,500,
-  // the pension's, the ISA's and the mortgage's fixed sums, leaving
-  // £1,607.
+  // £1,000 sacrificed into the pension and the tax on the rest, against
+  // the household's £3,500, and the pension's and the ISA's fixed sums
+  // taking all that leaves before the mortgage's is reached, so the last
+  // of the ledger's figures, what is left, is nothing.
   it("hands the store's lines and the plan to both schedules under one header, and this year's cash flow beneath", async () => {
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
     vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
@@ -67,11 +68,15 @@ describe("Plan", () => {
       }),
     ).toHaveValue("2026");
     expect(screen.getByText("Left over")).toBeInTheDocument();
-    expect(screen.getByText("£1,607")).toHaveClass("figure", "font-medium");
+    expect(screen.getAllByText("£0").at(-1)).toHaveClass(
+      "figure",
+      "font-medium",
+    );
   });
 
   // The salary alone, with nothing going out and no account to pay,
-  // leaves all of its £12,250 a month.
+  // leaves all of its £12,250 a month that the tax does not take,
+  // £7,474.70.
   it("counts a single line in the singular and none as none", async () => {
     vi.mocked(getIncomeLines).mockResolvedValue([salary]);
     vi.mocked(getExpenseLines).mockResolvedValue([]);
@@ -84,6 +89,6 @@ describe("Plan", () => {
       screen.getByText("1 income line · 0 expense lines"),
     ).toBeInTheDocument();
     expect(screen.getByText("No expenses yet")).toBeInTheDocument();
-    expect(screen.getAllByText("£12,250")).toHaveLength(2);
+    expect(screen.getByText("£7,475")).toHaveClass("figure", "font-medium");
   });
 });
