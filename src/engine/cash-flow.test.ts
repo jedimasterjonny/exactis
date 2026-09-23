@@ -525,6 +525,96 @@ describe("cashFlow", () => {
     expect(at(120000, 0)).toBe(4000);
   });
 
+  // A tenth of a £600,000 base would land £5,750 a month with the
+  // employer's NI on it, past the £5,000 a twelfth of the allowance
+  // holds. The salary gives up only what lands as that £5,000,
+  // £4,347.83, and is paid and taxed on the rest, so the £627,000 a year
+  // with its parts is taxed on £47,902.17 a month rather than £47,250;
+  // and the pension's own fixed sum finds no room left and is paid
+  // nothing.
+  it("gives up only as much of a sacrifice as the pension's allowance takes", () => {
+    const rich: IncomeLine = { ...salary, amount: 600000 };
+    const flow = cashFlow(
+      [pension],
+      { expenses: [], income: [rich] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+
+    expect(flow.fed).toHaveLength(1);
+    expect(flow.fed[0]?.amount).toBeCloseTo(5000, 10);
+    expect(flow.fed[0]?.sacrificed).toBeCloseTo(5000 / 1.15, 10);
+    expect(flow.taxable).toBeCloseTo(52250 - 5000 / 1.15, 10);
+    expect(flow.fixed).toStrictEqual([{ account: pension, amount: 0 }]);
+  });
+
+  // The salaries are read in the order the schedule lists them, so the
+  // £600,000 base fills the allowance and the second salary feeding the
+  // same pension finds no room and gives up nothing: it is not listed
+  // as feeding it at all, and is taxed whole.
+  it("gives up nothing of a sacrifice the allowance has no room left for", () => {
+    const rich: IncomeLine = { ...salary, amount: 600000 };
+    const second: IncomeLine = { ...salary, id: 9 };
+    const flow = cashFlow(
+      [pension],
+      { expenses: [], income: [rich, second] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+
+    expect(flow.fed.map((entry) => entry.line)).toStrictEqual([rich]);
+    expect(flow.taxable).toBeCloseTo(52250 + 12250 - 5000 / 1.15, 10);
+  });
+
+  // The salary's pension is not listed, so it is earned whole, £7,474.70
+  // after its tax. A pension paid £6,000 a month has room for £4,000 of
+  // it, which lands as the £5,000 a twelfth of its allowance holds; an
+  // ISA paid £30,000 a year is paid the £1,666.67 its allowance gives it
+  // a month; and what neither could take passes down to the current
+  // account, £1,808.03.
+  it("pays a fixed sum only as far as the allowance reaches, passing the rest down", () => {
+    const overpaid: Account = {
+      ...pension,
+      contribution: { amount: 6000, cadence: "month", kind: "fixed" },
+      id: 7,
+    };
+    const oversaved: Account = {
+      ...isa,
+      contribution: { amount: 30000, cadence: "year", kind: "fixed" },
+    };
+    const flow = cashFlow(
+      [overpaid, oversaved, spareCash],
+      { expenses: [], income: [salary] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+
+    expect(pennies(flow.fixed)).toStrictEqual([
+      { account: overpaid, amount: 4000 },
+      { account: oversaved, amount: 1666.67 },
+    ]);
+    expect(pennies(flow.spare)).toStrictEqual([
+      { account: spareCash, amount: 1808.03, cap: null },
+    ]);
+  });
+
+  // The salary feeds the pension £1,150 a month, which leaves £3,850 of
+  // the £5,000 a twelfth of its allowance holds, so the pension's own
+  // £5,000 a month is paid £3,080, which lands as that £3,850 once the
+  // basic rate is claimed back.
+  it("counts what a salary feeds a pension against the fixed sum it is paid", () => {
+    const topped: Account = {
+      ...pension,
+      contribution: { amount: 5000, cadence: "month", kind: "fixed" },
+    };
+    const flow = cashFlow(
+      [topped],
+      { expenses: [], income: [salary] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+
+    expect(pennies(flow.fixed)).toStrictEqual([
+      { account: topped, amount: 3080 },
+    ]);
+  });
+
   // £187,787 a year is £15,648.92 a month, £9,276.13 after £5,892.26 of
   // income tax and £480.53 of NI, less the mortgage £7,066.13, of which
   // the ISA takes £1,666.67, the pension the £2,000 that lands as a
@@ -777,6 +867,35 @@ describe("cashFlow", () => {
           { at: { month: 0, year: 2026 }, plan },
         ),
       ).toThrow("A salary feeds a pension alone");
+    }
+  });
+
+  // A share of the base is held between none of it and all of it by the
+  // action, so one outside is a caller's mistake: below nothing, the
+  // room divided by a feed below nothing came out as the whole room fed
+  // from nothing given up, and past the whole the salary gave up pay it
+  // never paid. Refused whether or not the pension is listed, and all of
+  // the base or none of it is sound.
+  it("refuses a salary giving up less than none of its base or more than all of it", () => {
+    for (const sacrifice of [-0.1, 1.5, Number.NaN]) {
+      for (const held of [[pension], []]) {
+        expect(() =>
+          cashFlow(
+            held,
+            { expenses: [], income: [{ ...salary, sacrifice }] },
+            { at: { month: 0, year: 2026 }, plan },
+          ),
+        ).toThrow("A salary gives up a share of its base");
+      }
+    }
+    for (const sacrifice of [0, 1]) {
+      expect(() =>
+        cashFlow(
+          [pension],
+          { expenses: [], income: [{ ...salary, sacrifice }] },
+          { at: { month: 0, year: 2026 }, plan },
+        ),
+      ).not.toThrow();
     }
   });
 
