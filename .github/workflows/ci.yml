@@ -236,10 +236,19 @@ jobs:
       # Kept alongside typecheck even though next build type checks too: a
       # type error should fail in seconds rather than after a full build, and
       # the build catches what tsc alone does not.
-      - if:
+      - id: build
+        if:
           ${{ !cancelled() && steps.install.outcome == 'success' &&
           steps.proven.outputs.proven != 'true' }}
         run: bun run build
+      # The build just made, served by next start and signed in to over
+      # HTTP. The unit suite mocks Next's server APIs, so this is the one
+      # step that runs the proxy, a server action and the cookie it sets the
+      # way production does. Gated on the build rather than on the install:
+      # with no build to serve it fails on that alone, and a failed build
+      # has already said so.
+      - if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: bun run test:e2e
       # Nothing above reports a dependency that no file imports, or an export
       # that no file reads: both type check and lint perfectly. knip is the
       # only check here that looks for what is absent rather than what is
@@ -504,7 +513,8 @@ jobs:
             # that cannot be parsed into a commit with nothing to run.
             # Any other status is the probe breaking, which is a failure
             # rather than a reason to skip.
-            for script in format:check lint cycles typecheck test:coverage build knip; do
+            built=false
+            for script in format:check lint cycles typecheck test:coverage build test:e2e knip; do
               # The probe must not run bare: GitHub runs this with
               # `bash -e`, so a non-zero exit would abort the whole loop
               # before the code could be read. `|| probe=$?` puts it in an
@@ -520,7 +530,20 @@ jobs:
                 ok=false
                 continue
               fi
-              bun run "$script" || ok=false
+              # test:e2e serves the build, so as in the check job it runs
+              # only after one: with no build it fails on that alone, and a
+              # failed build has already said so.
+              if [ "$script" = test:e2e ] && [ "$built" = false ]; then
+                echo "no build to serve; test:e2e not run"
+                continue
+              fi
+              if bun run "$script"; then
+                if [ "$script" = build ]; then
+                  built=true
+                fi
+              else
+                ok=false
+              fi
             done
           fi
 

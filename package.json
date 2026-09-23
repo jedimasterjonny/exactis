@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "vitest run --config vitest.e2e.config.mts",
     "knip": "knip",
     "cycles": "bash scripts/cycles.sh",
     "db:generate": "drizzle-kit generate",
