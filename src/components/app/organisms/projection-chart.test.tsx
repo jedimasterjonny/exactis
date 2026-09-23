@@ -60,6 +60,21 @@ const shortPoints = [
   { age: 38, deferred: 0, early: 0, free: 0, uncovered: 52310, year: 2028 },
 ];
 
+// The same plan with its pension drawn early in its second year, before
+// it runs out in its third, so both marks have a year to fall on.
+const earlyPoints = [
+  {
+    age: 36,
+    deferred: 412880,
+    early: 0,
+    free: 286145,
+    uncovered: 0,
+    year: 2026,
+  },
+  { age: 37, deferred: 41209, early: 26667, free: 0, uncovered: 0, year: 2027 },
+  { age: 38, deferred: 0, early: 0, free: 0, uncovered: 52310, year: 2028 },
+];
+
 // The vertical rule recharts draws for a ReferenceLine, which carries the
 // year it stands at as an attribute.
 const marks = (): HTMLElement[] =>
@@ -139,7 +154,40 @@ describe("ProjectionChart", () => {
 
     expect(marks()).toHaveLength(0);
     expect(screen.queryByText("Runs out")).not.toBeInTheDocument();
+    expect(screen.queryByText("Early pension")).not.toBeInTheDocument();
     expect(screen.queryByText("Uncovered")).not.toBeInTheDocument();
+    expect(screen.queryByText("Drawn early")).not.toBeInTheDocument();
+  });
+
+  it("marks the first year a pension is drawn early apart from the year the money runs out", () => {
+    render(<ProjectionChart points={earlyPoints} />);
+
+    expect(marks().map((mark) => mark.getAttribute("x"))).toStrictEqual([
+      "2027",
+      "2028",
+    ]);
+    expect(screen.getByText("Early pension")).toBeInTheDocument();
+    expect(screen.getByText("Runs out")).toBeInTheDocument();
+  });
+
+  it("names what a year drew early under the crosshair", async () => {
+    render(<ProjectionChart points={earlyPoints} />);
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    expect(await screen.findByText("2027 · Age 37")).toHaveClass("font-medium");
+
+    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+
+    expect(tooltip.getByText("Drawn early")).toBeInTheDocument();
+    expect(tooltip.getByText("£26,667")).toHaveClass(
+      "figure",
+      "font-medium",
+      "text-caution",
+    );
+    expect(tooltip.queryByText("Uncovered")).not.toBeInTheDocument();
   });
 
   it("marks the first year the money runs out, and only that year", () => {
