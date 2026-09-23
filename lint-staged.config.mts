@@ -1,7 +1,10 @@
 import { defineConfig } from "lint-staged/config";
 
-// Every check the repo enforces, run against the staged snapshot before a
-// commit is written. The tasks only report - nothing is rewritten and
+// The fast checks, run against the staged snapshot before a commit is written.
+// The suite under coverage is not here: it is .husky/pre-push, because it cost
+// 83s of an 88s pre-commit and one decision per commit means paying that over
+// and over for a series that is pushed once. knip stays despite being a
+// whole-project check like the suite, because it takes a second. The tasks only report - nothing is rewritten and
 // silently re-staged - so a commit contains exactly the content that was
 // reviewed, and `git blame` keeps pointing at the change that was actually
 // made. Fixes are a deliberate `bun run format` / `bun run lint:fix` away.
@@ -33,17 +36,6 @@ export default defineConfig({
   // because these are the extensions that can be in an import graph at all,
   // and the key has to differ from every other here anyway.
   "**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}": (): string => "bun run cycles",
-  // The whole suite under coverage, not `vitest related` on the staged
-  // files: the per-file 100% gate is a property of the project, and a
-  // commit that adds an untested source file passes a related-only run.
-  //
-  // Keyed on every TypeScript file rather than on src, because the suite's
-  // own machinery lives at the root - vitest.setup.ts, the test that holds
-  // it, vitest.config.mts - and a change there is precisely when the suite
-  // has to run. A src glob let those through with no test run at all. It
-  // cannot share the typecheck key below, so it takes the `**/` spelling
-  // of the same pattern, matching the same files, as `*` and `**/*` do.
-  "**/*.{mts,ts,tsx}": (): string => "bun run test:coverage",
   // A staged file that ESLint ignores emits a warning, which
   // --max-warnings 0 would promote to a failure; --no-warn-ignored keeps
   // that from blocking an otherwise clean commit.
