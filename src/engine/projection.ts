@@ -36,10 +36,15 @@ import {
 // is rounded up, since a pension grossed up to cover a month exactly
 // leaves a residue of the order of a billionth of a pound, which read
 // whole marked a year short that covered itself to the last penny. The
-// last year is never carried, so its point is never short.
+// last year is never carried, so its point is never short. Beside that
+// is what the year drew out of a pension before the pension age, gross
+// and summed and read the same way: a last resort, charged 55%, and
+// marked so that a plan lasting only by it is not read as a plan that
+// works.
 export interface ProjectionPoint {
   readonly age: number;
   readonly deferred: number;
+  readonly early: number;
   readonly free: number;
   readonly uncovered: number;
   readonly year: number;
@@ -48,7 +53,8 @@ export interface ProjectionPoint {
 // The month a shortfall is drawn in, as the draw reads it: what is left
 // of the lump sum allowance; what the month earned that the tax is
 // charged on, which a draw on a pension is taxed on top of; and whether
-// the month falls before the pension age, when a pension cannot be had.
+// the month falls before the pension age, when a pension is drawn only
+// early.
 interface Drawing {
   readonly allowance: number;
   readonly below: number;
@@ -81,10 +87,10 @@ const april = 3;
 // The age the plan's owner may draw a pension at as income, the UK
 // normal minimum pension age: 55, until it rises to 57 on 6 April 2028,
 // taken here from the start of that April. Someone who is 55 or 56 when
-// it rises can draw before it and not again until 57, save under a
-// protected pension age this plan does not hold. Constants until there
-// is an assumptions screen to set them on, as the plan rate is in the
-// store.
+// it rises can draw as income before it and not again until 57, save
+// under a protected pension age this plan does not hold. Constants until
+// there is an assumptions screen to set them on, as the plan rate is in
+// the store.
 const pensionAge = {
   after: 57,
   before: 55,
@@ -106,8 +112,9 @@ const pensionAge = {
 // a fixed sum into any of them is money the month no longer has, and a
 // pension not listed would be fed nothing. A month the income does not
 // cover is drawn from the savings: cash first, then the tax-free
-// wrapper, then the tax-deferred one from the year the pension age is
-// reached, grossed up for its tax, at the start of the month and before
+// wrapper, then the tax-deferred one, grossed up for its tax, and before
+// the year the pension age is reached for the charge on taking it
+// early, at the start of the month and before
 // its growth as a payment lands, so what leaves earns nothing for the
 // month it is gone. The lump sum allowance a pension's tax-free quarter
 // comes out of is the plan's owner's for life, so what is left of it is
@@ -168,6 +175,7 @@ export function project(
     const age = year - plan.born;
     const deferred = total(held, "tax-deferred");
     const free = total(held, "tax-free");
+    let early = 0;
     let uncovered = 0;
     if (offset < plan.years) {
       for (let month = offset === 0 ? plan.month : 0; month < 12; month += 1) {
@@ -186,6 +194,7 @@ export function project(
           isEarly: isBeforePensionAge(age, { month, year }),
         });
         allowance = draw.allowance;
+        early += draw.early;
         taxYear = {
           months: taxYear.months + 1,
           paid:
@@ -206,7 +215,14 @@ export function project(
         }));
       }
     }
-    return { age, deferred, free, uncovered: upToPound(uncovered), year };
+    return {
+      age,
+      deferred,
+      early: upToPound(early),
+      free,
+      uncovered: upToPound(uncovered),
+      year,
+    };
   });
 }
 
@@ -222,13 +238,17 @@ function carried(balance: number, paid: number, rate: number): number {
 }
 
 // What a month's shortfall takes out of the savings, and what is left
-// of it after them, with what is left of the lump sum allowance and
-// what the month is taxed on once its pension draws are counted. The
-// kinds are drawn cash first, since it is spent as it stands and grows
-// least; then the tax-free wrapper, which is reached at any age and
-// owes nothing on the way out; then the tax-deferred one, and only from
-// the pension age, since before it the money cannot be had at all.
-// Within a kind the accounts are drawn in the
+// of it after them, with what is left of the lump sum allowance, what
+// the month is taxed on once its pension draws are counted, and what it
+// drew from a pension early. The kinds are drawn cash first, since it is
+// spent as it stands and grows least; then the tax-free wrapper, which
+// is reached at any age and owes nothing on the way out; then the
+// tax-deferred one. From the pension age a pension is drawn as income;
+// before it, only once cash and the ISA are
+// empty, as the last thing between the month and running out, and at
+// the charge on a payment the rules do not allow, 45p kept of each
+// pound, since the money can be had that way and at no other. Within a
+// kind the accounts are drawn in the
 // order they are listed, each giving up what it holds or what the month
 // is still short, whichever is the lesser, so an account is emptied and
 // never overdrawn and what it could not cover passes to the next. A
@@ -249,16 +269,16 @@ function drawnFrom(
   { allowance, below, isEarly }: Drawing,
 ): {
   readonly allowance: number;
+  readonly early: number;
   readonly held: readonly Held[];
   readonly taxable: number;
   readonly uncovered: number;
 } {
-  const kinds: readonly AccountKind[] = isEarly
-    ? ["cash", "tax-free"]
-    : ["cash", "tax-free", "tax-deferred"];
+  const kinds: readonly AccountKind[] = ["cash", "tax-free", "tax-deferred"];
   let drawn = held;
   let left = shortfall;
-  let taxed = { allowance, below, months: 1 };
+  let early = 0;
+  let taxed = { allowance, below, isEarly, months: 1 };
   for (const kind of kinds) {
     drawn = drawn.map(({ account, balance }) => {
       if (account.kind !== kind || !isPension(account)) {
@@ -270,6 +290,7 @@ function drawnFrom(
       const wanted = drawFor(left, taxed);
       const draw = wanted.gross <= balance ? wanted : drawOf(balance, taxed);
       left = draw === wanted ? 0 : Math.max(0, left - draw.net);
+      early += taxed.isEarly ? draw.gross : 0;
       taxed = {
         ...taxed,
         allowance: taxed.allowance - draw.taxFree,
@@ -280,13 +301,15 @@ function drawnFrom(
   }
   return {
     allowance: taxed.allowance,
+    early,
     held: drawn,
     taxable: taxed.below,
     uncovered: left,
   };
 }
 
-// Whether a month falls before the pension age: before 55 until the age
+// Whether a month falls before the pension age, when a pension can be
+// had only as a payment the rules do not allow: before 55 until the age
 // rises in April 2028, and before 57 from then. The plan holds the year
 // its owner was born in and not the day, so the age is the one reached
 // that year, and the whole of the year it is reached in counts as

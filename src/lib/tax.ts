@@ -17,11 +17,14 @@ export interface Draw {
 // Where a draw on a pension stands when it is taxed: what is left of the
 // lump sum allowance, which its free quarter comes out of; the taxable
 // income already had over the months it is taxed with, which it is
-// taxed on top of; and how many months those are, whose share of each
-// band it is charged against.
+// taxed on top of; how many months those are, whose share of each band
+// it is charged against; and whether it is taken before the pension
+// age, when it is no income at all but a payment the rules do not
+// allow, and is charged as one.
 export interface Standing {
   readonly allowance: number;
   readonly below: number;
+  readonly isEarly: boolean;
   readonly months: number;
 }
 
@@ -87,23 +90,45 @@ export const lumpSumAllowance = 268275;
 // takes its tax-free cash a piece at a time is.
 const taxFreeShare = 0.25;
 
+// The charge on a pension paid out before the pension age: 40% as an
+// unauthorised payment, and the 15% surcharge on top, which is owed
+// once such payments pass a quarter of the pension in a year and is
+// taken here on every one, since a draw that is all that stands
+// between a month and running out is no small one. A registered scheme
+// will not normally pay before the age at all, so this is the cost of
+// forcing it rather than a way the plan may count on.
+const unauthorisedCharge = 0.55;
+
 // The draw that leaves `net` once it is taxed, grossed up through the
-// bands from where the income below it stands.
+// bands from where the income below it stands, or by the charge alone
+// before the pension age.
 export function drawFor(net: number, standing: Standing): Draw {
   checkCharge(standing.months, net, standing.allowance, standing.below);
-  return drawOf(grossFor(net, standing), standing);
+  return drawOf(
+    standing.isEarly ? net / (1 - unauthorisedCharge) : grossFor(net, standing),
+    standing,
+  );
 }
 
 // What a draw of `gross` leaves once it is taxed: a quarter of it free
 // of tax as far as the allowance reaches, and the rest taxed as income
 // on top of what was taxable below it, so a draw beside a salary is
 // taxed at the salary's rate and one beside nothing uses the personal
-// allowance first.
+// allowance first. Before the pension age it is 45p a pound of it, the
+// charge taken, and none of it is income or free.
 export function drawOf(
   gross: number,
-  { allowance, below, months }: Standing,
+  { allowance, below, isEarly, months }: Standing,
 ): Draw {
   checkCharge(months, gross, allowance, below);
+  if (isEarly) {
+    return {
+      gross,
+      net: gross * (1 - unauthorisedCharge),
+      taxable: 0,
+      taxFree: 0,
+    };
+  }
   const taxFree = Math.min(gross * taxFreeShare, allowance);
   const taxable = gross - taxFree;
   const tax = incomeTaxOn(below + taxable, months) - incomeTaxOn(below, months);
@@ -217,12 +242,12 @@ function grossFor(net: number, standing: Standing): number {
   return (
     stretch +
     grossFor(net - stretch * kept, {
+      ...standing,
       allowance:
         stretch === toFree
           ? 0
           : Math.max(0, allowance - stretch * taxFreeShare),
       below: stretch === toBand ? to : below + stretch * part,
-      months,
     })
   );
 }

@@ -13,9 +13,14 @@ import {
 // A month's draw with the whole allowance to come and nothing else
 // earned, and one beside a salary at the top of the basic rate band, a
 // twelfth of £50,270, so the draw is taxed at the higher rate.
-const alone = { allowance: lumpSumAllowance, below: 0, months: 1 };
+const alone = {
+  allowance: lumpSumAllowance,
+  below: 0,
+  isEarly: false,
+  months: 1,
+};
 
-const beside = { allowance: lumpSumAllowance, below: 50270 / 12, months: 1 };
+const beside = { ...alone, below: 50270 / 12 };
 
 describe("drawOf", () => {
   // £1,000 is £250 free and £750 taxed, which alone sits under a twelfth
@@ -64,7 +69,7 @@ describe("drawFor", () => {
   // £125,140 keeps 40p a pound on the first £1,000 and 55p on the next,
   // £950.
   it("grosses up through the bands a stretch at a time", () => {
-    const year = { allowance: 0, below: 0, months: 12 };
+    const year = { ...alone, allowance: 0, months: 12 };
 
     expect(drawFor(42730, year).gross).toBeCloseTo(50270, 10);
     expect(drawFor(4000, { ...year, below: 100000 }).gross).toBeCloseTo(
@@ -134,6 +139,17 @@ describe("drawFor", () => {
         "A tax is charged on nothing or more",
       );
     }
+  });
+
+  // Before the pension age a draw keeps 45p a pound whatever else the
+  // month earned, so £900 takes £2,000, and none of it is income or
+  // uses the allowance.
+  it("charges a draw before the pension age 55% and nothing else", () => {
+    const draw = drawFor(900, { ...beside, isEarly: true });
+
+    expect(draw.gross).toBeCloseTo(2000, 10);
+    expect(draw.net).toBeCloseTo(900, 10);
+    expect(draw.taxable + draw.taxFree).toBe(0);
   });
 });
 
