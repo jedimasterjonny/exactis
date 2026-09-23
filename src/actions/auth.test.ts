@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { redirect } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
