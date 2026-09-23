@@ -50,7 +50,7 @@
         "eslint-plugin-package-json": "1.8.1",
         "eslint-plugin-perfectionist": "5.11.1",
         "eslint-plugin-promise": "7.3.0",
-        "eslint-plugin-regexp": "3.3.0",
+        "eslint-plugin-regexp": "3.3.1",
         "eslint-plugin-sonarjs": "4.2.1",
         "eslint-plugin-testing-library": "7.16.2",
         "eslint-plugin-yml": "3.8.1",
@@ -1108,7 +1108,7 @@
 
     "eslint-plugin-react-x": ["eslint-plugin-react-x@5.19.1", "", { "dependencies": { "@eslint-react/ast": "5.19.1", "@eslint-react/core": "5.19.1", "@eslint-react/eslint": "5.19.1", "@eslint-react/jsx": "5.19.1", "@eslint-react/shared": "5.19.1", "@eslint-react/var": "5.19.1", "@typescript-eslint/scope-manager": "^8.70.0", "@typescript-eslint/type-utils": "^8.70.0", "@typescript-eslint/types": "^8.70.0", "@typescript-eslint/typescript-estree": "^8.70.0", "@typescript-eslint/utils": "^8.70.0", "compare-versions": "^6.1.1", "string-ts": "^2.3.1", "ts-api-utils": "^2.5.0", "ts-pattern": "^5.9.0" }, "peerDependencies": { "eslint": "*", "typescript": "*" } }, "sha512-DAavqAjJWI2VE0AcD8UPix1UkeLEtLKe1k4CTyx4PEKrffxOTzJzvBVZWzKMLmLm62pAbIY2LJMZfhyDEn5cpw=="],
 
-    "eslint-plugin-regexp": ["eslint-plugin-regexp@3.3.0", "", { "dependencies": { "@eslint-community/eslint-utils": "^4.2.0", "@eslint-community/regexpp": "^4.11.0", "comment-parser": "^1.4.0", "jsdoc-type-pratt-parser": "^9.0.0", "refa": "^0.12.1", "regexp-ast-analysis": "^0.7.1", "scslre": "^0.3.0" }, "peerDependencies": { "eslint": ">=9.38.0" } }, "sha512-TT0JTQbW7CRKohntpGAsMdQ1K3MsmJK4gdAhKJtIwlJ0JvuYxauymFgJdvqxIY4lqNj0EuRZWVrymQtEdJYEFg=="],
+    "eslint-plugin-regexp": ["eslint-plugin-regexp@3.3.1", "", { "dependencies": { "@eslint-community/eslint-utils": "^4.2.0", "@eslint-community/regexpp": "^4.11.0", "comment-parser": "^1.4.0", "jsdoc-type-pratt-parser": "^9.0.0", "refa": "^0.12.1", "regexp-ast-analysis": "^0.7.1", "scslre": "^0.3.0" }, "peerDependencies": { "eslint": ">=9.38.0" } }, "sha512-58bGUci/AaWAo1ETj6Lsnmy6QXwnSyVONRA805828nnqp7vrTwdaQMc02vtowmYB3A5OB3SLr3r5HgmfxX4dLg=="],
 
     "eslint-plugin-sonarjs": ["eslint-plugin-sonarjs@4.2.1", "", { "dependencies": { "@eslint-community/regexpp": "^4.12.2", "@sonarsource/analyzer-commons-configurations": "^2.31.0-5284", "builtin-modules": "^3.3.0", "bytes": "^3.1.2", "functional-red-black-tree": "^1.0.1", "globals": "^17.12.0", "jsx-ast-utils-x": "^0.1.0", "lodash.merge": "^4.6.2", "minimatch": "^10.2.6", "scslre": "^0.3.0", "semver": "^7.8.5", "ts-api-utils": "^2.5.0", "typescript": ">=5 <6.1.0", "yaml": "^2.9.0" }, "peerDependencies": { "eslint": "^8.0.0 || ^9.0.0 || ^10.0.0" } }, "sha512-WGsnVkUxmHyBOytShcIeE+vhQaS8e+gYgbHNNi4y2e5Zj+DpE2DLTvarqDUhNwjceTZHGLgevSgfBSEVkt4EaA=="],
 
