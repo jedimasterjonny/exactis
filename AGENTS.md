@@ -83,6 +83,14 @@ imported. A test that asserts nothing fails, and test order is shuffled.
   method is detected and reported as tampering.
 - To assert on console output, call `takeConsoleOutput()` from
   `vitest.setup.ts`. It returns the running test's lines and clears them.
+- jsdom is the default, and a test that touches no DOM opens with
+  `// @vitest-environment node`. Standing one up costs about 0.8s a file, which
+  is most of what the suite spends, so the directive is why the pure-logic tests
+  do not pay for a document they never read. The same setup file runs either
+  way. Forgetting it costs that 0.8s and nothing else, which is why this is a
+  habit rather than a gate: `renderHook` needs a document, so `src/hooks` does
+  not carry the directive, and a test that does render without one fails plainly
+  on a missing `document` rather than misreporting.
 
 # Components
 
