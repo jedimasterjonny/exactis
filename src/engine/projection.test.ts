@@ -12,7 +12,7 @@ import { drawFor, lumpSumAllowance } from "@/lib/tax";
 import { project } from "./projection";
 
 const [pension, isa, cash, home, mortgage] = accounts;
-const [salary] = incomeLines;
+const [salary, , consulting] = incomeLines;
 const [household] = expenseLines;
 
 // Read at the start of its first year, so every year is carried whole.
@@ -568,6 +568,140 @@ describe("project", () => {
         { ...plan, born: 1960, years: 2 },
       ).map(({ deferred }) => deferred),
     ).toStrictEqual([5000000, 3062765, 906032]);
+  });
+
+  // Read in April, so the first tax year is whole. £36,000 ending in
+  // November leaves £2,453.30 in each of eight months, which the ISA
+  // takes: £19,626.40. Each month paid £390.50 of income tax, a twelfth
+  // of the tax on a year of it, £3,124 in all; but the year earned
+  // £24,000, and its tax is £2,286, the four months without the salary
+  // leaving a third of the personal allowance that the eight could not
+  // use. The £838 between them is refunded in April 2027, which the ISA
+  // takes: £20,464.40. The April the plan opens in settles nothing,
+  // having no year behind it.
+  it("settles the tax year a salary stops in, in the April after it", () => {
+    const wide: Account = {
+      ...flatIsa,
+      balance: 0,
+      contribution: { cap: 240000, kind: "spare" },
+    };
+    const ending = {
+      ...salary,
+      amount: 36000,
+      bonus: 0,
+      feeds: null,
+      lastMonth: 10,
+      lastYear: 2026,
+      rsu: 0,
+      sacrifice: 0,
+    };
+
+    expect(
+      project(
+        [wide],
+        { expenses: [], income: [ending] },
+        { ...plan, month: 3, years: 2 },
+      ).map(({ free }) => free),
+    ).toStrictEqual([0, 19626, 20464]);
+  });
+
+  // Read in September, the plan holds seven months of the 2026 tax
+  // year, which is taxed against seven twelfths of each band. The
+  // salary ends with December, so four months of £2,453.30 land in the
+  // ISA, £9,813.20, having paid £1,562 of income tax; the £12,000 they
+  // earned owes £933.50 against seven twelfths of the allowance, and
+  // the £628.50 between them lands in April: £10,441.70.
+  it("settles a tax year the plan holds part of against that part of each band", () => {
+    const wide: Account = {
+      ...flatIsa,
+      balance: 0,
+      contribution: { cap: 240000, kind: "spare" },
+    };
+    const ending = {
+      ...salary,
+      amount: 36000,
+      bonus: 0,
+      feeds: null,
+      lastYear: 2026,
+      rsu: 0,
+      sacrifice: 0,
+    };
+
+    expect(
+      project(
+        [wide],
+        { expenses: [], income: [ending] },
+        { ...plan, month: 8, years: 2 },
+      ).map(({ free }) => free),
+    ).toStrictEqual([0, 9813, 10442]);
+  });
+
+  // Class 4 is due on the year's profit, as income tax is on its income.
+  // Consulting of £2,000 a month from January is £6,000 in the 2026 tax
+  // year, under both the allowance and Class 4's threshold, but each of
+  // its three months paid £190.50 of income tax and £57.15 of Class 4 as
+  // a twelfth of a year of such months. All £742.95 is refunded in April,
+  // so the ISA takes twelve months of £1,752.35 and the refund:
+  // £21,771.15. Settling the income tax alone refunded £571.50 of it.
+  it("settles Class 4 on the year's profit with the income tax", () => {
+    const wide: Account = {
+      ...flatIsa,
+      balance: 0,
+      contribution: { cap: 240000, kind: "spare" },
+    };
+
+    expect(
+      project(
+        [wide],
+        { expenses: [], income: [{ ...consulting, firstYear: 2027 }] },
+        { ...plan, month: 3, years: 2 },
+      ).map(({ free }) => free),
+    ).toStrictEqual([0, 0, 21771]);
+  });
+
+  // A settlement can be owed as well as refunded. £112,800 to December
+  // and £138,000 from January is £119,100 in the 2026 tax year, which
+  // owes £38,892, the year sitting in the 60% band where the allowance is
+  // withdrawn. Taxed as twelfths, nine months at £2,926 and three at
+  // £4,025.25 paid only £38,409.75: the three read as £138,000 a year,
+  // past the withdrawal and into the 45% rate. April 2027 owes the
+  // £482.25 between them. The ISA takes nine months of £6,118.45, then
+  // twelve of £7,077.20 less the £482.25: £55,066.05, then £139,510.20.
+  it("takes what a tax year still owes out of the April after it", () => {
+    const wide: Account = {
+      ...flatIsa,
+      balance: 0,
+      contribution: { cap: 240000, kind: "spare" },
+    };
+    const earner = {
+      ...salary,
+      amount: 112800,
+      bonus: 0,
+      feeds: null,
+      lastYear: 2026,
+      rsu: 0,
+      sacrifice: 0,
+    };
+
+    expect(
+      project(
+        [wide],
+        {
+          expenses: [],
+          income: [
+            earner,
+            {
+              ...earner,
+              amount: 138000,
+              firstYear: 2027,
+              id: 2,
+              lastYear: null,
+            },
+          ],
+        },
+        { ...plan, month: 3, years: 2 },
+      ).map(({ free }) => free),
+    ).toStrictEqual([0, 55066, 139510]);
   });
 
   // £400 of cash covers £400 of January and stops there rather than
