@@ -5,7 +5,14 @@ import type { CashFlow, Paid, Schedule } from "@/engine/cash-flow";
 import { isPension, takesSpare } from "@/data/accounts";
 import { rateFrom } from "@/data/plan";
 import { cashFlow } from "@/engine/cash-flow";
-import { drawFor, drawOf, lumpSumAllowance, reliefOf } from "@/lib/tax";
+import {
+  drawFor,
+  drawOf,
+  incomeTaxOn,
+  insuranceOn,
+  lumpSumAllowance,
+  reliefOf,
+} from "@/lib/tax";
 
 // A year of the projection: the balance the plan expects entering it,
 // whole pounds, under the name the progress point gives the same
@@ -55,10 +62,25 @@ interface Held {
   readonly balance: number;
 }
 
+// A tax year as the projection has carried it so far: how many of its
+// months the plan holds, what they earned and drew that is taxed as
+// income, the self-employed profit among it that Class 4 is charged on,
+// and the income tax and Class 4 each month was charged on its own.
+interface TaxYear {
+  readonly months: number;
+  readonly paid: number;
+  readonly profit: number;
+  readonly taxable: number;
+}
+
 // The age the plan's owner may reach a pension at, which is the UK
 // normal minimum pension age from April 2028. A constant until there is
 // an assumptions screen to set it on, as the plan rate is in the store.
 const pensionAge = 57;
+
+// The month a tax year opens in, April, January being nought. The year
+// opens on the sixth, and is taken here from the first.
+const april = 3;
 
 // The plan's years, the first holding the balances as they are and each
 // after it the year before carried to its end, a month at a time: what
@@ -80,7 +102,19 @@ const pensionAge = 57;
 // its growth as a payment lands, so what leaves earns nothing for the
 // month it is gone. The lump sum allowance a pension's tax-free quarter
 // comes out of is the plan's owner's for life, so what is left of it is
-// carried from month to month rather than read afresh. A draw
+// carried from month to month rather than read afresh. Each month is
+// taxed as a twelfth of a year, which overcharges a tax year whose
+// months are not alike, the one a salary stops in above all, so the
+// projection carries each tax year as well, what its months were taxed
+// on and what they were charged, and settles it in the April after: the
+// year's tax on all of it, against as much of each band as the months
+// it held, less what the months paid, refunded into April's money or
+// owed out of it. Income tax is settled so, and Class 4 with it, since
+// it too is due on the year's profit rather than a month's; Class 1 is
+// charged a pay period at a time, as the flow charges it, and owes
+// nothing more at the year's end. The first tax year is the months of
+// it the plan holds, taxed against their share of each band, and the
+// last is cut off where the plan ends and never settled. A draw
 // and a payment never meet in one month: the flow pays a fixed sum and
 // the spare money only out of what the month has, and no salary
 // sacrifices at all in a month the income would not cover the expenses
@@ -119,6 +153,7 @@ export function project(
     throw new Error("A balance below nothing is a debt's");
   }
   let allowance = lumpSumAllowance;
+  let taxYear: TaxYear = { months: 0, paid: 0, profit: 0, taxable: 0 };
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
     const age = year - plan.born;
@@ -127,9 +162,14 @@ export function project(
     let uncovered = 0;
     if (offset < plan.years) {
       for (let month = offset === 0 ? plan.month : 0; month < 12; month += 1) {
+        const settlement = month === april ? settled(taxYear) : 0;
+        if (month === april) {
+          taxYear = { months: 0, paid: 0, profit: 0, taxable: 0 };
+        }
         const flow = cashFlow(accounts, schedule, {
           at: { month, year },
           plan,
+          settlement,
         });
         const draw = drawnFrom(held, Math.max(0, -flow.left), {
           age,
@@ -137,6 +177,15 @@ export function project(
           below: flow.taxable,
         });
         allowance = draw.allowance;
+        taxYear = {
+          months: taxYear.months + 1,
+          paid:
+            taxYear.paid +
+            incomeTaxOn(draw.taxable, 1) +
+            insuranceOn("self-employment", flow.profit, 1),
+          profit: taxYear.profit + flow.profit,
+          taxable: taxYear.taxable + draw.taxable,
+        };
         uncovered += draw.uncovered;
         held = draw.held.map(({ account, balance }) => ({
           account,
@@ -164,7 +213,8 @@ function carried(balance: number, paid: number, rate: number): number {
 }
 
 // What a month's shortfall takes out of the savings, and what is left
-// of it after them, with what is left of the lump sum allowance. The
+// of it after them, with what is left of the lump sum allowance and
+// what the month is taxed on once its pension draws are counted. The
 // kinds are drawn cash first, since it is spent as it stands and grows
 // least; then the tax-free wrapper, which is reached at any age and
 // owes nothing on the way out; then the tax-deferred one, and only from
@@ -191,6 +241,7 @@ function drawnFrom(
 ): {
   readonly allowance: number;
   readonly held: readonly Held[];
+  readonly taxable: number;
   readonly uncovered: number;
 } {
   const kinds: readonly AccountKind[] =
@@ -219,7 +270,12 @@ function drawnFrom(
       return { account, balance: balance - draw.gross };
     });
   }
-  return { allowance: taxed.allowance, held: drawn, uncovered: left };
+  return {
+    allowance: taxed.allowance,
+    held: drawn,
+    taxable: taxed.below,
+    uncovered: left,
+  };
 }
 
 // What lands in an account each month of the year: what each salary
@@ -259,6 +315,20 @@ function rateOf(account: Account, plan: Plan): number {
     throw new Error("A rate loses no more than everything");
   }
   return rate;
+}
+
+// What a tax year is refunded once it closes, or owes as a negative:
+// what its months paid, each a twelfth of a year's income tax and
+// Class 4 on itself, less the income tax on everything they were taxed
+// on together and the Class 4 on all their profit, each against as much
+// of each band as the months the plan held of the year. A year of no
+// months, the one before a plan read in April, settles nothing.
+function settled({ months, paid, profit, taxable }: TaxYear): number {
+  return months === 0
+    ? 0
+    : paid -
+        incomeTaxOn(taxable, months) -
+        insuranceOn("self-employment", profit, months);
 }
 
 // The wrapper's balance this year, whole pounds.

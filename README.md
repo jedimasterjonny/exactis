@@ -96,8 +96,15 @@ taxed money instead, so the pension claims the basic rate back on it and £800
 paid lands as £1,000, which is what a pension's cap is held to; the relief a
 higher rate taxpayer claims on top is theirs rather than the pension's, and is
 not counted. Each month is taxed as a twelfth of a year, which is the year's tax
-exactly when its months are alike. The bands are held as they stand, in today's
-money as the lines are, until the plan carries an inflation assumption.
+exactly when its months are alike and too much or too little when they are not,
+as in the year a salary stops. So the projection carries each tax year, April to
+April, and settles it in the April after: the year's income tax on everything
+its months earned and drew from a pension, and its Class 4 on all their profit,
+less what they paid, is refunded into that month's money or owed out of it.
+Class 1 is charged a pay period at a time, as the months charge it, and is not
+settled. The first tax year is the months of it the plan holds, against their
+share of each band. The bands are held as they stand, in today's money as the
+lines are, until the plan carries an inflation assumption.
 
 A debt's own fixed sum is a loan's payments, so it runs only until the loan
 maths in `src/lib/loans.ts` says they clear what is owed: the term the payment
