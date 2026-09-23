@@ -27,6 +27,12 @@ export default defineConfig({
   // sequential list stops at its first failure, so an unformatted file would
   // suppress the very result --continue-on-error exists to still report.
   "**/*": (): string => "bun run knip",
+  // Cycles, over the whole import graph rather than the staged files: a cycle
+  // is a property of the graph, and the file that closes one need not be the
+  // file that is wrong. The glob mirrors codeFiles in eslint.config.mjs,
+  // because these are the extensions that can be in an import graph at all,
+  // and the key has to differ from every other here anyway.
+  "**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}": (): string => "bun run cycles",
   // The whole suite under coverage, not `vitest related` on the staged
   // files: the per-file 100% gate is a property of the project, and a
   // commit that adds an untested source file passes a related-only run.
