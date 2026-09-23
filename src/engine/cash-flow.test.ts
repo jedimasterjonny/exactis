@@ -455,10 +455,11 @@ describe("cashFlow", () => {
 
   // £6,944.70 after the £1,000 sacrificed and the tax on the rest, less
   // the mortgage's £2,210, leaves £4,734.70 with nothing going out; the
-  // ISA takes £1,666.67, a twelfth of its allowance, the pension
-  // £1,350, a twelfth of its cap less the £1,150 the salary already
-  // feeds it, and the current account the £1,718.03 left, leaving
-  // nothing.
+  // ISA takes £1,666.67, a twelfth of its allowance; the pension has
+  // £1,350 of room, a twelfth of its cap less the £1,150 the salary
+  // already feeds it, and takes £1,080 of the month, which lands as
+  // that £1,350 once the basic rate is claimed back on it; and the
+  // current account takes the £1,988.03 left, leaving nothing.
   it("hands the spare money down the accounts that take it, each to a twelfth of its cap", () => {
     const flow = cashFlow(
       [spareIsa, sparePension, spareCash, home, mortgage],
@@ -468,8 +469,8 @@ describe("cashFlow", () => {
     expect(flow.fixed).toStrictEqual([{ account: mortgage, amount: 2210 }]);
     expect(pennies(flow.spare)).toStrictEqual([
       { account: spareIsa, amount: 1666.67, cap: 20000 },
-      { account: sparePension, amount: 1350, cap: 30000 },
-      { account: spareCash, amount: 1718.03, cap: null },
+      { account: sparePension, amount: 1080, cap: 30000 },
+      { account: spareCash, amount: 1988.03, cap: null },
     ]);
     expect(flow.left).toBe(0);
   });
@@ -478,8 +479,10 @@ describe("cashFlow", () => {
   // pension's allowance: a pension at its £60,000 allowance fed £5,750
   // a month off a £600,000 base takes nothing of the spare money,
   // since the feeding alone is £69,000 a year, while one fed £1,150
-  // takes the £3,850 left of its £5,000 a month, and one fed nothing
-  // takes the whole twelfth.
+  // has the £3,850 left of its £5,000 a month to fill, and one fed
+  // nothing the whole twelfth. What the month pays fills it with the
+  // basic rate claimed back on top, so it takes four fifths of that
+  // room: £3,080 and £4,000.
   it("counts what a salary feeds a pension against its allowance", () => {
     const uncapped: Account = {
       ...pension,
@@ -493,14 +496,15 @@ describe("cashFlow", () => {
       ).spare.map((take) => take.amount)[0] ?? Number.NaN;
 
     expect(at(600000, 0.1)).toBe(0);
-    expect(at(120000, 0.1)).toBeCloseTo(5000 - 1150, 10);
-    expect(at(120000, 0)).toBe(5000);
+    expect(at(120000, 0.1)).toBeCloseTo(3080, 10);
+    expect(at(120000, 0)).toBe(4000);
   });
 
   // £187,787 a year is £15,648.92 a month, £9,276.13 after £5,892.26 of
   // income tax and £480.53 of NI, less the mortgage £7,066.13, of which
-  // the ISA takes £1,666.67, the pension £2,500 and the current account
-  // the £2,899.46 left: a month whose figures do not add back in
+  // the ISA takes £1,666.67, the pension the £2,000 that lands as a
+  // twelfth of its cap with the relief on it, and the current account
+  // the £3,399.46 left: a month whose figures do not add back in
   // floating point, so what is left is read off the hand-down rather
   // than subtracted from the whole, and is exactly nothing.
   it("leaves exactly nothing when an account takes all there is", () => {
@@ -523,7 +527,7 @@ describe("cashFlow", () => {
     );
 
     expect(pennies(flow.spare).map(({ amount }) => amount)).toStrictEqual([
-      1666.67, 2500, 2899.46,
+      1666.67, 2000, 3399.46,
     ]);
     expect(Object.is(flow.left, 0)).toBe(true);
   });
