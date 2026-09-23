@@ -441,10 +441,10 @@ describe("project", () => {
     ]);
   });
 
-  // Born in 1970, so 2026 is the year 56 is reached and the pension
+  // Born in 1980, so 2026 is the year 46 is reached and the pension
   // cannot be touched: the year's twelve £1,000 go uncovered and the
   // £100,000 compounds a whole year to 105,000 all the same.
-  it("leaves a pension where it is before the access age, and the months short", () => {
+  it("leaves a pension where it is before the pension age, and the months short", () => {
     const growing: Account = {
       ...sipp,
       balance: 100000,
@@ -452,25 +452,33 @@ describe("project", () => {
     };
 
     expect(
-      project([growing], short, { ...plan, born: 1970, years: 1 }),
+      project([growing], short, { ...plan, born: 1980, years: 1 }),
     ).toStrictEqual([
-      { age: 56, deferred: 100000, free: 0, uncovered: 12000, year: 2026 },
-      { age: 57, deferred: 105000, free: 0, uncovered: 0, year: 2027 },
+      { age: 46, deferred: 100000, free: 0, uncovered: 12000, year: 2026 },
+      { age: 47, deferred: 105000, free: 0, uncovered: 0, year: 2027 },
     ]);
   });
 
-  // 57 is reached in 2027, and a pension is drawable in every month of
-  // that year rather than from a birthday the plan does not hold: the
-  // £12,000 covers 2027's twelve months exactly, where 2026's twelve
-  // went uncovered. A month's £1,000 is taxed nothing, a quarter of it
-  // free and the £750 left under a twelfth of the personal allowance.
-  it("draws a pension from the year the access age is reached", () => {
+  // Born in 1972, so 55 is reached in 2027, while the pension age is 55,
+  // and a pension is drawable in every month of it rather than from a
+  // birthday the plan does not hold: £1,000 is taxed nothing, a quarter
+  // of it free and the £750 left under a twelfth of the personal
+  // allowance, so twelve take £12,000. The age rises to 57 in April
+  // 2028, when its owner is 56, so January to March are drawn and the
+  // nine months after go uncovered. 2029 reaches 57 and is drawn again.
+  it("draws a pension from 55 until the pension age rises in April 2028, and from 57 after", () => {
     expect(
-      project([sipp], short, { ...plan, born: 1970, years: 2 }),
+      project([{ ...sipp, balance: 100000 }], short, {
+        ...plan,
+        born: 1972,
+        from: 2027,
+        years: 3,
+      }),
     ).toStrictEqual([
-      { age: 56, deferred: 12000, free: 0, uncovered: 12000, year: 2026 },
-      { age: 57, deferred: 12000, free: 0, uncovered: 0, year: 2027 },
-      { age: 58, deferred: 0, free: 0, uncovered: 0, year: 2028 },
+      { age: 55, deferred: 100000, free: 0, uncovered: 0, year: 2027 },
+      { age: 56, deferred: 88000, free: 0, uncovered: 9000, year: 2028 },
+      { age: 57, deferred: 85000, free: 0, uncovered: 0, year: 2029 },
+      { age: 58, deferred: 73000, free: 0, uncovered: 0, year: 2030 },
     ]);
   });
 
