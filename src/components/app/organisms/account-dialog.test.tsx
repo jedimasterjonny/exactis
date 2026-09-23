@@ -209,7 +209,7 @@ describe("AccountDialog", () => {
     ).not.toBeInTheDocument();
     expect(field(dialog, "Cap, a year")).toHaveValue("£0");
     expect(field(dialog, "Cap, a year")).toHaveAccessibleDescription(
-      "Leave at nothing for the £20,000 allowance",
+      "Up to the £20,000 allowance, or nothing for all of it",
     );
 
     commit(field(dialog, "Cap, a year"), "9,000");

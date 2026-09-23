@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   allowanceOf,
+  capOf,
   isAsset,
   isPension,
   takesSpare,
@@ -167,5 +168,18 @@ describe("allowanceOf", () => {
     expect(allowanceOf("house")).toBeNull();
     expect(allowanceOf("real-asset")).toBeNull();
     expect(allowanceOf("debt")).toBeNull();
+  });
+});
+
+describe("capOf", () => {
+  // A cap only ever lowers the allowance: one beneath it stands, one
+  // above it is the allowance, and none at all is the allowance or, for
+  // cash, no limit.
+  it("holds a cap beneath the kind's allowance, and takes the allowance for none", () => {
+    expect(capOf("tax-free", 4000)).toBe(4000);
+    expect(capOf("tax-free", 50000)).toBe(20000);
+    expect(capOf("tax-deferred", null)).toBe(60000);
+    expect(capOf("cash", 4000)).toBe(4000);
+    expect(capOf("cash", null)).toBeNull();
   });
 });

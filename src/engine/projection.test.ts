@@ -384,21 +384,27 @@ describe("project", () => {
     expect(last?.free).toBe(286145 + 23 * 20000);
   });
 
-  // The household ends in March 2027, so an ISA with a cap above the
-  // whole month takes the £3,974.70 left in each of 2026's twelve months
-  // and 2027's first three, and the whole £7,474.70 after tax in the
-  // nine after: 47,696.40 on the year, then 11,924.10 + 67,272.30.
+  // A salary of £20,000 leaves £1,493.30 a month after £123.83 of
+  // income tax and £49.53 of NI, under the ISA's £1,666.67 a month. A
+  // £1,000 household ending in March 2027 leaves £493.30 of it in each
+  // of 2026's twelve months and 2027's first three, and the whole
+  // £1,493.30 in the nine after: 5,919.60 on the year, then 1,479.90 +
+  // 13,439.70.
   it("pays a line to the month it ends in, reading each month's flow afresh", () => {
-    const wide: Account = {
-      ...spareIsa,
-      contribution: { cap: 240000, kind: "spare" },
+    const earner = {
+      ...salary,
+      amount: 20000,
+      bonus: 0,
+      feeds: null,
+      rsu: 0,
+      sacrifice: 0,
     };
-    const ending = { ...household, lastMonth: 2, lastYear: 2027 };
+    const ending = { ...household, amount: 1000, lastMonth: 2, lastYear: 2027 };
 
     expect(
       project(
-        [wide],
-        { expenses: [ending], income: [salary] },
+        [spareIsa],
+        { expenses: [ending], income: [earner] },
         { ...plan, years: 2 },
       ),
     ).toStrictEqual([
@@ -414,7 +420,7 @@ describe("project", () => {
         age: 37,
         deferred: 0,
         early: 0,
-        free: 333841,
+        free: 292065,
         uncovered: 0,
         year: 2027,
       },
@@ -422,7 +428,7 @@ describe("project", () => {
         age: 38,
         deferred: 0,
         early: 0,
-        free: 413038,
+        free: 306984,
         uncovered: 0,
         year: 2028,
       },
@@ -495,13 +501,14 @@ describe("project", () => {
 
   // A £5,000 card at 22% paying £250 a month clears with its 26th
   // payment, February 2028, and the ISA beside it takes whatever the
-  // month leaves of the £2,453.30 the salary pays after its tax. 2026
-  // pays the card twelve times, so the ISA takes 12 × £2,203.30 =
-  // £26,439.60; 2027 the same, £52,879.20; 2028 pays it twice and the
-  // ISA takes 2 × £2,203.30 and then ten whole months of £2,453.30,
-  // £81,818.80. Charged for every month of the plan instead, as it
+  // month leaves of the £2,453.30 the salary pays after its tax and the
+  // £1,000 going out, which is under its £1,666.67 a month. 2026 pays
+  // the card twelve times, so the ISA takes 12 × £1,203.30 =
+  // £14,439.60; 2027 the same, £28,879.20; 2028 pays it twice and the
+  // ISA takes 2 × £1,203.30 and then ten whole months of £1,453.30,
+  // £45,818.80. Charged for every month of the plan instead, as it
   // was, the card would take £250 a month for ever and the ISA would be
-  // held to £2,203.30 a month in every year after the debt was gone.
+  // held to £1,203.30 a month in every year after the debt was gone.
   it("charges a debt's fixed sum only to the month its payments clear it", () => {
     const card: Account = {
       balance: -5000,
@@ -512,7 +519,7 @@ describe("project", () => {
       name: "Credit card",
     };
     const earned = {
-      expenses: [],
+      expenses: [{ ...household, amount: 1000 }],
       income: [
         {
           ...salary,
@@ -524,17 +531,13 @@ describe("project", () => {
         },
       ],
     };
-    const wide: Account = {
-      ...spareIsa,
-      balance: 0,
-      contribution: { cap: 240000, kind: "spare" },
-    };
+    const saving: Account = { ...spareIsa, balance: 0 };
 
     expect(
-      project([card, wide], earned, { ...plan, years: 3 }).map(
+      project([card, saving], earned, { ...plan, years: 3 }).map(
         ({ free }) => free,
       ),
-    ).toStrictEqual([0, 26440, 52879, 81819]);
+    ).toStrictEqual([0, 14440, 28879, 45819]);
   });
 
   // Read in December, so 2026 carries one month: the £1,000 going out
@@ -724,20 +727,17 @@ describe("project", () => {
   });
 
   // Read in April, so the first tax year is whole. £36,000 ending in
-  // November leaves £2,453.30 in each of eight months, which the ISA
-  // takes: £19,626.40. Each month paid £390.50 of income tax, a twelfth
-  // of the tax on a year of it, £3,124 in all; but the year earned
-  // £24,000, and its tax is £2,286, the four months without the salary
-  // leaving a third of the personal allowance that the eight could not
-  // use. The £838 between them is refunded in April 2027, which the ISA
-  // takes: £20,464.40. The April the plan opens in settles nothing,
-  // having no year behind it.
+  // November leaves £2,453.30 in each of eight months, and £1,000 going
+  // out while it runs leaves £1,453.30 of that, under the ISA's
+  // £1,666.67 a month, which the ISA takes: £11,626.40. Each month paid
+  // £390.50 of income tax, a twelfth of the tax on a year of it, £3,124
+  // in all; but the year earned £24,000, and its tax is £2,286, the four
+  // months without the salary leaving a third of the personal allowance
+  // that the eight could not use. The £838 between them is refunded in
+  // April 2027, which the ISA takes: £12,464.40. The April the plan
+  // opens in settles nothing, having no year behind it.
   it("settles the tax year a salary stops in, in the April after it", () => {
-    const wide: Account = {
-      ...flatIsa,
-      balance: 0,
-      contribution: { cap: 240000, kind: "spare" },
-    };
+    const saving: Account = { ...spareIsa, balance: 0 };
     const ending = {
       ...salary,
       amount: 36000,
@@ -748,28 +748,31 @@ describe("project", () => {
       rsu: 0,
       sacrifice: 0,
     };
+    const spending = {
+      ...household,
+      amount: 1000,
+      lastMonth: 10,
+      lastYear: 2026,
+    };
 
     expect(
       project(
-        [wide],
-        { expenses: [], income: [ending] },
+        [saving],
+        { expenses: [spending], income: [ending] },
         { ...plan, month: 3, years: 2 },
       ).map(({ free }) => free),
-    ).toStrictEqual([0, 19626, 20464]);
+    ).toStrictEqual([0, 11626, 12464]);
   });
 
   // Read in September, the plan holds seven months of the 2026 tax
   // year, which is taxed against seven twelfths of each band. The
-  // salary ends with December, so four months of £2,453.30 land in the
-  // ISA, £9,813.20, having paid £1,562 of income tax; the £12,000 they
-  // earned owes £933.50 against seven twelfths of the allowance, and
-  // the £628.50 between them lands in April: £10,441.70.
+  // salary ends with December, so four months of £2,453.30 are earned,
+  // less £1,000 going out while it runs, and £1,453.30 of each lands in
+  // the ISA, £5,813.20, having paid £1,562 of income tax; the £12,000
+  // they earned owes £933.50 against seven twelfths of the allowance,
+  // and the £628.50 between them lands in April: £6,441.70.
   it("settles a tax year the plan holds part of against that part of each band", () => {
-    const wide: Account = {
-      ...flatIsa,
-      balance: 0,
-      contribution: { cap: 240000, kind: "spare" },
-    };
+    const saving: Account = { ...spareIsa, balance: 0 };
     const ending = {
       ...salary,
       amount: 36000,
@@ -779,14 +782,15 @@ describe("project", () => {
       rsu: 0,
       sacrifice: 0,
     };
+    const spending = { ...household, amount: 1000, lastYear: 2026 };
 
     expect(
       project(
-        [wide],
-        { expenses: [], income: [ending] },
+        [saving],
+        { expenses: [spending], income: [ending] },
         { ...plan, month: 8, years: 2 },
       ).map(({ free }) => free),
-    ).toStrictEqual([0, 9813, 10442]);
+    ).toStrictEqual([0, 5813, 6442]);
   });
 
   // Class 4 is due on the year's profit, as income tax is on its income.
@@ -794,22 +798,22 @@ describe("project", () => {
   // year, under both the allowance and Class 4's threshold, but each of
   // its three months paid £190.50 of income tax and £57.15 of Class 4 as
   // a twelfth of a year of such months. All £742.95 is refunded in April,
-  // so the ISA takes twelve months of £1,752.35 and the refund:
-  // £21,771.15. Settling the income tax alone refunded £571.50 of it.
+  // so the ISA takes twelve months of £1,752.35 less the £1,000 going
+  // out, £752.35, and the refund: £9,771.15. Settling the income tax
+  // alone refunded £571.50 of it.
   it("settles Class 4 on the year's profit with the income tax", () => {
-    const wide: Account = {
-      ...flatIsa,
-      balance: 0,
-      contribution: { cap: 240000, kind: "spare" },
-    };
+    const saving: Account = { ...spareIsa, balance: 0 };
 
     expect(
       project(
-        [wide],
-        { expenses: [], income: [{ ...consulting, firstYear: 2027 }] },
+        [saving],
+        {
+          expenses: [{ ...household, amount: 1000, firstYear: 2027 }],
+          income: [{ ...consulting, firstYear: 2027 }],
+        },
         { ...plan, month: 3, years: 2 },
       ).map(({ free }) => free),
-    ).toStrictEqual([0, 0, 21771]);
+    ).toStrictEqual([0, 0, 9771]);
   });
 
   // A settlement can be owed as well as refunded. £112,800 to December
@@ -818,14 +822,11 @@ describe("project", () => {
   // withdrawn. Taxed as twelfths, nine months at £2,926 and three at
   // £4,025.25 paid only £38,409.75: the three read as £138,000 a year,
   // past the withdrawal and into the 45% rate. April 2027 owes the
-  // £482.25 between them. The ISA takes nine months of £6,118.45, then
-  // twelve of £7,077.20 less the £482.25: £55,066.05, then £139,510.20.
+  // £482.25 between them. £6,000 going out every month leaves the ISA
+  // under its £1,666.67 a month: nine months of £118.45, then twelve of
+  // £1,077.20 less the £482.25: £1,066.05, then £13,510.20.
   it("takes what a tax year still owes out of the April after it", () => {
-    const wide: Account = {
-      ...flatIsa,
-      balance: 0,
-      contribution: { cap: 240000, kind: "spare" },
-    };
+    const saving: Account = { ...spareIsa, balance: 0 };
     const earner = {
       ...salary,
       amount: 112800,
@@ -838,9 +839,9 @@ describe("project", () => {
 
     expect(
       project(
-        [wide],
+        [saving],
         {
-          expenses: [],
+          expenses: [{ ...household, amount: 6000 }],
           income: [
             earner,
             {
@@ -854,7 +855,7 @@ describe("project", () => {
         },
         { ...plan, month: 3, years: 2 },
       ).map(({ free }) => free),
-    ).toStrictEqual([0, 55066, 139510]);
+    ).toStrictEqual([0, 1066, 13510]);
   });
 
   // £400 of cash covers £400 of January and stops there rather than
