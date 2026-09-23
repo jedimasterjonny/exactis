@@ -28,17 +28,36 @@ and deflate or inflate whatever is entered on the other.
 
 ## Tax
 
-Nothing is taxed. Left over is gross, so every spare-money account is
-over-funded by the tax bill; a sacrifice is charged at its full cost, so its
-employee saving is zero; the employer's NI is credited at the full rate on the
-whole sacrifice, ignoring the threshold and what the scheme passes on; and a
-pension and an ISA are summed as if worth the same. Drawing down needs it too: a
-pension draw is taxable income where an ISA's is not, so a tax year, April to
-April, has to sum the pension draws falling in it, which the engine can only do
-by keeping what each month drew rather than the balances a draw leaves behind,
-and a draw on a pension has to be grossed up so that what survives the tax is
-what the month was short by. The tax-efficient order, filling the personal
-allowance from the pension before the ISA is touched, is a second way of drawing
-down that waits on the same answer. Decide the tax the plan takes, income tax
-and both NIs, and where it comes off, so what is spare and what a pension is
-worth are both after it.
+The month's income pays income tax and the employee's NI, a pension draw is
+grossed up for its tax and each tax year is settled in the April after it, so
+what is spare is after tax. What a pension is worth is not: the chart sums a
+pension and an ISA as if worth the same, the pension gross of what taking it out
+would cost. And the draw order is the one that was right before tax, cash, then
+the ISA, then the pension, where filling the personal allowance from the pension
+before the ISA is touched pays less over a life; with draws taxed, the engine
+can now weigh the two, and does not.
+
+Smaller gaps sit beside those. The employer's NI is credited at the full rate on
+the whole sacrifice, ignoring the threshold and what the scheme passes on, and
+from April 2029 a sacrifice over £2,000 a year pays both NIs. A pension paid out
+of taxed money claims the basic rate and not the higher rate a taxpayer claims
+back through a return; nor does its gross come off the income the personal
+allowance is withdrawn against, which between £100,000 and £125,140 is worth
+another 20%; and it claims relief in a year with no earnings to relieve, and
+after 75, when relief stops. The employee's NI runs past the State Pension age,
+when it stops, and a bonus is spread over the year as the line pays it, where
+paid in one month most of it would meet the 2% rate. Cash interest is not taxed.
+The bands are those outside Scotland, and are held flat in today's money, so in
+effect they rise with prices where the freeze to April 2031 holds them and drags
+income into higher bands. A draw before the pension age is charged a flat 55%
+however small against the pension, and the lump sum allowance is taken to be
+whole when the plan opens. The pension age is read off the year its owner was
+born and not the day, so the whole of the year an age is reached counts as
+reaching it, and a protected pension age some schemes give is not held. A refund
+a month has no account to take goes where any money the month leaves goes, which
+is nowhere the projection counts.
+
+Decide what a pension is worth beside an ISA once the tax on taking it out is
+counted, and the order the plan draws in, so the projection's two lines and its
+drawdown are both after tax; the smaller gaps are figures to add as the plan
+needs them.
