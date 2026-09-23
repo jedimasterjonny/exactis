@@ -240,6 +240,7 @@ describe("cashFlow", () => {
       id: pension.id,
       kind: "tax-deferred",
       name: "Workplace pension",
+      owner: 1,
     };
     const against = (amount: number): CashFlow =>
       cashFlow(
@@ -278,6 +279,7 @@ describe("cashFlow", () => {
       id: pension.id,
       kind: "tax-deferred",
       name: "Workplace pension",
+      owner: 1,
     };
     const earner: IncomeLine = {
       ...salary,
@@ -356,6 +358,7 @@ describe("cashFlow", () => {
       id: pension.id,
       kind: "tax-deferred",
       name: "Workplace pension",
+      owner: 1,
     };
     const income = [salary];
     const fed = cashFlow(
@@ -401,6 +404,7 @@ describe("cashFlow", () => {
       id: pension.id,
       kind: "tax-deferred",
       name: "Workplace pension",
+      owner: 1,
     };
     const ending = { ...salary, lastMonth: 5, lastYear: 2030 };
     const flowAt = (income: IncomeLine, at: Month): CashFlow =>
@@ -613,6 +617,92 @@ describe("cashFlow", () => {
     expect(pennies(flow.fixed)).toStrictEqual([
       { account: topped, amount: 3080 },
     ]);
+  });
+
+  // An allowance is its owner's, shared across their accounts of the
+  // kind. The salary's pension is not listed, so it is earned whole,
+  // £7,474.70 after its tax: the first owner's first ISA takes the
+  // £1,666.67 their allowance gives them a month and their second finds
+  // nothing left, while the second owner's ISA has an allowance of its
+  // own and takes the same again, and the current account the £4,141.37
+  // after them.
+  it("shares an owner's allowance across their accounts of the kind, and gives each owner their own", () => {
+    const second: Account = { ...spareIsa, id: 7, name: "Second ISA" };
+    const theirs: Account = { ...spareIsa, id: 8, name: "Their ISA", owner: 2 };
+    const flow = cashFlow(
+      [spareIsa, second, theirs, spareCash],
+      { expenses: [], income: [salary] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+
+    expect(pennies(flow.spare)).toStrictEqual([
+      { account: spareIsa, amount: 1666.67, cap: 20000 },
+      { account: second, amount: 0, cap: 20000 },
+      { account: theirs, amount: 1666.67, cap: 20000 },
+      { account: spareCash, amount: 4141.37, cap: null },
+    ]);
+  });
+
+  // What one account is fed, paid or handed counts against the room the
+  // owner's others of the kind have. The salary feeds the workplace
+  // pension £1,150 and its fixed £2,266.25 lands as £2,832.81 with the
+  // relief, which leaves £1,017.19 of the owner's £5,000 a month, so a
+  // second pension of theirs paid the spare money takes £813.75 of the
+  // month, which lands as that £1,017.19; and an ISA paid its £20,000 a
+  // year as a fixed sum leaves a second ISA of the owner's nothing.
+  it("counts what one account of an owner's takes against the others of the kind", () => {
+    const sipp: Account = {
+      ...pension,
+      contribution: { cap: null, kind: "spare" },
+      id: 7,
+      name: "SIPP",
+    };
+    const second: Account = { ...spareIsa, id: 8, name: "Second ISA" };
+    const flow = cashFlow(
+      [pension, sipp, isa, second],
+      { expenses: [], income: [salary] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+
+    expect(pennies(flow.fixed)).toStrictEqual([
+      { account: pension, amount: 2266.25 },
+      { account: isa, amount: 1666.67 },
+    ]);
+    expect(pennies(flow.spare)).toStrictEqual([
+      { account: sipp, amount: 813.75, cap: 60000 },
+      { account: second, amount: 0, cap: 20000 },
+    ]);
+  });
+
+  // The store holds every ISA and pension to an owner and nothing else
+  // to one, so either broken is a caller's mistake: a wrapper's allowance
+  // would have nobody to be held to, and an owner on cash says something
+  // the engine would ignore. Cash naming none is sound.
+  it("refuses an ISA or a pension that names no owner, and anything else that names one", () => {
+    const unowned: Account = {
+      balance: 0,
+      growth: { kind: "plan" },
+      id: 9,
+      kind: "tax-free",
+      name: "Unowned ISA",
+    };
+
+    for (const held of [[unowned], [{ ...cash, owner: 1 }]]) {
+      expect(() =>
+        cashFlow(
+          held,
+          { expenses: [], income: [plain] },
+          { at: { month: 0, year: 2026 }, plan },
+        ),
+      ).toThrow("An ISA or a pension belongs to an owner, and nothing else");
+    }
+    expect(() =>
+      cashFlow(
+        [cash],
+        { expenses: [], income: [plain] },
+        { at: { month: 0, year: 2026 }, plan },
+      ),
+    ).not.toThrow();
   });
 
   // £187,787 a year is £15,648.92 a month, £9,276.13 after £5,892.26 of

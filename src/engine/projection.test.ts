@@ -60,6 +60,7 @@ const flatIsa: Account = {
   id: 6,
   kind: "tax-free",
   name: "Flat ISA",
+  owner: 1,
 };
 
 const sipp: Account = {
@@ -68,6 +69,7 @@ const sipp: Account = {
   id: 7,
   kind: "tax-deferred",
   name: "SIPP",
+  owner: 1,
 };
 
 describe("project", () => {
@@ -118,6 +120,7 @@ describe("project", () => {
       id: 6,
       kind: "tax-free",
       name: "Regular saver",
+      owner: 1,
     };
 
     expect(project([monthly], funded, { ...plan, years: 2 })).toStrictEqual([
@@ -136,6 +139,7 @@ describe("project", () => {
       id: 6,
       kind: "tax-free",
       name: "Lifetime ISA",
+      owner: 1,
     };
 
     expect(
@@ -265,6 +269,7 @@ describe("project", () => {
       id: pension.id,
       kind: "tax-deferred",
       name: "Workplace pension",
+      owner: 1,
     };
 
     expect(
@@ -315,6 +320,7 @@ describe("project", () => {
       id: pension.id,
       kind: "tax-deferred",
       name: "Workplace pension",
+      owner: 1,
     };
 
     expect(
