@@ -4,7 +4,7 @@ import type { IncomeKind, IncomeLine } from "@/data/income";
 import type { Plan } from "@/data/plan";
 import type { LineValues, Month } from "@/data/schedule";
 
-import { allowanceOf, isPension, takesSpare } from "@/data/accounts";
+import { capOf, isPension, takesSpare } from "@/data/accounts";
 import {
   contributionOf,
   incomeKinds,
@@ -65,8 +65,8 @@ export interface Spent {
 }
 
 // An account paid the spare money, what it takes a month, and the most
-// it takes a year from every source: its cap, or the allowance its kind
-// has, or nothing at all for cash.
+// it takes a year from every source: its cap held beneath the allowance
+// its kind has, or the allowance, or nothing at all for cash.
 export interface Take extends Paid {
   readonly cap: null | number;
 }
@@ -392,7 +392,7 @@ function spareMoney(
       if (!takesSpare(account)) {
         throw new Error("A real asset or a debt takes no spare money");
       }
-      const cap = contribution.cap ?? allowanceOf(account.kind);
+      const cap = capOf(account.kind, contribution.cap);
       const room =
         cap === null
           ? left

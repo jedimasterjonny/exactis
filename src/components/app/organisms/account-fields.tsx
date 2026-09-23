@@ -199,10 +199,10 @@ export function AccountFields({
 }
 
 // What the cap field says a cap of nothing means: the kind's allowance,
-// or no cap at all for cash.
+// which a cap can only lower, or no cap at all for cash.
 function capHint(kind: AccountKind): string {
   const allowance = allowanceOf(kind);
   return allowance === null
     ? "Leave at nothing for no cap"
-    : `Leave at nothing for the ${formatGbp(allowance)} allowance`;
+    : `Up to the ${formatGbp(allowance)} allowance, or nothing for all of it`;
 }

@@ -477,6 +477,29 @@ describe("cashFlow", () => {
     expect(flow.left).toBe(0);
   });
 
+  // A cap says how much of the allowance an account may use, not that
+  // it has more. The salary's pension is not listed, so it is earned
+  // whole, £7,474.70 after its tax: an ISA capped at £50,000 a year
+  // takes the £1,666.67 its £20,000 allowance gives it a month, as one
+  // with no cap does, and the current account after it the £5,808.03
+  // left.
+  it("holds a cap above the allowance to the allowance", () => {
+    const overcapped: Account = {
+      ...isa,
+      contribution: { cap: 50000, kind: "spare" },
+    };
+    const flow = cashFlow(
+      [overcapped, spareCash],
+      { expenses: [], income: [salary] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+
+    expect(pennies(flow.spare)).toStrictEqual([
+      { account: overcapped, amount: 1666.67, cap: 20000 },
+      { account: spareCash, amount: 5808.03, cap: null },
+    ]);
+  });
+
   // A sacrifice is an employer contribution and counts against the
   // pension's allowance: a pension at its £60,000 allowance fed £5,750
   // a month off a £600,000 base takes nothing of the spare money,
