@@ -117,13 +117,17 @@ projection no month to stop at.
 
 A month the income does not cover is drawn out of the savings at the start of
 it, before the month's growth: cash first, then the tax-free wrapper, then the
-tax-deferred one and only from the pension age: from the year its owner turns 55
-until the age rises in April 2028, and from the year they turn 57 after it, ages
-held as constants in the engine until that same assumptions screen exists, as
-the plan rate is held in the store. Each account is drawn to nothing and no
-lower, and what a year could not draw from anywhere is carried on its point, so
-the projection can say when the money runs out and the dashboard's chart marks
-that year. Cash and the tax-free wrapper give up what the month is short, and a
+tax-deferred one, as income from the pension age: from the year its owner turns
+55 until the age rises in April 2028, and from the year they turn 57 after it,
+ages held as constants in the engine until that same assumptions screen exists,
+as the plan rate is held in the store. Before the pension age a pension is drawn
+only as the last resort, once cash and the tax-free wrapper are empty, and at
+the 55% a payment before the pension age is charged; a registered scheme will
+not normally make one, so what a year draws that way is carried on its point to
+be marked rather than counted on. Each account is drawn to nothing and no lower,
+and what a year could not draw from anywhere is carried on its point, so the
+projection can say when the money runs out and the dashboard's chart marks that
+year. Cash and the tax-free wrapper give up what the month is short, and a
 pension is grossed up so that what is left of the draw once taxed is what the
 month is short: a quarter of each draw is free of tax until the £268,275 lump
 sum allowance is used up over the plan, and the rest is taxed as income on top

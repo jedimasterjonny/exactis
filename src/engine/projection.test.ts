@@ -81,9 +81,30 @@ describe("project", () => {
   // are left out.
   it("pays a year's sum in a twelfth at a time, each month grown at the plan rate, by wrapper", () => {
     expect(project(accounts, funded, { ...plan, years: 2 })).toStrictEqual([
-      { age: 36, deferred: 412880, free: 286145, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 468432, free: 320990, uncovered: 0, year: 2027 },
-      { age: 38, deferred: 526761, free: 357577, uncovered: 0, year: 2028 },
+      {
+        age: 36,
+        deferred: 412880,
+        early: 0,
+        free: 286145,
+        uncovered: 0,
+        year: 2026,
+      },
+      {
+        age: 37,
+        deferred: 468432,
+        early: 0,
+        free: 320990,
+        uncovered: 0,
+        year: 2027,
+      },
+      {
+        age: 38,
+        deferred: 526761,
+        early: 0,
+        free: 357577,
+        uncovered: 0,
+        year: 2028,
+      },
     ]);
   });
 
@@ -100,9 +121,9 @@ describe("project", () => {
     };
 
     expect(project([monthly], funded, { ...plan, years: 2 })).toStrictEqual([
-      { age: 36, deferred: 0, free: 1000, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 0, free: 2200, uncovered: 0, year: 2027 },
-      { age: 38, deferred: 0, free: 3400, uncovered: 0, year: 2028 },
+      { age: 36, deferred: 0, early: 0, free: 1000, uncovered: 0, year: 2026 },
+      { age: 37, deferred: 0, early: 0, free: 2200, uncovered: 0, year: 2027 },
+      { age: 38, deferred: 0, early: 0, free: 3400, uncovered: 0, year: 2028 },
     ]);
   });
 
@@ -120,8 +141,22 @@ describe("project", () => {
     expect(
       project([isa, lifetime], funded, { ...plan, years: 1 }),
     ).toStrictEqual([
-      { age: 36, deferred: 0, free: 296145, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 0, free: 331190, uncovered: 0, year: 2027 },
+      {
+        age: 36,
+        deferred: 0,
+        early: 0,
+        free: 296145,
+        uncovered: 0,
+        year: 2026,
+      },
+      {
+        age: 37,
+        deferred: 0,
+        early: 0,
+        free: 331190,
+        uncovered: 0,
+        year: 2027,
+      },
     ]);
   });
 
@@ -130,9 +165,30 @@ describe("project", () => {
   // then 326,145.
   it("pays a spare-money account its take of the year's cash flow, every month", () => {
     expect(project([spareIsa], schedule, { ...plan, years: 2 })).toStrictEqual([
-      { age: 36, deferred: 0, free: 286145, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 0, free: 306145, uncovered: 0, year: 2027 },
-      { age: 38, deferred: 0, free: 326145, uncovered: 0, year: 2028 },
+      {
+        age: 36,
+        deferred: 0,
+        early: 0,
+        free: 286145,
+        uncovered: 0,
+        year: 2026,
+      },
+      {
+        age: 37,
+        deferred: 0,
+        early: 0,
+        free: 306145,
+        uncovered: 0,
+        year: 2027,
+      },
+      {
+        age: 38,
+        deferred: 0,
+        early: 0,
+        free: 326145,
+        uncovered: 0,
+        year: 2028,
+      },
     ]);
   });
 
@@ -189,6 +245,7 @@ describe("project", () => {
     ).toStrictEqual({
       age: 37,
       deferred: 12000,
+      early: 0,
       free: 9600,
       uncovered: 0,
       year: 2027,
@@ -213,9 +270,9 @@ describe("project", () => {
     expect(
       project([fed], { expenses: [], income: [salary] }, { ...plan, years: 2 }),
     ).toStrictEqual([
-      { age: 36, deferred: 0, free: 0, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 13800, free: 0, uncovered: 0, year: 2027 },
-      { age: 38, deferred: 27600, free: 0, uncovered: 0, year: 2028 },
+      { age: 36, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2026 },
+      { age: 37, deferred: 13800, early: 0, free: 0, uncovered: 0, year: 2027 },
+      { age: 38, deferred: 27600, early: 0, free: 0, uncovered: 0, year: 2028 },
     ]);
   });
 
@@ -244,8 +301,8 @@ describe("project", () => {
         { ...plan, born: 1960, years: 1 },
       ),
     ).toStrictEqual([
-      { age: 66, deferred: 0, free: 0, uncovered: 2643, year: 2026 },
-      { age: 67, deferred: 0, free: 0, uncovered: 0, year: 2027 },
+      { age: 66, deferred: 0, early: 0, free: 0, uncovered: 2643, year: 2026 },
+      { age: 67, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2027 },
     ]);
   });
 
@@ -310,8 +367,8 @@ describe("project", () => {
         years: 1,
       }),
     ).toStrictEqual([
-      { age: 36, deferred: 0, free: 0, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 0, free: 0, uncovered: 0, year: 2027 },
+      { age: 36, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2026 },
+      { age: 37, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2027 },
     ]);
   });
 
@@ -345,9 +402,30 @@ describe("project", () => {
         { ...plan, years: 2 },
       ),
     ).toStrictEqual([
-      { age: 36, deferred: 0, free: 286145, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 0, free: 333841, uncovered: 0, year: 2027 },
-      { age: 38, deferred: 0, free: 413038, uncovered: 0, year: 2028 },
+      {
+        age: 36,
+        deferred: 0,
+        early: 0,
+        free: 286145,
+        uncovered: 0,
+        year: 2026,
+      },
+      {
+        age: 37,
+        deferred: 0,
+        early: 0,
+        free: 333841,
+        uncovered: 0,
+        year: 2027,
+      },
+      {
+        age: 38,
+        deferred: 0,
+        early: 0,
+        free: 413038,
+        uncovered: 0,
+        year: 2028,
+      },
     ]);
   });
 
@@ -357,9 +435,30 @@ describe("project", () => {
     expect(
       project([spareIsa], schedule, { ...plan, month: 8, years: 2 }),
     ).toStrictEqual([
-      { age: 36, deferred: 0, free: 286145, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 0, free: 292812, uncovered: 0, year: 2027 },
-      { age: 38, deferred: 0, free: 312812, uncovered: 0, year: 2028 },
+      {
+        age: 36,
+        deferred: 0,
+        early: 0,
+        free: 286145,
+        uncovered: 0,
+        year: 2026,
+      },
+      {
+        age: 37,
+        deferred: 0,
+        early: 0,
+        free: 292812,
+        uncovered: 0,
+        year: 2027,
+      },
+      {
+        age: 38,
+        deferred: 0,
+        early: 0,
+        free: 312812,
+        uncovered: 0,
+        year: 2028,
+      },
     ]);
   });
 
@@ -375,8 +474,22 @@ describe("project", () => {
         { ...plan, years: 1 },
       ),
     ).toStrictEqual([
-      { age: 36, deferred: 0, free: 286145, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 0, free: 286145, uncovered: 0, year: 2027 },
+      {
+        age: 36,
+        deferred: 0,
+        early: 0,
+        free: 286145,
+        uncovered: 0,
+        year: 2026,
+      },
+      {
+        age: 37,
+        deferred: 0,
+        early: 0,
+        free: 286145,
+        uncovered: 0,
+        year: 2027,
+      },
     ]);
   });
 
@@ -435,38 +548,48 @@ describe("project", () => {
     expect(
       project([pocket, flatIsa], short, { ...plan, month: 11, years: 2 }),
     ).toStrictEqual([
-      { age: 36, deferred: 0, free: 20000, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 0, free: 20000, uncovered: 0, year: 2027 },
-      { age: 38, deferred: 0, free: 8200, uncovered: 0, year: 2028 },
+      { age: 36, deferred: 0, early: 0, free: 20000, uncovered: 0, year: 2026 },
+      { age: 37, deferred: 0, early: 0, free: 20000, uncovered: 0, year: 2027 },
+      { age: 38, deferred: 0, early: 0, free: 8200, uncovered: 0, year: 2028 },
     ]);
   });
 
-  // Born in 1980, so 2026 is the year 46 is reached and the pension
-  // cannot be touched: the year's twelve £1,000 go uncovered and the
-  // £100,000 compounds a whole year to 105,000 all the same.
-  it("leaves a pension where it is before the pension age, and the months short", () => {
-    const growing: Account = {
-      ...sipp,
-      balance: 100000,
-      growth: { kind: "plan" },
-    };
-
+  // Born in 1980, so 2026 is the year 46 is reached and a pension is
+  // drawn only as the last resort. The £1,200 of cash covers January
+  // and £200 of February, the £2,000 ISA the £800 left of February,
+  // March and £200 of April, and only then is the SIPP drawn, for the
+  // £800 left of April and eight whole months after it, £8,800, at 45p
+  // kept of each pound: £19,555.56 out of the £30,000, which the point
+  // reports as drawn early.
+  it("draws a pension before the pension age only once cash and the ISA are empty, at the charge on taking it early", () => {
     expect(
-      project([growing], short, { ...plan, born: 1980, years: 1 }),
+      project(
+        [{ ...sipp, balance: 30000 }, { ...flatIsa, balance: 2000 }, pocket],
+        short,
+        { ...plan, born: 1980, years: 1 },
+      ),
     ).toStrictEqual([
-      { age: 46, deferred: 100000, free: 0, uncovered: 12000, year: 2026 },
-      { age: 47, deferred: 105000, free: 0, uncovered: 0, year: 2027 },
+      {
+        age: 46,
+        deferred: 30000,
+        early: 19556,
+        free: 2000,
+        uncovered: 0,
+        year: 2026,
+      },
+      { age: 47, deferred: 10444, early: 0, free: 0, uncovered: 0, year: 2027 },
     ]);
   });
 
   // Born in 1972, so 55 is reached in 2027, while the pension age is 55,
-  // and a pension is drawable in every month of it rather than from a
-  // birthday the plan does not hold: £1,000 is taxed nothing, a quarter
-  // of it free and the £750 left under a twelfth of the personal
-  // allowance, so twelve take £12,000. The age rises to 57 in April
-  // 2028, when its owner is 56, so January to March are drawn and the
-  // nine months after go uncovered. 2029 reaches 57 and is drawn again.
-  it("draws a pension from 55 until the pension age rises in April 2028, and from 57 after", () => {
+  // and a pension is drawn as income in every month of it: £1,000 is
+  // taxed nothing, a quarter of it free and the £750 left under a
+  // twelfth of the personal allowance, so twelve take £12,000. The age
+  // rises to 57 in April 2028, when its owner is 56, so January to March
+  // are drawn as income and the nine months after early, £2,222.22 each
+  // and £20,000 in all, read to the penny rather than rounded up from
+  // the residue of adding them. 2029 reaches 57 and is income again.
+  it("draws a pension as income from 55 until the pension age rises in April 2028, and from 57 after", () => {
     expect(
       project([{ ...sipp, balance: 100000 }], short, {
         ...plan,
@@ -475,10 +598,24 @@ describe("project", () => {
         years: 3,
       }),
     ).toStrictEqual([
-      { age: 55, deferred: 100000, free: 0, uncovered: 0, year: 2027 },
-      { age: 56, deferred: 88000, free: 0, uncovered: 9000, year: 2028 },
-      { age: 57, deferred: 85000, free: 0, uncovered: 0, year: 2029 },
-      { age: 58, deferred: 73000, free: 0, uncovered: 0, year: 2030 },
+      {
+        age: 55,
+        deferred: 100000,
+        early: 0,
+        free: 0,
+        uncovered: 0,
+        year: 2027,
+      },
+      {
+        age: 56,
+        deferred: 88000,
+        early: 20000,
+        free: 0,
+        uncovered: 0,
+        year: 2028,
+      },
+      { age: 57, deferred: 65000, early: 0, free: 0, uncovered: 0, year: 2029 },
+      { age: 58, deferred: 53000, early: 0, free: 0, uncovered: 0, year: 2030 },
     ]);
   });
 
@@ -498,8 +635,15 @@ describe("project", () => {
         { ...plan, born: 1960, years: 1 },
       ),
     ).toStrictEqual([
-      { age: 66, deferred: 100000, free: 0, uncovered: 0, year: 2026 },
-      { age: 67, deferred: 60605, free: 0, uncovered: 0, year: 2027 },
+      {
+        age: 66,
+        deferred: 100000,
+        early: 0,
+        free: 0,
+        uncovered: 0,
+        year: 2026,
+      },
+      { age: 67, deferred: 60605, early: 0, free: 0, uncovered: 0, year: 2027 },
     ]);
   });
 
@@ -540,6 +684,7 @@ describe("project", () => {
     const { gross } = drawFor(2800, {
       allowance: lumpSumAllowance,
       below: 0,
+      isEarly: false,
       months: 1,
     });
     const exact: Account = {
@@ -721,8 +866,8 @@ describe("project", () => {
     expect(
       project([thin, flatIsa], short, { ...plan, years: 1 }),
     ).toStrictEqual([
-      { age: 36, deferred: 0, free: 20000, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 0, free: 8400, uncovered: 0, year: 2027 },
+      { age: 36, deferred: 0, early: 0, free: 20000, uncovered: 0, year: 2026 },
+      { age: 37, deferred: 0, early: 0, free: 8400, uncovered: 0, year: 2027 },
     ]);
   });
 
@@ -754,8 +899,8 @@ describe("project", () => {
     expect(
       project([{ ...flatIsa, balance: 0.5 }], tenths, { ...plan, years: 1 }),
     ).toStrictEqual([
-      { age: 36, deferred: 0, free: 1, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 0, free: 1, uncovered: 0, year: 2027 },
+      { age: 36, deferred: 0, early: 0, free: 1, uncovered: 0, year: 2026 },
+      { age: 37, deferred: 0, early: 0, free: 1, uncovered: 0, year: 2027 },
     ]);
   });
 
@@ -766,9 +911,9 @@ describe("project", () => {
   // carried, so its point is short by nothing.
   it("reports what nothing covered on the point of the year it went short", () => {
     expect(project([pocket], short, { ...plan, years: 2 })).toStrictEqual([
-      { age: 36, deferred: 0, free: 0, uncovered: 10800, year: 2026 },
-      { age: 37, deferred: 0, free: 0, uncovered: 12000, year: 2027 },
-      { age: 38, deferred: 0, free: 0, uncovered: 0, year: 2028 },
+      { age: 36, deferred: 0, early: 0, free: 0, uncovered: 10800, year: 2026 },
+      { age: 37, deferred: 0, early: 0, free: 0, uncovered: 12000, year: 2027 },
+      { age: 38, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2028 },
     ]);
   });
 
@@ -788,8 +933,8 @@ describe("project", () => {
         { ...plan, month: 8, years: 1 },
       ),
     ).toStrictEqual([
-      { age: 36, deferred: 0, free: 0, uncovered: 1, year: 2026 },
-      { age: 37, deferred: 0, free: 0, uncovered: 0, year: 2027 },
+      { age: 36, deferred: 0, early: 0, free: 0, uncovered: 1, year: 2026 },
+      { age: 37, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2027 },
     ]);
   });
 
@@ -807,8 +952,8 @@ describe("project", () => {
     expect(
       project([growing], short, { ...plan, month: 11, years: 1 }),
     ).toStrictEqual([
-      { age: 36, deferred: 0, free: 10000, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 0, free: 9037, uncovered: 0, year: 2027 },
+      { age: 36, deferred: 0, early: 0, free: 10000, uncovered: 0, year: 2026 },
+      { age: 37, deferred: 0, early: 0, free: 9037, uncovered: 0, year: 2027 },
     ]);
   });
 
@@ -830,6 +975,7 @@ describe("project", () => {
     ).toStrictEqual({
       age: 37,
       deferred: 0,
+      early: 0,
       free: 0,
       uncovered: 0,
       year: 2027,
@@ -848,6 +994,7 @@ describe("project", () => {
     ).toStrictEqual({
       age: 37,
       deferred: 0,
+      early: 0,
       free: 2000,
       uncovered: 0,
       year: 2027,
@@ -858,8 +1005,8 @@ describe("project", () => {
     expect(
       project([home, mortgage], funded, { ...plan, years: 1 }),
     ).toStrictEqual([
-      { age: 36, deferred: 0, free: 0, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 0, free: 0, uncovered: 0, year: 2027 },
+      { age: 36, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2026 },
+      { age: 37, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2027 },
     ]);
   });
 
@@ -867,7 +1014,14 @@ describe("project", () => {
     expect(
       project([pension, isa], funded, { ...plan, years: 0 }),
     ).toStrictEqual([
-      { age: 36, deferred: 412880, free: 286145, uncovered: 0, year: 2026 },
+      {
+        age: 36,
+        deferred: 412880,
+        early: 0,
+        free: 286145,
+        uncovered: 0,
+        year: 2026,
+      },
     ]);
   });
 });

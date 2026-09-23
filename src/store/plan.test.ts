@@ -47,7 +47,14 @@ describe("getProjection", () => {
   it("runs the engine over the store's accounts and lines from this year, given a life", async () => {
     vi.useFakeTimers({ now: new Date("2026-09-15T12:00:00Z") });
     const points = [
-      { age: 36, deferred: 412880, free: 286145, uncovered: 0, year: 2026 },
+      {
+        age: 36,
+        deferred: 412880,
+        early: 0,
+        free: 286145,
+        uncovered: 0,
+        year: 2026,
+      },
     ];
     vi.mocked(getAccounts).mockResolvedValue([...accounts]);
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
