@@ -90,6 +90,7 @@ describe("cashFlow", () => {
     });
 
     expect(flow.income).toBe(12250);
+    expect(flow.taxable).toBe(11250);
     expect(flow.fed).toStrictEqual([
       {
         account: pension,
@@ -889,6 +890,7 @@ describe("cashFlow", () => {
       left: 0,
       spare: [],
       spent: [],
+      taxable: 0,
     });
   });
 });
