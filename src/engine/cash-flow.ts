@@ -15,7 +15,7 @@ import { rateFrom } from "@/data/plan";
 import { monthly } from "@/lib/cadence";
 import { runsIn } from "@/lib/lines";
 import { clearsIn, termOf } from "@/lib/loans";
-import { incomeTaxOn, insuranceOn } from "@/lib/tax";
+import { incomeTaxOn, insuranceOn, reliefOf } from "@/lib/tax";
 
 // A month of a year's money, in pounds as the lines state them and
 // unrounded, formatted where it is rendered: what comes in, what goes
@@ -41,6 +41,17 @@ export interface Fed extends Paid {
   readonly sacrificed: number;
 }
 
+// An account and what the month actually pays it, which for a fixed sum
+// is the sum it states or as much of it as the month had. The stated sum
+// is not carried alongside what was paid, since nothing reads it yet and
+// the account itself still holds it. A pension paid out of the month
+// lands more than it is paid by the relief it claims, which is added
+// where what lands is read rather than carried here beside it.
+export interface Paid {
+  readonly account: Account;
+  readonly amount: number;
+}
+
 // The two schedules the plan screen holds, as the engine reads them.
 export interface Schedule {
   readonly expenses: readonly ExpenseLine[];
@@ -58,15 +69,6 @@ export interface Spent {
 // has, or nothing at all for cash.
 export interface Take extends Paid {
   readonly cap: null | number;
-}
-
-// An account and what the month actually pays it, which for a fixed sum
-// is the sum it states or as much of it as the month had. The stated sum
-// is not carried alongside what was paid, since nothing reads it yet and
-// the account itself still holds it.
-interface Paid {
-  readonly account: Account;
-  readonly amount: number;
 }
 
 // The flow is asked for a month of a plan: the month being worked out,
@@ -351,7 +353,10 @@ function isPaying(
 // feeds it that month, since a sacrifice is an employer contribution
 // and counts against the pension's allowance as the spare money does,
 // and none of it once there is none left or the feeding has filled
-// it, with what is left after them. The remainder is the one the
+// it, with what is left after them. The cap holds what lands in the
+// account, and a pension lands a quarter more than it is paid, the
+// basic rate it claims back, so what it takes out of the month is four
+// fifths of the room it has. The remainder is the one the
 // hand-down keeps, rather than the sum taken back off the whole, so an
 // account that takes all there is leaves exactly nothing and not the
 // rounding of a subtraction. A real asset or a debt takes no spare
@@ -375,7 +380,9 @@ function spareMoney(
       const room =
         cap === null
           ? left
-          : cap / 12 - total(fed.filter((entry) => entry.account === account));
+          : (cap / 12 -
+              total(fed.filter((entry) => entry.account === account))) /
+            (1 + reliefOf(account));
       const amount = Math.max(0, Math.min(left, room));
       takes.push({ account, amount, cap });
       left -= amount;

@@ -74,14 +74,15 @@ describe("project", () => {
   // then growing at m = 1.05^(1/12) for the months it is in: 271,930 ×
   // 1.05 + 1,666.67 × m(m¹² − 1)/(m − 1) = 285,526.50 + 20,537.63 =
   // 306,064.13, then the same again on that: 341,904.96. The pension
-  // the same way with £2,376 a month: 437,707.52, then 486,151.06.
+  // the same way with its £2,376 a month and the basic rate claimed
+  // back on it, £2,970: 447,820.06, then 506,809.11.
   // The current account, the home and the mortgage are no wrapper and
   // are left out.
   it("pays a year's sum in a twelfth at a time, each month grown at the plan rate, by wrapper", () => {
     expect(project(accounts, funded, { ...plan, years: 2 })).toStrictEqual([
       { age: 34, deferred: 391640, free: 271930, uncovered: 0, year: 2026 },
-      { age: 35, deferred: 437708, free: 306064, uncovered: 0, year: 2027 },
-      { age: 36, deferred: 486151, free: 341905, uncovered: 0, year: 2028 },
+      { age: 35, deferred: 447820, free: 306064, uncovered: 0, year: 2027 },
+      { age: 36, deferred: 506809, free: 341905, uncovered: 0, year: 2028 },
     ]);
   });
 
@@ -141,8 +142,8 @@ describe("project", () => {
   // mortgage the £980.20 left of its £2,180. The current account,
   // listed first and uncapped, would take whatever was left, and
   // nothing is, so the ISA is paid nothing either; the pension is paid
-  // its sum and fed the £1,380 that lands with the NI saved on top:
-  // 455,893.
+  // its sum, which lands with the basic rate claimed back as £2,970,
+  // and fed the £1,380 that lands with the NI saved on top: 461,072.
   it("reads the cash flow over every account, in the order they are listed", () => {
     const spareCash: Account = {
       ...cash,
@@ -156,7 +157,44 @@ describe("project", () => {
 
     expect(a?.free).toBe(271930);
     expect(b?.free).toBe(271930);
-    expect(a?.deferred).toBe(455893);
+    expect(a?.deferred).toBe(461072);
+  });
+
+  // £800 a month paid into a pension out of the month lands as £1,000,
+  // the basic rate claimed back on it, so a year at no growth is £12,000
+  // up; and the spare money into one to a £6,000 cap takes £400 a month,
+  // which lands as the £500 its cap holds, £6,000 up. The ISA beside
+  // them takes the same £800 a month and holds what it is paid.
+  it("lands what a pension is paid out of the month with the basic rate claimed back", () => {
+    const paying: Account = {
+      ...sipp,
+      balance: 0,
+      contribution: { amount: 800, cadence: "month", kind: "fixed" },
+    };
+    const spare: Account = {
+      ...sipp,
+      balance: 0,
+      contribution: { cap: 6000, kind: "spare" },
+      id: 8,
+    };
+    const saving: Account = {
+      ...flatIsa,
+      balance: 0,
+      contribution: { amount: 800, cadence: "month", kind: "fixed" },
+    };
+
+    expect(
+      project([paying, saving], funded, { ...plan, years: 1 }).at(-1),
+    ).toStrictEqual({
+      age: 35,
+      deferred: 12000,
+      free: 9600,
+      uncovered: 0,
+      year: 2027,
+    });
+    expect(
+      project([spare], funded, { ...plan, years: 1 }).at(-1)?.deferred,
+    ).toBe(6000);
   });
 
   // A pension paid nothing of its own and fed the salary's £1,200 a

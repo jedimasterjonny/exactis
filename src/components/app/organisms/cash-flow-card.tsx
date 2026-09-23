@@ -7,7 +7,7 @@ import { useState } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
-import type { Fed, Schedule, Spent, Take } from "@/engine/cash-flow";
+import type { Fed, Paid, Schedule, Spent, Take } from "@/engine/cash-flow";
 
 import { Field } from "@/components/app/atoms/field";
 import { SectionHeader } from "@/components/app/atoms/section-header";
@@ -26,6 +26,7 @@ import { spanOf } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 import { monthName } from "@/lib/months";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
+import { reliefOf } from "@/lib/tax";
 
 interface CashFlowCardProps {
   readonly accounts: readonly Account[];
@@ -61,7 +62,8 @@ interface RowProps {
 // from and what lands with the NI saved, then the income tax and the
 // National Insurance on what is left of it, then the expenses and every
 // account paid go out, each account under its name with how it is
-// paid, and what is left closes the list, in the loss tone when the
+// paid, and a pension with what lands once the basic rate is claimed
+// back on it, and what is left closes the list, in the loss tone when the
 // month does not cover its outgoings. The
 // expenses figure opens into the lines behind it, each under its name
 // with what it is paid at and the years it runs, since a sum over a
@@ -118,7 +120,7 @@ export function CashFlowCard({
           {flow.fixed.map((paid) => (
             <Row
               amount={-paid.amount}
-              detail="A fixed sum"
+              detail={relieved("A fixed sum", paid)}
               key={paid.account.id}
               label={paid.account.name}
             />
@@ -126,7 +128,7 @@ export function CashFlowCard({
           {flow.spare.map((take) => (
             <Row
               amount={-take.amount}
-              detail={describeTake(take)}
+              detail={relieved(describeTake(take), take)}
               key={take.account.id}
               label={take.account.name}
             />
@@ -227,6 +229,18 @@ function Figure({ amount, isTotal = false }: FigureProps): JSX.Element {
 // sign Intl gives a negative zero or a fraction of a pound going out.
 function isZero(amount: number): boolean {
   return Math.round(amount) === 0;
+}
+
+// How an account is paid, and for a pension what lands in it once the
+// basic rate is claimed back on what the month paid, "A fixed sum, paid
+// in as £1,000 with basic-rate relief", which is more than comes off
+// the month as a sacrifice's feed is. An account that claims nothing,
+// and a pension the month paid nothing, says how it is paid alone.
+function relieved(how: string, { account, amount }: Paid): string {
+  const relief = reliefOf(account);
+  return relief === 0 || isZero(amount)
+    ? how
+    : `${how}, paid in as ${formatGbp(amount * (1 + relief))} with basic-rate relief`;
 }
 
 // A line of the ledger: the name and, beneath it, how the money is

@@ -1,4 +1,7 @@
+import type { AccountKind } from "@/data/accounts";
 import type { IncomeKind } from "@/data/income";
+
+import { isPension } from "@/data/accounts";
 
 // A band of a tax: the rate charged on each pound of a year's income
 // from where the band starts to where the next one does, and on every
@@ -49,6 +52,10 @@ const classFour: readonly Band[] = [
   { from: 50270, rate: 0.02 },
 ];
 
+// The basic rate, which a pension claims back on what is paid into it
+// out of taxed money.
+const basicRate = 0.2;
+
 // The income tax on what so many months of the year earned, which is
 // everything the lines pay less what a salary gives up into a pension,
 // since a sacrifice is never paid to its owner at all.
@@ -75,6 +82,17 @@ export function insuranceOn(
     case "self-employment":
       return chargedOn(classFour, pay, months);
   }
+}
+
+// What a pension adds to each pound paid into it out of taxed money:
+// the pound is taken as what is left of a gross payment once the basic
+// rate is off it, and the scheme claims that rate back, so £800 paid is
+// £1,000 in the pension and the relief is a quarter of what was paid.
+// Anything else holds what it is paid. The relief a higher or an
+// additional rate taxpayer claims on top comes back to them rather than
+// to the pension, and is not counted.
+export function reliefOf(account: { readonly kind: AccountKind }): number {
+  return isPension(account) ? basicRate / (1 - basicRate) : 0;
 }
 
 // What the bands charge on what so many months earned: each band's rate
