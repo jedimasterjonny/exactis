@@ -8,6 +8,23 @@
       "description": "A GitHub Action, looked up through github-tags, or Node, through node-version, waits three days before it is offered, as config:best-practices already has an npm release wait. Without this, either was offered the day it was published.",
       "matchDatasources": ["github-tags", "node-version"],
       "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "A stable minor or patch bump lands by itself once every check on it is green. Not a 0.x one, where a minor is breaking under semver. Renovate merges it rather than GitHub, because main has no required checks for GitHub's auto-merge to wait on.",
+      "automerge": true,
+      "matchCurrentVersion": "!/^0/",
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Reviewed by hand at any update type. Nothing in CI renders a page that reads the store, or reaches the store through the Neon driver rather than PGlite, so a bump to either can pass every gate and still break at runtime.",
+      "automerge": false,
+      "matchPackageNames": [
+        "@neondatabase/serverless",
+        "@next/env",
+        "eslint-config-next",
+        "next"
+      ]
     }
-  ]
+  ],
+  "platformAutomerge": false
 }
