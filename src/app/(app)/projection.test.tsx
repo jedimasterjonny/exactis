@@ -10,8 +10,22 @@ vi.mock("@/store/plan", () => ({ getProjection: vi.fn() }));
 describe("Projection", () => {
   it("hands the store's projection to the chart", async () => {
     vi.mocked(getProjection).mockResolvedValue([
-      { age: 36, deferred: 412880, free: 286145, uncovered: 0, year: 2026 },
-      { age: 37, deferred: 462079, free: 321452, uncovered: 0, year: 2027 },
+      {
+        age: 36,
+        deferred: 412880,
+        early: 0,
+        free: 286145,
+        uncovered: 0,
+        year: 2026,
+      },
+      {
+        age: 37,
+        deferred: 462079,
+        early: 0,
+        free: 321452,
+        uncovered: 0,
+        year: 2027,
+      },
     ]);
 
     render(await Projection());

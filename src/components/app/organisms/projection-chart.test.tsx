@@ -19,17 +19,45 @@ const bySlot =
     element?.getAttribute("data-slot") === slot;
 
 const points = [
-  { age: 36, deferred: 412880, free: 286145, uncovered: 0, year: 2026 },
-  { age: 37, deferred: 462079, free: 321452, uncovered: 0, year: 2027 },
-  { age: 38, deferred: 513737, free: 358525, uncovered: 0, year: 2028 },
+  {
+    age: 36,
+    deferred: 412880,
+    early: 0,
+    free: 286145,
+    uncovered: 0,
+    year: 2026,
+  },
+  {
+    age: 37,
+    deferred: 462079,
+    early: 0,
+    free: 321452,
+    uncovered: 0,
+    year: 2027,
+  },
+  {
+    age: 38,
+    deferred: 513737,
+    early: 0,
+    free: 358525,
+    uncovered: 0,
+    year: 2028,
+  },
 ];
 
 // The same plan, short from its second year on, so the mark has a year
 // to fall on and a later short year to leave unmarked.
 const shortPoints = [
-  { age: 36, deferred: 412880, free: 286145, uncovered: 0, year: 2026 },
-  { age: 37, deferred: 41209, free: 0, uncovered: 18450, year: 2027 },
-  { age: 38, deferred: 0, free: 0, uncovered: 52310, year: 2028 },
+  {
+    age: 36,
+    deferred: 412880,
+    early: 0,
+    free: 286145,
+    uncovered: 0,
+    year: 2026,
+  },
+  { age: 37, deferred: 41209, early: 0, free: 0, uncovered: 18450, year: 2027 },
+  { age: 38, deferred: 0, early: 0, free: 0, uncovered: 52310, year: 2028 },
 ];
 
 // The vertical rule recharts draws for a ReferenceLine, which carries the
@@ -150,8 +178,8 @@ describe("ProjectionChart", () => {
     render(
       <ProjectionChart
         points={[
-          { age: 36, deferred: 0, free: 0, uncovered: 0, year: 2026 },
-          { age: 37, deferred: 0, free: 0, uncovered: 0, year: 2027 },
+          { age: 36, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2026 },
+          { age: 37, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2027 },
         ]}
       />,
     );
