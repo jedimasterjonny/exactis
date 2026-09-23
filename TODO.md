@@ -14,11 +14,40 @@ rises.
 
 ## Allowances
 
-The ISA and pension allowances are applied per account, so two of a kind get two
-allowances; a typed cap replaces the allowance rather than tightening it; a
-fixed sum and a salary sacrifice are never held to it; and there is no taper,
-MPAA or carry-forward. Decide the allowance as a per-person figure across every
-account of the kind, what counts against it, and what happens to money past it.
+Each owner has one ISA and one pension allowance, shared across their accounts
+of the kind. What a salary feeds, a fixed sum and the spare money all count
+against it, a typed cap only lowers it, and money past it is not paid, staying
+in the month for the accounts after it; what none of them takes is spent. A
+fixed sum that alone is past it is refused when it is saved. It is held a
+twelfth a month rather than across the tax year, so a month short of spare money
+loses its twelfth for good, and a sum paid once a year is spread as if paid
+monthly.
+
+What the law adds on top is not held. There is no taper above £260,000 of
+adjusted income, no carry-forward of the three years before, and no money
+purchase annual allowance, although the engine draws on a pension and a draw
+would cut the allowance to £10,000. Money past the pension allowance is simply
+not paid, where a sacrifice past it would really be paid in and charged at the
+owner's marginal rate. And the ISA allowance is one figure, with no Lifetime ISA
+held to £4,000 within it.
+
+Decide whether the allowance is held across the tax year rather than a month at
+a time, which would have the projection carry it as it carries the tax year; the
+rest are figures to add as the plan needs them.
+
+## Owners
+
+An ISA or a pension belongs to an owner, and nothing else in the plan knows
+whose it is. Income lines name no owner, so every salary is taxed together, as
+one person's income against one set of bands, and a salary may sacrifice into
+another owner's pension. The plan holds one year of birth, so every pension is
+drawn from the one pension age, as though all the owners were born in the same
+year, and one lump sum allowance is shared by all of them. A draw on one owner's
+pension is taxed on top of every other owner's earnings.
+
+Decide whose each income line is, and the year each owner was born, so tax, the
+pension age and the lump sum allowance are each a person's rather than the
+plan's, and a salary feeds only its own owner's pension.
 
 ## Today's money
 
