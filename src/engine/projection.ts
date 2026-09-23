@@ -1,5 +1,6 @@
 import type { Account, AccountKind } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
+import type { Month } from "@/data/schedule";
 import type { CashFlow, Paid, Schedule } from "@/engine/cash-flow";
 
 import { isPension, takesSpare } from "@/data/accounts";
@@ -44,14 +45,14 @@ export interface ProjectionPoint {
   readonly year: number;
 }
 
-// The month a shortfall is drawn in, as the draw reads it: the age
-// reached that year, which says whether a pension may be drawn; what is
-// left of the lump sum allowance; and what the month earned that the
-// tax is charged on, which a draw on a pension is taxed on top of.
+// The month a shortfall is drawn in, as the draw reads it: what is left
+// of the lump sum allowance; what the month earned that the tax is
+// charged on, which a draw on a pension is taxed on top of; and whether
+// the month falls before the pension age, when a pension cannot be had.
 interface Drawing {
-  readonly age: number;
   readonly allowance: number;
   readonly below: number;
+  readonly isEarly: boolean;
 }
 
 // An account and the balance the projection has carried it to, which
@@ -73,14 +74,22 @@ interface TaxYear {
   readonly taxable: number;
 }
 
-// The age the plan's owner may reach a pension at, which is the UK
-// normal minimum pension age from April 2028. A constant until there is
-// an assumptions screen to set it on, as the plan rate is in the store.
-const pensionAge = 57;
-
 // The month a tax year opens in, April, January being nought. The year
 // opens on the sixth, and is taken here from the first.
 const april = 3;
+
+// The age the plan's owner may draw a pension at as income, the UK
+// normal minimum pension age: 55, until it rises to 57 on 6 April 2028,
+// taken here from the start of that April. Someone who is 55 or 56 when
+// it rises can draw before it and not again until 57, save under a
+// protected pension age this plan does not hold. Constants until there
+// is an assumptions screen to set them on, as the plan rate is in the
+// store.
+const pensionAge = {
+  after: 57,
+  before: 55,
+  rises: { month: april, year: 2028 },
+} as const;
 
 // The plan's years, the first holding the balances as they are and each
 // after it the year before carried to its end, a month at a time: what
@@ -172,9 +181,9 @@ export function project(
           settlement,
         });
         const draw = drawnFrom(held, Math.max(0, -flow.left), {
-          age,
           allowance,
           below: flow.taxable,
+          isEarly: isBeforePensionAge(age, { month, year }),
         });
         allowance = draw.allowance;
         taxYear = {
@@ -218,8 +227,8 @@ function carried(balance: number, paid: number, rate: number): number {
 // kinds are drawn cash first, since it is spent as it stands and grows
 // least; then the tax-free wrapper, which is reached at any age and
 // owes nothing on the way out; then the tax-deferred one, and only from
-// the year its owner reaches the pension age, since before it the money
-// cannot be had at all. Within a kind the accounts are drawn in the
+// the pension age, since before it the money cannot be had at all.
+// Within a kind the accounts are drawn in the
 // order they are listed, each giving up what it holds or what the month
 // is still short, whichever is the lesser, so an account is emptied and
 // never overdrawn and what it could not cover passes to the next. A
@@ -237,17 +246,16 @@ function carried(balance: number, paid: number, rate: number): number {
 function drawnFrom(
   held: readonly Held[],
   shortfall: number,
-  { age, allowance, below }: Drawing,
+  { allowance, below, isEarly }: Drawing,
 ): {
   readonly allowance: number;
   readonly held: readonly Held[];
   readonly taxable: number;
   readonly uncovered: number;
 } {
-  const kinds: readonly AccountKind[] =
-    age < pensionAge
-      ? ["cash", "tax-free"]
-      : ["cash", "tax-free", "tax-deferred"];
+  const kinds: readonly AccountKind[] = isEarly
+    ? ["cash", "tax-free"]
+    : ["cash", "tax-free", "tax-deferred"];
   let drawn = held;
   let left = shortfall;
   let taxed = { allowance, below, months: 1 };
@@ -276,6 +284,18 @@ function drawnFrom(
     taxable: taxed.below,
     uncovered: left,
   };
+}
+
+// Whether a month falls before the pension age: before 55 until the age
+// rises in April 2028, and before 57 from then. The plan holds the year
+// its owner was born in and not the day, so the age is the one reached
+// that year, and the whole of the year it is reached in counts as
+// reaching it.
+function isBeforePensionAge(age: number, { month, year }: Month): boolean {
+  const { rises } = pensionAge;
+  const hasRisen =
+    year > rises.year || (year === rises.year && month >= rises.month);
+  return age < (hasRisen ? pensionAge.after : pensionAge.before);
 }
 
 // What lands in an account each month of the year: what each salary
