@@ -92,6 +92,13 @@ imported. A test that asserts nothing fails, and test order is shuffled.
   not carry the directive, and a test that does render without one fails plainly
   on a missing `document` rather than misreporting.
 
+`e2e/` is a second suite, run by `bun run test:e2e`. It serves the last
+`bun run build` with `next start` and drives it over HTTP, as a browser with
+JavaScript off would, so it reaches what the unit suite mocks: the proxy as Next
+runs it, a server action posted from a form, and the cookie that action sets. It
+needs a build, so it runs in CI after one rather than in a hook. Anything the
+server writes to stderr fails it, as console output fails a unit test.
+
 # Components
 
 `src/components` has three layers, and the dependency arrows only ever point

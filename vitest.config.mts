@@ -40,8 +40,9 @@ export default defineConfig({
     // suite's globs read no ignore file, so a second copy of every test
     // file was collected and run, against this checkout's node_modules
     // and this checkout's alias, and reported as failures of a tree
-    // nobody is committing.
-    exclude: [...configDefaults.exclude, "**/.claude/worktrees/**"],
+    // nobody is committing. And the end-to-end suite, which needs a build
+    // to serve and has vitest.e2e.config.mts to run it.
+    exclude: [...configDefaults.exclude, "**/.claude/worktrees/**", "e2e/**"],
     // A test that asserts nothing is not a test.
     expect: { requireAssertions: true },
     // No ambient describe/it/expect. Test files import what they use, like
