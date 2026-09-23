@@ -1,10 +1,11 @@
 import type { Account, AccountKind } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
-import type { CashFlow, Schedule } from "@/engine/cash-flow";
+import type { CashFlow, Paid, Schedule } from "@/engine/cash-flow";
 
 import { takesSpare } from "@/data/accounts";
 import { rateFrom } from "@/data/plan";
 import { cashFlow } from "@/engine/cash-flow";
+import { reliefOf } from "@/lib/tax";
 
 // A year of the projection: the balance the plan expects entering it,
 // whole pounds, under the name the progress point gives the same
@@ -177,16 +178,23 @@ function drawnFrom(
 
 // What lands in an account each month of the year: what each salary
 // feeds it, the fixed sum or the spare money's take the flow lists for
-// it, and nothing for an account it lists nothing for. The entries are
-// read off the flow as the ones listed for the account itself, the same
-// object the flow was read over, rather than for its id, which no two
-// accounts carried here share, a plan listing one twice being refused
-// by the flow this is read off; a sum over them, so a miss needs no
-// fallback that could never be reached.
+// it with the relief a pension claims on what is paid out of taxed
+// money, and nothing for an account it lists nothing for. A salary's
+// feed is what lands already, being paid before tax, so it takes no
+// relief. The entries are read off the flow as the ones listed for the
+// account itself, the same object the flow was read over, rather than
+// for its id, which no two accounts carried here share, a plan listing
+// one twice being refused by the flow this is read off; a sum over
+// them, so a miss needs no fallback that could never be reached.
 function paidIn(account: Account, flow: CashFlow): number {
-  return [...flow.fed, ...flow.fixed, ...flow.spare]
-    .filter((paid) => paid.account === account)
-    .reduce((sum, paid) => sum + paid.amount, 0);
+  const sumOf = (paid: readonly Paid[]): number =>
+    paid
+      .filter((entry) => entry.account === account)
+      .reduce((sum, entry) => sum + entry.amount, 0);
+  return (
+    sumOf(flow.fed) +
+    sumOf([...flow.fixed, ...flow.spare]) * (1 + reliefOf(account))
+  );
 }
 
 // The rate a month is carried at, held to losing no more than

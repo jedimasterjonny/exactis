@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { incomeTaxOn, insuranceOn } from "./tax";
+import { incomeTaxOn, insuranceOn, reliefOf } from "./tax";
 
 describe("incomeTaxOn", () => {
   // Nothing on the allowance; £36,000 is 20% on the £23,430 above it;
@@ -93,5 +93,17 @@ describe("refusing a charge", () => {
       );
     }
     expect(incomeTaxOn(0, 1)).toBe(0);
+  });
+});
+
+describe("reliefOf", () => {
+  // £800 paid is £1,000 gross less the basic rate's £200, which the
+  // pension claims back: a quarter of what was paid. Nothing else
+  // claims anything.
+  it("adds the basic rate to what a pension is paid, and nothing to anything else", () => {
+    expect(800 * (1 + reliefOf({ kind: "tax-deferred" }))).toBe(1000);
+    for (const kind of ["cash", "tax-free", "debt"] as const) {
+      expect(reliefOf({ kind })).toBe(0);
+    }
   });
 });

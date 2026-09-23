@@ -91,9 +91,13 @@ held in `src/lib/tax.ts`: income tax on every kind of line, with the personal
 allowance withdrawn over £100,000, Class 1 National Insurance on a salary and
 Class 4 on self-employed profit, and none on a pension or other income. A
 sacrifice comes off the salary before either, so what it saves in tax is what it
-saves the month. Each month is taxed as a twelfth of a year, which is the year's
-tax exactly when its months are alike. The bands are held as they stand, in
-today's money as the lines are, until the plan carries an inflation assumption.
+saves the month. A fixed sum or the spare money paid into a pension comes out of
+taxed money instead, so the pension claims the basic rate back on it and £800
+paid lands as £1,000, which is what a pension's cap is held to; the relief a
+higher rate taxpayer claims on top is theirs rather than the pension's, and is
+not counted. Each month is taxed as a twelfth of a year, which is the year's tax
+exactly when its months are alike. The bands are held as they stand, in today's
+money as the lines are, until the plan carries an inflation assumption.
 
 A debt's own fixed sum is a loan's payments, so it runs only until the loan
 maths in `src/lib/loans.ts` says they clear what is owed: the term the payment

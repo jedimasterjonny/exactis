@@ -18,7 +18,8 @@ const [household, , , retirement] = expenseLines;
 // month in 2026 has the salary's £12,250 coming in, £1,000 of it
 // sacrificed into the pension, £3,912.75 of income tax and £392.55 of
 // NI on the rest, and the household's £3,500 going out, which leaves
-// £3,444.70: the pension is paid its £2,266.25 whole, the mortgage the
+// £3,444.70: the pension is paid its £2,266.25 whole, which lands as
+// £2,832.81 with the basic rate claimed back on it, the mortgage the
 // £1,178.45 left of its £2,210, and the ISA and the current account
 // nothing.
 const spareIsa: Account = {
@@ -75,7 +76,7 @@ describe("CashFlowCard", () => {
       "Income tax−£3,913",
       "National Insurance−£393",
       "Expenses−£3,500",
-      "Workplace pensionA fixed sum−£2,266",
+      "Workplace pensionA fixed sum, paid in as £2,833 with basic-rate relief−£2,266",
       "MortgageA fixed sum−£1,178",
       "Stocks & shares ISASpare money, to £20,000 / yr£0",
       "Current accountSpare money, uncapped£0",
@@ -86,9 +87,9 @@ describe("CashFlowCard", () => {
     expect(screen.getByText(/^Salary sacrifice from Salary/)).toHaveClass(
       "text-muted-foreground",
     );
-    for (const detail of screen.getAllByText("A fixed sum")) {
-      expect(detail).toHaveClass("text-muted-foreground");
-    }
+    expect(screen.getByText("A fixed sum")).toHaveClass(
+      "text-muted-foreground",
+    );
   });
 
   // A year on, the childcare has started and the mortgage is paid
@@ -96,8 +97,9 @@ describe("CashFlowCard", () => {
   // sacrificed, and the consulting's £2,000 a month, £1,752.35 after
   // £190.50 of income tax and £57.15 of NI, is £6,448.65 short of the
   // mortgage payment and the retirement living, so the pension is paid
-  // nothing of its fixed sum, the ISA and the account take nothing, and
-  // the month is short by that £6,448.65 alone. The mortgage
+  // nothing of its fixed sum, so it says nothing of relief, the ISA and
+  // the account take nothing, and the month is short by that £6,448.65
+  // alone. The mortgage
   // has no row by then: its £2,210 a month cleared the £182,940 in
   // March 2035, so the ledger stops charging it rather than writing it
   // at nothing for the rest of the plan.
