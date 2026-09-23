@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { describe, expect, it, vi } from "vitest";
 

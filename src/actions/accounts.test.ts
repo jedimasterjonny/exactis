@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { drizzle } from "drizzle-orm/neon-http";
 import { updateTag } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";

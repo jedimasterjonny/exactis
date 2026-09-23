@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { cacheLife } from "next/cache";
 import { describe, expect, it, vi } from "vitest";
 

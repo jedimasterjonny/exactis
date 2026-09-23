@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
