@@ -73,7 +73,7 @@ export function OwnerList({
             Add owner
           </Button>
         }
-        caption="The people the plan is for. Each ISA and pension belongs to one of them."
+        caption="The people the plan is for. Each ISA and pension belongs to one of them, and shares their allowance with the rest of its kind."
         className="pb-0"
         label={label}
         title="Owners"

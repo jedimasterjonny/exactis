@@ -92,6 +92,7 @@ const isa: Account = {
   id: 99,
   kind: "tax-free",
   name: "ISA",
+  owner: 1,
 };
 
 // The ISA's twelfth of its allowance.
@@ -425,6 +426,7 @@ describe("project against the law", () => {
         id: 50,
         kind: "tax-deferred",
         name: "Pension",
+        owner: 1,
       };
       const income = Array.from(
         { length: 1 + Math.floor(random() * 4) },
@@ -481,6 +483,7 @@ describe("project against the law", () => {
         id: 50,
         kind: "tax-deferred",
         name: "SIPP",
+        owner: 1,
       };
       let drawing: Drawing = {
         allowance: 268275,
