@@ -99,7 +99,7 @@ export function AccountTable({
           <TableHead className="text-right">Growth</TableHead>
           <TableHead className="text-right">Balance</TableHead>
           {(onEdit !== undefined || onDelete !== undefined) && (
-            <TableHead className="w-0">
+            <TableHead className="w-px">
               <span className="sr-only">Actions</span>
             </TableHead>
           )}

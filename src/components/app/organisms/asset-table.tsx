@@ -70,7 +70,7 @@ export function AssetTable({
           <TableHead className="text-right">Secured loan</TableHead>
           <TableHead className="text-right">Payment</TableHead>
           <TableHead className="text-right">Equity</TableHead>
-          <TableHead className="w-0">
+          <TableHead className="w-px">
             <span className="sr-only">Actions</span>
           </TableHead>
         </TableRow>
