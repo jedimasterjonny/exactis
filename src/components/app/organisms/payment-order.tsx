@@ -133,7 +133,7 @@ export function PaymentOrder({
                       drop(account);
                     }}
                   >
-                    <TableCell className="w-0 py-1 pr-0">
+                    <TableCell className="w-px py-1 pr-0">
                       <RowAction
                         className="cursor-grab"
                         draggable
@@ -148,7 +148,7 @@ export function PaymentOrder({
                         }}
                       />
                     </TableCell>
-                    <TableCell className="w-0 figure text-muted-foreground">
+                    <TableCell className="w-px figure text-muted-foreground">
                       {String(index + 1)}
                     </TableCell>
                     <TableCell className="font-medium">

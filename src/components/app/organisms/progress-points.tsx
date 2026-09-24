@@ -83,7 +83,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
                   {header}
                 </TableHead>
               ))}
-              <TableHead className="w-0">
+              <TableHead className="w-px">
                 <span className="sr-only">Edit</span>
               </TableHead>
             </TableRow>
