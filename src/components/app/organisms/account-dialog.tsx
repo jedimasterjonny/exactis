@@ -21,6 +21,7 @@ import { isOwned, takesSpare, toValues } from "@/data/accounts";
 import { useMountedEditor } from "@/hooks/use-editor";
 import { feeding, listed } from "@/lib/feeders";
 import { ownerFor } from "@/lib/owners";
+import { isWithinAllowance } from "@/lib/tax";
 
 interface AccountDialogProps {
   readonly account: Account | null;
@@ -73,7 +74,9 @@ const blank: Draft = {
 // handed down for an ISA or a pension to name its own, a new one
 // opening on the first. The save holds while the account is unnamed,
 // while it is a wrapper with no owner, which is only while the plan has
-// none to give it, or while it is on its way to the store, and a store
+// none to give it, while it states a fixed sum past its allowance on its
+// own, which the amount's hint says the most of, or while it is on its
+// way to the store, and a store
 // that refuses leaves the dialog open and says why,
 // as the editor hook does, rather than handing the route the rejection.
 // The caller is told when the account has been saved, so the screen can
@@ -138,7 +141,8 @@ export function AccountDialog({
       canSave={
         !isSaving &&
         entry.draft.name.trim() !== "" &&
-        (!isOwned(entry.draft) || entry.draft.owner !== null)
+        (!isOwned(entry.draft) || entry.draft.owner !== null) &&
+        isWithinAllowance(entry.draft)
       }
       eyebrow={entry.id === null ? "New account" : "Edit account"}
       isWide

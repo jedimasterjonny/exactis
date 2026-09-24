@@ -6,7 +6,9 @@ import {
   drawOf,
   incomeTaxOn,
   insuranceOn,
+  isWithinAllowance,
   lumpSumAllowance,
+  mostFixedOf,
   reliefOf,
 } from "./tax";
 
@@ -255,5 +257,67 @@ describe("reliefOf", () => {
     for (const kind of ["cash", "tax-free", "debt"] as const) {
       expect(reliefOf({ kind })).toBe(0);
     }
+  });
+});
+
+describe("mostFixedOf", () => {
+  // What lands as the whole allowance: an ISA's £20,000, and the £48,000
+  // a pension is paid that lands as £60,000 with the relief.
+  it("gives the most a fixed sum lands the allowance from, and none for a kind with no allowance", () => {
+    expect(mostFixedOf("tax-free")).toBe(20000);
+    expect(mostFixedOf("tax-deferred")).toBe(48000);
+    expect(mostFixedOf("cash")).toBeNull();
+    expect(mostFixedOf("debt")).toBeNull();
+  });
+});
+
+describe("isWithinAllowance", () => {
+  const isa = {
+    balance: 0,
+    balloon: 0,
+    cadence: "year",
+    cap: 0,
+    contribution: 20000,
+    funding: "fixed",
+    growth: "plan",
+    kind: "tax-free",
+    name: "ISA",
+    owner: 1,
+    rate: 0,
+  } as const;
+
+  // At the most, whether stated a year or a month, is within; a pound
+  // past it, or a month of £1,667, which is £20,004 a year, is not.
+  it("holds an ISA's fixed sum to £20,000 a year and a pension's to £48,000", () => {
+    expect(isWithinAllowance(isa)).toBe(true);
+    expect(isWithinAllowance({ ...isa, contribution: 20001 })).toBe(false);
+    expect(
+      isWithinAllowance({ ...isa, cadence: "month", contribution: 1666 }),
+    ).toBe(true);
+    expect(
+      isWithinAllowance({ ...isa, cadence: "month", contribution: 1667 }),
+    ).toBe(false);
+    expect(
+      isWithinAllowance({ ...isa, contribution: 48000, kind: "tax-deferred" }),
+    ).toBe(true);
+    expect(
+      isWithinAllowance({ ...isa, contribution: 48001, kind: "tax-deferred" }),
+    ).toBe(false);
+  });
+
+  // The spare money is held to the allowance by the engine, and cash
+  // and a debt have none, so none of them states a sum it could pass.
+  it("asks nothing of the spare money or of a kind with no allowance", () => {
+    expect(
+      isWithinAllowance({ ...isa, contribution: 99999, funding: "spare" }),
+    ).toBe(true);
+    expect(
+      isWithinAllowance({
+        ...isa,
+        contribution: 99999,
+        kind: "cash",
+        owner: null,
+      }),
+    ).toBe(true);
   });
 });
