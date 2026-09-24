@@ -13,6 +13,7 @@ import { cadenceOptions } from "@/lib/cadence";
 import { formatGbp } from "@/lib/money";
 import { optionsOf } from "@/lib/options";
 import { ownerFor, ownerOptions } from "@/lib/owners";
+import { mostFixedOf } from "@/lib/tax";
 
 interface AccountFieldsProps {
   readonly children?: ReactNode;
@@ -157,11 +158,7 @@ export function AccountFields({
           <>
             <MoneyField
               defaultValue={initial.contribution}
-              hint={
-                isFed
-                  ? "Leave at nothing for none on top"
-                  : "Leave at nothing for none"
-              }
+              hint={amountHint(draft.kind, isFed)}
               // Keyed apart from the cap, which takes its place:
               // the fragment is unwrapped and the two would be
               // one field, keeping what was typed into the other.
@@ -218,6 +215,23 @@ export function AccountFields({
       </FieldRow>
     </div>
   );
+}
+
+// What the amount field says a sum of nothing means, and for an ISA or a
+// pension the most it can be a year and still land within the
+// allowance, which the save holds to: a pension's four fifths of it,
+// the rest being the relief. A fed pension's sum is on top of what the
+// salaries sacrifice, which the allowance holds too, month by month.
+function amountHint(kind: AccountKind, isFed: boolean): string {
+  const most = mostFixedOf(kind);
+  if (most === null) {
+    return "Leave at nothing for none";
+  }
+  const limit =
+    most === allowanceOf(kind)
+      ? `At most ${formatGbp(most)} a year, the allowance`
+      : `At most ${formatGbp(most)} a year, the allowance with relief`;
+  return isFed ? `${limit}, less the sacrifice` : `${limit}; nothing for none`;
 }
 
 // What the cap field says a cap of nothing means: the kind's allowance,
