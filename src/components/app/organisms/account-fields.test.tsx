@@ -213,7 +213,9 @@ describe("AccountFields", () => {
     ).toStrictEqual(["A fixed sum, or nothing", "Spare money"]);
     expect(
       screen.getByRole("textbox", { name: "Amount" }),
-    ).toHaveAccessibleDescription("Leave at nothing for none on top");
+    ).toHaveAccessibleDescription(
+      "At most £48,000 a year, the allowance with relief, less the sacrifice",
+    );
   });
 
   it("puts what the dialog adds beside the growth, after every other field", () => {
@@ -230,6 +232,29 @@ describe("AccountFields", () => {
     ).toHaveAccessibleDescription(
       "Spare money is what a month's income leaves after the expenses and every fixed sum",
     );
+    expect(
+      screen.getByRole("textbox", { name: "Amount" }),
+    ).toHaveAccessibleDescription(
+      "At most £20,000 a year, the allowance; nothing for none",
+    );
+  });
+
+  // The most a fixed sum can be is the allowance for an ISA and four
+  // fifths of it for a pension, the rest being the relief; cash has no
+  // allowance and is asked only whether it is paid anything.
+  it("says the most a wrapper's fixed sum can be a year, and nothing of cash's", () => {
+    renderFields({ ...isa, kind: "tax-deferred" });
+
+    expect(
+      screen.getByRole("textbox", { name: "Amount" }),
+    ).toHaveAccessibleDescription(
+      "At most £48,000 a year, the allowance with relief; nothing for none",
+    );
+  });
+
+  it("asks cash's fixed sum nothing but whether there is one", () => {
+    renderFields({ ...isa, kind: "cash", owner: null });
+
     expect(
       screen.getByRole("textbox", { name: "Amount" }),
     ).toHaveAccessibleDescription("Leave at nothing for none");

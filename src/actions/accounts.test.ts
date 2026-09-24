@@ -276,6 +276,34 @@ describe("saveAccount", () => {
 
   // A share is at most the whole of the base, and the whole of it is
   // taken: the bound is a bound, not a refusal of the figure at it.
+  // A sum that alone lands past its allowance would be written down as
+  // paid and never be, so the save refuses it; at the most it is taken.
+  it("refuses a fixed sum that lands past its allowance on its own", async () => {
+    vi.mocked(insertAccount).mockResolvedValue(pension);
+
+    await expect(
+      saveAccount(null, { ...values, cadence: "year", contribution: 20001 }),
+    ).rejects.toThrow(z.ZodError);
+    await expect(
+      saveAccount(null, {
+        ...values,
+        cadence: "year",
+        contribution: 48001,
+        kind: "tax-deferred",
+      }),
+    ).rejects.toThrow(z.ZodError);
+    expect(insertAccount).not.toHaveBeenCalled();
+
+    expect(
+      await saveAccount(null, {
+        ...values,
+        cadence: "year",
+        contribution: 48000,
+        kind: "tax-deferred",
+      }),
+    ).toBe(pension);
+  });
+
   it("takes a share of the whole of the base", async () => {
     vi.mocked(updateAccount).mockResolvedValue(pension);
     const share = { line: 1, sacrifice: 1 };

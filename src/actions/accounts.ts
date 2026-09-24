@@ -46,6 +46,7 @@ import {
 import { isFed, stopFeeding, updateSacrifice } from "@/db/income";
 import { termOf } from "@/lib/loans";
 import { requireSession } from "@/lib/session";
+import { isWithinAllowance } from "@/lib/tax";
 import { accountsTag } from "@/store/accounts";
 import { getPlan } from "@/store/plan";
 import { expenseLinesTag, incomeLinesTag } from "@/store/schedule";
@@ -119,7 +120,8 @@ const house = z
 // the same line twice, and none against anything but a pension, since
 // only a pension is fed. An ISA or a pension names its owner by id and
 // no other account names one; the store holds the id to an owner it
-// has. A debt paying a fixed sum is held to one that
+// has. A fixed sum into an ISA or a pension lands within its allowance
+// on its own. A debt paying a fixed sum is held to one that
 // clears it, since the engine charges that sum to the month the loan
 // maths says the payments end in and a payment the interest swallows
 // gives it no such month.
@@ -146,6 +148,7 @@ const values = z
   .refine((draft) => draft.kind === "debt" || draft.balance >= 0)
   .refine((draft) => draft.funding === "fixed" || takesSpare(draft))
   .refine((draft) => isOwned(draft) === (draft.owner !== null))
+  .refine(isWithinAllowance)
   .refine(doesClear)
   .refine((draft) => isPension(draft) || draft.shares.length === 0)
   .refine(

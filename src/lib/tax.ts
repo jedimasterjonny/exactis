@@ -1,7 +1,8 @@
-import type { AccountKind } from "@/data/accounts";
+import type { AccountKind, AccountValues } from "@/data/accounts";
 import type { IncomeKind } from "@/data/income";
 
-import { isPension } from "@/data/accounts";
+import { allowanceOf, isPension } from "@/data/accounts";
+import { yearly } from "@/lib/cadence";
 
 // A draw on a pension: what leaves it, what is left of that once taxed,
 // and the two parts the tax reads it as, the quarter that is free of tax
@@ -161,6 +162,33 @@ export function insuranceOn(
     case "self-employment":
       return chargedOn(classFour, pay, months);
   }
+}
+
+// Whether the fixed sum an account states lands no more than its
+// kind's allowance a year on its own. The engine holds what lands to
+// the allowance month by month, across every account of the owner's
+// and every source, and passes on what does not fit; a sum that alone
+// is past it would be written down as paid and never be, so the ledger
+// would say one figure and the plan carry another. That much is known
+// the moment the sum is typed, whatever else the owner holds, so the
+// save is where it stops. An account paid the spare money, or of a kind
+// with no allowance, states no sum it could be held to.
+export function isWithinAllowance(values: AccountValues): boolean {
+  const most = mostFixedOf(values.kind);
+  return (
+    values.funding !== "fixed" ||
+    most === null ||
+    yearly(values.contribution, values.cadence) <= most
+  );
+}
+
+// The most a fixed sum into an account of the kind can be paid a year
+// and land within the allowance: an ISA's £20,000, and four fifths of a
+// pension's £60,000, £48,000, which lands as the whole of it once the
+// basic rate is claimed back. None for a kind with no allowance.
+export function mostFixedOf(kind: AccountKind): null | number {
+  const allowance = allowanceOf(kind);
+  return allowance === null ? null : allowance / (1 + reliefOf({ kind }));
 }
 
 // What a pension adds to each pound paid into it out of taxed money:

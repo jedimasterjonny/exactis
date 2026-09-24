@@ -567,4 +567,19 @@ describe("AccountDialog", () => {
 
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
   });
+
+  // A fixed sum past its allowance on its own is held at the save, as
+  // the store would refuse it; the amount's hint says the most.
+  it("holds the save of a fixed sum past its allowance", () => {
+    renderDialog(isa);
+    const dialog = open();
+
+    commit(field(dialog, "Amount"), "20,001");
+
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+
+    commit(field(dialog, "Amount"), "20,000");
+
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
+  });
 });
