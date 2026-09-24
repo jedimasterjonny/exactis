@@ -2,5 +2,12 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "constraintsFiltering": "strict",
   "extends": ["config:best-practices", ":pinAllExceptPeerDependencies"],
-  "commitBody": "Raised by Renovate under the policy in renovate.json: dependencies are pinned, npm\nreleases are held for three days before they are offered, and every commit has to\ninstall from its own lockfile and pass CI on its own before it can land."
+  "commitBody": "Raised by Renovate under the policy in renovate.json: dependencies are pinned, npm,\nNode and GitHub Action releases are held for three days before they are offered, and\nevery commit has to install from its own lockfile and pass CI on its own before it\ncan land.",
+  "packageRules": [
+    {
+      "description": "A GitHub Action, looked up through github-tags, or Node, through node-version, waits three days before it is offered, as config:best-practices already has an npm release wait. Without this, either was offered the day it was published.",
+      "matchDatasources": ["github-tags", "node-version"],
+      "minimumReleaseAge": "3 days"
+    }
+  ]
 }
