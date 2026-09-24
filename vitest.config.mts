@@ -36,7 +36,7 @@ export default defineConfig({
     environment: "jsdom",
     // The runner's own two exclusions, plus the worktrees an agent is
     // given inside the checkout. .gitignore keeps those out of git and
-    // out of prettier, eslint and knip, each of which reads it; the
+    // out of prettier and knip, each of which reads it; the
     // suite's globs read no ignore file, so a second copy of every test
     // file was collected and run, against this checkout's node_modules
     // and this checkout's alias, and reported as failures of a tree
