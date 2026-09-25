@@ -172,12 +172,18 @@ The app is built for Vercel with Neon behind it. Adding Neon from the Vercel
 Marketplace sets `DATABASE_URL` on the project; `SESSION_PASSWORD` and
 `APP_PASSWORD_HASH` are set by hand, as `.env.example` describes. A build needs
 none of the three. The migrations are applied from a terminal with the
-production URL in `DATABASE_URL`, before the first deploy that reads the store
-and after any deploy that adds a migration:
+production URL in `DATABASE_URL`, before any deploy that adds one, so no deploy
+runs against a store that lacks what it reads:
 
 ```bash
 bun run db:migrate
 ```
+
+That order holds only while the code already deployed still runs against the
+migrated store, so a migration never takes away or tightens what that code
+relies on. A column it does not write lands open or with a default, and a column
+is dropped, renamed or closed only by a later migration, once no deployed code
+reads or writes it.
 
 [AGENTS.md](AGENTS.md) is the source of truth for how work is done here: code
 style, commit rules, and what has to be green before anything lands.
