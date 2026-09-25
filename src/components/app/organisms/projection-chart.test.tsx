@@ -115,6 +115,33 @@ describe("ProjectionChart", () => {
     expect(tooltip.getByText("Total")).toBeInTheDocument();
   });
 
+  it("sets the caller's controls beside the toggle, and none over nothing to plot", () => {
+    const { rerender } = render(
+      <ProjectionChart
+        controls={<button type="button">A control</button>}
+        points={points}
+        retirement={beyond}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "A control" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Areas" })).toBeInTheDocument();
+
+    rerender(
+      <ProjectionChart
+        controls={<button type="button">A control</button>}
+        points={[]}
+        retirement={beyond}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "A control" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("swaps the areas for a column per year on the toggle, and back", () => {
     render(<ProjectionChart points={points} retirement={beyond} />);
 
