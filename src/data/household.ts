@@ -5,6 +5,7 @@ import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Owner } from "@/data/owners";
 import type { Plan, PlanAges } from "@/data/plan";
+import type { Month } from "@/data/schedule";
 
 import {
   accountKinds,
@@ -37,14 +38,17 @@ export interface Household {
   };
 }
 
-// The household as the store keeps it: the records, the ages the plan
-// is set to rather than the plan they make on the day it is read, and
-// the id the next record added is given. That id only ever counts up,
-// so one a deleted record held is never given to another, which a form
-// left open on the deleted one would otherwise write over.
+// The household as the store keeps it: the records, the month their
+// balances are as of, one for the whole household since they are
+// recorded together, the ages the plan is set to rather than the plan
+// they make, and the id the next record added is given. That id only
+// ever counts up, so one a deleted record held is never given to
+// another, which a form left open on the deleted one would otherwise
+// write over.
 export interface Kept {
   readonly accounts: readonly Account[];
   readonly ages: PlanAges;
+  readonly asOf: Month;
   readonly next: number;
   readonly owners: readonly Owner[];
   readonly schedule: Household["schedule"];
@@ -305,6 +309,10 @@ const kept = z
         (ages) => ages.ends <= oldestAge,
         `A plan ends by ${String(oldestAge)}`,
       ),
+    asOf: z.object({
+      month: z.number().int().min(0).max(11),
+      year: z.number().int().positive(),
+    }),
     next: id,
     owners: z.array(owner),
     schedule: z.object({
@@ -320,32 +328,34 @@ const kept = z
     "A record's id is below the one the next record is given",
   ) satisfies z.ZodType<Kept>;
 
-// The household before anything is saved: no records, the ages the
-// dashboard has shown, a plan to 89 retiring at 59, and the first id.
-export const nothingKept: Kept = {
-  accounts: [],
-  ages: { ends: 89, retires: 59 },
-  next: 1,
-  owners: [],
-  schedule: { expenses: [], income: [] },
-};
+// The household before anything is saved: no records, balances as of
+// the month given, the ages the dashboard has shown, a plan to 89
+// retiring at 59, and the first id.
+export function nothingKeptIn(asOf: Month): Kept {
+  return {
+    accounts: [],
+    ages: { ends: 89, retires: 59 },
+    asOf,
+    next: 1,
+    owners: [],
+    schedule: { expenses: [], income: [] },
+  };
+}
 
-// A value as the kept household it is and the whole it makes on the day
-// given, or a refusal in the words of every rule it breaks, once each:
+// A value as the kept household it is and the whole it makes, or a
+// refusal in the words of every rule it breaks, once each:
 // what a save is held to before it is kept, and what a read is held to
 // before anything is drawn from it, so neither a save nor a stored
 // version the rules have since tightened past reaches the engine.
-export function soundKept(
-  value: unknown,
-  now: Date,
-): { readonly household: Household; readonly kept: Kept } {
+export function soundKept(value: unknown): {
+  readonly household: Household;
+  readonly kept: Kept;
+} {
   const parsed = kept.safeParse(value);
   if (!parsed.success) {
     throw refusalOf(parsed.error);
   }
-  const whole = household.safeParse(
-    householdOf(parsed.data, planOf(parsed.data.ages, now)),
-  );
+  const whole = household.safeParse(householdOf(parsed.data));
   if (!whole.success) {
     throw refusalOf(whole.error);
   }
@@ -384,12 +394,13 @@ function endsInAYear(line: {
   return line.lastMonth === null || line.lastYear !== null;
 }
 
-// The whole a kept household makes on the day its plan is read.
-function householdOf(kept: Kept, plan: Plan): Household {
+// The whole a kept household makes, its plan running from the month
+// its balances are as of.
+function householdOf(kept: Kept): Household {
   return {
     accounts: kept.accounts,
     owners: kept.owners,
-    plan,
+    plan: planOf(kept.ages, kept.asOf),
     schedule: kept.schedule,
   };
 }

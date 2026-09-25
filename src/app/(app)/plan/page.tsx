@@ -28,9 +28,8 @@ import {
 // schedule takes the accounts too, for the pension a salary may feed,
 // and the owners, for the one a salary opens to belong to.
 // The header counts both schedules, so it is the page's rather than
-// either's. The plan is read beside the lines, and reads the date
-// behind the session as they read the store, so its year is read at
-// request time rather than while the shell is prerendered.
+// either's. The plan is read beside the lines, from the same version
+// of the household.
 export default async function Plan(): Promise<JSX.Element> {
   const [incomeLines, expenseLines, accounts, owners, plan] = await Promise.all(
     [

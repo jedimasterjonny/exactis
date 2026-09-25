@@ -10,7 +10,7 @@ export interface Owed {
 }
 
 // The years a plan's payments are counted from: its first year, and the
-// month of it the plan is read in, January being nought.
+// month of it the plan starts in, January being nought.
 export interface PlanMonth {
   readonly from: number;
   readonly month: number;

@@ -48,11 +48,12 @@ a second file repeating it.
 
 ## The store
 
-The household, its owners, accounts, income and expense lines and the ages the
-plan is set to, lives in Postgres as one document, a version of it a save,
-reached through [Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The
-table is `src/db/schema.ts`, the migration generated from it is in `drizzle/`,
-and the two queries, reading the latest version and keeping the next, are in
+The household, its owners, accounts, income and expense lines, the month its
+balances are as of and the ages the plan is set to, lives in Postgres as one
+document, a version of it a save, reached through
+[Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The table is
+`src/db/schema.ts`, the migration generated from it is in `drizzle/`, and the
+two queries, reading the latest version and keeping the next, are in
 `src/db/household.ts`.
 
 A save reads the latest version, makes the household it leaves, holds the whole
@@ -94,8 +95,10 @@ tax-free and tax-deferred, each paid into a month at a time as its accounts say
 and grown at a plan rate held as a constant until there is an assumptions screen
 to set it on. Cash is carried beside them, so a short month can be drawn from
 it, but it is not plotted, since the progress points a projection is laid over
-carry no cash figure. The first year runs from the month the plan is read in,
-since the balances are that month's. What an account is paid in a month is what
+carry no cash figure. The first year runs from the month the household's
+balances are as of, since they are what it opens with, whatever day the plan is
+read on; a household read before anything is saved takes the month it is read
+in, and keeps it from its first save. What an account is paid in a month is what
 `src/engine/cash-flow.ts` works out: the month's income, less what the salaries
 sacrifice, the tax on the rest and what the expense lines cost, pays the fixed
 sums, handed down the accounts in the order they are listed, and what survives
@@ -125,11 +128,11 @@ lines are, until the plan carries an inflation assumption.
 
 A debt's own fixed sum is a loan's payments, so it runs only until the loan
 maths in `src/lib/loans.ts` says they clear what is owed: the term the payment
-takes at the debt's rate, counted from the month the plan is read in, and
-nothing charged after the month the last payment falls in. A debt whose payments
-an expense line carries is left out of the fixed sums as before, the line being
-the payment and carrying its own end. Saving a debt whose fixed payment never
-clears it is refused, since a payment the month's interest swallows gives the
+takes at the debt's rate, counted from the month the plan starts in, and nothing
+charged after the month the last payment falls in. A debt whose payments an
+expense line carries is left out of the fixed sums as before, the line being the
+payment and carrying its own end. Saving a debt whose fixed payment never clears
+it is refused, since a payment the month's interest swallows gives the
 projection no month to stop at.
 
 A month the income does not cover is drawn out of the savings at the start of

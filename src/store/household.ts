@@ -8,9 +8,10 @@ import type { Household, Kept } from "@/data/household";
 import type { IncomeLine } from "@/data/income";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
+import type { Month } from "@/data/schedule";
 import type { Answer } from "@/lib/answer";
 
-import { nothingKept, soundKept } from "@/data/household";
+import { nothingKeptIn, soundKept } from "@/data/household";
 import { getDb } from "@/db/client";
 import { keepAfter, readLatest } from "@/db/household";
 import { Refusal, refused, saved } from "@/lib/answer";
@@ -55,7 +56,7 @@ export async function amend<TResult>(
   const { version, ...held } = await readHeld();
   try {
     const { kept, result } = edit(held);
-    await keepAfter(getDb(), version, soundKept(kept, new Date()).kept);
+    await keepAfter(getDb(), version, soundKept(kept).kept);
     refresh();
     return saved(result);
   } catch (error: unknown) {
@@ -86,22 +87,29 @@ export async function getOwners(): Promise<readonly Owner[]> {
   return (await readHousehold()).owners;
 }
 
-// The plan as it stands, from this year and this month of it, which is
-// read at request time, since the session is read before it.
+// The plan as it stands, from the month the household's balances are
+// as of.
 export async function getPlan(): Promise<Plan> {
   await requireSession();
   return (await readHousehold()).plan;
 }
 
 // The latest version the store has kept, or the household before
-// anything is saved, held to every rule as it is today, so a version the
+// anything is saved, its balances as of this month, held to every rule as it is today, so a version the
 // rules have since tightened past is refused in their words rather than
 // handed to the engine to throw on, and with the version it is, which a
 // save writes the one after.
 async function readHeld(): Promise<Held & { readonly version: number }> {
   const latest = await readLatest(getDb());
   return {
-    ...soundKept(latest?.household ?? nothingKept, new Date()),
+    ...soundKept(latest?.household ?? nothingKeptIn(thisMonth())),
     version: latest?.version ?? 0,
   };
+}
+
+// The month it is, read at request time, since the session is read
+// before anything that reads it.
+function thisMonth(): Month {
+  const now = new Date();
+  return { month: now.getMonth(), year: now.getFullYear() };
 }

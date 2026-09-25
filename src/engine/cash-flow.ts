@@ -82,7 +82,7 @@ export interface Take extends Paid {
 
 // The flow is asked for a month of a plan: the month being worked out,
 // and the plan it is a month of, which carries the rate an account on
-// the plan rate is charged at and the month the plan is read in, from
+// the plan rate is charged at and the month the plan starts in, from
 // which a debt's payments are counted. A month that settles the tax
 // year before it carries what that year is refunded, or what it still
 // owes as a negative, which only the projection knows, having carried
@@ -163,7 +163,7 @@ const nanopound = 1e-9;
 // debt paying its own fixed sum stops too, at the month the loan maths
 // says the payments clear it, read off the balance it owes, the balloon
 // it leaves standing, the rate it is charged at and the sum itself, and
-// counted from the month the plan is read in. A debt's payments have an
+// counted from the month the plan starts in. A debt's payments have an
 // end, always: charged for every month of the plan instead, a £5,000
 // card at £250 a month costs £90,000 over thirty years and the money it
 // would have saved after the second is never saved. A payment that
@@ -413,7 +413,7 @@ function fixedSums(
 // balloon a PCP leaves standing, and the term is what that sum a month
 // takes to pay it down at the rate the debt is charged, its own fixed
 // one or the plan's. The last payment falls in the month clearsIn
-// counts to from the month the plan is read in, and the sum is charged
+// counts to from the month the plan starts in, and the sum is charged
 // whole through that month and not at all after it, which is the test
 // runsIn makes of a line's last year and month, made here of the month
 // the loan maths gives rather than of one anybody typed. A payment the

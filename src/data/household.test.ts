@@ -14,7 +14,7 @@ import { incomeLines, plan } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 import { project } from "@/engine/projection";
 
-import { household, nothingKept, soundKept } from "./household";
+import { household, nothingKeptIn, soundKept } from "./household";
 import { kept } from "./household.fixture";
 
 // A household made from the sound one to break one rule.
@@ -301,10 +301,10 @@ describe("household", () => {
 });
 
 describe("soundKept", () => {
-  const today = new Date("2026-09-15T12:00:00Z");
+  const september = { month: 8, year: 2026 };
 
   it("keeps the household before anything is saved and the reference plan, each with the plan on the day", () => {
-    expect(soundKept(nothingKept, today)).toStrictEqual({
+    expect(soundKept(nothingKeptIn(september))).toStrictEqual({
       household: {
         accounts: [],
         owners: [],
@@ -318,28 +318,34 @@ describe("soundKept", () => {
         },
         schedule: { expenses: [], income: [] },
       },
-      kept: nothingKept,
+      kept: nothingKeptIn(september),
     });
-    expect(soundKept(kept, today).kept).toStrictEqual(kept);
+    expect(soundKept(kept).kept).toStrictEqual(kept);
   });
 
   it("refuses a record whose id is not below the one the next is given", () => {
-    expect(() => soundKept({ ...kept, next: 5 }, today)).toThrow(
+    expect(() => soundKept({ ...kept, next: 5 })).toThrow(
       "A record's id is below the one the next record is given",
     );
   });
 
   it("refuses ages the plan action refuses, in its words", () => {
     expect(() =>
-      soundKept({ ...kept, ages: { ends: 60, retires: 61 } }, today),
+      soundKept({ ...kept, ages: { ends: 60, retires: 61 } }),
     ).toThrow("A plan's owner retires no later than it ends");
     expect(() =>
-      soundKept({ ...kept, ages: { ends: 121, retires: 59 } }, today),
+      soundKept({ ...kept, ages: { ends: 121, retires: 59 } }),
     ).toThrow("A plan ends by 120");
   });
 
+  it("refuses a balances month that is no month", () => {
+    expect(() =>
+      soundKept({ ...kept, asOf: { month: 12, year: 2026 } }),
+    ).toThrow("Too big: expected number to be <=11");
+  });
+
   it("refuses what is no kept household at all", () => {
-    expect(() => soundKept({ accounts: [] }, today)).toThrow(
+    expect(() => soundKept({ accounts: [] })).toThrow(
       "Invalid input: expected object, received undefined",
     );
   });
@@ -348,17 +354,14 @@ describe("soundKept", () => {
   // rule twice; it is said once.
   it("says each rule a household breaks once", () => {
     expect(() =>
-      soundKept(
-        {
-          ...kept,
-          accounts: kept.accounts.map((listed) =>
-            listed.id === 3 || listed.id === 4
-              ? { ...listed, balance: -1 }
-              : listed,
-          ),
-        },
-        today,
-      ),
+      soundKept({
+        ...kept,
+        accounts: kept.accounts.map((listed) =>
+          listed.id === 3 || listed.id === 4
+            ? { ...listed, balance: -1 }
+            : listed,
+        ),
+      }),
     ).toThrow(/^A balance below nothing is a debt's$/);
   });
 });
