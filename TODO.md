@@ -42,12 +42,16 @@ whose it is. Income lines name no owner, so every salary is taxed together, as
 one person's income against one set of bands, and a salary may sacrifice into
 another owner's pension. The plan holds one year of birth, so every pension is
 drawn from the one pension age, as though all the owners were born in the same
-year, and one lump sum allowance is shared by all of them. A draw on one owner's
+year, and one lump sum allowance is shared by all of them. It holds one
+retirement age too, so every salary and every self-employed line stops in the
+same year, whoever earns it, and the plan screen still draws each such line to
+its own last year where the engine stops it at retirement. A draw on one owner's
 pension is taxed on top of every other owner's earnings.
 
-Decide whose each income line is, and the year each owner was born, so tax, the
-pension age and the lump sum allowance are each a person's rather than the
-plan's, and a salary feeds only its own owner's pension.
+Decide whose each income line is, and the year each owner was born and retires,
+so tax, the pension age, the lump sum allowance and the last working year are
+each a person's rather than the plan's, and a salary feeds only its own owner's
+pension.
 
 ## Today's money
 
