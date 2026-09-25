@@ -116,7 +116,7 @@ export function isSound(car: CarValues): boolean {
 // owing the balloon, and its payments are a debt line of the same a
 // month, fixed in nominal terms as a finance payment is, from the plan's
 // first year to the month the last payment falls in, counted from the
-// month the plan is read in. On a PCP the balloon is refinanced on the
+// month the plan starts in. On a PCP the balloon is refinanced on the
 // same terms when the agreement ends, so the payments carry on past it
 // until the whole balance clears, and the line runs to that month rather
 // than the agreement's end; it is open-ended when the payment never

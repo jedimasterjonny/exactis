@@ -20,7 +20,7 @@ import {
 // balance, so a point recorded and a point projected can be laid over
 // each other, and the age reached that year, since a plan is read by
 // age as much as by year. The first point is the balances as they are,
-// at the month the plan is read in; each after it is the year before
+// at the month the plan starts in; each after it is the year before
 // carried to its end. The two wrappers are projected yet, each summed
 // over its accounts; cash is carried, so a shortfall can be drawn from
 // it, but is not plotted, since the progress points these are laid over
@@ -101,7 +101,7 @@ const pensionAge = {
 // after it the year before carried to its end, a month at a time: what
 // the account is paid that month, then a month's growth at its rate, a
 // fixed one or the plan's. The first year is carried from the month the
-// plan is read in, since the balances it opens with are that month's
+// plan starts in, since the balances it opens with are that month's
 // and the months before it are already in them; the last year is not
 // carried at all, since no point follows it. Each account is carried on
 // its own and the year sums them by wrapper. What an account is paid a
@@ -365,7 +365,7 @@ function rateOf(account: Account, plan: Plan): number {
 // Class 4 on itself, less the income tax on everything they were taxed
 // on together and the Class 4 on all their profit, each against as much
 // of each band as the months the plan held of the year. A year of no
-// months, the one before a plan read in April, settles nothing.
+// months, the one before a plan starting in April, settles nothing.
 function settled({ months, paid, profit, taxable }: TaxYear): number {
   return months === 0
     ? 0

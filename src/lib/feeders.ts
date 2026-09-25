@@ -14,8 +14,8 @@ export const listed = new Intl.ListFormat("en-GB");
 // employer's NI saved on it, as the engine feeds it, stated a year
 // whatever the salary's cadence, so the ledger can put one figure
 // beside the account's own. The lines are the caller's to choose: the
-// ledger hands the table the ones running in the month the plan is
-// read in, so a salary that has ended, or is yet to start, lands
+// ledger hands the table the ones running in the month the plan
+// starts in, so a salary that has ended, or is yet to start, lands
 // nothing on the row. Nothing for an account nothing feeds.
 export function fedOf(id: number, lines: readonly IncomeLine[]): number {
   return feeding(id, lines).reduce(

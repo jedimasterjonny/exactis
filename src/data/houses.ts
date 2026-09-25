@@ -91,7 +91,7 @@ export function isSound(house: HouseValues): boolean {
 // contribution, which is what the ledger shows against it, and its
 // payments are a debt line of the same a month, fixed in nominal terms
 // as a mortgage payment is, from the plan's first year to the month the
-// last payment falls in, counted from the month the plan is read in, or
+// last payment falls in, counted from the month the plan starts in, or
 // open-ended when the payment never clears it. The engine counts the
 // payment once, as the line, since it leaves the contribution of a loan
 // a line pays out of the month's fixed sums. Both are named for the

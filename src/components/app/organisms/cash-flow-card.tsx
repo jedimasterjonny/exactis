@@ -53,7 +53,7 @@ interface RowProps {
 // and moved along the plan's span by the slider under the title, since
 // lines start and end and overlap, so a month a decade on can leave
 // something else. The month shown is the first the plan runs in that
-// year, the month the plan is read in for its first year and January
+// year, the month the plan starts in for its first year and January
 // after, and the title names it, since a line may end part way through
 // a year and a later month of it would leave something else again. The
 // card runs the engine itself, which is pure and cheap, rather than

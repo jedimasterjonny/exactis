@@ -17,8 +17,7 @@ import {
 // page renders behind the loading screen beside it and the rest of the
 // shell does not wait for any of them. The
 // plan is read beside them, for the month the ledger counts the
-// salaries in; it reads the date behind the session as they read the
-// store, so the month is read at request time.
+// salaries in, which is the month the balances are as of.
 export default async function Accounts(): Promise<JSX.Element> {
   const [accounts, lines, owners, { from, month }] = await Promise.all([
     getAccounts(),

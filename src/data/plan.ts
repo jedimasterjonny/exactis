@@ -1,10 +1,10 @@
 import type { Account } from "@/data/accounts";
+import type { Month } from "@/data/schedule";
 
 // What the projection runs on: the rate every account on the plan rate
-// grows at, the first year plotted, which holds today's balances, and
-// the month of it the plan is read in, January being nought as the
-// date gives it, so the first year runs from there rather than from
-// its start; how many years it runs forward; the year the plan's owner
+// grows at, the first year plotted, which holds the balances, and the
+// month of it they are as of, January being nought as the date gives
+// it, so the first year runs from there rather than from its start; how many years it runs forward; the year the plan's owner
 // was born, which turns a year into an age; and the age they retire at,
 // from which they earn nothing by working. It sits beside the
 // accounts and the lines rather than inside the engine, since the flow
@@ -20,9 +20,9 @@ export interface Plan {
 }
 
 // The ages the plan is set to, as the store keeps them: the age it runs
-// to, from which the years it runs forward are worked out on the day it
-// is read, so the plan ends at the same age however many years are left
-// to it, and the age its owner retires at.
+// to, from which the years it runs forward are worked out from the
+// month it starts in, so the plan ends at the same age wherever it
+// starts, and the age its owner retires at.
 export interface PlanAges {
   readonly ends: number;
   readonly retires: number;
@@ -50,20 +50,20 @@ export function endYear(plan: Plan): number {
   return plan.from + plan.years;
 }
 
-// The plan as it stands on the day given, from that year and that month
-// of it, to the age the ages say it runs to and with the age they say
-// its owner retires at: what the projection runs on and what the plan
-// screen lays its lines over. A plan whose age is already reached runs
-// no years forward rather than a count below nothing.
-export function planOf(ages: PlanAges, now: Date): Plan {
-  const from = now.getFullYear();
+// The plan from the month given, the month the balances are as of,
+// since they are what its first year opens with, to the age the ages
+// say it runs to and with the age they say its owner retires at: what
+// the projection runs on and what the plan screen lays its lines over.
+// A plan whose age is already reached runs no years forward rather than
+// a count below nothing.
+export function planOf(ages: PlanAges, start: Month): Plan {
   return {
     born,
-    from,
-    month: now.getMonth(),
+    from: start.year,
+    month: start.month,
     rate,
     retires: ages.retires,
-    years: Math.max(0, born + ages.ends - from),
+    years: Math.max(0, born + ages.ends - start.year),
   };
 }
 

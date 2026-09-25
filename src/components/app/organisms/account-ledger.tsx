@@ -75,7 +75,7 @@ type AssetOpening = "new" | Secured;
 // income lines are handed down for that, for the treatment such a
 // pension is held to, so both can name the salaries, and for the
 // accounts' table to write what the salaries feed each pension: the
-// table is handed the lines running in the month the plan is read in,
+// table is handed the lines running in the month the plan starts in,
 // which the page hands down, so a salary that has ended or is yet to
 // start lands nothing on the row, while the dialog and the confirm
 // take every line, since the link stands whether or not it runs. The
@@ -141,7 +141,7 @@ export function AccountLedger({
   const orderPlace = debts.length > 0 ? 4 : 3;
   const ownersPlace = paid.length < 2 ? orderPlace : orderPlace + 1;
 
-  // The month the plan is read in as the loan maths counts from it, for
+  // The month the plan starts in as the loan maths counts from it, for
   // the two dialogs that let a loan's end be picked as a date.
   const plan: PlanMonth = { from: at.year, month: at.month };
 

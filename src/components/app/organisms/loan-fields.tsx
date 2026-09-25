@@ -63,7 +63,7 @@ const workedHint = "Worked out from the other two";
 // that never clears is paid to the end of the plan. What is owed and
 // paid a month is held at nothing or above, since a sum below nothing
 // is neither and the store would refuse it. The month and the year are
-// the term read the other way, counted from the month the plan is read
+// the term read the other way, counted from the month the plan starts
 // in: they show the month the term's last payment falls in, and one
 // picked is reported as the term whose last payment falls in it, so a
 // term can be typed as years or picked as a date and the two never
