@@ -40,7 +40,7 @@ export function isSound(draft: LineValues): boolean {
 // or on for good when it has none, and in its last year to the month it
 // ends in, or through the whole of it when it has none. The engine reads
 // a plan a month at a time by it, and the accounts screen asks it which
-// salaries feed a pension in the month the plan is read in.
+// salaries feed a pension in the month the plan starts in.
 export function runsIn(line: LineValues, at: Month): boolean {
   if (line.firstYear > at.year) {
     return false;

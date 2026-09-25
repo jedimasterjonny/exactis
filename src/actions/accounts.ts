@@ -242,7 +242,7 @@ export async function saveAccount(
 // the finance appears among the accounts and its payments among the
 // expenses with no more asked of the form, and hands back the car's own
 // account. Checked as a save is, the payments laid from the month the
-// plan is read in.
+// plan starts in, which the balances are as of.
 export async function saveCar(
   id: null | number,
   draft: CarValues,
@@ -261,7 +261,7 @@ export async function saveCar(
 // payments, so the mortgage appears among the accounts and its payments
 // among the expenses with no more asked of the form, and hands back the
 // house's own account. Checked as a save is, the payments laid from the
-// month the plan is read in.
+// month the plan starts in, which the balances are as of.
 export async function saveHouse(
   id: null | number,
   draft: HouseValues,

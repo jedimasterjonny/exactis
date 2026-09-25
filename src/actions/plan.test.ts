@@ -11,7 +11,7 @@ import {
 } from "vitest";
 import * as z from "zod";
 
-import { nothingKept } from "@/data/household";
+import { nothingKeptIn } from "@/data/household";
 import { getDb } from "@/db/client";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -29,6 +29,9 @@ const { close, db, empty, ready } = inMemory();
 
 // The day the plan is read on, when its owner, born in 1990, is 36.
 const today = new Date("2026-09-15T12:00:00Z");
+
+// The household before anything is saved, read this month.
+const blank = nothingKeptIn({ month: 8, year: 2026 });
 
 describe("saveAges", () => {
   beforeAll(ready);
@@ -51,7 +54,7 @@ describe("saveAges", () => {
       saved({ ends: 89, retires: 55 }),
     );
     expect(await readLatest(db)).toStrictEqual({
-      household: { ...nothingKept, ages: { ends: 89, retires: 55 } },
+      household: { ...blank, ages: { ends: 89, retires: 55 } },
       version: 1,
     });
     expect(refresh).toHaveBeenCalledOnce();
@@ -91,7 +94,7 @@ describe("saveAges", () => {
   // than held to today again, so a retirement age saved beside it
   // stands, while one past it is still refused.
   it("keeps an end age already outlived rather than refusing a retirement age saved beside it", async () => {
-    await keepAfter(db, 0, { ...nothingKept, ages: { ends: 35, retires: 34 } });
+    await keepAfter(db, 0, { ...blank, ages: { ends: 35, retires: 34 } });
 
     expect(await saveAges({ retires: 30 })).toStrictEqual(
       saved({ ends: 35, retires: 30 }),

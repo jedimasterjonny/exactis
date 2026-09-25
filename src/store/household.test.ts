@@ -12,7 +12,7 @@ import {
 
 import type { Answer } from "@/lib/answer";
 
-import { nothingKept } from "@/data/household";
+import { nothingKeptIn } from "@/data/household";
 import { kept as reference } from "@/data/household.fixture";
 import { planOf } from "@/data/plan";
 import { getDb } from "@/db/client";
@@ -38,6 +38,9 @@ vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 const { close, db, empty, ready } = inMemory();
 
 const today = new Date("2026-09-15T12:00:00Z");
+
+// The household before anything is saved, read this month.
+const blank = nothingKeptIn({ month: 8, year: 2026 });
 
 describe("the household store", () => {
   beforeAll(ready);
@@ -68,11 +71,11 @@ describe("the household store", () => {
     expect(await getOwners()).toStrictEqual([]);
     expect(await getIncomeLines()).toStrictEqual([]);
     expect(await getExpenseLines()).toStrictEqual([]);
-    expect(await getPlan()).toStrictEqual(planOf(nothingKept.ages, today));
+    expect(await getPlan()).toStrictEqual(planOf(blank.ages, blank.asOf));
   });
 
   it("reads each part of the latest version, and the plan on the day it is read", async () => {
-    await keepAfter(db, 0, nothingKept);
+    await keepAfter(db, 0, blank);
     await keepAfter(db, 1, reference);
 
     expect(await getAccounts()).toStrictEqual(reference.accounts);
@@ -89,6 +92,32 @@ describe("the household store", () => {
     });
   });
 
+  // The balances were recorded in March; read in September, the plan
+  // still opens on them in March, so a debt's payments and every figure
+  // after it are counted from the month the balances are as of rather
+  // than sliding with the day the page is read.
+  it("runs the plan from the month the balances are as of, whatever day it is read", async () => {
+    await keepAfter(db, 0, { ...reference, asOf: { month: 2, year: 2026 } });
+
+    expect(await getPlan()).toMatchObject({ from: 2026, month: 2 });
+
+    vi.setSystemTime(new Date("2027-01-15T12:00:00Z"));
+
+    expect(await getPlan()).toMatchObject({ from: 2026, month: 2 });
+  });
+
+  // The first save keeps the month the household was read in, so the
+  // balances it records are that month's from then on.
+  it("keeps the month a household is first saved in as its balances' month", async () => {
+    await amend(({ kept }) => ({ kept, result: null }));
+    vi.setSystemTime(new Date("2027-01-15T12:00:00Z"));
+
+    expect(await readLatest(db)).toMatchObject({
+      household: { asOf: { month: 8, year: 2026 } },
+    });
+    expect(await getPlan()).toMatchObject({ from: 2026, month: 8 });
+  });
+
   // Written past the rules, as a version kept before they tightened.
   it("refuses a version that breaks a rule, in its words, rather than hand it on", async () => {
     await keepAfter(db, 0, {
@@ -103,7 +132,9 @@ describe("the household store", () => {
     await keepAfter(db, 0, reference);
 
     const result = await amend(({ household, kept }) => {
-      expect(household.plan).toStrictEqual(planOf(reference.ages, today));
+      expect(household.plan).toStrictEqual(
+        planOf(reference.ages, reference.asOf),
+      );
       return {
         kept: {
           ...kept,
@@ -129,7 +160,7 @@ describe("the household store", () => {
     await amend(({ kept }) => ({ kept, result: null }));
 
     expect(await readLatest(db)).toStrictEqual({
-      household: nothingKept,
+      household: blank,
       version: 1,
     });
   });
