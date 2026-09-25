@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { plan } from "@/db/schema";
 
 // @vitest-environment node
-import { findAges } from "./plan";
+import { findAges, writeAges } from "./plan";
 
 // One Postgres in memory for the file, with the migrations applied once.
 // The row the tests read is the one a migration writes, so a test that
@@ -39,10 +39,23 @@ describe("plan store", () => {
     ).rejects.toThrow();
   });
 
+  it("writes new ages over the row's, and reads them back", async () => {
+    expect(await writeAges(db, { ends: 95, retires: 55 })).toStrictEqual({
+      ends: 95,
+      retires: 55,
+    });
+    expect(await findAges(db)).toStrictEqual({ ends: 95, retires: 55 });
+
+    await writeAges(db, { ends: 89, retires: 59 });
+  });
+
   it("refuses a store the migrations have not reached", async () => {
     await db.delete(plan);
 
     await expect(findAges(db)).rejects.toThrow("The plan has no row");
+    await expect(writeAges(db, { ends: 89, retires: 59 })).rejects.toThrow(
+      "The plan has no row",
+    );
 
     await db.insert(plan).values({ ends: 89, retires: 59 });
   });
