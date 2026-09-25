@@ -9,7 +9,7 @@ import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
 
-import type { CashFlow } from "./cash-flow";
+import type { CashFlow, Schedule } from "./cash-flow";
 
 import { cashFlow } from "./cash-flow";
 
@@ -152,6 +152,43 @@ describe("cashFlow", () => {
     expect(flow.incomeTax).toBeCloseTo(2356, 10);
     expect(flow.insurance).toBeCloseTo(293.35, 10);
     expect(flow.left).toBeCloseTo(8450 - 2356 - 293.35, 10);
+  });
+
+  // Retiring at 59, someone born in 1990 works to the end of 2048 and
+  // earns nothing by working from 2049, though the salary and the
+  // consulting both run on for good by their lines. December 2048 is
+  // earned whole: the £5,000 salary, feeding the pension, the £2,000 of
+  // consulting, the £1,950 state pension and £500 of other income.
+  // January 2049 is the state pension and the other income alone, with
+  // nothing fed and no profit for Class 4 to be charged on.
+  it("stops a salary and a self-employed profit at the retirement age, whatever their lines say, and runs the rest on", () => {
+    const retiring = { ...plan, retires: 59 };
+    const working = { ...lean, lastYear: null };
+    const lines: Schedule = {
+      expenses: [],
+      income: [
+        working,
+        { ...consulting, firstYear: 2026, lastYear: null },
+        { ...statePension, firstYear: 2026 },
+        { ...plain, amount: 6000, id: 6, kind: "other", lastYear: null },
+      ],
+    };
+
+    const last = cashFlow([pension], lines, {
+      at: { month: 11, year: 2048 },
+      plan: retiring,
+    });
+    const first = cashFlow([pension], lines, {
+      at: { month: 0, year: 2049 },
+      plan: retiring,
+    });
+
+    expect(last.income).toBe(9450);
+    expect(last.fed.map((entry) => entry.line)).toStrictEqual([working]);
+    expect(last.profit).toBe(2000);
+    expect(first.income).toBe(2450);
+    expect(first.fed).toStrictEqual([]);
+    expect(first.profit).toBe(0);
   });
 
   // £3,489.78 a month after the sacrifice and the tax on the rest, less

@@ -77,6 +77,13 @@ export function contributionOf(line: IncomeLineValues): number {
   return sacrificeOf(line) * (1 + employerNi);
 }
 
+// Whether the line is money earned by working, a salary or a
+// self-employed profit, which stops when the plan's owner retires,
+// rather than a pension or anything else, which runs on.
+export function isEarned(line: IncomeLineValues): boolean {
+  return line.kind === "employment" || line.kind === "self-employment";
+}
+
 // Whether the line has a pension for its sacrifice to go into: one
 // listed among the accounts, or one it opens with the save. The share
 // field shows while it does, since a share with nowhere to go is
