@@ -15,8 +15,10 @@ const [pension, isa, cash, home, mortgage] = accounts;
 const [salary, , consulting] = incomeLines;
 const [household] = expenseLines;
 
-// Read at the start of its first year, so every year is carried whole.
-const plan = { born: 1990, from: 2026, month: 0, rate: 0.05 };
+// Read at the start of its first year, so every year is carried whole,
+// and retiring past the end of any plan here, so a salary runs as long
+// as its line says.
+const plan = { born: 1990, from: 2026, month: 0, rate: 0.05, retires: 90 };
 
 // Nothing going out and one line coming in wide enough to cover every
 // fixed sum these tests pay, £6,346.45 a month once its tax is paid,

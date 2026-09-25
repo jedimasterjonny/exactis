@@ -77,5 +77,6 @@ export const plan: Plan = {
   from: 2026,
   month: 8,
   rate: 0.05,
+  retires: 90,
   years: 53,
 };

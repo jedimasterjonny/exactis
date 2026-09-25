@@ -34,13 +34,18 @@ export const expenseGrowth = pgEnum("expense_growth", lineGrowths);
 
 export const expenseKind = pgEnum("expense_kind", expenseKinds);
 
-// The plan's one row: the age it runs to. The id is always one, which
-// the table holds as a check, so there is never a second plan to choose
-// between, and the row is written by the migration that makes the table
-// rather than on first use, so a read always finds it.
+// The plan's one row: the age it runs to and the age its owner retires
+// at. The id is always one, which the table holds as a check, so there
+// is never a second plan to choose between, and the row is written by
+// the migration that makes the table rather than on first use, so a
+// read always finds it.
 export const plan = pgTable(
   "plan",
-  { ends: integer().notNull(), id: integer().primaryKey().default(1) },
+  {
+    ends: integer().notNull(),
+    id: integer().primaryKey().default(1),
+    retires: integer().notNull(),
+  },
   (table) => [check("plan_single", sql`${table.id} = 1`)],
 );
 

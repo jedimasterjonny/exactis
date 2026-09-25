@@ -407,6 +407,7 @@ describe("saveAccount", () => {
       from: 2026,
       month: 8,
       rate: 0.05,
+      retires: 90,
       years: 30,
     });
     const owing = {
@@ -426,6 +427,7 @@ describe("saveAccount", () => {
       from: 2026,
       month: 8,
       rate: 0.75,
+      retires: 90,
       years: 30,
     });
 
@@ -577,6 +579,7 @@ describe("saveHouse", () => {
       from: 2026,
       month: 8,
       rate: 0.05,
+      retires: 90,
       years: 30,
     });
   });
@@ -859,6 +862,7 @@ describe("saveCar", () => {
       from: 2026,
       month: 8,
       rate: 0.05,
+      retires: 90,
       years: 30,
     });
   });

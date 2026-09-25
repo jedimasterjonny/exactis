@@ -365,13 +365,15 @@ function pick<TChoice>(
 }
 
 // A plan drawn at random: read in any month of 2026, for one to five
-// years, at no growth so what lands is what is counted.
+// years, at no growth so what lands is what is counted, and retiring
+// past its end, so a salary runs as long as its line says.
 function planFrom(random: () => number, born: number): Plan {
   return {
     born,
     from: 2026,
     month: Math.floor(random() * 12),
     rate: 0,
+    retires: 90,
     years: 1 + Math.floor(random() * 5),
   };
 }
