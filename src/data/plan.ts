@@ -47,3 +47,12 @@ export function rateFrom(account: Account, plan: Plan): number {
       return plan.rate;
   }
 }
+
+// The year the plan's owner retires in, the first in which they earn
+// nothing by working. The plan holds the year they were born and not
+// the day, so the whole of the year they reach the age counts as
+// retired, as the whole of the year they reach the pension age counts
+// as reaching it, and the year before is their last working year.
+export function retirementYear(plan: Plan): number {
+  return plan.born + plan.retires;
+}
