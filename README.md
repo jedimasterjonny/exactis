@@ -55,11 +55,11 @@ in `drizzle/`, and the queries are in `src/db/accounts.ts`, `src/db/income.ts`,
 `src/db/expenses.ts` and `src/db/plan.ts`.
 
 The accounts and plan screens read and write it, and the dashboard projects what
-it holds and saves the age the plan's owner retires at; the progress screen
-still shows the reference kit's figures. `DATABASE_URL` names the database, as
-`.env.example` shows. Nothing reads it until a query runs, so a build needs no
-database. Locally, point it at a Neon branch of your own and apply the
-migrations once:
+it holds and saves the ages the plan runs to and its owner retires at; the
+progress screen still shows the reference kit's figures. `DATABASE_URL` names
+the database, as `.env.example` shows. Nothing reads it until a query runs, so a
+build needs no database. Locally, point it at a Neon branch of your own and
+apply the migrations once:
 
 ```bash
 bun run db:migrate
