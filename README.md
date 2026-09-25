@@ -131,9 +131,14 @@ maths in `src/lib/loans.ts` says they clear what is owed: the term the payment
 takes at the debt's rate, counted from the month the plan starts in, and nothing
 charged after the month the last payment falls in. A debt whose payments an
 expense line carries is left out of the fixed sums as before, the line being the
-payment and carrying its own end. Saving a debt whose fixed payment never clears
-it is refused, since a payment the month's interest swallows gives the
-projection no month to stop at.
+payment. When it runs is the loan's to say, not the line's: whenever the
+household is read, the line runs from the plan's first year to the month the
+same loan maths clears the loan in, a PCP's balloon refinanced on the same
+terms, or to the end of the plan when it never clears, as an interest-only
+mortgage does. So a mortgage's end moves with the balances' month as a plain
+debt's does. Saving a debt whose fixed payment never clears it is refused, since
+a payment the month's interest swallows gives the projection no month to stop
+at.
 
 A month the income does not cover is drawn out of the savings at the start of
 it, before the month's growth: cash first, then the tax-free wrapper, then the

@@ -75,9 +75,8 @@ const owing = {
   rate: 0.22,
 } as const;
 
-// The reference kit's house as the dialog would send it: the plan read
-// in September 2026, so its £2,210 a month clears the £341,810 in
-// November 2047.
+// The reference kit's house as the dialog would send it: £2,210 a month
+// against £341,810 owed at 5.15%.
 const house = {
   balance: 341810,
   growth: 0.021,
@@ -98,7 +97,8 @@ const outright = {
 
 // The records the house is held as, given the ids a new one takes: the
 // house, the loan owing £341,810 secured on it, and the line of its
-// payments, ending in November 2047.
+// payments, kept open-ended, since the household works out when they end
+// from the loan whenever it is read.
 const home = {
   balance: 416386,
   growth: { kind: "fixed", rate: 0.021 },
@@ -124,16 +124,16 @@ const payments = {
   growth: "nominal",
   id: 8,
   kind: "debt",
-  lastMonth: 10,
-  lastYear: 2047,
+  lastMonth: null,
+  lastYear: null,
   name: "Home mortgage",
   pays: 7,
 } as const;
 
 // A Golf as the dialog would send it: worth £18,000 losing 15% a year,
 // £14,000 owed at 7.9% on a PCP paying £290 a month towards a £6,000
-// balloon, refinanced on the same terms and so cleared in July 2031;
-// and the records it is held as.
+// balloon; and the records it is held as, its payments open-ended as
+// the house's are.
 const golf = {
   agreement: "pcp",
   balance: 14000,
@@ -171,8 +171,8 @@ const carPayments = {
   growth: "nominal",
   id: 8,
   kind: "debt",
-  lastMonth: 6,
-  lastYear: 2031,
+  lastMonth: null,
+  lastYear: null,
   name: "Golf PCP",
   pays: 7,
 } as const;

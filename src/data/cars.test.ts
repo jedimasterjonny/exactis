@@ -68,7 +68,7 @@ const pcp: Account = {
 };
 
 // The plan read in September 2026, so eight months of the year are gone.
-const plan = { from: 2026, month: 8 };
+const plan = { from: 2026 };
 
 describe("derive", () => {
   it("works each figure out from the other two, down to the balloon, the payment to the pound", () => {
@@ -157,10 +157,10 @@ describe("toRecords", () => {
     });
   });
 
-  // The £290 carries on past the agreement's end and clears the whole in
-  // 4.9 years, 59 payments, from September 2026: July 2031, not the
-  // August 2029 the agreement ends in.
-  it("writes a car on a PCP with the finance against it, left owing the balloon, and the payments to the year the whole clears", () => {
+  // Its payments' end is the finance's to say, worked out when the
+  // household is read, so the line is saved from the plan's first year
+  // and open-ended.
+  it("writes a car on a PCP with the finance against it, left owing the balloon, and its payments from the plan's first year, their end left to the finance", () => {
     const { asset: written, loan } = toRecords(golf, plan);
 
     expect(written.name).toBe("Golf");
@@ -184,30 +184,18 @@ describe("toRecords", () => {
         firstYear: 2026,
         growth: "nominal",
         kind: "debt",
-        lastMonth: 6,
-        lastYear: 2031,
+        lastMonth: null,
+        lastYear: null,
         name: "Golf PCP",
       },
     });
   });
 
-  // £438 a month, the exact £438.06 rounded down, leaves a few pounds
-  // for a 37th payment, which falls in September 2029 from September
-  // 2026.
-  it("writes a car on a loan with no balloon and the payments to the month it clears", () => {
+  it("writes a car on a loan with no balloon, named for the loan", () => {
     const { loan } = toRecords(financed, plan);
 
     expect(loan?.account.balloon).toBe(0);
     expect(loan?.account.name).toBe("Golf loan");
-    expect(loan?.line.lastYear).toBe(2029);
-    expect(loan?.line.lastMonth).toBe(8);
-  });
-
-  it("leaves the payments open-ended when they never clear the finance", () => {
-    const { loan } = toRecords({ ...golf, payment: 90 }, plan);
-
-    expect(loan?.line.lastYear).toBeNull();
-    expect(loan?.line.lastMonth).toBeNull();
   });
 
   it("writes a car that loses nothing at a rate of nothing, not a negative nothing", () => {
