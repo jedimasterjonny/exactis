@@ -1,14 +1,14 @@
 import type { JSX } from "react";
 
-import { Check, Landmark, ScrollText, SlidersHorizontal } from "lucide-react";
+import { Check, Landmark, ScrollText } from "lucide-react";
 
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { StatTile } from "@/components/app/molecules/stat-tile";
+import { PlanAssumptions } from "@/components/app/organisms/plan-assumptions";
 import { ProjectionBoard } from "@/components/app/organisms/projection-board";
 import { ProjectionPending } from "@/components/app/organisms/projection-chart";
 import { Badge } from "@/components/kit/badge";
-import { Button } from "@/components/kit/button";
 import { endAge } from "@/data/plan";
 import { dashboard, sectionLabel } from "@/lib/nav";
 import { getAccounts } from "@/store/accounts";
@@ -17,7 +17,8 @@ import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 
 // The dashboard, over the accounts, the lines and the plan read from
 // the store behind the session: titled with the age the plan runs to,
-// then the tiles, then the projection. The board holds the retirement
+// which the assumptions in the header set, then the tiles, then the
+// projection. The board holds the retirement
 // tile, since the retirement age is set on it; the badges and the rest
 // of the tiles are the reference kit's invented plan, standing in until
 // the engine projects what they show, save the age the net worth is
@@ -35,14 +36,7 @@ export async function Dashboard(): Promise<JSX.Element> {
   return (
     <>
       <ScreenHeader
-        // The assumptions route does not exist yet, and typed routes reject
-        // a link to a missing one, so the button gets its href with that route.
-        actions={
-          <Button size="sm">
-            <SlidersHorizontal aria-hidden />
-            Assumptions
-          </Button>
-        }
+        actions={<PlanAssumptions plan={plan} />}
         label={sectionLabel(dashboard)}
         title={`Projected to age ${age}`}
       >
