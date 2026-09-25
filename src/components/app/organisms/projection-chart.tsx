@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 import type { TooltipContentProps } from "recharts";
 
 import { ChartArea, ChartColumnStacked } from "lucide-react";
@@ -37,6 +37,7 @@ import { accountsAndAssets } from "@/lib/nav";
 type Mark = "area" | "bar";
 
 interface ProjectionChartProps {
+  readonly controls?: ReactNode;
   readonly points: readonly ProjectionPoint[];
   readonly retirement: number;
 }
@@ -81,11 +82,15 @@ const config = Object.fromEntries(
 // goes undrawn. The toggle takes its row from
 // inside the plot's box rather than adding one over it, so the box is
 // the same height as the frames that stand in for it and nothing shifts
-// when the chart arrives. A projection of nothing, because no account
+// when the chart arrives; whatever controls the caller gives for what
+// is plotted share the row, at its left, the toggle keeping the right,
+// and the row stands a gap clear of the plot, so a figure box above
+// the top tick does not crowd it. A projection of nothing, because no account
 // is a wrapper yet, says so in the plot's place rather than drawing a
 // flat zero over a column of £0 ticks, and points at the screen where
 // the account is added: the dashboard has no way to add one itself.
 export function ProjectionChart({
+  controls,
   points,
   retirement,
 }: ProjectionChartProps): JSX.Element {
@@ -132,8 +137,11 @@ export function ProjectionChart({
 
   return (
     <Frame>
-      <div className="flex aspect-[3/1] w-full flex-col">
-        <MarkToggle mark={mark} onMarkChange={setMark} />
+      <div className="flex aspect-[3/1] w-full flex-col gap-4">
+        <div className="flex items-end gap-4">
+          {controls}
+          <MarkToggle mark={mark} onMarkChange={setMark} />
+        </div>
         <ChartContainer className="aspect-auto min-h-0 flex-1" config={config}>
           <Plot
             data={points}
@@ -277,7 +285,7 @@ function Frame({ children }: { readonly children: JSX.Element }): JSX.Element {
 
 // The switch between the two marks: the name of the mark drawn now, with
 // the switch on for the bars. It sits at the right of the plot's top row,
-// where a screen keeps its actions.
+// where a screen keeps its actions, whatever is to the left of it.
 function MarkToggle({
   mark,
   onMarkChange,
@@ -288,7 +296,7 @@ function MarkToggle({
   const isBars = mark === "bar";
   return (
     <LabelledSwitch
-      className="self-end"
+      className="ml-auto"
       icon={isBars ? ChartColumnStacked : ChartArea}
       isChecked={isBars}
       onCheckedChange={(isChecked) => {
