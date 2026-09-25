@@ -48,11 +48,21 @@ a second file repeating it.
 
 ## The store
 
-Accounts, income lines, expense lines and the age the plan runs to live in
-Postgres, reached through [Drizzle](https://orm.drizzle.team) over Neon's HTTP
-driver. The schema is `src/db/schema.ts`, the migrations generated from it are
-in `drizzle/`, and the queries are in `src/db/accounts.ts`, `src/db/income.ts`,
-`src/db/expenses.ts` and `src/db/plan.ts`.
+The household, its owners, accounts, income and expense lines and the ages the
+plan is set to, lives in Postgres as one document, a version of it a save,
+reached through [Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The
+table is `src/db/schema.ts`, the migration generated from it is in `drizzle/`,
+and the two queries, reading the latest version and keeping the next, are in
+`src/db/household.ts`.
+
+A save reads the latest version, makes the household it leaves, holds the whole
+of it to the rules in `src/data/household.ts`, and keeps it as the version after
+the one it read, in one statement. So a save lands whole or not at all, one the
+household changed under since it was read is refused rather than written over
+the other, and a save that breaks a rule is refused in the rule's words. No
+version is written over or deleted, which the table holds with a trigger, so
+every household the store has held stays. A read holds the latest version to the
+same rules before any screen draws from it.
 
 The accounts and plan screens read and write it, and the dashboard projects what
 it holds and saves the ages the plan runs to and its owner retires at; the
@@ -65,10 +75,15 @@ apply the migrations once:
 bun run db:migrate
 ```
 
-A schema change is a new migration, written with `db:generate` and committed
-with the change. The tests apply every migration to an in-process Postgres
-([PGlite](https://pglite.dev)), so a migration that does not apply fails the
-suite before it reaches a database.
+The household's shape is the model's rather than the table's, so changing it is
+a change to `src/data/household.ts` and no migration. Until the store holds a
+household worth keeping, a change to the shape is made in place, and a store
+holding the old shape is emptied rather than carried forward, with
+`TRUNCATE household_versions`, which the trigger lets through where it refuses a
+delete. A change to the table is a new migration, written with `db:generate` and
+committed with the change. The tests apply the migrations to an in-process
+Postgres ([PGlite](https://pglite.dev)), so a migration that does not apply
+fails the suite before it reaches a database.
 
 ## The projection
 
@@ -139,10 +154,11 @@ today's money, until the plan carries an inflation assumption.
 The dashboard reads the accounts, the lines and the plan from the store and
 hands them to the browser, which runs the engine itself, so a save on the
 accounts or the plan screen is a new projection on the next render and a
-retirement age dragged on the dashboard is projected as it moves. The cached
-reads every screen goes through live under `src/store`, and the server actions a
-save goes to under `src/actions`: neither is a route, and the organisms that
-save through an action sit beneath the routes.
+retirement age dragged on the dashboard is projected as it moves. The reads
+every screen goes through, one read of the latest version a request, and the
+save every action makes live under `src/store`, and the server actions a save
+goes to under `src/actions`: neither is a route, and the organisms that save
+through an action sit beneath the routes.
 
 ## Signing in
 

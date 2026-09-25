@@ -5,19 +5,22 @@ import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
-import { getAccounts } from "@/store/accounts";
-import { getOwners } from "@/store/owners";
-import { getPlan } from "@/store/plan";
-import { getExpenseLines, getIncomeLines } from "@/store/schedule";
+import {
+  getAccounts,
+  getExpenseLines,
+  getIncomeLines,
+  getOwners,
+  getPlan,
+} from "@/store/household";
 
 import Plan from "./page";
 
-vi.mock("@/store/accounts", () => ({ getAccounts: vi.fn() }));
-vi.mock("@/store/owners", () => ({ getOwners: vi.fn() }));
-vi.mock("@/store/plan", () => ({ getPlan: vi.fn() }));
-vi.mock("@/store/schedule", () => ({
+vi.mock("@/store/household", () => ({
+  getAccounts: vi.fn(),
   getExpenseLines: vi.fn(),
   getIncomeLines: vi.fn(),
+  getOwners: vi.fn(),
+  getPlan: vi.fn(),
 }));
 vi.mock("@/actions/schedule", () => ({
   removeIncomeLine: vi.fn(),

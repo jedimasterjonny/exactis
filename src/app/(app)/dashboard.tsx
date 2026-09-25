@@ -11,9 +11,12 @@ import { ProjectionPending } from "@/components/app/organisms/projection-chart";
 import { Badge } from "@/components/kit/badge";
 import { endAge } from "@/data/plan";
 import { dashboard, sectionLabel } from "@/lib/nav";
-import { getAccounts } from "@/store/accounts";
-import { getPlan } from "@/store/plan";
-import { getExpenseLines, getIncomeLines } from "@/store/schedule";
+import {
+  getAccounts,
+  getExpenseLines,
+  getIncomeLines,
+  getPlan,
+} from "@/store/household";
 
 // The dashboard, over the accounts, the lines and the plan read from
 // the store behind the session: titled with the age the plan runs to,

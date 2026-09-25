@@ -4,18 +4,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
-import { getAccounts } from "@/store/accounts";
-import { getPlan } from "@/store/plan";
-import { getExpenseLines, getIncomeLines } from "@/store/schedule";
+import {
+  getAccounts,
+  getExpenseLines,
+  getIncomeLines,
+  getPlan,
+} from "@/store/household";
 
 import { Dashboard, DashboardPending } from "./dashboard";
 
 vi.mock("@/actions/plan", () => ({ saveAges: vi.fn() }));
-vi.mock("@/store/accounts", () => ({ getAccounts: vi.fn() }));
-vi.mock("@/store/plan", () => ({ getPlan: vi.fn() }));
-vi.mock("@/store/schedule", () => ({
+vi.mock("@/store/household", () => ({
+  getAccounts: vi.fn(),
   getExpenseLines: vi.fn(),
   getIncomeLines: vi.fn(),
+  getPlan: vi.fn(),
 }));
 
 describe("Dashboard", () => {
