@@ -28,6 +28,11 @@ export interface PlanAges {
   readonly retires: number;
 }
 
+// The age the plan runs to, the age its owner reaches in its last year.
+export function endAge(plan: Plan): number {
+  return endYear(plan) - plan.born;
+}
+
 // The last year the plan runs to, which is the last year plotted, whose
 // point is the balance entering it, and the year an open-ended line
 // runs to. A fact about the plan rather than the engine, since a line's
