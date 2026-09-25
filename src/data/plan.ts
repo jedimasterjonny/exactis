@@ -28,6 +28,11 @@ export interface PlanAges {
   readonly retires: number;
 }
 
+// The rest of the plan, until there is somewhere to set it: five per
+// cent a year, for someone born in 1990.
+const born = 1990;
+const rate = 0.05;
+
 // The age the plan runs to, the age its owner reaches in its last year.
 export function endAge(plan: Plan): number {
   return endYear(plan) - plan.born;
@@ -43,6 +48,23 @@ export const oldestAge = 120;
 // span, the fields and the rows read it as the projection does.
 export function endYear(plan: Plan): number {
   return plan.from + plan.years;
+}
+
+// The plan as it stands on the day given, from that year and that month
+// of it, to the age the ages say it runs to and with the age they say
+// its owner retires at: what the projection runs on and what the plan
+// screen lays its lines over. A plan whose age is already reached runs
+// no years forward rather than a count below nothing.
+export function planOf(ages: PlanAges, now: Date): Plan {
+  const from = now.getFullYear();
+  return {
+    born,
+    from,
+    month: now.getMonth(),
+    rate,
+    retires: ages.retires,
+    years: Math.max(0, born + ages.ends - from),
+  };
 }
 
 // The rate an account is carried at, its own fixed one or the plan's,
