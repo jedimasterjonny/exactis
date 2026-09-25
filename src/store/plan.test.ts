@@ -39,16 +39,17 @@ describe("getPlan", () => {
     expect(findAges).not.toHaveBeenCalled();
   });
 
-  it("runs from this year and this month to the age the store keeps, tagged and given a life", async () => {
+  it("runs from this year and this month to the ages the store keeps, tagged and given a life", async () => {
     vi.useFakeTimers({ now: new Date("2026-09-15T12:00:00Z") });
     vi.mocked(getDb).mockReturnValue(db);
-    vi.mocked(findAges).mockResolvedValue({ ends: 91 });
+    vi.mocked(findAges).mockResolvedValue({ ends: 91, retires: 61 });
 
     expect(await getPlan()).toStrictEqual({
       born: 1992,
       from: 2026,
       month: 8,
       rate: 0.05,
+      retires: 61,
       years: 57,
     });
     expect(findAges).toHaveBeenCalledExactlyOnceWith(db);
@@ -60,7 +61,7 @@ describe("getPlan", () => {
   // years forward rather than a count below nothing.
   it("runs no years forward once its age is reached", async () => {
     vi.useFakeTimers({ now: new Date("2026-09-15T12:00:00Z") });
-    vi.mocked(findAges).mockResolvedValue({ ends: 28 });
+    vi.mocked(findAges).mockResolvedValue({ ends: 28, retires: 61 });
 
     expect(await getPlan()).toMatchObject({ from: 2026, years: 0 });
   });
@@ -71,7 +72,7 @@ describe("getProjection", () => {
     vi.mocked(getAccounts).mockRejectedValue(new Error("redirected"));
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
     vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
-    vi.mocked(findAges).mockResolvedValue({ ends: 91 });
+    vi.mocked(findAges).mockResolvedValue({ ends: 91, retires: 61 });
 
     await expect(getProjection()).rejects.toThrow("redirected");
     expect(project).not.toHaveBeenCalled();
@@ -92,14 +93,14 @@ describe("getProjection", () => {
     vi.mocked(getAccounts).mockResolvedValue([...accounts]);
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
     vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
-    vi.mocked(findAges).mockResolvedValue({ ends: 91 });
+    vi.mocked(findAges).mockResolvedValue({ ends: 91, retires: 61 });
     vi.mocked(project).mockReturnValue(points);
 
     expect(await getProjection()).toBe(points);
     expect(project).toHaveBeenCalledExactlyOnceWith(
       accounts,
       { expenses: expenseLines, income: incomeLines },
-      { born: 1992, from: 2026, month: 8, rate: 0.05, years: 57 },
+      { born: 1992, from: 2026, month: 8, rate: 0.05, retires: 61, years: 57 },
     );
     expect(cacheLife).toHaveBeenCalledWith("hours");
   });
