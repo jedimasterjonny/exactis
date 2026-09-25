@@ -3,8 +3,10 @@
 import * as z from "zod";
 
 import type { PlanAges } from "@/data/plan";
+import type { Answer } from "@/lib/answer";
 
 import { oldestAge } from "@/data/plan";
+import { Refusal } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
@@ -31,14 +33,16 @@ const patch = z.object({
 // already past is sound, since it says only that nothing is earned by
 // working. Each refusal says why, since the screen says so under a
 // toast.
-export async function saveAges(draft: Partial<PlanAges>): Promise<PlanAges> {
+export async function saveAges(
+  draft: Partial<PlanAges>,
+): Promise<Answer<PlanAges>> {
   await requireSession();
   const parsed = patch.parse(draft);
   return amend(({ household, kept }) => {
     if (parsed.ends !== undefined) {
       const { born, from } = household.plan;
       if (parsed.ends <= from - born || parsed.ends > oldestAge) {
-        throw new Error(
+        throw new Refusal(
           `A plan ends after the age already reached and by ${String(oldestAge)}`,
         );
       }

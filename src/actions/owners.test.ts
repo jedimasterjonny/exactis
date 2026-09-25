@@ -15,6 +15,7 @@ import { kept } from "@/data/household.fixture";
 import { getDb } from "@/db/client";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
+import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
 import { removeOwner, saveOwner } from "./owners";
@@ -53,10 +54,9 @@ describe("the owner actions", () => {
     });
 
     it("adds a new owner with the name trimmed, given the next id, and draws the page again", async () => {
-      expect(await saveOwner(null, { name: "  Kid  " })).toStrictEqual({
-        id: 7,
-        name: "Kid",
-      });
+      expect(await saveOwner(null, { name: "  Kid  " })).toStrictEqual(
+        saved({ id: 7, name: "Kid" }),
+      );
       expect(await readLatest(db)).toMatchObject({
         household: {
           next: 8,
@@ -68,10 +68,9 @@ describe("the owner actions", () => {
     });
 
     it("writes over the owner with the id, in its place", async () => {
-      expect(await saveOwner(1, { name: "Jo" })).toStrictEqual({
-        id: 1,
-        name: "Jo",
-      });
+      expect(await saveOwner(1, { name: "Jo" })).toStrictEqual(
+        saved({ id: 1, name: "Jo" }),
+      );
       expect(await readLatest(db)).toMatchObject({
         household: {
           next: 7,
@@ -88,8 +87,8 @@ describe("the owner actions", () => {
         z.ZodError,
       );
       await expect(saveOwner(0, { name: "Jo" })).rejects.toThrow(z.ZodError);
-      await expect(saveOwner(99, { name: "Jo" })).rejects.toThrow(
-        "No owner has the id",
+      await expect(saveOwner(99, { name: "Jo" })).resolves.toStrictEqual(
+        refused("No owner has the id"),
       );
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
@@ -114,15 +113,17 @@ describe("the owner actions", () => {
     });
 
     it("refuses to delete an owner an account names, and writes nothing", async () => {
-      await expect(removeOwner(1)).rejects.toThrow(
-        "An owner who holds an account stays",
+      await expect(removeOwner(1)).resolves.toStrictEqual(
+        refused("An owner who holds an account stays"),
       );
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
 
     it("refuses an id the list could not have sent, and one no owner has", async () => {
       await expect(removeOwner(1.5)).rejects.toThrow(z.ZodError);
-      await expect(removeOwner(99)).rejects.toThrow("No owner has the id");
+      await expect(removeOwner(99)).resolves.toStrictEqual(
+        refused("No owner has the id"),
+      );
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
   });

@@ -8,6 +8,7 @@ import type { Kept } from "@/data/household";
 import type { HouseValues } from "@/data/houses";
 import type { IncomeLine } from "@/data/income";
 import type { SecuredRecords } from "@/data/secured";
+import type { Answer } from "@/lib/answer";
 import type { Held } from "@/store/household";
 
 import {
@@ -24,6 +25,7 @@ import {
   toRecords as toCarRecords,
 } from "@/data/cars";
 import { isSound, statuses, toRecords } from "@/data/houses";
+import { Refusal } from "@/lib/answer";
 import { found, replaced } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
@@ -143,12 +145,12 @@ const target = z.number().int().positive().nullable();
 // save is.
 export async function placeAccountsInOrder(
   ids: readonly number[],
-): Promise<void> {
+): Promise<Answer<undefined>> {
   await requireSession();
   const placed = order.parse(ids);
-  await amend(({ kept }) => {
+  return amend(({ kept }) => {
     if (placed.length !== kept.accounts.length) {
-      throw new Error("Not every account was placed");
+      throw new Refusal("Not every account was placed");
     }
     return {
       kept: {
@@ -165,10 +167,10 @@ export async function placeAccountsInOrder(
 // loan takes its payments; a salary feeding the account stops, and is
 // left earned whole, giving up nothing. All of it goes together or none
 // of it does. Checked as a save is.
-export async function removeAccount(id: number): Promise<void> {
+export async function removeAccount(id: number): Promise<Answer<undefined>> {
   await requireSession();
   const at = z.number().int().positive().parse(id);
-  await amend(({ kept }) => {
+  return amend(({ kept }) => {
     found(kept.accounts, at, "account");
     const gone = new Set([
       at,
@@ -211,7 +213,7 @@ export async function removeAccount(id: number): Promise<void> {
 export async function saveAccount(
   id: null | number,
   draft: AccountDraft,
-): Promise<Account> {
+): Promise<Answer<Account>> {
   await requireSession();
   const at = target.parse(id);
   const { shares, ...parsed } = values.parse(draft);
@@ -244,7 +246,7 @@ export async function saveAccount(
 export async function saveCar(
   id: null | number,
   draft: CarValues,
-): Promise<Account> {
+): Promise<Answer<Account>> {
   await requireSession();
   const at = target.parse(id);
   const parsed = car.parse(draft);
@@ -263,7 +265,7 @@ export async function saveCar(
 export async function saveHouse(
   id: null | number,
   draft: HouseValues,
-): Promise<Account> {
+): Promise<Answer<Account>> {
   await requireSession();
   const at = target.parse(id);
   const parsed = house.parse(draft);
@@ -285,7 +287,7 @@ function sacrificed(
     (lines, share) => {
       const line = lines.find(({ id }) => id === share.line);
       if (line?.feeds !== account) {
-        throw new Error("No salary feeding the account has the id");
+        throw new Refusal("No salary feeding the account has the id");
       }
       return replaced(lines, { ...line, sacrifice: share.sacrifice });
     },

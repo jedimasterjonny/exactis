@@ -8,10 +8,12 @@ import type { Household, Kept } from "@/data/household";
 import type { IncomeLine } from "@/data/income";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
+import type { Answer } from "@/lib/answer";
 
 import { nothingKept, soundKept } from "@/data/household";
 import { getDb } from "@/db/client";
 import { keepAfter, readLatest } from "@/db/household";
+import { Refusal, refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
 // What a save works from: the household as it stands, the whole it makes
@@ -35,10 +37,11 @@ const readHousehold = cache(
   async (): Promise<Household> => (await readHeld()).household,
 );
 
-// Saves the household as the edit makes it, and hands back what the edit
-// says to. The edit works from the latest version and is held to every
-// rule before anything is written, so a save that breaks one is refused
-// in its words and leaves the store as it was; and the whole household
+// Saves the household as the edit makes it, and answers with what the
+// edit says to hand back. The edit works from the latest version and is
+// held to every rule before anything is written, so a save that breaks
+// one is answered as a refusal in its words and leaves the store as it
+// was, and anything else thrown on the way stays a failure; and the whole household
 // is written as the version after the one read, in one statement, so a
 // save lands whole or not at all, and a save the household changed
 // under since it was read is refused rather than written over what the
@@ -47,13 +50,20 @@ const readHousehold = cache(
 // checks the session for itself, as every read does.
 export async function amend<TResult>(
   edit: (held: Held) => Amended<TResult>,
-): Promise<TResult> {
+): Promise<Answer<TResult>> {
   await requireSession();
   const { version, ...held } = await readHeld();
-  const { kept, result } = edit(held);
-  await keepAfter(getDb(), version, soundKept(kept, new Date()).kept);
-  refresh();
-  return result;
+  try {
+    const { kept, result } = edit(held);
+    await keepAfter(getDb(), version, soundKept(kept, new Date()).kept);
+    refresh();
+    return saved(result);
+  } catch (error: unknown) {
+    if (error instanceof Refusal) {
+      return refused(error.message);
+    }
+    throw error;
+  }
 }
 
 export async function getAccounts(): Promise<readonly Account[]> {

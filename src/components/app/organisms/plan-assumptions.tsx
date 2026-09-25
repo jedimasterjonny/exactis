@@ -13,6 +13,7 @@ import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { Button } from "@/components/kit/button";
 import { toast } from "@/components/kit/toast";
 import { endAge, oldestAge } from "@/data/plan";
+import { acceptedOf } from "@/lib/answer";
 import { reasonOf } from "@/lib/errors";
 
 interface PlanAssumptionsProps {
@@ -43,7 +44,7 @@ export function PlanAssumptions({ plan }: PlanAssumptionsProps): JSX.Element {
   function save(age: number): void {
     startSaving(async () => {
       try {
-        const saved = await saveAges({ ends: age });
+        const saved = acceptedOf(await saveAges({ ends: age }));
         startTransition(() => {
           setEnds(null);
         });

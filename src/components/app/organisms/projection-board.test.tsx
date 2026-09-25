@@ -11,6 +11,7 @@ import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
 import { project } from "@/engine/projection";
+import { refused } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
 
 import { ProjectionBoard, settle } from "./projection-board";
@@ -173,8 +174,8 @@ describe("ProjectionBoard", () => {
 
   it("puts the store's age back and says why when the store refuses it", async () => {
     vi.useFakeTimers();
-    vi.mocked(saveAges).mockRejectedValue(
-      new Error("A plan's owner retires no later than it ends"),
+    vi.mocked(saveAges).mockResolvedValue(
+      refused("A plan's owner retires no later than it ends"),
     );
     render(board());
 

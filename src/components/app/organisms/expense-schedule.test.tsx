@@ -8,12 +8,14 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { ExpenseLine } from "@/data/expenses";
+import type { Answer } from "@/lib/answer";
 
 import { saveExpenseLine } from "@/actions/schedule";
 import { Toaster } from "@/components/kit/toast";
 import { expenseKinds } from "@/data/expenses";
 import { expenseLines } from "@/data/expenses.fixture";
 import { plan } from "@/data/income.fixture";
+import { saved as accepted } from "@/lib/answer";
 
 import { ExpenseSchedule } from "./expense-schedule";
 
@@ -49,7 +51,7 @@ function renderSchedule(lines: readonly ExpenseLine[] = expenseLines): void {
 // shows it only once the page re-reads, which is the router's work and
 // not the schedule's, so the rows here stay as rendered.
 function saved(line: ExpenseLine): void {
-  vi.mocked(saveExpenseLine).mockResolvedValue(line);
+  vi.mocked(saveExpenseLine).mockResolvedValue(accepted(line));
 }
 
 describe("ExpenseSchedule", () => {
@@ -150,7 +152,7 @@ describe("ExpenseSchedule", () => {
     ).toBeInTheDocument();
 
     // The store's answer is held back, so the save can be seen in flight.
-    let answer!: (line: ExpenseLine) => void;
+    let answer!: (answered: Answer<ExpenseLine>) => void;
     vi.mocked(saveExpenseLine).mockReturnValue(
       new Promise((resolve) => {
         answer = resolve;
@@ -170,17 +172,19 @@ describe("ExpenseSchedule", () => {
     });
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
 
-    answer({
-      amount: 1150,
-      cadence: "month",
-      firstYear: 2027,
-      growth: "inflation-plus-2",
-      id: 6,
-      kind: "time-bound",
-      lastMonth: null,
-      lastYear: 2035,
-      name: "Nursery",
-    });
+    answer(
+      accepted({
+        amount: 1150,
+        cadence: "month",
+        firstYear: 2027,
+        growth: "inflation-plus-2",
+        id: 6,
+        kind: "time-bound",
+        lastMonth: null,
+        lastYear: 2035,
+        name: "Nursery",
+      }),
+    );
 
     await waitFor(() => {
       expect(
