@@ -32,12 +32,12 @@ in the vendored file works until the next refresh silently discards it.
 
 ## Tier: the app directory
 
-| tier         | what it is                                       | here                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ------------ | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `atoms/`     | one presentational job, composes nothing of ours | `delta-value`, `empty-state`, `field`, `field-row`, `figure-input`, `labelled-switch`, `note`, `row-action`, `screen-body`, `screen-header`, `section-header`, `span-bar`, `tile-grid`                                                                                                                                                                                                                          |
-| `molecules/` | atoms combined into one reusable control         | `age-field`, `app-nav`, `confirm-dialog`, `edit-dialog`, `money-field`, `month-field`, `rate-field`, `row-actions`, `section-card`, `select-field`, `stat-tile`, `term-field`, `text-field`, `theme-toggle`, `year-field`                                                                                                                                                                                       |
-| `organisms/` | a whole region of a screen                       | `account-dialog`, `account-fields`, `account-ledger`, `account-table`, `asset-table`, `car-dialog`, `car-fields`, `cash-flow-card`, `employment-fields`, `expense-schedule`, `house-dialog`, `house-fields`, `income-schedule`, `line-fields`, `loan-fields`, `owner-list`, `payment-order`, `plan-assumptions`, `progress-points`, `projection-board`, `projection-chart`, `sacrifice-fields`, `schedule-rows` |
-| `templates/` | the shell a page sits in                         | `app-frame`                                                                                                                                                                                                                                                                                                                                                                                                     |
+| tier         | what it is                                                   | here                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------ | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `atoms/`     | one presentational job, composes nothing of ours             | `delta-value`, `empty-state`, `field`, `field-row`, `figure-input`, `labelled-switch`, `note`, `row-action`, `screen-body`, `screen-header`, `section-header`, `span-bar`, `tile-grid`                                                                                                                                                                                                                          |
+| `molecules/` | atoms combined into one reusable control                     | `age-field`, `app-nav`, `confirm-dialog`, `edit-dialog`, `money-field`, `month-field`, `rate-field`, `row-actions`, `section-card`, `select-field`, `stat-tile`, `term-field`, `text-field`, `theme-toggle`, `year-field`                                                                                                                                                                                       |
+| `organisms/` | a group of molecules: a screen region, a dialog, a field set | `account-dialog`, `account-fields`, `account-ledger`, `account-table`, `asset-table`, `car-dialog`, `car-fields`, `cash-flow-card`, `employment-fields`, `expense-schedule`, `house-dialog`, `house-fields`, `income-schedule`, `line-fields`, `loan-fields`, `owner-list`, `payment-order`, `plan-assumptions`, `progress-points`, `projection-board`, `projection-chart`, `sacrifice-fields`, `schedule-rows` |
+| `templates/` | the shell a page sits in                                     | `app-frame`                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 A component composes what is below it, and beside it, never above.
 Organism-on-organism is the one same-tier edge this allows, and there are
@@ -59,15 +59,26 @@ Ask what it composes, not how big it is. Size correlates but does not decide.
 2. Does it combine atoms, or more than one `kit/` primitive, into one control,
    or give a control state of its own? It is a molecule. `theme-toggle` is one
    atom, the labelled switch, and is a molecule because it reads and sets the
-   theme.
-3. Does it own a region of a screen - a table with its empty state, a schedule
-   with its dialogs? It is an organism.
+   theme. A molecule reaches Base UI directly only to finish what an atom began:
+   `select-field` and `month-field` render `Field.Control`, because Base UI
+   wires a field through context, so `field` can own the root, the label and the
+   description but not a control it does not know.
+3. Does it group molecules into something that is not itself one control? It is
+   an organism. Usually that is a region of a screen - a table with its empty
+   state, a schedule with its dialogs - but it is the grouping that decides
+   rather than the region, which is why the seven `*-fields` here are organisms
+   and not molecules. Each composes four or five molecules into the body of a
+   dialog and owns no region of its own, and a molecule composes atoms, never
+   molecules.
 4. Does it arrange regions without knowing what goes in them? It is a template.
 
-A useful check: the tiers correlate with how much `kit/` a component reaches
-for. An atom imports at most one wrapper, a molecule one or two, and the
-organisms take one to five, most of them three or more. A proposed atom that
-needs four wrappers is probably a molecule or an organism.
+A useful check, though it only runs one way. The ceiling rises with the tier -
+an atom imports at most one `kit/` wrapper, a molecule two, an organism four -
+so a proposed atom reaching for two is probably a molecule, and one reaching for
+three is probably an organism. The floor is zero at every tier, so a low count
+says nothing: ten of the organisms import no wrapper at all, because an organism
+built out of molecules rather than primitives, as every `*-fields` and every
+`*-dialog` here is, reaches for them at one remove.
 
 If a component seems to belong in two tiers it is usually two components.
 
