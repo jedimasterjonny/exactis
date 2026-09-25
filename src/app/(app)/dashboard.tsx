@@ -1,16 +1,9 @@
 import type { JSX } from "react";
 
-import {
-  Check,
-  Flag,
-  Landmark,
-  ScrollText,
-  SlidersHorizontal,
-} from "lucide-react";
+import { Check, Landmark, ScrollText, SlidersHorizontal } from "lucide-react";
 
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
-import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ProjectionBoard } from "@/components/app/organisms/projection-board";
 import { ProjectionPending } from "@/components/app/organisms/projection-chart";
@@ -24,11 +17,13 @@ import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 
 // The dashboard, over the accounts, the lines and the plan read from
 // the store behind the session: titled with the age the plan runs to,
-// then the tiles, then the projection. The badges and the tiles are the
-// reference kit's invented plan, standing in until the engine projects
-// what they show, save the age the net worth is read at, which is the
-// plan's. It is its own component so the page can stream it in behind
-// the pending frame, since every part of it now reads the store.
+// then the tiles, then the projection. The board holds the retirement
+// tile, since the retirement age is set on it; the badges and the rest
+// of the tiles are the reference kit's invented plan, standing in until
+// the engine projects what they show, save the age the net worth is
+// read at, which is the plan's. It is its own component so the page
+// can stream it in behind the pending frame, since every part of it
+// now reads the store.
 export async function Dashboard(): Promise<JSX.Element> {
   const [accounts, income, expenses, plan] = await Promise.all([
     getAccounts(),
@@ -59,15 +54,11 @@ export async function Dashboard(): Promise<JSX.Element> {
         {"Figures in today's money"}
       </ScreenHeader>
       <ScreenBody>
-        <TileGrid>
-          <StatTile
-            caption="Last working year 58"
-            icon={Flag}
-            label="Retirement"
-            tone="inverse"
-            unit="yrs"
-            value="59"
-          />
+        <ProjectionBoard
+          accounts={accounts}
+          plan={plan}
+          schedule={{ expenses, income }}
+        >
           <StatTile
             caption="vs Aug run"
             delta={250418}
@@ -89,12 +80,7 @@ export async function Dashboard(): Promise<JSX.Element> {
             label="Net legacy"
             value="£1,771,204"
           />
-        </TileGrid>
-        <ProjectionBoard
-          accounts={accounts}
-          plan={plan}
-          schedule={{ expenses, income }}
-        />
+        </ProjectionBoard>
       </ScreenBody>
     </>
   );
