@@ -218,7 +218,7 @@ export async function saveAccount(
 ): Promise<Account> {
   await requireSession();
   const at = target.parse(id);
-  const { shares, ...parsed } = values.parse(draft);
+  const { shares, ...parsed } = await values.parseAsync(draft);
   if (at === null && shares.length > 0) {
     throw new Error("Nothing feeds an account the store has not given an id");
   }
@@ -245,7 +245,7 @@ export async function saveCar(
 ): Promise<Account> {
   await requireSession();
   const at = target.parse(id);
-  const records = toCarRecords(car.parse(draft), getPlan());
+  const records = toCarRecords(car.parse(draft), await getPlan());
   return writeSecured(getDb(), at, records);
 }
 
@@ -263,7 +263,7 @@ export async function saveHouse(
 ): Promise<Account> {
   await requireSession();
   const at = target.parse(id);
-  const records = toRecords(house.parse(draft), getPlan());
+  const records = toRecords(house.parse(draft), await getPlan());
   return writeSecured(getDb(), at, records);
 }
 
@@ -277,7 +277,7 @@ export async function saveHouse(
 // is refused above, and the rate is the debt's own or the plan's, read
 // here as the engine reads it. Every other kind clears nothing and is
 // asked nothing.
-function doesClear(draft: AccountValues): boolean {
+async function doesClear(draft: AccountValues): Promise<boolean> {
   if (
     draft.kind !== "debt" ||
     draft.funding !== "fixed" ||
@@ -287,7 +287,7 @@ function doesClear(draft: AccountValues): boolean {
   }
   const payment =
     draft.cadence === "year" ? draft.contribution / 12 : draft.contribution;
-  const rate = draft.growth === "plan" ? getPlan().rate : draft.rate;
+  const rate = draft.growth === "plan" ? (await getPlan()).rate : draft.rate;
   return (
     termOf(
       { balance: -draft.balance, balloon: draft.balloon },

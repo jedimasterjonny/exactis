@@ -17,6 +17,14 @@ export interface Plan {
   readonly years: number;
 }
 
+// The ages the plan is set to, as the store keeps them: the age it runs
+// to, from which the years it runs forward are worked out on the day it
+// is read, so the plan ends at the same age however many years are left
+// to it.
+export interface PlanAges {
+  readonly ends: number;
+}
+
 // The last year the plan runs to, which is the last year plotted, whose
 // point is the balance entering it, and the year an open-ended line
 // runs to. A fact about the plan rather than the engine, since a line's
