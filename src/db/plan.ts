@@ -16,3 +16,19 @@ export async function findAges(db: Database): Promise<PlanAges> {
   }
   return row;
 }
+
+// The plan's ages, written over the ones it had. There is one row, so
+// the write names none.
+export async function writeAges(
+  db: Database,
+  ages: PlanAges,
+): Promise<PlanAges> {
+  const [row] = await db
+    .update(plan)
+    .set(ages)
+    .returning({ ends: plan.ends, retires: plan.retires });
+  if (row === undefined) {
+    throw new Error("The plan has no row");
+  }
+  return row;
+}

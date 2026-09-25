@@ -33,6 +33,10 @@ export function endAge(plan: Plan): number {
   return endYear(plan) - plan.born;
 }
 
+// The oldest age a plan may run to: past any life it plans for, and
+// short of a plan of centuries.
+export const oldestAge = 120;
+
 // The last year the plan runs to, which is the last year plotted, whose
 // point is the balance entering it, and the year an open-ended line
 // runs to. A fact about the plan rather than the engine, since a line's
