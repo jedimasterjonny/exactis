@@ -57,13 +57,22 @@ const routesPattern = {
     "Nothing beneath the routes imports them. A server action lives under @/actions and a store under @/store.",
 };
 
-// Atomic design's one mechanical rule: a component composes what is below it,
-// and beside it, never above. Written as what each tier may not reach, so a
-// new tier is one entry rather than an edit to every other.
+// Atomic design's two mechanical rules: a component composes what is below
+// it, never above, and only an organism composes beside it. Written as what
+// each tier may not reach, so a new tier is one entry rather than an edit to
+// every other. A tier names itself when its own same-tier edge is a
+// violation, which is every tier but organisms: two organisms composing each
+// other is the one sideways edge atomic design permits, and `bun run cycles`
+// is what catches the loop that freedom makes possible. Only the upward half
+// of this was ever enforced; the sideways half was prose in
+// src/components/README.md, which the tree has obeyed in every commit since -
+// no atom has imported an atom and no molecule a molecule - so what changes
+// here is that it is checked rather than remembered.
 const tierBans = {
-  atoms: ["molecules", "organisms", "templates"],
-  molecules: ["organisms", "templates"],
+  atoms: ["atoms", "molecules", "organisms", "templates"],
+  molecules: ["molecules", "organisms", "templates"],
   organisms: ["templates"],
+  templates: ["templates"],
 };
 
 // The tier bans above are patterns over `@/…` specifiers, so a sibling
@@ -333,19 +342,19 @@ const eslintConfig = defineConfig([
       ],
     },
   },
-  // Templates ban no tier, so they take only the two patterns above from
-  // the block before this one. src/app composes organisms and templates
-  // and is above both.
+  // Every tier bans something now, templates included, so none of them falls
+  // through to the block above. src/app is the tier none of these names: it
+  // composes organisms and templates and sits above both.
   //
   // Two blocks per tier, because flat config replaces a rule's options rather
   // than merging them, so the narrower one has to restate what it keeps. The
   // test files take the tier bans without the sibling one: a test importing
   // "./field" is reaching for its subject rather than composing it, and that
   // is the spelling every test in the tree uses.
-  ...Object.entries(tierBans).flatMap(([tier, above]) => {
+  ...Object.entries(tierBans).flatMap(([tier, banned]) => {
     const tierPattern = {
-      group: above.map((t) => `@/components/app/${t}/*`),
-      message: `A component composes what is below it, never above: ${tier} cannot import ${above.join(", ")}.`,
+      group: banned.map((t) => `@/components/app/${t}/*`),
+      message: `A component composes what is below it, and only an organism composes beside it: ${tier} cannot import ${banned.join(", ")}.`,
     };
     return [
       {

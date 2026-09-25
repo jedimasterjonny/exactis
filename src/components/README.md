@@ -39,15 +39,15 @@ in the vendored file works until the next refresh silently discards it.
 | `organisms/` | a group of molecules: a screen region, a dialog, a field set | `account-dialog`, `account-fields`, `account-ledger`, `account-table`, `asset-table`, `car-dialog`, `car-fields`, `cash-flow-card`, `employment-fields`, `expense-schedule`, `house-dialog`, `house-fields`, `income-schedule`, `line-fields`, `loan-fields`, `owner-list`, `payment-order`, `plan-assumptions`, `progress-points`, `projection-board`, `projection-chart`, `sacrifice-fields`, `schedule-rows` |
 | `templates/` | the shell a page sits in                                     | `app-frame`                                                                                                                                                                                                                                                                                                                                                                                                     |
 
-A component composes what is below it, and beside it, never above.
-Organism-on-organism is the one same-tier edge this allows, and there are
-nineteen of them: `account-ledger` on `account-dialog`, `account-table`,
-`asset-table`, `car-dialog`, `house-dialog`, `owner-list` and `payment-order`,
-`account-dialog` on `account-fields` and `sacrifice-fields`, `car-dialog` on
-`car-fields`, `house-dialog` on `house-fields`, each of `car-fields` and
-`house-fields` on `loan-fields`, `income-schedule` on `employment-fields`, each
-of the two schedules on both `line-fields` and `schedule-rows`, and
-`projection-board` on `projection-chart`.
+A component composes what is below it, never above, and only an organism
+composes beside it. There are nineteen of those same-tier edges:
+`account-ledger` on `account-dialog`, `account-table`, `asset-table`,
+`car-dialog`, `house-dialog`, `owner-list` and `payment-order`, `account-dialog`
+on `account-fields` and `sacrifice-fields`, `car-dialog` on `car-fields`,
+`house-dialog` on `house-fields`, each of `car-fields` and `house-fields` on
+`loan-fields`, `income-schedule` on `employment-fields`, each of the two
+schedules on both `line-fields` and `schedule-rows`, and `projection-board` on
+`projection-chart`.
 
 ## Placing a new component
 
@@ -87,10 +87,11 @@ If a component seems to belong in two tiers it is usually two components.
 Nothing here relies on being remembered.
 
 - `no-restricted-imports` bars everything outside `kit/` from importing
-  `@/components/ui/*`, bars each tier from importing a tier above it, and bars
-  everything outside `src/app` from importing `@/app/*`: the routes are the top
-  tier, so a server action lives under `src/actions` and a store under
-  `src/store`, where an organism or a template can reach them.
+  `@/components/ui/*`, bars each tier from importing a tier above it and - for
+  every tier but organisms - from importing its own, and bars everything outside
+  `src/app` from importing `@/app/*`: the routes are the top tier, so a server
+  action lives under `src/actions` and a store under `src/store`, where an
+  organism or a template can reach them.
 - The same rule bars a relative import in a component, leaving `@/` as the only
   way one component names another. The tier bans are patterns over `@/…`
   specifiers, so without this one an import that reached past its tier could
