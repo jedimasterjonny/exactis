@@ -24,14 +24,15 @@ const born = 1990;
 const rate = 0.05;
 
 // The plan as it stands, from this year and this month of it, to the
-// age the store says it runs to: what the projection runs on and what
-// the plan screen lays its lines over. The ages are read behind the
-// session, as the accounts are, and the date after them, so it is read
-// at request time. A plan whose age is already reached runs no years
-// forward rather than a count below nothing.
+// age the store says it runs to and with the age it says its owner
+// retires at: what the projection runs on and what the plan screen
+// lays its lines over. The ages are read behind the session, as the
+// accounts are, and the date after them, so it is read at request
+// time. A plan whose age is already reached runs no years forward
+// rather than a count below nothing.
 export async function getPlan(): Promise<Plan> {
   await requireSession();
-  const { ends } = await readAges();
+  const { ends, retires } = await readAges();
   const now = new Date();
   const from = now.getFullYear();
   return {
@@ -39,6 +40,7 @@ export async function getPlan(): Promise<Plan> {
     from,
     month: now.getMonth(),
     rate,
+    retires,
     years: Math.max(0, born + ends - from),
   };
 }

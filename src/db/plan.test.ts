@@ -24,16 +24,18 @@ describe("plan store", () => {
     await client.close();
   });
 
-  it("opens on the row the migration wrote, running to 89", async () => {
-    expect(await findAges(db)).toStrictEqual({ ends: 89 });
+  it("opens on the row the migrations wrote, running to 89 and retiring at 59", async () => {
+    expect(await findAges(db)).toStrictEqual({ ends: 89, retires: 59 });
   });
 
   it("holds the plan to one row", async () => {
     await expect(
-      db.execute(sql`INSERT INTO ${plan} ("id", "ends") VALUES (2, 90)`),
+      db.execute(
+        sql`INSERT INTO ${plan} ("id", "ends", "retires") VALUES (2, 90, 60)`,
+      ),
     ).rejects.toThrow();
     await expect(
-      db.execute(sql`INSERT INTO ${plan} ("ends") VALUES (90)`),
+      db.execute(sql`INSERT INTO ${plan} ("ends", "retires") VALUES (90, 60)`),
     ).rejects.toThrow();
   });
 
@@ -42,6 +44,6 @@ describe("plan store", () => {
 
     await expect(findAges(db)).rejects.toThrow("The plan has no row");
 
-    await db.insert(plan).values({ ends: 89 });
+    await db.insert(plan).values({ ends: 89, retires: 59 });
   });
 });

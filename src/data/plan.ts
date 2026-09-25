@@ -4,8 +4,9 @@ import type { Account } from "@/data/accounts";
 // grows at, the first year plotted, which holds today's balances, and
 // the month of it the plan is read in, January being nought as the
 // date gives it, so the first year runs from there rather than from
-// its start; how many years it runs forward; and the year the plan's
-// owner was born, which turns a year into an age. It sits beside the
+// its start; how many years it runs forward; the year the plan's owner
+// was born, which turns a year into an age; and the age they retire at,
+// from which they earn nothing by working. It sits beside the
 // accounts and the lines rather than inside the engine, since the flow
 // and the projection each read it and the flow is what the projection
 // is built on.
@@ -14,15 +15,17 @@ export interface Plan {
   readonly from: number;
   readonly month: number;
   readonly rate: number;
+  readonly retires: number;
   readonly years: number;
 }
 
 // The ages the plan is set to, as the store keeps them: the age it runs
 // to, from which the years it runs forward are worked out on the day it
 // is read, so the plan ends at the same age however many years are left
-// to it.
+// to it, and the age its owner retires at.
 export interface PlanAges {
   readonly ends: number;
+  readonly retires: number;
 }
 
 // The last year the plan runs to, which is the last year plotted, whose

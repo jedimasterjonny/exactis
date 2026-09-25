@@ -20,8 +20,16 @@ const [household, childcare, mortgagePayment, retirement, care] = expenseLines;
 const schedule = { expenses: expenseLines, income: incomeLines };
 
 // Read at the start of 2026, so a debt's payments are counted from
-// January and the months a month is charged for are read off there.
-const plan = { born: 1990, from: 2026, month: 0, rate: 0.05, years: 53 };
+// January and the months a month is charged for are read off there,
+// and retiring past its end, so a salary runs as long as its line says.
+const plan = {
+  born: 1990,
+  from: 2026,
+  month: 0,
+  rate: 0.05,
+  retires: 90,
+  years: 53,
+};
 
 // The fixture's accounts, each paid the spare money instead: the ISA to
 // its £20,000 allowance, the pension to a cap under its own, and the
