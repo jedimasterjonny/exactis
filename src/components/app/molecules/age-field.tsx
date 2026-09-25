@@ -10,6 +10,7 @@ import { Slider } from "@/components/kit/slider";
 import { thumbOf } from "@/lib/slider";
 
 interface AgeFieldProps {
+  readonly hasSlider?: boolean;
   readonly hint?: string;
   readonly label: string;
   readonly max: number;
@@ -39,8 +40,11 @@ const format: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };
 // tab order and the accessibility tree with it, so the box and the
 // panel need no state and no handlers between them; the panel takes
 // the focus itself when it is pressed anywhere but the thumb, so
-// pressing the track leaves the focus inside and the panel open.
+// pressing the track leaves the focus inside and the panel open. An age
+// set on purpose rather than watched as it moves asks for no slider,
+// and is the field alone, committing as it does with one.
 export function AgeField({
+  hasSlider = true,
   hint,
   label,
   max,
@@ -50,19 +54,25 @@ export function AgeField({
   value,
 }: AgeFieldProps): JSX.Element {
   const sliderLabelId = useId();
+  const field = (
+    <Field hint={hint} label={label}>
+      <FigureInput
+        format={format}
+        largeStep={5}
+        max={max}
+        min={min}
+        onValueCommitted={onValueCommitted}
+        step={1}
+        value={value}
+      />
+    </Field>
+  );
+  if (!hasSlider) {
+    return field;
+  }
   return (
     <div className="group/age relative">
-      <Field hint={hint} label={label}>
-        <FigureInput
-          format={format}
-          largeStep={5}
-          max={max}
-          min={min}
-          onValueCommitted={onValueCommitted}
-          step={1}
-          value={value}
-        />
-      </Field>
+      {field}
       <div
         className="invisible absolute inset-x-0 top-full z-10 mt-2 rounded-md border bg-popover px-3 py-4 shadow-md group-focus-within/age:visible"
         data-slot="age-slider"

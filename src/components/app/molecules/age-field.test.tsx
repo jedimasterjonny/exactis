@@ -150,4 +150,29 @@ describe("AgeField", () => {
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(60);
   });
+
+  it("is the box alone when asked for no slider, committing as it does with one", () => {
+    const onValueCommitted = vi.fn<(age: number) => void>();
+    render(
+      <AgeField
+        hasSlider={false}
+        label="Plan end age"
+        max={120}
+        min={61}
+        onValueCommitted={onValueCommitted}
+        value={91}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Plan end age" });
+
+    expect(
+      screen.queryByRole("slider", { hidden: true }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: "130" } });
+    fireEvent.blur(input);
+
+    expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(120);
+  });
 });
