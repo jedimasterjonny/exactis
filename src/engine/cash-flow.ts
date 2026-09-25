@@ -14,10 +14,11 @@ import {
 import {
   contributionOf,
   incomeKinds,
+  isEarned,
   sacrificeOf,
   totalOf,
 } from "@/data/income";
-import { rateFrom } from "@/data/plan";
+import { rateFrom, retirementYear } from "@/data/plan";
 import { monthly } from "@/lib/cadence";
 import { runsIn } from "@/lib/lines";
 import { clearsIn, termOf } from "@/lib/loans";
@@ -143,7 +144,11 @@ const nanopound = 1e-9;
 // band that the quieter months leave unused. The projection settles
 // the difference in the April after the tax year, which comes into
 // that month's money as income does, untaxed, and is spent, saved or
-// drawn for with the rest of it. What is left within a
+// drawn for with the rest of it. A salary or a self-employed profit
+// runs only until the plan's owner retires, whatever its own last year
+// says, since money earned by working is not earned once the work
+// stops; a line ending before then ends where it says, and a pension
+// or any other income runs on. What is left within a
 // nanopound of nothing is nothing exactly: a month whose lines cancel
 // to the penny need not
 // cancel in binary, and a shortfall too small to write down is no
@@ -247,35 +252,37 @@ export function cashFlow(
     );
   }
   checkLinks(accounts, schedule);
-  const income = sumOf(schedule.income, at, totalOf);
+  const running = schedule.income.filter(
+    (line) =>
+      runsIn(line, at) &&
+      (!isEarned(line) || at.year < retirementYear(reading.plan)),
+  );
+  const income = sumOf(running, at, totalOf);
   const offered: Rooms = new Map();
-  const feeding = schedule.income
-    .filter((line) => runsIn(line, at))
-    .flatMap((line) => {
-      const account = accountAt(accounts, line.feeds);
-      const wanted = monthly(contributionOf(line), line.cadence);
-      if (account === undefined || wanted === 0) {
-        return [];
-      }
-      const share = Math.min(1, roomIn(offered, account) / wanted);
-      landIn(offered, account, wanted * share);
-      return share === 0
-        ? []
-        : [
-            {
-              account,
-              amount: wanted * share,
-              line,
-              sacrificed: monthly(sacrificeOf(line), line.cadence) * share,
-            },
-          ];
-    });
+  const feeding = running.flatMap((line) => {
+    const account = accountAt(accounts, line.feeds);
+    const wanted = monthly(contributionOf(line), line.cadence);
+    if (account === undefined || wanted === 0) {
+      return [];
+    }
+    const share = Math.min(1, roomIn(offered, account) / wanted);
+    landIn(offered, account, wanted * share);
+    return share === 0
+      ? []
+      : [
+          {
+            account,
+            amount: wanted * share,
+            line,
+            sacrificed: monthly(sacrificeOf(line), line.cadence) * share,
+          },
+        ];
+  });
   const spent = schedule.expenses
     .filter((line) => runsIn(line, at))
     .map((line) => ({ amount: monthly(line.amount, line.cadence), line }));
   const expenses = total(spent);
   const givenUp = feeding.reduce((sum, entry) => sum + entry.sacrificed, 0);
-  const running = schedule.income.filter((line) => runsIn(line, at));
   const sacrificing = taxOn(running, feeding);
   const isEarnedWhole =
     income - givenUp - taxOf(sacrificing) + settlement - expenses < -nanopound;
