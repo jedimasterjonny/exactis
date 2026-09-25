@@ -23,6 +23,7 @@ import { StatTile } from "@/components/app/molecules/stat-tile";
 import { AccountDialog } from "@/components/app/organisms/account-dialog";
 import { AccountTable } from "@/components/app/organisms/account-table";
 import { AssetTable } from "@/components/app/organisms/asset-table";
+import { BalancesMonth } from "@/components/app/organisms/balances-month";
 import { CarDialog } from "@/components/app/organisms/car-dialog";
 import { HouseDialog } from "@/components/app/organisms/house-dialog";
 import { OwnerList } from "@/components/app/organisms/owner-list";
@@ -54,7 +55,8 @@ type AccountOpening = "new" | Account;
 // and a car are the same shape to the ledger.
 type AssetOpening = "new" | Secured;
 
-// The accounts screen's ledger and the three dialogs it edits through.
+// The accounts screen's ledger and the three dialogs it edits through,
+// under a header holding the month the balances are as of.
 // The rows are the store's, handed down by the page, and a save goes to
 // the store and comes back with the page re-read, so the tables reflect
 // it without the ledger holding rows of its own. The one thing the
@@ -189,6 +191,7 @@ export function AccountLedger({
   return (
     <>
       <ScreenHeader
+        actions={<BalancesMonth at={at} />}
         label={sectionLabel(accountsAndAssets)}
         title="Accounts & assets"
       >

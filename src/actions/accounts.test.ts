@@ -24,6 +24,7 @@ import {
   placeAccountsInOrder,
   removeAccount,
   saveAccount,
+  saveBalancesMonth,
   saveCar,
   saveHouse,
 } from "./accounts";
@@ -768,6 +769,67 @@ describe("the account actions", () => {
       await expect(removeAccount(0)).rejects.toThrow(z.ZodError);
       await expect(removeAccount(99)).resolves.toStrictEqual(
         refused("No account has the id"),
+      );
+      expect(await versions()).toBe(1);
+    });
+  });
+
+  describe("saveBalancesMonth", () => {
+    it("moves nothing without a session", async () => {
+      vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+      await expect(saveBalancesMonth({ month: 2, year: 2026 })).rejects.toThrow(
+        "redirected",
+      );
+      expect(await versions()).toBe(1);
+    });
+
+    // The household's balances are as of September 2026; moved to
+    // March, every balance stays as it was, now March's.
+    it("moves the month the balances are as of, and no balance with it", async () => {
+      expect(await saveBalancesMonth({ month: 2, year: 2026 })).toStrictEqual(
+        saved({ month: 2, year: 2026 }),
+      );
+      expect(await latest()).toStrictEqual({
+        ...kept,
+        asOf: { month: 2, year: 2026 },
+      });
+      expect(refresh).toHaveBeenCalledOnce();
+    });
+
+    // It is 15 September 2026: September has begun, October has not, and
+    // the plan's owner was born in 1990.
+    it("takes this month and none after it, and none before the owner was born", async () => {
+      for (const [month, refusal] of [
+        [
+          { month: 9, year: 2026 },
+          "The balances are as of a month that has begun",
+        ],
+        [
+          { month: 0, year: 2027 },
+          "The balances are as of a month that has begun",
+        ],
+        [
+          { month: 11, year: 1989 },
+          "The balances are as of a month after the plan's owner was born",
+        ],
+      ] as const) {
+        expect(await saveBalancesMonth(month)).toStrictEqual(refused(refusal));
+      }
+      expect(await versions()).toBe(1);
+
+      await saveBalancesMonth({ month: 0, year: 1990 });
+      await saveBalancesMonth({ month: 8, year: 2026 });
+
+      expect(await versions()).toBe(3);
+    });
+
+    it("refuses what the dialog could not have sent", async () => {
+      await expect(
+        saveBalancesMonth({ month: 12, year: 2026 }),
+      ).rejects.toThrow(z.ZodError);
+      await expect(saveBalancesMonth({ month: 2, year: 0 })).rejects.toThrow(
+        z.ZodError,
       );
       expect(await versions()).toBe(1);
     });
