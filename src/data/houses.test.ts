@@ -22,7 +22,7 @@ const home: HouseValues = {
 const draft: HouseDraft = { ...home, term: 22 };
 
 // The plan read in September 2026, so eight months of the year are gone.
-const plan = { from: 2026, month: 8 };
+const plan = { from: 2026 };
 
 describe("derive", () => {
   it("works each figure out from the other two, the payment to the pound", () => {
@@ -100,8 +100,10 @@ describe("toRecords", () => {
     });
   });
 
-  // The loan clears in 21.2 years from September 2026, which is 2047.
-  it("writes a mortgaged house with the loan against it and the payments to the year it clears", () => {
+  // Its payments' end is the loan's to say, worked out when the
+  // household is read, so the line is saved from the plan's first year
+  // and open-ended.
+  it("writes a mortgaged house with the loan against it and its payments from the plan's first year, their end left to the loan", () => {
     const { asset, loan } = toRecords(home, plan);
 
     expect(asset.name).toBe("Home");
@@ -125,30 +127,10 @@ describe("toRecords", () => {
         firstYear: 2026,
         growth: "nominal",
         kind: "debt",
-        lastMonth: 10,
-        lastYear: 2047,
+        lastMonth: null,
+        lastYear: null,
         name: "Home mortgage",
       },
     });
-  });
-
-  // £1,000 a month at no rate clears £114,000 in 114 payments, the last
-  // of which falls in February 2036 from September 2026, with eight
-  // months of the year gone.
-  it("ends the payments in the month the last one falls, counted from the month the plan is read in", () => {
-    const { loan } = toRecords(
-      { ...home, balance: 114000, payment: 1000, rate: 0 },
-      plan,
-    );
-
-    expect(loan?.line.lastYear).toBe(2036);
-    expect(loan?.line.lastMonth).toBe(1);
-  });
-
-  it("leaves the payments open-ended when they never clear the loan", () => {
-    const { loan } = toRecords({ ...home, payment: 1000 }, plan);
-
-    expect(loan?.line.lastYear).toBeNull();
-    expect(loan?.line.lastMonth).toBeNull();
   });
 });

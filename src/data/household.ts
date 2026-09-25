@@ -22,7 +22,7 @@ import { endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
 import { lineGrowths } from "@/data/schedule";
 import { Refusal } from "@/lib/answer";
 import { monthly } from "@/lib/cadence";
-import { termOf } from "@/lib/loans";
+import { clearsIn, termOf } from "@/lib/loans";
 import { isWithinAllowance } from "@/lib/tax";
 
 // Everything the projection runs on, and the owners the wrappers name:
@@ -395,13 +395,20 @@ function endsInAYear(line: {
 }
 
 // The whole a kept household makes, its plan running from the month
-// its balances are as of.
+// its balances are as of, and each line paying a loan running as the
+// loan's payments do.
 function householdOf(kept: Kept): Household {
+  const plan = planOf(kept.ages, kept.asOf);
   return {
     accounts: kept.accounts,
     owners: kept.owners,
-    plan: planOf(kept.ages, kept.asOf),
-    schedule: kept.schedule,
+    plan,
+    schedule: {
+      ...kept.schedule,
+      expenses: kept.schedule.expenses.map((line) =>
+        paidOver(line, kept.accounts, plan),
+      ),
+    },
   };
 }
 
@@ -414,6 +421,40 @@ function isHeldOnce(links: readonly (null | number)[]): boolean {
 
 function isListedOnce(records: readonly { readonly id: number }[]): boolean {
   return new Set(records.map((record) => record.id)).size === records.length;
+}
+
+// A line as it runs once the loan it pays is read with the plan: from
+// the plan's first year to the month its payments clear what the loan
+// owes, counted from the plan's first month at the loan's rate, or to
+// the end of the plan when they never clear it, as the interest on an
+// interest-only mortgage swallows them. A balloon a PCP leaves is
+// refinanced on the same terms, so the payments run until the whole of
+// it clears. The span is the loan's rather than the line's own, so it
+// is worked out here, whenever the household is read, and moves with
+// the balances' month, where one saved with the line would stay where
+// the save left it. A line paying no loan the household lists runs as
+// it was saved, and the rules refuse one naming a loan it does not.
+function paidOver(
+  line: ExpenseLine,
+  accounts: readonly Account[],
+  plan: Plan,
+): ExpenseLine {
+  const loan = accounts.find(({ id }) => id === line.pays);
+  if (loan === undefined) {
+    return line;
+  }
+  const term = termOf(
+    { balance: -loan.balance, balloon: 0 },
+    monthly(line.amount, line.cadence),
+    rateFrom(loan, plan),
+  );
+  const end = term === null ? null : clearsIn(term, plan);
+  return {
+    ...line,
+    firstYear: plan.from,
+    lastMonth: end?.month ?? null,
+    lastYear: end?.year ?? null,
+  };
 }
 
 function refusalOf(error: z.ZodError): Refusal {
