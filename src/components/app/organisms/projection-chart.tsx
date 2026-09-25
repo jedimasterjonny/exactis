@@ -38,6 +38,7 @@ type Mark = "area" | "bar";
 
 interface ProjectionChartProps {
   readonly points: readonly ProjectionPoint[];
+  readonly retirement: number;
 }
 
 type Series = (typeof series)[number]["key"];
@@ -72,15 +73,22 @@ const config = Object.fromEntries(
 // one that works, and what a year drew so joins its figures too. The
 // early mark's label sits a line beneath the run-out mark's and to the
 // right of its own line where the other's is to the left, so neither
-// writes over the other a year apart or in the one year. The toggle
-// takes its row from
+// writes over the other a year apart or in the one year. The year the
+// plan's owner retires in is marked too, a milestone rather than a
+// warning, so in the muted tone, and its label takes a third line to
+// the right of its own, clear of both the others wherever they fall;
+// a retirement outside the plan's years has no year to stand on and
+// goes undrawn. The toggle takes its row from
 // inside the plot's box rather than adding one over it, so the box is
 // the same height as the frames that stand in for it and nothing shifts
 // when the chart arrives. A projection of nothing, because no account
 // is a wrapper yet, says so in the plot's place rather than drawing a
 // flat zero over a column of £0 ticks, and points at the screen where
 // the account is added: the dashboard has no way to add one itself.
-export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
+export function ProjectionChart({
+  points,
+  retirement,
+}: ProjectionChartProps): JSX.Element {
   const [mark, setMark] = useState<Mark>("area");
 
   if (points.every((point) => totalOf(point) === 0)) {
@@ -117,6 +125,10 @@ export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
   // income, at the charge on taking it early. Undefined while no year
   // does, and the mark goes undrawn.
   const drawsEarly = points.find((point) => point.early > 0);
+
+  // Whether the plan's years reach the year its owner retires in, which
+  // is where the milestone stands.
+  const isRetiring = points.some((point) => point.year === retirement);
 
   return (
     <Frame>
@@ -195,6 +207,20 @@ export function ProjectionChart({ points }: ProjectionChartProps): JSX.Element {
                   stackId="wrappers"
                 />
               ),
+            )}
+            {isRetiring && (
+              <ReferenceLine
+                label={{
+                  dy: 32,
+                  fill: "var(--muted-foreground)",
+                  fontSize: 12,
+                  position: "insideTopLeft",
+                  value: "Retirement",
+                }}
+                stroke="var(--muted-foreground)"
+                strokeDasharray="4 4"
+                x={retirement}
+              />
             )}
             {drawsEarly !== undefined && (
               <ReferenceLine
@@ -295,7 +321,8 @@ function ProjectionTooltip({
   active: isActive,
   label,
   points,
-}: ProjectionChartProps & TooltipContentProps): JSX.Element | null {
+}: Pick<ProjectionChartProps, "points"> &
+  TooltipContentProps): JSX.Element | null {
   const point = points.find((candidate) => candidate.year === label);
   if (!isActive || point === undefined) {
     return null;
