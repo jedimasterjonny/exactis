@@ -135,12 +135,12 @@ sum allowance is used up over the plan, and the rest is taxed as income on top
 of what the month earned. Every line is taken at the amount it states, in
 today's money, until the plan carries an inflation assumption.
 
-The dashboard reads the projection through `src/store/plan.ts`, a cached read
-keyed on the accounts and the lines, so a save on the accounts or the plan
-screen is a new projection on the next render. The cached reads every screen
-goes through live under `src/store`, and the server actions a save goes to under
-`src/actions`: neither is a route, and the organisms that save through an action
-sit beneath the routes.
+The dashboard reads the accounts, the lines and the plan from the store and
+hands them to the browser, which runs the engine itself, so a save on the
+accounts or the plan screen is a new projection on the next render. The cached
+reads every screen goes through live under `src/store`, and the server actions a
+save goes to under `src/actions`: neither is a route, and the organisms that
+save through an action sit beneath the routes.
 
 ## Signing in
 

@@ -1,36 +1,30 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { plan } from "@/data/income.fixture";
-import { getPlan, getProjection } from "@/store/plan";
+import { accounts } from "@/data/accounts.fixture";
+import { expenseLines } from "@/data/expenses.fixture";
+import { incomeLines, plan } from "@/data/income.fixture";
+import { getAccounts } from "@/store/accounts";
+import { getPlan } from "@/store/plan";
+import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 
 import { Projection } from "./projection";
 
-vi.mock("@/store/plan", () => ({ getPlan: vi.fn(), getProjection: vi.fn() }));
+vi.mock("@/store/accounts", () => ({ getAccounts: vi.fn() }));
+vi.mock("@/store/plan", () => ({ getPlan: vi.fn() }));
+vi.mock("@/store/schedule", () => ({
+  getExpenseLines: vi.fn(),
+  getIncomeLines: vi.fn(),
+}));
 
 describe("Projection", () => {
-  // Born in 1992 and retiring at 34, the plan's owner retires in its
-  // first year, which the chart marks.
-  it("hands the store's projection to the chart, marked where the plan's owner retires", async () => {
-    vi.mocked(getPlan).mockResolvedValue({ ...plan, retires: 34 });
-    vi.mocked(getProjection).mockResolvedValue([
-      {
-        age: 34,
-        deferred: 391640,
-        early: 0,
-        free: 271930,
-        uncovered: 0,
-        year: 2026,
-      },
-      {
-        age: 35,
-        deferred: 438308,
-        early: 0,
-        free: 305483,
-        uncovered: 0,
-        year: 2027,
-      },
-    ]);
+  // Born in 1992 and retiring at 61, the plan's owner retires within
+  // the fixture's plan, which the chart marks.
+  it("projects the store's accounts, lines and plan", async () => {
+    vi.mocked(getAccounts).mockResolvedValue([...accounts]);
+    vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
+    vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
+    vi.mocked(getPlan).mockResolvedValue({ ...plan, retires: 61 });
 
     render(await Projection());
 
