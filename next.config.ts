@@ -24,6 +24,13 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // So a phone on the home network can use the dev server. next dev already
+  // listens on every interface, but it serves its chunks and the HMR socket
+  // only to a page loaded from localhost, so a page opened at a LAN address
+  // renders and never hydrates: each chunk comes back 403. Matched against
+  // the hostname of the request's Origin, and `*` is exactly one label, so
+  // this admits the one /24 and nothing wider. next start never reads it.
+  allowedDevOrigins: ["192.168.1.*"],
   // Top-level and stable-named in 16: it absorbed the removed `ppr`,
   // `dynamicIO` and `useCache` flags, and `experimental.cacheComponents` is a
   // deprecated alias for it. Off by default, and turning it on is not a
