@@ -4,6 +4,7 @@ import * as z from "zod";
 
 import type { ExpenseLine, ExpenseLineValues } from "@/data/expenses";
 import type { IncomeLine, IncomeLineDraft } from "@/data/income";
+import type { Answer } from "@/lib/answer";
 
 import { cadences, toAccount } from "@/data/accounts";
 import { expenseKinds } from "@/data/expenses";
@@ -69,10 +70,10 @@ const target = z.number().int().positive().nullable();
 
 // Deletes the income line with that id. Nothing hangs on a line, so it
 // goes alone. Checked as a save is.
-export async function removeIncomeLine(id: number): Promise<void> {
+export async function removeIncomeLine(id: number): Promise<Answer<undefined>> {
   await requireSession();
   const at = z.number().int().positive().parse(id);
-  await amend(({ kept }) => {
+  return amend(({ kept }) => {
     found(kept.schedule.income, at, "income line");
     return {
       kept: {
@@ -93,7 +94,7 @@ export async function removeIncomeLine(id: number): Promise<void> {
 export async function saveExpenseLine(
   id: null | number,
   draft: ExpenseLineValues,
-): Promise<ExpenseLine> {
+): Promise<Answer<ExpenseLine>> {
   await requireSession();
   const at = target.parse(id);
   const parsed = expenseValues.parse(draft);
@@ -135,7 +136,7 @@ export async function saveExpenseLine(
 export async function saveIncomeLine(
   id: null | number,
   draft: IncomeLineDraft,
-): Promise<IncomeLine> {
+): Promise<Answer<IncomeLine>> {
   await requireSession();
   const at = target.parse(id);
   const { opens, ...parsed } = incomeValues.parse(draft);

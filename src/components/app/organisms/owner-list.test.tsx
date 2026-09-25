@@ -13,6 +13,7 @@ import type { Owner } from "@/data/owners";
 import { removeOwner, saveOwner } from "@/actions/owners";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
+import { saved } from "@/lib/answer";
 
 import { OwnerList } from "./owner-list";
 
@@ -69,7 +70,7 @@ describe("OwnerList", () => {
 
   it("adds a named owner and reports it", async () => {
     renderList([]);
-    vi.mocked(saveOwner).mockResolvedValue(me);
+    vi.mocked(saveOwner).mockResolvedValue(saved(me));
 
     fireEvent.click(screen.getByRole("button", { name: "Add owner" }));
 
@@ -96,7 +97,7 @@ describe("OwnerList", () => {
 
   it("opens an owner as it is and writes a new name back over it", async () => {
     renderList([me, sam]);
-    vi.mocked(saveOwner).mockResolvedValue({ ...sam, name: "Samira" });
+    vi.mocked(saveOwner).mockResolvedValue(saved({ ...sam, name: "Samira" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Edit Sam" }));
 
@@ -134,7 +135,7 @@ describe("OwnerList", () => {
 
   it("asks before deleting an owner, and deletes it on confirm", async () => {
     renderList([me, sam]);
-    vi.mocked(removeOwner).mockResolvedValue();
+    vi.mocked(removeOwner).mockResolvedValue(saved(undefined));
 
     fireEvent.click(screen.getByRole("button", { name: "Delete Sam" }));
 

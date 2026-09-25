@@ -1,6 +1,8 @@
+import { Refusal } from "@/lib/answer";
+
 // The record listed with the id, or a refusal saying none is, in the
-// words of what the records are: an id is the caller's to have read off
-// a list, so one no record has is a mistake and not a result.
+// words of what the records are. An id is read off a list the page drew,
+// so one no record has is a record another save has since taken away.
 export function found<TRecord extends { readonly id: number }>(
   records: readonly TRecord[],
   id: number,
@@ -8,7 +10,7 @@ export function found<TRecord extends { readonly id: number }>(
 ): TRecord {
   const record = records.find((listed) => listed.id === id);
   if (record === undefined) {
-    throw new Error(`No ${noun} has the id`);
+    throw new Refusal(`No ${noun} has the id`);
   }
   return record;
 }

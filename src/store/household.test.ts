@@ -10,12 +10,15 @@ import {
   vi,
 } from "vitest";
 
+import type { Answer } from "@/lib/answer";
+
 import { nothingKept } from "@/data/household";
 import { kept as reference } from "@/data/household.fixture";
 import { planOf } from "@/data/plan";
 import { getDb } from "@/db/client";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
+import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
 import {
@@ -111,7 +114,7 @@ describe("the household store", () => {
       };
     });
 
-    expect(result).toBe("added");
+    expect(result).toStrictEqual(saved("added"));
     expect(await readLatest(db)).toMatchObject({
       household: {
         next: 7,
@@ -136,9 +139,23 @@ describe("the household store", () => {
 
     await expect(
       amend(({ kept }) => ({ kept: { ...kept, owners: [] }, result: null })),
-    ).rejects.toThrow(
-      "An ISA or a pension belongs to an owner the household lists",
+    ).resolves.toStrictEqual(
+      refused("An ISA or a pension belongs to an owner the household lists"),
     );
+    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  // A bug in an edit, or a store that cannot answer, is no rule broken:
+  // it stays a failure for the page to report as one.
+  it("lets anything but a refusal through as the failure it is, and writes nothing", async () => {
+    await keepAfter(db, 0, reference);
+
+    await expect(
+      amend(() => {
+        throw new Error("The edit broke");
+      }),
+    ).rejects.toThrow("The edit broke");
     expect(await readLatest(db)).toMatchObject({ version: 1 });
     expect(refresh).not.toHaveBeenCalled();
   });
@@ -148,7 +165,7 @@ describe("the household store", () => {
   // a household that is gone by then.
   it("refuses a save the household changed under after it was read", async () => {
     await keepAfter(db, 0, reference);
-    const renamed = async (name: string): Promise<string> =>
+    const renamed = async (name: string): Promise<Answer<string>> =>
       amend(({ kept }) => ({
         kept: { ...kept, owners: [{ id: 1, name }] },
         result: name,
@@ -160,12 +177,12 @@ describe("the household store", () => {
     ]);
 
     expect(saves).toStrictEqual([
-      { status: "fulfilled", value: "First" },
+      { status: "fulfilled", value: saved("First") },
       {
-        reason: new Error(
+        status: "fulfilled",
+        value: refused(
           "The household changed while this was being saved, so nothing was",
         ),
-        status: "rejected",
       },
     ]);
     expect(await readLatest(db)).toMatchObject({

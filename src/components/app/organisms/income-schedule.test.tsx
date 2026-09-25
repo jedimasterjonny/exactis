@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
+import type { Answer } from "@/lib/answer";
 
 import { removeIncomeLine, saveIncomeLine } from "@/actions/schedule";
 import { Toaster } from "@/components/kit/toast";
@@ -17,6 +18,7 @@ import { incomeKinds } from "@/data/income";
 import { incomeLines, plan } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 import { lineGrowths } from "@/data/schedule";
+import { saved as accepted, refused } from "@/lib/answer";
 
 import { IncomeSchedule } from "./income-schedule";
 
@@ -71,7 +73,7 @@ function renderSchedule(lines: readonly IncomeLine[] = incomeLines): void {
 // shows it only once the page re-reads, which is the router's work and
 // not the schedule's, so the rows here stay as rendered.
 function saved(line: IncomeLine): void {
-  vi.mocked(saveIncomeLine).mockResolvedValue(line);
+  vi.mocked(saveIncomeLine).mockResolvedValue(accepted(line));
 }
 
 describe("IncomeSchedule", () => {
@@ -106,7 +108,7 @@ describe("IncomeSchedule", () => {
   // and closes on the answer; the row goes when the page re-reads.
   it("asks before deleting a line, and deletes it on confirm", async () => {
     renderSchedule();
-    let answer!: () => void;
+    let answer!: (answered: Answer<undefined>) => void;
     vi.mocked(removeIncomeLine).mockReturnValue(
       new Promise((resolve) => {
         answer = resolve;
@@ -126,7 +128,7 @@ describe("IncomeSchedule", () => {
       within(dialog).getByRole("button", { name: "Delete" }),
     ).toBeDisabled();
 
-    answer();
+    answer(accepted(undefined));
 
     await waitFor(() => {
       expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
@@ -138,8 +140,8 @@ describe("IncomeSchedule", () => {
 
   it("keeps the question open when the store refuses, and says why", async () => {
     renderSchedule();
-    vi.mocked(removeIncomeLine).mockRejectedValue(
-      new Error("No income line was written"),
+    vi.mocked(removeIncomeLine).mockResolvedValue(
+      refused("No income line was written"),
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Delete Salary" }));
@@ -547,7 +549,7 @@ describe("IncomeSchedule", () => {
     ).toBeInTheDocument();
 
     // The store's answer is held back, so the save can be seen in flight.
-    let answer!: (line: IncomeLine) => void;
+    let answer!: (answered: Answer<IncomeLine>) => void;
     vi.mocked(saveIncomeLine).mockReturnValue(
       new Promise((resolve) => {
         answer = resolve;
@@ -573,21 +575,23 @@ describe("IncomeSchedule", () => {
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(screen.getByRole("dialog", { name: "Bonus scheme" })).toBeVisible();
 
-    answer({
-      amount: 12000,
-      bonus: 0,
-      cadence: "month",
-      feeds: null,
-      firstYear: 2030,
-      growth: "triple-lock",
-      id: 5,
-      kind: "self-employment",
-      lastMonth: null,
-      lastYear: 2035,
-      name: "Bonus scheme",
-      rsu: 0,
-      sacrifice: 0,
-    });
+    answer(
+      accepted({
+        amount: 12000,
+        bonus: 0,
+        cadence: "month",
+        feeds: null,
+        firstYear: 2030,
+        growth: "triple-lock",
+        id: 5,
+        kind: "self-employment",
+        lastMonth: null,
+        lastYear: 2035,
+        name: "Bonus scheme",
+        rsu: 0,
+        sacrifice: 0,
+      }),
+    );
 
     await waitFor(() => {
       expect(

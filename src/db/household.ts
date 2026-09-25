@@ -4,6 +4,7 @@ import type { Kept } from "@/data/household";
 import type { Database } from "@/db/client";
 
 import { householdVersions } from "@/db/schema";
+import { Refusal } from "@/lib/answer";
 
 // A version the store has kept: its number, and the household as the
 // store holds it, which is for the model to read and hold to its rules
@@ -28,7 +29,7 @@ export async function keepAfter(
     .onConflictDoNothing()
     .returning({ version: householdVersions.version });
   if (rows.length === 0) {
-    throw new Error(
+    throw new Refusal(
       "The household changed while this was being saved, so nothing was",
     );
   }

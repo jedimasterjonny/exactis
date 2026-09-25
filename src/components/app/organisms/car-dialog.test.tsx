@@ -9,9 +9,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 import type { Secured } from "@/data/secured";
+import type { Answer } from "@/lib/answer";
 
 import { saveCar } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
+import { saved as accepted, refused } from "@/lib/answer";
 
 import { CarDialog } from "./car-dialog";
 
@@ -90,7 +92,7 @@ function renderDialog(
 // it. A test waits for the caller to be told before reading the toast,
 // since the telling is a transition that lands after it.
 function saved(account: Account): void {
-  vi.mocked(saveCar).mockResolvedValue(account);
+  vi.mocked(saveCar).mockResolvedValue(accepted(account));
 }
 
 describe("CarDialog", () => {
@@ -143,7 +145,7 @@ describe("CarDialog", () => {
     );
 
     // The store's answer is held back, so the save can be seen in flight.
-    let answer!: (account: Account) => void;
+    let answer!: (answered: Answer<Account>) => void;
     vi.mocked(saveCar).mockReturnValue(
       new Promise((resolve) => {
         answer = resolve;
@@ -164,7 +166,7 @@ describe("CarDialog", () => {
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(onSaved).not.toHaveBeenCalled();
 
-    answer(golf);
+    answer(accepted(golf));
 
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
@@ -437,8 +439,8 @@ describe("CarDialog", () => {
 
   it("keeps a refused save open and says why", async () => {
     const onSaved = vi.fn<() => void>();
-    vi.mocked(saveCar).mockRejectedValue(
-      new Error("A pension a salary feeds stays a pension"),
+    vi.mocked(saveCar).mockResolvedValue(
+      refused("A pension a salary feeds stays a pension"),
     );
     renderDialog(null, onSaved);
     const dialog = open();

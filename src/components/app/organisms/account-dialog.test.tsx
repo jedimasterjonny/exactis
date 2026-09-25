@@ -8,12 +8,14 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { Answer } from "@/lib/answer";
 
 import { saveAccount } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
+import { refused, saved } from "@/lib/answer";
 
 import { AccountDialog } from "./account-dialog";
 
@@ -118,7 +120,7 @@ describe("AccountDialog", () => {
     ).toBeInTheDocument();
 
     // The store's answer is held back, so the save can be seen in flight.
-    let answer!: (account: Account) => void;
+    let answer!: (answered: Answer<Account>) => void;
     vi.mocked(saveAccount).mockReturnValue(
       new Promise((resolve) => {
         answer = resolve;
@@ -143,7 +145,7 @@ describe("AccountDialog", () => {
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(onSaved).not.toHaveBeenCalled();
 
-    answer(stored);
+    answer(saved(stored));
 
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledExactlyOnceWith(stored);
@@ -158,7 +160,9 @@ describe("AccountDialog", () => {
   // same word.
   it("opens an account on its values, writes the edit back and closes", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
-    vi.mocked(saveAccount).mockResolvedValue({ ...pension, balance: 420000 });
+    vi.mocked(saveAccount).mockResolvedValue(
+      saved({ ...pension, balance: 420000 }),
+    );
     renderDialog(pension, onSaved);
     const dialog = open();
 
@@ -312,7 +316,7 @@ describe("AccountDialog", () => {
   // new one, carry none.
   it("edits the share a salary sacrifices into the pension, and saves it with the account", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
-    vi.mocked(saveAccount).mockResolvedValue(pension);
+    vi.mocked(saveAccount).mockResolvedValue(saved(pension));
     render(
       <Toaster>
         <AccountDialog
@@ -373,7 +377,7 @@ describe("AccountDialog", () => {
   // a change.
   it("sends no share it did not change", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
-    vi.mocked(saveAccount).mockResolvedValue(pension);
+    vi.mocked(saveAccount).mockResolvedValue(saved(pension));
     render(
       <Toaster>
         <AccountDialog
@@ -424,8 +428,8 @@ describe("AccountDialog", () => {
 
   it("keeps a refused save open and says why", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
-    vi.mocked(saveAccount).mockRejectedValue(
-      new Error("A pension a salary feeds stays a pension"),
+    vi.mocked(saveAccount).mockResolvedValue(
+      refused("A pension a salary feeds stays a pension"),
     );
     renderDialog(pension, onSaved);
     const dialog = open();
@@ -472,7 +476,7 @@ describe("AccountDialog", () => {
       </Toaster>,
     );
     const dialog = open();
-    vi.mocked(saveAccount).mockResolvedValue(pension);
+    vi.mocked(saveAccount).mockResolvedValue(saved(pension));
 
     expect(choice(dialog, "Owner")).toHaveValue("1");
 
@@ -518,7 +522,7 @@ describe("AccountDialog", () => {
       onSaved,
     );
     const dialog = open();
-    vi.mocked(saveAccount).mockResolvedValue(isa);
+    vi.mocked(saveAccount).mockResolvedValue(saved(isa));
 
     fireEvent.change(choice(dialog, "Treatment"), {
       target: { value: "tax-free" },

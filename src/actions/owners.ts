@@ -3,7 +3,9 @@
 import * as z from "zod";
 
 import type { Owner, OwnerValues } from "@/data/owners";
+import type { Answer } from "@/lib/answer";
 
+import { Refusal } from "@/lib/answer";
 import { found, replaced } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
@@ -21,13 +23,13 @@ const target = z.number().int().positive().nullable();
 // belonging to none, so the account is given to another owner or
 // deleted first, and the refusal says so in words that say what to do.
 // Checked as a save is.
-export async function removeOwner(id: number): Promise<void> {
+export async function removeOwner(id: number): Promise<Answer<undefined>> {
   await requireSession();
   const at = z.number().int().positive().parse(id);
-  await amend(({ kept }) => {
+  return amend(({ kept }) => {
     found(kept.owners, at, "owner");
     if (kept.accounts.some(({ owner }) => owner === at)) {
-      throw new Error("An owner who holds an account stays");
+      throw new Refusal("An owner who holds an account stays");
     }
     return {
       kept: { ...kept, owners: kept.owners.filter(({ id }) => id !== at) },
@@ -44,7 +46,7 @@ export async function removeOwner(id: number): Promise<void> {
 export async function saveOwner(
   id: null | number,
   draft: OwnerValues,
-): Promise<Owner> {
+): Promise<Answer<Owner>> {
   await requireSession();
   const at = target.parse(id);
   const parsed = values.parse(draft);

@@ -1,6 +1,9 @@
 import { startTransition, useState, useTransition } from "react";
 
+import type { Answer } from "@/lib/answer";
+
 import { toast } from "@/components/kit/toast";
+import { acceptedOf } from "@/lib/answer";
 import { reasonOf } from "@/lib/errors";
 
 // What the caller gets back: the record the question is open on, which a
@@ -20,7 +23,7 @@ interface Remover<TDoomed> {
 interface RemoverProps<TDoomed> {
   readonly describe: (doomed: TDoomed) => string;
   readonly noun: string;
-  readonly remove: (id: number) => Promise<void>;
+  readonly remove: (id: number) => Promise<Answer<undefined>>;
 }
 
 // The question every bin asks through, which the account ledger and the
@@ -58,14 +61,15 @@ export function useRemover<TDoomed extends { readonly id: number }>({
   // part of the one it awaited in. What the toast says went is described
   // from the record asked about rather than from anything the store
   // answers with, since a deletion answers with nothing. A store that
-  // refuses leaves the question open as it was, with the confirm free
-  // again, and says why under a toast: a rejection left to the transition
-  // would reach the nearest error boundary, which is the route's, and
-  // take the whole screen with it.
+  // refuses, or fails, leaves the question open as it was, with the
+  // confirm free again, and says why under a toast, a refusal in its own
+  // words: a rejection left to the transition would reach the nearest
+  // error boundary, which is the route's, and take the whole screen with
+  // it.
   function confirm(current: TDoomed): void {
     startRemoving(async () => {
       try {
-        await store(current.id);
+        acceptedOf(await store(current.id));
         startTransition(() => {
           setDoomed(null);
         });

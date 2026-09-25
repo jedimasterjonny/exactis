@@ -23,6 +23,7 @@ import { ProjectionChart } from "@/components/app/organisms/projection-chart";
 import { toast } from "@/components/kit/toast";
 import { endAge, retirementYear } from "@/data/plan";
 import { project } from "@/engine/projection";
+import { acceptedOf } from "@/lib/answer";
 import { reasonOf } from "@/lib/errors";
 
 // An age moved on the board and not yet known to be in the store, and
@@ -88,7 +89,7 @@ export function ProjectionBoard({
   function save(age: number): void {
     startSaving(async () => {
       try {
-        await saveAges({ retires: age });
+        acceptedOf(await saveAges({ retires: age }));
       } catch (error: unknown) {
         startTransition(() => {
           setDraft(null);

@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 import type { Month } from "@/data/schedule";
+import type { Answer } from "@/lib/answer";
 
 import {
   placeAccountsInOrder,
@@ -22,6 +23,7 @@ import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
+import { saved as accepted, refused } from "@/lib/answer";
 
 import { AccountLedger } from "./account-ledger";
 
@@ -113,7 +115,7 @@ function rowsOf(panel: HTMLElement): HTMLElement[] {
 // transition that lands after the toast, and a modal dialog hides the
 // sections from the accessibility tree while it is open.
 function saved(account: Account): void {
-  vi.mocked(saveAccount).mockResolvedValue(account);
+  vi.mocked(saveAccount).mockResolvedValue(accepted(account));
 }
 
 describe("AccountLedger", () => {
@@ -313,7 +315,7 @@ describe("AccountLedger", () => {
     ).toBeInTheDocument();
 
     // The store's answer is held back, so the save can be seen in flight.
-    let answer!: (account: Account) => void;
+    let answer!: (answered: Answer<Account>) => void;
     vi.mocked(saveAccount).mockReturnValue(
       new Promise((resolve) => {
         answer = resolve;
@@ -338,14 +340,16 @@ describe("AccountLedger", () => {
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(screen.getByRole("dialog", { name: "Lifetime ISA" })).toBeVisible();
 
-    answer({
-      balance: 4000,
-      contribution: { amount: 333, cadence: "month", kind: "fixed" },
-      growth: { kind: "fixed", rate: 0.03 },
-      id: 6,
-      kind: "tax-free",
-      name: "Lifetime ISA",
-    });
+    answer(
+      accepted({
+        balance: 4000,
+        contribution: { amount: 333, cadence: "month", kind: "fixed" },
+        growth: { kind: "fixed", rate: 0.03 },
+        id: 6,
+        kind: "tax-free",
+        name: "Lifetime ISA",
+      }),
+    );
 
     await waitFor(() => {
       expect(
@@ -418,7 +422,9 @@ describe("AccountLedger", () => {
   // its business, and the ledger's is to close it once it has.
   it("adds a house from the property section and closes on the save", async () => {
     renderLedger();
-    vi.mocked(saveHouse).mockResolvedValue({ ...home, id: 6, name: "Flat" });
+    vi.mocked(saveHouse).mockResolvedValue(
+      accepted({ ...home, id: 6, name: "Flat" }),
+    );
 
     fireEvent.click(
       within(
@@ -449,7 +455,7 @@ describe("AccountLedger", () => {
   // part is the same: to close it once it has saved.
   it("adds a car from the property section and closes on the save", async () => {
     renderLedger();
-    vi.mocked(saveCar).mockResolvedValue(golf);
+    vi.mocked(saveCar).mockResolvedValue(accepted(golf));
 
     fireEvent.click(
       within(
@@ -839,7 +845,7 @@ describe("AccountLedger", () => {
   it("moves a row onto another from the keyboard, shows the order at once and sends it whole to the store", async () => {
     renderLedger();
     fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
-    let answer!: () => void;
+    let answer!: (answered: Answer<undefined>) => void;
     vi.mocked(placeAccountsInOrder).mockReturnValue(
       new Promise((resolve) => {
         answer = resolve;
@@ -870,7 +876,7 @@ describe("AccountLedger", () => {
       2, 1, 3, 4, 5,
     ]);
 
-    answer();
+    answer(accepted(undefined));
 
     await waitFor(() => {
       expect(names()).toStrictEqual([
@@ -886,7 +892,7 @@ describe("AccountLedger", () => {
   // was above; the assets keep their places in the whole.
   it("moves a row dropped on another after it when it came from above", async () => {
     renderLedger();
-    vi.mocked(placeAccountsInOrder).mockResolvedValue();
+    vi.mocked(placeAccountsInOrder).mockResolvedValue(accepted(undefined));
     fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
 
     const cashRow = screen.getByRole("row", { name: /Current account/ });
@@ -901,6 +907,44 @@ describe("AccountLedger", () => {
     await waitFor(() => {
       expect(placeAccountsInOrder).toHaveBeenCalledExactlyOnceWith([
         2, 3, 1, 4, 5,
+      ]);
+    });
+  });
+
+  // Another save has added an account since the card was drawn, so the
+  // store refuses an order that leaves it out; the card's own order
+  // stands, and the toast says why.
+  it("says why when the store refuses an order, and keeps the page's", async () => {
+    renderLedger();
+    vi.mocked(placeAccountsInOrder).mockResolvedValue(
+      refused("Not every account was placed"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
+
+    const cashRow = screen.getByRole("row", { name: /Current account/ });
+
+    fireEvent.dragStart(
+      screen.getByRole("button", { name: "Move Workplace pension" }),
+      { dataTransfer: { setData: vi.fn() } },
+    );
+    fireEvent.dragOver(cashRow);
+    fireEvent.drop(cashRow);
+
+    expect(
+      await screen.findByRole("dialog", { name: "Order not saved" }),
+    ).toHaveAccessibleDescription("Not every account was placed");
+    // The toast lands inside the transition, and the page's order comes
+    // back once it ends.
+    await waitFor(() => {
+      expect(
+        screen
+          .getAllByRole("button", { name: /^Move / })
+          .map((button) => button.getAttribute("aria-label")),
+      ).toStrictEqual([
+        "Move Workplace pension",
+        "Move Stocks & shares ISA",
+        "Move Current account",
+        "Move Mortgage",
       ]);
     });
   });
@@ -1046,7 +1090,7 @@ describe("AccountLedger", () => {
   // and closes on the answer; the row goes when the page re-reads.
   it("asks before deleting an account, and deletes it on confirm", async () => {
     renderLedger();
-    let answer!: () => void;
+    let answer!: (answered: Answer<undefined>) => void;
     vi.mocked(removeAccount).mockReturnValue(
       new Promise((resolve) => {
         answer = resolve;
@@ -1070,7 +1114,7 @@ describe("AccountLedger", () => {
       within(dialog).getByRole("button", { name: "Delete" }),
     ).toBeDisabled();
 
-    answer();
+    answer(accepted(undefined));
 
     await waitFor(() => {
       expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
@@ -1082,7 +1126,7 @@ describe("AccountLedger", () => {
 
   it("keeps the question open when the store refuses, and says why", async () => {
     renderLedger();
-    vi.mocked(removeAccount).mockRejectedValue(new Error("Still secured"));
+    vi.mocked(removeAccount).mockResolvedValue(refused("Still secured"));
 
     fireEvent.click(
       screen.getByRole("button", { name: "Delete Current account" }),

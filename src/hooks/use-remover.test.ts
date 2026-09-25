@@ -1,7 +1,12 @@
+import type { Mock } from "vitest";
+
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { Answer } from "@/lib/answer";
+
 import { toast } from "@/components/kit/toast";
+import { refused, saved } from "@/lib/answer";
 
 import { useRemover } from "./use-remover";
 
@@ -18,7 +23,7 @@ interface Doomed {
   readonly name: string;
 }
 
-type Store = (id: number) => Promise<void>;
+type Store = (id: number) => Promise<Answer<undefined>>;
 
 const doomed: Doomed = { id: 6, name: "Lifetime ISA" };
 
@@ -54,7 +59,7 @@ describe("useRemover", () => {
     const store = vi.fn<Store>();
     // The store's answer is held back, so the deletion can be seen in
     // flight.
-    let answer!: () => void;
+    let answer!: (answered: Answer<undefined>) => void;
     store.mockReturnValue(
       new Promise((resolve) => {
         answer = resolve;
@@ -80,7 +85,7 @@ describe("useRemover", () => {
     expect(result.current.doomed).not.toBeNull();
     expect(toast.add).not.toHaveBeenCalled();
 
-    answer();
+    answer(saved(undefined));
 
     await waitFor(() => {
       expect(result.current.doomed).toBeNull();
@@ -94,10 +99,25 @@ describe("useRemover", () => {
   });
 
   // A refused deletion leaves the question open and free to confirm
-  // again, and reports the refusal rather than throwing it to the route.
-  it("keeps a refused deletion open and says why", async () => {
+  // again, and reports the refusal in its words rather than throwing it
+  // to the route; a deletion that fails outright is reported the same
+  // way.
+  it.each([
+    [
+      "refused",
+      (store: Mock<Store>): void => {
+        store.mockResolvedValue(refused("No income line was written"));
+      },
+    ],
+    [
+      "failed",
+      (store: Mock<Store>): void => {
+        store.mockRejectedValue(new Error("No income line was written"));
+      },
+    ],
+  ] as const)("keeps a %s deletion open and says why", async (_how, answer) => {
     const store = vi.fn<Store>();
-    store.mockRejectedValue(new Error("No income line was written"));
+    answer(store);
     const { result } = renderHook(() =>
       useRemover<Doomed>({
         describe: (record) => record.name,
