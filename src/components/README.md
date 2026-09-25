@@ -91,6 +91,11 @@ Nothing here relies on being remembered.
   everything outside `src/app` from importing `@/app/*`: the routes are the top
   tier, so a server action lives under `src/actions` and a store under
   `src/store`, where an organism or a template can reach them.
+- The same rule bars a relative import in a component, leaving `@/` as the only
+  way one component names another. The tier bans are patterns over `@/…`
+  specifiers, so without this one an import that reached past its tier could
+  pass simply by being spelled relatively. A test keeps the relative spelling
+  for its own subject, which is a reach rather than an edge.
 - `bun run cycles` catches the loop that the permitted same-tier edge makes
   possible. It is oxlint rather than ESLint's `import/no-cycle`, which walked
   the import graph once per file and cost 76% of the whole lint run.
