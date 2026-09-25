@@ -1,73 +1,30 @@
 {
-  "id": "b0e4d6c5-cb93-4f0e-a3ae-c843b1e90ad7",
+  "id": "472c702e-d594-480c-aeeb-3bc5b7308e92",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.accounts": {
-      "name": "accounts",
+    "public.household_versions": {
+      "name": "household_versions",
       "schema": "",
       "columns": {
-        "balance": {
-          "name": "balance",
-          "type": "integer",
+        "household": {
+          "name": "household",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": true
         },
-        "cadence": {
-          "name": "cadence",
-          "type": "cadence",
-          "typeSchema": "public",
+        "saved_at": {
+          "name": "saved_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "now()"
         },
-        "contribution": {
-          "name": "contribution",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "growth": {
-          "name": "growth",
-          "type": "growth_kind",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "id": {
-          "name": "id",
+        "version": {
+          "name": "version",
           "type": "integer",
           "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "accounts_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "2147483647",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "kind": {
-          "name": "kind",
-          "type": "account_kind",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "rate": {
-          "name": "rate",
-          "type": "double precision",
-          "primaryKey": false,
           "notNull": true
         }
       },
@@ -80,35 +37,7 @@
       "isRLSEnabled": false
     }
   },
-  "enums": {
-    "public.account_kind": {
-      "name": "account_kind",
-      "schema": "public",
-      "values": [
-        "cash",
-        "debt",
-        "real-asset",
-        "tax-deferred",
-        "tax-free"
-      ]
-    },
-    "public.cadence": {
-      "name": "cadence",
-      "schema": "public",
-      "values": [
-        "month",
-        "year"
-      ]
-    },
-    "public.growth_kind": {
-      "name": "growth_kind",
-      "schema": "public",
-      "values": [
-        "fixed",
-        "plan"
-      ]
-    }
-  },
+  "enums": {},
   "schemas": {},
   "sequences": {},
   "roles": {},

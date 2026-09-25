@@ -4,7 +4,7 @@ import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Owner } from "@/data/owners";
-import type { Plan } from "@/data/plan";
+import type { Plan, PlanAges } from "@/data/plan";
 
 import {
   accountKinds,
@@ -17,7 +17,7 @@ import {
 } from "@/data/accounts";
 import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
-import { endAge, oldestAge, rateFrom } from "@/data/plan";
+import { endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
 import { lineGrowths } from "@/data/schedule";
 import { monthly } from "@/lib/cadence";
 import { termOf } from "@/lib/loans";
@@ -26,7 +26,7 @@ import { isWithinAllowance } from "@/lib/tax";
 // Everything the projection runs on, and the owners the wrappers name:
 // the whole of what the store holds for the household, with the plan
 // as it stands the day it is read.
-interface Household {
+export interface Household {
   readonly accounts: readonly Account[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
@@ -34,6 +34,19 @@ interface Household {
     readonly expenses: readonly ExpenseLine[];
     readonly income: readonly IncomeLine[];
   };
+}
+
+// The household as the store keeps it: the records, the ages the plan
+// is set to rather than the plan they make on the day it is read, and
+// the id the next record added is given. That id only ever counts up,
+// so one a deleted record held is never given to another, which a form
+// left open on the deleted one would otherwise write over.
+export interface Kept {
+  readonly accounts: readonly Account[];
+  readonly ages: PlanAges;
+  readonly next: number;
+  readonly owners: readonly Owner[];
+  readonly schedule: Household["schedule"];
 }
 
 // The words a rate below losing everything is refused in, the engine's
@@ -272,6 +285,72 @@ export const household = z
     "A debt's payments end",
   ) satisfies z.ZodType<Household>;
 
+// The household as the store may keep it: its records sound on their
+// own, the ages the plan action holds them to, and every record's id
+// below the one the next is given.
+const kept = z
+  .object({
+    accounts: z.array(account),
+    ages: z
+      .object({
+        ends: z.number().int().nonnegative(),
+        retires: z.number().int().nonnegative(),
+      })
+      .refine(
+        (ages) => ages.retires <= ages.ends,
+        "A plan's owner retires no later than it ends",
+      )
+      .refine(
+        (ages) => ages.ends <= oldestAge,
+        `A plan ends by ${String(oldestAge)}`,
+      ),
+    next: id,
+    owners: z.array(owner),
+    schedule: z.object({
+      expenses: z.array(expenseLine),
+      income: z.array(incomeLine),
+    }),
+  })
+  .refine(
+    ({ accounts, next, owners, schedule }) =>
+      [...accounts, ...owners, ...schedule.expenses, ...schedule.income].every(
+        (record) => record.id < next,
+      ),
+    "A record's id is below the one the next record is given",
+  ) satisfies z.ZodType<Kept>;
+
+// The household before anything is saved: no records, the ages the
+// dashboard has shown, a plan to 89 retiring at 59, and the first id.
+export const nothingKept: Kept = {
+  accounts: [],
+  ages: { ends: 89, retires: 59 },
+  next: 1,
+  owners: [],
+  schedule: { expenses: [], income: [] },
+};
+
+// A value as the kept household it is and the whole it makes on the day
+// given, or a refusal in the words of every rule it breaks, once each:
+// what a save is held to before it is kept, and what a read is held to
+// before anything is drawn from it, so neither a save nor a stored
+// version the rules have since tightened past reaches the engine.
+export function soundKept(
+  value: unknown,
+  now: Date,
+): { readonly household: Household; readonly kept: Kept } {
+  const parsed = kept.safeParse(value);
+  if (!parsed.success) {
+    throw refusalOf(parsed.error);
+  }
+  const whole = household.safeParse(
+    householdOf(parsed.data, planOf(parsed.data.ages, now)),
+  );
+  if (!whole.success) {
+    throw refusalOf(whole.error);
+  }
+  return { household: whole.data, kept: parsed.data };
+}
+
 // Whether a debt's own fixed sum pays it off at the rate it is charged,
 // down to the balloon a PCP leaves standing, as the engine reads it to
 // find the month the payments end in. Every other account, and a debt
@@ -304,6 +383,16 @@ function endsInAYear(line: {
   return line.lastMonth === null || line.lastYear !== null;
 }
 
+// The whole a kept household makes on the day its plan is read.
+function householdOf(kept: Kept, plan: Plan): Household {
+  return {
+    accounts: kept.accounts,
+    owners: kept.owners,
+    plan,
+    schedule: kept.schedule,
+  };
+}
+
 // Whether no two links name the same record, a link of nothing naming
 // none.
 function isHeldOnce(links: readonly (null | number)[]): boolean {
@@ -313,4 +402,10 @@ function isHeldOnce(links: readonly (null | number)[]): boolean {
 
 function isListedOnce(records: readonly { readonly id: number }[]): boolean {
   return new Set(records.map((record) => record.id)).size === records.length;
+}
+
+function refusalOf(error: z.ZodError): Error {
+  return new Error(
+    [...new Set(error.issues.map(({ message }) => message))].join("; "),
+  );
 }

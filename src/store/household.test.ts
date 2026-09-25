@@ -1,0 +1,185 @@
+// @vitest-environment node
+import { refresh } from "next/cache";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+
+import { nothingKept } from "@/data/household";
+import { kept as reference } from "@/data/household.fixture";
+import { planOf } from "@/data/plan";
+import { getDb } from "@/db/client";
+import { keepAfter, readLatest } from "@/db/household";
+import { inMemory } from "@/db/memory.fixture";
+import { requireSession } from "@/lib/session";
+
+import {
+  amend,
+  getAccounts,
+  getExpenseLines,
+  getIncomeLines,
+  getOwners,
+  getPlan,
+} from "./household";
+
+vi.mock("server-only", () => ({}));
+vi.mock("next/cache", () => ({ refresh: vi.fn() }));
+vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
+vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
+
+const { close, db, empty, ready } = inMemory();
+
+const today = new Date("2026-09-15T12:00:00Z");
+
+describe("the household store", () => {
+  beforeAll(ready);
+  beforeEach(async () => {
+    await empty();
+    vi.mocked(getDb).mockReturnValue(db);
+    vi.useFakeTimers({ now: today, toFake: ["Date"] });
+  });
+  afterAll(close);
+
+  it("reads nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    for (const read of [
+      getAccounts,
+      getExpenseLines,
+      getIncomeLines,
+      getOwners,
+      getPlan,
+    ]) {
+      await expect(read()).rejects.toThrow("redirected");
+    }
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("reads the household before anything is saved as empty, to 89 retiring at 59", async () => {
+    expect(await getAccounts()).toStrictEqual([]);
+    expect(await getOwners()).toStrictEqual([]);
+    expect(await getIncomeLines()).toStrictEqual([]);
+    expect(await getExpenseLines()).toStrictEqual([]);
+    expect(await getPlan()).toStrictEqual(planOf(nothingKept.ages, today));
+  });
+
+  it("reads each part of the latest version, and the plan on the day it is read", async () => {
+    await keepAfter(db, 0, nothingKept);
+    await keepAfter(db, 1, reference);
+
+    expect(await getAccounts()).toStrictEqual(reference.accounts);
+    expect(await getOwners()).toStrictEqual(reference.owners);
+    expect(await getIncomeLines()).toStrictEqual(reference.schedule.income);
+    expect(await getExpenseLines()).toStrictEqual(reference.schedule.expenses);
+    expect(await getPlan()).toStrictEqual({
+      born: 1990,
+      from: 2026,
+      month: 8,
+      rate: 0.05,
+      retires: 59,
+      years: 53,
+    });
+  });
+
+  // Written past the rules, as a version kept before they tightened.
+  it("refuses a version that breaks a rule, in its words, rather than hand it on", async () => {
+    await keepAfter(db, 0, {
+      ...reference,
+      accounts: [...reference.accounts, ...reference.accounts],
+    });
+
+    await expect(getAccounts()).rejects.toThrow("An account is listed once");
+  });
+
+  it("keeps the household an edit makes as the next version, draws the page again and hands back what the edit says", async () => {
+    await keepAfter(db, 0, reference);
+
+    const result = await amend(({ household, kept }) => {
+      expect(household.plan).toStrictEqual(planOf(reference.ages, today));
+      return {
+        kept: {
+          ...kept,
+          next: 7,
+          owners: [...kept.owners, { id: 6, name: "Partner" }],
+        },
+        result: "added",
+      };
+    });
+
+    expect(result).toBe("added");
+    expect(await readLatest(db)).toMatchObject({
+      household: {
+        next: 7,
+        owners: [...reference.owners, { id: 6, name: "Partner" }],
+      },
+      version: 2,
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the first save as the first version", async () => {
+    await amend(({ kept }) => ({ kept, result: null }));
+
+    expect(await readLatest(db)).toStrictEqual({
+      household: nothingKept,
+      version: 1,
+    });
+  });
+
+  it("refuses an edit that breaks a rule, in its words, and writes nothing", async () => {
+    await keepAfter(db, 0, reference);
+
+    await expect(
+      amend(({ kept }) => ({ kept: { ...kept, owners: [] }, result: null })),
+    ).rejects.toThrow(
+      "An ISA or a pension belongs to an owner the household lists",
+    );
+    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  // Two saves reading the one version: the store answers them in turn,
+  // so both read before either writes, and the second to write is from
+  // a household that is gone by then.
+  it("refuses a save the household changed under after it was read", async () => {
+    await keepAfter(db, 0, reference);
+    const renamed = async (name: string): Promise<string> =>
+      amend(({ kept }) => ({
+        kept: { ...kept, owners: [{ id: 1, name }] },
+        result: name,
+      }));
+
+    const saves = await Promise.allSettled([
+      renamed("First"),
+      renamed("Second"),
+    ]);
+
+    expect(saves).toStrictEqual([
+      { status: "fulfilled", value: "First" },
+      {
+        reason: new Error(
+          "The household changed while this was being saved, so nothing was",
+        ),
+        status: "rejected",
+      },
+    ]);
+    expect(await readLatest(db)).toMatchObject({
+      household: { owners: [{ id: 1, name: "First" }] },
+      version: 2,
+    });
+  });
+
+  it("saves nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(amend(({ kept }) => ({ kept, result: null }))).rejects.toThrow(
+      "redirected",
+    );
+    expect(await readLatest(db)).toBeNull();
+  });
+});

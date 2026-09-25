@@ -1,54 +1,36 @@
 // @vitest-environment node
-import { drizzle } from "drizzle-orm/neon-http";
-import { updateTag } from "next/cache";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { refresh } from "next/cache";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import * as z from "zod";
 
-import type { IncomeLineDraft, IncomeLineValues } from "@/data/income";
+import type { IncomeLine, IncomeLineDraft } from "@/data/income";
 
-import { accounts } from "@/data/accounts.fixture";
-import { expenseLines } from "@/data/expenses.fixture";
-import { incomeLines } from "@/data/income.fixture";
-import { findAccount, insertAccount } from "@/db/accounts";
+import { kept } from "@/data/household.fixture";
 import { getDb } from "@/db/client";
-import { insertExpenseLine, updateExpenseLine } from "@/db/expenses";
-import {
-  deleteIncomeLine,
-  insertIncomeLine,
-  updateIncomeLine,
-} from "@/db/income";
+import { keepAfter, readLatest } from "@/db/household";
+import { inMemory } from "@/db/memory.fixture";
 import { requireSession } from "@/lib/session";
-import { accountsTag } from "@/store/accounts";
-import { expenseLinesTag, incomeLinesTag } from "@/store/schedule";
 
 import { removeIncomeLine, saveExpenseLine, saveIncomeLine } from "./schedule";
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/cache", () => ({
-  cacheLife: vi.fn(),
-  cacheTag: vi.fn(),
-  updateTag: vi.fn(),
-}));
-vi.mock("@/db/accounts", () => ({
-  findAccount: vi.fn(),
-  insertAccount: vi.fn(),
-}));
+vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
-vi.mock("@/db/expenses", () => ({
-  insertExpenseLine: vi.fn(),
-  updateExpenseLine: vi.fn(),
-}));
-vi.mock("@/db/income", () => ({
-  deleteIncomeLine: vi.fn(),
-  insertIncomeLine: vi.fn(),
-  updateIncomeLine: vi.fn(),
-}));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 
-const [pension, isa, cash] = accounts;
-const [salary, , , statePension] = incomeLines;
-const [household, , , retirement] = expenseLines;
+const { close, db, empty, ready } = inMemory();
 
+const today = new Date("2026-09-15T12:00:00Z");
+
+// An expense line as its dialog sends it, the name as typed.
 const expense = {
   amount: 1150,
   cadence: "month",
@@ -60,6 +42,8 @@ const expense = {
   name: " Nursery ",
 } as const;
 
+// An income line as its dialog sends it, the name as typed, opening no
+// pension.
 const values = {
   amount: 12000,
   bonus: 0,
@@ -76,14 +60,11 @@ const values = {
   sacrifice: 0,
 } as const;
 
-// A database that answers nothing, standing in for the one the client
-// would open; the queries are mocked, so it is only ever handed on.
-const db = drizzle.mock();
-
-// What the store is handed of a draft: the line less the pension it
-// opens, with the name trimmed as the action trims it. Spelled out key
-// by key, since a rest destructure would bind the pension to nothing.
-function lineOf(draft: IncomeLineDraft): IncomeLineValues {
+// The line the household is handed of a draft: the draft less the
+// pension it opens, the name trimmed as the action trims it, and an id.
+// Spelled out key by key, since a rest destructure would bind the
+// pension to nothing.
+function lineOf(draft: IncomeLineDraft, id: number): IncomeLine {
   return {
     amount: draft.amount,
     bonus: draft.bonus,
@@ -91,6 +72,7 @@ function lineOf(draft: IncomeLineDraft): IncomeLineValues {
     feeds: draft.feeds,
     firstYear: draft.firstYear,
     growth: draft.growth,
+    id,
     kind: draft.kind,
     lastMonth: draft.lastMonth,
     lastYear: draft.lastYear,
@@ -100,375 +82,344 @@ function lineOf(draft: IncomeLineDraft): IncomeLineValues {
   };
 }
 
-describe("saveIncomeLine", () => {
-  beforeEach(() => {
+describe("the schedule actions", () => {
+  beforeAll(ready);
+  beforeEach(async () => {
+    await empty();
     vi.mocked(getDb).mockReturnValue(db);
+    vi.useFakeTimers({ now: today, toFake: ["Date"] });
+    await keepAfter(db, 0, kept);
   });
+  afterAll(close);
 
-  it("writes nothing without a session", async () => {
-    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+  describe("saveIncomeLine", () => {
+    it("writes nothing without a session", async () => {
+      vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-    await expect(saveIncomeLine(null, values)).rejects.toThrow("redirected");
-    expect(insertIncomeLine).not.toHaveBeenCalled();
-    expect(updateTag).not.toHaveBeenCalled();
-  });
-
-  it("inserts a new line with the name trimmed and expires the tag", async () => {
-    vi.mocked(insertIncomeLine).mockResolvedValue(salary);
-
-    expect(await saveIncomeLine(null, values)).toBe(salary);
-    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(
-      db,
-      lineOf(values),
-    );
-    expect(updateIncomeLine).not.toHaveBeenCalled();
-    expect(updateTag).toHaveBeenCalledExactlyOnceWith(incomeLinesTag);
-  });
-
-  it("takes a bonus and RSUs on an employment line", async () => {
-    vi.mocked(insertIncomeLine).mockResolvedValue(salary);
-    const employment = {
-      ...values,
-      bonus: 15000,
-      kind: "employment",
-      rsu: 12000,
-    } as const;
-
-    expect(await saveIncomeLine(null, employment)).toBe(salary);
-    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(
-      db,
-      lineOf(employment),
-    );
-  });
-
-  it("takes the pension an employment line feeds and the share of its base it sacrifices", async () => {
-    vi.mocked(findAccount).mockResolvedValue(pension);
-    vi.mocked(insertIncomeLine).mockResolvedValue(salary);
-    const sacrificing = {
-      ...values,
-      feeds: pension.id,
-      kind: "employment",
-      sacrifice: 0.1,
-    } as const;
-
-    expect(await saveIncomeLine(null, sacrificing)).toBe(salary);
-    expect(findAccount).toHaveBeenCalledExactlyOnceWith(db, pension.id);
-    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(
-      db,
-      lineOf(sacrificing),
-    );
-  });
-
-  // The store holds the id to an account, so the action holds it to a
-  // pension: an ISA, cash, or an id no account has is refused before
-  // anything is written. A line feeding none reads no account.
-  it("refuses a pension that is no account or an account of another kind", async () => {
-    const sacrificing = {
-      ...values,
-      feeds: isa.id,
-      kind: "employment",
-      sacrifice: 0.1,
-    } as const;
-    vi.mocked(findAccount).mockResolvedValueOnce(isa);
-
-    await expect(saveIncomeLine(null, sacrificing)).rejects.toThrow(
-      "A salary feeds a pension alone",
-    );
-
-    vi.mocked(findAccount).mockResolvedValueOnce(cash);
-
-    await expect(
-      saveIncomeLine(null, { ...sacrificing, feeds: cash.id }),
-    ).rejects.toThrow("A salary feeds a pension alone");
-
-    vi.mocked(findAccount).mockResolvedValueOnce(null);
-
-    await expect(
-      saveIncomeLine(null, { ...sacrificing, feeds: 99 }),
-    ).rejects.toThrow("No account has the id the salary feeds");
-    expect(insertIncomeLine).not.toHaveBeenCalled();
-    expect(updateTag).not.toHaveBeenCalled();
-
-    vi.mocked(insertIncomeLine).mockResolvedValue(salary);
-    await saveIncomeLine(null, values);
-
-    expect(findAccount).toHaveBeenCalledTimes(3);
-  });
-
-  // A share is at most the whole of the base, and the whole of it is
-  // taken: the bound is a bound, not a refusal of the figure at it.
-  it("takes a sacrifice of the whole of the base", async () => {
-    vi.mocked(findAccount).mockResolvedValue(pension);
-    vi.mocked(insertIncomeLine).mockResolvedValue(salary);
-    const whole = {
-      ...values,
-      feeds: pension.id,
-      kind: "employment",
-      sacrifice: 1,
-    } as const;
-
-    expect(await saveIncomeLine(null, whole)).toBe(salary);
-    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(db, lineOf(whole));
-  });
-
-  // The pension is written first, as the account a new pension is,
-  // named as typed less the space around it, and the line feeds it by
-  // the id the store gave; no account is read, since the pension was
-  // just written as one. Both tags expire, since the accounts changed
-  // too. A salary already listed opens one the same way.
-  it("opens the pension a salary opens, first, and feeds it by the id the store gave", async () => {
-    vi.mocked(insertAccount).mockResolvedValue({
-      ...pension,
-      id: 6,
-      name: "Aviva",
+      await expect(saveIncomeLine(null, values)).rejects.toThrow("redirected");
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
-    vi.mocked(insertIncomeLine).mockResolvedValue(salary);
-    vi.mocked(updateIncomeLine).mockResolvedValue(salary);
-    const opening = {
-      ...values,
-      kind: "employment",
-      opens: { balance: 2500, name: " Aviva ", owner: 1 },
-      sacrifice: 0.1,
-    } as const;
 
-    expect(await saveIncomeLine(null, opening)).toBe(salary);
-    expect(insertAccount).toHaveBeenCalledExactlyOnceWith(db, {
-      balance: 2500,
-      balloon: 0,
-      cadence: "year",
-      cap: 0,
-      contribution: 0,
-      funding: "fixed",
-      growth: "plan",
-      kind: "tax-deferred",
-      name: "Aviva",
-      owner: 1,
-      rate: 0,
+    it("adds a new line with the name trimmed, given the next id, and draws the page again", async () => {
+      expect(await saveIncomeLine(null, values)).toStrictEqual(
+        lineOf(values, 6),
+      );
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          next: 7,
+          schedule: { income: [...kept.schedule.income, lineOf(values, 6)] },
+        },
+        version: 2,
+      });
+      expect(refresh).toHaveBeenCalledOnce();
     });
-    expect(findAccount).not.toHaveBeenCalled();
-    expect(insertIncomeLine).toHaveBeenCalledExactlyOnceWith(db, {
-      ...lineOf(opening),
-      feeds: 6,
+
+    it("takes a bonus and RSUs on an employment line", async () => {
+      const employment = {
+        ...values,
+        bonus: 15000,
+        kind: "employment",
+        rsu: 12000,
+      } as const;
+
+      expect(await saveIncomeLine(null, employment)).toStrictEqual(
+        lineOf(employment, 6),
+      );
     });
-    expect(updateTag).toHaveBeenCalledTimes(2);
-    expect(updateTag).toHaveBeenCalledWith(accountsTag);
-    expect(updateTag).toHaveBeenCalledWith(incomeLinesTag);
 
-    expect(await saveIncomeLine(salary.id, opening)).toBe(salary);
-    expect(updateIncomeLine).toHaveBeenCalledExactlyOnceWith(db, salary.id, {
-      ...lineOf(opening),
-      feeds: 6,
-    });
-    expect(insertAccount).toHaveBeenCalledTimes(2);
-  });
-
-  it("writes over the line with the id, open-ended, and expires the tag", async () => {
-    vi.mocked(updateIncomeLine).mockResolvedValue(statePension);
-
-    expect(await saveIncomeLine(4, { ...values, lastYear: null })).toBe(
-      statePension,
-    );
-    expect(updateIncomeLine).toHaveBeenCalledExactlyOnceWith(
-      db,
-      4,
-      lineOf({ ...values, lastYear: null }),
-    );
-    expect(insertIncomeLine).not.toHaveBeenCalled();
-    expect(updateTag).toHaveBeenCalledExactlyOnceWith(incomeLinesTag);
-  });
-
-  it("refuses what the form could not have sent", async () => {
-    await expect(saveIncomeLine(0, values)).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, { ...values, name: "  " }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, { ...values, amount: -1 }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, { ...values, amount: 0.5 }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, { ...values, lastYear: 2029 }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, { ...values, lastMonth: 3, lastYear: null }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, { ...values, bonus: -1, kind: "employment" }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, { ...values, rsu: 12000 }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(saveIncomeLine(null, { ...values, feeds: 1 })).rejects.toThrow(
-      z.ZodError,
-    );
-    await expect(
-      saveIncomeLine(null, { ...values, feeds: 0, kind: "employment" }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, { ...values, kind: "employment", sacrifice: 0.1 }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, {
+    it("takes the pension an employment line feeds and the share of its base it sacrifices, the whole of it included", async () => {
+      const sacrificing = {
         ...values,
         feeds: 1,
         kind: "employment",
-        sacrifice: 1.5,
-      }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, {
-        ...values,
-        feeds: 1,
-        kind: "employment",
-        sacrifice: -0.1,
-      }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, {
-        ...values,
-        opens: { balance: 0, name: "Aviva", owner: 1 },
-      }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, {
-        ...values,
-        feeds: 1,
-        kind: "employment",
-        opens: { balance: 0, name: "Aviva", owner: 1 },
-      }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, {
-        ...values,
-        kind: "employment",
-        opens: { balance: 0, name: "  ", owner: 1 },
-      }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, {
-        ...values,
-        kind: "employment",
-        opens: { balance: -1, name: "Aviva", owner: 1 },
-      }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveIncomeLine(null, {
-        ...values,
-        kind: "employment",
-        opens: { balance: 0, name: "Aviva", owner: null },
-      }),
-    ).rejects.toThrow(z.ZodError);
-    expect(insertAccount).not.toHaveBeenCalled();
-    expect(insertIncomeLine).not.toHaveBeenCalled();
-    expect(updateIncomeLine).not.toHaveBeenCalled();
-    expect(updateTag).not.toHaveBeenCalled();
-  });
-});
+        sacrifice: 0.1,
+      } as const;
 
-describe("removeIncomeLine", () => {
-  beforeEach(() => {
-    vi.mocked(getDb).mockReturnValue(db);
-  });
-
-  it("deletes nothing without a session", async () => {
-    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
-
-    await expect(removeIncomeLine(salary.id)).rejects.toThrow("redirected");
-    expect(deleteIncomeLine).not.toHaveBeenCalled();
-    expect(updateTag).not.toHaveBeenCalled();
-  });
-
-  it("deletes the line with the id and expires the tag", async () => {
-    await removeIncomeLine(salary.id);
-
-    expect(deleteIncomeLine).toHaveBeenCalledExactlyOnceWith(db, salary.id);
-    expect(updateTag).toHaveBeenCalledExactlyOnceWith(incomeLinesTag);
-  });
-
-  it("refuses an id the schedule could not have sent", async () => {
-    await expect(removeIncomeLine(0)).rejects.toThrow(z.ZodError);
-    expect(deleteIncomeLine).not.toHaveBeenCalled();
-    expect(updateTag).not.toHaveBeenCalled();
-  });
-});
-
-describe("saveExpenseLine", () => {
-  beforeEach(() => {
-    vi.mocked(getDb).mockReturnValue(db);
-  });
-
-  it("writes nothing without a session", async () => {
-    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
-
-    await expect(saveExpenseLine(null, expense)).rejects.toThrow("redirected");
-    expect(insertExpenseLine).not.toHaveBeenCalled();
-    expect(updateTag).not.toHaveBeenCalled();
-  });
-
-  it("inserts a new line with the name trimmed and expires the expense tag alone", async () => {
-    vi.mocked(insertExpenseLine).mockResolvedValue(household);
-
-    expect(await saveExpenseLine(null, expense)).toBe(household);
-    expect(insertExpenseLine).toHaveBeenCalledExactlyOnceWith(db, {
-      ...expense,
-      name: "Nursery",
+      expect(await saveIncomeLine(null, sacrificing)).toStrictEqual(
+        lineOf(sacrificing, 6),
+      );
+      expect(
+        await saveIncomeLine(null, { ...sacrificing, sacrifice: 1 }),
+      ).toStrictEqual(lineOf({ ...sacrificing, sacrifice: 1 }, 7));
     });
-    expect(updateExpenseLine).not.toHaveBeenCalled();
-    expect(insertIncomeLine).not.toHaveBeenCalled();
-    expect(updateTag).toHaveBeenCalledExactlyOnceWith(expenseLinesTag);
-  });
 
-  it("takes a line ending in a month of its last year", async () => {
-    vi.mocked(insertExpenseLine).mockResolvedValue(retirement);
+    // The ISA, the current account, and an id no account has.
+    it("refuses a pension that is no account or an account of another kind, and writes nothing", async () => {
+      for (const feeds of [2, 3, 99]) {
+        await expect(
+          saveIncomeLine(null, {
+            ...values,
+            feeds,
+            kind: "employment",
+            sacrifice: 0.1,
+          }),
+        ).rejects.toThrow("A salary feeds a pension alone");
+      }
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+      expect(refresh).not.toHaveBeenCalled();
+    });
 
-    await saveExpenseLine(null, { ...expense, lastMonth: 2 });
+    // The pension is added as the account a new pension is, named as
+    // typed less the space around it and given the next id, and the line
+    // feeds it by that id, both in the one version. A salary already
+    // listed opens one the same way.
+    it("opens the pension a salary opens, and feeds it by the id it is given", async () => {
+      const opening = {
+        ...values,
+        kind: "employment",
+        opens: { balance: 2500, name: " Aviva ", owner: 1 },
+        sacrifice: 0.1,
+      } as const;
+      const aviva = (id: number): object => ({
+        balance: 2500,
+        growth: { kind: "plan" },
+        id,
+        kind: "tax-deferred",
+        name: "Aviva",
+        owner: 1,
+      });
 
-    expect(insertExpenseLine).toHaveBeenCalledExactlyOnceWith(db, {
-      ...expense,
-      lastMonth: 2,
-      name: "Nursery",
+      expect(await saveIncomeLine(null, opening)).toStrictEqual({
+        ...lineOf(opening, 7),
+        feeds: 6,
+      });
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          accounts: [...kept.accounts, aviva(6)],
+          next: 8,
+          schedule: {
+            income: [
+              ...kept.schedule.income,
+              { ...lineOf(opening, 7), feeds: 6 },
+            ],
+          },
+        },
+        version: 2,
+      });
+
+      expect(await saveIncomeLine(4, opening)).toStrictEqual({
+        ...lineOf(opening, 4),
+        feeds: 8,
+      });
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          accounts: [...kept.accounts, aviva(6), aviva(8)],
+          next: 9,
+        },
+      });
+    });
+
+    it("writes over the line with the id, open-ended, in its place", async () => {
+      expect(
+        await saveIncomeLine(4, { ...values, lastYear: null }),
+      ).toStrictEqual(lineOf({ ...values, lastYear: null }, 4));
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          next: 6,
+          schedule: {
+            income: [
+              ...kept.schedule.income.slice(0, 3),
+              lineOf({ ...values, lastYear: null }, 4),
+            ],
+          },
+        },
+      });
+    });
+
+    it("refuses what the form could not have sent", async () => {
+      for (const draft of [
+        { ...values, name: "  " },
+        { ...values, amount: -1 },
+        { ...values, amount: 0.5 },
+        { ...values, bonus: -1, kind: "employment" },
+        { ...values, feeds: 0, kind: "employment" },
+        { ...values, feeds: 1, kind: "employment", sacrifice: 1.5 },
+        { ...values, feeds: 1, kind: "employment", sacrifice: -0.1 },
+        { ...values, opens: { balance: 0, name: "Aviva", owner: 1 } },
+        {
+          ...values,
+          feeds: 1,
+          kind: "employment",
+          opens: { balance: 0, name: "Aviva", owner: 1 },
+        },
+        {
+          ...values,
+          kind: "employment",
+          opens: { balance: 0, name: "  ", owner: 1 },
+        },
+        {
+          ...values,
+          kind: "employment",
+          opens: { balance: -1, name: "Aviva", owner: 1 },
+        },
+        {
+          ...values,
+          kind: "employment",
+          opens: { balance: 0, name: "Aviva", owner: null },
+        },
+      ] as const) {
+        await expect(saveIncomeLine(null, draft)).rejects.toThrow(z.ZodError);
+      }
+      await expect(saveIncomeLine(0, values)).rejects.toThrow(z.ZodError);
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+
+    it("refuses a line the household cannot hold, in its words, and an id no line has", async () => {
+      for (const [draft, refusal] of [
+        [
+          { ...values, lastYear: 2029 },
+          "A line ends no earlier than it starts",
+        ],
+        [
+          { ...values, lastMonth: 3, lastYear: null },
+          "A line ends in a month only of a year it ends in",
+        ],
+        [
+          { ...values, rsu: 12000 },
+          "A bonus, RSUs and a pension are a salary's alone",
+        ],
+        [
+          { ...values, feeds: 1 },
+          "A bonus, RSUs and a pension are a salary's alone",
+        ],
+        [
+          { ...values, kind: "employment", sacrifice: 0.1 },
+          "A salary gives up a share only into a pension it feeds",
+        ],
+      ] as const) {
+        await expect(saveIncomeLine(null, draft)).rejects.toThrow(refusal);
+      }
+      await expect(saveIncomeLine(99, values)).rejects.toThrow(
+        "No income line has the id",
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
   });
 
-  it("writes over the line with the id, open-ended, and expires the tag", async () => {
-    vi.mocked(updateExpenseLine).mockResolvedValue(retirement);
+  describe("removeIncomeLine", () => {
+    it("deletes nothing without a session", async () => {
+      vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-    expect(await saveExpenseLine(4, { ...expense, lastYear: null })).toBe(
-      retirement,
-    );
-    expect(updateExpenseLine).toHaveBeenCalledExactlyOnceWith(db, 4, {
-      ...expense,
-      lastYear: null,
-      name: "Nursery",
+      await expect(removeIncomeLine(4)).rejects.toThrow("redirected");
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
-    expect(insertExpenseLine).not.toHaveBeenCalled();
-    expect(updateTag).toHaveBeenCalledExactlyOnceWith(expenseLinesTag);
+
+    it("deletes the line with the id and draws the page again", async () => {
+      await removeIncomeLine(4);
+
+      expect(await readLatest(db)).toMatchObject({
+        household: { schedule: { income: kept.schedule.income.slice(0, 3) } },
+        version: 2,
+      });
+      expect(refresh).toHaveBeenCalledOnce();
+    });
+
+    it("refuses an id the schedule could not have sent, and one no line has", async () => {
+      await expect(removeIncomeLine(0)).rejects.toThrow(z.ZodError);
+      await expect(removeIncomeLine(99)).rejects.toThrow(
+        "No income line has the id",
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
   });
 
-  it("refuses what the form could not have sent", async () => {
-    await expect(saveExpenseLine(0, expense)).rejects.toThrow(z.ZodError);
-    await expect(
-      saveExpenseLine(null, { ...expense, name: "  " }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveExpenseLine(null, { ...expense, amount: -1 }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveExpenseLine(null, { ...expense, lastYear: 2026 }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveExpenseLine(null, { ...expense, lastMonth: 12 }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveExpenseLine(null, { ...expense, lastMonth: -1 }),
-    ).rejects.toThrow(z.ZodError);
-    await expect(
-      saveExpenseLine(null, { ...expense, lastMonth: 3, lastYear: null }),
-    ).rejects.toThrow(z.ZodError);
-    expect(insertExpenseLine).not.toHaveBeenCalled();
-    expect(updateExpenseLine).not.toHaveBeenCalled();
-    expect(updateTag).not.toHaveBeenCalled();
+  describe("saveExpenseLine", () => {
+    it("writes nothing without a session", async () => {
+      vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+      await expect(saveExpenseLine(null, expense)).rejects.toThrow(
+        "redirected",
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+
+    it("adds a new line with the name trimmed, given the next id, and draws the page again", async () => {
+      const written = { ...expense, id: 6, name: "Nursery" };
+
+      expect(await saveExpenseLine(null, expense)).toStrictEqual(written);
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          next: 7,
+          schedule: {
+            expenses: [...kept.schedule.expenses, written],
+            income: kept.schedule.income,
+          },
+        },
+        version: 2,
+      });
+      expect(refresh).toHaveBeenCalledOnce();
+    });
+
+    it("takes a line ending in a month of its last year", async () => {
+      expect(
+        await saveExpenseLine(null, { ...expense, lastMonth: 2 }),
+      ).toStrictEqual({ ...expense, id: 6, lastMonth: 2, name: "Nursery" });
+    });
+
+    it("writes over the line with the id, open-ended, in its place", async () => {
+      const written = { ...expense, id: 4, lastYear: null, name: "Nursery" };
+
+      expect(
+        await saveExpenseLine(4, { ...expense, lastYear: null }),
+      ).toStrictEqual(written);
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          next: 6,
+          schedule: {
+            expenses: [
+              ...kept.schedule.expenses.slice(0, 3),
+              written,
+              kept.schedule.expenses[4],
+            ],
+          },
+        },
+      });
+    });
+
+    // The mortgage's payments line, as the house dialog links it.
+    it("keeps the loan a line pays when it is written over", async () => {
+      await keepAfter(db, 1, {
+        ...kept,
+        schedule: {
+          ...kept.schedule,
+          expenses: kept.schedule.expenses.map((line) =>
+            line.id === 3 ? { ...line, pays: 5 } : line,
+          ),
+        },
+      });
+
+      expect(await saveExpenseLine(3, expense)).toStrictEqual({
+        ...expense,
+        id: 3,
+        name: "Nursery",
+        pays: 5,
+      });
+    });
+
+    it("refuses what the form could not have sent", async () => {
+      for (const draft of [
+        { ...expense, name: "  " },
+        { ...expense, amount: -1 },
+        { ...expense, lastMonth: 12 },
+        { ...expense, lastMonth: -1 },
+      ] as const) {
+        await expect(saveExpenseLine(null, draft)).rejects.toThrow(z.ZodError);
+      }
+      await expect(saveExpenseLine(0, expense)).rejects.toThrow(z.ZodError);
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+
+    it("refuses a line the household cannot hold, in its words, and an id no line has", async () => {
+      await expect(
+        saveExpenseLine(null, { ...expense, lastYear: 2026 }),
+      ).rejects.toThrow("A line ends no earlier than it starts");
+      await expect(
+        saveExpenseLine(null, { ...expense, lastMonth: 3, lastYear: null }),
+      ).rejects.toThrow("A line ends in a month only of a year it ends in");
+      await expect(saveExpenseLine(99, expense)).rejects.toThrow(
+        "No expense line has the id",
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
   });
 });

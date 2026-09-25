@@ -1,27 +1,22 @@
 "use server";
 
-import { updateTag } from "next/cache";
 import * as z from "zod";
 
-import type {
-  Account,
-  AccountDraft,
-  AccountValues,
-  Share,
-} from "@/data/accounts";
+import type { Account, AccountDraft, Share } from "@/data/accounts";
 import type { CarValues } from "@/data/cars";
+import type { Kept } from "@/data/household";
 import type { HouseValues } from "@/data/houses";
+import type { IncomeLine } from "@/data/income";
 import type { SecuredRecords } from "@/data/secured";
-import type { Database } from "@/db/accounts";
+import type { Held } from "@/store/household";
 
 import {
   accountKinds,
   cadences,
   fundings,
   growthKinds,
-  isOwned,
   isPension,
-  takesSpare,
+  toAccount,
 } from "@/data/accounts";
 import {
   agreements,
@@ -29,27 +24,9 @@ import {
   toRecords as toCarRecords,
 } from "@/data/cars";
 import { isSound, statuses, toRecords } from "@/data/houses";
-import {
-  deleteAccount,
-  findLoanAgainst,
-  insertAccount,
-  placeAccounts,
-  updateAccount,
-} from "@/db/accounts";
-import { getDb } from "@/db/client";
-import {
-  deleteExpenseLine,
-  findLinePaying,
-  insertExpenseLine,
-  updateExpenseLine,
-} from "@/db/expenses";
-import { isFed, stopFeeding, updateSacrifice } from "@/db/income";
-import { termOf } from "@/lib/loans";
+import { found, replaced } from "@/lib/records";
 import { requireSession } from "@/lib/session";
-import { isWithinAllowance } from "@/lib/tax";
-import { accountsTag } from "@/store/accounts";
-import { getPlan } from "@/store/plan";
-import { expenseLinesTag, incomeLinesTag } from "@/store/schedule";
+import { amend } from "@/store/household";
 
 // What a car may carry, checked against the model's own list and its
 // own soundness so the two cannot drift: the figures whole and never
@@ -107,24 +84,21 @@ const house = z
 
 // What a save may carry, checked against the model's own lists so the
 // two cannot drift: the figures whole, a contribution, a cap and a
-// balloon never negative, a balance below nothing only on a debt,
-// since a debt is the one kind a balance below nothing says anything
-// about and the engine carries a wrapper, cash or an asset held there
-// deeper without ever drawing on it, the spare money only into an
-// account that takes it, a rate
-// no lower than losing everything, since below that a year's growth is
-// not a number, the name as typed less the space around it, which
-// the form also trims, and the shares the salaries feeding the account
-// sacrifice, each a fraction of the base at most against a line by its
-// id, one share a line, since the dialog holds one and two would write
-// the same line twice, and none against anything but a pension, since
-// only a pension is fed. An ISA or a pension names its owner by id and
-// no other account names one; the store holds the id to an owner it
-// has. A fixed sum into an ISA or a pension lands within its allowance
-// on its own. A debt paying a fixed sum is held to one that
-// clears it, since the engine charges that sum to the month the loan
-// maths says the payments end in and a payment the interest swallows
-// gives it no such month.
+// balloon never negative, a rate no lower than losing everything, since
+// below that a year's growth is not a number, the name as typed less
+// the space around it, which the form also trims, and the shares the
+// salaries feeding the account sacrifice, each a fraction of the base
+// at most against a line by its id, one share a line, since the dialog
+// holds one and two would write the same line twice, and none against
+// anything but a pension, since only a pension is fed. What holds the
+// account as a whole is the household's to hold once it is written in:
+// a balance below nothing only on a debt, the spare money only into an
+// account that takes it, an owner on an ISA or a pension, one the
+// household lists, and on nothing else, a fixed sum within its
+// allowance on its own, and a debt paying its own fixed sum paying it
+// off, since the engine charges that sum to the month the loan maths
+// says the payments end in and a payment the interest swallows gives it
+// no such month.
 const values = z
   .object({
     balance: z.number().int(),
@@ -145,11 +119,6 @@ const values = z
       }),
     ),
   })
-  .refine((draft) => draft.kind === "debt" || draft.balance >= 0)
-  .refine((draft) => draft.funding === "fixed" || takesSpare(draft))
-  .refine((draft) => isOwned(draft) === (draft.owner !== null))
-  .refine(isWithinAllowance)
-  .refine(doesClear)
   .refine((draft) => isPension(draft) || draft.shares.length === 0)
   .refine(
     (draft) =>
@@ -157,7 +126,8 @@ const values = z
       draft.shares.length,
   ) satisfies z.ZodType<AccountDraft>;
 
-// An order: every account's id once, so the store can place them all.
+// An order: every account's id once, so the household can place them
+// all.
 const order = z
   .array(z.number().int().positive())
   .nonempty()
@@ -167,69 +137,101 @@ const target = z.number().int().positive().nullable();
 
 // Places the accounts in the order the ids are given, which is the order
 // they are listed in and the order the spare money is handed down them.
-// Checked and expired as a save is.
+// The order must name every account and no other: one that left an
+// account out would leave it with no place, and one naming an id no
+// account has is a caller's mistake rather than a result. Checked as a
+// save is.
 export async function placeAccountsInOrder(
   ids: readonly number[],
 ): Promise<void> {
   await requireSession();
-  await placeAccounts(getDb(), order.parse(ids));
-  updateTag(accountsTag);
+  const placed = order.parse(ids);
+  await amend(({ kept }) => {
+    if (placed.length !== kept.accounts.length) {
+      throw new Error("Not every account was placed");
+    }
+    return {
+      kept: {
+        ...kept,
+        accounts: placed.map((id) => found(kept.accounts, id, "account")),
+      },
+      result: undefined,
+    };
+  });
 }
 
 // Deletes the account with that id, and what cannot stand without it: a
 // house takes the loan secured on it and that loan's payments, and a
-// loan takes its payments, each line before its loan since the store
-// holds the links; a salary feeding the account stops, since the store
-// holds that link too, and is left earned whole. Checked as a save is,
-// and each tag expired with the write it answers for, so a failure
-// part way leaves every screen reading what was written rather than
-// what the cache held.
+// loan takes its payments; a salary feeding the account stops, and is
+// left earned whole, giving up nothing. All of it goes together or none
+// of it does. Checked as a save is.
 export async function removeAccount(id: number): Promise<void> {
   await requireSession();
   const at = z.number().int().positive().parse(id);
-  const db = getDb();
-  const loan = await findLoanAgainst(db, at);
-  if (loan !== null) {
-    await removeWithPayments(db, loan.id);
-  }
-  await stopFeeding(db, at);
-  updateTag(incomeLinesTag);
-  await removeWithPayments(db, at);
+  await amend(({ kept }) => {
+    found(kept.accounts, at, "account");
+    const gone = new Set([
+      at,
+      ...kept.accounts
+        .filter(({ secures }) => secures === at)
+        .map((loan) => loan.id),
+    ]);
+    return {
+      kept: {
+        ...kept,
+        accounts: kept.accounts.filter((account) => !gone.has(account.id)),
+        schedule: {
+          expenses: kept.schedule.expenses.filter(
+            ({ pays }) => pays === undefined || !gone.has(pays),
+          ),
+          income: kept.schedule.income.map((line) =>
+            line.feeds === at ? { ...line, feeds: null, sacrifice: 0 } : line,
+          ),
+        },
+      },
+      result: undefined,
+    };
+  });
 }
 
-// Writes an account: a new one when the id is null, else over the one
-// with that id, and hands back the account as the store now has it. An
-// action answers a POST from anywhere, so it checks the session for
-// itself and parses what it was sent rather than trusting the form; a
-// value the form could not have sent fails loudly. A pension a salary
-// feeds stays a pension and a debt a line pays stays a debt, so an edit
-// that would make either anything else is refused. The shares the
-// dialog holds for the salaries feeding the
-// account are written over theirs after the account, each held to a
-// line feeding it; a new account is fed by nothing, so a share sent
-// with one is refused before anything is written. Each tag is expired
-// with the write it answers for, the accounts' as soon as the account
-// is written and the lines' with each share, so the same round trip
-// carries the lists re-read and a share refused after the account
-// leaves the account written and seen rather than written and hidden.
+// Writes an account: a new one when the id is null, given the
+// household's next id, else over the one with that id, keeping the
+// asset a loan is secured on, and hands back the account as the
+// household now has it. An action answers a POST from anywhere, so it
+// checks the session for itself and parses what it was sent rather than
+// trusting the form; a value the form could not have sent fails loudly.
+// The household holds a pension a salary feeds to staying a pension and
+// a debt a line pays to staying a debt, so an edit that would make
+// either anything else is refused, and the salary is unlinked or the
+// payments sent away first. The shares the dialog holds for the salaries
+// feeding the account are written over theirs with it, each held to a
+// line feeding the account; a new account is fed by nothing, so a share
+// sent with one is refused. The account and its shares land together or
+// not at all.
 export async function saveAccount(
   id: null | number,
   draft: AccountDraft,
 ): Promise<Account> {
   await requireSession();
   const at = target.parse(id);
-  const { shares, ...parsed } = await values.parseAsync(draft);
-  if (at === null && shares.length > 0) {
-    throw new Error("Nothing feeds an account the store has not given an id");
-  }
-  const db = getDb();
-  const account =
-    at === null
-      ? await insertAccount(db, parsed)
-      : await writeOver(db, at, parsed);
-  updateTag(accountsTag);
-  await writeShares(db, account.id, shares);
-  return account;
+  const { shares, ...parsed } = values.parse(draft);
+  return amend(({ kept }) => {
+    const written = writtenIn(kept, at, toAccount(parsed, at ?? kept.next));
+    return {
+      kept: {
+        ...written.kept,
+        schedule: {
+          ...written.kept.schedule,
+          income: sacrificed(
+            written.kept.schedule.income,
+            written.result.id,
+            shares,
+          ),
+        },
+      },
+      result: written.result,
+    };
+  });
 }
 
 // Writes a car as the records it is, a new one when the id is null and
@@ -237,16 +239,18 @@ export async function saveAccount(
 // financed car the loan secured on it and the line of its payments, so
 // the finance appears among the accounts and its payments among the
 // expenses with no more asked of the form, and hands back the car's own
-// account. Checked as a save is, each tag expired with the write it
-// answers for, and the plan read for the year the payments start in.
+// account. Checked as a save is, the payments laid from the month the
+// plan is read in.
 export async function saveCar(
   id: null | number,
   draft: CarValues,
 ): Promise<Account> {
   await requireSession();
   const at = target.parse(id);
-  const records = toCarRecords(car.parse(draft), await getPlan());
-  return writeSecured(getDb(), at, records);
+  const parsed = car.parse(draft);
+  return amend((held) =>
+    securedIn(held, at, toCarRecords(parsed, held.household.plan)),
+  );
 }
 
 // Writes a house as the records it is, a new one when the id is null
@@ -254,88 +258,39 @@ export async function saveCar(
 // and for a mortgaged house the loan secured on it and the line of its
 // payments, so the mortgage appears among the accounts and its payments
 // among the expenses with no more asked of the form, and hands back the
-// house's own account. Checked as a save is, each tag expired with the
-// write it answers for, and the plan read for the year the payments
-// start in.
+// house's own account. Checked as a save is, the payments laid from the
+// month the plan is read in.
 export async function saveHouse(
   id: null | number,
   draft: HouseValues,
 ): Promise<Account> {
   await requireSession();
   const at = target.parse(id);
-  const records = toRecords(house.parse(draft), await getPlan());
-  return writeSecured(getDb(), at, records);
-}
-
-// Whether a debt's own fixed sum pays it off. The engine charges that
-// sum from the plan's month to the month the loan maths says the
-// payments clear the balance in, so a payment the month's interest
-// swallows has no month to stop at and no figure the plan can mean; the
-// save is where that stops, as it is where a balance below nothing on a
-// wrapper stops. Everything else is left alone. A debt paid nothing of
-// its own is a static figure nothing carries, one paid the spare money
-// is refused above, and the rate is the debt's own or the plan's, read
-// here as the engine reads it. Every other kind clears nothing and is
-// asked nothing.
-async function doesClear(draft: AccountValues): Promise<boolean> {
-  if (
-    draft.kind !== "debt" ||
-    draft.funding !== "fixed" ||
-    draft.contribution === 0
-  ) {
-    return true;
-  }
-  const payment =
-    draft.cadence === "year" ? draft.contribution / 12 : draft.contribution;
-  const rate = draft.growth === "plan" ? (await getPlan()).rate : draft.rate;
-  return (
-    termOf(
-      { balance: -draft.balance, balloon: draft.balloon },
-      payment,
-      rate,
-    ) !== null
+  const parsed = house.parse(draft);
+  return amend((held) =>
+    securedIn(held, at, toRecords(parsed, held.household.plan)),
   );
 }
 
-// An account and the line of its payments, if it is a loan with one,
-// gone: the line first, since the store holds the link and refuses to
-// leave it dangling, each expiring its own read as it goes.
-async function removeWithPayments(db: Database, id: number): Promise<void> {
-  const line = await findLinePaying(db, id);
-  if (line !== null) {
-    await deleteExpenseLine(db, line.id);
-    updateTag(expenseLinesTag);
-  }
-  await deleteAccount(db, id);
-  updateTag(accountsTag);
-}
-
-// The account with that id, written over with the values, through the
-// two checks every write over an account goes through: a pension a
-// salary feeds stays a pension, since the sacrifice would otherwise go
-// on leaving the salary and land in no wrapper, and a debt a line pays
-// stays a debt, since the line is that loan's payment and the engine
-// refuses a line paying anything else, so every projection read after
-// such an edit throws where the plan is worked out. An edit that would
-// make either anything else is refused, and the salary is unlinked or
-// the payments sent away first. The forms never offer such an edit, but
-// each action answers a POST from anywhere, and a house or a car
-// written over a pension's id is the same edit by another door, as is
-// the loan against either written over one: a loan made a pension by
-// such a POST keeps its asset, and the asset's next save would write a
-// debt back over it.
-async function writeOver(
-  db: Database,
-  at: number,
-  values: AccountValues,
-): Promise<Account> {
-  if (!isPension(values) && (await isFed(db, at))) {
-    throw new Error("A pension a salary feeds stays a pension");
-  }
-  if (values.kind !== "debt" && (await findLinePaying(db, at)) !== null) {
-    throw new Error("A debt a line pays stays a debt");
-  }
-  return updateAccount(db, at, values);
+// The shares written over the salaries' own, each against the line it
+// names, which has to be one feeding the account: a share written
+// against a line feeding another, or none, would land elsewhere or
+// nowhere, and is refused as a caller's mistake.
+function sacrificed(
+  income: readonly IncomeLine[],
+  account: number,
+  shares: readonly Share[],
+): IncomeLine[] {
+  return shares.reduce<IncomeLine[]>(
+    (lines, share) => {
+      const line = lines.find(({ id }) => id === share.line);
+      if (line?.feeds !== account) {
+        throw new Error("No salary feeding the account has the id");
+      }
+      return replaced(lines, { ...line, sacrifice: share.sacrifice });
+    },
+    [...income],
+  );
 }
 
 // An asset and the loan secured on it, written: the asset as a new
@@ -343,57 +298,87 @@ async function writeOver(
 // and hands back the asset's account. An edit finds the loan by the
 // asset and the line by the loan, writes over what is there and adds
 // what is not, and an asset with no loan against it now sends its loan
-// and the loan's line away. The records are written one after another
-// rather than in a transaction, since Neon's HTTP driver runs none; a
-// failure between them leaves what was written and reaches the form as
-// an error, and each tag is expired with the write it answers for, so
-// what was written is seen rather than hidden behind the cache until
-// it next turns over.
-async function writeSecured(
-  db: Database,
+// and the loan's line away. The whole lands together or not at all.
+function securedIn(
+  { kept }: Held,
   at: null | number,
   { asset, loan: secured }: SecuredRecords,
-): Promise<Account> {
-  const account =
-    at === null
-      ? await insertAccount(db, asset)
-      : await writeOver(db, at, asset);
-  updateTag(accountsTag);
-  const loan = at === null ? null : await findLoanAgainst(db, account.id);
+): { readonly kept: Kept; readonly result: Account } {
+  const written = writtenIn(kept, at, toAccount(asset, at ?? kept.next));
+  const { accounts, next, schedule } = written.kept;
+  const loan = accounts.find(({ secures }) => secures === written.result.id);
   if (secured === null) {
-    if (loan !== null) {
-      await removeWithPayments(db, loan.id);
-    }
-  } else if (loan === null) {
-    const written = await insertAccount(db, secured.account, account.id);
-    updateTag(accountsTag);
-    await insertExpenseLine(db, secured.line, written.id);
-    updateTag(expenseLinesTag);
-  } else {
-    await writeOver(db, loan.id, secured.account);
-    updateTag(accountsTag);
-    const line = await findLinePaying(db, loan.id);
-    if (line === null) {
-      await insertExpenseLine(db, secured.line, loan.id);
-    } else {
-      await updateExpenseLine(db, line.id, secured.line);
-    }
-    updateTag(expenseLinesTag);
+    return {
+      kept:
+        loan === undefined
+          ? written.kept
+          : {
+              ...written.kept,
+              accounts: accounts.filter((account) => account !== loan),
+              schedule: {
+                ...schedule,
+                expenses: schedule.expenses.filter(
+                  ({ pays }) => pays !== loan.id,
+                ),
+              },
+            },
+      result: written.result,
+    };
   }
-  return account;
+  // A loan the asset had keeps its id, and so does the line paying it;
+  // what is added takes the next, the loan before its line.
+  const debt = {
+    ...toAccount(secured.account, loan?.id ?? next),
+    secures: written.result.id,
+  };
+  const afterDebt = loan === undefined ? next + 1 : next;
+  const line = schedule.expenses.find(({ pays }) => pays === debt.id);
+  const payments = {
+    ...secured.line,
+    id: line?.id ?? afterDebt,
+    pays: debt.id,
+  };
+  return {
+    kept: {
+      ...written.kept,
+      accounts:
+        loan === undefined ? [...accounts, debt] : replaced(accounts, debt),
+      next: line === undefined ? afterDebt + 1 : afterDebt,
+      schedule: {
+        ...schedule,
+        expenses:
+          line === undefined
+            ? [...schedule.expenses, payments]
+            : replaced(schedule.expenses, payments),
+      },
+    },
+    result: written.result,
+  };
 }
 
-// The shares written over the salaries' own, each against the line
-// it names and held by the store to one feeding the account. The lines
-// are expired with each share, since one changed, and left where they
-// are when there are none: the tag goes with the write it answers for.
-async function writeShares(
-  db: Database,
-  id: number,
-  shares: readonly Share[],
-): Promise<void> {
-  for (const share of shares) {
-    await updateSacrifice(db, id, share);
-    updateTag(incomeLinesTag);
+// The account written into the household: added as the next when the
+// id is null, else written over the one with that id in its place,
+// keeping the asset a loan is secured on, since what an account
+// secures is not among the values a save sends.
+function writtenIn(
+  kept: Kept,
+  at: null | number,
+  account: Account,
+): { readonly kept: Kept; readonly result: Account } {
+  if (at === null) {
+    return {
+      kept: {
+        ...kept,
+        accounts: [...kept.accounts, account],
+        next: kept.next + 1,
+      },
+      result: account,
+    };
   }
+  const { secures } = found(kept.accounts, at, "account");
+  const written = { ...account, ...(secures !== undefined && { secures }) };
+  return {
+    kept: { ...kept, accounts: replaced(kept.accounts, written) },
+    result: written,
+  };
 }

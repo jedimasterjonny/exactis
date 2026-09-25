@@ -1,122 +1,129 @@
 // @vitest-environment node
-import { drizzle } from "drizzle-orm/neon-http";
-import { updateTag } from "next/cache";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { refresh } from "next/cache";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import * as z from "zod";
 
-import { isOwning } from "@/db/accounts";
+import { kept } from "@/data/household.fixture";
 import { getDb } from "@/db/client";
-import { deleteOwner, insertOwner, updateOwner } from "@/db/owners";
+import { keepAfter, readLatest } from "@/db/household";
+import { inMemory } from "@/db/memory.fixture";
 import { requireSession } from "@/lib/session";
-import { ownersTag } from "@/store/owners";
 
 import { removeOwner, saveOwner } from "./owners";
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/cache", () => ({
-  cacheLife: vi.fn(),
-  cacheTag: vi.fn(),
-  updateTag: vi.fn(),
-}));
-vi.mock("@/db/accounts", () => ({ isOwning: vi.fn() }));
+vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
-vi.mock("@/db/owners", () => ({
-  deleteOwner: vi.fn(),
-  insertOwner: vi.fn(),
-  updateOwner: vi.fn(),
-}));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 
-// A database that answers nothing, standing in for the one the client
-// would open; the queries are mocked, so it is only ever handed on.
-const db = drizzle.mock();
+const { close, db, empty, ready } = inMemory();
 
-const me = { id: 1, name: "Me" };
+// The reference household with a second owner, who holds nothing.
+const shared = {
+  ...kept,
+  next: 7,
+  owners: [...kept.owners, { id: 6, name: "Partner" }],
+};
 
-describe("saveOwner", () => {
-  beforeEach(() => {
+describe("the owner actions", () => {
+  beforeAll(ready);
+  beforeEach(async () => {
+    await empty();
     vi.mocked(getDb).mockReturnValue(db);
+    await keepAfter(db, 0, shared);
   });
+  afterAll(close);
 
-  it("writes nothing without a session", async () => {
-    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+  describe("saveOwner", () => {
+    it("writes nothing without a session", async () => {
+      vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-    await expect(saveOwner(null, { name: "Me" })).rejects.toThrow("redirected");
-    expect(insertOwner).not.toHaveBeenCalled();
-    expect(updateTag).not.toHaveBeenCalled();
-  });
-
-  it("inserts a new owner with the name trimmed and expires the tag", async () => {
-    vi.mocked(insertOwner).mockResolvedValue(me);
-
-    expect(await saveOwner(null, { name: " Me " })).toBe(me);
-    expect(insertOwner).toHaveBeenCalledExactlyOnceWith(db, { name: "Me" });
-    expect(updateOwner).not.toHaveBeenCalled();
-    expect(updateTag).toHaveBeenCalledExactlyOnceWith(ownersTag);
-  });
-
-  it("writes over the owner with the id", async () => {
-    vi.mocked(updateOwner).mockResolvedValue({ id: 1, name: "Alex" });
-
-    expect(await saveOwner(1, { name: "Alex" })).toStrictEqual({
-      id: 1,
-      name: "Alex",
+      await expect(saveOwner(null, { name: "Kid" })).rejects.toThrow(
+        "redirected",
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
-    expect(updateOwner).toHaveBeenCalledExactlyOnceWith(db, 1, {
-      name: "Alex",
+
+    it("adds a new owner with the name trimmed, given the next id, and draws the page again", async () => {
+      expect(await saveOwner(null, { name: "  Kid  " })).toStrictEqual({
+        id: 7,
+        name: "Kid",
+      });
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          next: 8,
+          owners: [...shared.owners, { id: 7, name: "Kid" }],
+        },
+        version: 2,
+      });
+      expect(refresh).toHaveBeenCalledOnce();
     });
-    expect(insertOwner).not.toHaveBeenCalled();
-    expect(updateTag).toHaveBeenCalledExactlyOnceWith(ownersTag);
+
+    it("writes over the owner with the id, in its place", async () => {
+      expect(await saveOwner(1, { name: "Jo" })).toStrictEqual({
+        id: 1,
+        name: "Jo",
+      });
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          next: 7,
+          owners: [
+            { id: 1, name: "Jo" },
+            { id: 6, name: "Partner" },
+          ],
+        },
+      });
+    });
+
+    it("refuses a name of nothing but space, an id the list could not have sent, and one no owner has", async () => {
+      await expect(saveOwner(null, { name: "   " })).rejects.toThrow(
+        z.ZodError,
+      );
+      await expect(saveOwner(0, { name: "Jo" })).rejects.toThrow(z.ZodError);
+      await expect(saveOwner(99, { name: "Jo" })).rejects.toThrow(
+        "No owner has the id",
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
   });
 
-  it("refuses a name of nothing but space, and an id the list could not have sent", async () => {
-    await expect(saveOwner(null, { name: "  " })).rejects.toThrow(z.ZodError);
-    await expect(saveOwner(0, { name: "Me" })).rejects.toThrow(z.ZodError);
-    expect(insertOwner).not.toHaveBeenCalled();
-    expect(updateOwner).not.toHaveBeenCalled();
-    expect(updateTag).not.toHaveBeenCalled();
-  });
-});
+  describe("removeOwner", () => {
+    it("deletes nothing without a session", async () => {
+      vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-describe("removeOwner", () => {
-  beforeEach(() => {
-    vi.mocked(getDb).mockReturnValue(db);
-  });
+      await expect(removeOwner(6)).rejects.toThrow("redirected");
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
 
-  it("deletes nothing without a session", async () => {
-    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+    it("deletes the owner with the id and draws the page again", async () => {
+      await removeOwner(6);
 
-    await expect(removeOwner(me.id)).rejects.toThrow("redirected");
-    expect(deleteOwner).not.toHaveBeenCalled();
-    expect(updateTag).not.toHaveBeenCalled();
-  });
+      expect(await readLatest(db)).toMatchObject({
+        household: { owners: kept.owners },
+        version: 2,
+      });
+      expect(refresh).toHaveBeenCalledOnce();
+    });
 
-  it("deletes the owner with the id and expires the tag", async () => {
-    vi.mocked(isOwning).mockResolvedValue(false);
+    it("refuses to delete an owner an account names, and writes nothing", async () => {
+      await expect(removeOwner(1)).rejects.toThrow(
+        "An owner who holds an account stays",
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
 
-    await removeOwner(me.id);
-
-    expect(isOwning).toHaveBeenCalledExactlyOnceWith(db, me.id);
-    expect(deleteOwner).toHaveBeenCalledExactlyOnceWith(db, me.id);
-    expect(updateTag).toHaveBeenCalledExactlyOnceWith(ownersTag);
-  });
-
-  // An ISA or a pension belongs to an owner, so an owner an account
-  // names stays until the account is given to another or deleted, and
-  // the refusal says so rather than the store's broken link.
-  it("refuses to delete an owner an account names", async () => {
-    vi.mocked(isOwning).mockResolvedValue(true);
-
-    await expect(removeOwner(me.id)).rejects.toThrow(
-      "An owner who holds an account stays",
-    );
-    expect(deleteOwner).not.toHaveBeenCalled();
-    expect(updateTag).not.toHaveBeenCalled();
-  });
-
-  it("refuses an id the list could not have sent", async () => {
-    await expect(removeOwner(0)).rejects.toThrow(z.ZodError);
-    expect(deleteOwner).not.toHaveBeenCalled();
-    expect(updateTag).not.toHaveBeenCalled();
+    it("refuses an id the list could not have sent, and one no owner has", async () => {
+      await expect(removeOwner(1.5)).rejects.toThrow(z.ZodError);
+      await expect(removeOwner(99)).rejects.toThrow("No owner has the id");
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
   });
 });
