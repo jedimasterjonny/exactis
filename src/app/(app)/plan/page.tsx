@@ -25,18 +25,19 @@ import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 // schedule takes the accounts too, for the pension a salary may feed,
 // and the owners, for the one a salary opens to belong to.
 // The header counts both schedules, so it is the page's rather than
-// either's. The plan is read after the lines, as the
-// projection reads it after the accounts: the reads behind the session
-// make the route dynamic, and the plan's year has to be read at request
-// time rather than while the shell is prerendered.
+// either's. The plan is read beside the lines, and reads the date
+// behind the session as they read the store, so its year is read at
+// request time rather than while the shell is prerendered.
 export default async function Plan(): Promise<JSX.Element> {
-  const [incomeLines, expenseLines, accounts, owners] = await Promise.all([
-    getIncomeLines(),
-    getExpenseLines(),
-    getAccounts(),
-    getOwners(),
-  ]);
-  const plan = getPlan();
+  const [incomeLines, expenseLines, accounts, owners, plan] = await Promise.all(
+    [
+      getIncomeLines(),
+      getExpenseLines(),
+      getAccounts(),
+      getOwners(),
+      getPlan(),
+    ],
+  );
   return (
     <>
       <ScreenHeader label={sectionLabel(planScreen)} title="Income & expenses">

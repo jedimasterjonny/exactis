@@ -2,7 +2,7 @@
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
-import { accounts, expenseLines, incomeLines } from "./schema";
+import { accounts, expenseLines, incomeLines, plan } from "./schema";
 
 // The links each table carries and the column each points at, read off
 // the table as drizzle-kit reads them, in the order of the columns they
@@ -40,5 +40,11 @@ describe("schema", () => {
     expect(linksOf(incomeLines)).toStrictEqual([
       { column: "feeds", foreignColumn: "id", foreignTable: "accounts" },
     ]);
+  });
+
+  it("holds the plan to its one row", () => {
+    expect(
+      getTableConfig(plan).checks.map((check) => check.name),
+    ).toStrictEqual(["plan_single"]);
   });
 });

@@ -31,7 +31,7 @@ describe("Accounts", () => {
     vi.mocked(getAccounts).mockResolvedValue([...accounts]);
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
     vi.mocked(getOwners).mockResolvedValue([{ id: 1, name: "Me" }]);
-    vi.mocked(getPlan).mockReturnValue(plan);
+    vi.mocked(getPlan).mockResolvedValue(plan);
 
     render(await Accounts());
 

@@ -38,7 +38,7 @@ describe("Plan", () => {
     vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
     vi.mocked(getAccounts).mockResolvedValue([...accounts]);
     vi.mocked(getOwners).mockResolvedValue([...owners]);
-    vi.mocked(getPlan).mockReturnValue(plan);
+    vi.mocked(getPlan).mockResolvedValue(plan);
 
     render(await Plan());
 
@@ -85,7 +85,7 @@ describe("Plan", () => {
     vi.mocked(getIncomeLines).mockResolvedValue([salary]);
     vi.mocked(getExpenseLines).mockResolvedValue([]);
     vi.mocked(getAccounts).mockResolvedValue([]);
-    vi.mocked(getPlan).mockReturnValue(plan);
+    vi.mocked(getPlan).mockResolvedValue(plan);
 
     render(await Plan());
 
