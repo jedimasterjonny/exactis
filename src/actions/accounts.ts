@@ -7,6 +7,7 @@ import type { CarValues } from "@/data/cars";
 import type { Kept } from "@/data/household";
 import type { HouseValues } from "@/data/houses";
 import type { IncomeLine } from "@/data/income";
+import type { Month } from "@/data/schedule";
 import type { SecuredRecords } from "@/data/secured";
 import type { Answer } from "@/lib/answer";
 import type { Held } from "@/store/household";
@@ -128,6 +129,12 @@ const values = z
       draft.shares.length,
   ) satisfies z.ZodType<AccountDraft>;
 
+// A month of a year, January being nought as the date gives it.
+const month = z.object({
+  month: z.number().int().min(0).max(11),
+  year: z.number().int().positive(),
+}) satisfies z.ZodType<Month>;
+
 // An order: every account's id once, so the household can place them
 // all.
 const order = z
@@ -233,6 +240,31 @@ export async function saveAccount(
       },
       result: written.result,
     };
+  });
+}
+
+// Moves the month the household's balances are as of, which is the
+// month the plan starts in, and hands back the month as the household
+// now has it. No balance moves with it: every balance is taken as that
+// month's from then on, so moving on a month is recording the balances
+// for it, account by account. A month that has not begun is refused,
+// since a balance is what an account held, and so is one before the
+// plan's owner was born, since the plan would run from it. Checked as a
+// save is.
+export async function saveBalancesMonth(draft: Month): Promise<Answer<Month>> {
+  await requireSession();
+  const asOf = month.parse(draft);
+  return amend(({ household, kept }) => {
+    const now = new Date();
+    if (asOf.year * 12 + asOf.month > now.getFullYear() * 12 + now.getMonth()) {
+      throw new Refusal("The balances are as of a month that has begun");
+    }
+    if (asOf.year < household.plan.born) {
+      throw new Refusal(
+        "The balances are as of a month after the plan's owner was born",
+      );
+    }
+    return { kept: { ...kept, asOf }, result: asOf };
   });
 }
 

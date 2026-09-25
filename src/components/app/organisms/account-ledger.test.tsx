@@ -119,7 +119,7 @@ function saved(account: Account): void {
 }
 
 describe("AccountLedger", () => {
-  it("opens with the header and the month it starts from, and no actions of its own", () => {
+  it("opens with the header, the month its balances are as of, and the one action to move it", () => {
     renderLedger();
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -132,8 +132,10 @@ describe("AccountLedger", () => {
       screen.getByText("Starting balances for the plan · September 2026"),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByRole("banner")).queryByRole("button"),
-    ).not.toBeInTheDocument();
+      within(screen.getByRole("banner"))
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toStrictEqual(["Balances month"]);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
