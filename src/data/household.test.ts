@@ -14,7 +14,8 @@ import { incomeLines, plan } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 import { project } from "@/engine/projection";
 
-import { household } from "./household";
+import { household, nothingKept, soundKept } from "./household";
+import { kept } from "./household.fixture";
 
 // A household made from the sound one to break one rule.
 type Break = (sound: Inputs) => Inputs;
@@ -296,6 +297,69 @@ describe("household", () => {
 
   it.each(held)("refuses what the actions hold as %s", (refusal, broken) => {
     expect(refusalsOf(broken(sound))).toContain(refusal);
+  });
+});
+
+describe("soundKept", () => {
+  const today = new Date("2026-09-15T12:00:00Z");
+
+  it("keeps the household before anything is saved and the reference plan, each with the plan on the day", () => {
+    expect(soundKept(nothingKept, today)).toStrictEqual({
+      household: {
+        accounts: [],
+        owners: [],
+        plan: {
+          born: 1990,
+          from: 2026,
+          month: 8,
+          rate: 0.05,
+          retires: 59,
+          years: 53,
+        },
+        schedule: { expenses: [], income: [] },
+      },
+      kept: nothingKept,
+    });
+    expect(soundKept(kept, today).kept).toStrictEqual(kept);
+  });
+
+  it("refuses a record whose id is not below the one the next is given", () => {
+    expect(() => soundKept({ ...kept, next: 5 }, today)).toThrow(
+      "A record's id is below the one the next record is given",
+    );
+  });
+
+  it("refuses ages the plan action refuses, in its words", () => {
+    expect(() =>
+      soundKept({ ...kept, ages: { ends: 60, retires: 61 } }, today),
+    ).toThrow("A plan's owner retires no later than it ends");
+    expect(() =>
+      soundKept({ ...kept, ages: { ends: 121, retires: 59 } }, today),
+    ).toThrow("A plan ends by 120");
+  });
+
+  it("refuses what is no kept household at all", () => {
+    expect(() => soundKept({ accounts: [] }, today)).toThrow(
+      "Invalid input: expected object, received undefined",
+    );
+  });
+
+  // The current account and the home each below nothing break the one
+  // rule twice; it is said once.
+  it("says each rule a household breaks once", () => {
+    expect(() =>
+      soundKept(
+        {
+          ...kept,
+          accounts: kept.accounts.map((listed) =>
+            listed.id === 3 || listed.id === 4
+              ? { ...listed, balance: -1 }
+              : listed,
+          ),
+        },
+        today,
+      ),
+    ).toThrow(/^A balance below nothing is a debt's$/);
   });
 });
 

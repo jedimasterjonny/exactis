@@ -1,60 +1,63 @@
 // @vitest-environment node
-import { drizzle } from "drizzle-orm/neon-http";
-import { updateTag } from "next/cache";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { refresh } from "next/cache";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import * as z from "zod";
 
-import { plan } from "@/data/income.fixture";
+import { nothingKept } from "@/data/household";
 import { getDb } from "@/db/client";
-import { findAges, writeAges } from "@/db/plan";
+import { keepAfter, readLatest } from "@/db/household";
+import { inMemory } from "@/db/memory.fixture";
 import { requireSession } from "@/lib/session";
-import { getPlan, planTag } from "@/store/plan";
 
 import { saveAges } from "./plan";
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/cache", () => ({ updateTag: vi.fn() }));
+vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
-vi.mock("@/db/plan", () => ({ findAges: vi.fn(), writeAges: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
-vi.mock("@/store/plan", () => ({ getPlan: vi.fn(), planTag: "plan" }));
 
-// A database that answers nothing, standing in for the one the client
-// would open; the queries are mocked, so it is only ever handed on.
-const db = drizzle.mock();
+const { close, db, empty, ready } = inMemory();
 
-// The fixture's plan is read in 2026 for someone born in 1990, who is
-// 36, and the store holds a plan to 89 retiring at 59.
+// The day the plan is read on, when its owner, born in 1990, is 36.
+const today = new Date("2026-09-15T12:00:00Z");
+
 describe("saveAges", () => {
-  beforeEach(() => {
+  beforeAll(ready);
+  beforeEach(async () => {
+    await empty();
     vi.mocked(getDb).mockReturnValue(db);
-    vi.mocked(getPlan).mockResolvedValue(plan);
-    vi.mocked(findAges).mockResolvedValue({ ends: 89, retires: 59 });
-    vi.mocked(writeAges).mockImplementation(
-      async (_db, ages) => await Promise.resolve(ages),
-    );
+    vi.useFakeTimers({ now: today, toFake: ["Date"] });
   });
+  afterAll(close);
 
   it("writes nothing without a session", async () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(saveAges({ retires: 60 })).rejects.toThrow("redirected");
-    expect(writeAges).not.toHaveBeenCalled();
+    expect(await readLatest(db)).toBeNull();
   });
 
-  it("writes the retirement age over the store's, keeping its end age, and expires the plan", async () => {
+  it("writes the retirement age over the household's, keeping its end age, and draws the page again", async () => {
     expect(await saveAges({ retires: 55 })).toStrictEqual({
       ends: 89,
       retires: 55,
     });
-    expect(writeAges).toHaveBeenCalledExactlyOnceWith(db, {
-      ends: 89,
-      retires: 55,
+    expect(await readLatest(db)).toStrictEqual({
+      household: { ...nothingKept, ages: { ends: 89, retires: 55 } },
+      version: 1,
     });
-    expect(updateTag).toHaveBeenCalledExactlyOnceWith(planTag);
+    expect(refresh).toHaveBeenCalledOnce();
   });
 
-  it("writes the end age over the store's, keeping its retirement age", async () => {
+  it("writes the end age over the household's, keeping its retirement age", async () => {
     expect(await saveAges({ ends: 95 })).toStrictEqual({
       ends: 95,
       retires: 59,
@@ -64,7 +67,7 @@ describe("saveAges", () => {
   it("refuses an age that is not a whole number, or is below nothing", async () => {
     await expect(saveAges({ retires: 59.5 })).rejects.toThrow(z.ZodError);
     await expect(saveAges({ retires: -1 })).rejects.toThrow(z.ZodError);
-    expect(writeAges).not.toHaveBeenCalled();
+    expect(await readLatest(db)).toBeNull();
   });
 
   // 36 is the age already reached, so a plan to it has no year left.
@@ -81,23 +84,22 @@ describe("saveAges", () => {
     });
     expect(await saveAges({ ends: 120 })).toStrictEqual({
       ends: 120,
-      retires: 59,
+      retires: 37,
     });
-    expect(writeAges).toHaveBeenCalledTimes(2);
+    expect(await readLatest(db)).toMatchObject({ version: 2 });
   });
 
-  // The store holds a plan to 35, which the fixture's owner of 36 has
-  // already outlived, as a plan saved years ago would be. It is kept as
-  // it is rather than held to today again, so a retirement age saved
-  // beside it stands, while one past it is still refused.
+  // The household holds a plan to 35, which its owner of 36 has already
+  // outlived, as a plan saved years ago would. It is kept as it is rather
+  // than held to today again, so a retirement age saved beside it
+  // stands, while one past it is still refused.
   it("keeps an end age already outlived rather than refusing a retirement age saved beside it", async () => {
-    vi.mocked(findAges).mockResolvedValue({ ends: 35, retires: 34 });
+    await keepAfter(db, 0, { ...nothingKept, ages: { ends: 35, retires: 34 } });
 
     expect(await saveAges({ retires: 30 })).toStrictEqual({
       ends: 35,
       retires: 30,
     });
-    expect(getPlan).not.toHaveBeenCalled();
     await expect(saveAges({ retires: 36 })).rejects.toThrow(
       "A plan's owner retires no later than it ends",
     );
@@ -116,6 +118,6 @@ describe("saveAges", () => {
       ends: 89,
       retires: 30,
     });
-    expect(writeAges).toHaveBeenCalledOnce();
+    expect(await readLatest(db)).toMatchObject({ version: 1 });
   });
 });
