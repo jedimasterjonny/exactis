@@ -17,6 +17,7 @@ import { kept } from "@/data/household.fixture";
 import { getDb } from "@/db/client";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
+import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
 import { removeIncomeLine, saveExpenseLine, saveIncomeLine } from "./schedule";
@@ -102,7 +103,7 @@ describe("the schedule actions", () => {
 
     it("adds a new line with the name trimmed, given the next id, and draws the page again", async () => {
       expect(await saveIncomeLine(null, values)).toStrictEqual(
-        lineOf(values, 6),
+        saved(lineOf(values, 6)),
       );
       expect(await readLatest(db)).toMatchObject({
         household: {
@@ -123,7 +124,7 @@ describe("the schedule actions", () => {
       } as const;
 
       expect(await saveIncomeLine(null, employment)).toStrictEqual(
-        lineOf(employment, 6),
+        saved(lineOf(employment, 6)),
       );
     });
 
@@ -136,11 +137,11 @@ describe("the schedule actions", () => {
       } as const;
 
       expect(await saveIncomeLine(null, sacrificing)).toStrictEqual(
-        lineOf(sacrificing, 6),
+        saved(lineOf(sacrificing, 6)),
       );
       expect(
         await saveIncomeLine(null, { ...sacrificing, sacrifice: 1 }),
-      ).toStrictEqual(lineOf({ ...sacrificing, sacrifice: 1 }, 7));
+      ).toStrictEqual(saved(lineOf({ ...sacrificing, sacrifice: 1 }, 7)));
     });
 
     // The ISA, the current account, and an id no account has.
@@ -153,7 +154,7 @@ describe("the schedule actions", () => {
             kind: "employment",
             sacrifice: 0.1,
           }),
-        ).rejects.toThrow("A salary feeds a pension alone");
+        ).resolves.toStrictEqual(refused("A salary feeds a pension alone"));
       }
       expect(await readLatest(db)).toMatchObject({ version: 1 });
       expect(refresh).not.toHaveBeenCalled();
@@ -179,10 +180,9 @@ describe("the schedule actions", () => {
         owner: 1,
       });
 
-      expect(await saveIncomeLine(null, opening)).toStrictEqual({
-        ...lineOf(opening, 7),
-        feeds: 6,
-      });
+      expect(await saveIncomeLine(null, opening)).toStrictEqual(
+        saved({ ...lineOf(opening, 7), feeds: 6 }),
+      );
       expect(await readLatest(db)).toMatchObject({
         household: {
           accounts: [...kept.accounts, aviva(6)],
@@ -197,10 +197,9 @@ describe("the schedule actions", () => {
         version: 2,
       });
 
-      expect(await saveIncomeLine(4, opening)).toStrictEqual({
-        ...lineOf(opening, 4),
-        feeds: 8,
-      });
+      expect(await saveIncomeLine(4, opening)).toStrictEqual(
+        saved({ ...lineOf(opening, 4), feeds: 8 }),
+      );
       expect(await readLatest(db)).toMatchObject({
         household: {
           accounts: [...kept.accounts, aviva(6), aviva(8)],
@@ -212,7 +211,7 @@ describe("the schedule actions", () => {
     it("writes over the line with the id, open-ended, in its place", async () => {
       expect(
         await saveIncomeLine(4, { ...values, lastYear: null }),
-      ).toStrictEqual(lineOf({ ...values, lastYear: null }, 4));
+      ).toStrictEqual(saved(lineOf({ ...values, lastYear: null }, 4)));
       expect(await readLatest(db)).toMatchObject({
         household: {
           next: 6,
@@ -287,10 +286,12 @@ describe("the schedule actions", () => {
           "A salary gives up a share only into a pension it feeds",
         ],
       ] as const) {
-        await expect(saveIncomeLine(null, draft)).rejects.toThrow(refusal);
+        await expect(saveIncomeLine(null, draft)).resolves.toStrictEqual(
+          refused(refusal),
+        );
       }
-      await expect(saveIncomeLine(99, values)).rejects.toThrow(
-        "No income line has the id",
+      await expect(saveIncomeLine(99, values)).resolves.toStrictEqual(
+        refused("No income line has the id"),
       );
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
@@ -316,8 +317,8 @@ describe("the schedule actions", () => {
 
     it("refuses an id the schedule could not have sent, and one no line has", async () => {
       await expect(removeIncomeLine(0)).rejects.toThrow(z.ZodError);
-      await expect(removeIncomeLine(99)).rejects.toThrow(
-        "No income line has the id",
+      await expect(removeIncomeLine(99)).resolves.toStrictEqual(
+        refused("No income line has the id"),
       );
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
@@ -336,7 +337,9 @@ describe("the schedule actions", () => {
     it("adds a new line with the name trimmed, given the next id, and draws the page again", async () => {
       const written = { ...expense, id: 6, name: "Nursery" };
 
-      expect(await saveExpenseLine(null, expense)).toStrictEqual(written);
+      expect(await saveExpenseLine(null, expense)).toStrictEqual(
+        saved(written),
+      );
       expect(await readLatest(db)).toMatchObject({
         household: {
           next: 7,
@@ -353,7 +356,9 @@ describe("the schedule actions", () => {
     it("takes a line ending in a month of its last year", async () => {
       expect(
         await saveExpenseLine(null, { ...expense, lastMonth: 2 }),
-      ).toStrictEqual({ ...expense, id: 6, lastMonth: 2, name: "Nursery" });
+      ).toStrictEqual(
+        saved({ ...expense, id: 6, lastMonth: 2, name: "Nursery" }),
+      );
     });
 
     it("writes over the line with the id, open-ended, in its place", async () => {
@@ -361,7 +366,7 @@ describe("the schedule actions", () => {
 
       expect(
         await saveExpenseLine(4, { ...expense, lastYear: null }),
-      ).toStrictEqual(written);
+      ).toStrictEqual(saved(written));
       expect(await readLatest(db)).toMatchObject({
         household: {
           next: 6,
@@ -388,12 +393,9 @@ describe("the schedule actions", () => {
         },
       });
 
-      expect(await saveExpenseLine(3, expense)).toStrictEqual({
-        ...expense,
-        id: 3,
-        name: "Nursery",
-        pays: 5,
-      });
+      expect(await saveExpenseLine(3, expense)).toStrictEqual(
+        saved({ ...expense, id: 3, name: "Nursery", pays: 5 }),
+      );
     });
 
     it("refuses what the form could not have sent", async () => {
@@ -412,12 +414,16 @@ describe("the schedule actions", () => {
     it("refuses a line the household cannot hold, in its words, and an id no line has", async () => {
       await expect(
         saveExpenseLine(null, { ...expense, lastYear: 2026 }),
-      ).rejects.toThrow("A line ends no earlier than it starts");
+      ).resolves.toStrictEqual(
+        refused("A line ends no earlier than it starts"),
+      );
       await expect(
         saveExpenseLine(null, { ...expense, lastMonth: 3, lastYear: null }),
-      ).rejects.toThrow("A line ends in a month only of a year it ends in");
-      await expect(saveExpenseLine(99, expense)).rejects.toThrow(
-        "No expense line has the id",
+      ).resolves.toStrictEqual(
+        refused("A line ends in a month only of a year it ends in"),
+      );
+      await expect(saveExpenseLine(99, expense)).resolves.toStrictEqual(
+        refused("No expense line has the id"),
       );
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });

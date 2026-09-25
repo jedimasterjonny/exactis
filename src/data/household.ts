@@ -19,6 +19,7 @@ import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
 import { endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
 import { lineGrowths } from "@/data/schedule";
+import { Refusal } from "@/lib/answer";
 import { monthly } from "@/lib/cadence";
 import { termOf } from "@/lib/loans";
 import { isWithinAllowance } from "@/lib/tax";
@@ -404,8 +405,8 @@ function isListedOnce(records: readonly { readonly id: number }[]): boolean {
   return new Set(records.map((record) => record.id)).size === records.length;
 }
 
-function refusalOf(error: z.ZodError): Error {
-  return new Error(
+function refusalOf(error: z.ZodError): Refusal {
+  return new Refusal(
     [...new Set(error.issues.map(({ message }) => message))].join("; "),
   );
 }

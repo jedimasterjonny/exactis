@@ -12,6 +12,7 @@ import type { Plan } from "@/data/plan";
 import { saveAges } from "@/actions/plan";
 import { Toaster } from "@/components/kit/toast";
 import { plan } from "@/data/income.fixture";
+import { refused, saved } from "@/lib/answer";
 
 import { PlanAssumptions } from "./plan-assumptions";
 
@@ -89,7 +90,7 @@ describe("PlanAssumptions", () => {
   });
 
   it("follows the age typed in the dialog and saves it, then closes and reports it", async () => {
-    vi.mocked(saveAges).mockResolvedValue({ ends: 95, retires: 59 });
+    vi.mocked(saveAges).mockResolvedValue(saved({ ends: 95, retires: 59 }));
     renderAssumptions();
 
     fireEvent.click(screen.getByRole("button", { name: "Assumptions" }));
@@ -116,8 +117,8 @@ describe("PlanAssumptions", () => {
   });
 
   it("stays open and says why when the store refuses the age", async () => {
-    vi.mocked(saveAges).mockRejectedValue(
-      new Error("A plan's owner retires no later than it ends"),
+    vi.mocked(saveAges).mockResolvedValue(
+      refused("A plan's owner retires no later than it ends"),
     );
     renderAssumptions();
 

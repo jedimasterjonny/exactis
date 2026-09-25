@@ -15,6 +15,7 @@ import { nothingKept } from "@/data/household";
 import { getDb } from "@/db/client";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
+import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
 import { saveAges } from "./plan";
@@ -46,10 +47,9 @@ describe("saveAges", () => {
   });
 
   it("writes the retirement age over the household's, keeping its end age, and draws the page again", async () => {
-    expect(await saveAges({ retires: 55 })).toStrictEqual({
-      ends: 89,
-      retires: 55,
-    });
+    expect(await saveAges({ retires: 55 })).toStrictEqual(
+      saved({ ends: 89, retires: 55 }),
+    );
     expect(await readLatest(db)).toStrictEqual({
       household: { ...nothingKept, ages: { ends: 89, retires: 55 } },
       version: 1,
@@ -58,10 +58,9 @@ describe("saveAges", () => {
   });
 
   it("writes the end age over the household's, keeping its retirement age", async () => {
-    expect(await saveAges({ ends: 95 })).toStrictEqual({
-      ends: 95,
-      retires: 59,
-    });
+    expect(await saveAges({ ends: 95 })).toStrictEqual(
+      saved({ ends: 95, retires: 59 }),
+    );
   });
 
   it("refuses an age that is not a whole number, or is below nothing", async () => {
@@ -72,20 +71,18 @@ describe("saveAges", () => {
 
   // 36 is the age already reached, so a plan to it has no year left.
   it("holds the end age past the age already reached and to 120", async () => {
-    await expect(saveAges({ ends: 36, retires: 30 })).rejects.toThrow(
-      "A plan ends after the age already reached and by 120",
+    await expect(saveAges({ ends: 36, retires: 30 })).resolves.toStrictEqual(
+      refused("A plan ends after the age already reached and by 120"),
     );
-    await expect(saveAges({ ends: 121 })).rejects.toThrow(
-      "A plan ends after the age already reached and by 120",
+    await expect(saveAges({ ends: 121 })).resolves.toStrictEqual(
+      refused("A plan ends after the age already reached and by 120"),
     );
-    expect(await saveAges({ ends: 37, retires: 37 })).toStrictEqual({
-      ends: 37,
-      retires: 37,
-    });
-    expect(await saveAges({ ends: 120 })).toStrictEqual({
-      ends: 120,
-      retires: 37,
-    });
+    expect(await saveAges({ ends: 37, retires: 37 })).toStrictEqual(
+      saved({ ends: 37, retires: 37 }),
+    );
+    expect(await saveAges({ ends: 120 })).toStrictEqual(
+      saved({ ends: 120, retires: 37 }),
+    );
     expect(await readLatest(db)).toMatchObject({ version: 2 });
   });
 
@@ -96,28 +93,26 @@ describe("saveAges", () => {
   it("keeps an end age already outlived rather than refusing a retirement age saved beside it", async () => {
     await keepAfter(db, 0, { ...nothingKept, ages: { ends: 35, retires: 34 } });
 
-    expect(await saveAges({ retires: 30 })).toStrictEqual({
-      ends: 35,
-      retires: 30,
-    });
-    await expect(saveAges({ retires: 36 })).rejects.toThrow(
-      "A plan's owner retires no later than it ends",
+    expect(await saveAges({ retires: 30 })).toStrictEqual(
+      saved({ ends: 35, retires: 30 }),
+    );
+    await expect(saveAges({ retires: 36 })).resolves.toStrictEqual(
+      refused("A plan's owner retires no later than it ends"),
     );
   });
 
   // A retirement already past says only that nothing is earned by
   // working, so 30 is sound for someone of 36.
   it("holds the retirement age to the plan's end, but not to the age reached", async () => {
-    await expect(saveAges({ retires: 90 })).rejects.toThrow(
-      "A plan's owner retires no later than it ends",
+    await expect(saveAges({ retires: 90 })).resolves.toStrictEqual(
+      refused("A plan's owner retires no later than it ends"),
     );
-    await expect(saveAges({ ends: 58 })).rejects.toThrow(
-      "A plan's owner retires no later than it ends",
+    await expect(saveAges({ ends: 58 })).resolves.toStrictEqual(
+      refused("A plan's owner retires no later than it ends"),
     );
-    expect(await saveAges({ retires: 30 })).toStrictEqual({
-      ends: 89,
-      retires: 30,
-    });
+    expect(await saveAges({ retires: 30 })).toStrictEqual(
+      saved({ ends: 89, retires: 30 }),
+    );
     expect(await readLatest(db)).toMatchObject({ version: 1 });
   });
 });

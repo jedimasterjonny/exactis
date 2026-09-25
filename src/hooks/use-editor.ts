@@ -1,6 +1,9 @@
 import { startTransition, useState, useTransition } from "react";
 
+import type { Answer } from "@/lib/answer";
+
 import { toast } from "@/components/kit/toast";
+import { acceptedOf } from "@/lib/answer";
 import { reasonOf } from "@/lib/errors";
 
 // An open dialog: the draft as it is, the draft as it opened, which the
@@ -29,7 +32,7 @@ interface EditorProps<TDraft, TSaved> {
   readonly describe: (saved: TSaved, values: TDraft) => string;
   readonly noun: string;
   readonly onSaved?: (saved: TSaved) => void;
-  readonly save: (id: null | number, values: TDraft) => Promise<TSaved>;
+  readonly save: (id: null | number, values: TDraft) => Promise<Answer<TSaved>>;
 }
 
 // What a dialog open for as long as it is mounted gets back: the same,
@@ -112,15 +115,16 @@ function useEntry<TDraft extends { readonly name: string }, TSaved>(
   // its save held until the store answers, then closes, onto whatever
   // the caller makes of the record; the close is a transition of its
   // own, since a state update after an await is not part of the one it
-  // awaited in. A store that refuses leaves the dialog open as it was,
-  // with the save free again, and says why under a toast: a rejection
-  // left to the transition would reach the nearest error boundary,
-  // which is the route's, and take the whole screen with it.
+  // awaited in. A store that refuses, or fails, leaves the dialog open as
+  // it was, with the save free again, and says why under a toast, a
+  // refusal in its own words: a rejection left to the transition would
+  // reach the nearest error boundary, which is the route's, and take the
+  // whole screen with it.
   function save(current: Entry<TDraft>): void {
     const values = { ...current.draft, name: current.draft.name.trim() };
     startSaving(async () => {
       try {
-        const record = await store(current.id, values);
+        const record = acceptedOf(await store(current.id, values));
         startTransition(() => {
           onSaved?.(record);
           setEntry(null);

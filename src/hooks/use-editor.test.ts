@@ -1,7 +1,12 @@
+import type { Mock } from "vitest";
+
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { Answer } from "@/lib/answer";
+
 import { toast } from "@/components/kit/toast";
+import { refused, saved } from "@/lib/answer";
 
 import { useEditor, useMountedEditor } from "./use-editor";
 
@@ -24,11 +29,11 @@ interface Saved extends Draft {
   readonly id: number;
 }
 
-type Store = (id: null | number, values: Draft) => Promise<Saved>;
+type Store = (id: null | number, values: Draft) => Promise<Answer<Saved>>;
 
 const blank: Draft = { amount: 0, name: "" };
 
-const saved: Saved = { amount: 4000, id: 6, name: "Lifetime ISA" };
+const written: Saved = { amount: 4000, id: 6, name: "Lifetime ISA" };
 
 // A draft as the fields report it, with the space around the name the
 // save is expected to drop.
@@ -120,7 +125,7 @@ describe("useEditor", () => {
   it("holds a new record's save in flight, then closes and reports it added", async () => {
     const store = vi.fn<Store>();
     // The store's answer is held back, so the save can be seen in flight.
-    let answer!: (record: Saved) => void;
+    let answer!: (answered: Answer<Saved>) => void;
     store.mockReturnValue(
       new Promise((resolve) => {
         answer = resolve;
@@ -149,7 +154,7 @@ describe("useEditor", () => {
     expect(result.current.entry).not.toBeNull();
     expect(toast.add).not.toHaveBeenCalled();
 
-    answer(saved);
+    answer(saved(written));
 
     await waitFor(() => {
       expect(result.current.entry).toBeNull();
@@ -163,10 +168,24 @@ describe("useEditor", () => {
   });
 
   // A refused save leaves the entry open and free to save again, and
-  // reports the refusal rather than throwing it to the route.
-  it("keeps a refused save open and says why", async () => {
+  // reports the refusal in its words rather than throwing it to the
+  // route; a save that fails outright is reported the same way.
+  it.each([
+    [
+      "refused",
+      (store: Mock<Store>): void => {
+        store.mockResolvedValue(refused("A salary feeds a pension alone"));
+      },
+    ],
+    [
+      "failed",
+      (store: Mock<Store>): void => {
+        store.mockRejectedValue(new Error("A salary feeds a pension alone"));
+      },
+    ],
+  ] as const)("keeps a %s save open and says why", async (_how, answer) => {
     const store = vi.fn<Store>();
-    store.mockRejectedValue(new Error("A salary feeds a pension alone"));
+    answer(store);
     const { result } = renderHook(() =>
       useEditor({
         describe: (record) => record.name,
@@ -198,7 +217,7 @@ describe("useEditor", () => {
   });
 
   it("saves over a record, tells the caller what it wrote and reports it updated", async () => {
-    const store = vi.fn<Store>().mockResolvedValue(saved);
+    const store = vi.fn<Store>().mockResolvedValue(saved(written));
     const onSaved = vi.fn<(record: Saved) => void>();
     const { result } = renderHook(() =>
       useEditor({
@@ -223,7 +242,7 @@ describe("useEditor", () => {
       amount: 4000,
       name: "Lifetime ISA",
     });
-    expect(onSaved).toHaveBeenCalledExactlyOnceWith(saved);
+    expect(onSaved).toHaveBeenCalledExactlyOnceWith(written);
     expect(toast.add).toHaveBeenCalledExactlyOnceWith({
       description: "Lifetime ISA · 4000",
       title: "Income line updated",
