@@ -4,7 +4,7 @@ import type { LoanFigure } from "@/lib/figures";
 import type { Owed } from "@/lib/loans";
 
 import { toValues } from "@/data/accounts";
-import { clearsIn, paymentOf, rateOf, termOf } from "@/lib/loans";
+import { paymentOf, rateOf, termOf } from "@/lib/loans";
 
 export type Agreement = (typeof agreements)[number];
 
@@ -115,17 +115,17 @@ export function isSound(car: CarValues): boolean {
 // its contribution, which is what the ledger shows against it, and left
 // owing the balloon, and its payments are a debt line of the same a
 // month, fixed in nominal terms as a finance payment is, from the plan's
-// first year to the month the last payment falls in, counted from the
-// month the plan starts in. On a PCP the balloon is refinanced on the
-// same terms when the agreement ends, so the payments carry on past it
-// until the whole balance clears, and the line runs to that month rather
-// than the agreement's end; it is open-ended when the payment never
-// clears it. The engine counts the payment once, as the line, since it leaves
+// first year and open-ended as saved: when its payments end is the
+// loan's to say, worked out from the finance whenever the household is
+// read, so it moves with the month the balances are as of, and on a PCP
+// runs past the agreement's end, since the balloon is refinanced on the
+// same terms until the whole balance clears. The engine counts the
+// payment once, as the line, since it leaves
 // the contribution of a loan a line pays out of the month's fixed sums.
 // Both are named for the car and the agreement it is on.
 export function toRecords(
   car: CarValues,
-  plan: { readonly from: number; readonly month: number },
+  plan: { readonly from: number },
 ): SecuredRecords {
   const asset: AccountValues = {
     balance: car.value,
@@ -144,8 +144,6 @@ export function toRecords(
     return { asset, loan: null };
   }
   const name = `${car.name} ${car.agreement === "pcp" ? "PCP" : "loan"}`;
-  const term = clearsAfter(car);
-  const end = term === null ? null : clearsIn(term, plan);
   return {
     asset,
     loan: {
@@ -168,8 +166,8 @@ export function toRecords(
         firstYear: plan.from,
         growth: "nominal",
         kind: "debt",
-        lastMonth: end?.month ?? null,
-        lastYear: end?.year ?? null,
+        lastMonth: null,
+        lastYear: null,
         name,
       },
     },

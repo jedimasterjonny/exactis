@@ -4,7 +4,7 @@ import type { LoanFigure } from "@/lib/figures";
 import type { Owed } from "@/lib/loans";
 
 import { toValues } from "@/data/accounts";
-import { clearsIn, paymentOf, rateOf, termOf } from "@/lib/loans";
+import { paymentOf, rateOf, termOf } from "@/lib/loans";
 
 // The house as the dialog holds it: the values, and the years the
 // mortgage has left to run. The term is not saved, since the store reads
@@ -90,15 +90,16 @@ export function isSound(house: HouseValues): boolean {
 // charged the rate as its growth and paid the payment a month as its
 // contribution, which is what the ledger shows against it, and its
 // payments are a debt line of the same a month, fixed in nominal terms
-// as a mortgage payment is, from the plan's first year to the month the
-// last payment falls in, counted from the month the plan starts in, or
-// open-ended when the payment never clears it. The engine counts the
+// as a mortgage payment is, from the plan's first year and open-ended as
+// saved: when its payments end is the loan's to say, worked out from
+// the mortgage whenever the household is read, so it moves with the
+// month the balances are as of. The engine counts the
 // payment once, as the line, since it leaves the contribution of a loan
 // a line pays out of the month's fixed sums. Both are named for the
 // house.
 export function toRecords(
   house: HouseValues,
-  plan: { readonly from: number; readonly month: number },
+  plan: { readonly from: number },
 ): SecuredRecords {
   const asset: AccountValues = {
     balance: house.value,
@@ -117,8 +118,6 @@ export function toRecords(
     return { asset, loan: null };
   }
   const name = `${house.name} mortgage`;
-  const term = termOf(owedOn(house), house.payment, house.rate);
-  const end = term === null ? null : clearsIn(term, plan);
   return {
     asset,
     loan: {
@@ -141,8 +140,8 @@ export function toRecords(
         firstYear: plan.from,
         growth: "nominal",
         kind: "debt",
-        lastMonth: end?.month ?? null,
-        lastYear: end?.year ?? null,
+        lastMonth: null,
+        lastYear: null,
         name,
       },
     },
