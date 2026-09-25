@@ -66,6 +66,21 @@ const tierBans = {
   organisms: ["templates"],
 };
 
+// The tier bans above are patterns over `@/…` specifiers, so a sibling
+// imported as "./field-row" is an edge they cannot see: an atom could compose
+// an atom by spelling it relatively and the rule would pass it. Every
+// relative import under src/components/app, in this commit and in every one
+// before it, is a test reaching for its own subject, which is not a
+// composition edge at all - so banning the spelling in the components
+// themselves costs nothing and leaves `@/` as the only way one component
+// names another. That is what makes the bans above complete rather than
+// advisory.
+const siblingPattern = {
+  group: ["./*", "../*"],
+  message:
+    "A component names another component by its @/ path, never relatively, because that is the spelling the tier bans are written against.",
+};
+
 const eslintConfig = defineConfig([
   // Deliberately the one block with no `files`, because neither option
   // names a rule, a plugin or a parser: an `eslint-disable` that no longer
@@ -321,24 +336,45 @@ const eslintConfig = defineConfig([
   // Templates ban no tier, so they take only the two patterns above from
   // the block before this one. src/app composes organisms and templates
   // and is above both.
-  ...Object.entries(tierBans).map(([tier, above]) => ({
-    files: [`src/components/app/${tier}/**`],
-    rules: {
-      "@typescript-eslint/no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            vendoredPattern,
-            routesPattern,
+  //
+  // Two blocks per tier, because flat config replaces a rule's options rather
+  // than merging them, so the narrower one has to restate what it keeps. The
+  // test files take the tier bans without the sibling one: a test importing
+  // "./field" is reaching for its subject rather than composing it, and that
+  // is the spelling every test in the tree uses.
+  ...Object.entries(tierBans).flatMap(([tier, above]) => {
+    const tierPattern = {
+      group: above.map((t) => `@/components/app/${t}/*`),
+      message: `A component composes what is below it, never above: ${tier} cannot import ${above.join(", ")}.`,
+    };
+    return [
+      {
+        files: [`src/components/app/${tier}/**`],
+        rules: {
+          "@typescript-eslint/no-restricted-imports": [
+            "error",
             {
-              group: above.map((t) => `@/components/app/${t}/*`),
-              message: `A component composes what is below it, never above: ${tier} cannot import ${above.join(", ")}.`,
+              patterns: [
+                vendoredPattern,
+                routesPattern,
+                tierPattern,
+                siblingPattern,
+              ],
             },
           ],
         },
-      ],
-    },
-  })),
+      },
+      {
+        files: [`src/components/app/${tier}/**/*.test.{ts,tsx}`],
+        rules: {
+          "@typescript-eslint/no-restricted-imports": [
+            "error",
+            { patterns: [vendoredPattern, routesPattern, tierPattern] },
+          ],
+        },
+      },
+    ];
+  }),
   // A tier rule cannot see a cycle. Two organisms importing each other both
   // point sideways, which the rule above allows and should: organism on
   // organism is the one same-tier edge atomic design permits. The companion
