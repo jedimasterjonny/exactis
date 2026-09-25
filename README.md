@@ -55,10 +55,11 @@ in `drizzle/`, and the queries are in `src/db/accounts.ts`, `src/db/income.ts`,
 `src/db/expenses.ts` and `src/db/plan.ts`.
 
 The accounts and plan screens read and write it, and the dashboard projects what
-it holds; the progress screen still shows the reference kit's figures.
-`DATABASE_URL` names the database, as `.env.example` shows. Nothing reads it
-until a query runs, so a build needs no database. Locally, point it at a Neon
-branch of your own and apply the migrations once:
+it holds and saves the age the plan's owner retires at; the progress screen
+still shows the reference kit's figures. `DATABASE_URL` names the database, as
+`.env.example` shows. Nothing reads it until a query runs, so a build needs no
+database. Locally, point it at a Neon branch of your own and apply the
+migrations once:
 
 ```bash
 bun run db:migrate
@@ -137,7 +138,8 @@ today's money, until the plan carries an inflation assumption.
 
 The dashboard reads the accounts, the lines and the plan from the store and
 hands them to the browser, which runs the engine itself, so a save on the
-accounts or the plan screen is a new projection on the next render. The cached
+accounts or the plan screen is a new projection on the next render and a
+retirement age dragged on the dashboard is projected as it moves. The cached
 reads every screen goes through live under `src/store`, and the server actions a
 save goes to under `src/actions`: neither is a route, and the organisms that
 save through an action sit beneath the routes.

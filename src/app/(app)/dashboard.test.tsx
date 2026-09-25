@@ -10,6 +10,7 @@ import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 
 import { Dashboard, DashboardPending } from "./dashboard";
 
+vi.mock("@/actions/plan", () => ({ saveAges: vi.fn() }));
 vi.mock("@/store/accounts", () => ({ getAccounts: vi.fn() }));
 vi.mock("@/store/plan", () => ({ getPlan: vi.fn() }));
 vi.mock("@/store/schedule", () => ({
@@ -87,13 +88,15 @@ describe("Dashboard", () => {
     }
   });
 
-  // Retirement is named twice: the tile's label, and the chart's mark.
+  // Retirement is named twice, the tile's label and the chart's mark,
+  // and the tile reads the plan's age.
   it("follows the tiles with the store's projection, marked where its owner retires", async () => {
     render(await Dashboard());
 
     expect(screen.getByRole("application")).toHaveClass("recharts-surface");
     expect(screen.getByText("Tax-free")).toBeInTheDocument();
     expect(screen.getAllByText("Retirement")).toHaveLength(2);
+    expect(screen.getByText("Last working year 58")).toBeInTheDocument();
   });
 });
 
