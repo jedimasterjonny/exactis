@@ -1,44 +1,70 @@
 import "server-only";
-import { cacheLife } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 
 import type { Account } from "@/data/accounts";
-import type { Plan } from "@/data/plan";
+import type { Plan, PlanAges } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { ProjectionPoint } from "@/engine/projection";
 
+import { getDb } from "@/db/client";
+import { findAges } from "@/db/plan";
 import { project } from "@/engine/projection";
+import { requireSession } from "@/lib/session";
 import { getAccounts } from "@/store/accounts";
 import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 
-// The plan, until there is an assumptions screen to set it on: five per
-// cent a year, thirty years out from this one, for someone born in 1990.
+// The tag every read of the plan's ages carries and every write of them
+// expires, so a save is seen on the way back from it.
+export const planTag = "plan";
+
+// The rest of the plan, until there is somewhere to set it: five per
+// cent a year, for someone born in 1990.
 const born = 1990;
 
 const rate = 0.05;
 
-const years = 30;
-
-// The plan as it stands, from this year and this month of it: what the
-// projection runs on and what the plan screen lays its lines over. The
-// date is read when the plan is, so it is read at request time.
-export function getPlan(): Plan {
+// The plan as it stands, from this year and this month of it, to the
+// age the store says it runs to: what the projection runs on and what
+// the plan screen lays its lines over. The ages are read behind the
+// session, as the accounts are, and the date after them, so it is read
+// at request time. A plan whose age is already reached runs no years
+// forward rather than a count below nothing.
+export async function getPlan(): Promise<Plan> {
+  await requireSession();
+  const { ends } = await readAges();
   const now = new Date();
-  return { born, from: now.getFullYear(), month: now.getMonth(), rate, years };
+  const from = now.getFullYear();
+  return {
+    born,
+    from,
+    month: now.getMonth(),
+    rate,
+    years: Math.max(0, born + ends - from),
+  };
 }
 
-// The projection, for whoever is signed in, run over the accounts and
-// the two schedules as the store has them. Each read checks the session
-// and is the read a save expires, so a save on either screen is seen
-// here on the way back from it too. The plan is read after them, so its
-// year is read at request time as they are, and all of it goes into the
-// projection's key.
+// The projection, for whoever is signed in, run over the accounts, the
+// two schedules and the plan as the store has them. Each read checks
+// the session and is the read a save expires, so a save on either
+// screen is seen here on the way back from it too, and all of it goes
+// into the projection's key.
 export async function getProjection(): Promise<ProjectionPoint[]> {
-  const [accounts, income, expenses] = await Promise.all([
+  const [accounts, income, expenses, plan] = await Promise.all([
     getAccounts(),
     getIncomeLines(),
     getExpenseLines(),
+    getPlan(),
   ]);
-  return readProjection(accounts, { expenses, income }, getPlan());
+  return readProjection(accounts, { expenses, income }, plan);
+}
+
+// A single user's plan is one entry, and hours is long enough that only
+// a save turns it over, which is what the tag is for.
+async function readAges(): Promise<PlanAges> {
+  "use cache";
+  cacheTag(planTag);
+  cacheLife("hours");
+  return findAges(getDb());
 }
 
 // Keyed on what it is run over, so a change to the accounts or the lines

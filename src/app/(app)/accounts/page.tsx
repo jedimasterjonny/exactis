@@ -14,16 +14,16 @@ import { getIncomeLines } from "@/store/schedule";
 // the section listing them; each read checks the session first, so the
 // page renders behind the loading screen beside it and the rest of the
 // shell does not wait for any of them. The
-// plan is read after them, as the plan page reads it, for the month
-// the ledger counts the salaries in: the reads behind the session make
-// the route dynamic, and the month has to be read at request time.
+// plan is read beside them, for the month the ledger counts the
+// salaries in; it reads the date behind the session as they read the
+// store, so the month is read at request time.
 export default async function Accounts(): Promise<JSX.Element> {
-  const [accounts, lines, owners] = await Promise.all([
+  const [accounts, lines, owners, { from, month }] = await Promise.all([
     getAccounts(),
     getIncomeLines(),
     getOwners(),
+    getPlan(),
   ]);
-  const { from, month } = getPlan();
   return (
     <AccountLedger
       accounts={accounts}

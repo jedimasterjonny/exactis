@@ -402,7 +402,7 @@ describe("saveAccount", () => {
   // seventy-five.
   it("reads a debt on the plan rate at the plan's rate", async () => {
     vi.mocked(insertAccount).mockResolvedValue(mortgage);
-    vi.mocked(getPlan).mockReturnValue({
+    vi.mocked(getPlan).mockResolvedValue({
       born: 1990,
       from: 2026,
       month: 8,
@@ -421,7 +421,7 @@ describe("saveAccount", () => {
 
     expect(await saveAccount(null, owing)).toBe(mortgage);
 
-    vi.mocked(getPlan).mockReturnValue({
+    vi.mocked(getPlan).mockResolvedValue({
       born: 1990,
       from: 2026,
       month: 8,
@@ -572,7 +572,7 @@ describe("saveHouse", () => {
   beforeEach(() => {
     vi.mocked(getDb).mockReturnValue(db);
     vi.mocked(findLinePaying).mockResolvedValue(null);
-    vi.mocked(getPlan).mockReturnValue({
+    vi.mocked(getPlan).mockResolvedValue({
       born: 1990,
       from: 2026,
       month: 8,
@@ -854,7 +854,7 @@ describe("saveCar", () => {
   beforeEach(() => {
     vi.mocked(getDb).mockReturnValue(db);
     vi.mocked(findLinePaying).mockResolvedValue(null);
-    vi.mocked(getPlan).mockReturnValue({
+    vi.mocked(getPlan).mockResolvedValue({
       born: 1990,
       from: 2026,
       month: 8,

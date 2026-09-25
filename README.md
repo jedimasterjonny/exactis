@@ -48,11 +48,11 @@ a second file repeating it.
 
 ## The store
 
-Accounts, income lines and expense lines live in Postgres, reached through
-[Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The schema is
-`src/db/schema.ts`, the migrations generated from it are in `drizzle/`, and the
-queries are in `src/db/accounts.ts`, `src/db/income.ts` and
-`src/db/expenses.ts`.
+Accounts, income lines, expense lines and the age the plan runs to live in
+Postgres, reached through [Drizzle](https://orm.drizzle.team) over Neon's HTTP
+driver. The schema is `src/db/schema.ts`, the migrations generated from it are
+in `drizzle/`, and the queries are in `src/db/accounts.ts`, `src/db/income.ts`,
+`src/db/expenses.ts` and `src/db/plan.ts`.
 
 The accounts and plan screens read and write it, and the dashboard projects what
 it holds; the progress screen still shows the reference kit's figures.

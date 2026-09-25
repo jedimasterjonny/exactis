@@ -1,0 +1,530 @@
+{
+  "id": "7a1e7105-8985-4982-bf3c-4ce94cc3e5c6",
+  "prevId": "5aa013ab-59c3-40c4-8a71-88ecb6fb7f52",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.accounts": {
+      "name": "accounts",
+      "schema": "",
+      "columns": {
+        "balance": {
+          "name": "balance",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "balloon": {
+          "name": "balloon",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cadence": {
+          "name": "cadence",
+          "type": "cadence",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cap": {
+          "name": "cap",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contribution": {
+          "name": "contribution",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "funding": {
+          "name": "funding",
+          "type": "funding",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "growth": {
+          "name": "growth",
+          "type": "growth_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "accounts_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "kind": {
+          "name": "kind",
+          "type": "account_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner": {
+          "name": "owner",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rate": {
+          "name": "rate",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "secures": {
+          "name": "secures",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "accounts_owner_owners_id_fk": {
+          "name": "accounts_owner_owners_id_fk",
+          "tableFrom": "accounts",
+          "tableTo": "owners",
+          "columnsFrom": [
+            "owner"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "accounts_secures_accounts_id_fk": {
+          "name": "accounts_secures_accounts_id_fk",
+          "tableFrom": "accounts",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "secures"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "accounts_owned": {
+          "name": "accounts_owned",
+          "value": "(\"accounts\".\"kind\" in ('tax-deferred', 'tax-free')) = (\"accounts\".\"owner\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.expense_lines": {
+      "name": "expense_lines",
+      "schema": "",
+      "columns": {
+        "amount": {
+          "name": "amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cadence": {
+          "name": "cadence",
+          "type": "cadence",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "first_year": {
+          "name": "first_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "growth": {
+          "name": "growth",
+          "type": "expense_growth",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "expense_lines_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "kind": {
+          "name": "kind",
+          "type": "expense_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_month": {
+          "name": "last_month",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_year": {
+          "name": "last_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pays": {
+          "name": "pays",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "expense_lines_pays_accounts_id_fk": {
+          "name": "expense_lines_pays_accounts_id_fk",
+          "tableFrom": "expense_lines",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "pays"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.income_lines": {
+      "name": "income_lines",
+      "schema": "",
+      "columns": {
+        "amount": {
+          "name": "amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bonus": {
+          "name": "bonus",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cadence": {
+          "name": "cadence",
+          "type": "cadence",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "feeds": {
+          "name": "feeds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_year": {
+          "name": "first_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "growth": {
+          "name": "growth",
+          "type": "income_growth",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "income_lines_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "kind": {
+          "name": "kind",
+          "type": "income_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_month": {
+          "name": "last_month",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_year": {
+          "name": "last_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rsu": {
+          "name": "rsu",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sacrifice": {
+          "name": "sacrifice",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "income_lines_feeds_accounts_id_fk": {
+          "name": "income_lines_feeds_accounts_id_fk",
+          "tableFrom": "income_lines",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "feeds"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.owners": {
+      "name": "owners",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "owners_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.plan": {
+      "name": "plan",
+      "schema": "",
+      "columns": {
+        "ends": {
+          "name": "ends",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "plan_single": {
+          "name": "plan_single",
+          "value": "\"plan\".\"id\" = 1"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.account_kind": {
+      "name": "account_kind",
+      "schema": "public",
+      "values": [
+        "car",
+        "cash",
+        "debt",
+        "house",
+        "real-asset",
+        "tax-deferred",
+        "tax-free"
+      ]
+    },
+    "public.cadence": {
+      "name": "cadence",
+      "schema": "public",
+      "values": [
+        "month",
+        "year"
+      ]
+    },
+    "public.expense_growth": {
+      "name": "expense_growth",
+      "schema": "public",
+      "values": [
+        "inflation",
+        "inflation-plus-1",
+        "inflation-plus-2",
+        "nominal",
+        "triple-lock"
+      ]
+    },
+    "public.expense_kind": {
+      "name": "expense_kind",
+      "schema": "public",
+      "values": [
+        "core",
+        "debt",
+        "other",
+        "time-bound"
+      ]
+    },
+    "public.funding": {
+      "name": "funding",
+      "schema": "public",
+      "values": [
+        "fixed",
+        "spare"
+      ]
+    },
+    "public.growth_kind": {
+      "name": "growth_kind",
+      "schema": "public",
+      "values": [
+        "fixed",
+        "plan"
+      ]
+    },
+    "public.income_growth": {
+      "name": "income_growth",
+      "schema": "public",
+      "values": [
+        "inflation",
+        "inflation-plus-1",
+        "inflation-plus-2",
+        "nominal",
+        "triple-lock"
+      ]
+    },
+    "public.income_kind": {
+      "name": "income_kind",
+      "schema": "public",
+      "values": [
+        "employment",
+        "other",
+        "pension",
+        "self-employment"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
