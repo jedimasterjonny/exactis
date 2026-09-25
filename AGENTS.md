@@ -170,12 +170,16 @@ because the vocabulary is open by design.
   on top.
 - Minimum diff surface. Formatter sweeps, drive-by renames and unrelated tidying
   get their own commit or do not happen.
-- Every commit stands alone. Regenerate `bun.lock` per commit, and check a
-  series in throwaway worktrees, one per commit: `git worktree add` at each
-  commit, then `bun install --frozen-lockfile` and every gate the hook runs in
-  each, one worktree after another. Not in parallel: the worktrees checked side
-  by side report failures that are not there, so a series takes as long as all
-  of its commits together and that is the price of a result worth reading.
+- Every commit stands alone. Regenerate `bun.lock` per commit. Checking the
+  whole series is not a step before pushing: the commit job owns that, and owns
+  it better, because it takes the range as a matrix and gives every commit a
+  runner of its own, so a series costs the time of its slowest commit where a
+  local walk costs the sum of all of them. The local equivalent is throwaway
+  worktrees, one per commit - `git worktree add` at each, then
+  `bun install --frozen-lockfile` and every gate the hook runs - and they have
+  to run one after another, since worktrees checked side by side report failures
+  that are not there. Reach for that when an answer is needed without a push,
+  not on the way to one.
 - Drop verification artefacts before the work lands: smoke-test files, scratch
   scripts, probe commits. Never fold them into a real commit.
 - The body says what was decided, what was rejected and why, and what was
@@ -196,10 +200,11 @@ here is what neither hook reaches:
   it.
 - `git rebase` does not re-run the hook, and nor does `git cherry-pick`. After
   reordering or amending, every commit in the series must still be green, not
-  only the tip, and the worktree check above is the only check those commits get
-  before CI. The pre-push hook does not stand in for it either: it runs the
-  suite at the tip, so a middle commit can be red under a green push, and the
-  commit job is what finds it.
+  only the tip. The pre-push hook does not stand in for that: it runs the suite
+  at the tip, so a middle commit can be red under a green push. The commit job
+  is what finds it, and that is where the check belongs rather than a gap in
+  front of it - a red middle commit blocks the merge whether or not anything
+  local saw it first.
 - Never suppress a diagnostic to clear a check, and never delete, skip or
   `.only` a test or loosen an assertion to match behaviour that is broken. A
   skipped test reports nothing, which is worse than red.
