@@ -1,17 +1,11 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 
-import type { Account } from "@/data/accounts";
 import type { Plan, PlanAges } from "@/data/plan";
-import type { Schedule } from "@/engine/cash-flow";
-import type { ProjectionPoint } from "@/engine/projection";
 
 import { getDb } from "@/db/client";
 import { findAges } from "@/db/plan";
-import { project } from "@/engine/projection";
 import { requireSession } from "@/lib/session";
-import { getAccounts } from "@/store/accounts";
-import { getExpenseLines, getIncomeLines } from "@/store/schedule";
 
 // The tag every read of the plan's ages carries and every write of them
 // expires, so a save is seen on the way back from it.
@@ -45,21 +39,6 @@ export async function getPlan(): Promise<Plan> {
   };
 }
 
-// The projection, for whoever is signed in, run over the accounts, the
-// two schedules and the plan as the store has them. Each read checks
-// the session and is the read a save expires, so a save on either
-// screen is seen here on the way back from it too, and all of it goes
-// into the projection's key.
-export async function getProjection(): Promise<ProjectionPoint[]> {
-  const [accounts, income, expenses, plan] = await Promise.all([
-    getAccounts(),
-    getIncomeLines(),
-    getExpenseLines(),
-    getPlan(),
-  ]);
-  return readProjection(accounts, { expenses, income }, plan);
-}
-
 // A single user's plan is one entry, and hours is long enough that only
 // a save turns it over, which is what the tag is for.
 async function readAges(): Promise<PlanAges> {
@@ -67,20 +46,4 @@ async function readAges(): Promise<PlanAges> {
   cacheTag(planTag);
   cacheLife("hours");
   return findAges(getDb());
-}
-
-// Keyed on what it is run over, so a change to the accounts or the lines
-// misses here rather than expiring anything and nothing needs a tag.
-// Hours is long enough that only a change turns it over. The engine is
-// cheap today; the entry is what keeps it cheap to read when it is not.
-//
-// eslint-disable-next-line @typescript-eslint/require-await -- "use cache" caches only an async function, and the engine is synchronous
-async function readProjection(
-  accounts: readonly Account[],
-  schedule: Schedule,
-  plan: Plan,
-): Promise<ProjectionPoint[]> {
-  "use cache";
-  cacheLife("hours");
-  return project(accounts, schedule, plan);
 }
