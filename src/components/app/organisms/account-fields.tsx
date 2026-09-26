@@ -8,7 +8,13 @@ import { MoneyField } from "@/components/app/molecules/money-field";
 import { RateField } from "@/components/app/molecules/rate-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
-import { allowanceOf, isOwned, kindLabels, takesSpare } from "@/data/accounts";
+import {
+  allowanceOf,
+  isOwned,
+  isPension,
+  kindLabels,
+  takesSpare,
+} from "@/data/accounts";
 import { cadenceOptions } from "@/lib/cadence";
 import { formatGbp } from "@/lib/money";
 import { optionsOf } from "@/lib/options";
@@ -44,6 +50,13 @@ const growths = [
   { label: "Fixed rate", value: "fixed" },
 ] as const;
 
+// What a pension is paid in a month that cannot pay it: what the month
+// has, or all of it, drawn from the cash and the ISAs.
+const shortfalls = [
+  { label: "Pay what it can", value: "month" },
+  { label: "Always fund it", value: "always" },
+] as const;
+
 // The treatments the dialog offers, in the order the reference's offers
 // them: a house and a car are left out, since each is written from a
 // dialog of its own.
@@ -60,8 +73,9 @@ const kinds = optionsOf(kindLabels, [
 // the owner beside them for an ISA or a pension, chosen from the owners
 // the ledger hands down and held until there is one to choose, the
 // balance and, for a wrapper or cash, the contribution choice on the
-// second, what that choice asks for on the third, a sum and its cadence
-// or a cap, and on the last the growth choice, with its rate stacked
+// second, with a pension's choice beside them of what it is paid in a
+// month that cannot pay it, what that choice asks for on the third, a
+// sum and its cadence or a cap, and on the last the growth choice, with its rate stacked
 // beneath it while the growth is fixed, beside whatever the dialog
 // adds. The fields are uncontrolled and mount with the account as it
 // opened, and report each change to the ledger, whose draft mirrors
@@ -128,7 +142,7 @@ export function AccountFields({
           />
         )}
       </FieldRow>
-      <FieldRow layout="pair">
+      <FieldRow layout={isPension(draft) ? "triple" : "pair"}>
         <MoneyField
           defaultValue={initial.balance}
           hint="A debt's is negative"
@@ -150,6 +164,17 @@ export function AccountFields({
               onFundingChange(funding);
             }}
             options={isFed ? fundingsOnTop : fundings}
+          />
+        )}
+        {isPension(draft) && (
+          <SelectField
+            defaultValue={initial.isAlwaysFunded ? "always" : "month"}
+            hint="Always draws on cash and ISAs, never a pension"
+            label="When short"
+            onValueChange={(shortfall) => {
+              onAmend({ isAlwaysFunded: shortfall === "always" });
+            }}
+            options={shortfalls}
           />
         )}
       </FieldRow>

@@ -17,7 +17,7 @@ import { saveAccount } from "@/actions/accounts";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { AccountFields } from "@/components/app/organisms/account-fields";
 import { SacrificeFields } from "@/components/app/organisms/sacrifice-fields";
-import { isOwned, takesSpare, toValues } from "@/data/accounts";
+import { isOwned, isPension, takesSpare, toValues } from "@/data/accounts";
 import { useMountedEditor } from "@/hooks/use-editor";
 import { feeding, listed } from "@/lib/feeders";
 import { ownerFor } from "@/lib/owners";
@@ -117,23 +117,29 @@ export function AccountDialog({
   // with it, which is what the choice mounts showing. A change that
   // stays on one side leaves the choice where it is. The owner goes with
   // a treatment nobody owns and comes back with a wrapper's, as below.
+  // Whether the account is always funded goes with any treatment but a
+  // pension's and comes back as the account opened with it, which is
+  // what the choice mounts showing when a pension is chosen again.
   function treat(current: Entry<Draft>, kind: AccountKind): void {
     const willTakeSpare = takesSpare({ kind });
-    const owner = ownerAfter(current, kind, owners);
+    const treated = {
+      isAlwaysFunded: isPension({ kind }) && current.initial.isAlwaysFunded,
+      kind,
+      owner: ownerAfter(current, kind, owners),
+    };
     if (!willTakeSpare && current.draft.funding === "spare") {
-      amend(current, { kind, owner, ...fundedBy(current, "fixed") });
+      amend(current, { ...treated, ...fundedBy(current, "fixed") });
     } else if (
       willTakeSpare &&
       !takesSpare(current.draft) &&
       current.initial.funding !== current.draft.funding
     ) {
       amend(current, {
-        kind,
-        owner,
+        ...treated,
         ...fundedBy(current, current.initial.funding),
       });
     } else {
-      amend(current, { kind, owner });
+      amend(current, treated);
     }
   }
 

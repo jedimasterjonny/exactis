@@ -510,6 +510,63 @@ describe("AccountDialog", () => {
     });
   });
 
+  // A pension always funded made cash is not, since only a pension may
+  // be, and the choice leaves with the treatment.
+  it("drops the mark of a pension always funded with another treatment", async () => {
+    const onSaved = vi.fn<(account: Account) => void>();
+    renderDialog({ ...pension, isAlwaysFunded: true }, onSaved);
+    const dialog = open();
+    vi.mocked(saveAccount).mockResolvedValue(saved(pension));
+
+    expect(choice(dialog, "When short")).toHaveTextContent("Always fund it");
+
+    fireEvent.change(choice(dialog, "Treatment"), {
+      target: { value: "cash" },
+    });
+
+    expect(
+      within(dialog).queryByRole("combobox", { name: "When short" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(vi.mocked(saveAccount).mock.calls[0]?.[1]).toMatchObject({
+      isAlwaysFunded: false,
+      kind: "cash",
+    });
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+  });
+
+  // Made cash and then a pension again, it is always funded as it
+  // opened, which the choice mounts showing, and saves so.
+  it("brings the mark back as it opened when a pension is chosen again", async () => {
+    const onSaved = vi.fn<(account: Account) => void>();
+    renderDialog({ ...pension, isAlwaysFunded: true }, onSaved);
+    const dialog = open();
+    vi.mocked(saveAccount).mockResolvedValue(saved(pension));
+
+    fireEvent.change(choice(dialog, "Treatment"), {
+      target: { value: "cash" },
+    });
+    fireEvent.change(choice(dialog, "Treatment"), {
+      target: { value: "tax-deferred" },
+    });
+
+    expect(choice(dialog, "When short")).toHaveTextContent("Always fund it");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(vi.mocked(saveAccount).mock.calls[0]?.[1]).toMatchObject({
+      isAlwaysFunded: true,
+      kind: "tax-deferred",
+    });
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+  });
+
   // A cash account made a wrapper takes the first owner, which its field
   // mounts showing.
   it("gives an account made a wrapper the first owner", async () => {
