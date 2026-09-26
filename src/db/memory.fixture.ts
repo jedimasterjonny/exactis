@@ -11,7 +11,7 @@ import { householdVersions } from "@/db/schema";
 // for the one the client opens. Booting and migrating one costs about a
 // second, so a file makes one and readies it once, and empties it before
 // each test, which a TRUNCATE does where the trigger refuses a DELETE.
-interface Memory {
+export interface Memory {
   readonly close: () => Promise<void>;
   readonly db: Database;
   readonly empty: () => Promise<void>;

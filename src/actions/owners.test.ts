@@ -1,20 +1,12 @@
 // @vitest-environment node
 import { refresh } from "next/cache";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
 import { kept } from "@/data/household.fixture";
-import { getDb } from "@/db/client";
-import { keepAfter, readLatest } from "@/db/household";
+import { readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
+import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
@@ -25,7 +17,8 @@ vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 
-const { close, db, empty, ready } = inMemory();
+const memory = inMemory();
+const { db } = memory;
 
 // The reference household with a second owner, who holds nothing.
 const shared = {
@@ -35,13 +28,7 @@ const shared = {
 };
 
 describe("the owner actions", () => {
-  beforeAll(ready);
-  beforeEach(async () => {
-    await empty();
-    vi.mocked(getDb).mockReturnValue(db);
-    await keepAfter(db, 0, shared);
-  });
-  afterAll(close);
+  standUp(memory, { seed: shared });
 
   describe("saveOwner", () => {
     it("writes nothing without a session", async () => {
