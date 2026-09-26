@@ -4,6 +4,17 @@ import type { Answer } from "@/lib/answer";
 
 import { useSender } from "@/hooks/use-sender";
 
+// What the confirm dialog is handed for the record asked about, which
+// every bin's was handed the same way: the title asking whether to
+// delete it, by the words the toast describes it in, whether the
+// deletion is on its way, and the two answers.
+interface Question {
+  readonly isBusy: boolean;
+  readonly onCancel: () => void;
+  readonly onConfirm: () => void;
+  readonly title: string;
+}
+
 // What the caller gets back: the record the question is open on, which a
 // screen holds one or none of, so it doubles as the confirm dialog's open
 // state; the three things that move it; and whether a deletion is in
@@ -14,6 +25,7 @@ interface Remover<TDoomed> {
   readonly confirm: (current: TDoomed) => void;
   readonly doomed: null | TDoomed;
   readonly isRemoving: boolean;
+  readonly questionOf: (current: TDoomed) => Question;
 }
 
 // What the remover is given: the store action a deletion goes to, the
@@ -29,10 +41,11 @@ interface RemoverProps<TDoomed> {
 // before it. What differs between them is not the machine but what it is
 // pointed at: the record is the caller's shape, constrained only to have
 // an id, since the id is all the store is sent; the action is the
-// caller's, as are the words the toast carries. What stays the caller's
-// is the question itself, since the dialog's title names the record and
-// its sentence says what goes with it, and what goes with an account is
-// not what goes with an income line. Cancel and confirm are its words
+// caller's, as are the words the toast carries. The question is asked
+// the same way of every record, "Delete" and the record as the toast
+// describes it, but what stays the caller's is the sentence beneath it,
+// which says what goes with the record, since what goes with an account
+// is not what goes with an income line. Cancel and confirm are its words
 // rather than the editor's dismiss and save, because the dialog they
 // drive says Cancel and Delete, and because an organism holding both
 // hooks would otherwise have two dismisses to tell apart.
@@ -72,5 +85,19 @@ export function useRemover<TDoomed extends { readonly id: number }>({
     });
   }
 
-  return { ask, cancel, confirm, doomed, isRemoving };
+  // What the confirm dialog is handed for the record: "Delete Lifetime
+  // ISA?", the confirm held while the deletion is on its way, and the
+  // two answers. What goes with the record stays the caller's to say.
+  function questionOf(current: TDoomed): Question {
+    return {
+      isBusy: isRemoving,
+      onCancel: cancel,
+      onConfirm: (): void => {
+        confirm(current);
+      },
+      title: `Delete ${describe(current)}?`,
+    };
+  }
+
+  return { ask, cancel, confirm, doomed, isRemoving, questionOf };
 }

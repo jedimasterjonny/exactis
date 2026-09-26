@@ -79,7 +79,7 @@ export function CarDialog({
 }: CarDialogProps): JSX.Element | null {
   // The store answers with the car's own account, which the caller is
   // not told, so the answer's type is stated rather than inferred.
-  const { amend, entry, isSaving, save } = useMountedEditor<Draft, Account>({
+  const { amend, dialogOf, entry } = useMountedEditor<Draft, Account>({
     describe: (saved, values) => described(saved.name, values.agreement),
     noun: "Car",
     onSaved,
@@ -92,9 +92,8 @@ export function CarDialog({
   const { canSave, clears, figure, values, worked } = workedOut(entry.draft);
   return (
     <EditDialog
-      canSave={!isSaving && canSave}
-      eyebrow={entry.id === null ? "New car" : "Edit car"}
-      isSaving={isSaving}
+      {...dialogOf(entry)}
+      canSave={canSave}
       isWide
       onDelete={
         car === null || onDelete === undefined
@@ -104,9 +103,6 @@ export function CarDialog({
             }
       }
       onDismiss={onDismiss}
-      onSave={() => {
-        save(entry);
-      }}
       title={values.name || "Untitled car"}
     >
       <CarFields

@@ -33,11 +33,22 @@ interface EditorProps<TDraft, TSaved> {
   readonly save: (id: null | number, values: TDraft) => Promise<Answer<TSaved>>;
 }
 
+// What the edit dialog is handed for an entry, which every editor's
+// dialog was handed the same way: the eyebrow saying whether the record
+// is new or edited, in the noun the toasts carry, whether a save is on
+// its way, and the save of the entry.
+interface EntryDialog {
+  readonly eyebrow: string;
+  readonly isSaving: boolean;
+  readonly onSave: () => void;
+}
+
 // What a dialog open for as long as it is mounted gets back: the same,
 // less the two it cannot use, since it is opened by being rendered and
 // closed by being dropped.
 interface MountedEditor<TDraft> {
   readonly amend: (current: Entry<TDraft>, patch: Partial<TDraft>) => void;
+  readonly dialogOf: (current: Entry<TDraft>) => EntryDialog;
   readonly entry: Entry<TDraft> | null;
   readonly isSaving: boolean;
   readonly save: (current: Entry<TDraft>) => void;
@@ -82,8 +93,11 @@ export function useMountedEditor<
   TDraft extends { readonly name: string },
   TSaved,
 >(props: MountedEditorProps<TDraft, TSaved>): MountedEditor<TDraft> {
-  const { amend, entry, isSaving, save } = useEntry(props, props.opening);
-  return { amend, entry, isSaving, save };
+  const { amend, dialogOf, entry, isSaving, save } = useEntry(
+    props,
+    props.opening,
+  );
+  return { amend, dialogOf, entry, isSaving, save };
 }
 
 // What both entry points are: the state, and the four or six things
@@ -98,6 +112,19 @@ function useEntry<TDraft extends { readonly name: string }, TSaved>(
 
   function amend(current: Entry<TDraft>, patch: Partial<TDraft>): void {
     setEntry({ ...current, draft: { ...current.draft, ...patch } });
+  }
+
+  // What the edit dialog is handed for the entry: "New income line" or
+  // "Edit income line" above the title, the save held while one is on
+  // its way, and the save.
+  function dialogOf(current: Entry<TDraft>): EntryDialog {
+    return {
+      eyebrow: `${current.id === null ? "New" : "Edit"} ${noun.toLowerCase()}`,
+      isSaving,
+      onSave: (): void => {
+        save(current);
+      },
+    };
   }
 
   function dismiss(): void {
@@ -129,5 +156,5 @@ function useEntry<TDraft extends { readonly name: string }, TSaved>(
     });
   }
 
-  return { amend, dismiss, entry, isSaving, open, save };
+  return { amend, dialogOf, dismiss, entry, isSaving, open, save };
 }

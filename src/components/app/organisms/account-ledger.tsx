@@ -95,7 +95,7 @@ export function AccountLedger({
   const [account, setAccount] = useState<AccountOpening | null>(null);
   const [house, setHouse] = useState<AssetOpening | null>(null);
   const [car, setCar] = useState<AssetOpening | null>(null);
-  const { ask, cancel, confirm, doomed, isRemoving } = useRemover<Account>({
+  const { ask, doomed, questionOf } = useRemover<Account>({
     describe: (account) => account.name,
     noun: "Account",
     remove: removeAccount,
@@ -340,14 +340,7 @@ export function AccountLedger({
         />
       )}
       {doomed !== null && (
-        <ConfirmDialog
-          isBusy={isRemoving}
-          onCancel={cancel}
-          onConfirm={() => {
-            confirm(doomed);
-          }}
-          title={`Delete ${doomed.name}?`}
-        >
+        <ConfirmDialog {...questionOf(doomed)}>
           {goesWith(doomed, order, lines)}
         </ConfirmDialog>
       )}
