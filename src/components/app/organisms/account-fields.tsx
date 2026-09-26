@@ -57,6 +57,14 @@ const shortfalls = [
   { label: "Always fund it", value: "always" },
 ] as const;
 
+// What the hint beneath the choice says of whichever is chosen. It said
+// where an always funded pension's money comes from whatever the choice,
+// so beneath "Pay what it can" it described the other answer.
+const shortfallHints = {
+  always: "Always draws on cash and ISAs, never a pension",
+  month: "Paid only what the month has left",
+} as const;
+
 // The treatments the dialog offers, in the order the reference's offers
 // them: a house and a car are left out, since each is written from a
 // dialog of its own.
@@ -169,7 +177,7 @@ export function AccountFields({
         {isPension(draft) && (
           <SelectField
             defaultValue={initial.isAlwaysFunded ? "always" : "month"}
-            hint="Always draws on cash and ISAs, never a pension"
+            hint={shortfallHints[draft.isAlwaysFunded ? "always" : "month"]}
             label="When short"
             onValueChange={(shortfall) => {
               onAmend({ isAlwaysFunded: shortfall === "always" });
