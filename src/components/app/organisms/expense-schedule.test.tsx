@@ -62,6 +62,9 @@ describe("ExpenseSchedule", () => {
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       "Expenses by year",
     );
+    expect(
+      screen.getByRole("region", { name: "Expenses by year" }),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(expenseLines.length);
     expect(screen.getAllByRole("button", { name: /^Edit / })).toHaveLength(
       expenseLines.length,
