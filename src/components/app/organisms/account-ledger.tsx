@@ -103,12 +103,13 @@ export function AccountLedger({
     (_current: readonly Account[], next: readonly Account[]) => next,
   );
   // Each asset with the loan it shares a row with, and the accounts paid
-  // out of the month, in the order they are paid: every one but an
-  // asset, a paired loan among them, since its payments are met in the
-  // order as any other's are. The savings section lists them less the
-  // paired loans, which are read on their assets' rows instead, and less
-  // the debts left, which are secured on nothing with a row and have a
-  // section of their own, drawn only when there is one.
+  // out of the month: every one but an asset, a paired loan among them.
+  // The savings section lists them less the paired loans, which are read
+  // on their assets' rows instead, and less the debts left, which are
+  // secured on nothing with a row and have a section of their own, drawn
+  // only when there is one. The savings are the order of payment too,
+  // in the order they are paid, since a debt is paid before any of them
+  // wherever it is listed and has no place in the order to set.
   const assets = order
     .filter(isAsset)
     .map((asset) => securedFor(asset, order) ?? { asset, loan: null });
@@ -139,9 +140,9 @@ export function AccountLedger({
 
   // Where the order and the owners sit among the sections: the order
   // after the debts when there are any, and the owners after the order
-  // when it is drawn, which it is not for fewer than two accounts.
+  // when it is drawn, which it is not for fewer than two savings.
   const orderPlace = debts.length > 0 ? 4 : 3;
-  const ownersPlace = paid.length < 2 ? orderPlace : orderPlace + 1;
+  const ownersPlace = savings.length < 2 ? orderPlace : orderPlace + 1;
 
   // The month the plan starts in as the loan maths counts from it, for
   // the two dialogs that let a loan's end be picked as a date.
@@ -299,7 +300,7 @@ export function AccountLedger({
           </SectionCard>
         )}
         <PaymentOrder
-          accounts={paid}
+          accounts={savings}
           label={subsectionLabel(accountsAndAssets, orderPlace)}
           onMove={move}
         />

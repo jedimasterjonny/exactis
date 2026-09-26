@@ -29,14 +29,17 @@ interface PaymentOrderProps {
   readonly onMove: (account: Account, target: Account) => void;
 }
 
-// The order the accounts are paid and drawn in, as a section of its own
+// The order the savings are paid and drawn in, as a section of its own
 // rather than as the order of a table's rows, where it went unread: the
 // rows looked unsorted, since nothing said what they were sorted by.
 // The order decides three things, and the card says all three, where
 // the note it replaces named only the spare money: which fixed payment
 // is met first when a month runs short, which account takes the spare
-// money first, and which account of a kind is drawn on first. The card
-// numbers the accounts down the line and says nothing else of them.
+// money first, and which account of a kind is drawn on first. A debt
+// has no place in it, being paid before any saving and drawn for when
+// the month is short of it, so the card is handed the savings alone
+// and says that the debts come first. It numbers the savings down the
+// line and says nothing else of them.
 // Reordering is a dialog opened from the card, whose rows are dragged
 // by their grips or moved with the arrow keys, each move reported as it
 // lands and sent to the store by the caller, as the grips on the table
@@ -73,7 +76,7 @@ export function PaymentOrder({
             Reorder
           </Button>
         }
-        caption="When a month runs short, fixed payments are met in this order. Spare money is handed down it too, and savings are drawn on in it one kind at a time."
+        caption="Debts are always paid first. Savings are then paid in this order, and drawn on in it one kind at a time."
         label={label}
         title="Order of payment"
       >
