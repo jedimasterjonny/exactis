@@ -98,10 +98,11 @@ const house = z
 // a balance below nothing only on a debt, the spare money only into an
 // account that takes it, an owner on an ISA or a pension, one the
 // household lists, and on nothing else, a fixed sum within its
-// allowance on its own, and a debt paying its own fixed sum paying it
-// off, since the engine charges that sum to the month the loan maths
-// says the payments end in and a payment the interest swallows gives it
-// no such month.
+// allowance on its own, a debt paying its own fixed sum paying it off,
+// since the engine charges that sum to the month the loan maths says
+// the payments end in and a payment the interest swallows gives it no
+// such month, and the mark of an account always funded on a pension
+// alone.
 const values = z
   .object({
     balance: z.number().int(),
@@ -111,6 +112,7 @@ const values = z
     contribution: z.number().int().nonnegative(),
     funding: z.enum(fundings),
     growth: z.enum(growthKinds),
+    isAlwaysFunded: z.boolean(),
     kind: z.enum(accountKinds),
     name: z.string().trim().min(1),
     owner: z.number().int().positive().nullable(),

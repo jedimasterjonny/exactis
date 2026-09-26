@@ -166,6 +166,11 @@ const held: readonly Case[] = [
     (given): Inputs => changed(given, 3, (cash) => ({ ...cash, secures: 4 })),
   ],
   [
+    "Only a pension is always funded",
+    (given): Inputs =>
+      changed(given, 2, (isa) => ({ ...isa, isAlwaysFunded: true })),
+  ],
+  [
     "A loan is secured on an asset the household lists",
     (given): Inputs =>
       changed(given, 5, (mortgage) => ({ ...mortgage, secures: 3 })),
