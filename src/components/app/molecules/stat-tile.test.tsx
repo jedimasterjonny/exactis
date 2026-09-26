@@ -22,7 +22,13 @@ describe("StatTile", () => {
     );
 
     expect(screen.getByText("Net worth at 91")).toHaveClass("label");
-    expect(screen.getByText("£4,218,760")).toHaveClass("figure");
+    expect(screen.getByText("£4,218,760")).toHaveClass(
+      "figure",
+      "text-base",
+      "@[7.5rem]:text-xl",
+      "@[8.75rem]:text-2xl",
+      "@[11rem]:text-3xl",
+    );
     expect(screen.getByText("+£231,906")).toHaveClass("text-positive");
     expect(screen.getByText(bySlot("card-content"))).toHaveTextContent(
       "vs Jul run",

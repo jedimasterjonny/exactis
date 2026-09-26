@@ -21,7 +21,12 @@ interface StatTileProps {
 // arrives formatted; the tile never rounds. Exactly one tile per dashboard
 // takes the inverse tone and carries the figure that matters most. The tone
 // is a data attribute the stylesheet scopes tokens on, so every part inside,
-// the delta included, recolours without being told.
+// the delta included, recolours without being told. The figure steps down
+// with the width of the card's header, which the registry makes a
+// container, so a figure of ten characters, a balance in the millions,
+// fits a tile two across a phone, down to a 320px one; every tile in a
+// row is the same width, so the figures in it step together whatever
+// each one's length.
 export function StatTile({
   caption,
   delta,
@@ -41,7 +46,7 @@ export function StatTile({
           {label}
         </span>
         <span className="flex items-baseline gap-1.5">
-          <span className="figure text-3xl font-medium tracking-tight">
+          <span className="figure text-base font-medium tracking-tight @[7.5rem]:text-xl @[8.75rem]:text-2xl @[11rem]:text-3xl">
             {value}
           </span>
           {unit !== undefined && (
