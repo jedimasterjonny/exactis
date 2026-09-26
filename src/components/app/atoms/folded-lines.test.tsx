@@ -80,4 +80,32 @@ describe("FoldedLines", () => {
     // eslint-disable-next-line testing-library/no-node-access -- the lines beneath are a layout box with no role of their own
     expect(item.children).toHaveLength(1);
   });
+
+  // A row edited elsewhere does not open, and says why in the lock its
+  // caller gives, drawn where the chevron would be.
+  it("draws the lock it is given in the chevron's place", () => {
+    renderInItem(
+      <FoldedLines
+        figure="£2,244 / mo"
+        lock={
+          <span
+            aria-label="Edited with its asset on the accounts screen"
+            role="img"
+          />
+        }
+        name="Home mortgage"
+      />,
+    );
+
+    const item = screen.getByRole("listitem");
+
+    expect(
+      within(item).getByRole("img", {
+        name: "Edited with its asset on the accounts screen",
+      }),
+    ).toBeInTheDocument();
+    expect(within(item).queryByRole("button")).not.toBeInTheDocument();
+    // eslint-disable-next-line testing-library/no-node-access -- the chevron is hidden from the accessibility tree, so its absence is read off the nodes
+    expect(item.querySelector("svg")).not.toBeInTheDocument();
+  });
 });
