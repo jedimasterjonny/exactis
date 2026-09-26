@@ -19,7 +19,7 @@ import {
 } from "@/components/kit/accordion";
 import { CardContent } from "@/components/kit/card";
 import { Slider } from "@/components/kit/slider";
-import { endYear } from "@/data/plan";
+import { ageIn, endYear } from "@/data/plan";
 import { cashFlow } from "@/engine/cash-flow";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { spanOf } from "@/lib/lines";
@@ -81,7 +81,7 @@ export function CashFlowCard({
   const flow = cashFlow(accounts, schedule, { at: { month, year }, plan });
   return (
     <SectionCard
-      caption={`${monthName(month, "long")} ${String(year)}, age ${String(year - plan.born)}, in today's money`}
+      caption={`${monthName(month, "long")} ${String(year)}, age ${String(ageIn(year, plan))}, in today's money`}
       controls={
         <Field
           hint={`${String(plan.from)} to ${String(end)}, the years of the plan`}

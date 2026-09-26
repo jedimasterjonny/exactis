@@ -13,7 +13,7 @@ import { RowLock } from "@/components/app/atoms/row-lock";
 import { SpanBar } from "@/components/app/atoms/span-bar";
 import { RowActions } from "@/components/app/molecules/row-actions";
 import { Badge } from "@/components/kit/badge";
-import { endYear } from "@/data/plan";
+import { ageIn, endYear } from "@/data/plan";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { endOf, growthLabels } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
@@ -213,8 +213,8 @@ export function ScheduleRows<TLine extends Line>({
 // and the ages are those reached in its first and last years, the last
 // the age at the plan's end for a line that runs to it.
 function describe(line: LineValues, plan: Plan, summary: Summary): Row {
-  const first = line.firstYear - plan.born;
-  const last = (line.lastYear ?? endYear(plan)) - plan.born;
+  const first = ageIn(line.firstYear, plan);
+  const last = ageIn(line.lastYear ?? endYear(plan), plan);
   return {
     ages: `Age ${String(first)}–${String(last)}`,
     cadence: cadenceAbbreviations[line.cadence],

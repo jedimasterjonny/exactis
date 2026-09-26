@@ -10,7 +10,7 @@ import { MoneyField } from "@/components/app/molecules/money-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { YearField } from "@/components/app/molecules/year-field";
-import { endYear } from "@/data/plan";
+import { ageIn, endYear } from "@/data/plan";
 import { cadenceOptions } from "@/lib/cadence";
 import { growthLabels } from "@/lib/lines";
 import { optionsOf } from "@/lib/options";
@@ -129,7 +129,7 @@ export function LineFields<TKind extends string>({
       <FieldRow layout="pair-top">
         <YearField
           defaultValue={initial.firstYear}
-          hint={ageIn(draft.firstYear, plan)}
+          hint={ageHint(draft.firstYear, plan)}
           label="First year"
           onValueCommitted={(firstYear) => {
             onAmend({ firstYear });
@@ -149,7 +149,7 @@ export function LineFields<TKind extends string>({
           ) : (
             <YearField
               defaultValue={fixedYear}
-              hint={ageIn(draft.lastYear, plan)}
+              hint={ageHint(draft.lastYear, plan)}
               label="Last year"
               onValueCommitted={(lastYear) => {
                 onAmend({ lastYear });
@@ -175,6 +175,6 @@ export function LineFields<TKind extends string>({
 }
 
 // The age reached in a year, for the hint beneath a year field.
-function ageIn(year: number, plan: Plan): string {
-  return `Age ${String(year - plan.born)}`;
+function ageHint(year: number, plan: Plan): string {
+  return `Age ${String(ageIn(year, plan))}`;
 }

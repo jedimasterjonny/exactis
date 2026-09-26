@@ -11,7 +11,7 @@ import { saveAges } from "@/actions/plan";
 import { AgeField } from "@/components/app/molecules/age-field";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { Button } from "@/components/kit/button";
-import { endAge, oldestAge } from "@/data/plan";
+import { ageIn, endAge, oldestAge } from "@/data/plan";
 import { useSender } from "@/hooks/use-sender";
 
 interface PlanAssumptionsProps {
@@ -78,7 +78,7 @@ export function PlanAssumptions({ plan }: PlanAssumptionsProps): JSX.Element {
             hint={`Runs to ${String(plan.born + ends)}`}
             label="Plan end age"
             max={oldestAge}
-            min={Math.max(plan.retires, plan.from - plan.born + 1)}
+            min={Math.max(plan.retires, ageIn(plan.from, plan) + 1)}
             onValueCommitted={setEnds}
             value={ends}
           />
