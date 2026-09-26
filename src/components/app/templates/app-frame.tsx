@@ -3,6 +3,7 @@ import type { JSX, ReactNode } from "react";
 import { LogOut } from "lucide-react";
 
 import { signOut } from "@/actions/auth";
+import { ScreenLabel } from "@/components/app/atoms/screen-label";
 import { AppNav } from "@/components/app/molecules/app-nav";
 import { ThemeToggle } from "@/components/app/molecules/theme-toggle";
 import {
@@ -24,7 +25,8 @@ interface AppFrameProps {
 // wordmark, the navigation, the theme toggle, sign-out and the motto, and
 // the main column beside it. The inset is the page's one main landmark, so
 // screens render their content directly. On a phone the sidebar is off
-// canvas and a trigger above the screen opens it as a sheet. Sign-out is a
+// canvas and a trigger above the screen opens it as a sheet, with the
+// screen's section label beside it in place of the header's. Sign-out is a
 // form posting to its action, so it works before the page hydrates and
 // needs no client code of its own. Its button is the registry's, so hover
 // and focus come from where the navigation's do, but the footer's
@@ -64,8 +66,9 @@ export function AppFrame({ children }: AppFrameProps): JSX.Element {
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <div className="flex h-12 items-center border-b bg-card px-4 md:hidden">
+        <div className="flex h-12 items-center gap-2 border-b bg-card px-4 md:hidden">
           <SidebarTrigger />
+          <ScreenLabel />
         </div>
         {children}
       </SidebarInset>

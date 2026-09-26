@@ -15,6 +15,18 @@ describe("ScreenHeader", () => {
     );
   });
 
+  // The frame's phone bar carries the label below the breakpoint it shows
+  // under, so the header leaves its own off there rather than repeat it.
+  it("leaves the label to the phone bar below the md breakpoint", () => {
+    render(
+      <ScreenHeader label="Sect. I · Dashboard" title="Projected to age 89" />,
+    );
+
+    expect(screen.getByText("Sect. I · Dashboard")).toHaveClass(
+      "max-md:hidden",
+    );
+  });
+
   it("renders a meta line only when a child actually renders", () => {
     const { rerender } = render(
       <ScreenHeader label="Sect. I" title="Title">

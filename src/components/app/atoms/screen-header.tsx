@@ -11,7 +11,9 @@ interface ScreenHeaderProps {
 // heading face, and a meta line beneath when the screen has one. Actions sit
 // to the right, on the title's baseline row, and wrap beneath when the
 // screen is too narrow for both. The side gutter is the screen body's,
-// halving on a phone as it does, so the title stays over the cards.
+// halving on a phone as it does, so the title stays over the cards. The
+// label is left off below the md breakpoint, where the frame's phone bar
+// carries it beside the sidebar's trigger.
 export function ScreenHeader({
   actions,
   children,
@@ -21,7 +23,9 @@ export function ScreenHeader({
   return (
     <header className="flex flex-wrap items-end justify-between gap-4 border-b bg-card px-4 pt-6 pb-5 sm:px-8">
       <div className="grid gap-1.5">
-        <span className="label text-muted-foreground">{label}</span>
+        <span className="label text-muted-foreground max-md:hidden">
+          {label}
+        </span>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">
           {title}
         </h1>

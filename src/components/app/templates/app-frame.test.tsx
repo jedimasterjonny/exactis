@@ -49,6 +49,22 @@ describe("AppFrame", () => {
     expect(screen.getByText("Certitudo in numeris")).toHaveClass("label");
   });
 
+  it("names the current screen's section in the bar above it on a phone", () => {
+    stubViewport(390);
+    render(
+      <AppFrame>
+        <p>Screen</p>
+      </AppFrame>,
+    );
+
+    const main = screen.getByRole("main");
+
+    expect(
+      within(main).getByRole("button", { name: "Toggle Sidebar" }),
+    ).toBeInTheDocument();
+    expect(within(main).getByText("Sect. I · Dashboard")).toHaveClass("label");
+  });
+
   it("offers sign-out as a form posting to its action", () => {
     stubViewport(1024);
     render(
