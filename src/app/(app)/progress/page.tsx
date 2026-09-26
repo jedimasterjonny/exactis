@@ -26,7 +26,7 @@ export default function Progress(): JSX.Element {
           </Button>
         }
         label={sectionLabel(progress)}
-        title="Progress points"
+        title={progress.title}
       >
         Newest first
       </ScreenHeader>
