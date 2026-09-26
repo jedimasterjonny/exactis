@@ -565,6 +565,39 @@ describe("project", () => {
     ]);
   });
 
+  // Nothing coming in and nothing spent, and a SIPP always funded at
+  // £800 a month: the £1,200 of cash and the £2,000 ISA keep it paid
+  // for four months, each landing as £860, since with no earnings only
+  // £240 of it is relieved, and then it is paid nothing, since the only
+  // savings left are pensions. The old pension beside it is never drawn
+  // on, so nothing is drawn early and nothing goes uncovered.
+  it("keeps an always funded pension paid out of cash and the ISA, and never out of a pension", () => {
+    const kept: Account = {
+      ...sipp,
+      contribution: { amount: 800, cadence: "month", kind: "fixed" },
+      isAlwaysFunded: true,
+    };
+    const old: Account = { ...sipp, balance: 50000, id: 9, name: "Old SIPP" };
+
+    expect(
+      project(
+        [pocket, { ...flatIsa, balance: 2000 }, kept, old],
+        { expenses: [], income: [] },
+        { ...plan, years: 1 },
+      ),
+    ).toStrictEqual([
+      {
+        age: 36,
+        deferred: 62000,
+        early: 0,
+        free: 2000,
+        uncovered: 0,
+        year: 2026,
+      },
+      { age: 37, deferred: 65440, early: 0, free: 0, uncovered: 0, year: 2027 },
+    ]);
+  });
+
   // Nothing coming in, and a £2,000 loan at no interest paid £500 a
   // month, so it clears in April: the four payments are owed, so each
   // is drawn from the ISA as an expense would be, £2,000 in all, and

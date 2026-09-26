@@ -104,10 +104,14 @@ interface Purse {
 // which a debt's payments are counted. A month that settles the tax
 // year before it carries what that year is refunded, or what it still
 // owes as a negative, which only the projection knows, having carried
-// the year; a month read on its own settles nothing.
+// the year; a month read on its own settles nothing. Beside it is what
+// the cash and the ISAs hold as the month opens, the savings a pension
+// always funded may be kept paid out of, which the projection knows
+// too; a month read on its own is taken to have enough of them.
 interface Reading {
   readonly at: Month;
   readonly plan: Plan;
+  readonly reserve?: number;
   readonly settlement?: number;
 }
 
@@ -148,15 +152,17 @@ const nanopound = 1e-9;
 // income tax and the National Insurance on the rest, less the expense
 // lines, each kept as well as summed, and less each debt's fixed sum,
 // whole and before any other wherever the debt is listed. What that
-// leaves pays the other fixed sums, in the order the accounts are
-// listed, each taking its sum or what the month still has when it no
-// longer covers it, and then the spare money to each account that
-// takes it in the order they are listed, each up to its cap and
-// passing the rest on, and what is left after them, which is negative
-// by the expenses and the debts' payments the income after its tax
-// does not cover and by nothing else. So the spare money is what
-// the month has after tax, and an account taking it is paid money the
-// month really has rather than the tax bill on top. The tax is charged
+// leaves pays each pension always funded its fixed sum, then the other
+// fixed sums, each in the order the accounts are listed, each taking
+// its sum or what the month still has when it no longer covers it, and
+// then the spare money to each account that takes it in the order they
+// are listed, each up to its cap and passing the rest on, and what is
+// left after them, which is negative by the expenses, the debts'
+// payments and what a pension always funded is kept paid that the
+// income after its tax does not cover, and by nothing else. So the
+// spare money is what the month has after tax, and an account taking
+// it is paid money the month really has rather than the tax bill on
+// top. The tax is charged
 // on the month as a twelfth of a year, a twelfth of what a year of
 // months like it would pay, which is the year's tax exactly whenever
 // the year's months are alike and more than it when they are not,
@@ -176,7 +182,16 @@ const nanopound = 1e-9;
 // contribution out of what the month has, not a drawdown: an account is
 // paid only while the income funding it lasts, and selling out of one
 // wrapper to keep a payment into another going would be a shortfall the
-// ledger read back as saving. A debt's fixed sum is owed rather than
+// ledger read back as saving. A pension always funded is the one saving
+// kept paid all the same, since what it is paid out of taxed money is
+// relieved, and a pension an ISA is sold to keep paid holds more than
+// the ISA did: its own fixed sum is paid out of what the month has and
+// then out of what the cash and the ISAs hold, once the spending and
+// the debts' payments the month is short of have been met from them,
+// and never out of a pension, since one pension sold to pay another is
+// money going round in a circle, charged 55% before the pension age.
+// Once the cash and the ISAs are spent it is paid only what the month
+// has, as any other saving is. A debt's fixed sum is owed rather than
 // saved, so it goes out with the expenses and is drawn for as they are
 // when the month is short of it, rather than going short itself: a debt
 // short of its payments is a debt in default, which the plan does not
@@ -207,8 +222,8 @@ const nanopound = 1e-9;
 // income tax and National Insurance on what is left of it and the
 // sacrifice costs the month less than it puts in the pension. It is
 // given up only while what is left of the income after the tax on it
-// still covers the expenses and the debts' payments, a month short of
-// them by less than a
+// still covers the expenses, the debts' payments and what a pension
+// always funded is fed, a month short of them by less than a
 // nanopound covering them as a month left with that much is left with
 // nothing: what the sacrifices are dropped for and what the month
 // is left with are the one figure, so the two are read against the one
@@ -219,10 +234,16 @@ const nanopound = 1e-9;
 // nothing. All of them or none, rather than a share of each or
 // the lines that fit, since a sacrifice a month cannot afford is a
 // drawdown by another name and the pension would be fed in the very
-// month a wrapper is sold to cover the spending. So a month that is
-// short feeds nothing, pays no fixed sum but a debt's and hands over no
-// spare money, and what is left is short by the expenses and the debts'
-// payments the income does not cover and by nothing else. A salary
+// month a wrapper is sold to cover the spending. A salary feeding a
+// pension always funded gives up its sacrifice whatever the month has,
+// all of them or none as the rest, so long as the cash and the ISAs
+// have what the month is then short of, once the spending has been met
+// from them: the month is short by what it gave up too, for the
+// projection to draw. So a month that is short feeds nothing but a
+// pension always funded, pays no fixed sum but a debt's and such a
+// pension's, and hands over no spare money, and what is left is short
+// by the expenses, the debts' payments and what the pension is kept
+// paid that the income does not cover, and by nothing else. A salary
 // naming an account that is no pension is refused, as the spare money
 // into a real asset is, and so is an
 // expense line naming an account that is no debt: the action holds each
@@ -287,6 +308,13 @@ export function cashFlow(
       "An ISA or a pension belongs to an owner, and nothing else",
     );
   }
+  if (
+    accounts.some(
+      (account) => account.isAlwaysFunded === true && !isPension(account),
+    )
+  ) {
+    throw new Error("Only a pension is always funded");
+  }
   checkLinks(accounts, schedule);
   const running = schedule.income.filter(
     (line) =>
@@ -328,13 +356,32 @@ export function cashFlow(
     .filter((account) => account.kind === "debt")
     .flatMap((account) => fixedSum(account, reading));
   const outgoings = expenses + total(owed);
-  const givenUp = feeding.reduce((sum, entry) => sum + entry.sacrificed, 0);
-  const sacrificing = taxOn(running, feeding);
-  const isEarnedWhole =
-    income - givenUp - taxOf(sacrificing) + settlement - outgoings < -nanopound;
-  const fed = isEarnedWhole ? [] : feeding;
-  const sacrificed = isEarnedWhole ? 0 : givenUp;
-  const taxed = isEarnedWhole ? taxOn(running, []) : sacrificing;
+  const leftWith = (
+    feeds: readonly Fed[],
+    taxed: Taxed = taxOn(running, feeds),
+  ): number =>
+    income -
+    feeds.reduce((sum, entry) => sum + entry.sacrificed, 0) -
+    taxOf(taxed) +
+    settlement -
+    outgoings;
+  const floor = -Math.max(
+    Math.max(0, -leftWith([])),
+    reading.reserve ?? Number.POSITIVE_INFINITY,
+  );
+  const kept = feeding.filter(({ account }) => account.isAlwaysFunded === true);
+  const isKeeping = kept.length > 0 && leftWith(kept) >= floor - nanopound;
+  const others = feeding.filter(
+    ({ account }) => account.isAlwaysFunded !== true,
+  );
+  const isSacrificing =
+    others.length > 0 &&
+    leftWith([...(isKeeping ? kept : []), ...others]) >= -nanopound;
+  const fed = feeding.filter(({ account }) =>
+    account.isAlwaysFunded === true ? isKeeping : isSacrificing,
+  );
+  const taxed = taxOn(running, fed);
+  const month = leftWith(fed, taxed);
   const purse: Purse = {
     relief: [],
     reliefs: new Map(),
@@ -344,16 +391,22 @@ export function cashFlow(
   for (const entry of fed) {
     landIn(purse.rooms, entry.account, entry.amount);
   }
+  const saving = own.filter((account) => account.kind !== "debt");
+  const { sums: funded } = fixedSums(
+    saving.filter((account) => account.isAlwaysFunded === true),
+    month - floor,
+    { purse, reading },
+  );
   const { left: rest, sums: saved } = fixedSums(
-    own.filter((account) => account.kind !== "debt"),
-    income - sacrificed - taxOf(taxed) + settlement - outgoings,
+    saving.filter((account) => account.isAlwaysFunded !== true),
+    month - total(funded),
     { purse, reading },
   );
   const { left, takes } = spareMoney(accounts, rest, { fed, purse });
   return {
     expenses,
     fed,
-    fixed: [...owed, ...saved],
+    fixed: [...owed, ...funded, ...saved],
     income,
     incomeTax: taxed.incomeTax,
     insurance: taxed.insurance,
@@ -425,9 +478,8 @@ function fixedSum(account: Account, reading: Reading): Paid[] {
     : [{ account, amount }];
 }
 
-// The fixed sums paid out of what the month has after the sacrifices,
-// the expenses and the debts' payments, handed down the accounts other
-// than the debts in the order they are listed as
+// The fixed sums paid out of what is available to them, handed down
+// the accounts given in the order they are listed as
 // the spare money is: each takes its stated sum, or what is left when
 // the month no longer reaches it, or what is left of its allowance when
 // that no longer does, and passes the rest on. A pension lands more

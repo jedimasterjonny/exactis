@@ -120,6 +120,12 @@ const thrown: readonly Thrown[] = [
     (given): Inputs => paying(given, 5, 700),
   ],
   [
+    "Only a pension is always funded",
+    "Only a pension is always funded",
+    (given): Inputs =>
+      changed(given, 2, (isa) => ({ ...isa, isAlwaysFunded: true })),
+  ],
+  [
     "A real asset or a debt takes no spare money",
     "A real asset or a debt takes no spare money",
     (given): Inputs =>
@@ -164,11 +170,6 @@ const held: readonly Case[] = [
   [
     "A loan secured on an asset is a debt",
     (given): Inputs => changed(given, 3, (cash) => ({ ...cash, secures: 4 })),
-  ],
-  [
-    "Only a pension is always funded",
-    (given): Inputs =>
-      changed(given, 2, (isa) => ({ ...isa, isAlwaysFunded: true })),
   ],
   [
     "A loan is secured on an asset the household lists",
