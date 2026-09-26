@@ -4,7 +4,7 @@ import type { Month } from "@/data/schedule";
 import type { CashFlow, Paid, Schedule } from "@/engine/cash-flow";
 
 import { isPension, takesSpare } from "@/data/accounts";
-import { rateFrom } from "@/data/plan";
+import { ageIn, rateFrom } from "@/data/plan";
 import { rules } from "@/data/rules";
 import { cashFlow } from "@/engine/cash-flow";
 import {
@@ -179,7 +179,7 @@ export function project(
   let taxYear: TaxYear = { months: 0, paid: 0, profit: 0, taxable: 0 };
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
-    const age = year - plan.born;
+    const age = ageIn(year, plan);
     const deferred = total(held, "tax-deferred");
     const free = total(held, "tax-free");
     let early = 0;

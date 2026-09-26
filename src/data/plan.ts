@@ -35,6 +35,13 @@ export interface PlanAges {
 const born = 1990;
 const rate = 0.05;
 
+// The age the plan's owner reaches in a year. The plan holds the year
+// they were born in and not the day, so it is the age reached that
+// year, and the whole of the year counts as reaching it.
+export function ageIn(year: number, plan: Pick<Plan, "born">): number {
+  return year - plan.born;
+}
+
 // The years a debt's own payment takes to pay it down to the balloon a
 // PCP leaves standing, at the rate it is charged, its own or the
 // plan's, or null when the interest swallows the payment and it never
@@ -55,7 +62,7 @@ export function debtTermOf(
 
 // The age the plan runs to, the age its owner reaches in its last year.
 export function endAge(plan: Plan): number {
-  return endYear(plan) - plan.born;
+  return ageIn(endYear(plan), plan);
 }
 
 // The oldest age a plan may run to: past any life it plans for, and

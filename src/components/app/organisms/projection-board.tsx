@@ -14,7 +14,7 @@ import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { AgeField } from "@/components/app/molecules/age-field";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ProjectionChart } from "@/components/app/organisms/projection-chart";
-import { endAge, retirementYear } from "@/data/plan";
+import { ageIn, endAge, retirementYear } from "@/data/plan";
 import { project } from "@/engine/projection";
 import { useSender } from "@/hooks/use-sender";
 
@@ -134,7 +134,7 @@ export function ProjectionBoard({
             <AgeField
               label="Retirement age"
               max={endAge(plan)}
-              min={plan.from - plan.born}
+              min={ageIn(plan.from, plan)}
               onValueChange={move}
               onValueCommitted={commit}
               value={retires}
