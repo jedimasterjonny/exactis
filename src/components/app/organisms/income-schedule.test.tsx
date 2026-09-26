@@ -169,6 +169,68 @@ describe("IncomeSchedule", () => {
     expect(removeIncomeLine).not.toHaveBeenCalled();
   });
 
+  // A row folded to fit a phone has no bin, so the dialog it opens is
+  // where it is deleted from: the Delete there closes the dialog and
+  // asks as the bin would. A new line has nothing yet to delete.
+  it("asks from a saved line's dialog before deleting it, the dialog closing first", async () => {
+    renderSchedule();
+    vi.mocked(removeIncomeLine).mockResolvedValue(accepted(undefined));
+
+    expect(
+      within(openEntry()).queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(
+      within(openEditor("Salary")).getByRole("button", { name: "Delete" }),
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    const question = screen.getByRole("alertdialog", {
+      name: "Delete Salary?",
+    });
+    fireEvent.click(within(question).getByRole("button", { name: "Delete" }));
+
+    expect(removeIncomeLine).toHaveBeenCalledExactlyOnceWith(salary.id);
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+  });
+
+  // A deletion asked for over a save in flight would race it, so the
+  // Delete holds while the line's save is on its way.
+  it("holds a saved line's delete while its save is on its way", async () => {
+    renderSchedule();
+    // The store's answer is held back, so the save can be seen in flight,
+    // and given at the end, so no save is left on its way.
+    let answer!: (answered: Answer<IncomeLine>) => void;
+    vi.mocked(saveIncomeLine).mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const dialog = openEditor("Salary");
+
+    expect(
+      within(dialog).getByRole("button", { name: "Delete" }),
+    ).toBeEnabled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(
+      within(dialog).getByRole("button", { name: "Delete" }),
+    ).toBeDisabled();
+
+    answer(accepted(salary));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Salary" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it("draws the empty state for none", () => {
     render(
       <IncomeSchedule

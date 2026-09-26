@@ -73,9 +73,13 @@ const kinds = optionsOf(kindLabels, [
 // so the save holds while the one it opens is unnamed or has no owner,
 // as it holds while the line is unnamed. A row's bin asks through the confirm
 // dialog before the line goes, as the ledger's does; nothing hangs on a
-// line, so it goes alone. The card takes a numeral of its own off the
-// screen's, since the reference numbers each of the schedule's cards
-// that way, and the expense schedule beneath it takes the next.
+// line, so it goes alone. The dialog of a saved line offers a Delete
+// that asks the same question, which is where a row folded to fit a
+// phone is deleted from, and holds while a save is on its way, since a
+// deletion over a save in flight would race it. The card takes a
+// numeral of its own off the screen's, since the reference numbers each
+// of the schedule's cards that way, and the expense schedule beneath it
+// takes the next.
 export function IncomeSchedule({
   accounts,
   lines,
@@ -114,6 +118,20 @@ export function IncomeSchedule({
           }
         : { bonus: 0, feeds: null, opens: null, rsu: 0, sacrifice: 0 }),
     });
+  }
+
+  // The Delete a saved line's dialog offers, which asks as its row's bin
+  // does: the dialog closes first, so the question stands alone and a
+  // cancel lands back on the screen, as the ledger's does. A new line has
+  // nothing yet to delete, and matches no line the schedule lists.
+  function deleteFrom(current: Entry<Draft>): (() => void) | undefined {
+    const line = lines.find(({ id }) => id === current.id);
+    return line === undefined
+      ? undefined
+      : (): void => {
+          dismiss();
+          ask(line);
+        };
   }
 
   // A row's pencil opens its line as it is, with its id so a save writes
@@ -178,7 +196,9 @@ export function IncomeSchedule({
             !isSaving && isSound(entry.draft) && isOpeningSound(entry.draft)
           }
           eyebrow={entry.id === null ? "New income line" : "Edit income line"}
+          isSaving={isSaving}
           isWide
+          onDelete={deleteFrom(entry)}
           onDismiss={dismiss}
           onSave={() => {
             save(entry);
