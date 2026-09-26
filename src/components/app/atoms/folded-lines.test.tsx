@@ -27,10 +27,7 @@ describe("FoldedLines", () => {
     expect(within(item).getByText("Stocks & shares ISA")).toHaveClass(
       "font-medium",
     );
-    expect(within(item).getByText("£103,972")).toHaveClass(
-      "figure",
-      "whitespace-nowrap",
-    );
+    expect(within(item).getByText("£103,972")).toHaveClass("figure");
     // eslint-disable-next-line testing-library/no-node-access -- the lines beneath are a layout box with no role or text of their own to query by
     expect(within(item).getByText("Tax-free · Me").parentElement).toHaveClass(
       "text-xs",

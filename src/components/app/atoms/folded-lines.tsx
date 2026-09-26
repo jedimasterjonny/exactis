@@ -22,15 +22,15 @@ interface FoldedLinesProps {
 // so a tap anywhere on it opens it. The focus ring is drawn around what
 // the button covers for the same reason. A row that opens nothing, a
 // total, keeps the chevron's place unseen, so its figure lines up with
-// the figures above it. The figure is held to one line, so a narrow row
-// wraps the name rather than breaking a minus from its pounds. The first
-// line and the lines beneath it are boxes, so a screen reader reads a
-// pause between them rather than running the figure into the line after
-// it, and what goes beneath may be a box itself. A row locked against
-// editing here draws the lock it is given in the chevron's place
-// instead, the lock its caller draws in the row's actions too, so a row
-// that will not open says why rather than seeming not to answer; its
-// caller gives it nothing to open.
+// the figures above it. The figure is held to one line, as every figure
+// is, so a narrow row wraps the name rather than breaking a minus from
+// its pounds. The first line and the lines beneath it are boxes, so a
+// screen reader reads a pause between them rather than running the
+// figure into the line after it, and what goes beneath may be a box
+// itself. A row locked against editing here draws the lock it is given
+// in the chevron's place instead, the lock its caller draws in the
+// row's actions too, so a row that will not open says why rather than
+// seeming not to answer; its caller gives it nothing to open.
 export function FoldedLines({
   children,
   figure,
@@ -52,7 +52,7 @@ export function FoldedLines({
             {name}
           </button>
         )}
-        <span className="figure font-medium whitespace-nowrap">{figure}</span>
+        <span className="figure font-medium">{figure}</span>
         {lock === undefined ? (
           <ChevronRight
             aria-hidden
