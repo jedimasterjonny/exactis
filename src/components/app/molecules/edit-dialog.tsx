@@ -1,5 +1,6 @@
 import type { JSX, ReactNode } from "react";
 
+import { cn } from "cn";
 import { Trash2 } from "lucide-react";
 
 import { Button } from "@/components/kit/button";
@@ -41,7 +42,13 @@ interface EditDialogProps {
 // it offers nothing to delete. The Delete holds while the caller says a
 // save is on its way to the store, as Save does, since a deletion asked
 // for over a save in flight would race it: the save's answer could
-// report the record saved after the question had deleted it.
+// report the record saved after the question had deleted it. The dialog
+// is held to the height of the screen, less the margin it keeps at the
+// sides, and the fields scroll between the title and the footer, which
+// stay where they are: a form taller than a phone ran off both ends of
+// it, taking the title and Save with it, and scrolled nowhere. The
+// fields keep the dialog's gap between them in the box they scroll in,
+// as a caller giving more than one, fields and a note, had it before.
 export function EditDialog({
   canSave = true,
   children,
@@ -55,12 +62,19 @@ export function EditDialog({
 }: EditDialogProps): JSX.Element {
   return (
     <Dialog onOpenChange={onDismiss} open>
-      <DialogContent className={isWide ? "sm:max-w-lg" : undefined}>
+      <DialogContent
+        className={cn(
+          "max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto]",
+          isWide && "sm:max-w-lg",
+        )}
+      >
         <DialogHeader>
           <span className="label text-brand">{eyebrow}</span>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        {children}
+        <div className="-mx-4 -my-1 grid content-start gap-4 overflow-y-auto px-4 py-1">
+          {children}
+        </div>
         <DialogFooter>
           {onDelete !== undefined && (
             <Button
