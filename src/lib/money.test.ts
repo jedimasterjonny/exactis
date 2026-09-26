@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { formatGbp, formatPercent } from "./money";
+import { formatGbp, formatPercent, negated } from "./money";
 
 describe("formatGbp", () => {
   it("writes pounds with thousands separators and no pence", () => {
@@ -20,5 +20,15 @@ describe("formatPercent", () => {
     expect(formatPercent(0.021)).toBe("2.10%");
     expect(formatPercent(0)).toBe("0.00%");
     expect(formatPercent(0.12345)).toBe("12.35%");
+  });
+});
+
+describe("negated", () => {
+  it("turns a figure's sign, and leaves nothing as nothing rather than minus nothing", () => {
+    expect(negated(182940)).toBe(-182940);
+    expect(negated(-2210)).toBe(2210);
+    // toBe compares as Object.is does, which tells minus nothing apart.
+    expect(negated(0)).toBe(0);
+    expect(formatGbp(negated(0))).toBe("£0");
   });
 });

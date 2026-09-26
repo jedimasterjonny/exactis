@@ -5,6 +5,7 @@ import type { Owed } from "@/lib/loans";
 import { toValues } from "@/data/accounts";
 import { owes, securedRecords } from "@/data/secured";
 import { figureOf } from "@/lib/loans";
+import { negated } from "@/lib/money";
 
 // The house as the dialog holds it: the values, and the years the
 // mortgage has left to run. The term is not saved, since the store reads
@@ -53,7 +54,7 @@ export function houseOf({ asset, loan }: Secured): HouseValues {
   const held = toValues(asset);
   const owed = loan === null ? null : toValues(loan);
   return {
-    balance: owed === null ? 0 : -owed.balance,
+    balance: owed === null ? 0 : negated(owed.balance),
     growth: held.rate,
     name: held.name,
     payment: owed === null ? 0 : owed.contribution,
