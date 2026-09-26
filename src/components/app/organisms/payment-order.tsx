@@ -2,6 +2,7 @@
 
 import type { JSX } from "react";
 
+import { cn } from "cn";
 import { ArrowUpDown, ChevronRight, GripVertical } from "lucide-react";
 import { useState } from "react";
 
@@ -39,7 +40,9 @@ interface PaymentOrderProps {
 // has no place in it, being paid before any saving and drawn for when
 // the month is short of it, so the card is handed the savings alone
 // and says that the debts come first. It numbers the savings down the
-// line and says nothing else of them.
+// line, and draws a pension always funded in the loss red, border and
+// all, since it is paid ahead of the order whatever its place in it;
+// the red is said in words for a screen reader, which sees no colour.
 // Reordering is a dialog opened from the card, whose rows are dragged
 // by their grips or moved with the arrow keys, each move reported as it
 // lands and sent to the store by the caller, as the grips on the table
@@ -82,22 +85,38 @@ export function PaymentOrder({
       >
         <CardContent>
           <ol className="flex flex-wrap items-center gap-1.5">
-            {accounts.map((account, index) => (
-              <li className="flex items-center gap-1.5" key={account.id}>
-                <span className="flex items-center gap-2 rounded-md border px-2.5 py-1">
-                  <span className="figure text-xs text-muted-foreground">
-                    {String(index + 1)}
+            {accounts.map((account, index) => {
+              const isFunded = account.isAlwaysFunded === true;
+              return (
+                <li className="flex items-center gap-1.5" key={account.id}>
+                  <span
+                    className={cn(
+                      "flex items-center gap-2 rounded-md border px-2.5 py-1",
+                      isFunded && "border-destructive text-destructive",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "figure text-xs",
+                        !isFunded && "text-muted-foreground",
+                      )}
+                    >
+                      {String(index + 1)}
+                    </span>
+                    {account.name}
+                    {isFunded && (
+                      <span className="sr-only">, always funded</span>
+                    )}
                   </span>
-                  {account.name}
-                </span>
-                {index < accounts.length - 1 && (
-                  <ChevronRight
-                    aria-hidden
-                    className="size-3.5 text-muted-foreground"
-                  />
-                )}
-              </li>
-            ))}
+                  {index < accounts.length - 1 && (
+                    <ChevronRight
+                      aria-hidden
+                      className="size-3.5 text-muted-foreground"
+                    />
+                  )}
+                </li>
+              );
+            })}
           </ol>
         </CardContent>
       </SectionCard>
