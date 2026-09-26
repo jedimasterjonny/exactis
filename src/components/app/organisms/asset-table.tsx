@@ -7,7 +7,7 @@ import type { Account } from "@/data/accounts";
 import type { Secured } from "@/data/secured";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
-import { FoldedCell } from "@/components/app/atoms/folded-cell";
+import { FoldedCell } from "@/components/app/molecules/folded-cell";
 import { RowActions } from "@/components/app/molecules/row-actions";
 import { Badge } from "@/components/kit/badge";
 import {
