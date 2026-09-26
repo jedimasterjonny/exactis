@@ -1,12 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
 
+import { cn } from "cn";
 import { Banknote, Receipt } from "lucide-react";
 
 import type { Plan } from "@/data/plan";
 import type { LineValues, Side } from "@/data/schedule";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
+import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { RowLock } from "@/components/app/atoms/row-lock";
 import { SpanBar } from "@/components/app/atoms/span-bar";
 import { RowActions } from "@/components/app/molecules/row-actions";
@@ -30,6 +32,16 @@ export interface Summary {
 // is keyed on.
 interface Line extends LineValues {
   readonly id: number;
+}
+
+// What a row says of a line, in both the columns and the folded lines:
+// see describe.
+interface Row {
+  readonly ages: string;
+  readonly cadence: string;
+  readonly growth: string;
+  readonly total: string;
+  readonly years: string;
 }
 
 interface ScheduleRowsProps<TLine extends Line> {
@@ -58,10 +70,22 @@ const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
 // when given a delete handler a bin beside it, in the one actions
 // column, which reports the line the schedule asks about before it
 // goes. A locked line draws its lock in place of both, since it is
-// neither edited nor deleted here. The schedule reads its own lines, so what the rows cannot read
-// off one, the badge, the figure and the detail, comes from it. The
-// figures are right-aligned mono, as in every ledger. A schedule holding
-// nothing draws its empty state instead of a list of nothing.
+// neither edited nor deleted here. The schedule reads its own lines, so
+// what the rows cannot read off one, the badge, the figure and the
+// detail, comes from it. The figures are right-aligned mono, as in every
+// ledger. A schedule holding nothing draws its empty state instead of a
+// list of nothing. While the list is too narrow to read across, as on a
+// phone, each row folds into lines, as a ledger's does: the name and
+// what the line pays on the first, then its kind and how it grows, then
+// its detail when it has one, then the bar across the row, then the
+// years and the ages. The list is the container it folds by, at the
+// width the ledgers fold at. A row given an edit handler opens from
+// anywhere on it, the bar letting a tap through to the row beneath it,
+// and its actions fold away with the columns, the dialog it opens being
+// where it is deleted from; a locked row opens nothing and draws its
+// lock where the chevron would be, the same lock as its column, which
+// folds away with the rest. Each row is described once and both its
+// copies draw the description, so the two say the same thing.
 export function ScheduleRows<TLine extends Line>({
   emptyDescription,
   emptyTitle,
@@ -82,16 +106,51 @@ export function ScheduleRows<TLine extends Line>({
     );
   }
 
+  const hasActions = onEdit !== undefined || onDelete !== undefined;
+
   return (
-    <ul className="divide-y">
+    <ul className="@container divide-y">
       {lines.map((line) => {
         const summary = summarise(line);
+        const row = describe(line, plan, summary);
+        const lock =
+          hasActions && summary.lock !== undefined ? (
+            <RowLock reason={summary.lock} />
+          ) : undefined;
+        const bar = (
+          <SpanBar
+            firstYear={line.firstYear}
+            lastMonth={line.lastMonth}
+            lastYear={line.lastYear}
+            plan={plan}
+            side={side}
+          />
+        );
         return (
           <li
-            className="grid grid-cols-[minmax(0,1fr)_9rem_11rem_auto] items-center gap-4 py-3 first:pt-0 last:pb-0"
+            className="relative grid grid-cols-[minmax(0,1fr)_9rem_11rem_auto] items-center gap-4 py-3 first:pt-0 last:pb-0 folded:grid-cols-1"
             key={line.id}
           >
-            <div className="grid min-w-0 gap-2">
+            <div className="unfolded:hidden">
+              <FoldedLines
+                figure={`${row.total} / ${row.cadence}`}
+                lock={lock}
+                name={line.name}
+                onOpen={
+                  onEdit === undefined || lock !== undefined
+                    ? undefined
+                    : (): void => {
+                        onEdit(line);
+                      }
+                }
+              >
+                <span>{`${summary.badge.label} · ${row.growth}`}</span>
+                {summary.detail !== undefined && <span>{summary.detail}</span>}
+                <div className="pointer-events-none my-1">{bar}</div>
+                <span>{`${row.years} · ${row.ages}`}</span>
+              </FoldedLines>
+            </div>
+            <div className="grid min-w-0 gap-2 folded:hidden">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{line.name}</span>
                 <Badge variant={summary.badge.variant}>
@@ -103,44 +162,44 @@ export function ScheduleRows<TLine extends Line>({
                   </span>
                 )}
               </div>
-              <SpanBar
-                firstYear={line.firstYear}
-                lastMonth={line.lastMonth}
-                lastYear={line.lastYear}
-                plan={plan}
-                side={side}
-              />
+              {bar}
             </div>
-            <div className="grid gap-0.5 text-right">
+            <div className="grid gap-0.5 text-right folded:hidden">
               <span className="figure font-medium">
-                {formatGbp(summary.total)}
+                {row.total}
                 <span className="text-xs font-normal text-muted-foreground">
-                  {` / ${cadenceAbbreviations[line.cadence]}`}
+                  {` / ${row.cadence}`}
                 </span>
               </span>
               <span className="text-xs text-muted-foreground">
-                {growthLabels[line.growth]}
+                {row.growth}
               </span>
             </div>
-            <div className="grid gap-0.5 text-right">
-              <span className="figure">{formatYears(line)}</span>
-              <span className="label text-muted-foreground/60">
-                {formatAges(line, plan)}
-              </span>
+            <div className="grid gap-0.5 text-right folded:hidden">
+              <span className="figure">{row.years}</span>
+              <span className="label text-muted-foreground/60">{row.ages}</span>
             </div>
-            {(onEdit !== undefined || onDelete !== undefined) &&
-              (summary.lock === undefined ? (
-                <RowActions
-                  name={line.name}
-                  onDelete={onDelete}
-                  onEdit={onEdit}
-                  row={line}
-                />
-              ) : (
-                <span className="inline-flex size-7 items-center justify-center">
-                  <RowLock reason={summary.lock} />
-                </span>
-              ))}
+            {hasActions && (
+              <div
+                className={cn(
+                  (onEdit !== undefined || lock !== undefined) &&
+                    "folded:hidden",
+                )}
+              >
+                {lock === undefined ? (
+                  <RowActions
+                    name={line.name}
+                    onDelete={onDelete}
+                    onEdit={onEdit}
+                    row={line}
+                  />
+                ) : (
+                  <span className="inline-flex size-7 items-center justify-center">
+                    {lock}
+                  </span>
+                )}
+              </div>
+            )}
           </li>
         );
       })}
@@ -148,16 +207,19 @@ export function ScheduleRows<TLine extends Line>({
   );
 }
 
-// The ages reached in the line's first and last years, the last the age
-// at the plan's end for a line that runs to it.
-function formatAges(line: LineValues, plan: Plan): string {
+// What a row says of a line, worked out once and drawn twice: in the
+// columns while the list reads across, and on the folded lines while it
+// does not. What the line pays is its schedule's figure at its cadence,
+// and the ages are those reached in its first and last years, the last
+// the age at the plan's end for a line that runs to it.
+function describe(line: LineValues, plan: Plan, summary: Summary): Row {
   const first = line.firstYear - plan.born;
   const last = (line.lastYear ?? endYear(plan)) - plan.born;
-  return `Age ${String(first)}–${String(last)}`;
-}
-
-// The years the line runs, to the month when it ends part way through
-// its last, and an open-ended one to the end.
-function formatYears(line: LineValues): string {
-  return `${String(line.firstYear)} – ${endOf(line) ?? "end"}`;
+  return {
+    ages: `Age ${String(first)}–${String(last)}`,
+    cadence: cadenceAbbreviations[line.cadence],
+    growth: growthLabels[line.growth],
+    total: formatGbp(summary.total),
+    years: `${String(line.firstYear)} – ${endOf(line) ?? "end"}`,
+  };
 }
