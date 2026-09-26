@@ -567,14 +567,17 @@ const eslintConfig = defineConfig([
   // Test files carry their own rule sets. Several of these restate a
   // vitest.config.mts setting at lint time, on purpose: the config fails
   // the run, the rule fails the edit, and the second is the one that says
-  // which line is wrong.
+  // which line is wrong. The helpers the tests share under src/test are
+  // held to the same, since what they query and fire is the tests' own
+  // work lifted out of them, and would otherwise escape the rules on how
+  // a test queries the DOM by leaving the file the rules match.
   {
     extends: [
       vitest.configs.recommended,
       testingLibrary.configs["flat/react"],
       jestDom.configs["flat/recommended"],
     ],
-    files: ["**/*.test.{ts,tsx}"],
+    files: ["**/*.test.{ts,tsx}", "src/test/**/*.{ts,tsx}"],
     rules: {
       // it, never test, and never both in one file.
       "vitest/consistent-test-it": ["error", { fn: "it" }],
