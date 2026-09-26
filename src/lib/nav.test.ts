@@ -6,6 +6,7 @@ import {
   dashboard,
   plan,
   progress,
+  screenAt,
   screens,
   sectionLabel,
   sectionNumeral,
@@ -36,5 +37,14 @@ describe("sectionLabel", () => {
     expect(hrefs).toContain("/accounts");
     expect(hrefs).toContain("/plan");
     expect(hrefs).toContain("/progress");
+  });
+});
+
+describe("screenAt", () => {
+  it("finds the screen at its own route and none anywhere else", () => {
+    expect(screenAt("/")).toBe(dashboard);
+    expect(screenAt("/plan")).toBe(plan);
+    expect(screenAt("/plan/extra")).toBeUndefined();
+    expect(screenAt("/login")).toBeUndefined();
   });
 });

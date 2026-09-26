@@ -42,6 +42,11 @@ export const screens: readonly Screen[] = [
   progress,
 ];
 
+// The screen at a pathname, or undefined where no built screen is.
+export function screenAt(pathname: string): Screen | undefined {
+  return screens.find((screen) => screen.href === pathname);
+}
+
 // The label every screen header opens with, "Sect. II · Progress".
 export function sectionLabel(screen: Screen): string {
   return `Sect. ${sectionNumeral(screen)} · ${screen.label}`;
