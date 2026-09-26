@@ -27,7 +27,9 @@ import {
 // the engine projects what they show, save the age the net worth is
 // read at, which is the plan's. It is its own component so the page
 // can stream it in behind the pending frame, since every part of it
-// now reads the store.
+// now reads the store. A phone keeps the retirement age and the chance
+// of success, the two the plan is steered by, in one row, and leaves
+// the net worth and the legacy to a wider screen.
 export async function Dashboard(): Promise<JSX.Element> {
   const [accounts, income, expenses, plan] = await Promise.all([
     getAccounts(),
@@ -60,6 +62,7 @@ export async function Dashboard(): Promise<JSX.Element> {
             caption="vs Aug run"
             delta={250418}
             icon={Landmark}
+            isHiddenOnPhone
             label={`Net worth at ${age}`}
             value="£4,533,429"
           />
@@ -74,6 +77,7 @@ export async function Dashboard(): Promise<JSX.Element> {
           <StatTile
             caption="After IHT and estate costs"
             icon={ScrollText}
+            isHiddenOnPhone
             label="Net legacy"
             value="£1,771,204"
           />

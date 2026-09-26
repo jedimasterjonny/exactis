@@ -91,6 +91,28 @@ describe("Dashboard", () => {
     }
   });
 
+  // A phone keeps the two the plan is steered by, in one row, and
+  // leaves the other two to a wider screen.
+  it("keeps the retirement age and the chance of success on a phone, and no other tile", async () => {
+    vi.mocked(getPlan).mockResolvedValue(plan);
+
+    render(await Dashboard());
+
+    // A tile is the card that carries a tone, which the chart's does not,
+    // though it names the retirement too.
+    const tileOf = (label: string): HTMLElement =>
+      screen.getByText(
+        (_content, element) =>
+          element?.hasAttribute("data-tone") === true &&
+          element.textContent.startsWith(label),
+      );
+
+    expect(tileOf("Retirement")).not.toHaveClass("max-sm:hidden");
+    expect(tileOf("Chance of success")).not.toHaveClass("max-sm:hidden");
+    expect(tileOf("Net worth at 89")).toHaveClass("max-sm:hidden");
+    expect(tileOf("Net legacy")).toHaveClass("max-sm:hidden");
+  });
+
   // Retirement is named twice, the tile's label and the chart's mark,
   // and the tile reads the plan's age.
   it("follows the tiles with the store's projection, marked where its owner retires", async () => {
