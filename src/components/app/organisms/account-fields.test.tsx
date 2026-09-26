@@ -134,6 +134,39 @@ describe("AccountFields", () => {
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({ owner: 2 });
   });
 
+  // A pension is asked what it is paid in a month that cannot pay it,
+  // beside its balance and its contribution, and the choice reports as
+  // whether it is always funded; an ISA is asked nothing of it.
+  it("asks a pension what it is paid in a month short of it, and an ISA nothing", () => {
+    const { onAmend } = renderFields({
+      ...isa,
+      isAlwaysFunded: true,
+      kind: "tax-deferred",
+    });
+    const shortfall = screen.getByRole("combobox", { name: "When short" });
+
+    expect(shortfall).toHaveTextContent("Always fund it");
+    expect(shortfall).toHaveAccessibleDescription(
+      "Always draws on cash and ISAs, never a pension",
+    );
+
+    fireEvent.change(shortfall, { target: { value: "month" } });
+
+    expect(onAmend).toHaveBeenCalledExactlyOnceWith({ isAlwaysFunded: false });
+
+    fireEvent.change(shortfall, { target: { value: "always" } });
+
+    expect(onAmend).toHaveBeenLastCalledWith({ isAlwaysFunded: true });
+  });
+
+  it("asks an ISA nothing of a month short of it", () => {
+    renderFields(isa);
+
+    expect(
+      screen.queryByRole("combobox", { name: "When short" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("asks nothing of an account nobody owns", () => {
     renderFields({ ...isa, kind: "cash", owner: null });
 
