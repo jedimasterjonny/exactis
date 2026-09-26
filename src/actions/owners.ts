@@ -7,7 +7,7 @@ import type { Answer } from "@/lib/answer";
 
 import { named, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
-import { found, replaced } from "@/lib/records";
+import { removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
@@ -24,14 +24,11 @@ export async function removeOwner(id: number): Promise<Answer<undefined>> {
   await requireSession();
   const at = recordId.parse(id);
   return amend(({ kept }) => {
-    found(kept.owners, at, "owner");
+    const owners = removed(kept.owners, at, "owner");
     if (kept.accounts.some(({ owner }) => owner === at)) {
       throw new Refusal("An owner who holds an account stays");
     }
-    return {
-      kept: { ...kept, owners: kept.owners.filter(({ id }) => id !== at) },
-      result: undefined,
-    };
+    return { kept: { ...kept, owners }, result: undefined };
   });
 }
 
@@ -48,18 +45,14 @@ export async function saveOwner(
   const at = target.parse(id);
   const parsed = values.parse(draft);
   return amend(({ kept }) => {
-    if (at === null) {
-      const owner = { ...parsed, id: kept.next };
-      return {
-        kept: { ...kept, next: kept.next + 1, owners: [...kept.owners, owner] },
-        result: owner,
-      };
-    }
-    found(kept.owners, at, "owner");
-    const owner = { ...parsed, id: at };
-    return {
-      kept: { ...kept, owners: replaced(kept.owners, owner) },
-      result: owner,
-    };
+    const {
+      next,
+      records,
+      written: owner,
+    } = written(kept.owners, { at, next: kept.next, noun: "owner" }, (id) => ({
+      ...parsed,
+      id,
+    }));
+    return { kept: { ...kept, next, owners: records }, result: owner };
   });
 }
