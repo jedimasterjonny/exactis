@@ -124,6 +124,7 @@ export function toPension(opening: Opening): AccountValues {
     contribution: 0,
     funding: "fixed",
     growth: "plan",
+    isAlwaysFunded: false,
     kind: "tax-deferred",
     name: opening.name,
     owner: opening.owner,

@@ -81,8 +81,9 @@ const line = {
 // below nothing only on a debt, the spare money only into an account
 // that takes it, an owner on an ISA or a pension and on nothing else,
 // a fixed sum within its allowance on its own, a rate no lower than
-// losing everything, and a link to an asset only on the loan secured
-// on it. A contribution, a balloon, an owner and a link are absent
+// losing everything, a link to an asset only on the loan secured on
+// it, and the mark of an account always funded only on a pension. A
+// contribution, a balloon, an owner, a link and the mark are absent
 // rather than nothing, as the model has them.
 const account = z
   .object({
@@ -109,6 +110,7 @@ const account = z
       z.object({ kind: z.literal("plan") }),
     ]),
     id,
+    isAlwaysFunded: z.literal(true).exactOptional(),
     kind: z.enum(accountKinds),
     name: named,
     owner: id.exactOptional(),
@@ -133,6 +135,10 @@ const account = z
   .refine(
     (account) => account.secures === undefined || account.kind === "debt",
     "A loan secured on an asset is a debt",
+  )
+  .refine(
+    (account) => account.isAlwaysFunded === undefined || isPension(account),
+    "Only a pension is always funded",
   ) satisfies z.ZodType<Account>;
 
 const expenseLine = z

@@ -47,6 +47,7 @@ const blank: Draft = {
   contribution: 0,
   funding: "fixed",
   growth: "plan",
+  isAlwaysFunded: false,
   kind: "tax-deferred",
   name: "",
   owner: null,

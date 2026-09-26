@@ -15,6 +15,7 @@ const isa: AccountValues = {
   contribution: 500,
   funding: "fixed",
   growth: "plan",
+  isAlwaysFunded: false,
   kind: "tax-free",
   name: "ISA",
   owner: 1,
@@ -166,6 +167,7 @@ describe("AccountFields", () => {
       ...isa,
       funding: "spare",
       growth: "fixed",
+      isAlwaysFunded: false,
       kind: "cash",
       rate: 0.02,
     });

@@ -85,6 +85,7 @@ describe("toPension", () => {
         contribution: 0,
         funding: "fixed",
         growth: "plan",
+        isAlwaysFunded: false,
         kind: "tax-deferred",
         name: "Aviva",
         owner: 1,
