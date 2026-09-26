@@ -38,4 +38,23 @@ describe("Table", () => {
       "pr-0",
     );
   });
+
+  // The container is what the folded and unfolded variants measure: the
+  // table's own width, not the screen's.
+  it("sits the table in a container its rows can fold by", () => {
+    render(
+      <Table>
+        <TableBody>
+          <TableRow>
+            <TableCell>Pension</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+
+    // eslint-disable-next-line testing-library/no-node-access -- the container is a layout box with no role of its own, two above the table the registry wraps in its own box
+    expect(screen.getByRole("table").parentElement?.parentElement).toHaveClass(
+      "@container",
+    );
+  });
 });

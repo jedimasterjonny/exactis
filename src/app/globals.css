@@ -4,6 +4,17 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* A ledger folds each row's columns into one cell while its table is too
+   narrow to read across, measured on the table rather than the screen,
+   since the sidebar takes 256px of a laptop's width and none of a
+   phone's. Every kit Table is a container for this: folded styles what
+   shows only while the table is narrow, unfolded what shows only while
+   it is wide. The savings table is 759px across on today's accounts,
+   and a longer name or a second salary's sacrifice widens it, so the
+   fold holds to 56rem, 896px. */
+@custom-variant folded (@container (width < 56rem));
+@custom-variant unfolded (@container (width >= 56rem));
+
 @theme inline {
   --font-heading: var(--font-space-grotesk);
   --font-sans: var(--font-geist-sans);
