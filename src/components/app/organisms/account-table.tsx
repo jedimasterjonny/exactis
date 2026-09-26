@@ -10,7 +10,7 @@ import type { IncomeLine } from "@/data/income";
 import type { Owner } from "@/data/owners";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
-import { FoldedCell } from "@/components/app/atoms/folded-cell";
+import { FoldedCell } from "@/components/app/molecules/folded-cell";
 import { RowActions } from "@/components/app/molecules/row-actions";
 import { Badge } from "@/components/kit/badge";
 import {
