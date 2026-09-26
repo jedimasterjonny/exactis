@@ -1166,6 +1166,82 @@ describe("AccountLedger", () => {
     expect(removeAccount).not.toHaveBeenCalled();
   });
 
+  // A row folded to fit a phone has no bin, so the dialog it opens is
+  // where it is deleted from: the Delete there closes the dialog and
+  // asks as the bin would, and a cancel lands back on the screen.
+  it("asks from an account's dialog before deleting it, the dialog closing first", async () => {
+    renderLedger();
+    vi.mocked(removeAccount).mockResolvedValue(accepted(undefined));
+
+    const editor = openEditor("Stocks & shares ISA");
+    fireEvent.click(within(editor).getByRole("button", { name: "Delete" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    const question = screen.getByRole("alertdialog", {
+      name: "Delete Stocks & shares ISA?",
+    });
+    fireEvent.click(within(question).getByRole("button", { name: "Delete" }));
+
+    expect(removeAccount).toHaveBeenCalledExactlyOnceWith(isa.id);
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("asks from a house's dialog about the house, with its mortgage, and drops the question on cancel", () => {
+    render(
+      <Toaster>
+        <AccountLedger
+          accounts={[pension, house, loan]}
+          at={at}
+          lines={[]}
+          owners={owners}
+        />
+      </Toaster>,
+    );
+
+    fireEvent.click(
+      within(openEditor("Home")).getByRole("button", { name: "Delete" }),
+    );
+
+    const question = screen.getByRole("alertdialog", { name: "Delete Home?" });
+
+    expect(question).toHaveAccessibleDescription(
+      "Its mortgage, Mortgage, and the payments go with it.",
+    );
+
+    fireEvent.click(within(question).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(removeAccount).not.toHaveBeenCalled();
+  });
+
+  it("asks from a car's dialog about the car, with its finance", () => {
+    render(
+      <Toaster>
+        <AccountLedger
+          accounts={[golf, finance]}
+          at={at}
+          lines={[]}
+          owners={owners}
+        />
+      </Toaster>,
+    );
+
+    fireEvent.click(
+      within(openEditor("Golf")).getByRole("button", { name: "Delete" }),
+    );
+
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete Golf?" }),
+    ).toHaveAccessibleDescription(
+      "Its finance, Golf PCP, and the payments go with it.",
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("says a house takes its mortgage and the payments", () => {
     render(
       <Toaster>

@@ -18,6 +18,7 @@ import { stood, thirdOf } from "@/lib/figures";
 
 interface CarDialogProps {
   readonly car: null | Secured;
+  readonly onDelete?: ((asset: Account) => void) | undefined;
   readonly onDismiss: () => void;
   readonly onSaved: () => void;
   readonly plan: PlanMonth;
@@ -63,9 +64,15 @@ const blank: Draft = {
 // what is the car's own is the figure worked out on each amendment and
 // the values the save sends, which are the draft less the figure typed
 // over. The caller is told when the car has been saved, so the screen
-// can close the dialog and bring the assets forward.
+// can close the dialog and bring the assets forward. Given a delete
+// handler, the dialog of a car the store holds offers a Delete, which
+// reports the car's own account, as its row's bin does, for the caller
+// to ask about with the finance that goes with it, and holds while a
+// save is on its way; a new car has nothing yet to delete and is
+// offered none.
 export function CarDialog({
   car,
+  onDelete,
   onDismiss,
   onSaved,
   plan,
@@ -87,7 +94,15 @@ export function CarDialog({
     <EditDialog
       canSave={!isSaving && canSave}
       eyebrow={entry.id === null ? "New car" : "Edit car"}
+      isSaving={isSaving}
       isWide
+      onDelete={
+        car === null || onDelete === undefined
+          ? undefined
+          : (): void => {
+              onDelete(car.asset);
+            }
+      }
       onDismiss={onDismiss}
       onSave={() => {
         save(entry);

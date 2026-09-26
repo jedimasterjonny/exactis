@@ -450,6 +450,50 @@ describe("AccountDialog", () => {
     ).toBeVisible();
   });
 
+  // A deletion asked for over a save in flight would race it, so the
+  // Delete holds while the save is on its way.
+  it("holds a saved account's delete while its save is on its way", async () => {
+    render(
+      <Toaster>
+        <AccountDialog
+          account={isa}
+          lines={[]}
+          onDelete={vi.fn<(account: Account) => void>()}
+          onDismiss={vi.fn<() => void>()}
+          onSaved={vi.fn<(account: Account) => void>()}
+          owners={owners}
+        />
+      </Toaster>,
+    );
+    // The store's answer is held back, so the save can be seen in flight,
+    // and given at the end, so no save is left on its way.
+    let answer!: (answered: Answer<Account>) => void;
+    vi.mocked(saveAccount).mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const dialog = open();
+
+    expect(
+      within(dialog).getByRole("button", { name: "Delete" }),
+    ).toBeEnabled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(
+      within(dialog).getByRole("button", { name: "Delete" }),
+    ).toBeDisabled();
+
+    answer(saved(isa));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Stocks & shares ISA" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it("tells the caller when it is dismissed, and saves nothing", () => {
     const onDismiss = vi.fn<() => void>();
     renderDialog(null, vi.fn<(account: Account) => void>(), onDismiss);
@@ -645,5 +689,46 @@ describe("AccountDialog", () => {
     commit(field(dialog, "Amount"), "20,000");
 
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+  // The ledger hands the dialog its delete, which an account the store
+  // holds is offered and reports the account by, saving nothing; a new
+  // one has nothing yet to delete.
+  it("offers a saved account a delete that reports it, and a new one none", () => {
+    const onDelete = vi.fn<(account: Account) => void>();
+    const view = render(
+      <Toaster>
+        <AccountDialog
+          account={isa}
+          lines={[]}
+          onDelete={onDelete}
+          onDismiss={vi.fn<() => void>()}
+          onSaved={vi.fn<(account: Account) => void>()}
+          owners={owners}
+        />
+      </Toaster>,
+    );
+
+    fireEvent.click(within(open()).getByRole("button", { name: "Delete" }));
+
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith(isa);
+    expect(saveAccount).not.toHaveBeenCalled();
+
+    view.unmount();
+    render(
+      <Toaster>
+        <AccountDialog
+          account={null}
+          lines={[]}
+          onDelete={onDelete}
+          onDismiss={vi.fn<() => void>()}
+          onSaved={vi.fn<(account: Account) => void>()}
+          owners={owners}
+        />
+      </Toaster>,
+    );
+
+    expect(
+      within(open()).queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
   });
 });

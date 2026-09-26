@@ -71,8 +71,10 @@ type AssetOpening = "new" | Secured;
 // pencil opens the account as it is, unless it is a house or a car,
 // which shares its row with the loan secured on it and opens with it, so
 // an edit writes both. A row's bin asks through the confirm dialog
-// before the account goes, saying what goes with it, since an asset
-// takes its loan and the loan's payments, and what stops,
+// before the account goes, and so does the Delete in the dialog a row
+// opens, which is where a row folded to fit a phone is deleted from,
+// saying what goes with it, since an asset takes its loan and the
+// loan's payments, and what stops,
 // since a salary feeding a pension stops when the pension goes; the
 // income lines are handed down for that, for the treatment such a
 // pension is held to, so both can name the salaries, and for the
@@ -147,6 +149,18 @@ export function AccountLedger({
   // The month the plan starts in as the loan maths counts from it, for
   // the two dialogs that let a loan's end be picked as a date.
   const plan: PlanMonth = { from: at.year, month: at.month };
+
+  // A dialog's Delete asks as a row's bin does, about the account the
+  // dialog is open on, or for a house or a car its own account, which
+  // takes the loan with it. Whichever dialog it was closes first, so the
+  // question stands alone and a cancel lands back on the screen rather
+  // than on the draft of what was nearly deleted.
+  function drop(account: Account): void {
+    setAccount(null);
+    setHouse(null);
+    setCar(null);
+    ask(account);
+  }
 
   // A row's pencil opens its account as it is, unless the account is a
   // house or a car, which opens with the loan secured on it.
@@ -314,6 +328,7 @@ export function AccountLedger({
         <AccountDialog
           account={account === "new" ? null : account}
           lines={lines}
+          onDelete={drop}
           onDismiss={() => {
             setAccount(null);
           }}
@@ -338,6 +353,7 @@ export function AccountLedger({
       {house !== null && (
         <HouseDialog
           house={house === "new" ? null : house}
+          onDelete={drop}
           onDismiss={() => {
             setHouse(null);
           }}
@@ -350,6 +366,7 @@ export function AccountLedger({
       {car !== null && (
         <CarDialog
           car={car === "new" ? null : car}
+          onDelete={drop}
           onDismiss={() => {
             setCar(null);
           }}
