@@ -2,9 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { CarValues } from "@/data/cars";
 import type { ExpenseLine } from "@/data/expenses";
-import type { HouseValues } from "@/data/houses";
 import type { IncomeLine } from "@/data/income";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
@@ -14,9 +12,11 @@ import type { SecuredRecords } from "@/data/secured";
 import { toAccount, toValues } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { toRecords as toCarRecords } from "@/data/cars";
+import { golfValues } from "@/data/cars.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
-import { incomeLines, plan } from "@/data/income.fixture";
+import { homeValues } from "@/data/houses.fixture";
+import { incomeLines, retiring } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 import { project } from "@/engine/projection";
 
@@ -50,7 +50,7 @@ type Thrown = readonly [string, string, Break];
 const sound: Inputs = {
   accounts,
   owners,
-  plan: { ...plan, retires: 59 },
+  plan: retiring,
   schedule: { expenses: expenseLines, income: incomeLines },
 };
 
@@ -379,28 +379,10 @@ describe("soundKept", () => {
 });
 
 describe("a line paying a loan", () => {
-  // A house worth £416,386 owing £341,810 at 5.15%, paying £2,210 a
-  // month, and a Golf owing £14,000 at 7.9%, paying £290 a month on a PCP
-  // towards a £6,000 balloon, or £438 a month on a loan with none.
-  const home: HouseValues = {
-    balance: 341810,
-    growth: 0.02,
-    name: "Home",
-    payment: 2210,
-    rate: 0.0515,
-    status: "mortgaged",
-    value: 416386,
-  };
-  const golf: CarValues = {
-    agreement: "pcp",
-    balance: 14000,
-    balloon: 6000,
-    depreciation: 0.15,
-    name: "Golf",
-    payment: 290,
-    rate: 0.079,
-    value: 18000,
-  };
+  // The fixtures' house owes £341,810 at 5.15%, paying £2,210 a month,
+  // and their Golf £14,000 at 7.9%, paying £290 a month on a PCP towards
+  // a £6,000 balloon, or £438 a month on a loan with none; the balances
+  // are as of September 2026 unless a test says otherwise.
   const september = { month: 8, year: 2026 };
 
   // The reference household with the records an asset is saved as added
@@ -438,11 +420,9 @@ describe("a line paying a loan", () => {
 
   // The loan clears in 21.2 years from September 2026, in November 2047.
   it("runs a mortgage's payments from the plan's first year to the month the loan clears", () => {
-    expect(paymentsOf(toHouseRecords(home, { from: 2026 }))).toMatchObject({
-      firstYear: 2026,
-      lastMonth: 10,
-      lastYear: 2047,
-    });
+    expect(
+      paymentsOf(toHouseRecords(homeValues, { from: 2026 })),
+    ).toMatchObject({ firstYear: 2026, lastMonth: 10, lastYear: 2047 });
   });
 
   // £1,000 a month at no rate clears £114,000 in 114 payments: the last
@@ -450,7 +430,7 @@ describe("a line paying a loan", () => {
   // 2034 counted from March 2025, whatever year the line was saved from.
   it("counts the payments from the month the balances are as of, so the end moves with it", () => {
     const flat = toHouseRecords(
-      { ...home, balance: 114000, payment: 1000, rate: 0 },
+      { ...homeValues, balance: 114000, payment: 1000, rate: 0 },
       { from: 2026 },
     );
 
@@ -472,14 +452,14 @@ describe("a line paying a loan", () => {
   // a loan, the exact £438.06 rounded down, leaves a few pounds for a
   // 37th payment, in September 2029.
   it("runs a car's payments until the whole it owes clears, the balloon refinanced", () => {
-    expect(paymentsOf(toCarRecords(golf, { from: 2026 }))).toMatchObject({
+    expect(paymentsOf(toCarRecords(golfValues, { from: 2026 }))).toMatchObject({
       lastMonth: 6,
       lastYear: 2031,
     });
     expect(
       paymentsOf(
         toCarRecords(
-          { ...golf, agreement: "loan", balloon: 0, payment: 438 },
+          { ...golfValues, agreement: "loan", balloon: 0, payment: 438 },
           { from: 2026 },
         ),
       ),
@@ -489,7 +469,9 @@ describe("a line paying a loan", () => {
   // £1,000 a month is less than the interest on £341,810 at 5.15%.
   it("runs payments that never clear the loan to the end of the plan", () => {
     expect(
-      paymentsOf(toHouseRecords({ ...home, payment: 1000 }, { from: 2026 })),
+      paymentsOf(
+        toHouseRecords({ ...homeValues, payment: 1000 }, { from: 2026 }),
+      ),
     ).toMatchObject({ lastMonth: null, lastYear: null });
   });
 });

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
-import { incomeLines, plan } from "@/data/income.fixture";
+import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import {
   getAccounts,
   getExpenseLines,
@@ -28,7 +28,7 @@ describe("Dashboard", () => {
     vi.mocked(getAccounts).mockResolvedValue([...accounts]);
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
     vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
-    vi.mocked(getPlan).mockResolvedValue({ ...plan, retires: 59 });
+    vi.mocked(getPlan).mockResolvedValue(retiring);
   });
 
   it("opens with the dashboard header, titled with the age the plan runs to", async () => {

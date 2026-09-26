@@ -7,13 +7,12 @@ import {
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Account } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
 import type { Answer } from "@/lib/answer";
 
 import { removeIncomeLine, saveIncomeLine } from "@/actions/schedule";
 import { Toaster } from "@/components/kit/toast";
-import { accounts } from "@/data/accounts.fixture";
+import { accounts, sipp } from "@/data/accounts.fixture";
 import { incomeKinds } from "@/data/income";
 import { incomeLines, plan } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
@@ -31,15 +30,6 @@ vi.mock("@/actions/schedule", () => ({
 
 const [salary, , , statePension] = incomeLines;
 const [pension] = accounts;
-
-// A second pension, so the choice is a choice.
-const sipp: Account = {
-  balance: 0,
-  growth: { kind: "plan" },
-  id: 6,
-  kind: "tax-deferred",
-  name: "SIPP",
-};
 
 // Save reports through the toast manager, which needs its Toaster
 // mounted. The fixture's accounts hold the one pension the salary feeds.

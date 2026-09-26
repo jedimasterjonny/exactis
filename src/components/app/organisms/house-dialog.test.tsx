@@ -17,6 +17,8 @@ import type { Answer } from "@/lib/answer";
 import { saveHouse } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
+import { house as houseAsset, houseLoan } from "@/data/houses.fixture";
+import { plan } from "@/data/income.fixture";
 import { saved as accepted, refused } from "@/lib/answer";
 import { commit, field, openDialog } from "@/test/dom";
 import { heldBack } from "@/test/held-back";
@@ -25,19 +27,12 @@ import { HouseDialog } from "./house-dialog";
 
 vi.mock("@/actions/accounts", () => ({ saveHouse: vi.fn() }));
 
-const [, , , home, mortgage] = accounts;
+const [, , , home] = accounts;
 
 // The fixture's home as a house, with its mortgage secured on it: worth
 // £416,386 growing at 2.1%, owing £182,940 at 5.15% and paying £2,210 a
 // month, which clears it in 8.5 years.
-const house: Secured = {
-  asset: { ...home, kind: "house" },
-  loan: { ...mortgage, secures: home.id },
-};
-
-// The month the plan is read in, September 2026, which the end of the
-// term is counted from.
-const plan = { from: 2026, month: 8 };
+const house: Secured = { asset: houseAsset, loan: houseLoan };
 
 const workedHint = "Worked out from the other two";
 

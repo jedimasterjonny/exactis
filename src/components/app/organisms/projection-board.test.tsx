@@ -8,8 +8,8 @@ import type { Plan } from "@/data/plan";
 import { saveAges } from "@/actions/plan";
 import { toast } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
-import { expenseLines } from "@/data/expenses.fixture";
-import { incomeLines, plan } from "@/data/income.fixture";
+import { kept } from "@/data/household.fixture";
+import { retiring } from "@/data/income.fixture";
 import { project } from "@/engine/projection";
 import { refused } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
@@ -20,12 +20,7 @@ import { ProjectionBoard, settle } from "./projection-board";
 vi.mock("@/actions/plan", () => ({ saveAges: vi.fn() }));
 vi.mock("@/components/kit/toast", () => ({ toast: { add: vi.fn() } }));
 
-const schedule = { expenses: expenseLines, income: incomeLines };
-
-// Born in 1990 and retiring at 59, the plan's owner retires in 2049,
-// within the fixture's plan from 2026, when they are 36, to 2079, when
-// they are 89.
-const retiring: Plan = { ...plan, retires: 59 };
+const { schedule } = kept;
 
 // The vertical rule recharts draws for a ReferenceLine, which carries the
 // year it stands at as an attribute. A rule has no role, label or text,
@@ -40,6 +35,10 @@ const marks = (): (null | string)[] =>
     )
     .map((mark) => mark.getAttribute("x"));
 
+// The board over the fixture's schedule, on the plan given or the
+// fixture's retiring one: born in 1990 and retiring at 59, its owner
+// retires in 2049, within the plan from 2026, when they are 36, to
+// 2079, when they are 89.
 function board(held: Plan = retiring): JSX.Element {
   return (
     <ProjectionBoard accounts={accounts} plan={held} schedule={schedule}>

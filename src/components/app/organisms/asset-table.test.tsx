@@ -3,28 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 
-import { accounts } from "@/data/accounts.fixture";
+import { golf } from "@/data/cars.fixture";
+import { house, houseLoan as loan } from "@/data/houses.fixture";
 import { bySlot } from "@/test/dom";
 
 import { AssetTable } from "./asset-table";
 
 type Report = (asset: Account) => void;
 
-const [, , , home, mortgage] = accounts;
-
 // The fixture's home as a house, with its mortgage secured on it: worth
-// £416,386 with £182,940 owed, so £233,446 of it is held.
-const house: Account = { ...home, kind: "house" };
-const loan: Account = { ...mortgage, secures: home.id };
-
-// A car owned outright, and a real asset paid a sum of its own.
-const golf: Account = {
-  balance: 18000,
-  growth: { kind: "fixed", rate: -0.15 },
-  id: 6,
-  kind: "car",
-  name: "Golf",
-};
+// £416,386 with £182,940 owed, so £233,446 of it is held. The Golf is a
+// car owned outright, and the art a real asset paid a sum of its own.
 const art: Account = {
   balance: 5000,
   contribution: { amount: 600, cadence: "year", kind: "fixed" },

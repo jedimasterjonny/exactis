@@ -4,26 +4,17 @@ import { describe, expect, it, vi } from "vitest";
 import type { HouseDraft } from "@/data/houses";
 import type { LoanFigure } from "@/lib/figures";
 
+import { homeValues } from "@/data/houses.fixture";
+import { plan } from "@/data/income.fixture";
 import { commit, field, select } from "@/test/dom";
 
 import { HouseFields } from "./house-fields";
 
 // The reference kit's house as a draft: £341,810 owed at 5.15%, £2,210 a
-// month, over the 22 years its form says are left.
-const home: HouseDraft = {
-  balance: 341810,
-  growth: 0.021,
-  name: "Home",
-  payment: 2210,
-  rate: 0.0515,
-  status: "mortgaged",
-  term: 22,
-  value: 416386,
-};
-
-// The month the plan is read in, September 2026, which the end of the
-// term is counted from: the home's 22 years run to August 2048.
-const plan = { from: 2026, month: 8 };
+// month, over the 22 years its form says are left. The end of the term
+// is counted from the fixture plan's September 2026, so the 22 years
+// run to August 2048.
+const home: HouseDraft = { ...homeValues, term: 22 };
 
 const workedHint = "Worked out from the other two";
 

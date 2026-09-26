@@ -23,6 +23,8 @@ import {
 import { Toaster } from "@/components/kit/toast";
 import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
+import { golfPcp as finance, golf } from "@/data/cars.fixture";
+import { house, houseLoan as loan } from "@/data/houses.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 import { saved as accepted, refused } from "@/lib/answer";
@@ -50,31 +52,6 @@ const at: Month = { month: 8, year: 2026 };
 const held = accounts.filter((account) => !isAsset(account));
 const assets = accounts.filter(isAsset);
 const [pension, isa, cash, home, mortgage] = accounts;
-
-// The fixture's home as a house, with its mortgage secured on it.
-const house: Account = { ...home, kind: "house" };
-
-const loan: Account = { ...mortgage, secures: home.id };
-
-// A Golf as a car, with the finance secured on it.
-const golf: Account = {
-  balance: 18000,
-  growth: { kind: "fixed", rate: -0.15 },
-  id: 6,
-  kind: "car",
-  name: "Golf",
-};
-
-const finance: Account = {
-  balance: -14000,
-  balloon: 6000,
-  contribution: { amount: 290, cadence: "month", kind: "fixed" },
-  growth: { kind: "fixed", rate: 0.079 },
-  id: 7,
-  kind: "debt",
-  name: "Golf PCP",
-  secures: golf.id,
-};
 
 // The ledger on the fixture's accounts and owners in the month the plan
 // starts in, with whatever a test gives in their place. Save reports
@@ -201,7 +178,7 @@ describe("AccountLedger", () => {
   // An order of fewer than two accounts is no order and draws nothing,
   // so the owners take its place rather than leaving a numeral out.
   it("puts the owners where the order would be when there is no order", () => {
-    renderLedger({ accounts: [isa], owners: [{ id: 1, name: "Me" }] });
+    renderLedger({ accounts: [isa] });
 
     const owners = screen.getByRole("region", { name: "Owners" });
 
