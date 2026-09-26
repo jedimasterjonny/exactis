@@ -5,7 +5,16 @@ import type { Account } from "@/data/accounts";
 
 import { termOf } from "@/lib/loans";
 
-import { debtTermOf, planOf } from "./plan";
+import { ageIn, debtTermOf, endAge, planOf } from "./plan";
+
+describe("ageIn", () => {
+  it("reads the age the plan's owner reaches in a year, and in the plan's last", () => {
+    const plan = planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 });
+
+    expect(ageIn(2026, plan)).toBe(36);
+    expect(endAge(plan)).toBe(89);
+  });
+});
 
 describe("debtTermOf", () => {
   const plan = planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 });
