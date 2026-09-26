@@ -1,19 +1,9 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { AgeField } from "./age-field";
+import { commit, slider } from "@/test/dom";
 
-// The slider is the range input inside the group the field's label
-// names. It is asked for by the group, since the label's own text is
-// what names the group while jsdom's name computation gives the input
-// nothing for the same reference, and whether or not it is shown,
-// since the thumb is hidden until Base UI has measured a track jsdom
-// lays out at no width.
-function slider(): HTMLElement {
-  return within(
-    screen.getByRole("group", { name: "Retirement age" }),
-  ).getByRole("slider", { hidden: true });
-}
+import { AgeField } from "./age-field";
 
 describe("AgeField", () => {
   it("labels a box and a slider holding the one age, within its bounds", () => {
@@ -31,9 +21,9 @@ describe("AgeField", () => {
 
     expect(input).toHaveValue("59");
     expect(input).toHaveClass("figure", "text-right");
-    expect(slider()).toHaveValue("59");
-    expect(slider()).toHaveAttribute("min", "36");
-    expect(slider()).toHaveAttribute("max", "89");
+    expect(slider("Retirement age")).toHaveValue("59");
+    expect(slider("Retirement age")).toHaveAttribute("min", "36");
+    expect(slider("Retirement age")).toHaveAttribute("max", "89");
   });
 
   it("names the box and the thumb by the one label, each under an id of its own", () => {
@@ -50,12 +40,15 @@ describe("AgeField", () => {
     const input = screen.getByRole("textbox", { name: "Retirement age" });
     const group = screen.getByRole("group", { name: "Retirement age" });
 
-    expect(slider()).toHaveAttribute(
+    expect(slider("Retirement age")).toHaveAttribute(
       "aria-labelledby",
       group.getAttribute("aria-labelledby"),
     );
-    expect(slider()).toHaveAttribute("id");
-    expect(slider()).not.toHaveAttribute("id", input.getAttribute("id"));
+    expect(slider("Retirement age")).toHaveAttribute("id");
+    expect(slider("Retirement age")).not.toHaveAttribute(
+      "id",
+      input.getAttribute("id"),
+    );
   });
 
   // jsdom applies no stylesheet, so what shows the panel is read off
@@ -86,7 +79,7 @@ describe("AgeField", () => {
       "top-full",
     );
     expect(panel).toHaveAttribute("tabindex", "-1");
-    expect(panel).toContainElement(slider());
+    expect(panel).toContainElement(slider("Retirement age"));
     expect(screen.getByRole("paragraph")).toHaveTextContent(
       "Last working year 58",
     );
@@ -106,8 +99,7 @@ describe("AgeField", () => {
 
     const input = screen.getByRole("textbox", { name: "Retirement age" });
 
-    fireEvent.change(input, { target: { value: "95" } });
-    fireEvent.blur(input);
+    commit(input, "95");
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(89);
   });
@@ -128,7 +120,7 @@ describe("AgeField", () => {
       />,
     );
 
-    fireEvent.keyDown(slider(), { key: "ArrowRight" });
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
 
     expect(onValueChange).toHaveBeenCalledExactlyOnceWith(60);
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(60);
@@ -146,7 +138,7 @@ describe("AgeField", () => {
       />,
     );
 
-    fireEvent.keyDown(slider(), { key: "ArrowLeft" });
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowLeft" });
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(58);
   });
@@ -170,8 +162,7 @@ describe("AgeField", () => {
       screen.queryByRole("slider", { hidden: true }),
     ).not.toBeInTheDocument();
 
-    fireEvent.change(input, { target: { value: "130" } });
-    fireEvent.blur(input);
+    commit(input, "130");
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(120);
   });

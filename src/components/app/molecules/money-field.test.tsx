@@ -1,5 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+import { commit } from "@/test/dom";
 
 import { MoneyField } from "./money-field";
 
@@ -27,8 +29,7 @@ describe("MoneyField", () => {
 
     const input = screen.getByRole("textbox", { name: "Tax-deferred" });
 
-    fireEvent.change(input, { target: { value: "415,000" } });
-    fireEvent.blur(input);
+    commit(input, "415,000");
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(415000);
     expect(input).toHaveValue("£415,000");
@@ -58,8 +59,7 @@ describe("MoneyField", () => {
 
     const input = screen.getByRole("textbox", { name: "Payment" });
 
-    fireEvent.change(input, { target: { value: "-500" } });
-    fireEvent.blur(input);
+    commit(input, "-500");
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(0);
     expect(input).toHaveValue("£0");

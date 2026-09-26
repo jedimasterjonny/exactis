@@ -2,12 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { Landmark } from "lucide-react";
 import { describe, expect, it } from "vitest";
 
-import { StatTile } from "./stat-tile";
+import { bySlot } from "@/test/dom";
 
-const bySlot =
-  (slot: string) =>
-  (_content: string, element: Element | null): boolean =>
-    element?.getAttribute("data-slot") === slot;
+import { StatTile } from "./stat-tile";
 
 describe("StatTile", () => {
   it("renders the label, the figure, the delta and the caption", () => {

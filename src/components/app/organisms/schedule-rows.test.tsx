@@ -5,15 +5,11 @@ import type { IncomeLine } from "@/data/income";
 
 import { totalOf } from "@/data/income";
 import { incomeLines, plan } from "@/data/income.fixture";
+import { bySlot } from "@/test/dom";
 
 import type { Summary } from "./schedule-rows";
 
 import { ScheduleRows } from "./schedule-rows";
-
-const bySlot =
-  (slot: string) =>
-  (_content: string, element: Element | null): boolean =>
-    element?.getAttribute("data-slot") === slot;
 
 const [salary, , consulting, statePension] = incomeLines;
 

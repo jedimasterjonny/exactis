@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { bySlot } from "@/test/dom";
+
 import { ProjectionChart, ProjectionPending } from "./projection-chart";
 
 // recharts names the layer it draws each series in after the mark, which
@@ -12,11 +14,6 @@ const byClass =
   (className: string) =>
   (_content: string, element: Element | null): boolean =>
     element?.classList.contains(className) === true;
-
-const bySlot =
-  (slot: string) =>
-  (_content: string, element: Element | null): boolean =>
-    element?.getAttribute("data-slot") === slot;
 
 const points = [
   {

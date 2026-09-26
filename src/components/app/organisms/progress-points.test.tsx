@@ -3,18 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import { Toaster } from "@/components/kit/toast";
 import { points } from "@/data/points";
+import { commit, openEditor } from "@/test/dom";
 
 import { ProgressPoints } from "./progress-points";
-
-function commit(field: HTMLElement, value: string): void {
-  fireEvent.change(field, { target: { value } });
-  fireEvent.blur(field);
-}
-
-function openEditor(date: string): HTMLElement {
-  fireEvent.click(screen.getByRole("button", { name: `Edit ${date}` }));
-  return screen.getByRole("dialog", { name: date });
-}
 
 // Save reports through the toast manager, which needs its Toaster mounted.
 function renderPoints(): void {

@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Plan } from "@/data/plan";
@@ -13,6 +13,7 @@ import { incomeLines, plan } from "@/data/income.fixture";
 import { project } from "@/engine/projection";
 import { refused } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
+import { commit, slider } from "@/test/dom";
 
 import { ProjectionBoard, settle } from "./projection-board";
 
@@ -47,14 +48,6 @@ function board(held: Plan = retiring): JSX.Element {
   );
 }
 
-// The slider is asked for by the group the field's label names, and
-// whether or not it is shown, as the age field's own tests explain.
-function slider(): HTMLElement {
-  return within(
-    screen.getByRole("group", { name: "Retirement age" }),
-  ).getByRole("slider", { hidden: true });
-}
-
 // The total the chart gives for a year of a plan, as its tooltip
 // writes it.
 function totalIn(held: Plan, year: number): string {
@@ -67,8 +60,7 @@ function totalIn(held: Plan, year: number): string {
 // Types an age into the box and leaves it, which commits it.
 function typeAge(age: string): void {
   const input = screen.getByRole("textbox", { name: "Retirement age" });
-  fireEvent.change(input, { target: { value: age } });
-  fireEvent.blur(input);
+  commit(input, age);
 }
 
 describe("ProjectionBoard", () => {
@@ -82,8 +74,8 @@ describe("ProjectionBoard", () => {
     expect(screen.getByRole("textbox", { name: "Retirement age" })).toHaveValue(
       "59",
     );
-    expect(slider()).toHaveAttribute("min", "36");
-    expect(slider()).toHaveAttribute("max", "89");
+    expect(slider("Retirement age")).toHaveAttribute("min", "36");
+    expect(slider("Retirement age")).toHaveAttribute("max", "89");
   });
 
   // Retiring at 36 stops the salary from 2026, so 2028 opens on less
@@ -115,7 +107,7 @@ describe("ProjectionBoard", () => {
     vi.useFakeTimers();
     render(board());
 
-    fireEvent.keyDown(slider(), { key: "ArrowRight" });
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
 
     expect(screen.getByText("Last working year 59")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2050"]);
@@ -132,9 +124,9 @@ describe("ProjectionBoard", () => {
     vi.useFakeTimers();
     render(board());
 
-    fireEvent.keyDown(slider(), { key: "ArrowRight" });
-    fireEvent.keyDown(slider(), { key: "ArrowRight" });
-    fireEvent.keyDown(slider(), { key: "ArrowRight" });
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
     act(() => {
       vi.advanceTimersByTime(settle);
     });
@@ -163,7 +155,7 @@ describe("ProjectionBoard", () => {
   it("shows the store's age once it moves past a draft", () => {
     const { rerender } = render(board());
 
-    fireEvent.keyDown(slider(), { key: "ArrowRight" });
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
 
     expect(screen.getByText("Last working year 59")).toBeInTheDocument();
 
@@ -180,7 +172,7 @@ describe("ProjectionBoard", () => {
     );
     render(board());
 
-    fireEvent.keyDown(slider(), { key: "ArrowRight" });
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(settle);
     });
@@ -198,7 +190,7 @@ describe("ProjectionBoard", () => {
     vi.useFakeTimers();
     const { unmount } = render(board());
 
-    fireEvent.keyDown(slider(), { key: "ArrowLeft" });
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowLeft" });
     unmount();
 
     expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 58 });

@@ -2,20 +2,12 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { signOut } from "@/actions/auth";
+import { stubViewport } from "@/test/dom";
 
 import { AppFrame } from "./app-frame";
 
 vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
 vi.mock("@/actions/auth", () => ({ signOut: vi.fn() }));
-
-// jsdom has no matchMedia, and the sidebar's mobile hook reads the viewport.
-function stubViewport(width: number): void {
-  vi.stubGlobal("innerWidth", width);
-  vi.stubGlobal(
-    "matchMedia",
-    vi.fn(() => ({ addEventListener: vi.fn(), removeEventListener: vi.fn() })),
-  );
-}
 
 describe("AppFrame", () => {
   afterEach(() => {

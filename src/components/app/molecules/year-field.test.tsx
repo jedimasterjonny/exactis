@@ -1,5 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+import { commit } from "@/test/dom";
 
 import { YearField } from "./year-field";
 
@@ -27,8 +29,7 @@ describe("YearField", () => {
 
     const input = screen.getByRole("textbox", { name: "First year" });
 
-    fireEvent.change(input, { target: { value: "2031" } });
-    fireEvent.blur(input);
+    commit(input, "2031");
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(2031);
     expect(input).toHaveValue("2031");
@@ -61,8 +62,7 @@ describe("YearField", () => {
 
     expect(input).toHaveValue("2030");
 
-    fireEvent.change(input, { target: { value: "2019" } });
-    fireEvent.blur(input);
+    commit(input, "2019");
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(2026);
   });

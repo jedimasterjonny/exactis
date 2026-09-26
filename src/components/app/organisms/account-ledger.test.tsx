@@ -24,6 +24,8 @@ import { accounts } from "@/data/accounts.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 import { saved as accepted, refused } from "@/lib/answer";
+import { bySlot, commit, openEditor, openEntry } from "@/test/dom";
+import { heldBack } from "@/test/held-back";
 
 import { AccountLedger } from "./account-ledger";
 
@@ -71,26 +73,6 @@ const finance: Account = {
   name: "Golf PCP",
   secures: golf.id,
 };
-
-const bySlot =
-  (slot: string) =>
-  (_content: string, element: Element | null): boolean =>
-    element?.getAttribute("data-slot") === slot;
-
-function commit(field: HTMLElement, value: string): void {
-  fireEvent.change(field, { target: { value } });
-  fireEvent.blur(field);
-}
-
-function openEditor(name: string): HTMLElement {
-  fireEvent.click(screen.getByRole("button", { name: `Edit ${name}` }));
-  return screen.getByRole("dialog", { name });
-}
-
-function openEntry(): HTMLElement {
-  fireEvent.click(screen.getByRole("button", { name: "Add account" }));
-  return screen.getByRole("dialog");
-}
 
 // Save reports through the toast manager, which needs its Toaster mounted.
 function renderLedger(): void {
@@ -284,7 +266,7 @@ describe("AccountLedger", () => {
   it("adds a named account and reports it", async () => {
     renderLedger();
 
-    const dialog = openEntry();
+    const dialog = openEntry("Add account");
 
     expect(within(dialog).getByText("New account")).toHaveClass("text-brand");
     expect(
@@ -321,12 +303,8 @@ describe("AccountLedger", () => {
     ).toBeInTheDocument();
 
     // The store's answer is held back, so the save can be seen in flight.
-    let answer!: (answered: Answer<Account>) => void;
-    vi.mocked(saveAccount).mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      }),
-    );
+    const { answer, promise } = heldBack<Answer<Account>>();
+    vi.mocked(saveAccount).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(null, {
@@ -378,7 +356,7 @@ describe("AccountLedger", () => {
       name: "Car",
     });
 
-    const dialog = openEntry();
+    const dialog = openEntry("Add account");
 
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: "Car" },
@@ -494,7 +472,7 @@ describe("AccountLedger", () => {
   it("drops a cancelled draft and leaves a cleared figure as it was", () => {
     renderLedger();
 
-    let dialog = openEntry();
+    let dialog = openEntry("Add account");
 
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: "Premium bonds" },
@@ -504,7 +482,7 @@ describe("AccountLedger", () => {
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
-    dialog = openEntry();
+    dialog = openEntry("Add account");
 
     expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue(
       "",
@@ -857,12 +835,8 @@ describe("AccountLedger", () => {
   it("moves a row onto another from the keyboard, shows the order at once and sends it whole to the store", async () => {
     renderLedger();
     fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
-    let answer!: (answered: Answer<undefined>) => void;
-    vi.mocked(placeAccountsInOrder).mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      }),
-    );
+    const { answer, promise } = heldBack<Answer<undefined>>();
+    vi.mocked(placeAccountsInOrder).mockReturnValue(promise);
 
     expect(names()).toStrictEqual([
       "Workplace pension",
@@ -1120,12 +1094,8 @@ describe("AccountLedger", () => {
   // and closes on the answer; the row goes when the page re-reads.
   it("asks before deleting an account, and deletes it on confirm", async () => {
     renderLedger();
-    let answer!: (answered: Answer<undefined>) => void;
-    vi.mocked(removeAccount).mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      }),
-    );
+    const { answer, promise } = heldBack<Answer<undefined>>();
+    vi.mocked(removeAccount).mockReturnValue(promise);
 
     fireEvent.click(
       screen.getByRole("button", { name: "Delete Current account" }),

@@ -16,6 +16,8 @@ import { accounts } from "@/data/accounts.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 import { refused, saved } from "@/lib/answer";
+import { commit, field, openDialog } from "@/test/dom";
+import { heldBack } from "@/test/held-back";
 
 import { AccountDialog } from "./account-dialog";
 
@@ -32,19 +34,6 @@ const spared: Account = { ...isa, contribution: { cap: 4000, kind: "spare" } };
 
 function choice(dialog: HTMLElement, name: string): HTMLElement {
   return within(dialog).getByRole("combobox", { name });
-}
-
-function commit(field: HTMLElement, value: string): void {
-  fireEvent.change(field, { target: { value } });
-  fireEvent.blur(field);
-}
-
-function field(dialog: HTMLElement, name: string): HTMLElement {
-  return within(dialog).getByRole("textbox", { name });
-}
-
-function open(): HTMLElement {
-  return screen.getByRole("dialog");
 }
 
 // The dialog as the ledger mounts it, on a new account or one to edit,
@@ -73,7 +62,7 @@ function renderDialog(
 describe("AccountDialog", () => {
   it("opens a blank account with the save held until it is named", () => {
     renderDialog();
-    const dialog = open();
+    const dialog = openDialog();
 
     expect(within(dialog).getByText("New account")).toHaveClass("text-brand");
     expect(
@@ -82,13 +71,13 @@ describe("AccountDialog", () => {
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(choice(dialog, "Treatment")).toHaveValue("tax-deferred");
     expect(choice(dialog, "Treatment")).toBeEnabled();
-    expect(field(dialog, "Balance")).toHaveValue("£0");
+    expect(field("Balance", dialog)).toHaveValue("£0");
     expect(choice(dialog, "Growth")).toHaveValue("plan");
     expect(
       within(dialog).queryByRole("textbox", { name: "Rate" }),
     ).not.toBeInTheDocument();
 
-    fireEvent.change(field(dialog, "Name"), { target: { value: "Premium" } });
+    fireEvent.change(field("Name", dialog), { target: { value: "Premium" } });
 
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
   });
@@ -105,27 +94,23 @@ describe("AccountDialog", () => {
       name: "Lifetime ISA",
     };
     renderDialog(null, onSaved);
-    const dialog = open();
+    const dialog = openDialog();
 
-    fireEvent.change(field(dialog, "Name"), {
+    fireEvent.change(field("Name", dialog), {
       target: { value: " Lifetime ISA " },
     });
     fireEvent.change(choice(dialog, "Treatment"), {
       target: { value: "tax-free" },
     });
-    commit(field(dialog, "Balance"), "4,000");
+    commit(field("Balance", dialog), "4,000");
 
     expect(
       within(dialog).getByRole("heading", { name: "Lifetime ISA" }),
     ).toBeInTheDocument();
 
     // The store's answer is held back, so the save can be seen in flight.
-    let answer!: (answered: Answer<Account>) => void;
-    vi.mocked(saveAccount).mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      }),
-    );
+    const { answer, promise } = heldBack<Answer<Account>>();
+    vi.mocked(saveAccount).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(null, {
@@ -165,17 +150,17 @@ describe("AccountDialog", () => {
       saved({ ...pension, balance: 420000 }),
     );
     renderDialog(pension, onSaved);
-    const dialog = open();
+    const dialog = openDialog();
 
     expect(within(dialog).getByText("Edit account")).toHaveClass("text-brand");
-    expect(field(dialog, "Name")).toHaveValue("Workplace pension");
+    expect(field("Name", dialog)).toHaveValue("Workplace pension");
     expect(choice(dialog, "Treatment")).toHaveValue("tax-deferred");
-    expect(field(dialog, "Balance")).toHaveValue("£412,880");
+    expect(field("Balance", dialog)).toHaveValue("£412,880");
     expect(choice(dialog, "Contribution")).toHaveValue("fixed");
-    expect(field(dialog, "Amount")).toHaveValue("£27,195");
+    expect(field("Amount", dialog)).toHaveValue("£27,195");
     expect(choice(dialog, "Cadence")).toHaveValue("year");
 
-    commit(field(dialog, "Balance"), "420,000");
+    commit(field("Balance", dialog), "420,000");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -208,7 +193,7 @@ describe("AccountDialog", () => {
   // opened with, and the ones it leaves behind go back to nothing.
   it("pays the spare money to a cap, and brings the sum back with the fixed choice", () => {
     renderDialog(isa);
-    const dialog = open();
+    const dialog = openDialog();
 
     fireEvent.change(choice(dialog, "Contribution"), {
       target: { value: "spare" },
@@ -217,17 +202,17 @@ describe("AccountDialog", () => {
     expect(
       within(dialog).queryByRole("textbox", { name: "Amount" }),
     ).not.toBeInTheDocument();
-    expect(field(dialog, "Cap, a year")).toHaveValue("£0");
-    expect(field(dialog, "Cap, a year")).toHaveAccessibleDescription(
+    expect(field("Cap, a year", dialog)).toHaveValue("£0");
+    expect(field("Cap, a year", dialog)).toHaveAccessibleDescription(
       "Up to the £20,000 allowance, or nothing for all of it",
     );
 
-    commit(field(dialog, "Cap, a year"), "9,000");
+    commit(field("Cap, a year", dialog), "9,000");
     fireEvent.change(choice(dialog, "Contribution"), {
       target: { value: "fixed" },
     });
 
-    expect(field(dialog, "Amount")).toHaveValue("£20,000");
+    expect(field("Amount", dialog)).toHaveValue("£20,000");
     expect(choice(dialog, "Cadence")).toHaveValue("year");
   });
 
@@ -238,32 +223,32 @@ describe("AccountDialog", () => {
   // the wrappers and cash leaves what was typed where it is.
   it("drops the spare money with an asset treatment and brings it back with a wrapper's", () => {
     renderDialog(spared);
-    const dialog = open();
+    const dialog = openDialog();
     const treatment = choice(dialog, "Treatment");
 
-    expect(field(dialog, "Cap, a year")).toHaveValue("£4,000");
+    expect(field("Cap, a year", dialog)).toHaveValue("£4,000");
 
     fireEvent.change(treatment, { target: { value: "debt" } });
 
     expect(
       within(dialog).queryByRole("combobox", { name: "Contribution" }),
     ).not.toBeInTheDocument();
-    expect(field(dialog, "Amount")).toHaveValue("£0");
+    expect(field("Amount", dialog)).toHaveValue("£0");
 
     fireEvent.change(treatment, { target: { value: "real-asset" } });
-    commit(field(dialog, "Amount"), "100");
+    commit(field("Amount", dialog), "100");
     fireEvent.change(treatment, { target: { value: "cash" } });
 
     expect(choice(dialog, "Contribution")).toHaveValue("spare");
-    expect(field(dialog, "Cap, a year")).toHaveValue("£4,000");
+    expect(field("Cap, a year", dialog)).toHaveValue("£4,000");
 
     fireEvent.change(choice(dialog, "Contribution"), {
       target: { value: "fixed" },
     });
-    commit(field(dialog, "Amount"), "250");
+    commit(field("Amount", dialog), "250");
     fireEvent.change(treatment, { target: { value: "tax-free" } });
 
-    expect(field(dialog, "Amount")).toHaveValue("£250");
+    expect(field("Amount", dialog)).toHaveValue("£250");
   });
 
   // A pension a salary feeds stays a pension until the salary is
@@ -281,7 +266,7 @@ describe("AccountDialog", () => {
         />
       </Toaster>,
     );
-    const treatment = choice(open(), "Treatment");
+    const treatment = choice(openDialog(), "Treatment");
 
     expect(treatment).toBeDisabled();
     expect(treatment).toHaveAccessibleDescription(
@@ -305,7 +290,7 @@ describe("AccountDialog", () => {
         />
       </Toaster>,
     );
-    const treatment = choice(open(), "Treatment");
+    const treatment = choice(openDialog(), "Treatment");
 
     expect(treatment).toBeEnabled();
     expect(treatment).not.toHaveAccessibleDescription();
@@ -330,24 +315,24 @@ describe("AccountDialog", () => {
         />
       </Toaster>,
     );
-    const dialog = open();
+    const dialog = openDialog();
 
     expect(choice(dialog, "Contribution")).toHaveAccessibleDescription(
       "Paid in on top of the salary sacrifice",
     );
-    expect(field(dialog, "Sacrificed from Salary")).toHaveValue("10.00%");
-    expect(field(dialog, "Sacrificed from Salary")).toHaveAccessibleDescription(
+    expect(field("Sacrificed from Salary", dialog)).toHaveValue("10.00%");
+    expect(field("Sacrificed from Salary", dialog)).toHaveAccessibleDescription(
       "Of its £120,000 base; £13,800 a year lands with the NI saved",
     );
-    expect(field(dialog, "Sacrificed from Second job")).toHaveValue("10.00%");
+    expect(field("Sacrificed from Second job", dialog)).toHaveValue("10.00%");
 
-    commit(field(dialog, "Sacrificed from Salary"), "8");
+    commit(field("Sacrificed from Salary", dialog), "8");
 
-    expect(field(dialog, "Sacrificed from Salary")).toHaveAccessibleDescription(
+    expect(field("Sacrificed from Salary", dialog)).toHaveAccessibleDescription(
       "Of its £120,000 base; £11,040 a year lands with the NI saved",
     );
     expect(
-      field(dialog, "Sacrificed from Second job"),
+      field("Sacrificed from Second job", dialog),
     ).toHaveAccessibleDescription(
       "Of its £120,000 base; £13,800 a year lands with the NI saved",
     );
@@ -392,11 +377,11 @@ describe("AccountDialog", () => {
         />
       </Toaster>,
     );
-    const dialog = open();
+    const dialog = openDialog();
 
-    commit(field(dialog, "Balance"), "420,000");
-    commit(field(dialog, "Sacrificed from Salary"), "8");
-    commit(field(dialog, "Sacrificed from Salary"), "10");
+    commit(field("Balance", dialog), "420,000");
+    commit(field("Sacrificed from Salary", dialog), "8");
+    commit(field("Sacrificed from Salary", dialog), "10");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -422,9 +407,9 @@ describe("AccountDialog", () => {
     );
 
     expect(
-      within(open()).queryByRole("textbox", { name: /^Sacrificed from/ }),
+      within(openDialog()).queryByRole("textbox", { name: /^Sacrificed from/ }),
     ).not.toBeInTheDocument();
-    expect(choice(open(), "Contribution")).toHaveAccessibleDescription(
+    expect(choice(openDialog(), "Contribution")).toHaveAccessibleDescription(
       "Spare money is what a month's income leaves after the expenses and every fixed sum",
     );
   });
@@ -435,7 +420,7 @@ describe("AccountDialog", () => {
       refused("A pension a salary feeds stays a pension"),
     );
     renderDialog(pension, onSaved);
-    const dialog = open();
+    const dialog = openDialog();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
@@ -467,13 +452,9 @@ describe("AccountDialog", () => {
     );
     // The store's answer is held back, so the save can be seen in flight,
     // and given at the end, so no save is left on its way.
-    let answer!: (answered: Answer<Account>) => void;
-    vi.mocked(saveAccount).mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      }),
-    );
-    const dialog = open();
+    const { answer, promise } = heldBack<Answer<Account>>();
+    vi.mocked(saveAccount).mockReturnValue(promise);
+    const dialog = openDialog();
 
     expect(
       within(dialog).getByRole("button", { name: "Delete" }),
@@ -497,9 +478,9 @@ describe("AccountDialog", () => {
   it("tells the caller when it is dismissed, and saves nothing", () => {
     const onDismiss = vi.fn<() => void>();
     renderDialog(null, vi.fn<(account: Account) => void>(), onDismiss);
-    const dialog = open();
+    const dialog = openDialog();
 
-    fireEvent.change(field(dialog, "Name"), { target: { value: "Premium" } });
+    fireEvent.change(field("Name", dialog), { target: { value: "Premium" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
     expect(onDismiss).toHaveBeenCalledOnce();
@@ -522,12 +503,12 @@ describe("AccountDialog", () => {
         />
       </Toaster>,
     );
-    const dialog = open();
+    const dialog = openDialog();
     vi.mocked(saveAccount).mockResolvedValue(saved(pension));
 
     expect(choice(dialog, "Owner")).toHaveValue("1");
 
-    fireEvent.change(field(dialog, "Name"), { target: { value: "ISA" } });
+    fireEvent.change(field("Name", dialog), { target: { value: "ISA" } });
     fireEvent.change(choice(dialog, "Owner"), { target: { value: "2" } });
     fireEvent.change(choice(dialog, "Treatment"), {
       target: { value: "tax-free" },
@@ -559,7 +540,7 @@ describe("AccountDialog", () => {
   it("drops the mark of a pension always funded with another treatment", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
     renderDialog({ ...pension, isAlwaysFunded: true }, onSaved);
-    const dialog = open();
+    const dialog = openDialog();
     vi.mocked(saveAccount).mockResolvedValue(saved(pension));
 
     expect(choice(dialog, "When short")).toHaveTextContent("Always fund it");
@@ -588,7 +569,7 @@ describe("AccountDialog", () => {
   it("brings the mark back as it opened when a pension is chosen again", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
     renderDialog({ ...pension, isAlwaysFunded: true }, onSaved);
-    const dialog = open();
+    const dialog = openDialog();
     vi.mocked(saveAccount).mockResolvedValue(saved(pension));
 
     fireEvent.change(choice(dialog, "Treatment"), {
@@ -625,7 +606,7 @@ describe("AccountDialog", () => {
       },
       onSaved,
     );
-    const dialog = open();
+    const dialog = openDialog();
     vi.mocked(saveAccount).mockResolvedValue(saved(isa));
 
     fireEvent.change(choice(dialog, "Treatment"), {
@@ -659,9 +640,9 @@ describe("AccountDialog", () => {
         />
       </Toaster>,
     );
-    const dialog = open();
+    const dialog = openDialog();
 
-    fireEvent.change(field(dialog, "Name"), { target: { value: "Premium" } });
+    fireEvent.change(field("Name", dialog), { target: { value: "Premium" } });
 
     expect(choice(dialog, "Owner")).toBeDisabled();
     expect(choice(dialog, "Owner")).toHaveAccessibleDescription(
@@ -680,13 +661,13 @@ describe("AccountDialog", () => {
   // the store would refuse it; the amount's hint says the most.
   it("holds the save of a fixed sum past its allowance", () => {
     renderDialog(isa);
-    const dialog = open();
+    const dialog = openDialog();
 
-    commit(field(dialog, "Amount"), "20,001");
+    commit(field("Amount", dialog), "20,001");
 
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
 
-    commit(field(dialog, "Amount"), "20,000");
+    commit(field("Amount", dialog), "20,000");
 
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
   });
@@ -708,7 +689,9 @@ describe("AccountDialog", () => {
       </Toaster>,
     );
 
-    fireEvent.click(within(open()).getByRole("button", { name: "Delete" }));
+    fireEvent.click(
+      within(openDialog()).getByRole("button", { name: "Delete" }),
+    );
 
     expect(onDelete).toHaveBeenCalledExactlyOnceWith(isa);
     expect(saveAccount).not.toHaveBeenCalled();
@@ -728,7 +711,7 @@ describe("AccountDialog", () => {
     );
 
     expect(
-      within(open()).queryByRole("button", { name: "Delete" }),
+      within(openDialog()).queryByRole("button", { name: "Delete" }),
     ).not.toBeInTheDocument();
   });
 });

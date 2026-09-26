@@ -1,6 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { stubViewport } from "@/test/dom";
+
 import AppLayout from "./layout";
 
 vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
@@ -12,16 +14,7 @@ describe("AppLayout", () => {
   });
 
   it("frames its children in the sidebar shell", () => {
-    // jsdom has no matchMedia, and the sidebar's mobile hook reads the
-    // viewport.
-    vi.stubGlobal("innerWidth", 1024);
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn(() => ({
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      })),
-    );
+    stubViewport(1024);
     render(
       <AppLayout params={Promise.resolve({})}>
         <p>Screen</p>
