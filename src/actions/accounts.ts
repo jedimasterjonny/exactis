@@ -2,7 +2,12 @@
 
 import * as z from "zod";
 
-import type { Account, AccountDraft, Share } from "@/data/accounts";
+import type {
+  Account,
+  AccountDraft,
+  AccountValues,
+  Share,
+} from "@/data/accounts";
 import type { CarValues } from "@/data/cars";
 import type { Kept } from "@/data/household";
 import type { HouseValues } from "@/data/houses";
@@ -28,7 +33,7 @@ import {
 import { isSound, statuses, toRecords } from "@/data/houses";
 import { month, named, pounds, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
-import { found, replaced } from "@/lib/records";
+import { found, replaced, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
@@ -217,20 +222,20 @@ export async function saveAccount(
   const at = target.parse(id);
   const { shares, ...parsed } = values.parse(draft);
   return amend(({ kept }) => {
-    const written = writtenIn(kept, at, toAccount(parsed, at ?? kept.next));
+    const entered = writtenIn(kept, at, parsed);
     return {
       kept: {
-        ...written.kept,
+        ...entered.kept,
         schedule: {
-          ...written.kept.schedule,
+          ...entered.kept.schedule,
           income: sacrificed(
-            written.kept.schedule.income,
-            written.result.id,
+            entered.kept.schedule.income,
+            entered.result.id,
             shares,
           ),
         },
       },
-      result: written.result,
+      result: entered.result,
     };
   });
 }
@@ -330,16 +335,16 @@ function securedIn(
   at: null | number,
   { asset, loan: secured }: SecuredRecords,
 ): { readonly kept: Kept; readonly result: Account } {
-  const written = writtenIn(kept, at, toAccount(asset, at ?? kept.next));
-  const { accounts, next, schedule } = written.kept;
-  const loan = accounts.find(({ secures }) => secures === written.result.id);
+  const entered = writtenIn(kept, at, asset);
+  const { accounts, next, schedule } = entered.kept;
+  const loan = accounts.find(({ secures }) => secures === entered.result.id);
   if (secured === null) {
     return {
       kept:
         loan === undefined
-          ? written.kept
+          ? entered.kept
           : {
-              ...written.kept,
+              ...entered.kept,
               accounts: accounts.filter((account) => account !== loan),
               schedule: {
                 ...schedule,
@@ -348,14 +353,14 @@ function securedIn(
                 ),
               },
             },
-      result: written.result,
+      result: entered.result,
     };
   }
   // A loan the asset had keeps its id, and so does the line paying it;
   // what is added takes the next, the loan before its line.
   const debt = {
     ...toAccount(secured.account, loan?.id ?? next),
-    secures: written.result.id,
+    secures: entered.result.id,
   };
   const afterDebt = loan === undefined ? next + 1 : next;
   const line = schedule.expenses.find(({ pays }) => pays === debt.id);
@@ -366,7 +371,7 @@ function securedIn(
   };
   return {
     kept: {
-      ...written.kept,
+      ...entered.kept,
       accounts:
         loan === undefined ? [...accounts, debt] : replaced(accounts, debt),
       next: line === undefined ? afterDebt + 1 : afterDebt,
@@ -378,7 +383,7 @@ function securedIn(
             : replaced(schedule.expenses, payments),
       },
     },
-    result: written.result,
+    result: entered.result,
   };
 }
 
@@ -389,22 +394,19 @@ function securedIn(
 function writtenIn(
   kept: Kept,
   at: null | number,
-  account: Account,
+  values: AccountValues,
 ): { readonly kept: Kept; readonly result: Account } {
-  if (at === null) {
-    return {
-      kept: {
-        ...kept,
-        accounts: [...kept.accounts, account],
-        next: kept.next + 1,
-      },
-      result: account,
-    };
-  }
-  const { secures } = found(kept.accounts, at, "account");
-  const written = { ...account, ...(secures !== undefined && { secures }) };
-  return {
-    kept: { ...kept, accounts: replaced(kept.accounts, written) },
-    result: written,
-  };
+  const {
+    next,
+    records,
+    written: account,
+  } = written(
+    kept.accounts,
+    { at, next: kept.next, noun: "account" },
+    (id, listed) => ({
+      ...toAccount(values, id),
+      ...(listed?.secures !== undefined && { secures: listed.secures }),
+    }),
+  );
+  return { kept: { ...kept, accounts: records, next }, result: account };
 }
