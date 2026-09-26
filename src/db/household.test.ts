@@ -2,6 +2,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { blank } from "@/data/household.fixture";
+import { owners } from "@/data/owners.fixture";
 import { inMemory } from "@/db/memory.fixture";
 import { householdVersions } from "@/db/schema";
 
@@ -9,7 +10,7 @@ import { keepAfter, readLatest } from "./household";
 
 const { close, db, empty, ready } = inMemory();
 
-const named = { ...blank, next: 2, owners: [{ id: 1, name: "Me" }] };
+const named = { ...blank, next: 2, owners };
 
 describe("household store", () => {
   beforeAll(ready);

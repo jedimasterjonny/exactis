@@ -5,7 +5,13 @@ import * as z from "zod";
 
 import type { Kept } from "@/data/household";
 
+import {
+  golf as car,
+  golfPcp as finance,
+  golfValues,
+} from "@/data/cars.fixture";
 import { kept, today } from "@/data/household.fixture";
+import { homeValues } from "@/data/houses.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
@@ -68,15 +74,7 @@ const owing = {
 
 // The reference kit's house as the dialog would send it: £2,210 a month
 // against £341,810 owed at 5.15%.
-const house = {
-  balance: 341810,
-  growth: 0.021,
-  name: " Home ",
-  payment: 2210,
-  rate: 0.0515,
-  status: "mortgaged",
-  value: 416386,
-} as const;
+const house = { ...homeValues, name: " Home " };
 
 const outright = {
   ...house,
@@ -125,35 +123,7 @@ const payments = {
 // £14,000 owed at 7.9% on a PCP paying £290 a month towards a £6,000
 // balloon; and the records it is held as, its payments open-ended as
 // the house's are.
-const golf = {
-  agreement: "pcp",
-  balance: 14000,
-  balloon: 6000,
-  depreciation: 0.15,
-  name: " Golf ",
-  payment: 290,
-  rate: 0.079,
-  value: 18000,
-} as const;
-
-const car = {
-  balance: 18000,
-  growth: { kind: "fixed", rate: -0.15 },
-  id: 6,
-  kind: "car",
-  name: "Golf",
-} as const;
-
-const finance = {
-  balance: -14000,
-  balloon: 6000,
-  contribution: { amount: 290, cadence: "month", kind: "fixed" },
-  growth: { kind: "fixed", rate: 0.079 },
-  id: 7,
-  kind: "debt",
-  name: "Golf PCP",
-  secures: 6,
-} as const;
+const golf = { ...golfValues, name: " Golf " };
 
 const carPayments = {
   amount: 290,

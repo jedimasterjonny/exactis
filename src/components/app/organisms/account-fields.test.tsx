@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { AccountKind, AccountValues, Funding } from "@/data/accounts";
 
-import { owners } from "@/data/owners.fixture";
+import { owners, sam } from "@/data/owners.fixture";
 import { commit } from "@/test/dom";
 
 import { AccountFields } from "./account-fields";
@@ -50,7 +50,7 @@ function renderFields(
       onAmend={onAmend}
       onFundingChange={onFundingChange}
       onKindChange={onKindChange}
-      owners={[...owners, { id: 2, name: "Sam" }]}
+      owners={[...owners, sam]}
     >
       <p>What the salaries sacrifice</p>
     </AccountFields>,

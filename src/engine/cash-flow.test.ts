@@ -7,6 +7,7 @@ import type { Month } from "@/data/schedule";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
+import { kept } from "@/data/household.fixture";
 import { incomeLines } from "@/data/income.fixture";
 
 import type { CashFlow, Schedule } from "./cash-flow";
@@ -17,7 +18,7 @@ const [pension, isa, cash, home, mortgage] = accounts;
 const [salary, stepUp, consulting, statePension] = incomeLines;
 const [household, childcare, mortgagePayment, retirement, care] = expenseLines;
 
-const schedule = { expenses: expenseLines, income: incomeLines };
+const { schedule } = kept;
 
 // Read at the start of 2026, so a debt's payments are counted from
 // January and the months a month is charged for are read off there,

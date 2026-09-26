@@ -5,6 +5,7 @@ import type { Account } from "@/data/accounts";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
+import { kept } from "@/data/household.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
 import { slider } from "@/test/dom";
 
@@ -35,7 +36,7 @@ const spareCash: Account = {
 
 const held = [pension, spareIsa, spareCash, mortgage];
 
-const schedule = { expenses: expenseLines, income: incomeLines };
+const { schedule } = kept;
 
 function rows(): string[] {
   return screen.getAllByRole("listitem").map((row) => row.textContent);

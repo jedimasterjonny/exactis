@@ -47,3 +47,13 @@ export const accounts = [
     name: "Mortgage",
   },
 ] as const satisfies readonly Account[];
+
+// A second pension, holding nothing and belonging to no one, under the
+// id after the reference household's, for a choice of two. For tests.
+export const sipp: Account = {
+  balance: 0,
+  growth: { kind: "plan" },
+  id: 6,
+  kind: "tax-deferred",
+  name: "SIPP",
+};
