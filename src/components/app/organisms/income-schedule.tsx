@@ -13,14 +13,14 @@ import type { Entry } from "@/hooks/use-editor";
 
 import { removeIncomeLine, saveIncomeLine } from "@/actions/schedule";
 import { Note } from "@/components/app/atoms/note";
-import { SectionHeader } from "@/components/app/atoms/section-header";
 import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
+import { SectionCard } from "@/components/app/molecules/section-card";
 import { EmploymentFields } from "@/components/app/organisms/employment-fields";
 import { LineFields } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
-import { Card, CardContent, CardHeader } from "@/components/kit/card";
+import { CardContent } from "@/components/kit/card";
 import { isPension } from "@/data/accounts";
 import { isOpeningSound, totalOf } from "@/data/income";
 import { useEditor } from "@/hooks/use-editor";
@@ -143,24 +143,21 @@ export function IncomeSchedule({
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <SectionHeader
-            actions={
-              <Button
-                onClick={() => {
-                  open(blank(plan), null);
-                }}
-                size="sm"
-              >
-                <Plus aria-hidden />
-                Add income line
-              </Button>
-            }
-            label={subsectionLabel(planScreen, 1)}
-            title="Income by year"
-          />
-        </CardHeader>
+      <SectionCard
+        actions={
+          <Button
+            onClick={() => {
+              open(blank(plan), null);
+            }}
+            size="sm"
+          >
+            <Plus aria-hidden />
+            Add income line
+          </Button>
+        }
+        label={subsectionLabel(planScreen, 1)}
+        title="Income by year"
+      >
         <CardContent>
           <ScheduleRows
             emptyDescription="Add a salary, a pension or a side line to see it scheduled here."
@@ -173,7 +170,7 @@ export function IncomeSchedule({
             summarise={(line) => summarise(line, pensions)}
           />
         </CardContent>
-      </Card>
+      </SectionCard>
       <Note>
         Lines overlap freely: a step-up is a second line starting mid-way, not
         an edit to the first.

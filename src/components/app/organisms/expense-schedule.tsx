@@ -14,12 +14,12 @@ import type { Plan } from "@/data/plan";
 
 import { saveExpenseLine } from "@/actions/schedule";
 import { Note } from "@/components/app/atoms/note";
-import { SectionHeader } from "@/components/app/atoms/section-header";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
+import { SectionCard } from "@/components/app/molecules/section-card";
 import { LineFields } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
-import { Card, CardContent, CardHeader } from "@/components/kit/card";
+import { CardContent } from "@/components/kit/card";
 import { useEditor } from "@/hooks/use-editor";
 import { isSound, spanOf } from "@/lib/lines";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
@@ -82,24 +82,21 @@ export function ExpenseSchedule({
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <SectionHeader
-            actions={
-              <Button
-                onClick={() => {
-                  open(blank(plan), null);
-                }}
-                size="sm"
-              >
-                <Plus aria-hidden />
-                Add expense line
-              </Button>
-            }
-            label={subsectionLabel(planScreen, 2)}
-            title="Expenses by year"
-          />
-        </CardHeader>
+      <SectionCard
+        actions={
+          <Button
+            onClick={() => {
+              open(blank(plan), null);
+            }}
+            size="sm"
+          >
+            <Plus aria-hidden />
+            Add expense line
+          </Button>
+        }
+        label={subsectionLabel(planScreen, 2)}
+        title="Expenses by year"
+      >
         <CardContent>
           <ScheduleRows
             emptyDescription="Add the household's spending, childcare or a loan's payments to see them scheduled here."
@@ -111,7 +108,7 @@ export function ExpenseSchedule({
             summarise={summarise}
           />
         </CardContent>
-      </Card>
+      </SectionCard>
       <Note>
         An open-ended line runs to the end of the plan: retirement living starts
         where household spending stops, as a line of its own.

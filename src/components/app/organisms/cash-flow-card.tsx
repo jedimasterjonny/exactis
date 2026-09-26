@@ -10,14 +10,14 @@ import type { Plan } from "@/data/plan";
 import type { Fed, Paid, Schedule, Spent, Take } from "@/engine/cash-flow";
 
 import { Field } from "@/components/app/atoms/field";
-import { SectionHeader } from "@/components/app/atoms/section-header";
+import { SectionCard } from "@/components/app/molecules/section-card";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/kit/accordion";
-import { Card, CardContent, CardHeader } from "@/components/kit/card";
+import { CardContent } from "@/components/kit/card";
 import { Slider } from "@/components/kit/slider";
 import { endYear } from "@/data/plan";
 import { cashFlow } from "@/engine/cash-flow";
@@ -80,14 +80,9 @@ export function CashFlowCard({
   const month = year === plan.from ? plan.month : 0;
   const flow = cashFlow(accounts, schedule, { at: { month, year }, plan });
   return (
-    <Card>
-      <CardHeader className="grid gap-4">
-        <SectionHeader
-          label={subsectionLabel(planScreen, 3)}
-          title="Cash flow each month"
-        >
-          {`${monthName(month, "long")} ${String(year)}, age ${String(year - plan.born)}, in today's money`}
-        </SectionHeader>
+    <SectionCard
+      caption={`${monthName(month, "long")} ${String(year)}, age ${String(year - plan.born)}, in today's money`}
+      controls={
         <Field
           hint={`${String(plan.from)} to ${String(end)}, the years of the plan`}
           label="Year"
@@ -102,7 +97,10 @@ export function CashFlowCard({
             value={[year]}
           />
         </Field>
-      </CardHeader>
+      }
+      label={subsectionLabel(planScreen, 3)}
+      title="Cash flow each month"
+    >
       <CardContent>
         <ul className="divide-y">
           <Row amount={flow.income} label="Income" />
@@ -136,7 +134,7 @@ export function CashFlowCard({
           <Row amount={flow.left} isTotal label="Left over" />
         </ul>
       </CardContent>
-    </Card>
+    </SectionCard>
   );
 }
 

@@ -70,4 +70,28 @@ describe("SectionCard", () => {
       ).queryByRole("button"),
     ).not.toBeInTheDocument();
   });
+
+  it("puts controls in the header, beneath the title and above the content", () => {
+    render(
+      <SectionCard
+        controls={<input aria-label="Year" type="range" />}
+        label="Sect. III.iii"
+        title="Cash flow each month"
+      >
+        <p>Flow</p>
+      </SectionCard>,
+    );
+
+    const region = screen.getByRole("region", { name: "Cash flow each month" });
+    const header = within(region).getByText(
+      (_content, element) =>
+        element?.getAttribute("data-slot") === "card-header",
+    );
+
+    expect(header).toContainElement(
+      within(region).getByRole("slider", { name: "Year" }),
+    );
+    expect(header).toHaveClass("gap-4");
+    expect(header).not.toContainElement(within(region).getByRole("paragraph"));
+  });
 });
