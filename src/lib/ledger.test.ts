@@ -11,6 +11,8 @@ import {
   formatGrowth,
   formatMonthly,
   paidMonthly,
+  paidMonthlyOf,
+  sumOf,
 } from "./ledger";
 
 const [pension, isa, cash, home, mortgage] = accounts;
@@ -46,6 +48,24 @@ describe("paidMonthly", () => {
     expect(
       paidMonthly({ ...cash, contribution: { cap: null, kind: "spare" } }, []),
     ).toBe(0);
+  });
+});
+
+describe("paidMonthlyOf", () => {
+  it("adds up what each account is paid a month, the sacrifice with it", () => {
+    const [salary] = incomeLines;
+
+    expect(paidMonthlyOf([pension, isa], [salary])).toBeCloseTo(
+      (27195 + 13800 + 20000) / 12,
+    );
+    expect(paidMonthlyOf([], [salary])).toBe(0);
+  });
+});
+
+describe("sumOf", () => {
+  it("sums a figure down a list, and a list of nothing to nothing", () => {
+    expect(sumOf(accounts, ({ id }) => id)).toBe(1 + 2 + 3 + 4 + 5);
+    expect(sumOf([], () => 1)).toBe(0);
   });
 });
 
