@@ -41,6 +41,7 @@ describe("accounts", () => {
       contribution: 2210,
       funding: "fixed",
       growth: "fixed",
+      isAlwaysFunded: false,
       kind: "debt",
       name: "Mortgage",
       owner: null,
@@ -63,6 +64,7 @@ describe("accounts", () => {
         contribution: 0,
         funding: "fixed",
         growth: "plan",
+        isAlwaysFunded: false,
         kind: "tax-free",
         name: "Lifetime ISA",
         owner: 1,
@@ -87,6 +89,7 @@ describe("accounts", () => {
       contribution: 0,
       funding: "fixed",
       growth: "plan",
+      isAlwaysFunded: false,
       kind: "tax-free",
       name: "Lifetime ISA",
       owner: 1,
@@ -107,6 +110,7 @@ describe("accounts", () => {
       contribution: 333,
       funding: "spare",
       growth: "plan",
+      isAlwaysFunded: false,
       kind: "tax-free",
       name: "Lifetime ISA",
       owner: 1,
@@ -170,6 +174,25 @@ describe("balloon", () => {
     expect(toAccount({ ...values, balloon: 0 }, 5)).not.toHaveProperty(
       "balloon",
     );
+  });
+});
+
+describe("isAlwaysFunded", () => {
+  // A pension always funded carries the mark and reads back as marked;
+  // one that is not carries none, rather than a mark of false.
+  it("reads the mark of an always funded pension off an account and back, and drops one that is not", () => {
+    const [pension] = accounts;
+    const values = { ...toValues(pension), isAlwaysFunded: true };
+
+    expect(toAccount(values, 1)).toStrictEqual({
+      ...pension,
+      isAlwaysFunded: true,
+    });
+    expect(toValues(toAccount(values, 1))).toStrictEqual(values);
+    expect(toValues(pension).isAlwaysFunded).toBe(false);
+    expect(
+      toAccount({ ...values, isAlwaysFunded: false }, 1),
+    ).not.toHaveProperty("isAlwaysFunded");
   });
 });
 

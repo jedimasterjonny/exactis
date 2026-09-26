@@ -294,6 +294,7 @@ describe("isWithinAllowance", () => {
     contribution: 20000,
     funding: "fixed",
     growth: "plan",
+    isAlwaysFunded: false,
     kind: "tax-free",
     name: "ISA",
     owner: 1,

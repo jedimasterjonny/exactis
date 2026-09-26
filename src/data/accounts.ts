@@ -11,13 +11,17 @@
 // end, so the car it is on opens as the PCP it is; any other account
 // carries none. An ISA or a pension carries the id of the owner it
 // belongs to, whose allowance it is paid under; any other account
-// carries none.
+// carries none. A pension may be always funded, so what it is paid,
+// its own sum and what the salaries feeding it sacrifice, is kept up
+// out of the savings when the month cannot pay it; any other account,
+// and a pension that is not, carries no mark at all.
 export interface Account {
   readonly balance: number;
   readonly balloon?: number;
   readonly contribution?: Contribution;
   readonly growth: Growth;
   readonly id: number;
+  readonly isAlwaysFunded?: true;
   readonly kind: AccountKind;
   readonly name: string;
   readonly owner?: number;
@@ -41,10 +45,11 @@ export type AccountKind = (typeof accountKinds)[number];
 // cadence is kept beside it whether or not it applies, a cap of nothing
 // is the account's own allowance, the rate sits beside the growth
 // choice whether or not that is fixed, a balloon of nothing is a loan
-// with none, which is every account but a PCP's, and an owner of null
+// with none, which is every account but a PCP's, an owner of null
 // is an account nobody owns, which is every account but an ISA and a
-// pension. So a value can be edited field by field and stored column
-// by column, and becomes an account by the rules below.
+// pension, and an account not always funded is marked false. So a value
+// can be edited field by field and stored column by column, and becomes
+// an account by the rules below.
 export interface AccountValues {
   readonly balance: number;
   readonly balloon: number;
@@ -53,6 +58,7 @@ export interface AccountValues {
   readonly contribution: number;
   readonly funding: Funding;
   readonly growth: (typeof growthKinds)[number];
+  readonly isAlwaysFunded: boolean;
   readonly kind: AccountKind;
   readonly name: string;
   readonly owner: null | number;
@@ -202,6 +208,7 @@ export function toAccount(values: AccountValues, id: number): Account {
         ? { kind: "plan" }
         : { kind: "fixed", rate: values.rate },
     id,
+    ...(values.isAlwaysFunded && { isAlwaysFunded: true }),
     kind: values.kind,
     name: values.name,
     ...(values.owner !== null && { owner: values.owner }),
@@ -210,7 +217,8 @@ export function toAccount(values: AccountValues, id: number): Account {
 
 // The reverse: an absent contribution is a fixed sum of nothing a year,
 // a spare one carries no sum, a fixed one no cap, a plan rate no rate,
-// an absent balloon is one of nothing, and an absent owner is null.
+// an absent balloon is one of nothing, an absent owner is null, and an
+// absent mark is an account not always funded.
 export function toValues(account: Account): AccountValues {
   const { contribution } = account;
   return {
@@ -221,6 +229,7 @@ export function toValues(account: Account): AccountValues {
     contribution: contribution?.kind === "fixed" ? contribution.amount : 0,
     funding: contribution?.kind ?? "fixed",
     growth: account.growth.kind,
+    isAlwaysFunded: account.isAlwaysFunded === true,
     kind: account.kind,
     name: account.name,
     owner: account.owner ?? null,
