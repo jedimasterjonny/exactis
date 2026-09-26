@@ -35,8 +35,7 @@ interface EditDialogProps {
 // Save holds while the caller says the draft cannot be saved, unnamed or
 // on its way to the store. A wide dialog fits a form of three columns.
 // A dialog given a delete handler offers a Delete as well, set apart from
-// the other two, at the footer's far edge beside them and beneath them
-// on a phone, where the footer stacks: it reports the press and no more,
+// the other two at the footer's far edge: it reports the press and no more,
 // so the caller asks through its confirm before anything goes, as it
 // would from a row's bin. Given none, as an entry of something new is,
 // it offers nothing to delete. The Delete holds while the caller says a
@@ -49,6 +48,10 @@ interface EditDialogProps {
 // it, taking the title and Save with it, and scrolled nowhere. The
 // fields keep the dialog's gap between them in the box they scroll in,
 // as a caller giving more than one, fields and a note, had it before.
+// The footer is one row at every width, where the registry's stacks its
+// buttons the width of the dialog on a phone: three of them, held on
+// screen, took a fifth of it from the fields, and Save sits where a
+// thumb reaches, at the right.
 export function EditDialog({
   canSave = true,
   children,
@@ -75,10 +78,10 @@ export function EditDialog({
         <div className="-mx-4 -my-1 grid content-start gap-4 overflow-y-auto px-4 py-1">
           {children}
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex-row justify-end">
           {onDelete !== undefined && (
             <Button
-              className="sm:mr-auto"
+              className="mr-auto"
               disabled={isSaving}
               onClick={onDelete}
               size="sm"

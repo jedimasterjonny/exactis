@@ -87,10 +87,10 @@ describe("EditDialog", () => {
     expect(dialog).toHaveClass("sm:max-w-lg");
   });
 
-  // Delete sits first in the footer, which stacks it beneath the other
-  // two on a phone and, pushed to the far edge, sets it apart from them
-  // beside it; it reports the press, and the caller does the asking. The
-  // dialog's own Close is the cross in its corner, after the footer.
+  // Delete sits first in the footer, one row at every width, pushed to
+  // the far edge to set it apart from the other two; it reports the
+  // press, and the caller does the asking. The dialog's own Close is the
+  // cross in its corner, after the footer.
   it("offers a delete when given a handler, and reports it without saving or dismissing", () => {
     const onDelete = vi.fn<() => void>();
     const onDismiss = vi.fn<() => void>();
@@ -115,7 +115,9 @@ describe("EditDialog", () => {
         .getAllByRole("button")
         .map((button) => button.textContent),
     ).toStrictEqual(["Delete", "Cancel", "Save", "Close"]);
-    expect(remove).toHaveClass("sm:mr-auto", "text-destructive");
+    expect(remove).toHaveClass("mr-auto", "text-destructive");
+    // eslint-disable-next-line testing-library/no-node-access -- the footer is a layout box with no role or text of its own to query by
+    expect(remove.parentElement).toHaveClass("flex-row", "justify-end");
 
     fireEvent.click(remove);
 
