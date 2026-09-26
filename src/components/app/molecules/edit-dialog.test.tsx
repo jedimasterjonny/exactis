@@ -23,6 +23,9 @@ describe("EditDialog", () => {
       "The fields",
     );
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(
+      within(dialog).queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
   });
 
   it("reports a save and a cancel to the caller", () => {
@@ -70,5 +73,63 @@ describe("EditDialog", () => {
 
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(dialog).toHaveClass("sm:max-w-lg");
+  });
+
+  // Delete sits first in the footer, which stacks it beneath the other
+  // two on a phone and, pushed to the far edge, sets it apart from them
+  // beside it; it reports the press, and the caller does the asking. The
+  // dialog's own Close is the cross in its corner, after the footer.
+  it("offers a delete when given a handler, and reports it without saving or dismissing", () => {
+    const onDelete = vi.fn<() => void>();
+    const onDismiss = vi.fn<() => void>();
+    const onSave = vi.fn<() => void>();
+    render(
+      <EditDialog
+        eyebrow="Edit account"
+        onDelete={onDelete}
+        onDismiss={onDismiss}
+        onSave={onSave}
+        title="Stocks & shares ISA"
+      >
+        <p>The fields</p>
+      </EditDialog>,
+    );
+
+    const dialog = screen.getByRole("dialog");
+    const remove = within(dialog).getByRole("button", { name: "Delete" });
+
+    expect(
+      within(dialog)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toStrictEqual(["Delete", "Cancel", "Save", "Close"]);
+    expect(remove).toHaveClass("sm:mr-auto", "text-destructive");
+
+    fireEvent.click(remove);
+
+    expect(onDelete).toHaveBeenCalledOnce();
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  // A deletion asked for over a save in flight would race it, so the
+  // Delete holds while the caller says a save is on its way.
+  it("holds the delete while a save is on its way", () => {
+    render(
+      <EditDialog
+        canSave={false}
+        eyebrow="Edit account"
+        isSaving
+        onDelete={vi.fn<() => void>()}
+        onDismiss={vi.fn<() => void>()}
+        onSave={vi.fn<() => void>()}
+        title="Stocks & shares ISA"
+      >
+        <p>The fields</p>
+      </EditDialog>,
+    );
+
+    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 });
