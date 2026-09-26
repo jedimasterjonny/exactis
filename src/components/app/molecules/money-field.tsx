@@ -6,7 +6,7 @@ import { Field } from "@/components/app/atoms/field";
 import { FigureInput } from "@/components/app/atoms/figure-input";
 
 type MoneyFieldProps = Figure & {
-  readonly hint?: string;
+  readonly hint?: string | undefined;
   readonly label: string;
   readonly max?: number;
   readonly min?: number;
