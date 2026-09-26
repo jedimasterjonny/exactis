@@ -73,4 +73,30 @@ describe("StatTile", () => {
       ),
     ).toHaveAttribute("data-slot", "card");
   });
+
+  // A screen keeps its two tiles that matter most on a phone and leaves
+  // the rest off below the breakpoint the tiles go two across at.
+  it("leaves a tile its screen hides on a phone off below the breakpoint, and no other", () => {
+    render(
+      <>
+        <StatTile isHiddenOnPhone label="Net legacy" value="£1,771,204" />
+        <StatTile label="Chance of success" value="96.90" />
+      </>,
+    );
+
+    expect(
+      screen.getByText(
+        (_content, element) =>
+          element?.getAttribute("data-slot") === "card" &&
+          element.textContent.startsWith("Net legacy"),
+      ),
+    ).toHaveClass("max-sm:hidden");
+    expect(
+      screen.getByText(
+        (_content, element) =>
+          element?.getAttribute("data-slot") === "card" &&
+          element.textContent.startsWith("Chance of success"),
+      ),
+    ).not.toHaveClass("max-sm:hidden");
+  });
 });

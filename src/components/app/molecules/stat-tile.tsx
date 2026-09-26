@@ -1,6 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
 
+import { cn } from "cn";
+
 import type { DeltaFormat } from "@/components/app/atoms/delta-value";
 
 import { DeltaValue } from "@/components/app/atoms/delta-value";
@@ -11,6 +13,7 @@ interface StatTileProps {
   readonly delta?: number;
   readonly deltaFormat?: DeltaFormat;
   readonly icon?: LucideIcon;
+  readonly isHiddenOnPhone?: boolean;
   readonly label: string;
   readonly tone?: "default" | "inverse";
   readonly unit?: string;
@@ -26,12 +29,16 @@ interface StatTileProps {
 // container, so a figure of ten characters, a balance in the millions,
 // fits a tile two across a phone, down to a 320px one; every tile in a
 // row is the same width, so the figures in it step together whatever
-// each one's length.
+// each one's length. A tile its screen marks as hidden on a phone is
+// left off below the breakpoint the tiles go two across at, so a phone
+// opens on the two that matter most in one row rather than four in
+// two, and on the rest of the screen sooner.
 export function StatTile({
   caption,
   delta,
   deltaFormat,
   icon,
+  isHiddenOnPhone = false,
   label,
   tone = "default",
   unit,
@@ -39,7 +46,13 @@ export function StatTile({
 }: StatTileProps): JSX.Element {
   const Icon = icon;
   return (
-    <Card className="gap-3 data-[tone=inverse]:ring-0" data-tone={tone}>
+    <Card
+      className={cn(
+        "gap-3 data-[tone=inverse]:ring-0",
+        isHiddenOnPhone && "max-sm:hidden",
+      )}
+      data-tone={tone}
+    >
       <CardHeader className="gap-1.5">
         <span className="flex items-center gap-1.5 label text-muted-foreground">
           {Icon !== undefined && <Icon aria-hidden className="size-3.5" />}
