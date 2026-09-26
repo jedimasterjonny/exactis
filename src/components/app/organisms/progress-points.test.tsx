@@ -9,11 +9,7 @@ import { ProgressPoints } from "./progress-points";
 
 // Save reports through the toast manager, which needs its Toaster mounted.
 function renderPoints(): void {
-  render(
-    <Toaster>
-      <ProgressPoints points={points} />
-    </Toaster>,
-  );
+  render(<ProgressPoints points={points} />, { wrapper: Toaster });
 }
 
 describe("ProgressPoints", () => {

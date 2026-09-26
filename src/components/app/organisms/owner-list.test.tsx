@@ -32,11 +32,9 @@ function renderList(
   owners: readonly Owner[],
   held: readonly Account[] = [],
 ): void {
-  render(
-    <Toaster>
-      <OwnerList accounts={held} label="Sect. II.v" owners={owners} />
-    </Toaster>,
-  );
+  render(<OwnerList accounts={held} label="Sect. II.v" owners={owners} />, {
+    wrapper: Toaster,
+  });
 }
 
 describe("OwnerList", () => {

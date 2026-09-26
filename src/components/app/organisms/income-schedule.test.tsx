@@ -45,14 +45,13 @@ const sipp: Account = {
 // mounted. The fixture's accounts hold the one pension the salary feeds.
 function renderSchedule(lines: readonly IncomeLine[] = incomeLines): void {
   render(
-    <Toaster>
-      <IncomeSchedule
-        accounts={[...accounts, sipp]}
-        lines={lines}
-        owners={owners}
-        plan={plan}
-      />
-    </Toaster>,
+    <IncomeSchedule
+      accounts={[...accounts, sipp]}
+      lines={lines}
+      owners={owners}
+      plan={plan}
+    />,
+    { wrapper: Toaster },
   );
 }
 
@@ -885,14 +884,13 @@ describe("IncomeSchedule", () => {
   // saved, however it is named.
   it("holds the save of a salary opening a pension while the plan has no owner", () => {
     render(
-      <Toaster>
-        <IncomeSchedule
-          accounts={accounts}
-          lines={incomeLines}
-          owners={[]}
-          plan={plan}
-        />
-      </Toaster>,
+      <IncomeSchedule
+        accounts={accounts}
+        lines={incomeLines}
+        owners={[]}
+        plan={plan}
+      />,
+      { wrapper: Toaster },
     );
 
     const dialog = openEntry("Add income line");

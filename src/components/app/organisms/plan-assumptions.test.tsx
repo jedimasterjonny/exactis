@@ -26,11 +26,7 @@ const retiring: Plan = { ...plan, retires: 59 };
 // A save reports through the toast manager, which needs its Toaster
 // mounted.
 function renderAssumptions(held: Plan = retiring): void {
-  render(
-    <Toaster>
-      <PlanAssumptions plan={held} />
-    </Toaster>,
-  );
+  render(<PlanAssumptions plan={held} />, { wrapper: Toaster });
 }
 
 // Types an age into the dialog's box and leaves it, which commits it.

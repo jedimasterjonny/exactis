@@ -29,11 +29,7 @@ function pickMarch2025(): void {
 // A save reports through the toast manager, which needs its Toaster
 // mounted. The balances are as of September 2026.
 function renderMonth(): void {
-  render(
-    <Toaster>
-      <BalancesMonth at={{ month: 8, year: 2026 }} />
-    </Toaster>,
-  );
+  render(<BalancesMonth at={{ month: 8, year: 2026 }} />, { wrapper: Toaster });
 }
 
 describe("BalancesMonth", () => {

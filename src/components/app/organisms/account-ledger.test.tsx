@@ -1,3 +1,5 @@
+import type { ComponentProps } from "react";
+
 import {
   fireEvent,
   render,
@@ -74,12 +76,21 @@ const finance: Account = {
   secures: golf.id,
 };
 
-// Save reports through the toast manager, which needs its Toaster mounted.
-function renderLedger(): void {
+// The ledger on the fixture's accounts and owners in the month the plan
+// starts in, with whatever a test gives in their place. Save reports
+// through the toast manager, which needs its Toaster mounted.
+function renderLedger(
+  props: Partial<ComponentProps<typeof AccountLedger>> = {},
+): void {
   render(
-    <Toaster>
-      <AccountLedger accounts={accounts} at={at} lines={[]} owners={owners} />
-    </Toaster>,
+    <AccountLedger
+      accounts={accounts}
+      at={at}
+      lines={[]}
+      owners={owners}
+      {...props}
+    />,
+    { wrapper: Toaster },
   );
 }
 
@@ -190,16 +201,7 @@ describe("AccountLedger", () => {
   // An order of fewer than two accounts is no order and draws nothing,
   // so the owners take its place rather than leaving a numeral out.
   it("puts the owners where the order would be when there is no order", () => {
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[isa]}
-          at={at}
-          lines={[]}
-          owners={[{ id: 1, name: "Me" }]}
-        />
-      </Toaster>,
-    );
+    renderLedger({ accounts: [isa], owners: [{ id: 1, name: "Me" }] });
 
     const owners = screen.getByRole("region", { name: "Owners" });
 
@@ -243,16 +245,7 @@ describe("AccountLedger", () => {
   // a loan on a house owes against it, so the equity is what is left.
   it("counts the sacrifice in what is paid in, and the loan against the equity", () => {
     const [salary] = incomeLines;
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[pension, house, loan]}
-          at={at}
-          lines={[salary]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({ accounts: [pension, house, loan], lines: [salary] });
 
     const [worth, , equity, paidIn] = screen.getAllByText(bySlot("card"));
 
@@ -679,22 +672,15 @@ describe("AccountLedger", () => {
   });
 
   it("opens a spare-money account as it is and brings its sum back with the fixed choice", () => {
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[
-            { ...cash, contribution: { cap: null, kind: "spare" } },
-            {
-              ...isa,
-              contribution: { amount: 500, cadence: "month", kind: "fixed" },
-            },
-          ]}
-          at={at}
-          lines={[]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({
+      accounts: [
+        { ...cash, contribution: { cap: null, kind: "spare" } },
+        {
+          ...isa,
+          contribution: { amount: 500, cadence: "month", kind: "fixed" },
+        },
+      ],
+    });
 
     let dialog = openEditor("Current account");
 
@@ -745,16 +731,9 @@ describe("AccountLedger", () => {
   // which is what the choice mounts showing. A change that stays among
   // the wrappers and cash leaves what was typed where it is.
   it("drops the spare money with an asset treatment and brings it back with a wrapper's", () => {
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[{ ...isa, contribution: { cap: 4000, kind: "spare" } }]}
-          at={at}
-          lines={[]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({
+      accounts: [{ ...isa, contribution: { cap: 4000, kind: "spare" } }],
+    });
     saved(isa);
 
     const dialog = openEditor("Stocks & shares ISA");
@@ -955,16 +934,7 @@ describe("AccountLedger", () => {
   // more in the order than any other debt, so the one saving left is no
   // order and the owners take its numeral.
   it("puts a house and the loan against it on one row, which opens both in the house dialog", () => {
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[pension, house, loan]}
-          at={at}
-          lines={[]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({ accounts: [pension, house, loan] });
 
     const savingsSection = screen.getByRole("region", {
       name: "Savings and investments",
@@ -1013,16 +983,7 @@ describe("AccountLedger", () => {
   // A car and the finance on it share a row too, which opens both in the
   // car dialog.
   it("puts a car and the finance on it on one row, which opens both in the car dialog", () => {
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[pension, golf, finance]}
-          at={at}
-          lines={[]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({ accounts: [pension, golf, finance] });
 
     expect(
       screen.queryByRole("button", { name: "Edit Golf PCP" }),
@@ -1047,11 +1008,7 @@ describe("AccountLedger", () => {
   });
 
   it("opens a house with no loan against it as owned outright", () => {
-    render(
-      <Toaster>
-        <AccountLedger accounts={[house]} at={at} lines={[]} owners={owners} />
-      </Toaster>,
-    );
+    renderLedger({ accounts: [house] });
 
     const dialog = openEditor("Home");
 
@@ -1064,20 +1021,13 @@ describe("AccountLedger", () => {
   // A loan secured on an asset with no dialog of its own is edited as
   // the account it is too, since no dialog would write it back.
   it("edits a loan whose asset is not listed, or has no dialog, as the account it is", () => {
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[
-            home,
-            { ...mortgage, secures: 99 },
-            { ...finance, secures: home.id },
-          ]}
-          at={at}
-          lines={[]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({
+      accounts: [
+        home,
+        { ...mortgage, secures: 99 },
+        { ...finance, secures: home.id },
+      ],
+    });
 
     let dialog = openEditor("Mortgage");
 
@@ -1184,16 +1134,7 @@ describe("AccountLedger", () => {
   });
 
   it("asks from a house's dialog about the house, with its mortgage, and drops the question on cancel", () => {
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[pension, house, loan]}
-          at={at}
-          lines={[]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({ accounts: [pension, house, loan] });
 
     fireEvent.click(
       within(openEditor("Home")).getByRole("button", { name: "Delete" }),
@@ -1213,16 +1154,7 @@ describe("AccountLedger", () => {
   });
 
   it("asks from a car's dialog about the car, with its finance", () => {
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[golf, finance]}
-          at={at}
-          lines={[]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({ accounts: [golf, finance] });
 
     fireEvent.click(
       within(openEditor("Golf")).getByRole("button", { name: "Delete" }),
@@ -1237,16 +1169,7 @@ describe("AccountLedger", () => {
   });
 
   it("says a house takes its mortgage and the payments", () => {
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[pension, house, loan]}
-          at={at}
-          lines={[]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({ accounts: [pension, house, loan] });
 
     fireEvent.click(screen.getByRole("button", { name: "Delete Home" }));
 
@@ -1258,16 +1181,7 @@ describe("AccountLedger", () => {
   });
 
   it("says a car takes its finance and the payments", () => {
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[golf, finance]}
-          at={at}
-          lines={[]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({ accounts: [golf, finance] });
 
     fireEvent.click(screen.getByRole("button", { name: "Delete Golf" }));
 
@@ -1286,16 +1200,7 @@ describe("AccountLedger", () => {
   // asset.
   it("writes what the salary sacrifices into the pension on its row", () => {
     const [salary] = incomeLines;
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={accounts}
-          at={at}
-          lines={[salary]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({ lines: [salary] });
 
     expect(
       screen.getByText("+ £1,150 / mo sacrificed from Salary"),
@@ -1307,16 +1212,7 @@ describe("AccountLedger", () => {
   // the share, since the store holds the link whether or not it runs.
   it("counts a salary on the row only while it runs, and holds the link either way", () => {
     const [salary] = incomeLines;
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={accounts}
-          at={{ month: 0, year: 2049 }}
-          lines={[salary]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({ at: { month: 0, year: 2049 }, lines: [salary] });
 
     expect(screen.queryByText(/sacrificed from/)).not.toBeInTheDocument();
 
@@ -1332,16 +1228,7 @@ describe("AccountLedger", () => {
 
   it("holds the treatment of a pension a salary feeds", () => {
     const [salary] = incomeLines;
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[pension, isa]}
-          at={at}
-          lines={[salary]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({ accounts: [pension, isa], lines: [salary] });
 
     let treatment = within(openEditor("Workplace pension")).getByRole(
       "combobox",
@@ -1376,16 +1263,10 @@ describe("AccountLedger", () => {
   // nothing of it.
   it("says which salaries stop sacrificing into a pension", () => {
     const [salary, stepUp] = incomeLines;
-    render(
-      <Toaster>
-        <AccountLedger
-          accounts={[pension, isa]}
-          at={at}
-          lines={[salary, { ...stepUp, feeds: pension.id, sacrifice: 0.05 }]}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderLedger({
+      accounts: [pension, isa],
+      lines: [salary, { ...stepUp, feeds: pension.id, sacrifice: 0.05 }],
+    });
 
     fireEvent.click(
       screen.getByRole("button", { name: "Delete Workplace pension" }),
@@ -1408,11 +1289,7 @@ describe("AccountLedger", () => {
   });
 
   it("says a house with no loan goes alone", () => {
-    render(
-      <Toaster>
-        <AccountLedger accounts={[house]} at={at} lines={[]} owners={owners} />
-      </Toaster>,
-    );
+    renderLedger({ accounts: [house] });
 
     fireEvent.click(screen.getByRole("button", { name: "Delete Home" }));
 

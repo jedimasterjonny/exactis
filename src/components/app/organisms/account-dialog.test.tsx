@@ -1,3 +1,6 @@
+import type { RenderResult } from "@testing-library/react";
+import type { ComponentProps } from "react";
+
 import {
   fireEvent,
   render,
@@ -42,20 +45,18 @@ function choice(dialog: HTMLElement, name: string): HTMLElement {
 // ledger's, and matter only to the treatment a salary holds, so they are
 // none but in the test that has one.
 function renderDialog(
-  opening: Account | null = null,
-  onSaved: (account: Account) => void = vi.fn<(account: Account) => void>(),
-  onDismiss: () => void = vi.fn<() => void>(),
-): void {
-  render(
-    <Toaster>
-      <AccountDialog
-        account={opening}
-        lines={[]}
-        onDismiss={onDismiss}
-        onSaved={onSaved}
-        owners={owners}
-      />
-    </Toaster>,
+  props: Partial<ComponentProps<typeof AccountDialog>> = {},
+): RenderResult {
+  return render(
+    <AccountDialog
+      account={null}
+      lines={[]}
+      onDismiss={vi.fn<() => void>()}
+      onSaved={vi.fn<(account: Account) => void>()}
+      owners={owners}
+      {...props}
+    />,
+    { wrapper: Toaster },
   );
 }
 
@@ -93,7 +94,7 @@ describe("AccountDialog", () => {
       kind: "tax-free",
       name: "Lifetime ISA",
     };
-    renderDialog(null, onSaved);
+    renderDialog({ onSaved });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), {
@@ -149,7 +150,7 @@ describe("AccountDialog", () => {
     vi.mocked(saveAccount).mockResolvedValue(
       saved({ ...pension, balance: 420000 }),
     );
-    renderDialog(pension, onSaved);
+    renderDialog({ account: pension, onSaved });
     const dialog = openDialog();
 
     expect(within(dialog).getByText("Edit account")).toHaveClass("text-brand");
@@ -192,7 +193,7 @@ describe("AccountDialog", () => {
   // The fields a contribution choice shows mount with what the account
   // opened with, and the ones it leaves behind go back to nothing.
   it("pays the spare money to a cap, and brings the sum back with the fixed choice", () => {
-    renderDialog(isa);
+    renderDialog({ account: isa });
     const dialog = openDialog();
 
     fireEvent.change(choice(dialog, "Contribution"), {
@@ -222,7 +223,7 @@ describe("AccountDialog", () => {
   // which is what the choice mounts showing. A change that stays among
   // the wrappers and cash leaves what was typed where it is.
   it("drops the spare money with an asset treatment and brings it back with a wrapper's", () => {
-    renderDialog(spared);
+    renderDialog({ account: spared });
     const dialog = openDialog();
     const treatment = choice(dialog, "Treatment");
 
@@ -255,17 +256,7 @@ describe("AccountDialog", () => {
   // unlinked, which the store refuses to do from here and the reason
   // says, naming the salaries.
   it("holds the treatment of a pension a salary feeds", () => {
-    render(
-      <Toaster>
-        <AccountDialog
-          account={pension}
-          lines={[salary]}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={vi.fn<(account: Account) => void>()}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderDialog({ account: pension, lines: [salary] });
     const treatment = choice(openDialog(), "Treatment");
 
     expect(treatment).toBeDisabled();
@@ -279,17 +270,7 @@ describe("AccountDialog", () => {
   // account asked under its absent id would be held by every such line.
   // The fixture has three of them.
   it("leaves a new account's treatment free beside lines that feed no pension", () => {
-    render(
-      <Toaster>
-        <AccountDialog
-          account={null}
-          lines={incomeLines}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={vi.fn<(account: Account) => void>()}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderDialog({ lines: incomeLines });
     const treatment = choice(openDialog(), "Treatment");
 
     expect(treatment).toBeEnabled();
@@ -304,17 +285,11 @@ describe("AccountDialog", () => {
   it("edits the share a salary sacrifices into the pension, and saves it with the account", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
     vi.mocked(saveAccount).mockResolvedValue(saved(pension));
-    render(
-      <Toaster>
-        <AccountDialog
-          account={pension}
-          lines={[salary, { ...salary, id: 5, name: "Second job" }]}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={onSaved}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderDialog({
+      account: pension,
+      lines: [salary, { ...salary, id: 5, name: "Second job" }],
+      onSaved,
+    });
     const dialog = openDialog();
 
     expect(choice(dialog, "Contribution")).toHaveAccessibleDescription(
@@ -366,17 +341,7 @@ describe("AccountDialog", () => {
   it("sends no share it did not change", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
     vi.mocked(saveAccount).mockResolvedValue(saved(pension));
-    render(
-      <Toaster>
-        <AccountDialog
-          account={pension}
-          lines={[salary]}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={onSaved}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderDialog({ account: pension, lines: [salary], onSaved });
     const dialog = openDialog();
 
     commit(field("Balance", dialog), "420,000");
@@ -394,17 +359,7 @@ describe("AccountDialog", () => {
   });
 
   it("carries no shares for an account nothing feeds", () => {
-    render(
-      <Toaster>
-        <AccountDialog
-          account={isa}
-          lines={incomeLines}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={vi.fn<(account: Account) => void>()}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderDialog({ account: isa, lines: incomeLines });
 
     expect(
       within(openDialog()).queryByRole("textbox", { name: /^Sacrificed from/ }),
@@ -419,7 +374,7 @@ describe("AccountDialog", () => {
     vi.mocked(saveAccount).mockResolvedValue(
       refused("A pension a salary feeds stays a pension"),
     );
-    renderDialog(pension, onSaved);
+    renderDialog({ account: pension, onSaved });
     const dialog = openDialog();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
@@ -438,18 +393,10 @@ describe("AccountDialog", () => {
   // A deletion asked for over a save in flight would race it, so the
   // Delete holds while the save is on its way.
   it("holds a saved account's delete while its save is on its way", async () => {
-    render(
-      <Toaster>
-        <AccountDialog
-          account={isa}
-          lines={[]}
-          onDelete={vi.fn<(account: Account) => void>()}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={vi.fn<(account: Account) => void>()}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderDialog({
+      account: isa,
+      onDelete: vi.fn<(account: Account) => void>(),
+    });
     // The store's answer is held back, so the save can be seen in flight,
     // and given at the end, so no save is left on its way.
     const { answer, promise } = heldBack<Answer<Account>>();
@@ -477,7 +424,7 @@ describe("AccountDialog", () => {
 
   it("tells the caller when it is dismissed, and saves nothing", () => {
     const onDismiss = vi.fn<() => void>();
-    renderDialog(null, vi.fn<(account: Account) => void>(), onDismiss);
+    renderDialog({ onDismiss });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Premium" } });
@@ -492,17 +439,7 @@ describe("AccountDialog", () => {
   // its field, and the save sends what the draft is left with.
   it("names a wrapper's owner, keeps it between wrappers and drops it with cash", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
-    render(
-      <Toaster>
-        <AccountDialog
-          account={null}
-          lines={[]}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={onSaved}
-          owners={[...owners, { id: 2, name: "Sam" }]}
-        />
-      </Toaster>,
-    );
+    renderDialog({ onSaved, owners: [...owners, { id: 2, name: "Sam" }] });
     const dialog = openDialog();
     vi.mocked(saveAccount).mockResolvedValue(saved(pension));
 
@@ -539,7 +476,7 @@ describe("AccountDialog", () => {
   // be, and the choice leaves with the treatment.
   it("drops the mark of a pension always funded with another treatment", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
-    renderDialog({ ...pension, isAlwaysFunded: true }, onSaved);
+    renderDialog({ account: { ...pension, isAlwaysFunded: true }, onSaved });
     const dialog = openDialog();
     vi.mocked(saveAccount).mockResolvedValue(saved(pension));
 
@@ -568,7 +505,7 @@ describe("AccountDialog", () => {
   // opened, which the choice mounts showing, and saves so.
   it("brings the mark back as it opened when a pension is chosen again", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
-    renderDialog({ ...pension, isAlwaysFunded: true }, onSaved);
+    renderDialog({ account: { ...pension, isAlwaysFunded: true }, onSaved });
     const dialog = openDialog();
     vi.mocked(saveAccount).mockResolvedValue(saved(pension));
 
@@ -596,8 +533,8 @@ describe("AccountDialog", () => {
   // mounts showing.
   it("gives an account made a wrapper the first owner", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
-    renderDialog(
-      {
+    renderDialog({
+      account: {
         balance: 18300,
         growth: { kind: "fixed", rate: 0 },
         id: 3,
@@ -605,7 +542,7 @@ describe("AccountDialog", () => {
         name: "Current account",
       },
       onSaved,
-    );
+    });
     const dialog = openDialog();
     vi.mocked(saveAccount).mockResolvedValue(saved(isa));
 
@@ -629,17 +566,7 @@ describe("AccountDialog", () => {
   // With no owner to give it, a wrapper cannot be saved, and the field
   // says where one is added; an account nobody owns saves as it did.
   it("holds a wrapper's save while the plan has no owner", () => {
-    render(
-      <Toaster>
-        <AccountDialog
-          account={null}
-          lines={[]}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={vi.fn<(account: Account) => void>()}
-          owners={[]}
-        />
-      </Toaster>,
-    );
+    renderDialog({ owners: [] });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Premium" } });
@@ -660,7 +587,7 @@ describe("AccountDialog", () => {
   // A fixed sum past its allowance on its own is held at the save, as
   // the store would refuse it; the amount's hint says the most.
   it("holds the save of a fixed sum past its allowance", () => {
-    renderDialog(isa);
+    renderDialog({ account: isa });
     const dialog = openDialog();
 
     commit(field("Amount", dialog), "20,001");
@@ -676,18 +603,7 @@ describe("AccountDialog", () => {
   // one has nothing yet to delete.
   it("offers a saved account a delete that reports it, and a new one none", () => {
     const onDelete = vi.fn<(account: Account) => void>();
-    const view = render(
-      <Toaster>
-        <AccountDialog
-          account={isa}
-          lines={[]}
-          onDelete={onDelete}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={vi.fn<(account: Account) => void>()}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    const view = renderDialog({ account: isa, onDelete });
 
     fireEvent.click(
       within(openDialog()).getByRole("button", { name: "Delete" }),
@@ -697,18 +613,7 @@ describe("AccountDialog", () => {
     expect(saveAccount).not.toHaveBeenCalled();
 
     view.unmount();
-    render(
-      <Toaster>
-        <AccountDialog
-          account={null}
-          lines={[]}
-          onDelete={onDelete}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={vi.fn<(account: Account) => void>()}
-          owners={owners}
-        />
-      </Toaster>,
-    );
+    renderDialog({ onDelete });
 
     expect(
       within(openDialog()).queryByRole("button", { name: "Delete" }),
