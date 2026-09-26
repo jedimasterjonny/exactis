@@ -54,6 +54,38 @@ describe("PaymentOrder", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  // A pension always funded is paid ahead of the order, so its box is
+  // drawn in the loss red, border, name and numeral, and says so in
+  // words for a screen reader; the savings beside it are drawn as ever.
+  it("draws a pension always funded in red on the line, and says so", () => {
+    render(
+      <PaymentOrder
+        accounts={[{ ...pension, isAlwaysFunded: true }, isa, cash]}
+        label="Sect. II.iii"
+        onMove={vi.fn<Move>()}
+      />,
+    );
+
+    expect(
+      screen.getAllByRole("listitem").map((item) => item.textContent),
+    ).toStrictEqual([
+      "1Workplace pension, always funded",
+      "2Stocks & shares ISA",
+      "3Current account",
+    ]);
+    expect(screen.getByText("Workplace pension")).toHaveClass(
+      "border-destructive",
+      "text-destructive",
+    );
+    expect(screen.getByText("1")).not.toHaveClass("text-muted-foreground");
+    expect(screen.getByText(", always funded")).toHaveClass("sr-only");
+    expect(screen.getByText("Stocks & shares ISA")).not.toHaveClass(
+      "border-destructive",
+      "text-destructive",
+    );
+    expect(screen.getByText("2")).toHaveClass("text-muted-foreground");
+  });
+
   it("draws nothing for an order of fewer than two", () => {
     const onMove = vi.fn<Move>();
     const { container, rerender } = render(
