@@ -42,7 +42,7 @@ export default async function Plan(): Promise<JSX.Element> {
   );
   return (
     <>
-      <ScreenHeader label={sectionLabel(planScreen)} title="Income & expenses">
+      <ScreenHeader label={sectionLabel(planScreen)} title={planScreen.title}>
         {`${counted(incomeLines.length, "income line")} · ${counted(expenseLines.length, "expense line")}`}
       </ScreenHeader>
       <ScreenBody>

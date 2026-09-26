@@ -204,7 +204,7 @@ export function AccountLedger({
       <ScreenHeader
         actions={<BalancesMonth at={at} />}
         label={sectionLabel(accountsAndAssets)}
-        title="Accounts & assets"
+        title={accountsAndAssets.title}
       >
         {`Starting balances for the plan · ${monthName(at.month, "long")} ${String(at.year)}`}
       </ScreenHeader>

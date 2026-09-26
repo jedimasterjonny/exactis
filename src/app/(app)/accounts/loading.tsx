@@ -9,7 +9,7 @@ export default function Loading(): JSX.Element {
   return (
     <ScreenHeader
       label={sectionLabel(accountsAndAssets)}
-      title="Accounts & assets"
+      title={accountsAndAssets.title}
     >
       Reading the store…
     </ScreenHeader>
