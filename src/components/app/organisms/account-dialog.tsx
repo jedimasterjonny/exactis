@@ -26,6 +26,7 @@ import { isWithinAllowance } from "@/lib/tax";
 interface AccountDialogProps {
   readonly account: Account | null;
   readonly lines: readonly IncomeLine[];
+  readonly onDelete?: ((account: Account) => void) | undefined;
   readonly onDismiss: () => void;
   readonly onSaved: (account: Account) => void;
   readonly owners: readonly Owner[];
@@ -81,10 +82,15 @@ const blank: Draft = {
 // that refuses leaves the dialog open and says why,
 // as the editor hook does, rather than handing the route the rejection.
 // The caller is told when the account has been saved, so the screen can
-// close the dialog and bring the account's own tab forward.
+// close the dialog and bring the account's own tab forward. Given a
+// delete handler, the dialog of an account the store holds offers a
+// Delete, which reports the account for the caller to ask about and
+// holds while a save is on its way; a new account has nothing yet to
+// delete and is offered none.
 export function AccountDialog({
   account,
   lines,
+  onDelete,
   onDismiss,
   onSaved,
   owners,
@@ -152,7 +158,15 @@ export function AccountDialog({
         isWithinAllowance(entry.draft)
       }
       eyebrow={entry.id === null ? "New account" : "Edit account"}
+      isSaving={isSaving}
       isWide
+      onDelete={
+        account === null || onDelete === undefined
+          ? undefined
+          : (): void => {
+              onDelete(account);
+            }
+      }
       onDismiss={onDismiss}
       onSave={() => {
         save(entry);

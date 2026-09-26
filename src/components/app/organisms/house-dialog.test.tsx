@@ -424,4 +424,43 @@ describe("HouseDialog", () => {
     expect(onDismiss).toHaveBeenCalledOnce();
     expect(saveHouse).not.toHaveBeenCalled();
   });
+  // The ledger hands the dialog its delete, which a house the store holds
+  // is offered and reports its own account by, as its row's bin does,
+  // saving nothing; a new one has nothing yet to delete.
+  it("offers a saved house a delete that reports its asset, and a new one none", () => {
+    const onDelete = vi.fn<(asset: Account) => void>();
+    const view = render(
+      <Toaster>
+        <HouseDialog
+          house={house}
+          onDelete={onDelete}
+          onDismiss={vi.fn<() => void>()}
+          onSaved={vi.fn<() => void>()}
+          plan={plan}
+        />
+      </Toaster>,
+    );
+
+    fireEvent.click(within(open()).getByRole("button", { name: "Delete" }));
+
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith(house.asset);
+    expect(saveHouse).not.toHaveBeenCalled();
+
+    view.unmount();
+    render(
+      <Toaster>
+        <HouseDialog
+          house={null}
+          onDelete={onDelete}
+          onDismiss={vi.fn<() => void>()}
+          onSaved={vi.fn<() => void>()}
+          plan={plan}
+        />
+      </Toaster>,
+    );
+
+    expect(
+      within(open()).queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
+  });
 });
