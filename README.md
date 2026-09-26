@@ -100,11 +100,15 @@ balances are as of, since they are what it opens with, whatever day the plan is
 read on; a household read before anything is saved takes the month it is read
 in, and keeps it from its first save. What an account is paid in a month is what
 `src/engine/cash-flow.ts` works out: the month's income, less what the salaries
-sacrifice, the tax on the rest and what the expense lines cost, pays the fixed
-sums, handed down the accounts in the order they are listed, and what survives
-them is the spare money, handed down the accounts that take it the same way,
-each to a twelfth of its cap. A fixed sum is therefore paid only out of what the
-month has, so a contribution stops when the income funding it ends.
+sacrifice, the tax on the rest, what the expense lines cost and each debt's own
+fixed sum, pays the other fixed sums, handed down the accounts in the order they
+are listed, and what survives them is the spare money, handed down the accounts
+that take it the same way, each to a twelfth of its cap. A fixed sum into
+savings is therefore paid only out of what the month has, so a contribution
+stops when the income funding it ends. A debt's is owed rather than saved, so it
+is paid whole and first wherever the debt is listed, and a month short of it
+draws on the savings as it would for an expense; the order sets which saving is
+paid first, and a debt is no saving.
 
 The income is taxed as the UK outside Scotland taxes it for 2026/27, the rates
 held in `src/lib/tax.ts`: income tax on every kind of line, with the personal

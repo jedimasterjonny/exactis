@@ -200,13 +200,13 @@ describe("project", () => {
 
   // The salary's £1,000 a month sacrificed, the tax on the rest and the
   // household leave £3,444.70, and the fixed sums come out of it before
-  // the spare money does, in the order the accounts are listed: the
-  // pension's £27,195 a year, £2,266.25 a month, whole, and the
-  // mortgage the £1,178.45 left of its £2,210. The current account,
-  // listed first and uncapped, would take whatever was left, and
-  // nothing is, so the ISA is paid nothing either; the pension is paid
-  // its sum, which lands with the basic rate claimed back as £2,832.81,
-  // and fed the £1,150 that lands with the NI saved on top: 482,603.
+  // the spare money does: the mortgage's £2,210 first and whole, being
+  // owed, though it is listed last, and the pension the £1,234.70 left
+  // of its £2,266.25. The current account, listed first and uncapped,
+  // would take whatever was left, and nothing is, so the ISA is paid
+  // nothing either; the pension is paid what the month had, which lands
+  // with the basic rate claimed back as £1,543.38, and fed the £1,150
+  // that lands with the NI saved on top: 466,713.
   it("reads the cash flow over every account, in the order they are listed", () => {
     const spareCash: Account = {
       ...cash,
@@ -220,7 +220,7 @@ describe("project", () => {
 
     expect(a?.free).toBe(286145);
     expect(b?.free).toBe(286145);
-    expect(a?.deferred).toBe(482603);
+    expect(a?.deferred).toBe(466713);
   });
 
   // £800 a month paid into a pension out of the month lands as £1,000,
@@ -562,6 +562,32 @@ describe("project", () => {
       { age: 36, deferred: 0, early: 0, free: 20000, uncovered: 0, year: 2026 },
       { age: 37, deferred: 0, early: 0, free: 20000, uncovered: 0, year: 2027 },
       { age: 38, deferred: 0, early: 0, free: 8200, uncovered: 0, year: 2028 },
+    ]);
+  });
+
+  // Nothing coming in, and a £2,000 loan at no interest paid £500 a
+  // month, so it clears in April: the four payments are owed, so each
+  // is drawn from the ISA as an expense would be, £2,000 in all, and
+  // nothing after the loan clears.
+  it("draws on the savings for a debt's payment the month cannot meet", () => {
+    const loan: Account = {
+      balance: -2000,
+      contribution: { amount: 500, cadence: "month", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0 },
+      id: 8,
+      kind: "debt",
+      name: "Loan",
+    };
+
+    expect(
+      project(
+        [flatIsa, loan],
+        { expenses: [], income: [] },
+        { ...plan, years: 1 },
+      ),
+    ).toStrictEqual([
+      { age: 36, deferred: 0, early: 0, free: 20000, uncovered: 0, year: 2026 },
+      { age: 37, deferred: 0, early: 0, free: 18000, uncovered: 0, year: 2027 },
     ]);
   });
 
