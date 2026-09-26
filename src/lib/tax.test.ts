@@ -10,6 +10,7 @@ import {
   lumpSumAllowance,
   mostFixedOf,
   reliefOf,
+  relievableOn,
 } from "./tax";
 
 // A month's draw with the whole allowance to come and nothing else
@@ -257,6 +258,19 @@ describe("reliefOf", () => {
     for (const kind of ["cash", "tax-free", "debt"] as const) {
       expect(reliefOf({ kind })).toBe(0);
     }
+  });
+});
+
+describe("relievableOn", () => {
+  // A year earning £40,000 relieves £40,000, and one earning £2,000 or
+  // nothing still relieves £3,600, which a month earning nothing takes
+  // a twelfth of: £300. A month earning £1,000 relieves the £1,000.
+  it("relieves what is earned, and £3,600 a year when that is less", () => {
+    expect(relievableOn(40000, 12)).toBe(40000);
+    expect(relievableOn(2000, 12)).toBe(3600);
+    expect(relievableOn(0, 12)).toBe(3600);
+    expect(relievableOn(0, 1)).toBe(300);
+    expect(relievableOn(1000, 1)).toBe(1000);
   });
 });
 

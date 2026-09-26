@@ -793,6 +793,66 @@ describe("cashFlow", () => {
     ]);
   });
 
+  // £500 a month paid into the pension out of taxed money, against a
+  // state pension that covers it, earns no relief of its own: the owner
+  // is relieved on £3,600 a year, £300 a month, which is £240 paid and
+  // £60 claimed back. A £6,000 salary beside it relieves £500 a month,
+  // £400 paid and £100 back, and a £12,000 one the whole £500, £125
+  // back. Half that salary sacrificed is not earned, so it relieves £500
+  // a month again.
+  it("claims the basic rate on no more than the owner's earnings, or £3,600 a year", () => {
+    const paying: Account = {
+      ...pension,
+      contribution: { amount: 500, cadence: "month", kind: "fixed" },
+    };
+    const state: IncomeLine = { ...statePension, firstYear: 2026 };
+    const reliefWith = (lines: readonly IncomeLine[]): CashFlow["relief"] =>
+      pennies(
+        cashFlow(
+          [paying],
+          { expenses: [], income: lines },
+          { at: { month: 0, year: 2026 }, plan },
+        ).relief,
+      );
+
+    expect(reliefWith([state])).toStrictEqual([
+      { account: paying, amount: 60 },
+    ]);
+    expect(reliefWith([state, { ...plain, amount: 6000 }])).toStrictEqual([
+      { account: paying, amount: 100 },
+    ]);
+    expect(reliefWith([state, { ...plain, amount: 12000 }])).toStrictEqual([
+      { account: paying, amount: 125 },
+    ]);
+    expect(
+      reliefWith([
+        state,
+        { ...lean, amount: 12000, feeds: paying.id, sacrifice: 0.5 },
+      ]),
+    ).toStrictEqual([{ account: paying, amount: 100 }]);
+  });
+
+  // £120,000 of other income earns nothing, so the pension paid the
+  // spare money is relieved on £300 a month: £240 paid lands as £300,
+  // and every pound past it lands as a pound, so £4,940 is what lands
+  // as the £5,000 the allowance has room for, £60 of it the relief.
+  it("lands a pound a pound past what the owner's earnings relieve, up to the allowance", () => {
+    const sipp: Account = {
+      ...pension,
+      contribution: { cap: null, kind: "spare" },
+    };
+    const flow = cashFlow(
+      [sipp],
+      { expenses: [], income: [{ ...plain, amount: 120000, kind: "other" }] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+
+    expect(pennies(flow.spare)).toStrictEqual([
+      { account: sipp, amount: 4940, cap: 60000 },
+    ]);
+    expect(pennies(flow.relief)).toStrictEqual([{ account: sipp, amount: 60 }]);
+  });
+
   // The store holds every ISA and pension to an owner and nothing else
   // to one, so either broken is a caller's mistake: a wrapper's allowance
   // would have nobody to be held to, and an owner on cash says something
@@ -1258,6 +1318,7 @@ describe("cashFlow", () => {
       insurance: 0,
       left: 0,
       profit: 0,
+      relief: [],
       spare: [],
       spent: [],
       taxable: 0,

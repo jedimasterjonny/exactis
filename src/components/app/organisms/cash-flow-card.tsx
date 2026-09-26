@@ -27,7 +27,6 @@ import { formatGbp } from "@/lib/money";
 import { monthName } from "@/lib/months";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 import { thumbOf } from "@/lib/slider";
-import { reliefOf } from "@/lib/tax";
 
 interface CashFlowCardProps {
   readonly accounts: readonly Account[];
@@ -121,7 +120,7 @@ export function CashFlowCard({
           {flow.fixed.map((paid) => (
             <Row
               amount={-paid.amount}
-              detail={relieved("A fixed sum", paid)}
+              detail={relieved("A fixed sum", paid, flow.relief)}
               key={paid.account.id}
               label={paid.account.name}
             />
@@ -129,7 +128,7 @@ export function CashFlowCard({
           {flow.spare.map((take) => (
             <Row
               amount={-take.amount}
-              detail={relieved(describeTake(take), take)}
+              detail={relieved(describeTake(take), take, flow.relief)}
               key={take.account.id}
               label={take.account.name}
             />
@@ -235,13 +234,21 @@ function isZero(amount: number): boolean {
 // How an account is paid, and for a pension what lands in it once the
 // basic rate is claimed back on what the month paid, "A fixed sum, paid
 // in as £1,000 with basic-rate relief", which is more than comes off
-// the month as a sacrifice's feed is. An account that claims nothing,
-// and a pension the month paid nothing, says how it is paid alone.
-function relieved(how: string, { account, amount }: Paid): string {
-  const relief = reliefOf(account);
-  return relief === 0 || isZero(amount)
+// the month as a sacrifice's feed is. The relief is the flow's, which
+// claims it on no more than its owner's earnings relieve. An account
+// that claims nothing, and a pension the month paid nothing or whose
+// owner has no relief left, says how it is paid alone.
+function relieved(
+  how: string,
+  { account, amount }: Paid,
+  relief: readonly Paid[],
+): string {
+  const claimed = relief
+    .filter((entry) => entry.account === account)
+    .reduce((sum, entry) => sum + entry.amount, 0);
+  return isZero(claimed)
     ? how
-    : `${how}, paid in as ${formatGbp(amount * (1 + relief))} with basic-rate relief`;
+    : `${how}, paid in as ${formatGbp(amount + claimed)} with basic-rate relief`;
 }
 
 // A line of the ledger: the name and, beneath it, how the money is

@@ -82,6 +82,10 @@ const classFour: readonly Band[] = [
 // out of taxed money.
 const basicRate = 0.2;
 
+// The least a year's payments into a person's pensions out of taxed
+// money are relieved on, whatever they earn.
+const leastRelievable = 3600;
+
 // The most a life's draws on a pension may take free of tax, which
 // replaced the lifetime allowance in April 2024.
 export const lumpSumAllowance = 268275;
@@ -195,11 +199,23 @@ export function mostFixedOf(kind: AccountKind): null | number {
 // the pound is taken as what is left of a gross payment once the basic
 // rate is off it, and the scheme claims that rate back, so £800 paid is
 // £1,000 in the pension and the relief is a quarter of what was paid.
-// Anything else holds what it is paid. The relief a higher or an
-// additional rate taxpayer claims on top comes back to them rather than
-// to the pension, and is not counted.
+// It is claimed only on as much as relievableOn allows, a pound paid
+// past it landing as a pound. Anything else holds what it is paid. The
+// relief a higher or an additional rate taxpayer claims on top comes
+// back to them rather than to the pension, and is not counted.
 export function reliefOf(account: { readonly kind: AccountKind }): number {
   return isPension(account) ? basicRate / (1 - basicRate) : 0;
+}
+
+// The most a person's pensions may take in with relief on what is paid
+// out of taxed money, in what lands: what they earn, from a salary or
+// from self-employment, or £3,600 when they earn less, even nothing.
+// Taken as that share of the year for so many months' earnings, so a
+// month earning nothing relieves £300. What a salary sacrifices is not
+// earned, being given up before it is paid, and a pension or any other
+// income earns no relief at all.
+export function relievableOn(earned: number, months: number): number {
+  return Math.max((leastRelievable * months) / 12, earned);
 }
 
 // What the bands charge on what so many months earned: each band's rate
