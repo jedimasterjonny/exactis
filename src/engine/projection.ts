@@ -137,7 +137,11 @@ const pensionAge = {
 // fixed sum, a take of the spare money and a pension fed are each
 // nothing in the month a wrapper is drawn on. A debt's payment is made
 // in that month all the same, being owed, and is part of what the
-// wrapper is drawn for. What no
+// wrapper is drawn for, and so is what a pension always funded is paid
+// and fed, as far as the cash and the ISAs reach once the spending is
+// met from them: the flow is handed what they hold as the month opens
+// for that, and never keeps such a pension paid past it, so no pension
+// is drawn on to pay one. What no
 // account covered is the year's uncovered shortfall, summed over its
 // months and reported on the point the year's balances are read off, so
 // the loop reads the balances entering the year, carries it, and emits
@@ -188,6 +192,9 @@ export function project(
         const flow = cashFlow(accounts, schedule, {
           at: { month, year },
           plan,
+          reserve: held
+            .filter(({ account }) => !isPension(account))
+            .reduce((sum, { balance }) => sum + balance, 0),
           settlement,
         });
         const draw = drawnFrom(held, Math.max(0, -flow.left), {

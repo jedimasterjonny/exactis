@@ -853,6 +853,183 @@ describe("cashFlow", () => {
     expect(pennies(flow.relief)).toStrictEqual([{ account: sipp, amount: 60 }]);
   });
 
+  // £2,453.30 after its tax and £1,000 of household leave £1,453.30
+  // against the pension's £2,266.25. Always funded, it is paid whole and
+  // the month is £812.95 short, for the projection to draw from the cash
+  // and the ISAs; with only £500 in them it is paid the £1,953.30 the
+  // month and they have together, and with nothing in them the
+  // £1,453.30 the month has, which is all it is paid unmarked.
+  it("keeps an always funded pension's fixed sum paid out of the cash and the ISAs", () => {
+    const kept: Account = { ...pension, isAlwaysFunded: true };
+    const flowOf = (account: Account, reserve?: number): CashFlow =>
+      cashFlow(
+        [account],
+        { expenses: [{ ...household, amount: 1000 }], income: [plain] },
+        {
+          at: { month: 0, year: 2026 },
+          plan,
+          ...(reserve !== undefined && { reserve }),
+        },
+      );
+
+    expect(pennies(flowOf(kept).fixed)).toStrictEqual([
+      { account: kept, amount: 2266.25 },
+    ]);
+    expect(flowOf(kept).left).toBeCloseTo(-812.95, 2);
+    expect(pennies(flowOf(kept, 500).fixed)).toStrictEqual([
+      { account: kept, amount: 1953.3 },
+    ]);
+    expect(flowOf(kept, 500).left).toBeCloseTo(-500, 10);
+    expect(pennies(flowOf(kept, 0).fixed)).toStrictEqual([
+      { account: kept, amount: 1453.3 },
+    ]);
+    expect(flowOf(kept, 0).left).toBe(0);
+    expect(pennies(flowOf(pension).fixed)).toStrictEqual([
+      { account: pension, amount: 1453.3 },
+    ]);
+  });
+
+  // £3,253.30 of household is £800 more than the month's £2,453.30, so
+  // the cash and the ISAs meet that first: with £1,000 in them the
+  // pension is kept paid out of the £200 left, and with £500 in them
+  // the spending alone runs them out and the pension is paid nothing,
+  // rather than draw on a pension to pay one.
+  it("meets the spending out of the cash and the ISAs before it keeps a pension paid", () => {
+    const kept: Account = { ...pension, isAlwaysFunded: true };
+    const flowOf = (reserve: number): CashFlow =>
+      cashFlow(
+        [kept],
+        { expenses: [{ ...household, amount: 3253.3 }], income: [plain] },
+        { at: { month: 0, year: 2026 }, plan, reserve },
+      );
+
+    expect(pennies(flowOf(1000).fixed)).toStrictEqual([
+      { account: kept, amount: 200 },
+    ]);
+    expect(flowOf(1000).left).toBeCloseTo(-1000, 10);
+    expect(flowOf(500).fixed).toStrictEqual([{ account: kept, amount: 0 }]);
+    expect(flowOf(500).left).toBeCloseTo(-800, 10);
+  });
+
+  // Against £4,000 of household the £60,000 salary covers the month
+  // neither way, £3,489.78 with its £500 sacrificed and £3,779.78 earned
+  // whole. Always funded, the pension is fed as ever and the month is
+  // £510.22 short; with £300 in the cash and the ISAs, which the £220.22
+  // the spending is short by leaves only £79.78 of, the sacrifice goes
+  // and the month is short by the £220.22 alone.
+  it("keeps an always funded pension's sacrifice going in a month short of it", () => {
+    const kept: Account = {
+      balance: 412880,
+      growth: { kind: "plan" },
+      id: pension.id,
+      isAlwaysFunded: true,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+      owner: 1,
+    };
+    const flowOf = (reserve?: number): CashFlow =>
+      cashFlow(
+        [kept],
+        { expenses: [{ ...household, amount: 4000 }], income: [lean] },
+        {
+          at: { month: 0, year: 2026 },
+          plan,
+          ...(reserve !== undefined && { reserve }),
+        },
+      );
+
+    expect(flowOf().fed).toStrictEqual([
+      {
+        account: kept,
+        amount: (6000 * 1.15) / 12,
+        line: lean,
+        sacrificed: 500,
+      },
+    ]);
+    expect(flowOf().left).toBeCloseTo(-510.22, 2);
+    expect(flowOf(300).fed).toStrictEqual([]);
+    expect(flowOf(300).left).toBeCloseTo(-220.22, 2);
+  });
+
+  // A salary feeding a pension that is not always funded still gives up
+  // its sacrifice only while the month covers itself, and one feeding a
+  // pension that is gives it up whatever the month has left. £6,000 of
+  // household is more than the two salaries leave either way.
+  it("gives up an unmarked pension's sacrifice in a month an always funded one's goes on", () => {
+    const kept: Account = {
+      balance: 0,
+      growth: { kind: "plan" },
+      id: pension.id,
+      isAlwaysFunded: true,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+      owner: 1,
+    };
+    const unmarked: Account = {
+      balance: 0,
+      growth: { kind: "plan" },
+      id: 7,
+      kind: "tax-deferred",
+      name: "SIPP",
+      owner: 1,
+    };
+    const sipp: Account = { ...unmarked, isAlwaysFunded: true };
+    const side: IncomeLine = {
+      ...plain,
+      amount: 12000,
+      feeds: sipp.id,
+      id: 9,
+      name: "Side job",
+      sacrifice: 0.1,
+    };
+    const flowOf = (accounts: readonly Account[]): CashFlow =>
+      cashFlow(
+        accounts,
+        { expenses: [{ ...household, amount: 6000 }], income: [lean, side] },
+        { at: { month: 0, year: 2026 }, plan },
+      );
+
+    expect(
+      flowOf([kept, unmarked]).fed.map(({ account }) => account),
+    ).toStrictEqual([kept]);
+    expect(
+      flowOf([kept, sipp]).fed.map(({ account }) => account),
+    ).toStrictEqual([kept, sipp]);
+  });
+
+  // With nothing spent, the month's £2,453.30 pays the mortgage its
+  // £2,210 first, then the pension always funded its £2,266.25 before
+  // the ISA listed above it, which is paid nothing, and the month is
+  // £2,022.95 short.
+  it("pays an always funded pension after the debts and before any other saving", () => {
+    const kept: Account = { ...pension, isAlwaysFunded: true };
+    const flow = cashFlow(
+      [isa, kept, mortgage],
+      { expenses: [], income: [plain] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+
+    expect(pennies(flow.fixed)).toStrictEqual([
+      { account: mortgage, amount: 2210 },
+      { account: kept, amount: 2266.25 },
+      { account: isa, amount: 0 },
+    ]);
+    expect(flow.left).toBeCloseTo(-2022.95, 2);
+  });
+
+  // Only a pension gains by being funded out of the cash and the ISAs,
+  // and the store holds the mark to one, so an ISA carrying it is a
+  // caller's mistake.
+  it("refuses an account always funded that is no pension", () => {
+    expect(() =>
+      cashFlow(
+        [{ ...isa, isAlwaysFunded: true }],
+        { expenses: [], income: [plain] },
+        { at: { month: 0, year: 2026 }, plan },
+      ),
+    ).toThrow("Only a pension is always funded");
+  });
+
   // The store holds every ISA and pension to an owner and nothing else
   // to one, so either broken is a caller's mistake: a wrapper's allowance
   // would have nobody to be held to, and an owner on cash says something
