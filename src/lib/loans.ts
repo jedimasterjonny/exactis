@@ -1,4 +1,5 @@
 import type { Month } from "@/data/schedule";
+import type { LoanFigure } from "@/lib/figures";
 
 // What a loan's payments are over: the balance owed, whole pounds and
 // positive, and the balloon they leave standing at the end of the term,
@@ -16,6 +17,14 @@ export interface PlanMonth {
   readonly month: number;
 }
 
+// The three figures of a loan that fix each other, as a dialog holds
+// them: what is paid a month, the rate, and the years left to run.
+interface Figures {
+  readonly payment: number;
+  readonly rate: number;
+  readonly term: number;
+}
+
 // The month the last payment falls in. The plan's month is a paying
 // month, as the projection carries the first year from it, so the first
 // payment lands in that month and the last one the term's months later,
@@ -25,6 +34,26 @@ export interface PlanMonth {
 export function clearsIn(term: number, plan: PlanMonth): Month {
   const last = plan.month + monthsIn(term) - 1;
   return { month: last % 12, year: plan.from + Math.floor(last / 12) };
+}
+
+// The figure worked out from the other two, over what is owed: the
+// payment to the pound, since a line is paid in whole pounds; the rate
+// as found; the term to the month it lands in. Null where no figure
+// fits, which the two that can say so say below. A house and a car
+// work their finance out the same way, and differ only in what is owed.
+export function figureOf(
+  figure: LoanFigure,
+  owed: Owed,
+  { payment, rate, term }: Figures,
+): null | number {
+  switch (figure) {
+    case "payment":
+      return Math.round(paymentOf(owed, rate, term));
+    case "rate":
+      return rateOf(owed, payment, term);
+    case "term":
+      return termOf(owed, payment, rate);
+  }
 }
 
 // What pays the balance down to the balloon over the term at the rate,

@@ -1,10 +1,10 @@
-import type { AccountValues } from "@/data/accounts";
 import type { Secured, SecuredRecords } from "@/data/secured";
 import type { LoanFigure } from "@/lib/figures";
 import type { Owed } from "@/lib/loans";
 
 import { toValues } from "@/data/accounts";
-import { paymentOf, rateOf, termOf } from "@/lib/loans";
+import { owes, securedRecords } from "@/data/secured";
+import { figureOf } from "@/lib/loans";
 
 // The house as the dialog holds it: the values, and the years the
 // mortgage has left to run. The term is not saved, since the store reads
@@ -38,19 +38,10 @@ export type Status = (typeof statuses)[number];
 // take the same words the type does and cannot drift from them.
 export const statuses = ["mortgaged", "outright"] as const;
 
-// The figure worked out from the draft's other two: the payment to the
-// pound, since a line is paid in whole pounds; the rate as found; the
-// term to the month it lands in. Null where no figure fits, which the
-// two that can say so say in the loan maths.
+// The figure worked out from the draft's other two, over what the draft
+// owes, as the loan maths works out any loan's.
 export function derive(draft: HouseDraft, figure: LoanFigure): null | number {
-  switch (figure) {
-    case "payment":
-      return Math.round(paymentOf(owedOn(draft), draft.rate, draft.term));
-    case "rate":
-      return rateOf(owedOn(draft), draft.payment, draft.term);
-    case "term":
-      return termOf(owedOn(draft), draft.payment, draft.rate);
-  }
+  return figureOf(figure, owedOn(draft), draft);
 }
 
 // The values a house's records hold, for the dialog to open on: the
@@ -77,77 +68,31 @@ export function houseOf({ asset, loan }: Secured): HouseValues {
 // button holds until it is one.
 export function isSound(house: HouseValues): boolean {
   return (
-    house.name.trim() !== "" &&
-    (house.status === "outright" ||
-      (house.balance > 0 && house.payment > 0 && house.rate >= 0))
+    house.name.trim() !== "" && (house.status === "outright" || owes(house))
   );
 }
 
-// The records a house is written as. The house is an asset of its own
-// kind growing at its own fixed rate, since the plan rate is the
-// wrappers'; it is paid nothing, so its cadence is the one a contribution
-// of nothing reads back as. A mortgage is a debt owing the balance,
-// charged the rate as its growth and paid the payment a month as its
-// contribution, which is what the ledger shows against it, and its
-// payments are a debt line of the same a month, fixed in nominal terms
-// as a mortgage payment is, from the plan's first year and open-ended as
-// saved: when its payments end is the loan's to say, worked out from
-// the mortgage whenever the household is read, so it moves with the
-// month the balances are as of. The engine counts the
-// payment once, as the line, since it leaves the contribution of a loan
-// a line pays out of the month's fixed sums. Both are named for the
-// house.
+// The records a house is written as: an asset of its own kind growing
+// at its own fixed rate, and for a mortgaged house the mortgage and its
+// payments, as every secured asset's are written, the mortgage leaving
+// no balloon standing. Both are named for the house.
 export function toRecords(
   house: HouseValues,
   plan: { readonly from: number },
 ): SecuredRecords {
-  const asset: AccountValues = {
-    balance: house.value,
-    balloon: 0,
-    cadence: "year",
-    cap: 0,
-    contribution: 0,
-    funding: "fixed",
-    growth: "fixed",
-    isAlwaysFunded: false,
-    kind: "house",
-    name: house.name,
-    owner: null,
-    rate: house.growth,
-  };
-  if (house.status === "outright") {
-    return { asset, loan: null };
-  }
-  const name = `${house.name} mortgage`;
-  return {
-    asset,
-    loan: {
-      account: {
-        balance: -house.balance,
-        balloon: 0,
-        cadence: "month",
-        cap: 0,
-        contribution: house.payment,
-        funding: "fixed",
-        growth: "fixed",
-        isAlwaysFunded: false,
-        kind: "debt",
-        name,
-        owner: null,
-        rate: house.rate,
-      },
-      line: {
-        amount: house.payment,
-        cadence: "month",
-        firstYear: plan.from,
-        growth: "nominal",
-        kind: "debt",
-        lastMonth: null,
-        lastYear: null,
-        name,
-      },
-    },
-  };
+  return securedRecords(
+    { kind: "house", name: house.name, rate: house.growth, value: house.value },
+    house.status === "outright"
+      ? null
+      : {
+          balance: house.balance,
+          balloon: 0,
+          name: `${house.name} mortgage`,
+          payment: house.payment,
+          rate: house.rate,
+        },
+    plan,
+  );
 }
 
 // What a mortgage's payments are over: the balance, which they clear,

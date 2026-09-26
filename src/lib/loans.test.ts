@@ -3,12 +3,30 @@ import { describe, expect, it } from "vitest";
 
 import type { Owed } from "./loans";
 
-import { clearsIn, paymentOf, rateOf, termOf, termTo } from "./loans";
+import { clearsIn, figureOf, paymentOf, rateOf, termOf, termTo } from "./loans";
 
 // What is owed, with no balloon unless one is given.
 function owed(balance: number, balloon = 0): Owed {
   return { balance, balloon };
 }
+
+describe("figureOf", () => {
+  const figures = { payment: 2210, rate: 0.0515, term: 22 };
+
+  // The payment is the one a line is paid in, whole pounds; the rate
+  // and the term are as the maths finds them, over what is owed.
+  it("works the figure asked for out from the other two", () => {
+    expect(figureOf("payment", owed(341810), figures)).toBe(
+      Math.round(paymentOf(owed(341810), 0.0515, 22)),
+    );
+    expect(figureOf("rate", owed(341810), figures)).toBe(
+      rateOf(owed(341810), 2210, 22),
+    );
+    expect(figureOf("term", owed(20000, 8000), figures)).toBe(
+      termOf(owed(20000, 8000), 2210, 0.0515),
+    );
+  });
+});
 
 describe("paymentOf", () => {
   // £100,000 at 6% over 30 years is the textbook £599.55 a month.

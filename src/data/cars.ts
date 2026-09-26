@@ -4,7 +4,8 @@ import type { LoanFigure } from "@/lib/figures";
 import type { Owed } from "@/lib/loans";
 
 import { toValues } from "@/data/accounts";
-import { paymentOf, rateOf, termOf } from "@/lib/loans";
+import { owes, securedRecords } from "@/data/secured";
+import { figureOf, termOf } from "@/lib/loans";
 
 export type Agreement = (typeof agreements)[number];
 
@@ -73,19 +74,9 @@ export function clearsAfter(car: CarValues): null | number {
 }
 
 // The figure worked out from the draft's other two, over what the draft
-// owes: the payment to the pound, since a line is paid in whole pounds;
-// the rate as found; the term to the month it lands in. Null where no
-// figure fits, which the two that can say so say in the loan maths.
+// owes, as the loan maths works out any loan's.
 export function derive(draft: CarDraft, figure: LoanFigure): null | number {
-  const owed = owedOn(draft);
-  switch (figure) {
-    case "payment":
-      return Math.round(paymentOf(owed, draft.rate, draft.term));
-    case "rate":
-      return rateOf(owed, draft.payment, draft.term);
-    case "term":
-      return termOf(owed, draft.payment, draft.rate);
-  }
+  return figureOf(figure, owedOn(draft), draft);
 }
 
 // A car the store would take: named, and if financed owing something,
@@ -107,73 +98,35 @@ export function isSound(car: CarValues): boolean {
   }
 }
 
-// The records a car is written as. The car is an asset of its own kind
-// losing value at its own fixed rate, since the plan rate is the
-// wrappers'; it is paid nothing, so its cadence is the one a
-// contribution of nothing reads back as. The finance is a debt owing the
-// balance, charged the rate as its growth, paid the payment a month as
-// its contribution, which is what the ledger shows against it, and left
-// owing the balloon, and its payments are a debt line of the same a
-// month, fixed in nominal terms as a finance payment is, from the plan's
-// first year and open-ended as saved: when its payments end is the
-// loan's to say, worked out from the finance whenever the household is
-// read, so it moves with the month the balances are as of, and on a PCP
-// runs past the agreement's end, since the balloon is refinanced on the
-// same terms until the whole balance clears. The engine counts the
-// payment once, as the line, since it leaves
-// the contribution of a loan a line pays out of the month's fixed sums.
-// Both are named for the car and the agreement it is on.
+// The records a car is written as: an asset of its own kind losing
+// value at its own fixed rate, and for a financed car the finance and
+// its payments, as every secured asset's are written. The finance is
+// left owing the balloon, and on a PCP its payments run past the
+// agreement's end, since the balloon is refinanced on the same terms
+// until the whole balance clears. Both are named for the car and the
+// agreement it is on.
 export function toRecords(
   car: CarValues,
   plan: { readonly from: number },
 ): SecuredRecords {
-  const asset: AccountValues = {
-    balance: car.value,
-    balloon: 0,
-    cadence: "year",
-    cap: 0,
-    contribution: 0,
-    funding: "fixed",
-    growth: "fixed",
-    isAlwaysFunded: false,
-    kind: "car",
-    name: car.name,
-    owner: null,
-    rate: negated(car.depreciation),
-  };
-  if (car.agreement === "outright") {
-    return { asset, loan: null };
-  }
-  const name = `${car.name} ${car.agreement === "pcp" ? "PCP" : "loan"}`;
-  return {
-    asset,
-    loan: {
-      account: {
-        balance: -car.balance,
-        balloon: car.balloon,
-        cadence: "month",
-        cap: 0,
-        contribution: car.payment,
-        funding: "fixed",
-        growth: "fixed",
-        isAlwaysFunded: false,
-        kind: "debt",
-        name,
-        owner: null,
-        rate: car.rate,
-      },
-      line: {
-        amount: car.payment,
-        cadence: "month",
-        firstYear: plan.from,
-        growth: "nominal",
-        kind: "debt",
-        lastMonth: null,
-        lastYear: null,
-        name,
-      },
+  return securedRecords(
+    {
+      kind: "car",
+      name: car.name,
+      rate: negated(car.depreciation),
+      value: car.value,
     },
-  };
+    car.agreement === "outright"
+      ? null
+      : {
+          balance: car.balance,
+          balloon: car.balloon,
+          name: `${car.name} ${car.agreement === "pcp" ? "PCP" : "loan"}`,
+          payment: car.payment,
+          rate: car.rate,
+        },
+    plan,
+  );
 }
 
 // What a loan's records say the agreement is: none is a car owned
@@ -199,10 +152,4 @@ function owedOn(car: CarValues): Owed {
     balance: car.balance,
     balloon: car.agreement === "pcp" ? car.balloon : 0,
   };
-}
-
-// Whether a financed car owes something, pays something and is charged
-// a rate no lower than nothing.
-function owes(car: CarValues): boolean {
-  return car.balance > 0 && car.payment > 0 && car.rate >= 0;
 }
