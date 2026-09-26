@@ -1,6 +1,8 @@
 import type { Account } from "@/data/accounts";
 import type { Month } from "@/data/schedule";
 
+import { termOf } from "@/lib/loans";
+
 // What the projection runs on: the rate every account on the plan rate
 // grows at, the first year plotted, which holds the balances, and the
 // month of it they are as of, January being nought as the date gives
@@ -32,6 +34,24 @@ export interface PlanAges {
 // cent a year, for someone born in 1990.
 const born = 1990;
 const rate = 0.05;
+
+// The years a debt's own payment takes to pay it down to the balloon a
+// PCP leaves standing, at the rate it is charged, its own or the
+// plan's, or null when the interest swallows the payment and it never
+// does. The save holds a debt to one it pays down, and the engine
+// charges the payment to the month it does so in, so the two read the
+// term the same way.
+export function debtTermOf(
+  debt: Account,
+  payment: number,
+  plan: Plan,
+): null | number {
+  return termOf(
+    { balance: -debt.balance, balloon: debt.balloon ?? 0 },
+    payment,
+    rateFrom(debt, plan),
+  );
+}
 
 // The age the plan runs to, the age its owner reaches in its last year.
 export function endAge(plan: Plan): number {

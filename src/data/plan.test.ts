@@ -1,7 +1,47 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { planOf } from "./plan";
+import type { Account } from "@/data/accounts";
+
+import { termOf } from "@/lib/loans";
+
+import { debtTermOf, planOf } from "./plan";
+
+describe("debtTermOf", () => {
+  const plan = planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 });
+
+  // A PCP owing £14,000, £6,000 of it the balloon, at its own 7.9%.
+  const finance: Account = {
+    balance: -14000,
+    balloon: 6000,
+    growth: { kind: "fixed", rate: 0.079 },
+    id: 7,
+    kind: "debt",
+    name: "Golf PCP",
+  };
+
+  // A loan owing the same on the plan's 5%, with no balloon to leave.
+  const loan: Account = {
+    balance: -14000,
+    growth: { kind: "plan" },
+    id: 8,
+    kind: "debt",
+    name: "Car loan",
+  };
+
+  it("pays a debt down to its balloon at its own rate, or the plan's", () => {
+    expect(debtTermOf(finance, 290, plan)).toBe(
+      termOf({ balance: 14000, balloon: 6000 }, 290, 0.079),
+    );
+    expect(debtTermOf(loan, 290, plan)).toBe(
+      termOf({ balance: 14000, balloon: 0 }, 290, 0.05),
+    );
+  });
+
+  it("never pays off a debt whose interest swallows the payment", () => {
+    expect(debtTermOf(finance, 50, plan)).toBeNull();
+  });
+});
 
 describe("planOf", () => {
   it("runs from the month given to the ages given", () => {

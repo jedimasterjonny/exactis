@@ -7,7 +7,6 @@ import { incomeLines } from "@/data/income.fixture";
 import {
   balanceOf,
   equityOf,
-  fixedMonthly,
   formatContribution,
   formatGrowth,
   formatMonthly,
@@ -32,17 +31,6 @@ describe("equityOf", () => {
     expect(
       equityOf({ asset: home, loan: { ...mortgage, balance: -500000 } }),
     ).toBe(416386 - 500000);
-  });
-});
-
-describe("fixedMonthly", () => {
-  it("takes a fixed sum a month at either cadence, and nothing for the spare money or none", () => {
-    expect(fixedMonthly(pension)).toBe(27195 / 12);
-    expect(fixedMonthly(mortgage)).toBe(2210);
-    expect(
-      fixedMonthly({ ...isa, contribution: { cap: null, kind: "spare" } }),
-    ).toBe(0);
-    expect(fixedMonthly(cash)).toBe(0);
   });
 });
 

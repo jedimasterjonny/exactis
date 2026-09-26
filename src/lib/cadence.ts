@@ -1,4 +1,4 @@
-import type { Cadence } from "@/data/accounts";
+import type { Account, Cadence } from "@/data/accounts";
 import type { Option } from "@/lib/options";
 
 import { optionsOf } from "@/lib/options";
@@ -19,6 +19,17 @@ export const cadenceOptions: readonly Option<Cadence>[] = optionsOf(labels, [
   "year",
   "month",
 ]);
+
+// What an account is paid a month in a fixed sum, at whatever cadence
+// the sum is stated; nothing for one paid the spare money, whose take is
+// the month's to decide, or paid nothing. The ledger writes it, the
+// save holds a debt's to paying the debt off, and the engine pays it.
+export function fixedMonthly(account: Account): number {
+  const { contribution } = account;
+  return contribution?.kind === "fixed"
+    ? monthly(contribution.amount, contribution.cadence)
+    : 0;
+}
 
 // What is paid a month at a cadence: the sum itself, or a twelfth of a
 // year's, for a figure stated a month beside figures stated at their

@@ -18,10 +18,11 @@ import {
   sacrificeOf,
   totalOf,
 } from "@/data/income";
-import { rateFrom, retirementYear } from "@/data/plan";
-import { monthly } from "@/lib/cadence";
+import { debtTermOf, retirementYear } from "@/data/plan";
+import { rules } from "@/data/rules";
+import { fixedMonthly, monthly } from "@/lib/cadence";
 import { runsIn } from "@/lib/lines";
-import { clearsIn, termOf } from "@/lib/loans";
+import { clearsIn } from "@/lib/loans";
 import { incomeTaxOn, insuranceOn, reliefOf, relievableOn } from "@/lib/tax";
 
 // A month of a year's money, in pounds as the lines state them and
@@ -297,23 +298,21 @@ export function cashFlow(
 ): CashFlow {
   const { at, settlement = 0 } = reading;
   if (new Set(accounts.map(({ id }) => id)).size !== accounts.length) {
-    throw new Error("An account is listed once");
+    throw new Error(rules.listedOnce);
   }
   if (
     accounts.some(
       (account) => isOwned(account) !== (typeof account.owner === "number"),
     )
   ) {
-    throw new Error(
-      "An ISA or a pension belongs to an owner, and nothing else",
-    );
+    throw new Error(rules.owned);
   }
   if (
     accounts.some(
       (account) => account.isAlwaysFunded === true && !isPension(account),
     )
   ) {
-    throw new Error("Only a pension is always funded");
+    throw new Error(rules.alwaysFunded);
   }
   checkLinks(accounts, schedule);
   const running = schedule.income.filter(
@@ -445,16 +444,16 @@ function checkLinks(accounts: readonly Account[], schedule: Schedule): void {
   for (const { feeds, sacrifice } of schedule.income) {
     const account = accountAt(accounts, feeds);
     if (account !== undefined && !isPension(account)) {
-      throw new Error("A salary feeds a pension alone");
+      throw new Error(rules.feedsPension);
     }
     if (!(sacrifice >= 0 && sacrifice <= 1)) {
-      throw new Error("A salary gives up a share of its base");
+      throw new Error(rules.share);
     }
   }
   for (const { pays } of schedule.expenses) {
     const account = accountAt(accounts, pays);
     if (account !== undefined && account.kind !== "debt") {
-      throw new Error("A line pays a debt alone");
+      throw new Error(rules.paysDebt);
     }
   }
 }
@@ -468,11 +467,10 @@ function checkLinks(accounts: readonly Account[], schedule: Schedule): void {
 // than standing in the ledger at nothing a month for the rest of the
 // plan.
 function fixedSum(account: Account, reading: Reading): Paid[] {
-  const { contribution } = account;
-  if (contribution?.kind !== "fixed") {
+  if (account.contribution?.kind !== "fixed") {
     return [];
   }
-  const amount = monthly(contribution.amount, contribution.cadence);
+  const amount = fixedMonthly(account);
   return account.kind === "debt" && !isPaying(account, amount, reading)
     ? []
     : [{ account, amount }];
@@ -529,13 +527,9 @@ function isPaying(
   payment: number,
   { at, plan }: Reading,
 ): boolean {
-  const term = termOf(
-    { balance: -account.balance, balloon: account.balloon ?? 0 },
-    payment,
-    rateFrom(account, plan),
-  );
+  const term = debtTermOf(account, payment, plan);
   if (term === null) {
-    throw new Error("A debt's payments end");
+    throw new Error(rules.debtEnds);
   }
   const last = clearsIn(term, plan);
   return (
@@ -665,7 +659,7 @@ function spareMoney(
     const { contribution } = account;
     if (contribution?.kind === "spare") {
       if (!takesSpare(account)) {
-        throw new Error("A real asset or a debt takes no spare money");
+        throw new Error(rules.spare);
       }
       const own =
         contribution.cap === null

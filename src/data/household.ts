@@ -18,10 +18,12 @@ import {
 } from "@/data/accounts";
 import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
-import { endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
+import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
+import { rules } from "@/data/rules";
 import { lineGrowths } from "@/data/schedule";
 import { Refusal } from "@/lib/answer";
-import { monthly } from "@/lib/cadence";
+import { fixedMonthly, monthly } from "@/lib/cadence";
+import { endsAfterItStarts } from "@/lib/lines";
 import { clearsIn, termOf } from "@/lib/loans";
 import { isWithinAllowance } from "@/lib/tax";
 
@@ -53,10 +55,6 @@ export interface Kept {
   readonly owners: readonly Owner[];
   readonly schedule: Household["schedule"];
 }
-
-// The words a rate below losing everything is refused in, the engine's
-// own, since it refuses the same rate.
-const beyondLoss = "A rate loses no more than everything";
 
 const id = z.number().int().positive();
 
@@ -105,7 +103,7 @@ const account = z
     growth: z.discriminatedUnion("kind", [
       z.object({
         kind: z.literal("fixed"),
-        rate: z.number().min(-1, beyondLoss),
+        rate: z.number().min(-1, rules.beyondLoss),
       }),
       z.object({ kind: z.literal("plan") }),
     ]),
@@ -118,15 +116,15 @@ const account = z
   })
   .refine(
     (account) => account.kind === "debt" || account.balance >= 0,
-    "A balance below nothing is a debt's",
+    rules.belowNothing,
   )
   .refine(
     (account) => account.contribution?.kind !== "spare" || takesSpare(account),
-    "A real asset or a debt takes no spare money",
+    rules.spare,
   )
   .refine(
     (account) => isOwned(account) === (account.owner !== undefined),
-    "An ISA or a pension belongs to an owner, and nothing else",
+    rules.owned,
   )
   .refine(
     (account) => isWithinAllowance(toValues(account)),
@@ -138,7 +136,7 @@ const account = z
   )
   .refine(
     (account) => account.isAlwaysFunded === undefined || isPension(account),
-    "Only a pension is always funded",
+    rules.alwaysFunded,
   ) satisfies z.ZodType<Account>;
 
 const expenseLine = z
@@ -160,10 +158,7 @@ const incomeLine = z
     feeds: id.nullable(),
     kind: z.enum(incomeKinds),
     rsu: pounds,
-    sacrifice: z
-      .number()
-      .min(0, "A salary gives up a share of its base")
-      .max(1, "A salary gives up a share of its base"),
+    sacrifice: z.number().min(0, rules.share).max(1, rules.share),
   })
   .refine(endsAfterItStarts, "A line ends no earlier than it starts")
   .refine(endsInAYear, "A line ends in a month only of a year it ends in")
@@ -192,7 +187,7 @@ const plan = z
     born: z.number().int(),
     from: z.number().int(),
     month: z.number().int().min(0).max(11),
-    rate: z.number().min(-1, beyondLoss),
+    rate: z.number().min(-1, rules.beyondLoss),
     retires: z.number().int().nonnegative(),
     years: z.number().int().nonnegative(),
   })
@@ -227,7 +222,7 @@ export const household = z
       income: z.array(incomeLine),
     }),
   })
-  .refine(({ accounts }) => isListedOnce(accounts), "An account is listed once")
+  .refine(({ accounts }) => isListedOnce(accounts), rules.listedOnce)
   .refine(({ owners }) => isListedOnce(owners), "An owner is listed once")
   .refine(
     ({ schedule }) => isListedOnce(schedule.income),
@@ -267,7 +262,7 @@ export const household = z
           feeds === null ||
           accounts.some((listed) => listed.id === feeds && isPension(listed)),
       ),
-    "A salary feeds a pension alone",
+    rules.feedsPension,
   )
   .refine(
     ({ accounts, schedule }) =>
@@ -278,7 +273,7 @@ export const household = z
             (listed) => listed.id === pays && listed.kind === "debt",
           ),
       ),
-    "A line pays a debt alone",
+    rules.paysDebt,
   )
   .refine(
     ({ schedule }) =>
@@ -293,7 +288,7 @@ export const household = z
             !schedule.expenses.some((listed) => listed.pays === account.id),
         )
         .every((account) => doesClear(account, plan)),
-    "A debt's payments end",
+    rules.debtEnds,
   ) satisfies z.ZodType<Household>;
 
 // The household as the store may keep it: its records sound on their
@@ -373,23 +368,11 @@ export function soundKept(value: unknown): {
 // find the month the payments end in. Every other account, and a debt
 // paid no fixed sum, clears nothing and is asked nothing.
 function doesClear(account: Account, plan: Plan): boolean {
-  const { contribution } = account;
   return (
     account.kind !== "debt" ||
-    contribution?.kind !== "fixed" ||
-    termOf(
-      { balance: -account.balance, balloon: account.balloon ?? 0 },
-      monthly(contribution.amount, contribution.cadence),
-      rateFrom(account, plan),
-    ) !== null
+    account.contribution?.kind !== "fixed" ||
+    debtTermOf(account, fixedMonthly(account), plan) !== null
   );
-}
-
-function endsAfterItStarts(line: {
-  readonly firstYear: number;
-  readonly lastYear: null | number;
-}): boolean {
-  return line.lastYear === null || line.lastYear >= line.firstYear;
 }
 
 // A month to end in needs a year to end in.
