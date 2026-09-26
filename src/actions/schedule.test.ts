@@ -1,22 +1,14 @@
 // @vitest-environment node
 import { refresh } from "next/cache";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
 import type { IncomeLine, IncomeLineDraft } from "@/data/income";
 
-import { kept } from "@/data/household.fixture";
-import { getDb } from "@/db/client";
+import { kept, today } from "@/data/household.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
+import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
@@ -27,9 +19,8 @@ vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 
-const { close, db, empty, ready } = inMemory();
-
-const today = new Date("2026-09-15T12:00:00Z");
+const memory = inMemory();
+const { db } = memory;
 
 // An expense line as its dialog sends it, the name as typed.
 const expense = {
@@ -84,14 +75,7 @@ function lineOf(draft: IncomeLineDraft, id: number): IncomeLine {
 }
 
 describe("the schedule actions", () => {
-  beforeAll(ready);
-  beforeEach(async () => {
-    await empty();
-    vi.mocked(getDb).mockReturnValue(db);
-    vi.useFakeTimers({ now: today, toFake: ["Date"] });
-    await keepAfter(db, 0, kept);
-  });
-  afterAll(close);
+  standUp(memory, { seed: kept, today });
 
   describe("saveIncomeLine", () => {
     it("writes nothing without a session", async () => {

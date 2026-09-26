@@ -1,15 +1,13 @@
 // @vitest-environment node
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { nothingKeptIn } from "@/data/household";
+import { blank } from "@/data/household.fixture";
 import { inMemory } from "@/db/memory.fixture";
 import { householdVersions } from "@/db/schema";
 
 import { keepAfter, readLatest } from "./household";
 
 const { close, db, empty, ready } = inMemory();
-
-const blank = nothingKeptIn({ month: 8, year: 2026 });
 
 const named = { ...blank, next: 2, owners: [{ id: 1, name: "Me" }] };
 
