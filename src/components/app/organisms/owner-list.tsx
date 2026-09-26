@@ -47,12 +47,12 @@ export function OwnerList({
   label,
   owners,
 }: OwnerListProps): JSX.Element {
-  const { amend, dismiss, entry, isSaving, open, save } = useEditor({
+  const { amend, dialogOf, dismiss, entry, open } = useEditor({
     describe: (owner) => owner.name,
     noun: "Owner",
     save: saveOwner,
   });
-  const { ask, cancel, confirm, doomed, isRemoving } = useRemover<Owner>({
+  const { ask, doomed, questionOf } = useRemover<Owner>({
     describe: (owner) => owner.name,
     noun: "Owner",
     remove: removeOwner,
@@ -112,12 +112,9 @@ export function OwnerList({
       </SectionCard>
       {entry !== null && (
         <EditDialog
-          canSave={!isSaving && entry.draft.name.trim() !== ""}
-          eyebrow={entry.id === null ? "New owner" : "Edit owner"}
+          {...dialogOf(entry)}
+          canSave={entry.draft.name.trim() !== ""}
           onDismiss={dismiss}
-          onSave={() => {
-            save(entry);
-          }}
           title={entry.draft.name.trim() || "Unnamed owner"}
         >
           <TextField
@@ -131,14 +128,7 @@ export function OwnerList({
         </EditDialog>
       )}
       {doomed !== null && (
-        <ConfirmDialog
-          isBusy={isRemoving}
-          onCancel={cancel}
-          onConfirm={() => {
-            confirm(doomed);
-          }}
-          title={`Delete ${doomed.name}?`}
-        >
+        <ConfirmDialog {...questionOf(doomed)}>
           It cannot be brought back.
         </ConfirmDialog>
       )}

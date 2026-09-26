@@ -94,6 +94,54 @@ describe("useEditor", () => {
     expect(result.current).not.toHaveProperty("open");
   });
 
+  // The dialog is told whether the record is new or edited in the noun
+  // the toasts carry, and its Save is the entry's save, held while one
+  // is on its way.
+  it("hands the edit dialog its eyebrow, the save and whether one is on its way", async () => {
+    const store = vi.fn<Store>();
+    // The store's answer is held back, so the save can be seen in
+    // flight, and given before the test ends, since a transition left
+    // waiting holds every later one with it.
+    let answer!: (answered: Answer<Saved>) => void;
+    store.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const { result } = renderHook(() =>
+      useEditor({
+        describe: (record) => record.name,
+        noun: "Income line",
+        save: store,
+      }),
+    );
+    const added = { draft: typed, id: null, initial: typed };
+
+    expect(result.current.dialogOf(added)).toMatchObject({
+      eyebrow: "New income line",
+      isSaving: false,
+    });
+    expect(result.current.dialogOf({ ...added, id: 6 }).eyebrow).toBe(
+      "Edit income line",
+    );
+
+    act(() => {
+      result.current.dialogOf(added).onSave();
+    });
+
+    expect(store).toHaveBeenCalledExactlyOnceWith(null, {
+      amount: 4000,
+      name: "Lifetime ISA",
+    });
+    expect(result.current.dialogOf(added).isSaving).toBe(true);
+
+    answer(saved(written));
+
+    await waitFor(() => {
+      expect(result.current.dialogOf(added).isSaving).toBe(false);
+    });
+  });
+
   it("amends the draft and leaves the values it opened with", () => {
     const store = vi.fn<Store>();
     const { result } = renderHook(() =>

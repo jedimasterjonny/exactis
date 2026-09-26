@@ -86,12 +86,12 @@ export function IncomeSchedule({
   owners,
   plan,
 }: IncomeScheduleProps): JSX.Element {
-  const { amend, dismiss, entry, isSaving, open, save } = useEditor({
+  const { amend, dialogOf, dismiss, entry, open } = useEditor({
     describe: (line) => `${line.name} · ${spanOf(line)}`,
     noun: "Income line",
     save: saveIncomeLine,
   });
-  const { ask, cancel, confirm, doomed, isRemoving } = useRemover<IncomeLine>({
+  const { ask, doomed, questionOf } = useRemover<IncomeLine>({
     describe: (line) => line.name,
     noun: "Income line",
     remove: removeIncomeLine,
@@ -176,30 +176,17 @@ export function IncomeSchedule({
         an edit to the first.
       </Note>
       {doomed !== null && (
-        <ConfirmDialog
-          isBusy={isRemoving}
-          onCancel={cancel}
-          onConfirm={() => {
-            confirm(doomed);
-          }}
-          title={`Delete ${doomed.name}?`}
-        >
+        <ConfirmDialog {...questionOf(doomed)}>
           It cannot be brought back.
         </ConfirmDialog>
       )}
       {entry !== null && (
         <EditDialog
-          canSave={
-            !isSaving && isSound(entry.draft) && isOpeningSound(entry.draft)
-          }
-          eyebrow={entry.id === null ? "New income line" : "Edit income line"}
-          isSaving={isSaving}
+          {...dialogOf(entry)}
+          canSave={isSound(entry.draft) && isOpeningSound(entry.draft)}
           isWide
           onDelete={deleteFrom(entry)}
           onDismiss={dismiss}
-          onSave={() => {
-            save(entry);
-          }}
           title={entry.draft.name.trim() || "Untitled line"}
         >
           <LineFields

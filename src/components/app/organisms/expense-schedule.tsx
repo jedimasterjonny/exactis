@@ -67,7 +67,7 @@ export function ExpenseSchedule({
   lines,
   plan,
 }: ExpenseScheduleProps): JSX.Element {
-  const { amend, dismiss, entry, isSaving, open, save } = useEditor({
+  const { amend, dialogOf, dismiss, entry, open } = useEditor({
     describe: (line) => `${line.name} · ${spanOf(line)}`,
     noun: "Expense line",
     save: saveExpenseLine,
@@ -115,13 +115,10 @@ export function ExpenseSchedule({
       </Note>
       {entry !== null && (
         <EditDialog
-          canSave={!isSaving && isSound(entry.draft)}
-          eyebrow={entry.id === null ? "New expense line" : "Edit expense line"}
+          {...dialogOf(entry)}
+          canSave={isSound(entry.draft)}
           isWide
           onDismiss={dismiss}
-          onSave={() => {
-            save(entry);
-          }}
           title={entry.draft.name.trim() || "Untitled line"}
         >
           <LineFields

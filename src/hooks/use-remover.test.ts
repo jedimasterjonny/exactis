@@ -55,6 +55,59 @@ describe("useRemover", () => {
     expect(store).not.toHaveBeenCalled();
   });
 
+  // The confirm dialog asks after the record in the words the toast
+  // describes it in, and its answers are the remover's own.
+  it("hands the confirm dialog its question and its two answers", async () => {
+    const store = vi.fn<Store>();
+    // The store's answer is held back, so the deletion can be seen in
+    // flight, and given before the test ends, since a transition left
+    // waiting holds every later one with it.
+    let answer!: (answered: Answer<undefined>) => void;
+    store.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const { result } = renderHook(() =>
+      useRemover<Doomed>({
+        describe: (record) => record.name,
+        noun: "Account",
+        remove: store,
+      }),
+    );
+
+    act(() => {
+      result.current.ask(doomed);
+    });
+
+    expect(result.current.questionOf(doomed)).toMatchObject({
+      isBusy: false,
+      title: "Delete Lifetime ISA?",
+    });
+
+    act(() => {
+      result.current.questionOf(doomed).onCancel();
+    });
+
+    expect(result.current.doomed).toBeNull();
+
+    act(() => {
+      result.current.ask(doomed);
+    });
+    act(() => {
+      result.current.questionOf(doomed).onConfirm();
+    });
+
+    expect(store).toHaveBeenCalledExactlyOnceWith(6);
+    expect(result.current.questionOf(doomed).isBusy).toBe(true);
+
+    answer(saved(undefined));
+
+    await waitFor(() => {
+      expect(result.current.doomed).toBeNull();
+    });
+  });
+
   it("holds a deletion in flight, then closes and reports it deleted", async () => {
     const store = vi.fn<Store>();
     // The store's answer is held back, so the deletion can be seen in

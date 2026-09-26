@@ -97,7 +97,7 @@ export function AccountDialog({
 }: AccountDialogProps): JSX.Element | null {
   const feeders = account === null ? [] : feeding(account.id, lines);
   const opening = openingOf(account, feeders, owners);
-  const { amend, entry, isSaving, save } = useMountedEditor({
+  const { amend, dialogOf, entry } = useMountedEditor({
     describe: (saved) => saved.name,
     noun: "Account",
     onSaved,
@@ -151,14 +151,12 @@ export function AccountDialog({
 
   return entry === null ? null : (
     <EditDialog
+      {...dialogOf(entry)}
       canSave={
-        !isSaving &&
         entry.draft.name.trim() !== "" &&
         (!isOwned(entry.draft) || entry.draft.owner !== null) &&
         isWithinAllowance(entry.draft)
       }
-      eyebrow={entry.id === null ? "New account" : "Edit account"}
-      isSaving={isSaving}
       isWide
       onDelete={
         account === null || onDelete === undefined
@@ -168,9 +166,6 @@ export function AccountDialog({
             }
       }
       onDismiss={onDismiss}
-      onSave={() => {
-        save(entry);
-      }}
       title={entry.draft.name.trim() || "Untitled account"}
     >
       <AccountFields

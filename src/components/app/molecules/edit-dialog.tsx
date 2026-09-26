@@ -33,8 +33,10 @@ interface EditDialogProps {
 // and not otherwise, and the fields inside mount fresh with each entry.
 // The dialog opens only from a button, so the only change it can report
 // is a close: Cancel, Escape or a press outside, all of which dismiss.
-// Save holds while the caller says the draft cannot be saved, unnamed or
-// on its way to the store. A wide dialog fits a form of three columns.
+// Save holds while the caller says the draft cannot be saved, unnamed
+// say, and while a save is on its way to the store, which the dialog
+// holds it for itself rather than every caller folding it into what it
+// says. A wide dialog fits a form of three columns.
 // A dialog given a delete handler offers a Delete as well, set apart from
 // the other two at the footer's far edge: it reports the press and no more,
 // so the caller asks through its confirm before anything goes, as it
@@ -104,7 +106,7 @@ export function EditDialog({
           <DialogClose render={<Button size="sm" variant="outline" />}>
             Cancel
           </DialogClose>
-          <Button disabled={!canSave} onClick={onSave} size="sm">
+          <Button disabled={!canSave || isSaving} onClick={onSave} size="sm">
             Save
           </Button>
         </DialogFooter>
