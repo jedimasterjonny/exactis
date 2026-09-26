@@ -46,12 +46,14 @@ year, and one lump sum allowance is shared by all of them. It holds one
 retirement age too, so every salary and every self-employed line stops in the
 same year, whoever earns it, and the plan screen still draws each such line to
 its own last year where the engine stops it at retirement. A draw on one owner's
-pension is taxed on top of every other owner's earnings.
+pension is taxed on top of every other owner's earnings, and each owner's
+pensions are relieved on everyone's earnings, as though each owner earned them
+all.
 
 Decide whose each income line is, and the year each owner was born and retires,
-so tax, the pension age, the lump sum allowance and the last working year are
-each a person's rather than the plan's, and a salary feeds only its own owner's
-pension.
+so tax, the pension age, the lump sum allowance, the earnings relief is held to
+and the last working year are each a person's rather than the plan's, and a
+salary feeds only its own owner's pension.
 
 ## Today's money
 
@@ -76,19 +78,18 @@ from April 2029 a sacrifice over £2,000 a year pays both NIs. A pension paid ou
 of taxed money claims the basic rate and not the higher rate a taxpayer claims
 back through a return; nor does its gross come off the income the personal
 allowance is withdrawn against, which between £100,000 and £125,140 is worth
-another 20%; and it claims relief in a year with no earnings to relieve, and
-after 75, when relief stops. The employee's NI runs past the State Pension age,
-when it stops, and a bonus is spread over the year as the line pays it, where
-paid in one month most of it would meet the 2% rate. Cash interest is not taxed.
-The bands are those outside Scotland, and are held flat in today's money, so in
-effect they rise with prices where the freeze to April 2031 holds them and drags
-income into higher bands. A draw before the pension age is charged a flat 55%
-however small against the pension, and the lump sum allowance is taken to be
-whole when the plan opens. The pension age is read off the year its owner was
-born and not the day, so the whole of the year an age is reached counts as
-reaching it, and a protected pension age some schemes give is not held. A refund
-a month has no account to take goes where any money the month leaves goes, which
-is nowhere the projection counts.
+another 20%; and it claims relief after 75, when relief stops. The employee's NI
+runs past the State Pension age, when it stops, and a bonus is spread over the
+year as the line pays it, where paid in one month most of it would meet the 2%
+rate. Cash interest is not taxed. The bands are those outside Scotland, and are
+held flat in today's money, so in effect they rise with prices where the freeze
+to April 2031 holds them and drags income into higher bands. A draw before the
+pension age is charged a flat 55% however small against the pension, and the
+lump sum allowance is taken to be whole when the plan opens. The pension age is
+read off the year its owner was born and not the day, so the whole of the year
+an age is reached counts as reaching it, and a protected pension age some
+schemes give is not held. A refund a month has no account to take goes where any
+money the month leaves goes, which is nowhere the projection counts.
 
 Decide what a pension is worth beside an ISA once the tax on taking it out is
 counted, and the order the plan draws in, so the projection's two lines and its

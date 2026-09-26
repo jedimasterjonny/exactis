@@ -119,7 +119,10 @@ saves the month. A fixed sum or the spare money paid into a pension comes out of
 taxed money instead, so the pension claims the basic rate back on it and £800
 paid lands as £1,000, which is what a pension's cap is held to; the relief a
 higher rate taxpayer claims on top is theirs rather than the pension's, and is
-not counted. Each month is taxed as a twelfth of a year, which is the year's tax
+not counted. Relief is claimed on no more than the owner earns from a salary or
+self-employment, less what they sacrifice, or £3,600 a year when that is more,
+so a pension paid after its owner retires lands a pound a pound past £300 a
+month. Each month is taxed as a twelfth of a year, which is the year's tax
 exactly when its months are alike and too much or too little when they are not,
 as in the year a salary stops. So the projection carries each tax year, April to
 April, and settles it in the April after: the year's income tax on everything

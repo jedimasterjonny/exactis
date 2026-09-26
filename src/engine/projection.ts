@@ -12,7 +12,6 @@ import {
   incomeTaxOn,
   insuranceOn,
   lumpSumAllowance,
-  reliefOf,
 } from "@/lib/tax";
 
 // A year of the projection: the balance the plan expects entering it,
@@ -326,8 +325,8 @@ function isBeforePensionAge(age: number, { month, year }: Month): boolean {
 
 // What lands in an account each month of the year: what each salary
 // feeds it, the fixed sum or the spare money's take the flow lists for
-// it with the relief a pension claims on what is paid out of taxed
-// money, and nothing for an account it lists nothing for. A salary's
+// it, and the relief it lists a pension claiming on what is paid out of
+// taxed money, and nothing for an account it lists nothing for. A salary's
 // feed is what lands already, being paid before tax, so it takes no
 // relief. The entries are read off the flow as the ones listed for the
 // account itself, the same object the flow was read over, rather than
@@ -339,10 +338,7 @@ function paidIn(account: Account, flow: CashFlow): number {
     paid
       .filter((entry) => entry.account === account)
       .reduce((sum, entry) => sum + entry.amount, 0);
-  return (
-    sumOf(flow.fed) +
-    sumOf([...flow.fixed, ...flow.spare]) * (1 + reliefOf(account))
-  );
+  return sumOf([...flow.fed, ...flow.fixed, ...flow.relief, ...flow.spare]);
 }
 
 // The rate a month is carried at, held to losing no more than
