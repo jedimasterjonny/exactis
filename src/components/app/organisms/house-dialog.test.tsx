@@ -1,3 +1,6 @@
+import type { RenderResult } from "@testing-library/react";
+import type { ComponentProps } from "react";
+
 import {
   fireEvent,
   render,
@@ -42,19 +45,17 @@ const workedHint = "Worked out from the other two";
 // with spies where the ledger listens. Save reports through the toast
 // manager, which needs its Toaster mounted.
 function renderDialog(
-  opening: null | Secured = null,
-  onSaved: () => void = vi.fn<() => void>(),
-  onDismiss: () => void = vi.fn<() => void>(),
-): void {
-  render(
-    <Toaster>
-      <HouseDialog
-        house={opening}
-        onDismiss={onDismiss}
-        onSaved={onSaved}
-        plan={plan}
-      />
-    </Toaster>,
+  props: Partial<ComponentProps<typeof HouseDialog>> = {},
+): RenderResult {
+  return render(
+    <HouseDialog
+      house={null}
+      onDismiss={vi.fn<() => void>()}
+      onSaved={vi.fn<() => void>()}
+      plan={plan}
+      {...props}
+    />,
+    { wrapper: Toaster },
   );
 }
 
@@ -90,7 +91,7 @@ describe("HouseDialog", () => {
   // £341,810 at 5.15% over 22 years is £2,166 a month, to the pound.
   it("works the payment out from the balance, rate and term, and saves a new house with its mortgage", async () => {
     const onSaved = vi.fn<() => void>();
-    renderDialog(null, onSaved);
+    renderDialog({ onSaved });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: " Home " } });
@@ -140,7 +141,7 @@ describe("HouseDialog", () => {
   it("opens a house on its records with the term worked out and writes the edit back", async () => {
     const onSaved = vi.fn<() => void>();
     saved(house.asset);
-    renderDialog(house, onSaved);
+    renderDialog({ house, onSaved });
     const dialog = openDialog();
 
     expect(within(dialog).getByText("Edit house")).toHaveClass("text-brand");
@@ -187,7 +188,7 @@ describe("HouseDialog", () => {
   // years, which stands as the term and shows in the years, and the
   // rate is worked out in its place.
   it("ends the mortgage in a picked month, which stands as the term", () => {
-    renderDialog(house);
+    renderDialog({ house });
     const dialog = openDialog();
     const lastPayment = within(dialog).getByRole("combobox", {
       name: "Last payment",
@@ -209,7 +210,7 @@ describe("HouseDialog", () => {
   });
 
   it("opens a house owned outright with no loan fields", () => {
-    renderDialog({ ...house, loan: null });
+    renderDialog({ house: { ...house, loan: null } });
     const dialog = openDialog();
 
     expect(
@@ -256,7 +257,7 @@ describe("HouseDialog", () => {
   it("works the term out from the balance, rate and payment, and saves a loan that never clears", async () => {
     const onSaved = vi.fn<() => void>();
     saved(home);
-    renderDialog(null, onSaved);
+    renderDialog({ onSaved });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Home" } });
@@ -331,7 +332,7 @@ describe("HouseDialog", () => {
   it("saves a house owned outright as the asset alone", async () => {
     const onSaved = vi.fn<() => void>();
     saved({ ...home, id: 6, name: "Flat" });
-    renderDialog(null, onSaved);
+    renderDialog({ onSaved });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Flat" } });
@@ -370,7 +371,7 @@ describe("HouseDialog", () => {
     vi.mocked(saveHouse).mockResolvedValue(
       refused("A pension a salary feeds stays a pension"),
     );
-    renderDialog(null, onSaved);
+    renderDialog({ onSaved });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Flat" } });
@@ -400,7 +401,7 @@ describe("HouseDialog", () => {
 
   it("tells the caller when it is dismissed, and saves nothing", () => {
     const onDismiss = vi.fn<() => void>();
-    renderDialog(null, vi.fn<() => void>(), onDismiss);
+    renderDialog({ onDismiss });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Flat" } });
@@ -414,17 +415,7 @@ describe("HouseDialog", () => {
   // saving nothing; a new one has nothing yet to delete.
   it("offers a saved house a delete that reports its asset, and a new one none", () => {
     const onDelete = vi.fn<(asset: Account) => void>();
-    const view = render(
-      <Toaster>
-        <HouseDialog
-          house={house}
-          onDelete={onDelete}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={vi.fn<() => void>()}
-          plan={plan}
-        />
-      </Toaster>,
-    );
+    const view = renderDialog({ house, onDelete });
 
     fireEvent.click(
       within(openDialog()).getByRole("button", { name: "Delete" }),
@@ -434,17 +425,7 @@ describe("HouseDialog", () => {
     expect(saveHouse).not.toHaveBeenCalled();
 
     view.unmount();
-    render(
-      <Toaster>
-        <HouseDialog
-          house={null}
-          onDelete={onDelete}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={vi.fn<() => void>()}
-          plan={plan}
-        />
-      </Toaster>,
-    );
+    renderDialog({ onDelete });
 
     expect(
       within(openDialog()).queryByRole("button", { name: "Delete" }),
