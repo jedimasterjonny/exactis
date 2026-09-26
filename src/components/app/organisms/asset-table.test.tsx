@@ -38,10 +38,15 @@ const bySlot =
   (_content: string, element: Element | null): boolean =>
     element?.getAttribute("data-slot") === slot;
 
-// The fill of the bar beneath a row's equity, which draws its share of
-// the value.
-function fillOf(row: HTMLElement): HTMLElement {
-  return within(row).getByText(bySlot("equity-bar-fill"));
+// The share a row's equity draws of its value: the fill of the bar
+// beneath the equity's figure and of the folded row's across it, which
+// draw the same share, the one a stub and the other the row's width. The
+// bars are hidden from the accessibility tree, so no query is better
+// than the slot, and the suggestion to find one is switched off here.
+function shareOf(row: HTMLElement): string[] {
+  return within(row)
+    .getAllByText(bySlot("equity-bar-fill"), { suggest: false })
+    .map((fill) => fill.style.width);
 }
 
 describe("AssetTable", () => {
@@ -68,7 +73,11 @@ describe("AssetTable", () => {
       "Equity",
       "Actions",
     ]);
-    expect(within(table).getByText("Home")).toHaveClass("font-medium");
+    expect(
+      within(within(table).getByRole("cell", { name: "HomeHouse" })).getByText(
+        "Home",
+      ),
+    ).toHaveClass("font-medium");
     expect(within(table).getByText("House")).toHaveAttribute(
       "data-variant",
       "secondary",
@@ -96,13 +105,14 @@ describe("AssetTable", () => {
       "figure",
       "font-medium",
     );
-    expect(within(table).getByText(bySlot("equity-bar"))).toHaveAttribute(
-      "aria-hidden",
-      "true",
+    for (const bar of within(table).getAllByText(bySlot("equity-bar"), {
+      suggest: false,
+    })) {
+      expect(bar).toHaveAttribute("aria-hidden", "true");
+    }
+    expect(shareOf(screen.getByRole("row", { name: /Home/ }))).toStrictEqual(
+      Array.from({ length: 2 }, () => `${String((233446 / 416386) * 100)}%`),
     );
-    expect(fillOf(screen.getByRole("row", { name: /Home/ }))).toHaveStyle({
-      width: `${String((233446 / 416386) * 100)}%`,
-    });
   });
 
   // An asset owned outright owes and pays nothing and is all equity; one
@@ -129,7 +139,7 @@ describe("AssetTable", () => {
     expect(within(golfRow).getByRole("cell", { name: "£18,000" })).toHaveClass(
       "font-medium",
     );
-    expect(fillOf(golfRow)).toHaveStyle({ width: "100%" });
+    expect(shareOf(golfRow)).toStrictEqual(["100%", "100%"]);
     expect(
       within(artRow).getByRole("cell", { name: "£50 / mo" }),
     ).toBeInTheDocument();
@@ -164,10 +174,11 @@ describe("AssetTable", () => {
     expect(
       within(artRow).getByRole("cell", { name: "−£50,000" }),
     ).toBeInTheDocument();
-    expect(fillOf(artRow)).toHaveStyle({ width: "0%" });
-    expect(fillOf(screen.getByRole("row", { name: /Golf/ }))).toHaveStyle({
-      width: "0%",
-    });
+    expect(shareOf(artRow)).toStrictEqual(["0%", "0%"]);
+    expect(shareOf(screen.getByRole("row", { name: /Golf/ }))).toStrictEqual([
+      "0%",
+      "0%",
+    ]);
   });
 
   // Every figure is totalled beneath two rows or more; a row alone is its
@@ -189,6 +200,7 @@ describe("AssetTable", () => {
         .getAllByRole("cell")
         .map((cell) => cell.textContent),
     ).toStrictEqual([
+      "Total£251,446£434,386 value · £182,940 owed£2,210 / mo paid",
       "Total",
       "£434,386",
       "−£182,940",
@@ -247,5 +259,81 @@ describe("AssetTable", () => {
         "A house, a car, anything owned outright. Add one to see it listed here.",
       ),
     ).toBeInTheDocument();
+  });
+
+  // Narrow, each asset is one cell: the name and the equity, the bar
+  // across the row beneath them, then what it is worth, what is owed on
+  // it and what is paid, a line apiece and none for what is not there.
+  // The header, the columns and the actions hide while it shows, and a
+  // tap anywhere on it opens the asset.
+  it("folds each asset into one cell while narrow, its bar across the row, and opens it from there", () => {
+    const onEdit = vi.fn<Report>();
+    render(
+      <AssetTable
+        assets={[
+          { asset: house, loan },
+          { asset: golf, loan: null },
+          { asset: art, loan: null },
+        ]}
+        onDelete={vi.fn<Report>()}
+        onEdit={onEdit}
+      />,
+    );
+
+    const [header] = screen.getAllByRole("rowgroup");
+    const row = screen.getByRole("row", { name: /^Home/ });
+    // The folded cell's name runs its lines together, as a cell's does,
+    // but for the spaces the button and the first line's box put between
+    // them; the bar is drawn and says nothing.
+    const home = within(row).getByRole("cell", {
+      name: "Home £233,446 House · £416,386 value · grows at 2.10%£182,940 owed on Mortgage at 5.15%£2,210 / mo paid",
+    });
+    const columns = within(row)
+      .getAllByRole("cell")
+      .filter((cell) => cell !== home);
+
+    expect(header).toHaveClass("folded:hidden");
+    expect(home).toHaveClass("unfolded:hidden");
+    expect(within(home).getByText(bySlot("equity-bar"))).toHaveClass("w-full");
+    expect(columns).toHaveLength(6);
+    for (const column of columns) {
+      expect(column).toHaveClass("folded:hidden");
+    }
+    expect(
+      screen.getByRole("cell", {
+        name: "Golf £18,000 Car · £18,000 value · grows at -15.00%",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("cell", {
+        name: "Prints £5,000 Real asset · £5,000 value · grows at Plan rate£50 / mo paid",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(home).getByRole("button", { name: "Home" }));
+
+    expect(onEdit).toHaveBeenCalledExactlyOnceWith(house);
+  });
+
+  // Nothing owed is written as nothing, never as minus nothing: not by a
+  // total over assets none of which has a loan, nor by a loan paid down
+  // to nothing that is still linked.
+  it("writes nothing owed without a minus on a folded row and its total", () => {
+    render(
+      <AssetTable
+        assets={[
+          { asset: golf, loan: null },
+          { asset: house, loan: { ...loan, balance: 0 } },
+        ]}
+        onDelete={vi.fn<Report>()}
+        onEdit={vi.fn<Report>()}
+      />,
+    );
+
+    expect(
+      screen.getByText("£0 owed on Mortgage at 5.15%"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("£434,386 value · £0 owed")).toBeInTheDocument();
+    expect(screen.queryByText(/−£0/)).not.toBeInTheDocument();
   });
 });
