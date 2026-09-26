@@ -51,7 +51,9 @@ export interface Fed extends Paid {
 }
 
 // An account and what the month actually pays it, which for a fixed sum
-// is the sum it states or as much of it as the month had. The stated sum
+// is the sum it states or as much of it as the month had, and for a
+// debt's is the sum it states, which it is paid whether or not the
+// month has it. The stated sum
 // is not carried alongside what was paid, since nothing reads it yet and
 // the account itself still holds it. A pension paid out of the month
 // lands more than it is paid by the relief it claims, which is added
@@ -128,13 +130,15 @@ const nanopound = 1e-9;
 // A month's money: the income lines running that month, as they are
 // earned, less what a salary sacrifices into its pension, less the
 // income tax and the National Insurance on the rest, less the expense
-// lines, each kept as well as summed. What that leaves pays the fixed
-// sums, in the order the accounts are listed, each taking its sum or
-// what the month still has when it no longer covers it, and then the
-// spare money to each account that takes it in the order they are
-// listed, each up to its cap and passing the rest on, and what is left
-// after them, which is negative by the expenses the income after its
-// tax does not cover and by nothing else. So the spare money is what
+// lines, each kept as well as summed, and less each debt's fixed sum,
+// whole and before any other wherever the debt is listed. What that
+// leaves pays the other fixed sums, in the order the accounts are
+// listed, each taking its sum or what the month still has when it no
+// longer covers it, and then the spare money to each account that
+// takes it in the order they are listed, each up to its cap and
+// passing the rest on, and what is left after them, which is negative
+// by the expenses and the debts' payments the income after its tax
+// does not cover and by nothing else. So the spare money is what
 // the month has after tax, and an account taking it is paid money the
 // month really has rather than the tax bill on top. The tax is charged
 // on the month as a twelfth of a year, a twelfth of what a year of
@@ -152,11 +156,18 @@ const nanopound = 1e-9;
 // nanopound of nothing is nothing exactly: a month whose lines cancel
 // to the penny need not
 // cancel in binary, and a shortfall too small to write down is no
-// shortfall to draw savings for. A fixed sum is a contribution out of what
-// the month has, not a drawdown: an account is paid only while the
-// income funding it lasts, and selling out of one wrapper to keep a
-// payment into another going would be a shortfall the ledger read back
-// as saving. A yearly figure is spread over the twelve months. A loan
+// shortfall to draw savings for. A fixed sum into savings is a
+// contribution out of what the month has, not a drawdown: an account is
+// paid only while the income funding it lasts, and selling out of one
+// wrapper to keep a payment into another going would be a shortfall the
+// ledger read back as saving. A debt's fixed sum is owed rather than
+// saved, so it goes out with the expenses and is drawn for as they are
+// when the month is short of it, rather than going short itself: a debt
+// short of its payments is a debt in default, which the plan does not
+// model. It comes before the other fixed sums because it is drawn for:
+// met after them, it would sell savings to keep a saving paid. The order
+// the accounts are listed in sets which saving is paid first, and a debt
+// is no saving. A yearly figure is spread over the twelve months. A loan
 // whose payments are a line pays nothing as a fixed sum, since the line
 // is its payment and the ledger shows the same figure against the loan:
 // it is counted once, as the line, and stops when the line does. A
@@ -180,7 +191,8 @@ const nanopound = 1e-9;
 // income tax and National Insurance on what is left of it and the
 // sacrifice costs the month less than it puts in the pension. It is
 // given up only while what is left of the income after the tax on it
-// still covers the expenses, a month short of them by less than a
+// still covers the expenses and the debts' payments, a month short of
+// them by less than a
 // nanopound covering them as a month left with that much is left with
 // nothing: what the sacrifices are dropped for and what the month
 // is left with are the one figure, so the two are read against the one
@@ -192,10 +204,11 @@ const nanopound = 1e-9;
 // the lines that fit, since a sacrifice a month cannot afford is a
 // drawdown by another name and the pension would be fed in the very
 // month a wrapper is sold to cover the spending. So a month that is
-// short feeds nothing, pays no fixed sum and hands over no spare money,
-// and what is left is short by the expenses the income does not cover
-// and by nothing else. A salary naming an account that is no pension is
-// refused, as the spare money into a real asset is, and so is an
+// short feeds nothing, pays no fixed sum but a debt's and hands over no
+// spare money, and what is left is short by the expenses and the debts'
+// payments the income does not cover and by nothing else. A salary
+// naming an account that is no pension is refused, as the spare money
+// into a real asset is, and so is an
 // expense line naming an account that is no debt: the action holds each
 // link to the kind it may name, so one that reached here is a caller's
 // mistake rather than a result, and a sacrifice would otherwise leave
@@ -282,10 +295,20 @@ export function cashFlow(
     .filter((line) => runsIn(line, at))
     .map((line) => ({ amount: monthly(line.amount, line.cadence), line }));
   const expenses = total(spent);
+  const paid = new Set(
+    schedule.expenses.flatMap((line) =>
+      line.pays === undefined ? [] : [line.pays],
+    ),
+  );
+  const own = accounts.filter((account) => !paid.has(account.id));
+  const owed = own
+    .filter((account) => account.kind === "debt")
+    .flatMap((account) => fixedSum(account, reading));
+  const outgoings = expenses + total(owed);
   const givenUp = feeding.reduce((sum, entry) => sum + entry.sacrificed, 0);
   const sacrificing = taxOn(running, feeding);
   const isEarnedWhole =
-    income - givenUp - taxOf(sacrificing) + settlement - expenses < -nanopound;
+    income - givenUp - taxOf(sacrificing) + settlement - outgoings < -nanopound;
   const fed = isEarnedWhole ? [] : feeding;
   const sacrificed = isEarnedWhole ? 0 : givenUp;
   const taxed = isEarnedWhole ? taxOn(running, []) : sacrificing;
@@ -293,21 +316,16 @@ export function cashFlow(
   for (const entry of fed) {
     landIn(rooms, entry.account, entry.amount);
   }
-  const paid = new Set(
-    schedule.expenses.flatMap((line) =>
-      line.pays === undefined ? [] : [line.pays],
-    ),
-  );
-  const { left: rest, sums: fixed } = fixedSums(
-    accounts.filter((account) => !paid.has(account.id)),
-    income - sacrificed - taxOf(taxed) + settlement - expenses,
+  const { left: rest, sums: saved } = fixedSums(
+    own.filter((account) => account.kind !== "debt"),
+    income - sacrificed - taxOf(taxed) + settlement - outgoings,
     { reading, rooms },
   );
   const { left, takes } = spareMoney(accounts, rest, { fed, rooms });
   return {
     expenses,
     fed,
-    fixed,
+    fixed: [...owed, ...saved],
     income,
     incomeTax: taxed.incomeTax,
     insurance: taxed.insurance,
@@ -360,7 +378,8 @@ function checkLinks(accounts: readonly Account[], schedule: Schedule): void {
 }
 
 // The fixed sum an account states a month, before the month is asked
-// whether it has it, or nothing for an account paid the spare money or
+// whether it has it, which it is asked of any account but a debt, or
+// nothing for an account paid the spare money or
 // nothing. A debt states one only in the months its payments run, and
 // nothing at all once they have cleared it: a debt whose payments are
 // over states no sum, as a line that has ended costs nothing, rather
@@ -377,8 +396,9 @@ function fixedSum(account: Account, reading: Reading): Paid[] {
     : [{ account, amount }];
 }
 
-// The fixed sums paid out of what the month has after the sacrifices and
-// the expenses, handed down the accounts in the order they are listed as
+// The fixed sums paid out of what the month has after the sacrifices,
+// the expenses and the debts' payments, handed down the accounts other
+// than the debts in the order they are listed as
 // the spare money is: each takes its stated sum, or what is left when
 // the month no longer reaches it, or what is left of its allowance when
 // that no longer does, and passes the rest on. A pension lands a quarter

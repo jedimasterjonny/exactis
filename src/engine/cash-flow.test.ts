@@ -87,10 +87,11 @@ describe("cashFlow", () => {
   // with the NI saved. The £129,600 a year left is past the allowance's
   // withdrawal, so it pays £44,523 of income tax, £3,710.25 a month,
   // and £4,602.60 of NI, £383.55, leaving £6,706.20 against the
-  // household's £3,350 a month. The pension's £28,512 a year is
-  // £2,376 a month and is paid whole, and the ISA's £20,000 is
-  // £1,666.67 and takes the £980.20 left, so the mortgage's £2,180 is
-  // paid nothing and nothing is left.
+  // household's £3,350 a month. The mortgage's £2,180 is owed, so it
+  // goes out whole and before the other fixed sums, though it is listed
+  // after them, which leaves £1,176.20. The pension's £28,512 a year is
+  // £2,376 a month and takes all of it, so the ISA's £20,000,
+  // £1,666.67, is paid nothing and nothing is left.
   it("takes this year's lines a month at a time, less every sacrifice, the tax on the rest and the fixed sums", () => {
     const flow = cashFlow(accounts, schedule, {
       at: { month: 0, year: 2026 },
@@ -112,9 +113,9 @@ describe("cashFlow", () => {
     expect(flow.expenses).toBe(3350);
     expect(flow.spent).toStrictEqual([{ amount: 3350, line: household }]);
     expect(pennies(flow.fixed)).toStrictEqual([
-      { account: pension, amount: 2376 },
-      { account: isa, amount: 980.20 },
-      { account: mortgage, amount: 0 },
+      { account: mortgage, amount: 2180 },
+      { account: pension, amount: 1176.2 },
+      { account: isa, amount: 0 },
     ]);
     expect(flow.spare).toStrictEqual([]);
     expect(flow.left).toBe(0);
@@ -245,6 +246,79 @@ describe("cashFlow", () => {
       { account: pension, amount: 786.63 },
     ]);
     expect(reversed.left).toBe(0);
+  });
+
+  // The same £2,453.30 against the mortgage's £2,180 and the pension's
+  // £2,376: the mortgage is owed, so it is paid whole and first
+  // whichever of the two is listed first, and the pension takes the
+  // £273.30 it leaves. The order sets which saving is paid first, and a
+  // debt is no saving.
+  it("pays a debt's fixed sum whole and before any other, wherever it is listed", () => {
+    const flow = cashFlow(
+      [pension, mortgage],
+      { expenses: [], income: [plain] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+    const reversed = cashFlow(
+      [mortgage, pension],
+      { expenses: [], income: [plain] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+
+    expect(pennies(flow.fixed)).toStrictEqual([
+      { account: mortgage, amount: 2180 },
+      { account: pension, amount: 273.3 },
+    ]);
+    expect(flow.left).toBe(0);
+    expect(reversed).toStrictEqual(flow);
+  });
+
+  // £60,000 of salary leaves £3,431.78 a month with its £600 sacrificed
+  // and £3,779.78 earned whole, against the mortgage's £2,180 and the
+  // household. At £1,200 of household the £3,380 going out is covered
+  // with the £600 gone, so the pension is fed and £51.78 is left; at
+  // £1,500 the £3,680 is covered only by keeping the £600, so the salary
+  // is earned whole, the pension is fed nothing and £99.78 is left; and
+  // at £2,000 the £4,180 is covered neither way, so the mortgage is paid
+  // its £2,180 all the same and the month is short by the £400.22 the
+  // whole income does not cover, for the projection to draw from the
+  // savings as it would for an expense. A debt's payment is owed rather
+  // than saved, and a month short of it would be a debt in default.
+  it("pays a debt's fixed sum in a month short of it, and gives up no sacrifice to leave it short", () => {
+    const unpaid: Account = {
+      balance: 391640,
+      growth: { kind: "plan" },
+      id: pension.id,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+      owner: 1,
+    };
+    const against = (amount: number): CashFlow =>
+      cashFlow(
+        [unpaid, mortgage],
+        { expenses: [{ ...household, amount }], income: [lean] },
+        { at: { month: 0, year: 2026 }, plan },
+      );
+
+    expect(against(1200).fed).toStrictEqual([
+      {
+        account: unpaid,
+        amount: (7200 * 1.15) / 12,
+        line: lean,
+        sacrificed: 600,
+      },
+    ]);
+    expect(against(1200).fixed).toStrictEqual([
+      { account: mortgage, amount: 2180 },
+    ]);
+    expect(against(1200).left).toBeCloseTo(51.78, 2);
+    expect(against(1500).fed).toStrictEqual([]);
+    expect(against(1500).left).toBeCloseTo(99.78, 2);
+    expect(against(2000).fed).toStrictEqual([]);
+    expect(against(2000).fixed).toStrictEqual([
+      { account: mortgage, amount: 2180 },
+    ]);
+    expect(against(2000).left).toBeCloseTo(-400.22, 2);
   });
 
   // 2053's consulting is £2,000 a month, £1,752.35 after £190.50 of

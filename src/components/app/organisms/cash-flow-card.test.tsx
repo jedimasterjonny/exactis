@@ -18,10 +18,10 @@ const [household, , , retirement] = expenseLines;
 // month in 2026 has the salary's £12,000 coming in, £1,200 of it
 // sacrificed into the pension, £3,710.25 of income tax and £383.55 of
 // NI on the rest, and the household's £3,350 going out, which leaves
-// £3,356.20: the pension is paid its £2,376 whole, which lands as
-// £2,970 with the basic rate claimed back on it, the mortgage the
-// £980.20 left of its £2,180, and the ISA and the current account
-// nothing.
+// £3,356.20: the mortgage is paid its £2,180 whole and first, being
+// owed, the pension the £1,176.20 left of its £2,376, which lands as
+// £1,470.25 with the basic rate claimed back on it, and the ISA and the
+// current account nothing.
 const spareIsa: Account = {
   ...isa,
   contribution: { cap: null, kind: "spare" },
@@ -76,8 +76,8 @@ describe("CashFlowCard", () => {
       "Income tax−£3,710",
       "National Insurance−£384",
       "Expenses−£3,350",
-      "Workplace pensionA fixed sum, paid in as £2,970 with basic-rate relief−£2,376",
-      "MortgageA fixed sum−£980",
+      "MortgageA fixed sum−£2,180",
+      "Workplace pensionA fixed sum, paid in as £1,470 with basic-rate relief−£1,176",
       "Stocks & shares ISASpare money, to £20,000 / yr£0",
       "Current accountSpare money, uncapped£0",
       "Left over£0",
@@ -92,8 +92,8 @@ describe("CashFlowCard", () => {
     );
   });
 
-  // A year on, the childcare has started and the mortgage is paid
-  // £1,380 less, £12.75; by 2053 the salaries have ended, so nothing is
+  // A year on, the childcare has started and the pension is paid
+  // £1,380 less, £36.20, the mortgage still paid whole; by 2053 the salaries have ended, so nothing is
   // sacrificed, and the consulting's £2,000 a month, £1,752.35 after
   // £190.50 of income tax and £57.15 of NI, is £6,145.98 short of the
   // mortgage payment and the retirement living, so the pension is paid
@@ -113,7 +113,10 @@ describe("CashFlowCard", () => {
     ).toBeInTheDocument();
     expect(slider()).toHaveValue("2027");
     expect(rows()[4]).toBe("Expenses−£4,590");
-    expect(rows()[6]).toBe("MortgageA fixed sum−£28");
+    expect(rows()[5]).toBe("MortgageA fixed sum−£2,180");
+    expect(rows()[6]).toBe(
+      "Workplace pensionA fixed sum, paid in as £106 with basic-rate relief−£85",
+    );
 
     fireEvent.change(slider(), { target: { value: "2053" } });
 

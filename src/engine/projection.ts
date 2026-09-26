@@ -131,11 +131,14 @@ const pensionAge = {
 // nothing more at the year's end. The first tax year is the months of
 // it the plan holds, taxed against their share of each band, and the
 // last is cut off where the plan ends and never settled. A draw
-// and a payment never meet in one month: the flow pays a fixed sum and
-// the spare money only out of what the month has, and no salary
-// sacrifices at all in a month the income would not cover the expenses
-// without it, so a fixed sum, a take of the spare money and a pension
-// fed are each nothing in the month a wrapper is drawn on. What no
+// and a payment into savings never meet in one month: the flow pays a
+// saving's fixed sum and the spare money only out of what the month
+// has, and no salary sacrifices at all in a month the income would not
+// cover the expenses and the debts' payments without it, so a saving's
+// fixed sum, a take of the spare money and a pension fed are each
+// nothing in the month a wrapper is drawn on. A debt's payment is made
+// in that month all the same, being owed, and is part of what the
+// wrapper is drawn for. What no
 // account covered is the year's uncovered shortfall, summed over its
 // months and reported on the point the year's balances are read off, so
 // the loop reads the balances entering the year, carries it, and emits
