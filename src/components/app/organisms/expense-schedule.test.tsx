@@ -27,11 +27,7 @@ const [, , mortgagePayment, retirement] = expenseLines;
 
 // Save reports through the toast manager, which needs its Toaster mounted.
 function renderSchedule(lines: readonly ExpenseLine[] = expenseLines): void {
-  render(
-    <Toaster>
-      <ExpenseSchedule lines={lines} plan={plan} />
-    </Toaster>,
-  );
+  render(<ExpenseSchedule lines={lines} plan={plan} />, { wrapper: Toaster });
 }
 
 // The store's answer to a save: the line as it now has it. The schedule
@@ -259,12 +255,11 @@ describe("ExpenseSchedule", () => {
   // its pencil would be.
   it("locks a line that is a loan's payments", () => {
     render(
-      <Toaster>
-        <ExpenseSchedule
-          lines={[retirement, { ...mortgagePayment, pays: 5 }]}
-          plan={plan}
-        />
-      </Toaster>,
+      <ExpenseSchedule
+        lines={[retirement, { ...mortgagePayment, pays: 5 }]}
+        plan={plan}
+      />,
+      { wrapper: Toaster },
     );
 
     expect(

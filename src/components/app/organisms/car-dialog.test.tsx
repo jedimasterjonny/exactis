@@ -1,3 +1,6 @@
+import type { RenderResult } from "@testing-library/react";
+import type { ComponentProps } from "react";
+
 import {
   fireEvent,
   render,
@@ -61,19 +64,17 @@ const workedHint = "Worked out from the other two";
 // spies where the ledger listens. Save reports through the toast
 // manager, which needs its Toaster mounted.
 function renderDialog(
-  opening: null | Secured = null,
-  onSaved: () => void = vi.fn<() => void>(),
-  onDismiss: () => void = vi.fn<() => void>(),
-): void {
-  render(
-    <Toaster>
-      <CarDialog
-        car={opening}
-        onDismiss={onDismiss}
-        onSaved={onSaved}
-        plan={plan}
-      />
-    </Toaster>,
+  props: Partial<ComponentProps<typeof CarDialog>> = {},
+): RenderResult {
+  return render(
+    <CarDialog
+      car={null}
+      onDismiss={vi.fn<() => void>()}
+      onSaved={vi.fn<() => void>()}
+      plan={plan}
+      {...props}
+    />,
+    { wrapper: Toaster },
   );
 }
 
@@ -111,7 +112,7 @@ describe("CarDialog", () => {
   // month, to the pound, and carried on clears the whole in 4.9 years.
   it("works the payment out from the balance, balloon, rate and term, and saves a new car with its PCP", async () => {
     const onSaved = vi.fn<() => void>();
-    renderDialog(null, onSaved);
+    renderDialog({ onSaved });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: " Golf " } });
@@ -167,7 +168,7 @@ describe("CarDialog", () => {
   it("opens a car on its records as the PCP it is, with the term worked out, and writes the edit back", async () => {
     const onSaved = vi.fn<() => void>();
     saved(golf);
-    renderDialog(car, onSaved);
+    renderDialog({ car, onSaved });
     const dialog = openDialog();
 
     expect(within(dialog).getByText("Edit car")).toHaveClass("text-brand");
@@ -214,7 +215,7 @@ describe("CarDialog", () => {
   it("opens a car on a loan as the loan it is, and saves it with its loan", async () => {
     const onSaved = vi.fn<() => void>();
     saved(golf);
-    renderDialog({ ...car, loan }, onSaved);
+    renderDialog({ car: { ...car, loan }, onSaved });
     const dialog = openDialog();
 
     expect(
@@ -246,7 +247,7 @@ describe("CarDialog", () => {
   });
 
   it("opens a car owned outright with no finance fields", () => {
-    renderDialog({ ...car, loan: null });
+    renderDialog({ car: { ...car, loan: null } });
     const dialog = openDialog();
 
     expect(
@@ -295,7 +296,7 @@ describe("CarDialog", () => {
   it("works the term out from the balance, balloon, rate and payment, and saves finance that never clears", async () => {
     const onSaved = vi.fn<() => void>();
     saved(golf);
-    renderDialog(null, onSaved);
+    renderDialog({ onSaved });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Golf" } });
@@ -377,7 +378,7 @@ describe("CarDialog", () => {
   it("saves a car owned outright as the asset alone, and a loan with no balloon", async () => {
     const onSaved = vi.fn<() => void>();
     saved({ ...golf, id: 8, name: "Polo" });
-    renderDialog(null, onSaved);
+    renderDialog({ onSaved });
     const dialog = openDialog();
     const agreement = within(dialog).getByRole("combobox", {
       name: "Agreement",
@@ -427,7 +428,7 @@ describe("CarDialog", () => {
     vi.mocked(saveCar).mockResolvedValue(
       refused("A pension a salary feeds stays a pension"),
     );
-    renderDialog(null, onSaved);
+    renderDialog({ onSaved });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Polo" } });
@@ -448,7 +449,7 @@ describe("CarDialog", () => {
 
   it("tells the caller when it is dismissed, and saves nothing", () => {
     const onDismiss = vi.fn<() => void>();
-    renderDialog(null, vi.fn<() => void>(), onDismiss);
+    renderDialog({ onDismiss });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Polo" } });
@@ -462,17 +463,7 @@ describe("CarDialog", () => {
   // saving nothing; a new one has nothing yet to delete.
   it("offers a saved car a delete that reports its asset, and a new one none", () => {
     const onDelete = vi.fn<(asset: Account) => void>();
-    const view = render(
-      <Toaster>
-        <CarDialog
-          car={car}
-          onDelete={onDelete}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={vi.fn<() => void>()}
-          plan={plan}
-        />
-      </Toaster>,
-    );
+    const view = renderDialog({ car, onDelete });
 
     fireEvent.click(
       within(openDialog()).getByRole("button", { name: "Delete" }),
@@ -482,17 +473,7 @@ describe("CarDialog", () => {
     expect(saveCar).not.toHaveBeenCalled();
 
     view.unmount();
-    render(
-      <Toaster>
-        <CarDialog
-          car={null}
-          onDelete={onDelete}
-          onDismiss={vi.fn<() => void>()}
-          onSaved={vi.fn<() => void>()}
-          plan={plan}
-        />
-      </Toaster>,
-    );
+    renderDialog({ onDelete });
 
     expect(
       within(openDialog()).queryByRole("button", { name: "Delete" }),
