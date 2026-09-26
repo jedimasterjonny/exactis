@@ -5,12 +5,12 @@ import { FieldRow } from "./field-row";
 
 describe("FieldRow", () => {
   it.each([
-    { classes: "grid grid-cols-[1.4fr_1fr] gap-4", layout: "named" },
-    { classes: "grid grid-cols-2 gap-4", layout: "pair" },
-    { classes: "grid grid-cols-2 items-start gap-4", layout: "pair-top" },
-    { classes: "grid grid-cols-3 gap-4", layout: "triple" },
+    { classes: "grid gap-4 sm:grid-cols-[1.4fr_1fr]", layout: "named" },
+    { classes: "grid gap-4 sm:grid-cols-2", layout: "pair" },
+    { classes: "grid items-start gap-4 sm:grid-cols-2", layout: "pair-top" },
+    { classes: "grid gap-4 sm:grid-cols-3", layout: "triple" },
   ] as const)(
-    "lays the fields of a $layout row out in its own columns",
+    "lays the fields of a $layout row out in its own columns, and in one on a phone",
     ({ classes, layout }) => {
       render(
         <FieldRow layout={layout}>
