@@ -149,8 +149,10 @@ function drawnIn(
 // income less its tax, sacrificing only while that covers the month
 // and only as much as the pension's allowance takes, the pension paid
 // its fixed sum out of what is left and what its allowance has left,
-// and the ISA the rest up to its allowance, what is past it going to
-// cash.
+// with the basic rate claimed on as much of it as the month's earnings
+// less what they sacrifice relieve, or a twelfth of £3,600 when that is
+// more, and the ISA the rest up to its allowance, what is past it going
+// to cash.
 function earnedFrom(
   earning: Earning,
   at: Month,
@@ -173,12 +175,22 @@ function earnedFrom(
   };
   const sacrificed = netOf(sacrifice) >= -1e-9 ? sacrifice : 0;
   const net = netOf(sacrificed);
+  const relievable = Math.max(
+    3600 / 12,
+    earnedIn(income, at, ["employment", "self-employment"]) - sacrificed,
+  );
+  const room = pensionRoom - sacrificed * 1.15;
   const paid = Math.max(
     0,
-    Math.min(fixed, net, (pensionRoom - sacrificed * 1.15) / 1.25),
+    Math.min(
+      fixed,
+      net,
+      room <= relievable ? room / 1.25 : room - relievable / 5,
+    ),
   );
+  const relief = Math.min(paid, relievable / 1.25) / 4;
   return {
-    fed: earning.fed + sacrificed * 1.15 + paid * 1.25,
+    fed: earning.fed + sacrificed * 1.15 + paid + relief,
     kept: earning.kept + Math.max(0, Math.min(net - paid, isaRoom)),
     year: yearWith(year, earnedIn(income, at, everyKind) - sacrificed, profit),
   };

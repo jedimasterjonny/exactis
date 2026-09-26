@@ -22,19 +22,21 @@ import { rateFrom, retirementYear } from "@/data/plan";
 import { monthly } from "@/lib/cadence";
 import { runsIn } from "@/lib/lines";
 import { clearsIn, termOf } from "@/lib/loans";
-import { incomeTaxOn, insuranceOn, reliefOf } from "@/lib/tax";
+import { incomeTaxOn, insuranceOn, reliefOf, relievableOn } from "@/lib/tax";
 
 // A month of a year's money, in pounds as the lines state them and
 // unrounded, formatted where it is rendered: what comes in, what goes
 // out, in sum and line by line, what each pension is fed, the income
 // tax and the National Insurance the month pays, what each account is
-// paid, and what is left after all of it.
+// paid, what each pension paid out of taxed money claims back on it,
+// and what is left after all of it.
 export interface CashFlow extends Taxed {
   readonly expenses: number;
   readonly fed: readonly Fed[];
   readonly fixed: readonly Paid[];
   readonly income: number;
   readonly left: number;
+  readonly relief: readonly Paid[];
   readonly spare: readonly Take[];
   readonly spent: readonly Spent[];
 }
@@ -56,8 +58,10 @@ export interface Fed extends Paid {
 // month has it. The stated sum
 // is not carried alongside what was paid, since nothing reads it yet and
 // the account itself still holds it. A pension paid out of the month
-// lands more than it is paid by the relief it claims, which is added
-// where what lands is read rather than carried here beside it.
+// lands more than it is paid by the relief it claims, which the flow
+// lists apart as a payment of its own rather than carrying it here
+// beside what was paid, since what a payment claims depends on what
+// the owner's payments before it claimed.
 export interface Paid {
   readonly account: Account;
   readonly amount: number;
@@ -80,6 +84,18 @@ export interface Spent {
 // its kind has, or the allowance, or nothing at all for cash.
 export interface Take extends Paid {
   readonly cap: null | number;
+}
+
+// What the payments out of the month are held to as they are made:
+// what is left of each allowance, in what lands, and what is left of
+// each owner's relief, in what lands with it, which opens at what the
+// month's earnings relieve, with the relief each pension has claimed so
+// far.
+interface Purse {
+  readonly relief: Paid[];
+  readonly reliefs: Rooms;
+  readonly relievable: number;
+  readonly rooms: Rooms;
 }
 
 // The flow is asked for a month of a plan: the month being worked out,
@@ -243,9 +259,16 @@ const nanopound = 1e-9;
 // after it, and what none of them takes is left, which the plan takes
 // as spent rather than saved. A twelfth rather than what is left of the tax year, so a
 // month reads the same whenever in the year it falls and needs nothing
-// the projection carries. Every line is taken at the amount it states,
-// in today's money; how it grows against inflation waits on an
-// inflation assumption the plan does not carry yet.
+// the projection carries. A pension paid out of taxed money claims the
+// basic rate back on no more than its owner is relieved on, held the
+// same way: a twelfth of what the month's salaries and self-employed
+// profit earn a year, less what they sacrifice, or of £3,600 when that
+// is more, shared across the owner's pensions in the order the month
+// pays them, and a pound paid past it lands as a pound. The earnings
+// are the plan's, since no line names whose they are. Every line is
+// taken at the amount it states, in today's money; how it grows
+// against inflation waits on an inflation assumption the plan does not
+// carry yet.
 export function cashFlow(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -312,16 +335,21 @@ export function cashFlow(
   const fed = isEarnedWhole ? [] : feeding;
   const sacrificed = isEarnedWhole ? 0 : givenUp;
   const taxed = isEarnedWhole ? taxOn(running, []) : sacrificing;
-  const rooms: Rooms = new Map();
+  const purse: Purse = {
+    relief: [],
+    reliefs: new Map(),
+    relievable: relievableOn(payOf(running.filter(isEarned), fed), 1),
+    rooms: new Map(),
+  };
   for (const entry of fed) {
-    landIn(rooms, entry.account, entry.amount);
+    landIn(purse.rooms, entry.account, entry.amount);
   }
   const { left: rest, sums: saved } = fixedSums(
     own.filter((account) => account.kind !== "debt"),
     income - sacrificed - taxOf(taxed) + settlement - outgoings,
-    { reading, rooms },
+    { purse, reading },
   );
-  const { left, takes } = spareMoney(accounts, rest, { fed, rooms });
+  const { left, takes } = spareMoney(accounts, rest, { fed, purse });
   return {
     expenses,
     fed,
@@ -331,6 +359,7 @@ export function cashFlow(
     insurance: taxed.insurance,
     left: Math.abs(left) < nanopound ? 0 : left,
     profit: taxed.profit,
+    relief: purse.relief,
     spare: takes,
     spent,
     taxable: taxed.taxable,
@@ -401,27 +430,31 @@ function fixedSum(account: Account, reading: Reading): Paid[] {
 // than the debts in the order they are listed as
 // the spare money is: each takes its stated sum, or what is left when
 // the month no longer reaches it, or what is left of its allowance when
-// that no longer does, and passes the rest on. A pension lands a quarter
-// more than it is paid, the basic rate it claims back, so what it is
-// paid is four fifths of the room it has. An account the month could
-// not pay is still listed, at what it was paid and not at what it asked
-// for, so the ledger says which sum went short rather than dropping the
-// account out of the month altogether.
+// that no longer does, and passes the rest on. A pension lands more
+// than it is paid, by the basic rate it claims back on as much of it
+// as its owner's relief still covers, so what it is paid is what
+// lands within the room it has once that relief is on it. An account
+// the month could not pay is still listed, at what it was paid and not
+// at what it asked for, so the ledger says which sum went short rather
+// than dropping the account out of the month altogether.
 function fixedSums(
   accounts: readonly Account[],
   available: number,
-  { reading, rooms }: { readonly reading: Reading; readonly rooms: Rooms },
+  { purse, reading }: { readonly purse: Purse; readonly reading: Reading },
 ): { readonly left: number; readonly sums: readonly Paid[] } {
   const sums: Paid[] = [];
   let left = available;
   const stated = accounts.flatMap((account) => fixedSum(account, reading));
   for (const { account, amount } of stated) {
-    const lands = 1 + reliefOf(account);
     const sum = Math.max(
       0,
-      Math.min(left, amount, roomIn(rooms, account) / lands),
+      Math.min(
+        left,
+        amount,
+        payableInto(account, roomIn(purse.rooms, account), purse),
+      ),
     );
-    landIn(rooms, account, sum * lands);
+    landWithRelief(account, sum, purse);
     sums.push({ account, amount: sum });
     left -= sum;
   }
@@ -469,6 +502,68 @@ function landIn(rooms: Rooms, account: Account, landed: number): void {
   }
 }
 
+// Lands what an account is paid out of taxed money, with the relief it
+// claims on as much of it as its owner's relief still covers, which is
+// listed for the pension and taken off what is left of that relief,
+// never below nothing, and what lands is taken off the allowance's
+// room. An account that claims no relief lands what it is paid.
+function landWithRelief(account: Account, paid: number, purse: Purse): void {
+  const rate = reliefOf(account);
+  const room = reliefIn(purse, account);
+  const relieved = Math.min(paid, room / (1 + rate));
+  if (rate > 0) {
+    purse.reliefs.set(
+      roomOf(account),
+      Math.max(0, room - relieved * (1 + rate)),
+    );
+    purse.relief.push({ account, amount: relieved * rate });
+  }
+  landIn(purse.rooms, account, paid + relieved * rate);
+}
+
+// The most an account may be paid out of taxed money for what lands in
+// it to stay within a limit, once it claims the relief its owner has
+// left: all of it relieved while the limit is within that relief, and
+// otherwise the relief's worth short of the limit, since past it a
+// pound paid lands as a pound. An account that claims no relief may be
+// paid the limit itself.
+function payableInto(account: Account, limit: number, purse: Purse): number {
+  const rate = reliefOf(account);
+  const room = reliefIn(purse, account);
+  return limit <= room
+    ? limit / (1 + rate)
+    : limit - (room * rate) / (1 + rate);
+}
+
+// What the lines of the kinds given pay in the month, every kind when
+// none is given, each as it is earned less what it gives up into the
+// pension it feeds.
+function payOf(
+  lines: readonly IncomeLine[],
+  fed: readonly Fed[],
+  kinds: readonly IncomeKind[] = incomeKinds,
+): number {
+  return lines
+    .filter((line) => kinds.includes(line.kind))
+    .reduce(
+      (sum, line) =>
+        sum +
+        monthly(totalOf(line), line.cadence) -
+        (fed.find((entry) => entry.line === line)?.sacrificed ?? 0),
+      0,
+    );
+}
+
+// What is left of the relief an account's owner may claim in the month,
+// in what lands with it: what the month's earnings relieve until a
+// payment has claimed some of it, and nothing for an account that
+// claims no relief.
+function reliefIn(purse: Purse, account: Account): number {
+  return reliefOf(account) === 0
+    ? 0
+    : (purse.reliefs.get(roomOf(account)) ?? purse.relievable);
+}
+
 // What is left of an account's allowance in the month, in what lands:
 // its owner's for its kind, a twelfth of it until something has been
 // paid under it into any of the owner's accounts of the kind, and no
@@ -496,8 +591,10 @@ function roomOf(account: Account): string {
 // pension's allowance as the spare money does, and none of it once
 // there is none left or the feeding has filled it, with what is left
 // after them. The cap holds what lands in the account, and a pension
-// lands a quarter more than it is paid, the basic rate it claims back,
-// so what it takes out of the month is four fifths of the room it has.
+// lands more than it is paid, by the basic rate it claims back on as
+// much of it as its owner's relief still covers, so what it takes out
+// of the month is what lands within the room it has once that relief
+// is on it.
 // The remainder is the one the
 // hand-down keeps, rather than the sum taken back off the whole, so an
 // account that takes all there is leaves exactly nothing and not the
@@ -508,7 +605,7 @@ function roomOf(account: Account): string {
 function spareMoney(
   accounts: readonly Account[],
   available: number,
-  { fed, rooms }: { readonly fed: readonly Fed[]; readonly rooms: Rooms },
+  { fed, purse }: { readonly fed: readonly Fed[]; readonly purse: Purse },
 ): { readonly left: number; readonly takes: readonly Take[] } {
   const takes: Take[] = [];
   let left = available;
@@ -523,12 +620,18 @@ function spareMoney(
           ? Number.POSITIVE_INFINITY
           : contribution.cap / 12 -
             total(fed.filter((entry) => entry.account === account));
-      const lands = 1 + reliefOf(account);
       const amount = Math.max(
         0,
-        Math.min(left, Math.min(own, roomIn(rooms, account)) / lands),
+        Math.min(
+          left,
+          payableInto(
+            account,
+            Math.min(own, roomIn(purse.rooms, account)),
+            purse,
+          ),
+        ),
       );
-      landIn(rooms, account, amount * lands);
+      landWithRelief(account, amount, purse);
       takes.push({
         account,
         amount,
@@ -566,24 +669,14 @@ function taxOf({ incomeTax, insurance }: Taxed): number {
 // which is a twelfth of what a year of the month would pay, so a month
 // is charged the same whenever in the year it falls.
 function taxOn(lines: readonly IncomeLine[], fed: readonly Fed[]): Taxed {
-  const payOf = (kinds: readonly IncomeKind[]): number =>
-    lines
-      .filter((line) => kinds.includes(line.kind))
-      .reduce(
-        (sum, line) =>
-          sum +
-          monthly(totalOf(line), line.cadence) -
-          (fed.find((entry) => entry.line === line)?.sacrificed ?? 0),
-        0,
-      );
-  const taxable = payOf(incomeKinds);
+  const taxable = payOf(lines, fed);
   return {
     incomeTax: incomeTaxOn(taxable, 1),
     insurance: incomeKinds.reduce(
-      (sum, kind) => sum + insuranceOn(kind, payOf([kind]), 1),
+      (sum, kind) => sum + insuranceOn(kind, payOf(lines, fed, [kind]), 1),
       0,
     ),
-    profit: payOf(["self-employment"]),
+    profit: payOf(lines, fed, ["self-employment"]),
     taxable,
   };
 }
