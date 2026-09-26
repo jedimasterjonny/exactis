@@ -61,9 +61,11 @@ describe("Plan", () => {
     ]);
     expect(screen.getByText("Age 68–89")).toBeInTheDocument();
     expect(screen.getByText("Age 82–89")).toBeInTheDocument();
+    // Written in the salary's columns and again on its folded lines, only
+    // one of which is on screen at any width.
     expect(
-      screen.getByText(/10\.00% of the base into Workplace pension$/),
-    ).toBeInTheDocument();
+      screen.getAllByText(/10\.00% of the base into Workplace pension$/),
+    ).toHaveLength(2);
     // The two schedules' notes, and the hint under the cash flow's year.
     expect(screen.getAllByRole("paragraph")).toHaveLength(3);
     expect(
