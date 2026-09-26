@@ -922,40 +922,59 @@ describe("AccountLedger", () => {
 
   // Another save has added an account since the card was drawn, so the
   // store refuses an order that leaves it out; the card's own order
-  // stands, and the toast says why.
-  it("says why when the store refuses an order, and keeps the page's", async () => {
-    renderLedger();
-    vi.mocked(placeAccountsInOrder).mockResolvedValue(
-      refused("Not every account was placed"),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
+  // stands, and the toast says why. An order the store fails to take
+  // outright is reported the same way, rather than thrown to the route.
+  it.each([
+    [
+      "refuses",
+      (): void => {
+        vi.mocked(placeAccountsInOrder).mockResolvedValue(
+          refused("Not every account was placed"),
+        );
+      },
+    ],
+    [
+      "fails",
+      (): void => {
+        vi.mocked(placeAccountsInOrder).mockRejectedValue(
+          new Error("Not every account was placed"),
+        );
+      },
+    ],
+  ] as const)(
+    "says why when the store %s an order, and keeps the page's",
+    async (_how, answer) => {
+      renderLedger();
+      answer();
+      fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
 
-    const cashRow = screen.getByRole("row", { name: /Current account/ });
+      const cashRow = screen.getByRole("row", { name: /Current account/ });
 
-    fireEvent.dragStart(
-      screen.getByRole("button", { name: "Move Workplace pension" }),
-      { dataTransfer: { setData: vi.fn() } },
-    );
-    fireEvent.dragOver(cashRow);
-    fireEvent.drop(cashRow);
+      fireEvent.dragStart(
+        screen.getByRole("button", { name: "Move Workplace pension" }),
+        { dataTransfer: { setData: vi.fn() } },
+      );
+      fireEvent.dragOver(cashRow);
+      fireEvent.drop(cashRow);
 
-    expect(
-      await screen.findByRole("dialog", { name: "Order not saved" }),
-    ).toHaveAccessibleDescription("Not every account was placed");
-    // The toast lands inside the transition, and the page's order comes
-    // back once it ends.
-    await waitFor(() => {
       expect(
-        screen
-          .getAllByRole("button", { name: /^Move / })
-          .map((button) => button.getAttribute("aria-label")),
-      ).toStrictEqual([
-        "Move Workplace pension",
-        "Move Stocks & shares ISA",
-        "Move Current account",
-      ]);
-    });
-  });
+        await screen.findByRole("dialog", { name: "Order not saved" }),
+      ).toHaveAccessibleDescription("Not every account was placed");
+      // The toast lands inside the transition, and the page's order comes
+      // back once it ends.
+      await waitFor(() => {
+        expect(
+          screen
+            .getAllByRole("button", { name: /^Move / })
+            .map((button) => button.getAttribute("aria-label")),
+        ).toStrictEqual([
+          "Move Workplace pension",
+          "Move Stocks & shares ISA",
+          "Move Current account",
+        ]);
+      });
+    },
+  );
 
   // A house and the loan against it share a row, which opens both in the
   // house dialog; the loan leaves the accounts' section for it, and is no
