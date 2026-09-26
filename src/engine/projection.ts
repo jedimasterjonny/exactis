@@ -5,6 +5,7 @@ import type { CashFlow, Paid, Schedule } from "@/engine/cash-flow";
 
 import { isPension, takesSpare } from "@/data/accounts";
 import { rateFrom } from "@/data/plan";
+import { rules } from "@/data/rules";
 import { cashFlow } from "@/engine/cash-flow";
 import {
   drawFor,
@@ -166,13 +167,13 @@ export function project(
   plan: Plan,
 ): ProjectionPoint[] {
   if (new Set(accounts.map(({ id }) => id)).size !== accounts.length) {
-    throw new Error("An account is listed once");
+    throw new Error(rules.listedOnce);
   }
   let held: readonly Held[] = accounts
     .filter(takesSpare)
     .map((account) => ({ account, balance: account.balance }));
   if (held.some(({ balance }) => balance < 0)) {
-    throw new Error("A balance below nothing is a debt's");
+    throw new Error(rules.belowNothing);
   }
   let allowance = lumpSumAllowance;
   let taxYear: TaxYear = { months: 0, paid: 0, profit: 0, taxable: 0 };
@@ -361,7 +362,7 @@ function paidIn(account: Account, flow: CashFlow): number {
 function rateOf(account: Account, plan: Plan): number {
   const rate = rateFrom(account, plan);
   if (rate < -1) {
-    throw new Error("A rate loses no more than everything");
+    throw new Error(rules.beyondLoss);
   }
   return rate;
 }
