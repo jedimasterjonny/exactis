@@ -2,6 +2,7 @@ import type { Kept } from "@/data/household";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
+import { nothingKeptIn } from "@/data/household";
 import { incomeLines } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 
@@ -16,3 +17,11 @@ export const kept: Kept = {
   owners,
   schedule: { expenses: expenseLines, income: incomeLines },
 };
+
+// The household before anything is saved, its balances as of the same
+// month as the reference's.
+export const blank: Kept = nothingKeptIn(kept.asOf);
+
+// The day the household is read on, in the month its balances are as
+// of, when the plan's owner, born in 1990, is 36.
+export const today = new Date("2026-09-15T12:00:00Z");

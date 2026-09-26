@@ -1,23 +1,15 @@
 // @vitest-environment node
 import { refresh } from "next/cache";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Answer } from "@/lib/answer";
 
-import { nothingKeptIn } from "@/data/household";
-import { kept as reference } from "@/data/household.fixture";
+import { blank, kept as reference, today } from "@/data/household.fixture";
 import { planOf } from "@/data/plan";
 import { getDb } from "@/db/client";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
+import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
@@ -35,21 +27,11 @@ vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 
-const { close, db, empty, ready } = inMemory();
-
-const today = new Date("2026-09-15T12:00:00Z");
-
-// The household before anything is saved, read this month.
-const blank = nothingKeptIn({ month: 8, year: 2026 });
+const memory = inMemory();
+const { db } = memory;
 
 describe("the household store", () => {
-  beforeAll(ready);
-  beforeEach(async () => {
-    await empty();
-    vi.mocked(getDb).mockReturnValue(db);
-    vi.useFakeTimers({ now: today, toFake: ["Date"] });
-  });
-  afterAll(close);
+  standUp(memory, { today });
 
   it("reads nothing without a session", async () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
