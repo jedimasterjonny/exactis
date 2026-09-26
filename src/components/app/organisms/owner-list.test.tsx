@@ -177,7 +177,7 @@ describe("OwnerList", () => {
       within(screen.getByRole("cell", { name: /^Me/ })).getByText(
         "Holds Workplace pension and Stocks & shares ISA",
       ),
-    ).toHaveClass("text-muted-foreground");
+    ).toHaveClass("whitespace-normal", "text-muted-foreground");
     expect(held).toBeDisabled();
     expect(held).toHaveAttribute(
       "title",

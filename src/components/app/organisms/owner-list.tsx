@@ -167,7 +167,8 @@ function heldBy(owner: Owner, accounts: readonly Account[]): string[] {
 
 // What an owner holds, beneath their name, faint: the accounts naming
 // them, which are why they cannot be deleted, or nothing for an owner
-// who holds none.
+// who holds none. The line wraps where the cell would hold it to one,
+// since three names run wider than a phone and the card scrolled.
 function Holdings({
   accounts,
   owner,
@@ -177,7 +178,7 @@ function Holdings({
 }): JSX.Element | null {
   const held = heldBy(owner, accounts);
   return held.length === 0 ? null : (
-    <span className="block text-xs font-normal text-muted-foreground">
+    <span className="block text-xs font-normal whitespace-normal text-muted-foreground">
       {`Holds ${listed.format(held)}`}
     </span>
   );
