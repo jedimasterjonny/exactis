@@ -7,6 +7,7 @@ import type { Answer } from "@/lib/answer";
 
 import { toast } from "@/components/kit/toast";
 import { refused, saved } from "@/lib/answer";
+import { heldBack } from "@/test/held-back";
 
 import { useEditor, useMountedEditor } from "./use-editor";
 
@@ -102,12 +103,8 @@ describe("useEditor", () => {
     // The store's answer is held back, so the save can be seen in
     // flight, and given before the test ends, since a transition left
     // waiting holds every later one with it.
-    let answer!: (answered: Answer<Saved>) => void;
-    store.mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      }),
-    );
+    const { answer, promise } = heldBack<Answer<Saved>>();
+    store.mockReturnValue(promise);
     const { result } = renderHook(() =>
       useEditor({
         describe: (record) => record.name,
@@ -173,12 +170,8 @@ describe("useEditor", () => {
   it("holds a new record's save in flight, then closes and reports it added", async () => {
     const store = vi.fn<Store>();
     // The store's answer is held back, so the save can be seen in flight.
-    let answer!: (answered: Answer<Saved>) => void;
-    store.mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      }),
-    );
+    const { answer, promise } = heldBack<Answer<Saved>>();
+    store.mockReturnValue(promise);
     const { result } = renderHook(() =>
       useEditor({
         describe: (record) => record.name,

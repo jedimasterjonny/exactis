@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { LoanFigure } from "@/lib/figures";
 
+import { commit, field } from "@/test/dom";
+
 import type { LoanDraft, LoanWords } from "./loan-fields";
 
 import { LoanFields } from "./loan-fields";
@@ -26,15 +28,6 @@ const words: LoanWords = {
 };
 
 const workedHint = "Worked out from the other two";
-
-function commit(field: HTMLElement, value: string): void {
-  fireEvent.change(field, { target: { value } });
-  fireEvent.blur(field);
-}
-
-function field(name: string): HTMLElement {
-  return screen.getByRole("textbox", { name });
-}
 
 // The fields as an asset's would mount them, shown the draft and what
 // the dialog worked out, with a spy where the dialog listens.

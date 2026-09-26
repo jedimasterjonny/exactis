@@ -6,6 +6,7 @@ import type { LineValues } from "@/data/schedule";
 import { plan } from "@/data/income.fixture";
 import { lineGrowths } from "@/data/schedule";
 import { optionsOf } from "@/lib/options";
+import { commit } from "@/test/dom";
 
 import { LineFields } from "./line-fields";
 
@@ -28,11 +29,6 @@ const salary: Line = {
   lastYear: null,
   name: "Salary",
 };
-
-function commit(field: HTMLElement, value: string): void {
-  fireEvent.change(field, { target: { value } });
-  fireEvent.blur(field);
-}
 
 // The fields as a dialog would mount them, opened on a line and shown
 // the draft that mirrors them, with spies where the schedule listens.

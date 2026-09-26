@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Account } from "@/data/accounts";
 
 import { accounts } from "@/data/accounts.fixture";
+import { bySlot } from "@/test/dom";
 
 import { AssetTable } from "./asset-table";
 
@@ -32,11 +33,6 @@ const art: Account = {
   kind: "real-asset",
   name: "Prints",
 };
-
-const bySlot =
-  (slot: string) =>
-  (_content: string, element: Element | null): boolean =>
-    element?.getAttribute("data-slot") === slot;
 
 // The share a row's equity draws of its value: the fill of the bar
 // beneath the equity's figure and of the folded row's across it, which

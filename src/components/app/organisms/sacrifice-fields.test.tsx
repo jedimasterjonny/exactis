@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Share } from "@/data/accounts";
 
 import { incomeLines } from "@/data/income.fixture";
+import { commit, field } from "@/test/dom";
 
 import { SacrificeFields } from "./sacrifice-fields";
 
@@ -21,15 +22,6 @@ const shares: readonly Share[] = [
   { line: salary.id, sacrifice: 0.1 },
   { line: stepUp.id, sacrifice: 0.05 },
 ];
-
-function commit(field: HTMLElement, value: string): void {
-  fireEvent.change(field, { target: { value } });
-  fireEvent.blur(field);
-}
-
-function field(name: string): HTMLElement {
-  return screen.getByRole("textbox", { name });
-}
 
 // The fields as the dialog would mount them, opened on the shares and
 // shown the draft that mirrors them, with a spy where the dialog

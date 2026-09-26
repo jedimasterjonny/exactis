@@ -3,12 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import type { Plan } from "@/data/plan";
 
-import { SpanBar } from "./span-bar";
+import { bySlot } from "@/test/dom";
 
-const bySlot =
-  (slot: string) =>
-  (_content: string, element: Element | null): boolean =>
-    element?.getAttribute("data-slot") === slot;
+import { SpanBar } from "./span-bar";
 
 // Forty years from 2026, so the span ends in 2066 and the shares are round.
 const plan: Plan = {

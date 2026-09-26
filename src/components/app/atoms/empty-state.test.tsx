@@ -2,12 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { Wallet } from "lucide-react";
 import { describe, expect, it } from "vitest";
 
-import { EmptyState } from "./empty-state";
+import { bySlot } from "@/test/dom";
 
-const bySlot =
-  (slot: string) =>
-  (_content: string, element: Element | null): boolean =>
-    element?.getAttribute("data-slot") === slot;
+import { EmptyState } from "./empty-state";
 
 describe("EmptyState", () => {
   it("says what is missing and what would fill it", () => {

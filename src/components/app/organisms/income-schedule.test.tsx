@@ -19,6 +19,8 @@ import { incomeLines, plan } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 import { lineGrowths } from "@/data/schedule";
 import { saved as accepted, refused } from "@/lib/answer";
+import { commit, openEditor, openEntry } from "@/test/dom";
+import { heldBack } from "@/test/held-back";
 
 import { IncomeSchedule } from "./income-schedule";
 
@@ -38,21 +40,6 @@ const sipp: Account = {
   kind: "tax-deferred",
   name: "SIPP",
 };
-
-function commit(field: HTMLElement, value: string): void {
-  fireEvent.change(field, { target: { value } });
-  fireEvent.blur(field);
-}
-
-function openEditor(name: string): HTMLElement {
-  fireEvent.click(screen.getByRole("button", { name: `Edit ${name}` }));
-  return screen.getByRole("dialog", { name });
-}
-
-function openEntry(): HTMLElement {
-  fireEvent.click(screen.getByRole("button", { name: "Add income line" }));
-  return screen.getByRole("dialog");
-}
 
 // Save reports through the toast manager, which needs its Toaster
 // mounted. The fixture's accounts hold the one pension the salary feeds.
@@ -115,12 +102,8 @@ describe("IncomeSchedule", () => {
   // and closes on the answer; the row goes when the page re-reads.
   it("asks before deleting a line, and deletes it on confirm", async () => {
     renderSchedule();
-    let answer!: (answered: Answer<undefined>) => void;
-    vi.mocked(removeIncomeLine).mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      }),
-    );
+    const { answer, promise } = heldBack<Answer<undefined>>();
+    vi.mocked(removeIncomeLine).mockReturnValue(promise);
 
     fireEvent.click(screen.getByRole("button", { name: "Delete Salary" }));
 
@@ -184,7 +167,9 @@ describe("IncomeSchedule", () => {
     vi.mocked(removeIncomeLine).mockResolvedValue(accepted(undefined));
 
     expect(
-      within(openEntry()).queryByRole("button", { name: "Delete" }),
+      within(openEntry("Add income line")).queryByRole("button", {
+        name: "Delete",
+      }),
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
@@ -211,12 +196,8 @@ describe("IncomeSchedule", () => {
     renderSchedule();
     // The store's answer is held back, so the save can be seen in flight,
     // and given at the end, so no save is left on its way.
-    let answer!: (answered: Answer<IncomeLine>) => void;
-    vi.mocked(saveIncomeLine).mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      }),
-    );
+    const { answer, promise } = heldBack<Answer<IncomeLine>>();
+    vi.mocked(saveIncomeLine).mockReturnValue(promise);
     const dialog = openEditor("Salary");
 
     expect(
@@ -285,7 +266,7 @@ describe("IncomeSchedule", () => {
   it("adds a salary feeding a pension a share of its base", async () => {
     renderSchedule();
 
-    const dialog = openEntry();
+    const dialog = openEntry("Add income line");
     const choice = within(dialog).getByRole("combobox", { name: "Pension" });
 
     expect(choice).toHaveValue("none");
@@ -357,7 +338,7 @@ describe("IncomeSchedule", () => {
   it("adds a salary opening a pension of its own, the first owner's, with the save held until the pension is named", async () => {
     renderSchedule();
 
-    const dialog = openEntry();
+    const dialog = openEntry("Add income line");
     const save = (): HTMLElement =>
       within(dialog).getByRole("button", { name: "Save" });
 
@@ -517,7 +498,7 @@ describe("IncomeSchedule", () => {
   it("adds a named line ending in a year and reports it", async () => {
     renderSchedule();
 
-    const dialog = openEntry();
+    const dialog = openEntry("Add income line");
 
     expect(within(dialog).getByText("New income line")).toHaveClass(
       "text-brand",
@@ -621,12 +602,8 @@ describe("IncomeSchedule", () => {
     ).toBeInTheDocument();
 
     // The store's answer is held back, so the save can be seen in flight.
-    let answer!: (answered: Answer<IncomeLine>) => void;
-    vi.mocked(saveIncomeLine).mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      }),
-    );
+    const { answer, promise } = heldBack<Answer<IncomeLine>>();
+    vi.mocked(saveIncomeLine).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(null, {
@@ -678,7 +655,7 @@ describe("IncomeSchedule", () => {
   it("drops a cancelled draft and leaves a cleared figure as it was", () => {
     renderSchedule();
 
-    let dialog = openEntry();
+    let dialog = openEntry("Add income line");
 
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: "Consulting" },
@@ -690,7 +667,7 @@ describe("IncomeSchedule", () => {
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
-    dialog = openEntry();
+    dialog = openEntry("Add income line");
 
     expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue(
       "",
@@ -918,7 +895,7 @@ describe("IncomeSchedule", () => {
       </Toaster>,
     );
 
-    const dialog = openEntry();
+    const dialog = openEntry("Add income line");
 
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: "New job" },

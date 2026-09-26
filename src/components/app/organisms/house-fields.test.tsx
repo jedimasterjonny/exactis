@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { HouseDraft } from "@/data/houses";
 import type { LoanFigure } from "@/lib/figures";
 
+import { commit, field, select } from "@/test/dom";
+
 import { HouseFields } from "./house-fields";
 
 // The reference kit's house as a draft: £341,810 owed at 5.15%, £2,210 a
@@ -24,19 +26,6 @@ const home: HouseDraft = {
 const plan = { from: 2026, month: 8 };
 
 const workedHint = "Worked out from the other two";
-
-function commit(field: HTMLElement, value: string): void {
-  fireEvent.change(field, { target: { value } });
-  fireEvent.blur(field);
-}
-
-function field(name: string): HTMLElement {
-  return screen.getByRole("textbox", { name });
-}
-
-function month(name: string): HTMLElement {
-  return screen.getByRole("combobox", { name });
-}
 
 // The fields as the dialog would mount them, shown the draft and the
 // figure it worked out, with a spy where the dialog listens.
@@ -99,8 +88,8 @@ describe("HouseFields", () => {
     expect(field("Years to pay off")).toHaveAccessibleDescription(
       "Left to run",
     );
-    expect(month("Last payment")).toHaveDisplayValue("August");
-    expect(month("Last payment")).toHaveAccessibleDescription(
+    expect(select("Last payment")).toHaveDisplayValue("August");
+    expect(select("Last payment")).toHaveAccessibleDescription(
       "One with the years left",
     );
     expect(field("Year")).toHaveValue("2048");
@@ -112,7 +101,7 @@ describe("HouseFields", () => {
     commit(field("Rate"), "4.5");
     commit(field("Monthly payment"), "2,000");
     commit(field("Years to pay off"), "20");
-    fireEvent.change(month("Last payment"), { target: { value: "1" } });
+    fireEvent.change(select("Last payment"), { target: { value: "1" } });
     commit(field("Year"), "2047");
     fireEvent.change(screen.getByRole("combobox", { name: "Status" }), {
       target: { value: "outright" },
@@ -172,8 +161,8 @@ describe("HouseFields", () => {
 
     expect(field("Years to pay off")).toHaveValue("21.2");
     expect(field("Years to pay off")).toHaveAccessibleDescription(workedHint);
-    expect(month("Last payment")).toHaveDisplayValue("November");
-    expect(month("Last payment")).toHaveAccessibleDescription(
+    expect(select("Last payment")).toHaveDisplayValue("November");
+    expect(select("Last payment")).toHaveAccessibleDescription(
       "Worked out with the years left",
     );
     expect(field("Year")).toHaveValue("2047");
@@ -184,13 +173,13 @@ describe("HouseFields", () => {
     expect(field("Years to pay off")).toHaveAccessibleDescription(
       "Never clears at this payment, so the payments run to the end of the plan",
     );
-    expect(month("Last payment")).toHaveDisplayValue("—");
-    expect(month("Last payment")).toHaveAccessibleDescription(
+    expect(select("Last payment")).toHaveDisplayValue("—");
+    expect(select("Last payment")).toHaveAccessibleDescription(
       "Never, at this payment",
     );
     expect(field("Year")).toHaveValue("");
 
-    fireEvent.change(month("Last payment"), { target: { value: "11" } });
+    fireEvent.change(select("Last payment"), { target: { value: "11" } });
     commit(field("Year"), "2027");
 
     const [december, yearOn] = onAmend.mock.calls.map(([patch]) => patch);

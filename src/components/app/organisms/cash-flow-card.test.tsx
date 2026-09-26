@@ -6,6 +6,7 @@ import type { Account } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
+import { slider } from "@/test/dom";
 
 import { CashFlowCard } from "./cash-flow-card";
 
@@ -40,19 +41,6 @@ function rows(): string[] {
   return screen.getAllByRole("listitem").map((row) => row.textContent);
 }
 
-// The slider is the range input inside the group the field labels. It
-// is asked for by the group, since the label's own text is what names
-// the group while jsdom's name computation gives the input nothing for
-// the same reference, and whether or not it is shown, since the thumb
-// is hidden until Base UI has measured a track jsdom lays out at no
-// width.
-function slider(): HTMLElement {
-  return within(screen.getByRole("group", { name: "Year" })).getByRole(
-    "slider",
-    { hidden: true },
-  );
-}
-
 describe("CashFlowCard", () => {
   it("opens on the plan's first year and lays the month out as a ledger", () => {
     render(<CashFlowCard accounts={held} plan={plan} schedule={schedule} />);
@@ -67,10 +55,10 @@ describe("CashFlowCard", () => {
     expect(
       screen.getByText("September 2026, age 36, in today's money"),
     ).toBeInTheDocument();
-    expect(slider()).toHaveValue("2026");
-    expect(slider()).toHaveAttribute("min", "2026");
-    expect(slider()).toHaveAttribute("max", "2079");
-    expect(slider()).toHaveAccessibleDescription(
+    expect(slider("Year")).toHaveValue("2026");
+    expect(slider("Year")).toHaveAttribute("min", "2026");
+    expect(slider("Year")).toHaveAttribute("max", "2079");
+    expect(slider("Year")).toHaveAccessibleDescription(
       "2026 to 2079, the years of the plan",
     );
     expect(rows()).toStrictEqual([
@@ -109,19 +97,19 @@ describe("CashFlowCard", () => {
   it("moves the year along the plan with the slider and reads that year's month", () => {
     render(<CashFlowCard accounts={held} plan={plan} schedule={schedule} />);
 
-    fireEvent.keyDown(slider(), { key: "ArrowRight" });
+    fireEvent.keyDown(slider("Year"), { key: "ArrowRight" });
 
     expect(
       screen.getByText("January 2027, age 37, in today's money"),
     ).toBeInTheDocument();
-    expect(slider()).toHaveValue("2027");
+    expect(slider("Year")).toHaveValue("2027");
     expect(rows()[4]).toBe("Expenses−£4,650");
     expect(rows()[5]).toBe("MortgageA fixed sum−£2,210");
     expect(rows()[6]).toBe(
       "Workplace pensionA fixed sum, paid in as £106 with basic-rate relief−£85",
     );
 
-    fireEvent.change(slider(), { target: { value: "2049" } });
+    fireEvent.change(slider("Year"), { target: { value: "2049" } });
 
     expect(
       screen.getByText("January 2049, age 59, in today's money"),
@@ -156,7 +144,7 @@ describe("CashFlowCard", () => {
     expect(left).toHaveClass("figure", "font-medium");
     expect(left).not.toHaveClass("text-destructive");
 
-    fireEvent.change(slider(), { target: { value: "2049" } });
+    fireEvent.change(slider("Year"), { target: { value: "2049" } });
 
     const [, short] = screen.getAllByText("−£5,000");
 
@@ -215,7 +203,7 @@ describe("CashFlowCard", () => {
     expect(expenses).toHaveAttribute("aria-expanded", "true");
     expect(lines()).toStrictEqual(["Household£3,500 / mo · 2026–2047−£3,500"]);
 
-    fireEvent.change(slider(), { target: { value: "2049" } });
+    fireEvent.change(slider("Year"), { target: { value: "2049" } });
 
     expect(lines()).toStrictEqual([
       "Mortgage payment£3,201 / mo · 2036–2060−£3,201",
@@ -238,7 +226,7 @@ describe("CashFlowCard", () => {
       />,
     );
 
-    fireEvent.change(slider(), { target: { value: "2048" } });
+    fireEvent.change(slider("Year"), { target: { value: "2048" } });
     fireEvent.click(screen.getByRole("button", { name: /^Expenses/ }));
 
     expect(rows()[3]).toBe("Expenses£0No expense line runs this month.");
