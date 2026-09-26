@@ -62,6 +62,9 @@ describe("CashFlowCard", () => {
       "Cash flow each month",
     );
     expect(
+      screen.getByRole("region", { name: "Cash flow each month" }),
+    ).toBeInTheDocument();
+    expect(
       screen.getByText("September 2026, age 36, in today's money"),
     ).toBeInTheDocument();
     expect(slider()).toHaveValue("2026");
@@ -197,7 +200,9 @@ describe("CashFlowCard", () => {
     const expenses = screen.getByRole("button", { name: /^Expenses/ });
 
     expect(expenses).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: /^Expenses/ }),
+    ).not.toBeInTheDocument();
     expect(rows()[3]).toBe("Expenses−£3,500");
 
     fireEvent.click(expenses);
@@ -219,7 +224,9 @@ describe("CashFlowCard", () => {
 
     fireEvent.click(expenses);
 
-    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: /^Expenses/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("says when no expense line runs in the year", () => {
