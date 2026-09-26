@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ScreenBody } from "./screen-body";
 
 describe("ScreenBody", () => {
-  it("stacks the regions it is given inside the screen's gutter", () => {
+  it("stacks the regions it is given inside the screen's gutter, halved on a phone", () => {
     render(
       <ScreenBody>
         <p>A region</p>
@@ -15,7 +15,8 @@ describe("ScreenBody", () => {
     expect(screen.getByRole("paragraph").parentElement).toHaveClass(
       "grid",
       "gap-5",
-      "p-8",
+      "p-4",
+      "sm:p-8",
     );
   });
 });
