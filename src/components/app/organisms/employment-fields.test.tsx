@@ -5,6 +5,7 @@ import type { Account } from "@/data/accounts";
 import type { IncomeLineDraft } from "@/data/income";
 
 import { owners } from "@/data/owners.fixture";
+import { commit, field } from "@/test/dom";
 
 import { EmploymentFields } from "./employment-fields";
 
@@ -44,15 +45,6 @@ const pensions: readonly Account[] = [
     name: "SIPP",
   },
 ];
-
-function commit(field: HTMLElement, value: string): void {
-  fireEvent.change(field, { target: { value } });
-  fireEvent.blur(field);
-}
-
-function field(name: string): HTMLElement {
-  return screen.getByRole("textbox", { name });
-}
 
 // The fields as the dialog would mount them, opened on a line and shown
 // the draft that mirrors them, with a spy where the schedule listens.

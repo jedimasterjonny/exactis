@@ -16,27 +16,14 @@ import { expenseKinds } from "@/data/expenses";
 import { expenseLines } from "@/data/expenses.fixture";
 import { plan } from "@/data/income.fixture";
 import { saved as accepted } from "@/lib/answer";
+import { commit, openEditor, openEntry } from "@/test/dom";
+import { heldBack } from "@/test/held-back";
 
 import { ExpenseSchedule } from "./expense-schedule";
 
 vi.mock("@/actions/schedule", () => ({ saveExpenseLine: vi.fn() }));
 
 const [, , mortgagePayment, retirement] = expenseLines;
-
-function commit(field: HTMLElement, value: string): void {
-  fireEvent.change(field, { target: { value } });
-  fireEvent.blur(field);
-}
-
-function openEditor(name: string): HTMLElement {
-  fireEvent.click(screen.getByRole("button", { name: `Edit ${name}` }));
-  return screen.getByRole("dialog", { name });
-}
-
-function openEntry(): HTMLElement {
-  fireEvent.click(screen.getByRole("button", { name: "Add expense line" }));
-  return screen.getByRole("dialog");
-}
 
 // Save reports through the toast manager, which needs its Toaster mounted.
 function renderSchedule(lines: readonly ExpenseLine[] = expenseLines): void {
@@ -108,7 +95,7 @@ describe("ExpenseSchedule", () => {
   it("adds a named line ending in a year and reports it", async () => {
     renderSchedule();
 
-    const dialog = openEntry();
+    const dialog = openEntry("Add expense line");
 
     expect(within(dialog).getByText("New expense line")).toHaveClass(
       "text-brand",
@@ -159,12 +146,8 @@ describe("ExpenseSchedule", () => {
     ).toBeInTheDocument();
 
     // The store's answer is held back, so the save can be seen in flight.
-    let answer!: (answered: Answer<ExpenseLine>) => void;
-    vi.mocked(saveExpenseLine).mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      }),
-    );
+    const { answer, promise } = heldBack<Answer<ExpenseLine>>();
+    vi.mocked(saveExpenseLine).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(null, {
@@ -206,7 +189,7 @@ describe("ExpenseSchedule", () => {
   it("drops a cancelled draft", () => {
     renderSchedule();
 
-    let dialog = openEntry();
+    let dialog = openEntry("Add expense line");
 
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: "Holidays" },
@@ -215,7 +198,7 @@ describe("ExpenseSchedule", () => {
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
-    dialog = openEntry();
+    dialog = openEntry("Add expense line");
 
     expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue(
       "",

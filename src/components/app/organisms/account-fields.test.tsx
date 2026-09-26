@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AccountKind, AccountValues, Funding } from "@/data/accounts";
 
 import { owners } from "@/data/owners.fixture";
+import { commit } from "@/test/dom";
 
 import { AccountFields } from "./account-fields";
 
@@ -21,11 +22,6 @@ const isa: AccountValues = {
   owner: 1,
   rate: 0,
 };
-
-function commit(field: HTMLElement, value: string): void {
-  fireEvent.change(field, { target: { value } });
-  fireEvent.blur(field);
-}
 
 // The fields as the dialog would mount them, opened on an account and
 // shown the draft that mirrors them, with spies where the ledger listens.

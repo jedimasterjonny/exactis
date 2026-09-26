@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { commit } from "@/test/dom";
+
 import { FigureInput } from "./figure-input";
 
 const plain: Intl.NumberFormatOptions = { useGrouping: false };
@@ -64,8 +66,7 @@ describe("FigureInput", () => {
 
     const input = screen.getByRole("textbox");
 
-    fireEvent.change(input, { target: { value: "" } });
-    fireEvent.blur(input);
+    commit(input, "");
 
     expect(onValueCommitted).not.toHaveBeenCalled();
     expect(input).toHaveValue("");
@@ -102,8 +103,7 @@ describe("FigureInput", () => {
 
     expect(input).toHaveValue("22");
 
-    fireEvent.change(input, { target: { value: "25" } });
-    fireEvent.blur(input);
+    commit(input, "25");
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(25);
 

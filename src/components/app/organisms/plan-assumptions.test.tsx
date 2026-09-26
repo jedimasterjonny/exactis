@@ -13,6 +13,7 @@ import { saveAges } from "@/actions/plan";
 import { Toaster } from "@/components/kit/toast";
 import { plan } from "@/data/income.fixture";
 import { refused, saved } from "@/lib/answer";
+import { commit } from "@/test/dom";
 
 import { PlanAssumptions } from "./plan-assumptions";
 
@@ -35,8 +36,7 @@ function renderAssumptions(held: Plan = retiring): void {
 // Types an age into the dialog's box and leaves it, which commits it.
 function typeAge(age: string): void {
   const input = screen.getByRole("textbox", { name: "Plan end age" });
-  fireEvent.change(input, { target: { value: age } });
-  fireEvent.blur(input);
+  commit(input, age);
 }
 
 describe("PlanAssumptions", () => {

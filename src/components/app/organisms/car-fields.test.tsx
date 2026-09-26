@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { CarDraft } from "@/data/cars";
 import type { LoanFigure } from "@/lib/figures";
 
+import { commit, field, select } from "@/test/dom";
+
 import { CarFields } from "./car-fields";
 
 // The Golf as a draft: £14,000 owed at 7.9%, £290 a month, over the
@@ -35,19 +37,6 @@ interface Shown {
   readonly clears?: null | number;
   readonly figure: null | number;
   readonly worked: LoanFigure;
-}
-
-function commit(field: HTMLElement, value: string): void {
-  fireEvent.change(field, { target: { value } });
-  fireEvent.blur(field);
-}
-
-function field(name: string): HTMLElement {
-  return screen.getByRole("textbox", { name });
-}
-
-function month(name: string): HTMLElement {
-  return screen.getByRole("combobox", { name });
 }
 
 // The fields as the dialog would mount them, shown the draft and what
@@ -111,8 +100,8 @@ describe("CarFields", () => {
     expect(field("Monthly payment")).toHaveAccessibleDescription(workedHint);
     expect(field("Years left")).toHaveValue("3");
     expect(field("Years left")).toHaveAccessibleDescription("On the agreement");
-    expect(month("Agreement ends")).toHaveDisplayValue("August");
-    expect(month("Agreement ends")).toHaveAccessibleDescription(
+    expect(select("Agreement ends")).toHaveDisplayValue("August");
+    expect(select("Agreement ends")).toHaveAccessibleDescription(
       "One with the years left",
     );
     expect(field("Year")).toHaveValue("2029");
@@ -128,7 +117,7 @@ describe("CarFields", () => {
     commit(field("Rate"), "6.9");
     commit(field("Monthly payment"), "250");
     commit(field("Years left"), "4");
-    fireEvent.change(month("Agreement ends"), { target: { value: "1" } });
+    fireEvent.change(select("Agreement ends"), { target: { value: "1" } });
     commit(field("Year"), "2030");
     commit(field("Balloon"), "4,000");
     fireEvent.change(screen.getByRole("combobox", { name: "Agreement" }), {
@@ -195,8 +184,8 @@ describe("CarFields", () => {
 
     expect(field("Years left")).toHaveValue("3");
     expect(field("Years left")).toHaveAccessibleDescription(workedHint);
-    expect(month("Agreement ends")).toHaveDisplayValue("August");
-    expect(month("Agreement ends")).toHaveAccessibleDescription(
+    expect(select("Agreement ends")).toHaveDisplayValue("August");
+    expect(select("Agreement ends")).toHaveAccessibleDescription(
       "Worked out with the years left",
     );
     expect(field("Year")).toHaveValue("2029");
@@ -207,14 +196,14 @@ describe("CarFields", () => {
     expect(field("Years left")).toHaveAccessibleDescription(
       "Never reaches the balloon at this payment, so the payments run to the end of the plan",
     );
-    expect(month("Agreement ends")).toHaveDisplayValue("—");
-    expect(month("Agreement ends")).toHaveAccessibleDescription(
+    expect(select("Agreement ends")).toHaveDisplayValue("—");
+    expect(select("Agreement ends")).toHaveAccessibleDescription(
       "Never, at this payment",
     );
     expect(field("Year")).toHaveValue("");
     expect(field("Balloon")).toHaveAccessibleDescription(refinanced);
 
-    fireEvent.change(month("Agreement ends"), { target: { value: "11" } });
+    fireEvent.change(select("Agreement ends"), { target: { value: "11" } });
     commit(field("Year"), "2027");
 
     const [december, yearOn] = onAmend.mock.calls.map(([patch]) => patch);
@@ -234,7 +223,7 @@ describe("CarFields", () => {
       screen.queryByRole("textbox", { name: "Balloon" }),
     ).not.toBeInTheDocument();
     expect(field("Years left")).toHaveAccessibleDescription(workedHint);
-    expect(month("Last payment")).toHaveDisplayValue("August");
+    expect(select("Last payment")).toHaveDisplayValue("August");
     expect(
       screen.queryByRole("combobox", { name: "Agreement ends" }),
     ).not.toBeInTheDocument();

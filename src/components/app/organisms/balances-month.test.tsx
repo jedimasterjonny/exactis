@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import { saveBalancesMonth } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
 import { refused, saved } from "@/lib/answer";
+import { commit } from "@/test/dom";
 
 import { BalancesMonth } from "./balances-month";
 
@@ -22,8 +23,7 @@ function pickMarch2025(): void {
     target: { value: "2" },
   });
   const year = screen.getByRole("textbox", { name: "Year" });
-  fireEvent.change(year, { target: { value: "2025" } });
-  fireEvent.blur(year);
+  commit(year, "2025");
 }
 
 // A save reports through the toast manager, which needs its Toaster

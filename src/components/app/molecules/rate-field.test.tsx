@@ -1,5 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+import { commit } from "@/test/dom";
 
 import { RateField } from "./rate-field";
 
@@ -29,8 +31,7 @@ describe("RateField", () => {
 
     expect(input).toHaveValue("0.00%");
 
-    fireEvent.change(input, { target: { value: "3.5" } });
-    fireEvent.blur(input);
+    commit(input, "3.5");
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(0.035);
     expect(input).toHaveValue("3.50%");
@@ -55,12 +56,9 @@ describe("RateField", () => {
 
     const input = screen.getByRole("textbox", { name: "Share" });
 
-    fireEvent.change(input, { target: { value: "150" } });
-    fireEvent.blur(input);
-    fireEvent.change(input, { target: { value: "-10" } });
-    fireEvent.blur(input);
-    fireEvent.change(input, { target: { value: "25" } });
-    fireEvent.blur(input);
+    commit(input, "150");
+    commit(input, "-10");
+    commit(input, "25");
 
     expect(onValueCommitted.mock.calls).toStrictEqual([[1], [0], [0.25]]);
     expect(input).toHaveValue("25.00%");

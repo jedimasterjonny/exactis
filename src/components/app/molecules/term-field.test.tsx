@@ -1,5 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+import { commit } from "@/test/dom";
 
 import { TermField } from "./term-field";
 
@@ -29,8 +31,7 @@ describe("TermField", () => {
 
     expect(input).toHaveValue("25");
 
-    fireEvent.change(input, { target: { value: "22.5" } });
-    fireEvent.blur(input);
+    commit(input, "22.5");
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(22.5);
     expect(input).toHaveValue("22.5");
