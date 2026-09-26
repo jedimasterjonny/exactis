@@ -180,9 +180,11 @@
   }
 }
 
-/* Every figure is mono and tabular so columns of money align. No exceptions. */
+/* Every figure is mono and tabular so columns of money align, and held to
+   one line, so a minus never breaks from its pounds nor a cadence from its
+   sum where a figure shares a row with words that wrap. No exceptions. */
 @utility figure {
-  @apply font-mono tabular-nums;
+  @apply font-mono whitespace-nowrap tabular-nums;
 }
 
 /* Micro-labels: field labels, table headers, section numerals, card eyebrows.
