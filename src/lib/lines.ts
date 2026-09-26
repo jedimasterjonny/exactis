@@ -27,13 +27,20 @@ export function endOf(line: LineValues): null | string {
     : `${monthName(line.lastMonth, "short")} ${year}`;
 }
 
+// Whether a line ends no earlier than it starts, a line with no last
+// year running to the end of the plan. The save holds a line to it, and
+// the save button waits on it, so the two ask the one question.
+export function endsAfterItStarts(line: {
+  readonly firstYear: number;
+  readonly lastYear: null | number;
+}): boolean {
+  return line.lastYear === null || line.lastYear >= line.firstYear;
+}
+
 // A draft the store would take: named, and not ending before it starts.
 // The save button holds until it is one.
 export function isSound(draft: LineValues): boolean {
-  return (
-    draft.name.trim() !== "" &&
-    (draft.lastYear === null || draft.lastYear >= draft.firstYear)
-  );
+  return draft.name.trim() !== "" && endsAfterItStarts(draft);
 }
 
 // Whether a line is paid in the month: from its first year to its last,

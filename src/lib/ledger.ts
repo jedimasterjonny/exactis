@@ -3,7 +3,7 @@ import type { IncomeLine } from "@/data/income";
 import type { Secured } from "@/data/secured";
 
 import { capOf } from "@/data/accounts";
-import { cadenceAbbreviations, monthly } from "@/lib/cadence";
+import { cadenceAbbreviations, fixedMonthly, monthly } from "@/lib/cadence";
 import { fedOf } from "@/lib/feeders";
 import { formatGbp, formatPercent } from "@/lib/money";
 
@@ -18,16 +18,6 @@ export function balanceOf(accounts: readonly Account[]): number {
 // A loan above the value leaves the equity below nothing.
 export function equityOf({ asset, loan }: Secured): number {
   return asset.balance + (loan?.balance ?? 0);
-}
-
-// What an account is paid a month in a fixed sum, at whatever cadence
-// the sum is stated; nothing for one paid the spare money, whose take is
-// the month's to decide, or paid nothing.
-export function fixedMonthly(account: Account): number {
-  const { contribution } = account;
-  return contribution?.kind === "fixed"
-    ? monthly(contribution.amount, contribution.cadence)
-    : 0;
 }
 
 // An account with nothing paid in shows a flat dash, as a flat delta does.

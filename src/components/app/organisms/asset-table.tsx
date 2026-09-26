@@ -20,12 +20,8 @@ import {
   TableRow,
 } from "@/components/kit/table";
 import { kindLabels } from "@/data/accounts";
-import {
-  equityOf,
-  fixedMonthly,
-  formatGrowth,
-  formatMonthly,
-} from "@/lib/ledger";
+import { fixedMonthly } from "@/lib/cadence";
+import { equityOf, formatGrowth, formatMonthly } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
 
 interface AssetTableProps {
