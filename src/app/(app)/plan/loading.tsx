@@ -7,7 +7,7 @@ import { plan, sectionLabel } from "@/lib/nav";
 // the shell can carry, and nothing beneath until there are lines.
 export default function Loading(): JSX.Element {
   return (
-    <ScreenHeader label={sectionLabel(plan)} title="Income & expenses">
+    <ScreenHeader label={sectionLabel(plan)} title={plan.title}>
       Reading the store…
     </ScreenHeader>
   );

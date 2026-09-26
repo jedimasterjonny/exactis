@@ -43,7 +43,7 @@ export async function Dashboard(): Promise<JSX.Element> {
       <ScreenHeader
         actions={<PlanAssumptions plan={plan} />}
         label={sectionLabel(dashboard)}
-        title={`Projected to age ${age}`}
+        title={`${dashboard.title} ${age}`}
       >
         <Badge variant="positive">
           <Check aria-hidden />
@@ -98,7 +98,7 @@ export function DashboardPending(): JSX.Element {
     <>
       <ScreenHeader
         label={sectionLabel(dashboard)}
-        title="Projected to age …"
+        title={`${dashboard.title} …`}
       />
       <ScreenBody>
         <ProjectionPending />
