@@ -33,6 +33,7 @@ import {
 import { isSound, statuses, toRecords } from "@/data/houses";
 import { month, named, pounds, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
+import { isOnOrBefore, thisMonth } from "@/lib/months";
 import { found, replaced, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
@@ -252,8 +253,7 @@ export async function saveBalancesMonth(draft: Month): Promise<Answer<Month>> {
   await requireSession();
   const asOf = month.parse(draft);
   return amend(({ household, kept }) => {
-    const now = new Date();
-    if (asOf.year * 12 + asOf.month > now.getFullYear() * 12 + now.getMonth()) {
+    if (!isOnOrBefore(asOf, thisMonth())) {
       throw new Refusal("The balances are as of a month that has begun");
     }
     if (asOf.year < household.plan.born) {
