@@ -1,5 +1,7 @@
 import type { JSX, ReactNode } from "react";
 
+import { Trash2 } from "lucide-react";
+
 import { Button } from "@/components/kit/button";
 import {
   Dialog,
@@ -14,7 +16,9 @@ interface EditDialogProps {
   readonly canSave?: boolean;
   readonly children: ReactNode;
   readonly eyebrow: string;
+  readonly isSaving?: boolean;
   readonly isWide?: boolean;
+  readonly onDelete?: (() => void) | undefined;
   readonly onDismiss: () => void;
   readonly onSave: () => void;
   readonly title: string;
@@ -29,11 +33,22 @@ interface EditDialogProps {
 // is a close: Cancel, Escape or a press outside, all of which dismiss.
 // Save holds while the caller says the draft cannot be saved, unnamed or
 // on its way to the store. A wide dialog fits a form of three columns.
+// A dialog given a delete handler offers a Delete as well, set apart from
+// the other two, at the footer's far edge beside them and beneath them
+// on a phone, where the footer stacks: it reports the press and no more,
+// so the caller asks through its confirm before anything goes, as it
+// would from a row's bin. Given none, as an entry of something new is,
+// it offers nothing to delete. The Delete holds while the caller says a
+// save is on its way to the store, as Save does, since a deletion asked
+// for over a save in flight would race it: the save's answer could
+// report the record saved after the question had deleted it.
 export function EditDialog({
   canSave = true,
   children,
   eyebrow,
+  isSaving = false,
   isWide = false,
+  onDelete,
   onDismiss,
   onSave,
   title,
@@ -47,6 +62,18 @@ export function EditDialog({
         </DialogHeader>
         {children}
         <DialogFooter>
+          {onDelete !== undefined && (
+            <Button
+              className="sm:mr-auto"
+              disabled={isSaving}
+              onClick={onDelete}
+              size="sm"
+              variant="destructive"
+            >
+              <Trash2 aria-hidden />
+              Delete
+            </Button>
+          )}
           <DialogClose render={<Button size="sm" variant="outline" />}>
             Cancel
           </DialogClose>
