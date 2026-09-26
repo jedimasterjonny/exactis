@@ -110,6 +110,14 @@ is paid whole and first wherever the debt is listed, and a month short of it
 draws on the savings as it would for an expense; the order sets which saving is
 paid first, and a debt is no saving.
 
+A pension can be marked always funded, for a pension worth keeping paid when the
+month cannot, since what it is paid out of taxed money is relieved. It is paid
+after the debts and before every other saving: what the salaries feeding it
+sacrifice is given up, and its own fixed sum paid, out of what the month has and
+then out of the cash and the ISAs, once they have met whatever spending the
+month is short of. It is never paid out of a pension, and once the cash and the
+ISAs are spent it is paid what the month has, as any other saving is.
+
 The income is taxed as the UK outside Scotland taxes it for 2026/27, the rates
 held in `src/lib/tax.ts`: income tax on every kind of line, with the personal
 allowance withdrawn over £100,000, Class 1 National Insurance on a salary and
