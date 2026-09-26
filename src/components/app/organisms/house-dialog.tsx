@@ -78,7 +78,7 @@ export function HouseDialog({
 }: HouseDialogProps): JSX.Element | null {
   // The store answers with the house's own account, which the caller is
   // not told, so the answer's type is stated rather than inferred.
-  const { amend, entry, isSaving, save } = useMountedEditor<Draft, Account>({
+  const { amend, dialogOf, entry } = useMountedEditor<Draft, Account>({
     describe: (saved, values) =>
       values.status === "mortgaged"
         ? `${saved.name} · with its mortgage and payments`
@@ -94,9 +94,8 @@ export function HouseDialog({
   const { canSave, figure, values, worked } = workedOut(entry.draft);
   return (
     <EditDialog
-      canSave={!isSaving && canSave}
-      eyebrow={entry.id === null ? "New house" : "Edit house"}
-      isSaving={isSaving}
+      {...dialogOf(entry)}
+      canSave={canSave}
       isWide
       onDelete={
         house === null || onDelete === undefined
@@ -106,9 +105,6 @@ export function HouseDialog({
             }
       }
       onDismiss={onDismiss}
-      onSave={() => {
-        save(entry);
-      }}
       title={values.name || "Untitled house"}
     >
       <HouseFields

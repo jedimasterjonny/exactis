@@ -133,11 +133,11 @@ describe("EditDialog", () => {
   });
 
   // A deletion asked for over a save in flight would race it, so the
-  // Delete holds while the caller says a save is on its way.
+  // Delete holds while the caller says a save is on its way, and so does
+  // the Save, a draft the caller would save being on its way already.
   it("holds the delete while a save is on its way", () => {
     render(
       <EditDialog
-        canSave={false}
         eyebrow="Edit account"
         isSaving
         onDelete={vi.fn<() => void>()}
