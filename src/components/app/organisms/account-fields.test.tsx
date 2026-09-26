@@ -159,6 +159,22 @@ describe("AccountFields", () => {
     expect(onAmend).toHaveBeenLastCalledWith({ isAlwaysFunded: true });
   });
 
+  // The hint says what the answer the draft holds does, so a pension
+  // paid what the month can manage is not told where an always funded
+  // one's money comes from.
+  it("says what the answer to a month short of it does, for the one chosen", () => {
+    const pension: AccountValues = {
+      ...isa,
+      isAlwaysFunded: true,
+      kind: "tax-deferred",
+    };
+    renderFields(pension, { ...pension, isAlwaysFunded: false });
+
+    expect(
+      screen.getByRole("combobox", { name: "When short" }),
+    ).toHaveAccessibleDescription("Paid only what the month has left");
+  });
+
   it("asks an ISA nothing of a month short of it", () => {
     renderFields(isa);
 
