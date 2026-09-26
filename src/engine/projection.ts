@@ -7,6 +7,7 @@ import { isPension, takesSpare } from "@/data/accounts";
 import { ageIn, rateFrom } from "@/data/plan";
 import { rules } from "@/data/rules";
 import { cashFlow } from "@/engine/cash-flow";
+import { isOnOrBefore } from "@/lib/months";
 import {
   drawFor,
   drawOf,
@@ -325,9 +326,7 @@ function drawnFrom(
 // that year, and the whole of the year it is reached in counts as
 // reaching it.
 function isBeforePensionAge(age: number, { month, year }: Month): boolean {
-  const { rises } = pensionAge;
-  const hasRisen =
-    year > rises.year || (year === rises.year && month >= rises.month);
+  const hasRisen = isOnOrBefore(pensionAge.rises, { month, year });
   return age < (hasRisen ? pensionAge.after : pensionAge.before);
 }
 

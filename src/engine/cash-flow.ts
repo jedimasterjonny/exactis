@@ -23,6 +23,7 @@ import { rules } from "@/data/rules";
 import { fixedMonthly, monthly } from "@/lib/cadence";
 import { runsIn } from "@/lib/lines";
 import { clearsIn } from "@/lib/loans";
+import { isOnOrBefore } from "@/lib/months";
 import { incomeTaxOn, insuranceOn, reliefOf, relievableOn } from "@/lib/tax";
 
 // A month of a year's money, in pounds as the lines state them and
@@ -531,10 +532,7 @@ function isPaying(
   if (term === null) {
     throw new Error(rules.debtEnds);
   }
-  const last = clearsIn(term, plan);
-  return (
-    at.year < last.year || (at.year === last.year && at.month <= last.month)
-  );
+  return isOnOrBefore(at, clearsIn(term, plan));
 }
 
 // What lands in an account, taken off what is left of its owner's

@@ -1,6 +1,8 @@
 import type { Month } from "@/data/schedule";
 import type { LoanFigure } from "@/lib/figures";
 
+import { monthsBetween } from "@/lib/months";
+
 // What a loan's payments are over: the balance owed, whole pounds and
 // positive, and the balloon they leave standing at the end of the term,
 // which is nothing for a loan they clear and the final payment a PCP
@@ -169,7 +171,8 @@ export function termOf(
 // month is the first paying month and a month before it is read as it:
 // a term never steps back before the plan.
 export function termTo(end: Month, plan: PlanMonth): number {
-  const payments = (end.year - plan.from) * 12 + end.month - plan.month + 1;
+  const payments =
+    monthsBetween({ month: plan.month, year: plan.from }, end) + 1;
   return Math.max(1, payments) / 12;
 }
 

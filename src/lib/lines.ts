@@ -1,6 +1,6 @@
 import type { LineGrowth, LineValues, Month } from "@/data/schedule";
 
-import { monthName } from "@/lib/months";
+import { isOnOrBefore, monthName } from "@/lib/months";
 
 // What each growth choice is called, on the rows and in the dialog that
 // offers them: the amount rises with inflation, a point or two over it,
@@ -49,15 +49,10 @@ export function isSound(draft: LineValues): boolean {
 // a plan a month at a time by it, and the accounts screen asks it which
 // salaries feed a pension in the month the plan starts in.
 export function runsIn(line: LineValues, at: Month): boolean {
-  if (line.firstYear > at.year) {
-    return false;
-  }
-  if (line.lastYear === null || at.year < line.lastYear) {
-    return true;
-  }
   return (
-    at.year === line.lastYear &&
-    (line.lastMonth === null || at.month <= line.lastMonth)
+    line.firstYear <= at.year &&
+    (line.lastYear === null ||
+      isOnOrBefore(at, { month: line.lastMonth ?? 11, year: line.lastYear }))
   );
 }
 
