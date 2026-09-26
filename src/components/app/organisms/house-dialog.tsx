@@ -6,7 +6,7 @@ import type { Account } from "@/data/accounts";
 import type { HouseDraft, HouseValues } from "@/data/houses";
 import type { Secured } from "@/data/secured";
 import type { Entry } from "@/hooks/use-editor";
-import type { LoanFigure, Stood } from "@/lib/figures";
+import type { Stood, WorkedOut } from "@/lib/figures";
 import type { PlanMonth } from "@/lib/loans";
 
 import { saveHouse } from "@/actions/accounts";
@@ -14,7 +14,7 @@ import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { HouseFields } from "@/components/app/organisms/house-fields";
 import { derive, houseOf, isSound } from "@/data/houses";
 import { useMountedEditor } from "@/hooks/use-editor";
-import { stood, thirdOf } from "@/lib/figures";
+import { isSettled, settled, stood, thirdOf, typedOn } from "@/lib/figures";
 
 // What the dialog holds while it is open: the house as the fields hold
 // it, and the two of the mortgage's three figures that stand while the
@@ -135,64 +135,46 @@ function openingOf(house: null | Secured): Entry<Draft> {
   if (house === null) {
     return { draft: blank, id: null, initial: blank };
   }
-  const typed: Stood =
-    house.loan === null ? ["rate", "term"] : ["payment", "rate"];
-  const draft: Draft = { ...houseOf(house), term: blank.term, typed };
+  const draft: Draft = {
+    ...houseOf(house),
+    term: blank.term,
+    typed: typedOn(house.loan !== null),
+  };
   return { draft, id: house.asset.id, initial: draft };
 }
 
 // The house the draft would save: the name as typed less the space
-// around it, which is what the title shows; nothing owed, paid or
-// charged for a house owned outright, whatever the hidden fields hold;
-// and the figure worked out in place of the draft's own where there is
-// one to put there. A worked-out term goes nowhere, since the store
-// reads it off the other two, and a figure that could not be worked out
-// leaves the draft's, which the held save never sends.
-function valuesOf(
-  draft: HouseDraft,
-  worked: LoanFigure,
-  figure: null | number,
-): HouseValues {
-  const values: HouseValues = {
-    balance: draft.balance,
-    growth: draft.growth,
-    name: draft.name.trim(),
-    payment: draft.payment,
-    rate: draft.rate,
-    status: draft.status,
-    value: draft.value,
-  };
-  if (values.status === "outright") {
-    return { ...values, balance: 0, payment: 0, rate: 0 };
-  }
-  if (worked === "term" || figure === null) {
-    return values;
-  }
-  return worked === "payment"
-    ? { ...values, payment: figure }
-    : { ...values, rate: figure };
+// around it, which is what the title shows, and the mortgage's figures
+// settled as every secured asset's are, nothing owed for a house owned
+// outright and the figure worked out in place of the draft's own.
+function valuesOf(draft: HouseDraft, out: WorkedOut): HouseValues {
+  return settled(
+    {
+      balance: draft.balance,
+      growth: draft.growth,
+      name: draft.name.trim(),
+      payment: draft.payment,
+      rate: draft.rate,
+      status: draft.status,
+      value: draft.value,
+    },
+    draft.status === "mortgaged",
+    out,
+  );
 }
 
 // What the dialog shows of a draft: which figure is worked out, what it
 // came to, the house the draft would save, and whether it can be: a
-// sound house, whose rate was found if the rate is what is worked out
-// and the house is mortgaged. A term that could not be worked out is no
-// bar, since the store reads the open end off the figures it keeps.
-function workedOut(draft: Draft): {
-  readonly canSave: boolean;
-  readonly figure: null | number;
-  readonly values: HouseValues;
-  readonly worked: LoanFigure;
-} {
+// sound house whose mortgage's figures are settled.
+function workedOut(
+  draft: Draft,
+): WorkedOut & { readonly canSave: boolean; readonly values: HouseValues } {
   const worked = thirdOf(...draft.typed);
-  const figure = derive(draft, worked);
-  const values = valuesOf(draft, worked, figure);
+  const out = { figure: derive(draft, worked), worked };
+  const values = valuesOf(draft, out);
   return {
-    canSave:
-      isSound(values) &&
-      (values.status === "outright" || worked !== "rate" || figure !== null),
-    figure,
+    ...out,
+    canSave: isSound(values) && isSettled(values.status === "mortgaged", out),
     values,
-    worked,
   };
 }
