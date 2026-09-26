@@ -175,6 +175,24 @@ describe("AccountFields", () => {
     ).toHaveAccessibleDescription("Paid only what the month has left");
   });
 
+  // A debt's balance is entered negative, which its field says; any
+  // other's has nothing to be told about its sign.
+  it("says a debt's balance is negative", () => {
+    renderFields({ ...isa, kind: "debt", owner: null });
+
+    expect(
+      screen.getByRole("textbox", { name: "Balance" }),
+    ).toHaveAccessibleDescription("A debt's is negative");
+  });
+
+  it("says nothing of a pension's balance's sign", () => {
+    renderFields({ ...isa, kind: "tax-deferred" });
+
+    expect(
+      screen.getByRole("textbox", { name: "Balance" }),
+    ).not.toHaveAccessibleDescription();
+  });
+
   it("asks an ISA nothing of a month short of it", () => {
     renderFields(isa);
 
