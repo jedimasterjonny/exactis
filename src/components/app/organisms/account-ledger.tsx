@@ -34,7 +34,7 @@ import { isAsset } from "@/data/accounts";
 import { useRemover } from "@/hooks/use-remover";
 import { counted } from "@/lib/count";
 import { feedersOf, listed } from "@/lib/feeders";
-import { equityOf, paidMonthly } from "@/lib/ledger";
+import { balanceOf, equityOf, paidMonthly } from "@/lib/ledger";
 import { runsIn } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 import { monthName } from "@/lib/months";
@@ -131,8 +131,8 @@ export function AccountLedger({
   // worth; and what the month pays in, every fixed sum and sacrifice
   // the salaries running then make, the spare money's take being the
   // month's to decide.
-  const worth = order.reduce((sum, account) => sum + account.balance, 0);
-  const saved = savings.reduce((sum, account) => sum + account.balance, 0);
+  const worth = balanceOf(order);
+  const saved = balanceOf(savings);
   const owned = assets.reduce((sum, { asset }) => sum + asset.balance, 0);
   const equity = assets.reduce((sum, pair) => sum + equityOf(pair), 0);
   const paidIn = order.reduce(

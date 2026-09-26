@@ -7,6 +7,12 @@ import { cadenceAbbreviations, monthly } from "@/lib/cadence";
 import { fedOf } from "@/lib/feeders";
 import { formatGbp, formatPercent } from "@/lib/money";
 
+// What the accounts hold between them, a debt's balance taking away, as
+// every total of balances on the accounts screen adds them.
+export function balanceOf(accounts: readonly Account[]): number {
+  return accounts.reduce((sum, account) => sum + account.balance, 0);
+}
+
 // What an asset is worth to the plan once the loan secured on it is
 // paid: its value less what is owed, all of it for one owned outright.
 // A loan above the value leaves the equity below nothing.
