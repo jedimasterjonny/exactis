@@ -21,7 +21,7 @@ import {
 } from "@/components/kit/table";
 import { kindLabels } from "@/data/accounts";
 import { fixedMonthly } from "@/lib/cadence";
-import { equityOf, formatGrowth, formatMonthly } from "@/lib/ledger";
+import { equityOf, formatGrowth, formatMonthly, sumOf } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
 
 interface AssetTableProps {
@@ -279,14 +279,6 @@ function paidTowards({ asset, loan }: Secured): number {
   return fixedMonthly(asset) + (loan === null ? 0 : fixedMonthly(loan));
 }
 
-// A figure summed down the rows, for the totals beneath them.
-function totalOf(
-  assets: readonly Secured[],
-  figure: (pair: Secured) => number,
-): number {
-  return assets.reduce((sum, pair) => sum + figure(pair), 0);
-}
-
 // The totals beneath the rows, each summed once: what the assets are
 // worth, what is owed on them as the loans' column writes it and as the
 // folded total does, what is paid towards them and the equity.
@@ -297,12 +289,12 @@ function totalsOf(assets: readonly Secured[]): {
   readonly paid: string;
   readonly value: string;
 } {
-  const loans = totalOf(assets, owedOn);
+  const loans = sumOf(assets, owedOn);
   return {
-    equity: formatGbp(totalOf(assets, equityOf)),
+    equity: formatGbp(sumOf(assets, equityOf)),
     loans: formatGbp(loans),
     owed: owedOf(loans),
-    paid: formatMonthly(totalOf(assets, paidTowards)),
-    value: formatGbp(totalOf(assets, ({ asset }) => asset.balance)),
+    paid: formatMonthly(sumOf(assets, paidTowards)),
+    value: formatGbp(sumOf(assets, ({ asset }) => asset.balance)),
   };
 }

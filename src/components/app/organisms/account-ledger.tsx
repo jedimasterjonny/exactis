@@ -34,7 +34,7 @@ import { useRemover } from "@/hooks/use-remover";
 import { useSender } from "@/hooks/use-sender";
 import { counted } from "@/lib/count";
 import { feedersOf, listed } from "@/lib/feeders";
-import { balanceOf, equityOf, paidMonthly } from "@/lib/ledger";
+import { balanceOf, equityOf, paidMonthlyOf, sumOf } from "@/lib/ledger";
 import { runsIn } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 import { monthName } from "@/lib/months";
@@ -136,12 +136,9 @@ export function AccountLedger({
   // screen, the sections beneath saying both.
   const worth = balanceOf(order);
   const saved = balanceOf(savings);
-  const owned = assets.reduce((sum, { asset }) => sum + asset.balance, 0);
-  const equity = assets.reduce((sum, pair) => sum + equityOf(pair), 0);
-  const paidIn = order.reduce(
-    (sum, account) => sum + paidMonthly(account, running),
-    0,
-  );
+  const owned = sumOf(assets, ({ asset }) => asset.balance);
+  const equity = sumOf(assets, equityOf);
+  const paidIn = paidMonthlyOf(order, running);
 
   // Where the order and the owners sit among the sections: the order
   // after the debts when there are any, and the owners after the order

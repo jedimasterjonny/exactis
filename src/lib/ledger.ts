@@ -10,7 +10,7 @@ import { formatGbp, formatPercent } from "@/lib/money";
 // What the accounts hold between them, a debt's balance taking away, as
 // every total of balances on the accounts screen adds them.
 export function balanceOf(accounts: readonly Account[]): number {
-  return accounts.reduce((sum, account) => sum + account.balance, 0);
+  return sumOf(accounts, ({ balance }) => balance);
 }
 
 // What an asset is worth to the plan once the loan secured on it is
@@ -68,4 +68,23 @@ export function paidMonthly(
   lines: readonly IncomeLine[],
 ): number {
   return fixedMonthly(account) + monthly(fedOf(account.id, lines), "year");
+}
+
+// What the accounts are paid a month between them that the month
+// decides in advance, as the account table totals it beneath its rows
+// and the screen's tile states it over them.
+export function paidMonthlyOf(
+  accounts: readonly Account[],
+  lines: readonly IncomeLine[],
+): number {
+  return sumOf(accounts, (account) => paidMonthly(account, lines));
+}
+
+// A figure summed down a list, for a total beneath the rows or a tile
+// over them.
+export function sumOf<TItem>(
+  items: readonly TItem[],
+  figure: (item: TItem) => number,
+): number {
+  return items.reduce((sum, item) => sum + figure(item), 0);
 }

@@ -30,7 +30,7 @@ import {
   formatContribution,
   formatGrowth,
   formatMonthly,
-  paidMonthly,
+  paidMonthlyOf,
 } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
 
@@ -301,9 +301,7 @@ function paidInOf(
   accounts: readonly Account[],
   lines: readonly IncomeLine[],
 ): { readonly column: string; readonly folded: string } {
-  const total = formatMonthly(
-    accounts.reduce((sum, account) => sum + paidMonthly(account, lines), 0),
-  );
+  const total = formatMonthly(paidMonthlyOf(accounts, lines));
   return accounts.some((account) => account.contribution?.kind === "spare")
     ? { column: `${total} + spare`, folded: `${total} paid + spare` }
     : { column: total, folded: `${total} paid` };
