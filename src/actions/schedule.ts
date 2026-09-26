@@ -10,7 +10,7 @@ import { toAccount } from "@/data/accounts";
 import { expenseKinds } from "@/data/expenses";
 import { incomeKinds, toPension } from "@/data/income";
 import { lineValues, named, pounds, recordId, target } from "@/data/schemas";
-import { found, replaced } from "@/lib/records";
+import { removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
@@ -55,19 +55,16 @@ const incomeValues = z
 export async function removeIncomeLine(id: number): Promise<Answer<undefined>> {
   await requireSession();
   const at = recordId.parse(id);
-  return amend(({ kept }) => {
-    found(kept.schedule.income, at, "income line");
-    return {
-      kept: {
-        ...kept,
-        schedule: {
-          ...kept.schedule,
-          income: kept.schedule.income.filter(({ id }) => id !== at),
-        },
+  return amend(({ kept }) => ({
+    kept: {
+      ...kept,
+      schedule: {
+        ...kept.schedule,
+        income: removed(kept.schedule.income, at, "income line"),
       },
-      result: undefined,
-    };
-  });
+    },
+    result: undefined,
+  }));
 }
 
 // Writes an expense line, as an income line is written below. A line
@@ -81,26 +78,26 @@ export async function saveExpenseLine(
   const at = target.parse(id);
   const parsed = expenseValues.parse(draft);
   return amend(({ kept }) => {
-    const { expenses } = kept.schedule;
-    if (at === null) {
-      const written = { ...parsed, id: kept.next };
-      return {
-        kept: {
-          ...kept,
-          next: kept.next + 1,
-          schedule: { ...kept.schedule, expenses: [...expenses, written] },
-        },
-        result: written,
-      };
-    }
-    const { pays } = found(expenses, at, "expense line");
-    const written = { ...parsed, id: at, ...(pays !== undefined && { pays }) };
+    const {
+      next,
+      records,
+      written: line,
+    } = written(
+      kept.schedule.expenses,
+      { at, next: kept.next, noun: "expense line" },
+      (id, listed) => ({
+        ...parsed,
+        id,
+        ...(listed?.pays !== undefined && { pays: listed.pays }),
+      }),
+    );
     return {
       kept: {
         ...kept,
-        schedule: { ...kept.schedule, expenses: replaced(expenses, written) },
+        next,
+        schedule: { ...kept.schedule, expenses: records },
       },
-      result: written,
+      result: line,
     };
   });
 }
@@ -125,26 +122,28 @@ export async function saveIncomeLine(
   return amend(({ kept }) => {
     const pension =
       opens === null ? null : toAccount(toPension(opens), kept.next);
-    const next = pension === null ? kept.next : kept.next + 1;
-    const values = { ...parsed, feeds: pension?.id ?? parsed.feeds };
-    const { income } = kept.schedule;
-    if (at !== null) {
-      found(income, at, "income line");
-    }
-    const written = { ...values, id: at ?? next };
+    const {
+      next,
+      records,
+      written: line,
+    } = written(
+      kept.schedule.income,
+      {
+        at,
+        next: pension === null ? kept.next : kept.next + 1,
+        noun: "income line",
+      },
+      (id) => ({ ...parsed, feeds: pension?.id ?? parsed.feeds, id }),
+    );
     return {
       kept: {
         ...kept,
         accounts:
           pension === null ? kept.accounts : [...kept.accounts, pension],
-        next: at === null ? next + 1 : next,
-        schedule: {
-          ...kept.schedule,
-          income:
-            at === null ? [...income, written] : replaced(income, written),
-        },
+        next,
+        schedule: { ...kept.schedule, income: records },
       },
-      result: written,
+      result: line,
     };
   });
 }
