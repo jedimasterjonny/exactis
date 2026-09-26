@@ -92,10 +92,14 @@ describe("IncomeSchedule", () => {
       incomeLines.length,
     );
     expect(screen.getByText("£144,000")).toHaveTextContent("£144,000 / yr");
+    // A row is drawn in its columns and again in its folded lines, only
+    // one of which is on screen at any width, the columns' copy last.
     expect(
-      screen.getByText(
-        "£120,000 base · £16,500 bonus · £7,500 RSUs · 12.00% of the base into Workplace pension",
-      ),
+      screen
+        .getAllByText(
+          "£120,000 base · £16,500 bonus · £7,500 RSUs · 12.00% of the base into Workplace pension",
+        )
+        .at(-1),
     ).toHaveClass("text-muted-foreground");
     expect(screen.queryByText(/£174,000 base/)).not.toBeInTheDocument();
     expect(screen.getByRole("paragraph")).toHaveTextContent(
@@ -261,8 +265,11 @@ describe("IncomeSchedule", () => {
       />,
     );
 
-    expect(screen.getByText("£120,000 base · £7,500 RSUs")).toBeVisible();
-    expect(screen.getByText("£120,000 base · £16,500 bonus")).toBeVisible();
+    // Each is written in the row's columns and on its folded lines.
+    expect(screen.getAllByText("£120,000 base · £7,500 RSUs")).toHaveLength(2);
+    expect(screen.getAllByText("£120,000 base · £16,500 bonus")).toHaveLength(
+      2,
+    );
     expect(screen.queryByText(/£120,000 base$/)).not.toBeInTheDocument();
     expect(screen.getByText("£127,500")).toHaveTextContent("£127,500 / yr");
     expect(screen.getByText("£136,500")).toHaveTextContent("£136,500 / yr");

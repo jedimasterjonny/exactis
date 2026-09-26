@@ -68,7 +68,11 @@ describe("ExpenseSchedule", () => {
     );
     expect(screen.getAllByText("Core")).toHaveLength(2);
     expect(screen.getAllByText("Time-bound")).toHaveLength(2);
-    expect(screen.getByText("Childcare")).toHaveClass("font-medium");
+    // A row is drawn in its columns and again in its folded lines, only
+    // one of which is on screen at any width.
+    for (const name of screen.getAllByText("Childcare")) {
+      expect(name).toHaveClass("font-medium");
+    }
     expect(screen.getByText("Debt")).toHaveAttribute(
       "data-variant",
       "destructive",
@@ -283,10 +287,11 @@ describe("ExpenseSchedule", () => {
     expect(
       screen.queryByRole("button", { name: "Edit Mortgage payment" }),
     ).not.toBeInTheDocument();
+    // The lock is drawn in the row's columns and on its folded lines.
     expect(
-      screen.getByRole("img", {
+      screen.getAllByRole("img", {
         name: "Edited with its asset on the accounts screen",
       }),
-    ).toBeInTheDocument();
+    ).toHaveLength(2);
   });
 });
