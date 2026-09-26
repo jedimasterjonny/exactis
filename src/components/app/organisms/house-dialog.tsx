@@ -26,6 +26,7 @@ interface Draft extends HouseDraft {
 
 interface HouseDialogProps {
   readonly house: null | Secured;
+  readonly onDelete?: ((asset: Account) => void) | undefined;
   readonly onDismiss: () => void;
   readonly onSaved: () => void;
   readonly plan: PlanMonth;
@@ -63,9 +64,14 @@ const blank: Draft = {
 // each amendment and the values the save sends, which are the draft
 // less the figure typed over. The caller is told when the house has
 // been saved, so the screen can close the dialog and bring the assets
-// forward.
+// forward. Given a delete handler, the dialog of a house the store holds
+// offers a Delete, which reports the house's own account, as its row's
+// bin does, for the caller to ask about with the mortgage that goes with
+// it, and holds while a save is on its way; a new house has nothing yet
+// to delete and is offered none.
 export function HouseDialog({
   house,
+  onDelete,
   onDismiss,
   onSaved,
   plan,
@@ -90,7 +96,15 @@ export function HouseDialog({
     <EditDialog
       canSave={!isSaving && canSave}
       eyebrow={entry.id === null ? "New house" : "Edit house"}
+      isSaving={isSaving}
       isWide
+      onDelete={
+        house === null || onDelete === undefined
+          ? undefined
+          : (): void => {
+              onDelete(house.asset);
+            }
+      }
       onDismiss={onDismiss}
       onSave={() => {
         save(entry);
