@@ -3,7 +3,7 @@
 import type { JSX } from "react";
 
 import { CarFront, HousePlus, Plus } from "lucide-react";
-import { startTransition, useOptimistic, useState } from "react";
+import { useOptimistic, useState } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
@@ -29,9 +29,9 @@ import { HouseDialog } from "@/components/app/organisms/house-dialog";
 import { OwnerList } from "@/components/app/organisms/owner-list";
 import { PaymentOrder } from "@/components/app/organisms/payment-order";
 import { Button } from "@/components/kit/button";
-import { toast } from "@/components/kit/toast";
 import { isAsset } from "@/data/accounts";
 import { useRemover } from "@/hooks/use-remover";
+import { useSender } from "@/hooks/use-sender";
 import { counted } from "@/lib/count";
 import { feedersOf, listed } from "@/lib/feeders";
 import { balanceOf, equityOf, paidMonthly } from "@/lib/ledger";
@@ -100,6 +100,7 @@ export function AccountLedger({
     noun: "Account",
     remove: removeAccount,
   });
+  const { send } = useSender();
   const [order, placeOptimistically] = useOptimistic(
     accounts,
     (_current: readonly Account[], next: readonly Account[]) => next,
@@ -183,8 +184,8 @@ export function AccountLedger({
   // at once and goes to the store behind it; the transition holds the
   // optimistic order until the store's answer brings the page re-read.
   // A store that refuses the order, as it does once another save has
-  // added or taken away an account the card still lists, leaves the
-  // page's order standing and says why under a toast.
+  // added or taken away an account the card still lists, or fails,
+  // leaves the page's order standing and says why under a toast.
   function move(account: Account, target: Account): void {
     const at = (id: number): number => order.findIndex((a) => a.id === id);
     const without = order.filter((a) => a.id !== account.id);
@@ -192,17 +193,13 @@ export function AccountLedger({
       without.findIndex((a) => a.id === target.id) +
       (at(account.id) < at(target.id) ? 1 : 0);
     const next = [...without.slice(0, place), account, ...without.slice(place)];
-    startTransition(async () => {
-      placeOptimistically(next);
-      const answer = await placeAccountsInOrder(next.map((a) => a.id));
-      if (answer.kind === "refused") {
-        toast.add({
-          description: answer.reason,
-          title: "Order not saved",
-          type: "error",
-        });
-      }
-    });
+    send(
+      async () => {
+        placeOptimistically(next);
+        return placeAccountsInOrder(next.map((a) => a.id));
+      },
+      { failure: "Order not saved" },
+    );
   }
 
   return (
