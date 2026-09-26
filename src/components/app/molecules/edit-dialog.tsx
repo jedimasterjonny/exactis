@@ -2,6 +2,7 @@ import type { JSX, ReactNode } from "react";
 
 import { cn } from "cn";
 import { Trash2 } from "lucide-react";
+import { useRef } from "react";
 
 import { Button } from "@/components/kit/button";
 import {
@@ -52,6 +53,12 @@ interface EditDialogProps {
 // buttons the width of the dialog on a phone: three of them, held on
 // screen, took a fifth of it from the fields, and Save sits where a
 // thumb reaches, at the right.
+// Opened on a touch screen, the dialog takes the focus itself rather
+// than handing it to its first field, which opened the keyboard over
+// half the form before anything was asked of it; Base UI does the same
+// for a dialog its trigger opens by touch, but these open from state,
+// with no trigger to tell it how. A mouse or a keyboard still lands in
+// the first field, ready to type.
 export function EditDialog({
   canSave = true,
   children,
@@ -63,6 +70,7 @@ export function EditDialog({
   onSave,
   title,
 }: EditDialogProps): JSX.Element {
+  const popupRef = useRef<HTMLDivElement>(null);
   return (
     <Dialog onOpenChange={onDismiss} open>
       <DialogContent
@@ -70,6 +78,8 @@ export function EditDialog({
           "max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto]",
           isWide && "sm:max-w-lg",
         )}
+        initialFocus={() => (isTouch() ? popupRef.current : true)}
+        ref={popupRef}
       >
         <DialogHeader>
           <span className="label text-brand">{eyebrow}</span>
@@ -100,5 +110,15 @@ export function EditDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Whether the screen is worked by touch, where a field focused unasked
+// opens the keyboard. A browser that cannot say is taken to have a
+// mouse, which is what jsdom, having no working matchMedia, has.
+function isTouch(): boolean {
+  return (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(pointer: coarse)").matches
   );
 }

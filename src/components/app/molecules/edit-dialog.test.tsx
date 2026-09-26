@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { EditDialog } from "./edit-dialog";
@@ -145,5 +151,38 @@ describe("EditDialog", () => {
 
     expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  // A field focused unasked on a touch screen opens the keyboard over
+  // the form, so there the dialog takes the focus itself; a mouse or a
+  // keyboard lands in the first field, ready to type. jsdom has no
+  // working matchMedia, so it is stubbed to say what the screen is
+  // worked by.
+  it("takes the focus itself on a touch screen, and gives it to the first field otherwise", async () => {
+    const dialog = (
+      <EditDialog
+        eyebrow="Edit account"
+        onDismiss={vi.fn<() => void>()}
+        onSave={vi.fn<() => void>()}
+        title="Stocks & shares ISA"
+      >
+        <input aria-label="Name" />
+      </EditDialog>
+    );
+    const view = render(dialog);
+
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: "Name" })).toHaveFocus();
+    });
+
+    view.unmount();
+    const matchMedia = vi.fn(() => ({ matches: true }));
+    vi.stubGlobal("matchMedia", matchMedia);
+    render(dialog);
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toHaveFocus();
+    });
+    expect(matchMedia).toHaveBeenCalledWith("(pointer: coarse)");
   });
 });
