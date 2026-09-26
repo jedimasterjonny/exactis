@@ -10,6 +10,13 @@ export function formatGbp(value: number): string {
   return gbp.format(value).replace(/^-/, "−");
 }
 
+// The figure with its sign turned, and nothing left as nothing rather
+// than as minus nothing, which Intl writes with its minus: a balance of
+// nothing owed would read "−£0", and a rate of nothing lost "-0.00%".
+export function negated(figure: number): number {
+  return figure === 0 ? 0 : -figure;
+}
+
 // A rate is held as a fraction and shown as a percentage to two places,
 // so 0 reads 0.00% and 0.021 reads 2.10%. The options are one statement
 // the ledger formats with and the rate field hands Base UI to format and
