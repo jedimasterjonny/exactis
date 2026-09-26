@@ -3,13 +3,7 @@
 import type { JSX, ReactNode } from "react";
 
 import { Flag } from "lucide-react";
-import {
-  startTransition,
-  useEffect,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
@@ -20,11 +14,9 @@ import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { AgeField } from "@/components/app/molecules/age-field";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ProjectionChart } from "@/components/app/organisms/projection-chart";
-import { toast } from "@/components/kit/toast";
 import { endAge, retirementYear } from "@/data/plan";
 import { project } from "@/engine/projection";
-import { acceptedOf } from "@/lib/answer";
-import { reasonOf } from "@/lib/errors";
+import { useSender } from "@/hooks/use-sender";
 
 // An age moved on the board and not yet known to be in the store, and
 // the age the store held when it was moved.
@@ -33,10 +25,12 @@ interface Draft {
   readonly over: number;
 }
 
-// A save waiting for the age to settle: the age, and the timer that
-// sends it.
+// A save waiting for the age to settle: the timer that sends it, and
+// the save itself, for a board taken down before the timer fires. The
+// save travels with the timer so the board's cleanup reads nothing but
+// the ref.
 interface Pending {
-  readonly age: number;
+  readonly flush: () => void;
   readonly timer: ReturnType<typeof setTimeout>;
 }
 
@@ -70,9 +64,7 @@ export const settle = 400;
 // so a run of arrow steps is one save and not one for each; a board
 // taken down with a save still waiting sends it as it goes. A store that
 // refuses drops the draft, so the board shows what the store holds,
-// read afresh, and says why under a toast; the drop is a transition of
-// its own, since a state update after an await is not part of the one
-// it awaited in.
+// read afresh, and says why under a toast.
 export function ProjectionBoard({
   accounts,
   children,
@@ -81,25 +73,17 @@ export function ProjectionBoard({
 }: ProjectionBoardProps): JSX.Element {
   const [draft, setDraft] = useState<Draft | null>(null);
   const pendingRef = useRef<null | Pending>(null);
-  const [, startSaving] = useTransition();
+  const { send } = useSender();
   const retires =
     draft !== null && draft.over === plan.retires ? draft.age : plan.retires;
   const drafted = { ...plan, retires };
 
   function save(age: number): void {
-    startSaving(async () => {
-      try {
-        acceptedOf(await saveAges({ retires: age }));
-      } catch (error: unknown) {
-        startTransition(() => {
-          setDraft(null);
-        });
-        toast.add({
-          description: reasonOf(error),
-          title: "Retirement age not saved",
-          type: "error",
-        });
-      }
+    send(async () => saveAges({ retires: age }), {
+      failure: "Retirement age not saved",
+      onRejected: () => {
+        setDraft(null);
+      },
     });
   }
 
@@ -112,13 +96,11 @@ export function ProjectionBoard({
     if (pendingRef.current !== null) {
       clearTimeout(pendingRef.current.timer);
     }
-    pendingRef.current = {
-      age,
-      timer: setTimeout(() => {
-        pendingRef.current = null;
-        save(age);
-      }, settle),
-    };
+    function flush(): void {
+      pendingRef.current = null;
+      save(age);
+    }
+    pendingRef.current = { flush, timer: setTimeout(flush, settle) };
   }
 
   // A save still waiting when the board is taken down is sent then
@@ -127,7 +109,7 @@ export function ProjectionBoard({
     () => (): void => {
       if (pendingRef.current !== null) {
         clearTimeout(pendingRef.current.timer);
-        save(pendingRef.current.age);
+        pendingRef.current.flush();
       }
     },
     [],

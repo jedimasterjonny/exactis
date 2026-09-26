@@ -3,7 +3,7 @@
 import type { JSX } from "react";
 
 import { CalendarDays } from "lucide-react";
-import { startTransition, useState, useTransition } from "react";
+import { useState } from "react";
 
 import type { Month } from "@/data/schedule";
 
@@ -14,9 +14,7 @@ import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { MonthField } from "@/components/app/molecules/month-field";
 import { YearField } from "@/components/app/molecules/year-field";
 import { Button } from "@/components/kit/button";
-import { toast } from "@/components/kit/toast";
-import { acceptedOf } from "@/lib/answer";
-import { reasonOf } from "@/lib/errors";
+import { useSender } from "@/hooks/use-sender";
 import { monthName } from "@/lib/months";
 
 interface BalancesMonthProps {
@@ -33,31 +31,21 @@ interface BalancesMonthProps {
 // on its way; the store's answer closes the dialog onto the screen
 // re-read in the new month, and a toast; a store that refuses, as it
 // does a month that has not begun, leaves the dialog open as it was and
-// says why under a toast. The close is a transition of its own, since a
-// state update after an await is not part of the one it awaited in.
+// says why under a toast.
 export function BalancesMonth({ at }: BalancesMonthProps): JSX.Element {
   const [draft, setDraft] = useState<Month | null>(null);
-  const [isSaving, startSaving] = useTransition();
+  const { isSending: isSaving, send } = useSender();
 
   function save(month: Month): void {
-    startSaving(async () => {
-      try {
-        const saved = acceptedOf(await saveBalancesMonth(month));
-        startTransition(() => {
-          setDraft(null);
-        });
-        toast.add({
-          description: `Balances as of ${named(saved)}`,
-          title: "Balances month updated",
-          type: "success",
-        });
-      } catch (error: unknown) {
-        toast.add({
-          description: reasonOf(error),
-          title: "Balances month not saved",
-          type: "error",
-        });
-      }
+    send(async () => saveBalancesMonth(month), {
+      failure: "Balances month not saved",
+      onAccepted: () => {
+        setDraft(null);
+      },
+      success: (saved) => ({
+        description: `Balances as of ${named(saved)}`,
+        title: "Balances month updated",
+      }),
     });
   }
 

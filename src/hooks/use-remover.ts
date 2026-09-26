@@ -1,10 +1,8 @@
-import { startTransition, useState, useTransition } from "react";
+import { useState } from "react";
 
 import type { Answer } from "@/lib/answer";
 
-import { toast } from "@/components/kit/toast";
-import { acceptedOf } from "@/lib/answer";
-import { reasonOf } from "@/lib/errors";
+import { useSender } from "@/hooks/use-sender";
 
 // What the caller gets back: the record the question is open on, which a
 // screen holds one or none of, so it doubles as the confirm dialog's open
@@ -44,7 +42,7 @@ export function useRemover<TDoomed extends { readonly id: number }>({
   remove: store,
 }: RemoverProps<TDoomed>): Remover<TDoomed> {
   const [doomed, setDoomed] = useState<null | TDoomed>(null);
-  const [isRemoving, startRemoving] = useTransition();
+  const { isSending: isRemoving, send } = useSender();
 
   function ask(next: TDoomed): void {
     setDoomed(next);
@@ -56,35 +54,21 @@ export function useRemover<TDoomed extends { readonly id: number }>({
 
   // What the dialog asked about goes to the store by its id. The question
   // stays open with its confirm held until the store answers, then
-  // closes, and the page re-read takes the row with it; the close is a
-  // transition of its own, since a state update after an await is not
-  // part of the one it awaited in. What the toast says went is described
-  // from the record asked about rather than from anything the store
-  // answers with, since a deletion answers with nothing. A store that
-  // refuses, or fails, leaves the question open as it was, with the
-  // confirm free again, and says why under a toast, a refusal in its own
-  // words: a rejection left to the transition would reach the nearest
-  // error boundary, which is the route's, and take the whole screen with
-  // it.
+  // closes, and the page re-read takes the row with it. What the toast
+  // says went is described from the record asked about rather than from
+  // anything the store answers with, since a deletion answers with
+  // nothing. A store that refuses, or fails, leaves the question open as
+  // it was, with the confirm free again, and the sender says why.
   function confirm(current: TDoomed): void {
-    startRemoving(async () => {
-      try {
-        acceptedOf(await store(current.id));
-        startTransition(() => {
-          setDoomed(null);
-        });
-        toast.add({
-          description: describe(current),
-          title: `${noun} deleted`,
-          type: "success",
-        });
-      } catch (error: unknown) {
-        toast.add({
-          description: reasonOf(error),
-          title: `${noun} not deleted`,
-          type: "error",
-        });
-      }
+    send(async () => store(current.id), {
+      failure: `${noun} not deleted`,
+      onAccepted: () => {
+        setDoomed(null);
+      },
+      success: () => ({
+        description: describe(current),
+        title: `${noun} deleted`,
+      }),
     });
   }
 

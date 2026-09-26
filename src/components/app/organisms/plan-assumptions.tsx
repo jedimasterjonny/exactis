@@ -3,7 +3,7 @@
 import type { JSX } from "react";
 
 import { SlidersHorizontal } from "lucide-react";
-import { startTransition, useState, useTransition } from "react";
+import { useState } from "react";
 
 import type { Plan } from "@/data/plan";
 
@@ -11,10 +11,8 @@ import { saveAges } from "@/actions/plan";
 import { AgeField } from "@/components/app/molecules/age-field";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { Button } from "@/components/kit/button";
-import { toast } from "@/components/kit/toast";
 import { endAge, oldestAge } from "@/data/plan";
-import { acceptedOf } from "@/lib/answer";
-import { reasonOf } from "@/lib/errors";
+import { useSender } from "@/hooks/use-sender";
 
 interface PlanAssumptionsProps {
   readonly plan: Plan;
@@ -34,32 +32,21 @@ interface PlanAssumptionsProps {
 // store until Save. Save holds while the age is on its way; the store's
 // answer closes the dialog onto the dashboard re-read, the chart run
 // to the new age, and a toast; a store that refuses leaves the dialog
-// open as it was and says why under a toast. The close is a transition
-// of its own, since a state update after an await is not part of the
-// one it awaited in.
+// open as it was and says why under a toast.
 export function PlanAssumptions({ plan }: PlanAssumptionsProps): JSX.Element {
   const [ends, setEnds] = useState<null | number>(null);
-  const [isSaving, startSaving] = useTransition();
+  const { isSending: isSaving, send } = useSender();
 
   function save(age: number): void {
-    startSaving(async () => {
-      try {
-        const saved = acceptedOf(await saveAges({ ends: age }));
-        startTransition(() => {
-          setEnds(null);
-        });
-        toast.add({
-          description: `Projected to age ${String(saved.ends)}`,
-          title: "Assumptions updated",
-          type: "success",
-        });
-      } catch (error: unknown) {
-        toast.add({
-          description: reasonOf(error),
-          title: "Assumptions not saved",
-          type: "error",
-        });
-      }
+    send(async () => saveAges({ ends: age }), {
+      failure: "Assumptions not saved",
+      onAccepted: () => {
+        setEnds(null);
+      },
+      success: (saved) => ({
+        description: `Projected to age ${String(saved.ends)}`,
+        title: "Assumptions updated",
+      }),
     });
   }
 
