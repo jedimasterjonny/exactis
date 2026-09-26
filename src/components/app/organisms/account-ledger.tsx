@@ -130,7 +130,9 @@ export function AccountLedger({
   // equity the assets hold once their loans are paid, of what they are
   // worth; and what the month pays in, every fixed sum and sacrifice
   // the salaries running then make, the spare money's take being the
-  // month's to decide.
+  // month's to decide. A phone keeps the net worth and the savings, in
+  // one row, and leaves the equity and what is paid in to a wider
+  // screen, the sections beneath saying both.
   const worth = balanceOf(order);
   const saved = balanceOf(savings);
   const owned = assets.reduce((sum, { asset }) => sum + asset.balance, 0);
@@ -227,11 +229,13 @@ export function AccountLedger({
           />
           <StatTile
             caption={`${formatGbp(owned)} owned · ${formatGbp(owned - equity)} owed`}
+            isHiddenOnPhone
             label="Equity"
             value={formatGbp(equity)}
           />
           <StatTile
             caption="Sacrifice and fixed payments"
+            isHiddenOnPhone
             label="Paid in"
             unit="/ mo"
             value={formatGbp(paidIn)}

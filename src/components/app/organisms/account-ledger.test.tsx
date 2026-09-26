@@ -250,6 +250,11 @@ describe("AccountLedger", () => {
     expect(paidIn).toHaveTextContent(
       "Paid in£6,143/ moSacrifice and fixed payments",
     );
+    // A phone keeps the net worth and the savings, in one row.
+    expect(worth).not.toHaveClass("max-sm:hidden");
+    expect(savings).not.toHaveClass("max-sm:hidden");
+    expect(equity).toHaveClass("max-sm:hidden");
+    expect(paidIn).toHaveClass("max-sm:hidden");
   });
 
   // A salary running in the plan's month pays in what it sacrifices, and
