@@ -22,6 +22,18 @@ describe("EditDialog", () => {
     expect(within(dialog).getByRole("paragraph")).toHaveTextContent(
       "The fields",
     );
+    // Held to the screen's height, the fields scroll between the title
+    // and the footer, which stay put.
+    expect(dialog).toHaveClass(
+      "max-h-[calc(100dvh-2rem)]",
+      "grid-rows-[auto_minmax(0,1fr)_auto]",
+    );
+    // eslint-disable-next-line testing-library/no-node-access -- the scrolling box is a layout box with no role or text of its own to query by
+    expect(within(dialog).getByRole("paragraph").parentElement).toHaveClass(
+      "grid",
+      "gap-4",
+      "overflow-y-auto",
+    );
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
     expect(
       within(dialog).queryByRole("button", { name: "Delete" }),
