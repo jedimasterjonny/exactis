@@ -100,7 +100,9 @@ const kinds = optionsOf(kindLabels, [
 // as it was. A fed pension's own contribution is paid on top of the
 // sacrifice, and the choice and the sum say so, since a fixed sum of
 // nothing beside what a salary lands would otherwise read as nothing
-// paid in at all.
+// paid in at all. The balance says a debt's is negative only while the
+// treatment is a debt, where it is the one thing to know about the
+// figure; beneath a pension's it was a line about something else.
 export function AccountFields({
   children,
   draft,
@@ -153,7 +155,7 @@ export function AccountFields({
       <FieldRow layout={isPension(draft) ? "triple" : "pair"}>
         <MoneyField
           defaultValue={initial.balance}
-          hint="A debt's is negative"
+          hint={draft.kind === "debt" ? "A debt's is negative" : undefined}
           label="Balance"
           onValueCommitted={(balance) => {
             onAmend({ balance });
