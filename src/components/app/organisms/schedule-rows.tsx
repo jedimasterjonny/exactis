@@ -1,12 +1,13 @@
 import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
 
-import { Banknote, Lock, Receipt } from "lucide-react";
+import { Banknote, Receipt } from "lucide-react";
 
 import type { Plan } from "@/data/plan";
 import type { LineValues, Side } from "@/data/schedule";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
+import { RowLock } from "@/components/app/atoms/row-lock";
 import { SpanBar } from "@/components/app/atoms/span-bar";
 import { RowActions } from "@/components/app/molecules/row-actions";
 import { Badge } from "@/components/kit/badge";
@@ -136,12 +137,8 @@ export function ScheduleRows<TLine extends Line>({
                   row={line}
                 />
               ) : (
-                <span
-                  aria-label={summary.lock}
-                  className="inline-flex size-7 items-center justify-center text-muted-foreground/60"
-                  role="img"
-                >
-                  <Lock aria-hidden className="size-4" />
+                <span className="inline-flex size-7 items-center justify-center">
+                  <RowLock reason={summary.lock} />
                 </span>
               ))}
           </li>

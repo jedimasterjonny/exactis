@@ -6,6 +6,7 @@ import { ChevronRight } from "lucide-react";
 interface FoldedLinesProps {
   readonly children?: ReactNode;
   readonly figure: string;
+  readonly lock?: ReactNode;
   readonly name: string;
   readonly onOpen?: (() => void) | undefined;
 }
@@ -25,10 +26,15 @@ interface FoldedLinesProps {
 // wraps the name rather than breaking a minus from its pounds. The first
 // line and the lines beneath it are boxes, so a screen reader reads a
 // pause between them rather than running the figure into the line after
-// it, and what goes beneath may be a box itself.
+// it, and what goes beneath may be a box itself. A row locked against
+// editing here draws the lock it is given in the chevron's place
+// instead, the lock its caller draws in the row's actions too, so a row
+// that will not open says why rather than seeming not to answer; its
+// caller gives it nothing to open.
 export function FoldedLines({
   children,
   figure,
+  lock,
   name,
   onOpen,
 }: FoldedLinesProps): JSX.Element {
@@ -47,13 +53,17 @@ export function FoldedLines({
           </button>
         )}
         <span className="figure font-medium whitespace-nowrap">{figure}</span>
-        <ChevronRight
-          aria-hidden
-          className={cn(
-            "size-4 self-center text-muted-foreground",
-            onOpen === undefined && "invisible",
-          )}
-        />
+        {lock === undefined ? (
+          <ChevronRight
+            aria-hidden
+            className={cn(
+              "size-4 self-center text-muted-foreground",
+              onOpen === undefined && "invisible",
+            )}
+          />
+        ) : (
+          <span className="self-center">{lock}</span>
+        )}
       </div>
       {children !== undefined && (
         <div className="mt-1 grid gap-0.5 text-xs text-muted-foreground">
