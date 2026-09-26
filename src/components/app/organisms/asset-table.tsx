@@ -22,7 +22,7 @@ import {
 import { kindLabels } from "@/data/accounts";
 import { fixedMonthly } from "@/lib/cadence";
 import { equityOf, formatGrowth, formatMonthly, sumOf } from "@/lib/ledger";
-import { formatGbp } from "@/lib/money";
+import { formatGbp, negated } from "@/lib/money";
 
 interface AssetTableProps {
   readonly assets: readonly Secured[];
@@ -258,11 +258,9 @@ function isPaid(pair: Secured): boolean {
   );
 }
 
-// What is owed on a loan whose balance is the one given, above nothing,
-// taken from nothing rather than negated: a balance of nothing negated
-// is minus nothing, which Intl writes with its minus, "−£0 owed".
+// What is owed on a loan whose balance is the one given, above nothing.
 function owedOf(balance: number): string {
-  return formatGbp(0 - balance);
+  return formatGbp(negated(balance));
 }
 
 // What is owed on the asset, as the loan's balance, which is nothing

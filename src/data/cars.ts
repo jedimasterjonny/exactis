@@ -6,6 +6,7 @@ import type { Owed } from "@/lib/loans";
 import { toValues } from "@/data/accounts";
 import { owes, securedRecords } from "@/data/secured";
 import { figureOf, termOf } from "@/lib/loans";
+import { negated } from "@/lib/money";
 
 export type Agreement = (typeof agreements)[number];
 
@@ -54,7 +55,7 @@ export function carOf({ asset, loan }: Secured): CarValues {
   const owed = loan === null ? null : toValues(loan);
   return {
     agreement: agreementOf(owed),
-    balance: owed === null ? 0 : -owed.balance,
+    balance: owed === null ? 0 : negated(owed.balance),
     balloon: owed === null ? 0 : owed.balloon,
     depreciation: negated(held.rate),
     name: held.name,
@@ -136,12 +137,6 @@ function agreementOf(owed: AccountValues | null): Agreement {
     return "outright";
   }
   return owed.balloon > 0 ? "pcp" : "loan";
-}
-
-// The figure with its sign turned, and nothing left as nothing rather
-// than as a negative nothing, which Intl would write with a sign.
-function negated(figure: number): number {
-  return figure === 0 ? 0 : -figure;
 }
 
 // What the finance's payments are over: the balance, down to the balloon
