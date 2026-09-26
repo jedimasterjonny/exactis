@@ -26,6 +26,7 @@ import {
   toRecords as toCarRecords,
 } from "@/data/cars";
 import { isSound, statuses, toRecords } from "@/data/houses";
+import { month, named, pounds, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { found, replaced } from "@/lib/records";
 import { requireSession } from "@/lib/session";
@@ -43,13 +44,13 @@ import { amend } from "@/store/household";
 const car = z
   .object({
     agreement: z.enum(agreements),
-    balance: z.number().int().nonnegative(),
-    balloon: z.number().int().nonnegative(),
+    balance: pounds,
+    balloon: pounds,
     depreciation: z.number().max(1),
-    name: z.string().trim().min(1),
-    payment: z.number().int().nonnegative(),
+    name: named,
+    payment: pounds,
     rate: z.number().nonnegative(),
-    value: z.number().int().nonnegative(),
+    value: pounds,
   })
   .refine(isSoundCar)
   .refine(
@@ -70,13 +71,13 @@ const car = z
 // status hides, and the name as typed less the space around it.
 const house = z
   .object({
-    balance: z.number().int().nonnegative(),
+    balance: pounds,
     growth: z.number().min(-1),
-    name: z.string().trim().min(1),
-    payment: z.number().int().nonnegative(),
+    name: named,
+    payment: pounds,
     rate: z.number().nonnegative(),
     status: z.enum(statuses),
-    value: z.number().int().nonnegative(),
+    value: pounds,
   })
   .refine(isSound)
   .refine(
@@ -106,22 +107,19 @@ const house = z
 const values = z
   .object({
     balance: z.number().int(),
-    balloon: z.number().int().nonnegative(),
+    balloon: pounds,
     cadence: z.enum(cadences),
-    cap: z.number().int().nonnegative(),
-    contribution: z.number().int().nonnegative(),
+    cap: pounds,
+    contribution: pounds,
     funding: z.enum(fundings),
     growth: z.enum(growthKinds),
     isAlwaysFunded: z.boolean(),
     kind: z.enum(accountKinds),
-    name: z.string().trim().min(1),
-    owner: z.number().int().positive().nullable(),
+    name: named,
+    owner: recordId.nullable(),
     rate: z.number().min(-1),
     shares: z.array(
-      z.object({
-        line: z.number().int().positive(),
-        sacrifice: z.number().min(0).max(1),
-      }),
+      z.object({ line: recordId, sacrifice: z.number().min(0).max(1) }),
     ),
   })
   .refine((draft) => isPension(draft) || draft.shares.length === 0)
@@ -131,20 +129,12 @@ const values = z
       draft.shares.length,
   ) satisfies z.ZodType<AccountDraft>;
 
-// A month of a year, January being nought as the date gives it.
-const month = z.object({
-  month: z.number().int().min(0).max(11),
-  year: z.number().int().positive(),
-}) satisfies z.ZodType<Month>;
-
 // An order: every account's id once, so the household can place them
 // all.
 const order = z
-  .array(z.number().int().positive())
+  .array(recordId)
   .nonempty()
   .refine((ids) => new Set(ids).size === ids.length);
-
-const target = z.number().int().positive().nullable();
 
 // Places the accounts in the order the ids are given, which is the order
 // they are listed in and the order the spare money is handed down them.
@@ -178,7 +168,7 @@ export async function placeAccountsInOrder(
 // of it does. Checked as a save is.
 export async function removeAccount(id: number): Promise<Answer<undefined>> {
   await requireSession();
-  const at = z.number().int().positive().parse(id);
+  const at = recordId.parse(id);
   return amend(({ kept }) => {
     found(kept.accounts, at, "account");
     const gone = new Set([

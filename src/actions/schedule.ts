@@ -6,33 +6,21 @@ import type { ExpenseLine, ExpenseLineValues } from "@/data/expenses";
 import type { IncomeLine, IncomeLineDraft } from "@/data/income";
 import type { Answer } from "@/lib/answer";
 
-import { cadences, toAccount } from "@/data/accounts";
+import { toAccount } from "@/data/accounts";
 import { expenseKinds } from "@/data/expenses";
 import { incomeKinds, toPension } from "@/data/income";
-import { lineGrowths } from "@/data/schedule";
+import { lineValues, named, pounds, recordId, target } from "@/data/schemas";
 import { found, replaced } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
-// What a save of either line may carry, checked against the model's own
-// lists so the two cannot drift: the amount whole and never negative;
-// the years whole, the last one absent for a line that runs to the end
-// of the plan; the last month one of the twelve; and the name as typed
-// less the space around it, which the form also trims. That a line ends
-// no earlier than it starts, and in a month only of a year it ends in,
-// is the household's to hold, as every rule across the fields is.
-const line = {
-  amount: z.number().int().nonnegative(),
-  cadence: z.enum(cadences),
-  firstYear: z.number().int().positive(),
-  growth: z.enum(lineGrowths),
-  lastMonth: z.number().int().min(0).max(11).nullable(),
-  lastYear: z.number().int().positive().nullable(),
-  name: z.string().trim().min(1),
-};
-
+// What a save of an expense line may carry: the values every line
+// holds, as the model holds them so the two cannot drift, and its kind.
+// That a line ends no earlier than it starts, and in a month only of a
+// year it ends in, is the household's to hold, as every rule across the
+// fields is.
 const expenseValues = z.object({
-  ...line,
+  ...lineValues,
   kind: z.enum(expenseKinds),
 }) satisfies z.ZodType<ExpenseLineValues>;
 
@@ -47,18 +35,14 @@ const expenseValues = z.object({
 // opens is among its accounts.
 const incomeValues = z
   .object({
-    ...line,
-    bonus: z.number().int().nonnegative(),
-    feeds: z.number().int().positive().nullable(),
+    ...lineValues,
+    bonus: pounds,
+    feeds: recordId.nullable(),
     kind: z.enum(incomeKinds),
     opens: z
-      .object({
-        balance: z.number().int().nonnegative(),
-        name: z.string().trim().min(1),
-        owner: z.number().int().positive(),
-      })
+      .object({ balance: pounds, name: named, owner: recordId })
       .nullable(),
-    rsu: z.number().int().nonnegative(),
+    rsu: pounds,
     sacrifice: z.number().min(0).max(1),
   })
   .refine((values) => values.kind === "employment" || values.opens === null)
@@ -66,13 +50,11 @@ const incomeValues = z
     (values) => values.feeds === null || values.opens === null,
   ) satisfies z.ZodType<IncomeLineDraft>;
 
-const target = z.number().int().positive().nullable();
-
 // Deletes the income line with that id. Nothing hangs on a line, so it
 // goes alone. Checked as a save is.
 export async function removeIncomeLine(id: number): Promise<Answer<undefined>> {
   await requireSession();
-  const at = z.number().int().positive().parse(id);
+  const at = recordId.parse(id);
   return amend(({ kept }) => {
     found(kept.schedule.income, at, "income line");
     return {

@@ -20,7 +20,14 @@ import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
 import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
 import { rules } from "@/data/rules";
-import { lineGrowths } from "@/data/schedule";
+import {
+  lineValues,
+  month,
+  monthOfYear,
+  named,
+  pounds,
+  recordId,
+} from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { fixedMonthly, monthly } from "@/lib/cadence";
 import { endsAfterItStarts } from "@/lib/lines";
@@ -56,23 +63,9 @@ export interface Kept {
   readonly schedule: Household["schedule"];
 }
 
-const id = z.number().int().positive();
-
-const named = z.string().trim().min(1);
-
-const pounds = z.number().int().nonnegative();
-
-// What every line of both schedules holds, as the actions take it.
-const line = {
-  amount: pounds,
-  cadence: z.enum(cadences),
-  firstYear: z.number().int().positive(),
-  growth: z.enum(lineGrowths),
-  id,
-  lastMonth: z.number().int().min(0).max(11).nullable(),
-  lastYear: z.number().int().positive().nullable(),
-  name: named,
-};
+// What every line of both schedules holds, as the actions take it, and
+// the id it is listed by.
+const line = { ...lineValues, id: recordId };
 
 // An account as the model lays it, with what the account save holds
 // it to and what the engine refuses of one account alone: a balance
@@ -107,12 +100,12 @@ const account = z
       }),
       z.object({ kind: z.literal("plan") }),
     ]),
-    id,
+    id: recordId,
     isAlwaysFunded: z.literal(true).exactOptional(),
     kind: z.enum(accountKinds),
     name: named,
-    owner: id.exactOptional(),
-    secures: id.exactOptional(),
+    owner: recordId.exactOptional(),
+    secures: recordId.exactOptional(),
   })
   .refine(
     (account) => account.kind === "debt" || account.balance >= 0,
@@ -140,7 +133,11 @@ const account = z
   ) satisfies z.ZodType<Account>;
 
 const expenseLine = z
-  .object({ ...line, kind: z.enum(expenseKinds), pays: id.exactOptional() })
+  .object({
+    ...line,
+    kind: z.enum(expenseKinds),
+    pays: recordId.exactOptional(),
+  })
   .refine(endsAfterItStarts, "A line ends no earlier than it starts")
   .refine(
     endsInAYear,
@@ -155,7 +152,7 @@ const incomeLine = z
   .object({
     ...line,
     bonus: pounds,
-    feeds: id.nullable(),
+    feeds: recordId.nullable(),
     kind: z.enum(incomeKinds),
     rsu: pounds,
     sacrifice: z.number().min(0, rules.share).max(1, rules.share),
@@ -173,7 +170,10 @@ const incomeLine = z
     "A salary gives up a share only into a pension it feeds",
   ) satisfies z.ZodType<IncomeLine>;
 
-const owner = z.object({ id, name: named }) satisfies z.ZodType<Owner>;
+const owner = z.object({
+  id: recordId,
+  name: named,
+}) satisfies z.ZodType<Owner>;
 
 // The plan as the day it is read makes it: a month of the year, whole
 // years forward, the plan rate no lower than losing everything, and the
@@ -186,7 +186,7 @@ const plan = z
   .object({
     born: z.number().int(),
     from: z.number().int(),
-    month: z.number().int().min(0).max(11),
+    month: monthOfYear,
     rate: z.number().min(-1, rules.beyondLoss),
     retires: z.number().int().nonnegative(),
     years: z.number().int().nonnegative(),
@@ -310,11 +310,8 @@ const kept = z
         (ages) => ages.ends <= oldestAge,
         `A plan ends by ${String(oldestAge)}`,
       ),
-    asOf: z.object({
-      month: z.number().int().min(0).max(11),
-      year: z.number().int().positive(),
-    }),
-    next: id,
+    asOf: month,
+    next: recordId,
     owners: z.array(owner),
     schedule: z.object({
       expenses: z.array(expenseLine),

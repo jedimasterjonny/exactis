@@ -5,6 +5,7 @@ import * as z from "zod";
 import type { Owner, OwnerValues } from "@/data/owners";
 import type { Answer } from "@/lib/answer";
 
+import { named, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { found, replaced } from "@/lib/records";
 import { requireSession } from "@/lib/session";
@@ -12,11 +13,7 @@ import { amend } from "@/store/household";
 
 // What a save may carry: the name as typed less the space around it,
 // which the form also trims, and never empty.
-const values = z.object({
-  name: z.string().trim().min(1),
-}) satisfies z.ZodType<OwnerValues>;
-
-const target = z.number().int().positive().nullable();
+const values = z.object({ name: named }) satisfies z.ZodType<OwnerValues>;
 
 // Deletes the owner with that id, unless an account names it: an ISA or
 // a pension belongs to an owner, and the household refuses to leave it
@@ -25,7 +22,7 @@ const target = z.number().int().positive().nullable();
 // Checked as a save is.
 export async function removeOwner(id: number): Promise<Answer<undefined>> {
   await requireSession();
-  const at = z.number().int().positive().parse(id);
+  const at = recordId.parse(id);
   return amend(({ kept }) => {
     found(kept.owners, at, "owner");
     if (kept.accounts.some(({ owner }) => owner === at)) {
