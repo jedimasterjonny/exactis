@@ -6,7 +6,7 @@ import type { Account } from "@/data/accounts";
 import type { Agreement, CarDraft, CarValues } from "@/data/cars";
 import type { Secured } from "@/data/secured";
 import type { Entry } from "@/hooks/use-editor";
-import type { LoanFigure, Stood } from "@/lib/figures";
+import type { Stood, WorkedOut } from "@/lib/figures";
 import type { PlanMonth } from "@/lib/loans";
 
 import { saveCar } from "@/actions/accounts";
@@ -14,7 +14,7 @@ import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { CarFields } from "@/components/app/organisms/car-fields";
 import { carOf, clearsAfter, derive, isSound } from "@/data/cars";
 import { useMountedEditor } from "@/hooks/use-editor";
-import { stood, thirdOf } from "@/lib/figures";
+import { isSettled, settled, stood, thirdOf, typedOn } from "@/lib/figures";
 
 interface CarDialogProps {
   readonly car: null | Secured;
@@ -147,69 +147,54 @@ function openingOf(car: null | Secured): Entry<Draft> {
   if (car === null) {
     return { draft: blank, id: null, initial: blank };
   }
-  const typed: Stood =
-    car.loan === null ? ["rate", "term"] : ["payment", "rate"];
-  const draft: Draft = { ...carOf(car), term: blank.term, typed };
+  const draft: Draft = {
+    ...carOf(car),
+    term: blank.term,
+    typed: typedOn(car.loan !== null),
+  };
   return { draft, id: car.asset.id, initial: draft };
 }
 
 // The car the draft would save: the name as typed less the space around
-// it, which is what the title shows; nothing owed, paid or charged and
-// no balloon for a car owned outright, and no balloon on a loan,
-// whatever the hidden fields hold; and the figure worked out in place of
-// the draft's own where there is one to put there. A worked-out term
-// goes nowhere, since the store reads it off the other figures, and a
-// figure that could not be worked out leaves the draft's, which the
-// held save never sends.
-function valuesOf(
-  draft: CarDraft,
-  worked: LoanFigure,
-  figure: null | number,
-): CarValues {
-  const values: CarValues = {
-    agreement: draft.agreement,
-    balance: draft.balance,
-    balloon: draft.agreement === "pcp" ? draft.balloon : 0,
-    depreciation: draft.depreciation,
-    name: draft.name.trim(),
-    payment: draft.payment,
-    rate: draft.rate,
-    value: draft.value,
-  };
-  if (values.agreement === "outright") {
-    return { ...values, balance: 0, payment: 0, rate: 0 };
-  }
-  if (worked === "term" || figure === null) {
-    return values;
-  }
-  return worked === "payment"
-    ? { ...values, payment: figure }
-    : { ...values, rate: figure };
+// it, which is what the title shows; no balloon on a loan, whatever the
+// hidden field holds; and the finance's figures settled as every
+// secured asset's are, nothing owed for a car owned outright and the
+// figure worked out in place of the draft's own.
+function valuesOf(draft: CarDraft, out: WorkedOut): CarValues {
+  return settled(
+    {
+      agreement: draft.agreement,
+      balance: draft.balance,
+      balloon: draft.agreement === "pcp" ? draft.balloon : 0,
+      depreciation: draft.depreciation,
+      name: draft.name.trim(),
+      payment: draft.payment,
+      rate: draft.rate,
+      value: draft.value,
+    },
+    draft.agreement !== "outright",
+    out,
+  );
 }
 
 // What the dialog shows of a draft: which figure is worked out, what it
 // came to, the years the payments run in all once the balloon is
 // refinanced, the car the draft would save, and whether it can be: a
-// sound car, whose rate was found if the rate is what is worked out and
-// the car is financed. A term that could not be worked out is no bar,
-// since the store reads the open end off the figures it keeps.
-function workedOut(draft: Draft): {
+// sound car whose finance's figures are settled.
+function workedOut(
+  draft: Draft,
+): WorkedOut & {
   readonly canSave: boolean;
   readonly clears: null | number;
-  readonly figure: null | number;
   readonly values: CarValues;
-  readonly worked: LoanFigure;
 } {
   const worked = thirdOf(...draft.typed);
-  const figure = derive(draft, worked);
-  const values = valuesOf(draft, worked, figure);
+  const out = { figure: derive(draft, worked), worked };
+  const values = valuesOf(draft, out);
   return {
-    canSave:
-      isSound(values) &&
-      (values.agreement === "outright" || worked !== "rate" || figure !== null),
+    ...out,
+    canSave: isSound(values) && isSettled(values.agreement !== "outright", out),
     clears: clearsAfter(values),
-    figure,
     values,
-    worked,
   };
 }
