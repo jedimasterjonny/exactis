@@ -89,8 +89,9 @@ describe("ProjectionBoard", () => {
   // Retiring at 36 stops the salary from 2026, so 2028 opens on less
   // than it does retiring at 59, and the chart's figure for it is the
   // engine's for the age moved to rather than the age handed down. With
-  // no salary the plan draws a pension early in 2033 and runs out in
-  // 2037, and the chart marks both beside the retirement in 2026.
+  // no salary the mortgage is paid out of the savings, so the plan draws
+  // a pension early in 2030 and runs out in 2033, and the chart marks
+  // both beside the retirement in 2026.
   it("projects every figure at the age moved to, before it is saved", async () => {
     render(board());
 
@@ -106,7 +107,7 @@ describe("ProjectionBoard", () => {
 
     expect(moved).not.toBe(totalIn(retiring, 2028));
     expect(screen.getByText(moved)).toHaveClass("figure");
-    expect(marks()).toStrictEqual(["2026", "2033", "2037"]);
+    expect(marks()).toStrictEqual(["2026", "2030", "2033"]);
     expect(saveAges).not.toHaveBeenCalled();
   });
 
