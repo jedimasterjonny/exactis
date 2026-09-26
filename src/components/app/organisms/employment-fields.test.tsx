@@ -4,47 +4,22 @@ import { describe, expect, it, vi } from "vitest";
 import type { Account } from "@/data/accounts";
 import type { IncomeLineDraft } from "@/data/income";
 
-import { owners } from "@/data/owners.fixture";
+import { accounts, sipp } from "@/data/accounts.fixture";
+import { incomeLines } from "@/data/income.fixture";
+import { owners, sam } from "@/data/owners.fixture";
 import { commit, field } from "@/test/dom";
 
 import { EmploymentFields } from "./employment-fields";
 
 // The reference's salary as a draft: £120,000 of base with £16,500 of
 // bonus and £7,500 of RSUs on top, sacrificing 12% of the base into
-// the workplace pension.
-const salary: IncomeLineDraft = {
-  amount: 120000,
-  bonus: 16500,
-  cadence: "year",
-  feeds: 1,
-  firstYear: 2026,
-  growth: "inflation-plus-1",
-  kind: "employment",
-  lastMonth: null,
-  lastYear: 2052,
-  name: "Salary",
-  opens: null,
-  rsu: 7500,
-  sacrifice: 0.12,
-};
+// the workplace pension, and opening none.
+const [line] = incomeLines;
+const salary: IncomeLineDraft = { ...line, opens: null };
 
-// Two pensions, so the choice is a choice.
-const pensions: readonly Account[] = [
-  {
-    balance: 391640,
-    growth: { kind: "plan" },
-    id: 1,
-    kind: "tax-deferred",
-    name: "Workplace pension",
-  },
-  {
-    balance: 0,
-    growth: { kind: "plan" },
-    id: 6,
-    kind: "tax-deferred",
-    name: "SIPP",
-  },
-];
+// The workplace pension and a second, so the choice is a choice.
+const [workplace] = accounts;
+const pensions: readonly Account[] = [workplace, sipp];
 
 // The fields as the dialog would mount them, opened on a line and shown
 // the draft that mirrors them, with a spy where the schedule listens.
@@ -53,7 +28,7 @@ function renderFields(
   draft: IncomeLineDraft = initial,
   held: readonly { readonly id: number; readonly name: string }[] = [
     ...owners,
-    { id: 2, name: "Sam" },
+    sam,
   ],
 ): {
   readonly onAmend: ReturnType<

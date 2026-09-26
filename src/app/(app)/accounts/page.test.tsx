@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { accounts } from "@/data/accounts.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
+import { owners } from "@/data/owners.fixture";
 import {
   getAccounts,
   getIncomeLines,
@@ -34,7 +35,7 @@ describe("Accounts", () => {
   it("hands the store's accounts, income lines and owners to the ledger, in the plan's month", async () => {
     vi.mocked(getAccounts).mockResolvedValue([...accounts]);
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
-    vi.mocked(getOwners).mockResolvedValue([{ id: 1, name: "Me" }]);
+    vi.mocked(getOwners).mockResolvedValue(owners);
     vi.mocked(getPlan).mockResolvedValue(plan);
 
     render(await Accounts());

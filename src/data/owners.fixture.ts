@@ -6,3 +6,6 @@ import type { Owner } from "@/data/owners";
 export const owners = [
   { id: 1, name: "Me" },
 ] as const satisfies readonly Owner[];
+
+// A second owner, holding nothing, for a choice of two. For tests.
+export const sam = { id: 2, name: "Sam" } as const satisfies Owner;

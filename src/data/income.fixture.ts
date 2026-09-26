@@ -80,3 +80,7 @@ export const plan: Plan = {
   retires: 92,
   years: 57,
 };
+
+// The plan with its owner retiring at 61, as the reference household's
+// ages have it, where the plan above has them retire at 92.
+export const retiring: Plan = { ...plan, retires: 61 };

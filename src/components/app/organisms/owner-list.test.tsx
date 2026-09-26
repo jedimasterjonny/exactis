@@ -13,6 +13,7 @@ import type { Owner } from "@/data/owners";
 import { removeOwner, saveOwner } from "@/actions/owners";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
+import { owners, sam } from "@/data/owners.fixture";
 import { saved } from "@/lib/answer";
 
 import { OwnerList } from "./owner-list";
@@ -22,17 +23,15 @@ vi.mock("@/actions/owners", () => ({
   saveOwner: vi.fn(),
 }));
 
-const me: Owner = { id: 1, name: "Me" };
-
-const sam: Owner = { id: 2, name: "Sam" };
+const [me] = owners;
 
 // Save and delete report through the toast manager, which needs its
 // Toaster mounted.
 function renderList(
-  owners: readonly Owner[],
+  listed: readonly Owner[],
   held: readonly Account[] = [],
 ): void {
-  render(<OwnerList accounts={held} label="Sect. II.v" owners={owners} />, {
+  render(<OwnerList accounts={held} label="Sect. II.v" owners={listed} />, {
     wrapper: Toaster,
   });
 }

@@ -3,18 +3,16 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { LoanFigure } from "@/lib/figures";
 
+import { plan } from "@/data/income.fixture";
 import { commit, field } from "@/test/dom";
 
 import type { LoanDraft, LoanWords } from "./loan-fields";
 
 import { LoanFields } from "./loan-fields";
 
-// A loan of £14,000 at 7.9%, £290 a month, over three years.
+// A loan of £14,000 at 7.9%, £290 a month, over three years, which run
+// to August 2029 counted from the fixture plan's September 2026.
 const loan: LoanDraft = { balance: 14000, payment: 290, rate: 0.079, term: 3 };
-
-// The month the plan is read in, September 2026, which the end of the
-// term is counted from: three years run to August 2029.
-const plan = { from: 2026, month: 8 };
 
 // Words of neither asset, so a test reads the caller's back off the
 // field they were given for.

@@ -16,6 +16,12 @@ import type { Answer } from "@/lib/answer";
 
 import { saveCar } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
+import {
+  golfPcp as finance,
+  golf,
+  golfLoan as loan,
+} from "@/data/cars.fixture";
+import { plan } from "@/data/income.fixture";
 import { saved as accepted, refused } from "@/lib/answer";
 import { commit, field, openDialog } from "@/test/dom";
 import { heldBack } from "@/test/held-back";
@@ -24,39 +30,10 @@ import { CarDialog } from "./car-dialog";
 
 vi.mock("@/actions/accounts", () => ({ saveCar: vi.fn() }));
 
-// A Golf worth £18,000 losing 15% a year, with the finance secured on
-// it: £14,000 owed at 7.9%, paying £290 a month towards a £6,000
-// balloon, which it reaches in three years.
-const golf: Account = {
-  balance: 18000,
-  growth: { kind: "fixed", rate: -0.15 },
-  id: 6,
-  kind: "car",
-  name: "Golf",
-};
-
-const loan: Account = {
-  balance: -14000,
-  contribution: { amount: 438, cadence: "month", kind: "fixed" },
-  growth: { kind: "fixed", rate: 0.079 },
-  id: 7,
-  kind: "debt",
-  name: "Golf loan",
-  secures: golf.id,
-};
-
-const finance: Account = {
-  ...loan,
-  balloon: 6000,
-  contribution: { amount: 290, cadence: "month", kind: "fixed" },
-  name: "Golf PCP",
-};
-
+// The Golf with the finance secured on it: £14,000 owed at 7.9%,
+// paying £290 a month towards a £6,000 balloon, which it reaches in
+// three years.
 const car: Secured = { asset: golf, loan: finance };
-
-// The month the plan is read in, September 2026, which the end of the
-// term is counted from.
-const plan = { from: 2026, month: 8 };
 
 const workedHint = "Worked out from the other two";
 

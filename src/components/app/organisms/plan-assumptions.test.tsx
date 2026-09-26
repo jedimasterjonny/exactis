@@ -11,7 +11,7 @@ import type { Plan } from "@/data/plan";
 
 import { saveAges } from "@/actions/plan";
 import { Toaster } from "@/components/kit/toast";
-import { plan } from "@/data/income.fixture";
+import { plan, retiring } from "@/data/income.fixture";
 import { refused, saved } from "@/lib/answer";
 import { commit } from "@/test/dom";
 
@@ -19,12 +19,10 @@ import { PlanAssumptions } from "./plan-assumptions";
 
 vi.mock("@/actions/plan", () => ({ saveAges: vi.fn() }));
 
-// The fixture's plan runs from 2026, when its owner born in 1992 is 34,
-// to 2083, when they are 91, and they retire at 61 within it.
-const retiring: Plan = { ...plan, retires: 61 };
-
-// A save reports through the toast manager, which needs its Toaster
-// mounted.
+// The assumptions on the plan given or the fixture's retiring one,
+// which runs from 2026, when its owner born in 1992 is 34, to 2083,
+// when they are 91, and retires them at 61 within it. A save reports
+// through the toast manager, which needs its Toaster mounted.
 function renderAssumptions(held: Plan = retiring): void {
   render(<PlanAssumptions plan={held} />, { wrapper: Toaster });
 }

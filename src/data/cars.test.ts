@@ -1,25 +1,16 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import type { Account } from "@/data/accounts";
+import {
+  golf as asset,
+  golfValues as golf,
+  golfLoan as loan,
+  golfPcp as pcp,
+} from "@/data/cars.fixture";
 
 import type { CarDraft, CarValues } from "./cars";
 
 import { carOf, clearsAfter, derive, isSound, toRecords } from "./cars";
-
-// A Golf worth £18,000 and losing 15% a year, with £14,000 owed on it
-// at 7.9% on a PCP paying £290 a month towards a £6,000 balloon, which
-// it reaches in three years and, carried on, clears in 4.9.
-const golf: CarValues = {
-  agreement: "pcp",
-  balance: 14000,
-  balloon: 6000,
-  depreciation: 0.15,
-  name: "Golf",
-  payment: 290,
-  rate: 0.079,
-  value: 18000,
-};
 
 // The same car on a loan, which £438 a month clears in three years.
 const financed: CarValues = {
@@ -39,33 +30,6 @@ const outright: CarValues = {
 };
 
 const draft: CarDraft = { ...golf, term: 3 };
-
-// The Golf as the store holds it: the car, and the finance secured on
-// it.
-const asset: Account = {
-  balance: 18000,
-  growth: { kind: "fixed", rate: -0.15 },
-  id: 6,
-  kind: "car",
-  name: "Golf",
-};
-
-const loan: Account = {
-  balance: -14000,
-  contribution: { amount: 438, cadence: "month", kind: "fixed" },
-  growth: { kind: "fixed", rate: 0.079 },
-  id: 7,
-  kind: "debt",
-  name: "Golf loan",
-  secures: 6,
-};
-
-const pcp: Account = {
-  ...loan,
-  balloon: 6000,
-  contribution: { amount: 290, cadence: "month", kind: "fixed" },
-  name: "Golf PCP",
-};
 
 // The plan read in September 2026, so eight months of the year are gone.
 const plan = { from: 2026 };

@@ -1,23 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { accounts } from "@/data/accounts.fixture";
+import { homeValues as home, house, houseLoan } from "@/data/houses.fixture";
 
-import type { HouseDraft, HouseValues } from "./houses";
+import type { HouseDraft } from "./houses";
 
 import { derive, houseOf, isSound, toRecords } from "./houses";
-
-// The reference kit's house: worth £397,512, with £334,670 owed on it at
-// 4.85% and £2,180 paid a month, which clears it in 20.0 years.
-const home: HouseValues = {
-  balance: 334670,
-  growth: 0.02,
-  name: "Home",
-  payment: 2180,
-  rate: 0.0485,
-  status: "mortgaged",
-  value: 397512,
-};
 
 const draft: HouseDraft = { ...home, term: 26 };
 
@@ -46,15 +34,13 @@ describe("isSound", () => {
 });
 
 describe("houseOf", () => {
-  const [, , , asset, loan] = accounts;
-
   // The fixture's home as a house, with its mortgage secured on it: the
   // loan's £176,520 owed comes back positive and its £2,180 a month is
   // the payment; without the loan the house is owned outright.
   it("reads a house's values back off its records", () => {
-    const house = { asset: { ...asset, kind: "house" as const }, loan };
+    const pair = { asset: house, loan: houseLoan };
 
-    expect(houseOf(house)).toStrictEqual({
+    expect(houseOf(pair)).toStrictEqual({
       balance: 176520,
       growth: 0.021,
       name: "Home",
@@ -63,7 +49,7 @@ describe("houseOf", () => {
       status: "mortgaged",
       value: 397512,
     });
-    expect(houseOf({ ...house, loan: null })).toStrictEqual({
+    expect(houseOf({ ...pair, loan: null })).toStrictEqual({
       balance: 0,
       growth: 0.021,
       name: "Home",
@@ -95,7 +81,7 @@ describe("toRecords", () => {
         kind: "house",
         name: "Home",
         owner: null,
-        rate: 0.02,
+        rate: 0.021,
       },
       loan: null,
     });

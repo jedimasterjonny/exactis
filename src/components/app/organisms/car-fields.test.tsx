@@ -4,27 +4,17 @@ import { describe, expect, it, vi } from "vitest";
 import type { CarDraft } from "@/data/cars";
 import type { LoanFigure } from "@/lib/figures";
 
+import { golfValues } from "@/data/cars.fixture";
+import { plan } from "@/data/income.fixture";
 import { commit, field, select } from "@/test/dom";
 
 import { CarFields } from "./car-fields";
 
 // The Golf as a draft: £14,000 owed at 7.9%, £290 a month, over the
-// three years the agreement has left, towards a £6,000 balloon.
-const golf: CarDraft = {
-  agreement: "pcp",
-  balance: 14000,
-  balloon: 6000,
-  depreciation: 0.15,
-  name: "Golf",
-  payment: 290,
-  rate: 0.079,
-  term: 3,
-  value: 18000,
-};
-
-// The month the plan is read in, September 2026, which the end of the
-// term is counted from: the Golf's three years run to August 2029.
-const plan = { from: 2026, month: 8 };
+// three years the agreement has left, towards a £6,000 balloon. The end
+// of the term is counted from the fixture plan's September 2026, so the
+// three years run to August 2029.
+const golf: CarDraft = { ...golfValues, term: 3 };
 
 const refinanced = "Refinanced on the same terms when the agreement ends";
 

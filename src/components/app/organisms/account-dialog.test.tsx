@@ -17,7 +17,7 @@ import { saveAccount } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 import { incomeLines } from "@/data/income.fixture";
-import { owners } from "@/data/owners.fixture";
+import { owners, sam } from "@/data/owners.fixture";
 import { refused, saved } from "@/lib/answer";
 import { commit, field, openDialog } from "@/test/dom";
 import { heldBack } from "@/test/held-back";
@@ -439,7 +439,7 @@ describe("AccountDialog", () => {
   // its field, and the save sends what the draft is left with.
   it("names a wrapper's owner, keeps it between wrappers and drops it with cash", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
-    renderDialog({ onSaved, owners: [...owners, { id: 2, name: "Sam" }] });
+    renderDialog({ onSaved, owners: [...owners, sam] });
     const dialog = openDialog();
     vi.mocked(saveAccount).mockResolvedValue(saved(pension));
 
