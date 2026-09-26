@@ -85,7 +85,11 @@ const config = Object.fromEntries(
 // when the chart arrives; whatever controls the caller gives for what
 // is plotted share the row, at its left, the toggle keeping the right,
 // and the row stands a gap clear of the plot, so a figure box above
-// the top tick does not crowd it. A projection of nothing, because no account
+// the top tick does not crowd it. The box is three times as wide as it
+// is tall down to a floor, and every frame with it: the row, the axis
+// and the legend take the same height at any width, and on a phone a
+// third of the width is less than they need, which left no plot at all.
+// A projection of nothing, because no account
 // is a wrapper yet, says so in the plot's place rather than drawing a
 // flat zero over a column of £0 ticks, and points at the screen where
 // the account is added: the dashboard has no way to add one itself.
@@ -100,7 +104,7 @@ export function ProjectionChart({
     return (
       <Frame>
         <EmptyState
-          className="aspect-[3/1]"
+          className="aspect-[3/1] min-h-72"
           description="Add a tax-free or tax-deferred account to see it projected."
           icon={ChartArea}
           title="Nothing to project yet"
@@ -137,7 +141,7 @@ export function ProjectionChart({
 
   return (
     <Frame>
-      <div className="flex aspect-[3/1] w-full flex-col gap-4">
+      <div className="flex aspect-[3/1] min-h-72 w-full flex-col gap-4">
         <div className="flex items-end gap-4">
           {controls}
           <MarkToggle mark={mark} onMarkChange={setMark} />
@@ -312,7 +316,7 @@ function MarkToggle({
 // atom, which closes a section with an icon; this is sized as the plot.
 function Placeholder({ children }: { readonly children: string }): JSX.Element {
   return (
-    <p className="flex aspect-[3/1] w-full items-center justify-center text-sm text-muted-foreground">
+    <p className="flex aspect-[3/1] min-h-72 w-full items-center justify-center text-sm text-muted-foreground">
       {children}
     </p>
   );
