@@ -192,7 +192,6 @@ describe("AccountLedger", () => {
       "1Workplace pension",
       "2Stocks & shares ISA",
       "3Current account",
-      "4Mortgage",
     ]);
     expect(
       within(
@@ -831,9 +830,9 @@ describe("AccountLedger", () => {
     });
   });
 
-  // The names down the reorder dialog, the mortgage last among them
-  // since a loan is paid as the accounts are, as the rows now stand: each
-  // row's grip is named for its account.
+  // The names down the reorder dialog, the savings alone since a debt is
+  // paid before any of them, as the rows now stand: each row's grip is
+  // named for its account.
   function names(): string[] {
     return screen
       .getAllByRole("button", { name: /^Move / })
@@ -842,8 +841,8 @@ describe("AccountLedger", () => {
 
   // Moving the ISA onto the pension puts it before the pension, since it
   // was below; the whole order goes to the store, the home and the
-  // mortgage where they were, and the rows show it before the store
-  // answers.
+  // mortgage where they were, though the dialog lists neither, and the
+  // rows show it before the store answers.
   it("moves a row onto another from the keyboard, shows the order at once and sends it whole to the store", async () => {
     renderLedger();
     fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
@@ -858,7 +857,6 @@ describe("AccountLedger", () => {
       "Workplace pension",
       "Stocks & shares ISA",
       "Current account",
-      "Mortgage",
     ]);
 
     fireEvent.keyDown(
@@ -871,7 +869,6 @@ describe("AccountLedger", () => {
         "Stocks & shares ISA",
         "Workplace pension",
         "Current account",
-        "Mortgage",
       ]);
     });
     expect(placeAccountsInOrder).toHaveBeenCalledExactlyOnceWith([
@@ -885,7 +882,6 @@ describe("AccountLedger", () => {
         "Workplace pension",
         "Stocks & shares ISA",
         "Current account",
-        "Mortgage",
       ]);
     });
   });
@@ -946,14 +942,14 @@ describe("AccountLedger", () => {
         "Move Workplace pension",
         "Move Stocks & shares ISA",
         "Move Current account",
-        "Move Mortgage",
       ]);
     });
   });
 
   // A house and the loan against it share a row, which opens both in the
-  // house dialog; the loan leaves the accounts' section for it, and stays
-  // in the order, since its payments are met in it as any other's are.
+  // house dialog; the loan leaves the accounts' section for it, and is no
+  // more in the order than any other debt, so the one saving left is no
+  // order and the owners take its numeral.
   it("puts a house and the loan against it on one row, which opens both in the house dialog", () => {
     render(
       <Toaster>
@@ -987,11 +983,13 @@ describe("AccountLedger", () => {
       screen.queryByRole("button", { name: "Edit Mortgage" }),
     ).not.toBeInTheDocument();
     expect(
-      within(screen.getByRole("region", { name: "Order of payment" }))
-        .getAllByRole("listitem")
-        .map((item) => item.textContent),
-    ).toStrictEqual(["1Workplace pension", "2Mortgage"]);
-    expect(screen.getByText("Sect. II.iii")).toHaveClass("label");
+      screen.queryByRole("region", { name: "Order of payment" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Owners" })).getByText(
+        "Sect. II.iii",
+      ),
+    ).toHaveClass("label");
 
     const dialog = openEditor("Home");
 

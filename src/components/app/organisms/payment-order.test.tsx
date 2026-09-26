@@ -15,11 +15,11 @@ import { PaymentOrder } from "./payment-order";
 
 type Move = (account: Account, target: Account) => void;
 
-// The fixture's accounts less its home, in the order the store lists
-// them: the ones the order is set over, since an asset is paid nothing
-// out of the month and drawn on never.
-const [pension, isa, cash, , mortgage] = accounts;
-const held: readonly Account[] = [pension, isa, cash, mortgage];
+// The fixture's savings, in the order the store lists them: the ones
+// the order is set over, since an asset is paid nothing out of the
+// month and drawn on never, and a debt is paid before any of them.
+const [pension, isa, cash] = accounts;
+const held: readonly Account[] = [pension, isa, cash];
 
 describe("PaymentOrder", () => {
   it("numbers the accounts down the line, and says what the order decides", () => {
@@ -36,7 +36,7 @@ describe("PaymentOrder", () => {
     expect(within(region).getByText("Sect. II.iii")).toHaveClass("label");
     expect(
       within(region).getByText(
-        "When a month runs short, fixed payments are met in this order. Spare money is handed down it too, and savings are drawn on in it one kind at a time.",
+        "Debts are always paid first. Savings are then paid in this order, and drawn on in it one kind at a time.",
       ),
     ).toHaveClass("text-muted-foreground");
     expect(
@@ -47,7 +47,6 @@ describe("PaymentOrder", () => {
       "1Workplace pension",
       "2Stocks & shares ISA",
       "3Current account",
-      "4Mortgage",
     ]);
     expect(
       within(region).getByRole("button", { name: "Reorder" }),
@@ -86,9 +85,11 @@ describe("PaymentOrder", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
 
     const dialog = screen.getByRole("dialog", { name: "Order of payment" });
-    const mortgageRow = within(dialog).getByRole("row", { name: /Mortgage/ });
     const cashRow = within(dialog).getByRole("row", {
       name: /Current account/,
+    });
+    const pensionRow = within(dialog).getByRole("row", {
+      name: /Workplace pension/,
     });
 
     expect(within(dialog).getByText("Reorder")).toHaveClass(
@@ -96,7 +97,7 @@ describe("PaymentOrder", () => {
       "text-brand",
     );
     expect(within(dialog).getAllByRole("row")).toHaveLength(held.length);
-    expect(mortgageRow).toHaveTextContent("4MortgageDebt");
+    expect(cashRow).toHaveTextContent("3Current accountCash");
 
     fireEvent.keyDown(
       within(dialog).getByRole("button", { name: "Move Stocks & shares ISA" }),
@@ -106,21 +107,21 @@ describe("PaymentOrder", () => {
     expect(onMove).toHaveBeenLastCalledWith(isa, pension);
 
     fireEvent.dragStart(
-      within(dialog).getByRole("button", { name: "Move Mortgage" }),
+      within(dialog).getByRole("button", { name: "Move Current account" }),
       { dataTransfer: { setData: vi.fn() } },
     );
-    fireEvent.dragOver(mortgageRow);
-
-    expect(mortgageRow).toHaveAttribute("data-moving", "");
-    expect(mortgageRow).not.toHaveAttribute("data-over");
-
     fireEvent.dragOver(cashRow);
 
-    expect(cashRow).toHaveAttribute("data-over", "");
+    expect(cashRow).toHaveAttribute("data-moving", "");
+    expect(cashRow).not.toHaveAttribute("data-over");
 
-    fireEvent.drop(cashRow);
+    fireEvent.dragOver(pensionRow);
 
-    expect(onMove).toHaveBeenLastCalledWith(mortgage, cash);
+    expect(pensionRow).toHaveAttribute("data-over", "");
+
+    fireEvent.drop(pensionRow);
+
+    expect(onMove).toHaveBeenLastCalledWith(cash, pension);
     expect(onMove).toHaveBeenCalledTimes(2);
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Done" }));
