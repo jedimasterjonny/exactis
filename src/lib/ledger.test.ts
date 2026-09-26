@@ -5,6 +5,7 @@ import { accounts } from "@/data/accounts.fixture";
 import { incomeLines } from "@/data/income.fixture";
 
 import {
+  balanceOf,
   equityOf,
   fixedMonthly,
   formatContribution,
@@ -14,6 +15,15 @@ import {
 } from "./ledger";
 
 const [pension, isa, cash, home, mortgage] = accounts;
+
+// The fixture's five accounts, the mortgage's balance taking away, hold
+// £950,771 between them.
+describe("balanceOf", () => {
+  it("adds up what the accounts hold, a debt's balance taking away, and nothing for none", () => {
+    expect(balanceOf(accounts)).toBe(950771);
+    expect(balanceOf([])).toBe(0);
+  });
+});
 
 describe("equityOf", () => {
   it("takes what is owed off the value, and holds all of one owned outright", () => {

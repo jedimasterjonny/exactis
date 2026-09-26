@@ -55,6 +55,9 @@ describe("AccountTable", () => {
 
   // The fixture's pension and ISA belong to its one owner, who is named
   // beneath each; the current account belongs to nobody and names none.
+  // The cell's name runs the account's and the owner's together, since
+  // the owner's is its own block, which also tells it from the folded
+  // cell's, which starts the same.
   it("writes whose a wrapper is beneath its name", () => {
     render(
       <AccountTable
@@ -67,12 +70,12 @@ describe("AccountTable", () => {
 
     expect(
       within(
-        screen.getByRole("cell", { name: /^Workplace pension/ }),
+        screen.getByRole("cell", { name: "Workplace pensionMe" }),
       ).getByText("Me"),
     ).toHaveClass("text-muted-foreground");
     expect(
       within(
-        screen.getByRole("cell", { name: /^Stocks & shares ISA/ }),
+        screen.getByRole("cell", { name: "Stocks & shares ISAMe" }),
       ).getByText("Me"),
     ).toBeInTheDocument();
     expect(
@@ -206,7 +209,15 @@ describe("AccountTable", () => {
       within(totals)
         .getAllByRole("cell")
         .map((cell) => cell.textContent),
-    ).toStrictEqual(["Total", "", "£5,083 / mo", "", "£717,325", ""]);
+    ).toStrictEqual([
+      "Total£717,325£5,083 / mo paid",
+      "Total",
+      "",
+      "£5,083 / mo",
+      "",
+      "£717,325",
+      "",
+    ]);
 
     view.rerender(
       <AccountTable
@@ -241,6 +252,13 @@ describe("AccountTable", () => {
         name: "£2,266 / mo + spare",
       }),
     ).toHaveClass("figure");
+    // Folded, the total says the fixed part is paid, the spare money on
+    // top of it.
+    expect(
+      within(screen.getByRole("row", { name: /^Total/ })).getByText(
+        "£2,266 / mo paid + spare",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("draws its empty state rather than a header over no rows", () => {
@@ -325,5 +343,149 @@ describe("AccountTable", () => {
     expect(screen.getAllByRole("button", { name: /^Delete / })).toHaveLength(
       assets.length,
     );
+  });
+
+  // Narrow, each row is one cell: the name and the balance, then what
+  // the account is, whose and how it grows, then what it is paid, a
+  // fixed sum saying so since its heading is folded away, the sacrifice
+  // run on after the pension's own. The columns and the header hide
+  // while it shows. Cash is paid nothing, which says nothing on a line
+  // of its own, and belongs to nobody.
+  it("folds each row into one cell while narrow, for the columns and the header it stands for", () => {
+    const [salary] = incomeLines;
+    render(
+      <AccountTable
+        accounts={held}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        lines={[salary]}
+        owners={owners}
+      />,
+    );
+
+    const [header] = screen.getAllByRole("rowgroup");
+    const row = screen.getByRole("row", { name: /^Workplace pension£412,880/ });
+    // The folded cell's name runs its lines together, as a cell's does,
+    // so it starts with the name and the balance where the column's
+    // starts with the name and the owner.
+    const pension = within(row).getByRole("cell", {
+      name: /^Workplace pension£412,880/,
+    });
+
+    expect(header).toHaveClass("folded:hidden");
+    expect(pension).toHaveClass("unfolded:hidden");
+    expect(within(pension).getByText("£412,880")).toHaveClass("figure");
+    expect(
+      within(pension).getByText("Tax-deferred · Me · grows at Plan rate"),
+    ).toBeInTheDocument();
+    expect(
+      within(pension).getByText(
+        "£2,266 / mo paid + £1,150 / mo sacrificed from Salary",
+      ),
+    ).toBeInTheDocument();
+    const columns = within(row)
+      .getAllByRole("cell")
+      .filter((cell) => cell !== pension);
+
+    expect(columns).toHaveLength(5);
+    for (const column of columns) {
+      expect(column).toHaveClass("folded:hidden");
+    }
+    expect(
+      screen.getByRole("cell", {
+        name: "Current account£18,300 Cash · grows at 0.00%",
+      }),
+    ).toHaveClass("unfolded:hidden");
+  });
+
+  // A pension paid nothing of its own, here the current account made
+  // one under the pension's id, which the salary feeds, has the
+  // sacrifice as its figure; and a debt is charged its rate rather than
+  // growing at it.
+  it("writes a sacrifice alone, and a debt's rate, on a folded row", () => {
+    const [pension, , cash, , mortgage] = accounts;
+    const [salary] = incomeLines;
+    render(
+      <AccountTable
+        accounts={[
+          { ...cash, id: pension.id, kind: "tax-deferred", name: "SIPP" },
+          mortgage,
+        ]}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        lines={[salary]}
+      />,
+    );
+
+    expect(
+      screen.getByRole("cell", {
+        name: "SIPP£18,300 Tax-deferred · grows at 0.00%£1,150 / mo sacrificed from Salary",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("cell", {
+        name: "Mortgage−£182,940 Debt · at 5.15%£2,210 / mo paid",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  // The folded row has no room for a pencil or a bin, so it opens from
+  // anywhere on it and its actions fold away with the other columns,
+  // the dialog it opens being where it is deleted from. A table given no
+  // edit handler has no dialog to send a bin to, so it keeps its bins.
+  it("opens a folded row from its name and folds its actions away, unless it cannot open", () => {
+    const onDelete = vi.fn<(account: Account) => void>();
+    const onEdit = vi.fn<(account: Account) => void>();
+    const view = render(
+      <AccountTable
+        accounts={assets}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        onDelete={onDelete}
+        onEdit={onEdit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Mortgage" }));
+
+    const [folded, ...columns] = within(
+      screen.getByRole("row", { name: /^Mortgage/ }),
+    ).getAllByRole("cell");
+    const [total, ...totals] = within(
+      screen.getByRole("row", { name: /^Total/ }),
+    ).getAllByRole("cell");
+
+    expect(onEdit).toHaveBeenCalledExactlyOnceWith(assets[1]);
+    expect(folded).toHaveClass("unfolded:hidden");
+    expect(total).toHaveClass("unfolded:hidden");
+    expect(columns.at(-1)).toContainElement(
+      screen.getByRole("button", { name: "Delete Mortgage" }),
+    );
+    for (const column of [...columns, ...totals]) {
+      expect(column).toHaveClass("folded:hidden");
+    }
+
+    view.rerender(
+      <AccountTable
+        accounts={assets}
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        onDelete={onDelete}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Mortgage" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("row", { name: /^Mortgage/ }))
+        .getAllByRole("cell")
+        .at(-1),
+    ).not.toHaveClass("folded:hidden");
+    expect(
+      within(screen.getByRole("row", { name: /^Total/ }))
+        .getAllByRole("cell")
+        .at(-1),
+    ).not.toHaveClass("folded:hidden");
   });
 });
