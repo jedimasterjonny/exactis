@@ -84,12 +84,14 @@ describe("project", () => {
   // The current account is no wrapper, and is carried on its own at the
   // £16,900 it holds, paid nothing and at no growth; the home at its own
   // 2.1%, 397,512 × 1.021 = 405,859.75, then 414,382.81; and the
-  // mortgage is not carried.
+  // mortgage paid down by its £2,180 a month, each month charged a
+  // twelfth of its 4.85% on what it owes before the payment comes off:
+  // 158,524.70 owed after a year, then 139,636.95.
   it("pays a year's sum in a twelfth at a time, each month grown at the plan rate, by wrapper", () => {
     expect(project(accounts, funded, { ...plan, years: 2 })).toStrictEqual([
       {
         age: 34,
-        balances: { 1: 391640, 2: 271930, 3: 16900, 4: 397512 },
+        balances: { 1: 391640, 2: 271930, 3: 16900, 4: 397512, 5: -176520 },
         deferred: 391640,
         early: 0,
         free: 271930,
@@ -98,7 +100,7 @@ describe("project", () => {
       },
       {
         age: 35,
-        balances: { 1: 447820, 2: 306064, 3: 16900, 4: 405860 },
+        balances: { 1: 447820, 2: 306064, 3: 16900, 4: 405860, 5: -158525 },
         deferred: 447820,
         early: 0,
         free: 306064,
@@ -107,7 +109,7 @@ describe("project", () => {
       },
       {
         age: 36,
-        balances: { 1: 506809, 2: 341905, 3: 16900, 4: 414383 },
+        balances: { 1: 506809, 2: 341905, 3: 16900, 4: 414383, 5: -139637 },
         deferred: 506809,
         early: 0,
         free: 341905,
@@ -475,7 +477,7 @@ describe("project", () => {
   // cover none of a month it was short and plot a wrapper owing money,
   // and a home at minus £500 would be worth less than nothing. A
   // balance of nothing is carried as it stands, and the mortgage,
-  // owing £176,520 and held by nothing, is left where it is.
+  // owing £176,520, is owed rather than held, and is paid down.
   it("refuses a held account below nothing", () => {
     expect(() =>
       project([{ ...flatIsa, balance: -500 }], funded, { ...plan, years: 1 }),
@@ -491,7 +493,7 @@ describe("project", () => {
     ).toStrictEqual([
       {
         age: 34,
-        balances: { 6: 0 },
+        balances: { 5: -176520, 6: 0 },
         deferred: 0,
         early: 0,
         free: 0,
@@ -500,7 +502,7 @@ describe("project", () => {
       },
       {
         age: 35,
-        balances: { 6: 0 },
+        balances: { 5: -158525, 6: 0 },
         deferred: 0,
         early: 0,
         free: 0,
@@ -655,6 +657,9 @@ describe("project", () => {
   // £45,818.80. Charged for every month of the plan instead, as it
   // was, the card would take £250 a month for ever and the ISA would be
   // held to £1,203.30 a month in every year after the debt was gone.
+  // The card owes £2,896.21 after its twelfth payment and £279.95 after
+  // its twenty-fourth, and its twenty-sixth, £214.28 more than it
+  // owes, leaves it owing nothing rather than owed.
   it("charges a debt's fixed sum only to the month its payments clear it", () => {
     const card: Account = {
       balance: -5000,
@@ -679,11 +684,79 @@ describe("project", () => {
     };
     const saving: Account = { ...spareIsa, balance: 0 };
 
+    const points = project([card, saving], earned, { ...plan, years: 3 });
+
+    expect(points.map(({ free }) => free)).toStrictEqual([
+      0, 14440, 28879, 45819,
+    ]);
+    expect(points.map(({ balances }) => balances[card.id])).toStrictEqual([
+      -5000, -2896, -280, 0,
+    ]);
+  });
+
+  // A £2,400 loan at no interest paid by a line of £300 a month, and
+  // not by the £100 a month it states, since the line pays in its
+  // place. Read in September, 2026 pays four of them, £1,200; 2027
+  // pays the last four by April, and the line runs on through the
+  // year, so the loan owes nothing rather than being owed £2,400.
+  it("pays a debt down by the line paying it, and no further than nothing", () => {
+    const loan: Account = {
+      balance: -2400,
+      contribution: { amount: 100, cadence: "month", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0 },
+      id: 8,
+      kind: "debt",
+      name: "Loan",
+    };
+    const paying = {
+      ...household,
+      amount: 300,
+      id: 9,
+      lastYear: null,
+      pays: loan.id,
+    };
+
     expect(
-      project([card, saving], earned, { ...plan, years: 3 }).map(
-        ({ free }) => free,
+      project(
+        [loan],
+        { expenses: [paying], income: funded.income },
+        { ...plan, month: 8, years: 2 },
+      ).map(({ balances }) => balances),
+    ).toStrictEqual([{ 8: -2400 }, { 8: -1200 }, { 8: 0 }]);
+  });
+
+  // A PCP owing £10,000 with a £4,000 balloon at no interest, paying
+  // £500 a month, is paid down to the balloon over 2026 and then paid
+  // nothing, so it owes the £4,000 for the rest of the plan. A £1,000
+  // debt at 10% that nothing pays is charged nothing and owes its
+  // £1,000 throughout.
+  it("holds a balloon where the payments leave it, and a debt nothing pays where it opened", () => {
+    const pcp: Account = {
+      balance: -10000,
+      balloon: 4000,
+      contribution: { amount: 500, cadence: "month", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0 },
+      id: 8,
+      kind: "debt",
+      name: "PCP",
+    };
+    const owed: Account = {
+      balance: -1000,
+      growth: { kind: "fixed", rate: 0.1 },
+      id: 9,
+      kind: "debt",
+      name: "Family loan",
+    };
+
+    expect(
+      project([pcp, owed], funded, { ...plan, years: 2 }).map(
+        ({ balances }) => balances,
       ),
-    ).toStrictEqual([0, 14440, 28879, 45819]);
+    ).toStrictEqual([
+      { 8: -10000, 9: -1000 },
+      { 8: -4000, 9: -1000 },
+      { 8: -4000, 9: -1000 },
+    ]);
   });
 
   // Read in December, so 2026 carries one month: the £1,000 going out
@@ -772,7 +845,7 @@ describe("project", () => {
   // Nothing coming in, and a £2,000 loan at no interest paid £500 a
   // month, so it clears in April: the four payments are owed, so each
   // is drawn from the ISA as an expense would be, £2,000 in all, and
-  // nothing after the loan clears.
+  // nothing after the loan clears, which owes nothing from then on.
   it("draws on the savings for a debt's payment the month cannot meet", () => {
     const loan: Account = {
       balance: -2000,
@@ -792,7 +865,7 @@ describe("project", () => {
     ).toStrictEqual([
       {
         age: 34,
-        balances: { 6: 20000 },
+        balances: { 6: 20000, 8: -2000 },
         deferred: 0,
         early: 0,
         free: 20000,
@@ -801,7 +874,7 @@ describe("project", () => {
       },
       {
         age: 35,
-        balances: { 6: 18000 },
+        balances: { 6: 18000, 8: 0 },
         deferred: 0,
         early: 0,
         free: 18000,
@@ -1382,15 +1455,15 @@ describe("project", () => {
     });
   });
 
-  // The home is carried at its own 2.1% and is in neither wrapper, so
-  // both sums are nothing.
+  // The home is carried at its own 2.1% and the mortgage paid down, and
+  // neither is in a wrapper, so both sums are nothing.
   it("sums no wrapper when no account is one, carrying the home all the same", () => {
     expect(
       project([home, mortgage], funded, { ...plan, years: 1 }),
     ).toStrictEqual([
       {
         age: 34,
-        balances: { 4: 397512 },
+        balances: { 4: 397512, 5: -176520 },
         deferred: 0,
         early: 0,
         free: 0,
@@ -1399,7 +1472,7 @@ describe("project", () => {
       },
       {
         age: 35,
-        balances: { 4: 405860 },
+        balances: { 4: 405860, 5: -158525 },
         deferred: 0,
         early: 0,
         free: 0,
