@@ -128,6 +128,9 @@ describe("PaymentOrder", () => {
       "label",
       "text-brand",
     );
+    // Held to the screen's height, a long order scrolls rather than
+    // running Done off a phone.
+    expect(dialog).toHaveClass("max-h-[calc(100dvh-2rem)]");
     expect(within(dialog).getAllByRole("row")).toHaveLength(held.length);
     expect(cashRow).toHaveTextContent("3Current accountCash");
 

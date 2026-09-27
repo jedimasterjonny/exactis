@@ -74,7 +74,7 @@ Ask what it composes, not how big it is. Size correlates but does not decide.
 
 A useful check, though it only runs one way. An atom imports at most one `kit/`
 wrapper, and so does a molecule, which reaches the rest of what it draws through
-the atoms it composes; an organism imports at most four. So a proposed atom or
+the atoms it composes; an organism imports at most three. So a proposed atom or
 molecule reaching for two is probably an organism, or holds an atom still to be
 lifted out, as the dialog frame was out of the edit dialog. The floor is zero at
 every tier, so a low count says nothing: ten of the organisms import no wrapper
