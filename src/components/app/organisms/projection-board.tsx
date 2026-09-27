@@ -19,7 +19,7 @@ import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ProjectionChart } from "@/components/app/organisms/projection-chart";
 import { markersOf, timed } from "@/data/milestones";
 import { ageIn, endAge, retirementYear } from "@/data/plan";
-import { balanceOf, project } from "@/engine/projection";
+import { balanceOf, holdsAnything, project } from "@/engine/projection";
 import { useSender } from "@/hooks/use-sender";
 import { formatGbp } from "@/lib/money";
 
@@ -110,7 +110,7 @@ export function ProjectionBoard({
     },
     drafted,
   );
-  const isProjecting = points.some((point) => balanceOf(point) > 0);
+  const isProjecting = points.some(holdsAnything);
   const markers = isProjecting
     ? markersOf(milestones, drafted).filter(({ year }) =>
         points.some((point) => point.year === year),
@@ -185,6 +185,7 @@ export function ProjectionBoard({
         {children}
       </TileGrid>
       <ProjectionChart
+        accounts={accounts}
         choices={
           chosen === undefined ? undefined : (
             <MilestoneChips

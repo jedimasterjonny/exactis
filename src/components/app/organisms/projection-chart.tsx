@@ -19,6 +19,7 @@ import {
   YAxis,
 } from "recharts";
 
+import type { Account, AccountKind } from "@/data/accounts";
 import type { Marker } from "@/data/milestones";
 import type { Tie } from "@/data/schedule";
 import type { ProjectionPoint } from "@/engine/projection";
@@ -28,16 +29,26 @@ import { LabelledSwitch } from "@/components/app/atoms/labelled-switch";
 import { buttonVariants } from "@/components/kit/button";
 import { Card, CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
-import { balanceOf } from "@/engine/projection";
+import { balanceIn, balanceOf, holdsAnything } from "@/engine/projection";
 import { listed } from "@/lib/feeders";
 import { formatAxisGbp, formatGbp } from "@/lib/money";
 import { accountsAndAssets } from "@/lib/nav";
+
+// The kinds of account that share a colour, and the colour, from the
+// palette's series tokens, which name a series by what it is. The
+// accounts of one family are drawn in its colour, each told from the
+// others of its kind by lightness.
+interface Family {
+  readonly color: string;
+  readonly kinds: readonly AccountKind[];
+}
 
 // The mark each series is drawn as: an area under a line, or a column
 // per year. The series stack either way, so the top is the total.
 type Mark = "area" | "bar";
 
 interface ProjectionChartProps {
+  readonly accounts: readonly Account[];
   readonly choices?: ReactNode;
   readonly controls?: ReactNode;
   readonly milestones: readonly Marker[];
@@ -45,18 +56,30 @@ interface ProjectionChartProps {
   readonly selected?: Tie | undefined;
 }
 
-type Series = (typeof series)[number]["key"];
-
-// The two series, in the order the progress table lists them and the
-// order they stack, the first at the baseline. Each keeps its colour for
-// good: a series is never recoloured by what else is plotted. The colour
+// An account the chart draws on its own: its id, its name, the colour
+// it is drawn in, and the key that colour is written under. The colour
 // is named once: the container writes it into --color-<key> within its
 // own scope, and everything drawn for the series, the tooltip's key
 // included, reads it back from there.
-const series = [
-  { color: "var(--chart-2)", key: "deferred", label: "Tax-deferred" },
-  { color: "var(--chart-1)", key: "free", label: "Tax-free" },
-] as const;
+interface Series {
+  readonly color: string;
+  readonly id: number;
+  readonly key: string;
+  readonly name: string;
+}
+
+// The families the chart stacks, in the order they stack, the first at
+// the baseline: the pensions, then the ISAs, so the top of the two is
+// where the balance a milestone is read at stands; then cash; then what
+// the plan owns, a house, a car or another real asset, above them all.
+// The wrappers keep the colours they had, and cash and the assets take
+// the palette's colours for cash and for property.
+const families: readonly Family[] = [
+  { color: "var(--chart-2)", kinds: ["tax-deferred"] },
+  { color: "var(--chart-1)", kinds: ["tax-free"] },
+  { color: "var(--chart-4)", kinds: ["cash"] },
+  { color: "var(--chart-3)", kinds: ["house", "car", "real-asset"] },
+];
 
 // The height of the plot's box, the frames standing in for it and the
 // empty state in its place: three times as wide as it is tall, down to a
@@ -64,13 +87,10 @@ const series = [
 // their own above the plot.
 const boxSize = "aspect-[3/1] min-h-90 sm:min-h-72";
 
-const config = Object.fromEntries(
-  series.map(({ color, key, label }) => [key, { color, label }]),
-);
-
-// The dashboard's chart: the two wrappers, projected a year at a time,
-// stacked so the top of the stack is the total, as areas under lines or,
-// on the toggle, as a column per year. The plot alone, with no figure
+// The dashboard's chart: every account the plan holds, projected a year
+// at a time and each drawn on its own, stacked so the top of the stack
+// is the total, as areas under lines or, on the toggle, as a column per
+// year. The plot alone, with no figure
 // over it: a hairline grid, the years and the pounds as recessive ticks,
 // and a crosshair with the year's figures on hover and on the arrow
 // keys, which names each series beside its figure, so no legend names
@@ -90,7 +110,7 @@ const config = Object.fromEntries(
 // writes over the other a year apart or in the one year. Every
 // milestone is marked too, retirement among them, as a faint hairline
 // in oxide, the palette's colour for milestones, and the one the caller
-// says is chosen as a solid line with a dot on the top of the stack,
+// says is chosen as a solid line with a dot on the top of the wrappers,
 // where the balance it is read at stands. A milestone's line carries no
 // name: on a phone a year is a few pixels wide and a name spans more
 // than a decade, so the names are the caller's to give, as the choices
@@ -111,11 +131,12 @@ const config = Object.fromEntries(
 // the rows and the axis take the same height at any width,
 // and on a phone a third of the width is less than they need, which
 // left no plot at all, so the floor there is higher again.
-// A projection of nothing, because no account
-// is a wrapper yet, says so in the plot's place rather than drawing a
+// A projection of nothing, because the plan
+// holds nothing yet, says so in the plot's place rather than drawing a
 // flat zero over a column of £0 ticks, and points at the screen where
-// the account is added: the dashboard has no way to add one itself.
+// an account is added: the dashboard has no way to add one itself.
 export function ProjectionChart({
+  accounts,
   choices,
   controls,
   milestones,
@@ -124,12 +145,12 @@ export function ProjectionChart({
 }: ProjectionChartProps): JSX.Element {
   const [mark, setMark] = useState<Mark>("area");
 
-  if (points.every((point) => balanceOf(point) === 0)) {
+  if (!points.some(holdsAnything)) {
     return (
       <Frame>
         <EmptyState
           className={boxSize}
-          description="Add a tax-free or tax-deferred account to see it projected."
+          description="Add an account or an asset to see it projected."
           icon={ChartArea}
           title="Nothing to project yet"
         >
@@ -148,6 +169,11 @@ export function ProjectionChart({
   // mark: recharts draws the crosshair as a band over the year's columns
   // only when the chart is a bar chart by name.
   const Plot = mark === "bar" ? BarChart : AreaChart;
+
+  const series = seriesOf(accounts);
+  const config = Object.fromEntries(
+    series.map(({ color, key, name }) => [key, { color, label: name }]),
+  );
 
   // The first year that could not draw what it needed from anywhere,
   // which is the year the money runs out. Undefined while every year
@@ -230,30 +256,31 @@ export function ProjectionChart({
                   {...props}
                   milestones={milestones}
                   points={points}
+                  series={series}
                 />
               )}
             />
-            {series.map(({ key }) =>
+            {series.map(({ id, key }) =>
               mark === "area" ? (
                 <Area
                   activeDot={{ r: 4, stroke: "var(--card)", strokeWidth: 2 }}
-                  dataKey={key}
+                  dataKey={(point: ProjectionPoint) => balanceIn(point, id)}
                   dot={false}
                   fill={`url(#${washOf(key)})`}
                   isAnimationActive={false}
                   key={key}
-                  stackId="wrappers"
+                  stackId="accounts"
                   stroke={`var(--color-${key})`}
                   strokeWidth={2}
                   type="monotone"
                 />
               ) : (
                 <Bar
-                  dataKey={key}
+                  dataKey={(point: ProjectionPoint) => balanceIn(point, id)}
                   fill={`var(--color-${key})`}
                   isAnimationActive={false}
                   key={key}
-                  stackId="wrappers"
+                  stackId="accounts"
                 />
               ),
             )}
@@ -320,10 +347,17 @@ export function ProjectionPending(): JSX.Element {
   );
 }
 
-// The card around the plot.
+// The card around the plot, which lets what is drawn over the plot out
+// past its edge rather than clipping it as a card clips its contents:
+// the crosshair's figures run to a line for every account, taller than
+// the plot beside a plan of a few, and the last of them is the total.
+// Clipping is also what held the card to the width of its column,
+// since an item that clips may shrink below its contents, so it is
+// held there by name: unheld, it took the width of what it holds, and a
+// phone's page scrolled sideways to nearly three times its width.
 function Frame({ children }: { readonly children: JSX.Element }): JSX.Element {
   return (
-    <Card>
+    <Card className="min-w-0 overflow-visible">
       <CardContent>{children}</CardContent>
     </Card>
   );
@@ -370,8 +404,9 @@ function Placeholder({ children }: { readonly children: string }): JSX.Element {
 }
 
 // The year under the crosshair, the age reached that year and the
-// milestones falling in it, and each series' figure with the total
-// beneath, and under that, for a year that drew on a pension early, what
+// milestones falling in it, and each account's figure, from the top of
+// the stack down as the plot reads, with the total of them beneath,
+// and under that, for a year that drew on a pension early, what
 // it drew so, and for a year that came up short, what it could not
 // cover. The values lead, in mono, with
 // a stroke of the series' colour keying the name beside each. The point
@@ -382,8 +417,11 @@ function ProjectionTooltip({
   label,
   milestones,
   points,
+  series,
 }: Pick<ProjectionChartProps, "milestones" | "points"> &
-  TooltipContentProps): JSX.Element | null {
+  TooltipContentProps & {
+    readonly series: readonly Series[];
+  }): JSX.Element | null {
   const point = points.find((candidate) => candidate.year === label);
   if (!isActive || point === undefined) {
     return null;
@@ -406,7 +444,7 @@ function ProjectionTooltip({
           </span>
         )}
       </span>
-      {series.map(({ key, label: name }) => (
+      {[...series].reverse().map(({ id, key, name }) => (
         <span className="flex items-center gap-2" key={key}>
           <span
             aria-hidden
@@ -415,14 +453,16 @@ function ProjectionTooltip({
           />
           <span className="text-muted-foreground">{name}</span>
           <span className="ml-auto figure font-medium">
-            {formatGbp(point[key])}
+            {formatGbp(balanceIn(point, id))}
           </span>
         </span>
       ))}
       <span className="flex items-center gap-2 border-t pt-1.5">
         <span className="text-muted-foreground">Total</span>
         <span className="ml-auto figure font-medium">
-          {formatGbp(balanceOf(point))}
+          {formatGbp(
+            series.reduce((sum, { id }) => sum + balanceIn(point, id), 0),
+          )}
         </span>
       </span>
       {point.early > 0 && (
@@ -445,11 +485,31 @@ function ProjectionTooltip({
   );
 }
 
+// Each account the chart draws, family by family in the order they
+// stack, and within a family in the order the accounts are listed. The
+// first of a family takes its colour, and each after it recedes a
+// further 30% toward the card, to 60% at most, so the family is told by
+// hue and its accounts from each other by lightness, in either theme.
+// An account's colour follows its place among its own kind, so what
+// else the plan holds never recolours it.
+function seriesOf(accounts: readonly Account[]): Series[] {
+  return families.flatMap(({ color, kinds }) =>
+    accounts
+      .filter(({ kind }) => kinds.includes(kind))
+      .map(({ id, name }, place) => ({
+        color: `color-mix(in oklab, ${color}, var(--card) ${String(Math.min(place, 2) * 30)}%)`,
+        id,
+        key: `account-${String(id)}`,
+        name,
+      })),
+  );
+}
+
 // The area under each line is its series' colour fading from a quarter
-// at the line to nothing at the baseline, rather than a flat tenth. The
-// light theme's petrol has too little chroma for a flat tint to read as
-// anything but grey, and the hue matters most along the curve. One chart
-// per page, so the gradients' ids are constants.
-function washOf(key: Series): string {
+// at the line to nothing at the line beneath it, rather than a flat
+// tenth. The light theme's petrol has too little chroma for a flat tint
+// to read as anything but grey, and the hue matters most along the
+// curve. One chart per page, so the gradients' ids are the series' own.
+function washOf(key: string): string {
   return `projection-wash-${key}`;
 }
