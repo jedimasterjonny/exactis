@@ -47,8 +47,8 @@ interface Family {
 // A family's hues: one at least.
 type Hues = readonly [string, ...string[]];
 
-// The mark each series is drawn as: an area under a line, or a column
-// per year. The series stack either way, what is held up from nothing
+// The mark each series is drawn as: a column per year, or an area
+// under a line. The series stack either way, what is held up from nothing
 // and what is owed down from it.
 type Mark = "area" | "bar";
 
@@ -103,8 +103,9 @@ const boxSize = "aspect-[3/1] min-h-90 sm:min-h-72";
 
 // The dashboard's chart: every account the plan holds or owes, projected
 // a year at a time and each drawn on its own, what it holds stacked up
-// from nothing and what it owes down from it, as areas under lines or,
-// on the toggle, as a column per year. The plot alone, with no figure
+// from nothing and what it owes down from it, as a column per year to
+// begin with or, on the toggle, as areas under lines. The plot alone,
+// with no figure
 // over it: a hairline grid, the years and the pounds as recessive ticks,
 // and a crosshair with the year's figures on hover and on the arrow
 // keys, which names each series beside its figure, so no legend names
@@ -157,7 +158,7 @@ export function ProjectionChart({
   points,
   selected,
 }: ProjectionChartProps): JSX.Element {
-  const [mark, setMark] = useState<Mark>("area");
+  const [mark, setMark] = useState<Mark>("bar");
 
   if (!points.some(holdsAnything)) {
     return (

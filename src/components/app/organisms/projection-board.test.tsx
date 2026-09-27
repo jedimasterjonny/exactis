@@ -145,7 +145,12 @@ describe("ProjectionBoard", () => {
   // no salary the mortgage is paid out of the savings, so the plan draws
   // a pension early in 2030 and runs out in 2033, and the chart marks
   // both beside the retirement in 2026.
-  it("projects every figure at the age moved to, before it is saved", async () => {
+  // On fake timers, so the save cannot fire however long the chart takes
+  // to draw: on real ones a column for every account in every year took
+  // the test past it under a loaded suite. The crosshair moves a frame
+  // after its key, so the frame is stepped to by hand.
+  it("projects every figure at the age moved to, before it is saved", () => {
+    vi.useFakeTimers();
     render(board());
 
     typeAge("36");
@@ -154,10 +159,13 @@ describe("ProjectionBoard", () => {
     chart.focus();
     fireEvent.keyDown(chart, { key: "ArrowRight" });
     fireEvent.keyDown(chart, { key: "ArrowRight" });
-    await screen.findByText("2028 · Age 38");
+    act(() => {
+      vi.advanceTimersToNextFrame();
+    });
 
     const moved = totalIn({ ...retiring, retires: 36 }, 2028);
 
+    expect(screen.getByText("2028 · Age 38")).toBeInTheDocument();
     expect(moved).not.toBe(totalIn(retiring, 2028));
     expect(screen.getByText(moved)).toHaveClass("figure");
     expect(marks()).toStrictEqual(["2026", "2030", "2033"]);
@@ -168,8 +176,10 @@ describe("ProjectionBoard", () => {
   // at 50 rather than 59 starts it in 2040 rather than 2049, and 2045
   // pays it beside the household spending that runs to 2047: the chart
   // gives the engine's figure for the line moved with the age, not the
-  // one handed down.
-  it("moves a line tied to retirement with the age moved to, before it is saved", async () => {
+  // one handed down. On fake timers, as the test before it is, so the
+  // save cannot fire and drop the draft before the figure is read.
+  it("moves a line tied to retirement with the age moved to, before it is saved", () => {
+    vi.useFakeTimers();
     render(board(retiring, livingFrom(2049, true)));
 
     typeAge("50");
@@ -179,13 +189,17 @@ describe("ProjectionBoard", () => {
     for (let step = 0; step < 19; step += 1) {
       fireEvent.keyDown(chart, { key: "ArrowRight" });
     }
-    await screen.findByText("2045 · Age 55");
+    act(() => {
+      vi.advanceTimersToNextFrame();
+    });
 
     const early = { ...retiring, retires: 50 };
     const moved = totalIn(early, 2045, livingFrom(2040, false));
 
+    expect(screen.getByText("2045 · Age 55")).toBeInTheDocument();
     expect(moved).not.toBe(totalIn(early, 2045, livingFrom(2049, false)));
     expect(screen.getByText(moved)).toHaveClass("figure");
+    expect(saveAges).not.toHaveBeenCalled();
   });
 
   // The children leave home in 2036 and the downsize is in 2055, either

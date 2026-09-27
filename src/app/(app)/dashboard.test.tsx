@@ -123,7 +123,7 @@ describe("Dashboard", () => {
     expect(
       screen.getAllByText(
         (_content, element) =>
-          element?.classList.contains("recharts-area") === true,
+          element?.classList.contains("recharts-bar") === true,
         { suggest: false },
       ),
     ).toHaveLength(5);
