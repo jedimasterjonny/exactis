@@ -3,7 +3,7 @@
 import type { JSX, ReactNode } from "react";
 
 import { Flag } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { Milestone } from "@/data/milestones";
@@ -99,16 +99,27 @@ export function ProjectionBoard({
   const { send } = useSender();
   const retires =
     draft !== null && draft.over === plan.retires ? draft.age : plan.retires;
-  const drafted = { ...plan, retires };
-  const points = project(
-    accounts,
-    {
-      expenses: schedule.expenses.map((line) =>
-        timed(line, milestones, drafted),
+  // The engine's run is memoised by hand, and the plan it runs over with
+  // it, since the compiler cannot see that nothing after the run changes
+  // what it returns. It folded the run into the scope that reads the
+  // milestone chosen, so choosing one ran the engine again and handed
+  // the chart points it had never seen, which recharts redraws whole.
+  const drafted = useMemo(() => ({ ...plan, retires }), [plan, retires]);
+  const points = useMemo(
+    () =>
+      project(
+        accounts,
+        {
+          expenses: schedule.expenses.map((line) =>
+            timed(line, milestones, drafted),
+          ),
+          income: schedule.income.map((line) =>
+            timed(line, milestones, drafted),
+          ),
+        },
+        drafted,
       ),
-      income: schedule.income.map((line) => timed(line, milestones, drafted)),
-    },
-    drafted,
+    [accounts, drafted, milestones, schedule],
   );
   const isProjecting = points.some(holdsAnything);
   const markers = isProjecting

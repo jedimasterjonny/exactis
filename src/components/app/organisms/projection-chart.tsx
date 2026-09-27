@@ -6,7 +6,7 @@ import type { TooltipContentProps } from "recharts";
 import { cn } from "cn";
 import { ChartArea, ChartColumnStacked, Droplet, Landmark } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -182,6 +182,11 @@ export function ProjectionChart({
 }: ProjectionChartProps): JSX.Element {
   const [basis, setBasis] = useState<Basis>("liquidity");
   const [mark, setMark] = useState<Mark>("bar");
+  // Memoised by hand, as the board memoises its points: left to the
+  // compiler, the series shared one scope with the milestone chosen, so
+  // choosing one gave every mark a new dataKey and recharts recomputed
+  // every column to move a line.
+  const series = useMemo(() => seriesOf(accounts, basis), [accounts, basis]);
 
   if (!points.some(holdsAnything)) {
     return (
@@ -212,7 +217,6 @@ export function ProjectionChart({
   // would set a year's columns side by side.
   const Plot = mark === "bar" ? BarChart : AreaChart;
 
-  const series = seriesOf(accounts, basis);
   const config = Object.fromEntries(
     series.map(({ color, key, name }) => [key, { color, label: name }]),
   );
