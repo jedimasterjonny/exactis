@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
+import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
@@ -17,6 +18,7 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
 import { homeValues } from "@/data/houses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
+import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import { project } from "@/engine/projection";
 
@@ -32,6 +34,7 @@ type Case = readonly [string, Break];
 
 interface Inputs {
   readonly accounts: readonly Account[];
+  readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
   readonly schedule: {
@@ -49,6 +52,7 @@ type Thrown = readonly [string, string, Break];
 // plan runs to and is what the plan action refuses.
 const sound: Inputs = {
   accounts,
+  milestones,
   owners,
   plan: retiring,
   schedule: { expenses: expenseLines, income: incomeLines },
@@ -199,6 +203,13 @@ const held: readonly Case[] = [
     (given): Inputs => changed(given, 2, (isa) => ({ ...isa, owner: 2 })),
   ],
   [
+    "A milestone is listed once",
+    (given): Inputs => ({
+      ...given,
+      milestones: [...given.milestones, ...given.milestones],
+    }),
+  ],
+  [
     "An owner is listed once",
     (given): Inputs => ({
       ...given,
@@ -319,6 +330,7 @@ describe("soundKept", () => {
     expect(soundKept(nothingKeptIn(september))).toStrictEqual({
       household: {
         accounts: [],
+        milestones: [],
         owners: [],
         plan: {
           born: 1990,
@@ -335,10 +347,35 @@ describe("soundKept", () => {
     expect(soundKept(kept).kept).toStrictEqual(kept);
   });
 
+  // A household kept before there were milestones holds no list of
+  // them at all. Spelled out key by key, since a rest destructure would
+  // bind the milestones to nothing.
+  it("reads a household kept before there were milestones as listing none", () => {
+    const before = {
+      accounts: kept.accounts,
+      ages: kept.ages,
+      asOf: kept.asOf,
+      next: kept.next,
+      owners: kept.owners,
+      schedule: kept.schedule,
+    };
+
+    expect(soundKept(before)).toMatchObject({
+      household: { milestones: [] },
+      kept: { milestones: [] },
+    });
+  });
+
   it("refuses a record whose id is not below the one the next is given", () => {
     expect(() => soundKept({ ...kept, next: 5 })).toThrow(
       "A record's id is below the one the next record is given",
     );
+    expect(() =>
+      soundKept({
+        ...kept,
+        milestones: [...kept.milestones, { id: 6, name: "Late", year: 2070 }],
+      }),
+    ).toThrow("A record's id is below the one the next record is given");
   });
 
   it("refuses ages the plan action refuses, in its words", () => {

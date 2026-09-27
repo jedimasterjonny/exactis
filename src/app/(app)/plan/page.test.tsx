@@ -4,11 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
+import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import {
   getAccounts,
   getExpenseLines,
   getIncomeLines,
+  getMilestones,
   getOwners,
   getPlan,
 } from "@/store/household";
@@ -19,6 +21,7 @@ vi.mock("@/store/household", () => ({
   getAccounts: vi.fn(),
   getExpenseLines: vi.fn(),
   getIncomeLines: vi.fn(),
+  getMilestones: vi.fn(),
   getOwners: vi.fn(),
   getPlan: vi.fn(),
 }));
@@ -36,10 +39,11 @@ describe("Plan", () => {
   // the household's £3,500, and the pension's and the ISA's fixed sums
   // taking all that leaves before the mortgage's is reached, so the last
   // of the ledger's figures, what is left, is nothing.
-  it("hands the store's lines and the plan to both schedules under one header, and this year's cash flow beneath", async () => {
+  it("hands the store's milestones, lines and plan to their cards under one header, and this year's cash flow beneath", async () => {
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
     vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
     vi.mocked(getAccounts).mockResolvedValue([...accounts]);
+    vi.mocked(getMilestones).mockResolvedValue([...milestones]);
     vi.mocked(getOwners).mockResolvedValue([...owners]);
     vi.mocked(getPlan).mockResolvedValue(plan);
 
@@ -50,11 +54,12 @@ describe("Plan", () => {
     );
     expect(screen.getByText("Sect. III · Plan")).toHaveClass("label");
     expect(
-      screen.getByText("4 income lines · 5 expense lines"),
+      screen.getByText("3 milestones · 4 income lines · 5 expense lines"),
     ).toBeInTheDocument();
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
     ).toStrictEqual([
+      "Milestones",
       "Income by year",
       "Expenses by year",
       "Cash flow each month",
@@ -90,12 +95,13 @@ describe("Plan", () => {
     vi.mocked(getIncomeLines).mockResolvedValue([salary]);
     vi.mocked(getExpenseLines).mockResolvedValue([]);
     vi.mocked(getAccounts).mockResolvedValue([]);
+    vi.mocked(getMilestones).mockResolvedValue([]);
     vi.mocked(getPlan).mockResolvedValue(plan);
 
     render(await Plan());
 
     expect(
-      screen.getByText("1 income line · 0 expense lines"),
+      screen.getByText("1 milestone · 1 income line · 0 expense lines"),
     ).toBeInTheDocument();
     expect(screen.getByText("No expenses yet")).toBeInTheDocument();
     expect(screen.getByText("£7,475")).toHaveClass("figure", "font-medium");

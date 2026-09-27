@@ -6,6 +6,7 @@ import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { Household, Kept } from "@/data/household";
 import type { IncomeLine } from "@/data/income";
+import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
 import type { Answer } from "@/lib/answer";
@@ -80,6 +81,11 @@ export async function getExpenseLines(): Promise<readonly ExpenseLine[]> {
 export async function getIncomeLines(): Promise<readonly IncomeLine[]> {
   await requireSession();
   return (await readHousehold()).schedule.income;
+}
+
+export async function getMilestones(): Promise<readonly Milestone[]> {
+  await requireSession();
+  return (await readHousehold()).milestones;
 }
 
 export async function getOwners(): Promise<readonly Owner[]> {

@@ -94,7 +94,7 @@ export function ExpenseSchedule({
             Add expense line
           </Button>
         }
-        label={subsectionLabel(planScreen, 2)}
+        label={subsectionLabel(planScreen, 3)}
         title="Expenses by year"
       >
         <CardContent>
