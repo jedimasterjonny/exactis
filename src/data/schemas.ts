@@ -30,10 +30,12 @@ export const tie = z.union([z.literal("retirement"), recordId]);
 // What every line of both schedules holds: the amount, whole and never
 // negative; the years whole, the last one absent for a line that runs
 // to the end of the plan; the last month one of the twelve; the name;
-// and the milestone either end is tied to, or none.
+// the milestone either end is tied to, or none; and the whole years
+// after its milestone the last ends, never before it.
 export const lineValues = {
   amount: pounds,
   cadence: z.enum(cadences),
+  endsAfter: z.number().int().nonnegative(),
   endsAt: tie.nullable(),
   firstYear: z.number().int().positive(),
   growth: z.enum(lineGrowths),

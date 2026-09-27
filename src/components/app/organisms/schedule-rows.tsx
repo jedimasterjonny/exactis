@@ -16,6 +16,7 @@ import { RowActions } from "@/components/app/molecules/row-actions";
 import { Badge } from "@/components/kit/badge";
 import { ageIn, endYear } from "@/data/plan";
 import { cadenceAbbreviations } from "@/lib/cadence";
+import { counted } from "@/lib/count";
 import { endOf, growthLabels } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 
@@ -224,6 +225,15 @@ export function ScheduleRows<TLine extends Line>({
   );
 }
 
+// Where a tied end falls: at the milestone named, or the years after it
+// the end falls, and nowhere for an end tied to nothing.
+function afterOf(name: null | string, after: number): null | string {
+  if (name === null || after === 0) {
+    return name;
+  }
+  return `${counted(after, "year")} after ${name}`;
+}
+
 // What a row says of a line, worked out once and drawn twice: in the
 // columns while the list reads across, and on the folded lines while it
 // does not. What the line pays is its schedule's figure at its cadence,
@@ -231,7 +241,9 @@ export function ScheduleRows<TLine extends Line>({
 // the age at the plan's end for a line that runs to it, or that it runs
 // no years for a line whose last year is before its first. The
 // milestones it is tied to are named as its ends are: "From Kids leave
-// home", "Until Retirement", or both, "Kids leave home to Retirement".
+// home", "Until Retirement", or both, "Kids leave home to Retirement",
+// and an end some years after its milestone says so, "Until 3 years
+// after Retirement".
 function describe(
   line: LineValues,
   laidOut: { readonly milestones: readonly Marker[]; readonly plan: Plan },
@@ -247,7 +259,7 @@ function describe(
     growth: growthLabels[line.growth],
     ties: tiesOf(
       nameOf(line.startsAt, milestones),
-      nameOf(line.endsAt, milestones),
+      afterOf(nameOf(line.endsAt, milestones), line.endsAfter),
     ),
     total: formatGbp(summary.total),
     years: `${String(line.firstYear)} – ${endOf(line) ?? "end"}`,

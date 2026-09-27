@@ -9,6 +9,7 @@ export const expenseLines = [
   {
     amount: 3350,
     cadence: "month",
+    endsAfter: 0,
     endsAt: null,
     firstYear: 2026,
     growth: "inflation",
@@ -22,6 +23,7 @@ export const expenseLines = [
   {
     amount: 1240,
     cadence: "month",
+    endsAfter: 0,
     endsAt: null,
     firstYear: 2031,
     growth: "inflation-plus-2",
@@ -35,6 +37,7 @@ export const expenseLines = [
   {
     amount: 3065,
     cadence: "month",
+    endsAfter: 0,
     endsAt: null,
     firstYear: 2040,
     growth: "nominal",
@@ -48,6 +51,7 @@ export const expenseLines = [
   {
     amount: 58000,
     cadence: "year",
+    endsAfter: 0,
     endsAt: null,
     firstYear: 2052,
     growth: "inflation",
@@ -61,6 +65,7 @@ export const expenseLines = [
   {
     amount: 31000,
     cadence: "year",
+    endsAfter: 0,
     endsAt: null,
     firstYear: 2076,
     growth: "inflation-plus-1",

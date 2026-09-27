@@ -26,6 +26,7 @@ import { isTiedTo, markersOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
+import { counted } from "@/lib/count";
 import { listed } from "@/lib/feeders";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 
@@ -201,6 +202,13 @@ export function MilestoneList({
       )}
     </>
   );
+}
+
+// The lines ending the years given after a milestone, "Ends Salary" at
+// it and "Ends Childcare 3 years after" past it.
+function endingAfter(lines: readonly LineValues[], after: number): string {
+  const ends = `Ends ${namesOf(lines)}`;
+  return after === 0 ? ends : `${ends} ${counted(after, "year")} after`;
 }
 
 // What deleting a milestone does to the lines tied to it, before the
@@ -407,16 +415,25 @@ function namesOf(lines: readonly LineValues[]): string {
 }
 
 // Which lines end and start at the milestone, "Ends Salary and
-// Household · Starts Retirement living", or nothing for one no line is
-// tied to.
+// Household · Starts Retirement living", those ending some years after
+// it by how many, "Ends Childcare 3 years after", or nothing for one no
+// line is tied to.
 function tiesAt(
   marker: Marker,
   lines: readonly LineValues[],
 ): string | undefined {
   const ending = lines.filter(({ endsAt }) => endsAt === marker.id);
   const starting = lines.filter(({ startsAt }) => startsAt === marker.id);
+  const afters = [...new Set(ending.map(({ endsAfter }) => endsAfter))].sort(
+    (first, second) => first - second,
+  );
   const said = [
-    ...(ending.length === 0 ? [] : [`Ends ${namesOf(ending)}`]),
+    ...afters.map((after) =>
+      endingAfter(
+        ending.filter(({ endsAfter }) => endsAfter === after),
+        after,
+      ),
+    ),
     ...(starting.length === 0 ? [] : [`Starts ${namesOf(starting)}`]),
   ];
   return said.length === 0 ? undefined : said.join(" · ");
