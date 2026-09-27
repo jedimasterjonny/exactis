@@ -19,7 +19,10 @@ interface MilestoneChipsProps {
 // milestone's line. A chip gives its flag and its year beside its name
 // where there is room, and on a phone its name alone, so three fit a
 // row there and the plot keeps its height, and the year of the one
-// chosen is read where the choice is shown. The chips are drawn 32px tall and
+// chosen is read where the choice is shown. The year is the name's size,
+// set back from it by its weight and, on a chip not chosen, its tone: a
+// smaller figure centred beside the name stood a pixel above its line.
+// The chips are drawn 32px tall and
 // reach 44px for a finger past their own edges, so a row of them stays
 // compact. The row is a group named for a screen reader, and each chip
 // says whether it is the one chosen.
@@ -62,7 +65,7 @@ export function MilestoneChips({
             {marker.name}{" "}
             <span
               className={cn(
-                "figure text-xs font-normal max-sm:hidden",
+                "figure font-normal max-sm:hidden",
                 !isChosen && "text-muted-foreground",
               )}
             >
