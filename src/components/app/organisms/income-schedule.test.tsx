@@ -15,6 +15,7 @@ import { Toaster } from "@/components/kit/toast";
 import { accounts, sipp } from "@/data/accounts.fixture";
 import { incomeKinds } from "@/data/income";
 import { incomeLines, plan } from "@/data/income.fixture";
+import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import { lineGrowths } from "@/data/schedule";
 import { saved as accepted, refused } from "@/lib/answer";
@@ -38,6 +39,7 @@ function renderSchedule(lines: readonly IncomeLine[] = incomeLines): void {
     <IncomeSchedule
       accounts={[...accounts, sipp]}
       lines={lines}
+      milestones={milestones}
       owners={owners}
       plan={plan}
     />,
@@ -213,6 +215,7 @@ describe("IncomeSchedule", () => {
       <IncomeSchedule
         accounts={accounts}
         lines={[]}
+        milestones={milestones}
         owners={owners}
         plan={plan}
       />,
@@ -233,6 +236,7 @@ describe("IncomeSchedule", () => {
           { ...salary, id: 6, rsu: 0 },
           { ...salary, bonus: 0, id: 7, rsu: 0, sacrifice: 0 },
         ]}
+        milestones={milestones}
         owners={owners}
         plan={plan}
       />,
@@ -305,6 +309,7 @@ describe("IncomeSchedule", () => {
       amount: 80000,
       bonus: 0,
       cadence: "year",
+      endsAt: null,
       feeds: 6,
       firstYear: 2026,
       growth: "inflation",
@@ -315,6 +320,7 @@ describe("IncomeSchedule", () => {
       opens: null,
       rsu: 0,
       sacrifice: 0.08,
+      startsAt: null,
     });
   });
 
@@ -390,6 +396,7 @@ describe("IncomeSchedule", () => {
       amount: 80000,
       bonus: 0,
       cadence: "year",
+      endsAt: null,
       feeds: null,
       firstYear: 2026,
       growth: "inflation",
@@ -400,6 +407,7 @@ describe("IncomeSchedule", () => {
       opens: { balance: 2500, name: " Aviva ", owner: 1 },
       rsu: 0,
       sacrifice: 0.05,
+      startsAt: null,
     });
   });
 
@@ -471,6 +479,7 @@ describe("IncomeSchedule", () => {
       amount: 120000,
       bonus: 15000,
       cadence: "year",
+      endsAt: null,
       feeds: sipp.id,
       firstYear: 2026,
       growth: "inflation-plus-1",
@@ -481,6 +490,7 @@ describe("IncomeSchedule", () => {
       opens: null,
       rsu: 12000,
       sacrifice: 0.05,
+      startsAt: null,
     });
   });
 
@@ -576,10 +586,10 @@ describe("IncomeSchedule", () => {
     });
 
     // A line that opened with no last year ends in its first year until
-    // told otherwise, the year the plan starts for a new line.
+    // told otherwise, the one typed above it.
     expect(
       within(dialog).getByRole("textbox", { name: "Last year" }),
-    ).toHaveValue("2026");
+    ).toHaveValue("2030");
 
     commit(within(dialog).getByRole("textbox", { name: "Last year" }), "2035");
 
@@ -599,6 +609,7 @@ describe("IncomeSchedule", () => {
       amount: 12000,
       bonus: 0,
       cadence: "month",
+      endsAt: null,
       feeds: null,
       firstYear: 2030,
       growth: "triple-lock",
@@ -609,6 +620,7 @@ describe("IncomeSchedule", () => {
       opens: null,
       rsu: 0,
       sacrifice: 0,
+      startsAt: null,
     });
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(screen.getByRole("dialog", { name: "Bonus scheme" })).toBeVisible();
@@ -618,6 +630,7 @@ describe("IncomeSchedule", () => {
         amount: 12000,
         bonus: 0,
         cadence: "month",
+        endsAt: null,
         feeds: null,
         firstYear: 2030,
         growth: "triple-lock",
@@ -628,6 +641,7 @@ describe("IncomeSchedule", () => {
         name: "Bonus scheme",
         rsu: 0,
         sacrifice: 0,
+        startsAt: null,
       }),
     );
 
@@ -735,6 +749,7 @@ describe("IncomeSchedule", () => {
       amount: 23400,
       bonus: 0,
       cadence: "year",
+      endsAt: null,
       feeds: null,
       firstYear: 2058,
       growth: "triple-lock",
@@ -745,6 +760,7 @@ describe("IncomeSchedule", () => {
       opens: null,
       rsu: 0,
       sacrifice: 0,
+      startsAt: null,
     });
   });
 
@@ -803,6 +819,7 @@ describe("IncomeSchedule", () => {
       amount: 120000,
       bonus: 15000,
       cadence: "year",
+      endsAt: null,
       feeds: 1,
       firstYear: 2026,
       growth: "inflation-plus-1",
@@ -813,6 +830,7 @@ describe("IncomeSchedule", () => {
       opens: null,
       rsu: 20000,
       sacrifice: 0.1,
+      startsAt: null,
     });
   });
 
@@ -857,6 +875,7 @@ describe("IncomeSchedule", () => {
       amount: 120000,
       bonus: 15000,
       cadence: "year",
+      endsAt: null,
       feeds: 1,
       firstYear: 2050,
       growth: "inflation-plus-1",
@@ -867,6 +886,7 @@ describe("IncomeSchedule", () => {
       opens: null,
       rsu: 12000,
       sacrifice: 0.1,
+      startsAt: null,
     });
   });
 
@@ -877,6 +897,7 @@ describe("IncomeSchedule", () => {
       <IncomeSchedule
         accounts={accounts}
         lines={incomeLines}
+        milestones={milestones}
         owners={[]}
         plan={plan}
       />,

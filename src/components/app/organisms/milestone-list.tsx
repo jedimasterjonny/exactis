@@ -7,6 +7,8 @@ import { useEffect, useRef } from "react";
 
 import type { Marker, Milestone, MilestoneValues } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
+import type { LineValues } from "@/data/schedule";
+import type { Schedule } from "@/engine/cash-flow";
 import type { Entry } from "@/hooks/use-editor";
 
 import { removeMilestone, saveMilestone } from "@/actions/milestones";
@@ -20,10 +22,11 @@ import { TextField } from "@/components/app/molecules/text-field";
 import { YearField } from "@/components/app/molecules/year-field";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
-import { markersOf } from "@/data/milestones";
+import { isTiedTo, markersOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
+import { listed } from "@/lib/feeders";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 
 interface MilestoneFormProps {
@@ -41,9 +44,11 @@ interface MilestoneFormProps {
 interface MilestoneListProps {
   readonly milestones: readonly Milestone[];
   readonly plan: Plan;
+  readonly schedule: Schedule;
 }
 
 interface MilestoneRowProps {
+  readonly lines: readonly LineValues[];
   readonly marker: Marker;
   readonly milestone: Milestone | undefined;
   readonly onDelete: (milestone: Milestone) => void;
@@ -51,9 +56,8 @@ interface MilestoneRowProps {
   readonly plan: Plan;
 }
 
-// What retirement's row says beside its name, since it is set on another
-// screen and moves when it is, and why it has no pencil or bin.
-const retirementDetail = "Moves with the retirement age on the dashboard";
+// Why retirement's row has no pencil or bin: it is set on another
+// screen, and moves when it is.
 const retirementLock = "Set by the retirement age on the dashboard";
 
 // The plan screen's first card: the years the plan turns on, retirement
@@ -65,7 +69,9 @@ const retirementLock = "Set by the retirement age on the dashboard";
 // schedules' own, the figure's left empty, so the span is as wide here
 // as there and a pin sits over the years a bar beneath it reaches. The
 // card comes before the schedules because the lines are laid out by the
-// milestones rather than the other way round. There is always one row,
+// milestones rather than the other way round. Each row says which lines
+// start and end at it, from either schedule, so what moves with a
+// milestone is read where the milestone is. There is always one row,
 // retirement's, so there is no empty state.
 // A milestone is a name and a year, too little to open a dialog for, so
 // it is added and edited where it is listed: the card's button opens a
@@ -77,15 +83,18 @@ const retirementLock = "Set by the retirement age on the dashboard";
 // only where the fields are drawn differs. A row's bin asks through the
 // confirm dialog before the milestone goes, and the row being edited
 // offers a Delete that asks the same, which is where a folded row is
-// deleted from. Retirement draws a lock in place of both, since it is
-// set on the dashboard. While the list is too narrow to read across, as
-// on a phone, each row folds into lines, as a schedule's does: the name
-// and the year on the first, then what retirement says of itself, then
-// the pin, then the age.
+// deleted from, and the question says what becomes of the lines tied to
+// it, which keep the years it gives them now. Retirement draws a lock in
+// place of both, since it is set on the dashboard, as the caption says.
+// While the list is too narrow to read across, as on a phone, each row
+// folds into lines, as a schedule's does: the name and the year on the
+// first, then the lines tied to it, then the pin, then the age.
 export function MilestoneList({
   milestones,
   plan,
+  schedule,
 }: MilestoneListProps): JSX.Element {
+  const lines = [...schedule.income, ...schedule.expenses];
   const { amend, dialogOf, dismiss, entry, isSaving, open, save } = useEditor({
     describe: (milestone) => `${milestone.name} · ${String(milestone.year)}`,
     noun: "Milestone",
@@ -159,7 +168,7 @@ export function MilestoneList({
             Add milestone
           </Button>
         }
-        caption="The years the plan turns on, retirement among them."
+        caption="The years the plan turns on. A line tied to one moves with it, and retirement moves with the age set on the dashboard."
         label={subsectionLabel(planScreen, 1)}
         title="Milestones"
       >
@@ -172,6 +181,7 @@ export function MilestoneList({
               ) : (
                 <MilestoneRow
                   key={marker.id}
+                  lines={lines}
                   marker={marker}
                   milestone={milestone}
                   onDelete={ask}
@@ -186,11 +196,21 @@ export function MilestoneList({
       </SectionCard>
       {doomed !== null && (
         <ConfirmDialog {...questionOf(doomed)}>
-          It cannot be brought back.
+          {freed(lines.filter((line) => isTiedTo(line, doomed.id)).length)}
         </ConfirmDialog>
       )}
     </>
   );
+}
+
+// What deleting a milestone does to the lines tied to it, before the
+// warning every deletion carries: they stay where it put them.
+function freed(tied: number): string {
+  const stay =
+    tied === 1
+      ? "The line tied to it stays where it is, in a fixed year. "
+      : `The ${String(tied)} lines tied to it stay where they are, in fixed years. `;
+  return `${tied === 0 ? "" : stay}It cannot be brought back.`;
 }
 
 // Whether the entry is open on the milestone, which it never is on
@@ -312,11 +332,13 @@ function MilestoneForm({
 }
 
 // A milestone's row as it is listed, drawn in its columns and again in
-// its folded lines, only one of which is shown at any width. A saved
-// milestone ends with its pencil and bin, and opens from anywhere on its
-// folded lines; retirement draws its lock in both places instead, and
-// opens nothing.
+// its folded lines, only one of which is shown at any width, and saying
+// beside its name which lines end and start at it. A saved milestone
+// ends with its pencil and bin, and opens from anywhere on its folded
+// lines; retirement draws its lock in both places instead, and opens
+// nothing.
 function MilestoneRow({
+  lines,
   marker,
   milestone,
   onDelete,
@@ -324,7 +346,7 @@ function MilestoneRow({
   plan,
 }: MilestoneRowProps): JSX.Element {
   const age = `Age ${String(ageIn(marker.year, plan))}`;
-  const detail = milestone === undefined ? retirementDetail : undefined;
+  const detail = tiesAt(marker, lines);
   const lock =
     milestone === undefined ? <RowLock reason={retirementLock} /> : undefined;
   const bar = <PinBar plan={plan} year={marker.year} />;
@@ -377,4 +399,25 @@ function MilestoneRow({
       </div>
     </li>
   );
+}
+
+// The lines' names as a sentence lists them.
+function namesOf(lines: readonly LineValues[]): string {
+  return listed.format(lines.map(({ name }) => name));
+}
+
+// Which lines end and start at the milestone, "Ends Salary and
+// Household · Starts Retirement living", or nothing for one no line is
+// tied to.
+function tiesAt(
+  marker: Marker,
+  lines: readonly LineValues[],
+): string | undefined {
+  const ending = lines.filter(({ endsAt }) => endsAt === marker.id);
+  const starting = lines.filter(({ startsAt }) => startsAt === marker.id);
+  const said = [
+    ...(ending.length === 0 ? [] : [`Ends ${namesOf(ending)}`]),
+    ...(starting.length === 0 ? [] : [`Starts ${namesOf(starting)}`]),
+  ];
+  return said.length === 0 ? undefined : said.join(" · ");
 }

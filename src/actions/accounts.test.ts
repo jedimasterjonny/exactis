@@ -109,6 +109,7 @@ const mortgage = {
 const payments = {
   amount: 2210,
   cadence: "month",
+  endsAt: null,
   firstYear: 2026,
   growth: "nominal",
   id: 8,
@@ -117,6 +118,7 @@ const payments = {
   lastYear: null,
   name: "Home mortgage",
   pays: 7,
+  startsAt: null,
 } as const;
 
 // A Golf as the dialog would send it: worth £18,000 losing 15% a year,
@@ -128,6 +130,7 @@ const golf = { ...golfValues, name: " Golf " };
 const carPayments = {
   amount: 290,
   cadence: "month",
+  endsAt: null,
   firstYear: 2026,
   growth: "nominal",
   id: 8,
@@ -136,6 +139,7 @@ const carPayments = {
   lastYear: null,
   name: "Golf PCP",
   pays: 7,
+  startsAt: null,
 } as const;
 
 // The reference household with the mortgage's payments linked to it, as

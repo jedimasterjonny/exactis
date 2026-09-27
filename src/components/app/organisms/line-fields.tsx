@@ -1,7 +1,8 @@
 import type { JSX, ReactNode } from "react";
 
+import type { Marker } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
-import type { LineValues, Side } from "@/data/schedule";
+import type { LineValues, Side, Tie } from "@/data/schedule";
 import type { Option } from "@/lib/options";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
@@ -15,10 +16,6 @@ import { cadenceOptions } from "@/lib/cadence";
 import { growthLabels } from "@/lib/lines";
 import { optionsOf } from "@/lib/options";
 
-// How a line ends: in a year typed into the field beneath the choice, or
-// with the plan, so it has no last year.
-type Ending = "fixed" | "open";
-
 // A line as the fields read it: what every line holds, and the kind,
 // whose choices are the schedule's own.
 type Line<TKind extends string> = LineValues & { readonly kind: TKind };
@@ -29,6 +26,7 @@ interface LineFieldsProps<TKind extends string> {
   readonly draft: Line<TKind>;
   readonly initial: Line<TKind>;
   readonly kinds: readonly Option<TKind>[];
+  readonly milestones: readonly Marker[];
   readonly namePlaceholder: string;
   readonly onAmend: (patch: Partial<LineValues>) => void;
   readonly onKindChange: (kind: TKind) => void;
@@ -36,10 +34,8 @@ interface LineFieldsProps<TKind extends string> {
   readonly side: Side;
 }
 
-const endings = [
-  { label: "In a fixed year", value: "fixed" },
-  { label: "With the plan", value: "open" },
-] as const;
+const fixed = { label: "In a fixed year", value: "fixed" } as const;
+const open = { label: "With the plan", value: "open" } as const;
 
 // The growth choices in the order the reference's dialog offers them,
 // named as the rows name them.
@@ -54,20 +50,26 @@ const growths = optionsOf(growthLabels, [
 // The fields every line's dialog takes, in the shape of the reference's
 // new-line dialog: a name and a category on the first row, the amount,
 // its cadence and what it grows with on the second, whatever the
-// schedule adds beneath, the first and last years, and the line's
+// schedule adds beneath, where the line starts and ends, and the line's
 // coverage of the plan's span, moving as the years are typed. The fields
-// are uncontrolled and mount with the line as it opened, and report each
-// change to the schedule, whose draft mirrors them. The last year is a
-// choice before it is a year: the line ends in a fixed year, or with the
-// plan, in which case it has none and the dialog says which year that
-// is. A line that opened running to the end and is then given a year
-// opens on its first year, which the field mounts showing.
+// report each change to the schedule, whose draft mirrors them. They
+// mount with the line as it opened, save the two years, which show the
+// draft's, since a choice moves them as well as the fields do. Each end
+// is a choice before it is a year: a fixed year, typed into the field
+// beneath the choice, or a milestone, in which case the line moves with
+// it and the dialog says which year that is, and the last may end with
+// the plan instead, so it has none. A milestone
+// is the first year of what it marks, so a line starting at one starts
+// in its year, and one ending at one runs to the year before it. An end
+// moved off a milestone stays where the milestone had it, and a line
+// that ran to the end and is given a year ends in its first year.
 export function LineFields<TKind extends string>({
   amountLabel,
   children,
   draft,
   initial,
   kinds,
+  milestones,
   namePlaceholder,
   onAmend,
   onKindChange,
@@ -75,10 +77,36 @@ export function LineFields<TKind extends string>({
   side,
 }: LineFieldsProps<TKind>): JSX.Element {
   const end = endYear(plan);
-  const fixedYear = initial.lastYear ?? initial.firstYear;
+  const tied = milestones.map((marker) => ({
+    label: `At ${marker.name} · ${String(marker.year)}`,
+    value: choiceOf(marker.id),
+  }));
+  const from = milestones.find(({ id }) => id === draft.startsAt);
+  const until = milestones.find(({ id }) => id === draft.endsAt);
 
-  function endIn(ending: Ending): void {
-    onAmend({ lastYear: ending === "open" ? null : fixedYear });
+  function startAt(starting: string): void {
+    const marker = milestones.find(({ id }) => choiceOf(id) === starting);
+    onAmend(
+      marker === undefined
+        ? { startsAt: null }
+        : { firstYear: marker.year, startsAt: marker.id },
+    );
+  }
+
+  function endAt(ending: string): void {
+    const marker = milestones.find(({ id }) => choiceOf(id) === ending);
+    if (marker !== undefined) {
+      onAmend({
+        endsAt: marker.id,
+        lastMonth: null,
+        lastYear: marker.year - 1,
+      });
+      return;
+    }
+    onAmend({
+      endsAt: null,
+      lastYear: ending === "open" ? null : (draft.lastYear ?? draft.firstYear),
+    });
   }
 
   return (
@@ -127,33 +155,55 @@ export function LineFields<TKind extends string>({
       </FieldRow>
       {children}
       <FieldRow layout="pair-top">
-        <YearField
-          defaultValue={initial.firstYear}
-          hint={ageHint(draft.firstYear, plan)}
-          label="First year"
-          onValueCommitted={(firstYear) => {
-            onAmend({ firstYear });
-          }}
-        />
         <div className="grid gap-4">
           <SelectField
-            defaultValue={initial.lastYear === null ? "open" : "fixed"}
-            label="Ends"
-            onValueChange={endIn}
-            options={endings}
+            defaultValue={
+              initial.startsAt === null ? "fixed" : choiceOf(initial.startsAt)
+            }
+            label="Starts"
+            onValueChange={startAt}
+            options={[fixed, ...tied]}
           />
-          {draft.lastYear === null ? (
-            <span className="text-xs text-muted-foreground">
-              {`Runs to ${String(end)}, the last year of the plan.`}
-            </span>
-          ) : (
+          {from === undefined ? (
             <YearField
-              defaultValue={fixedYear}
+              hint={ageHint(draft.firstYear, plan)}
+              label="First year"
+              onValueCommitted={(firstYear) => {
+                onAmend({ firstYear });
+              }}
+              value={draft.firstYear}
+            />
+          ) : (
+            <Beneath>
+              {`Starts in ${String(from.year)}, the year of ${from.name}.`}
+            </Beneath>
+          )}
+        </div>
+        <div className="grid gap-4">
+          <SelectField
+            defaultValue={endingOf(initial)}
+            label="Ends"
+            onValueChange={endAt}
+            options={[fixed, ...tied, open]}
+          />
+          {until !== undefined && (
+            <Beneath>
+              {`Runs to ${String(until.year - 1)}, the year before ${until.name}.`}
+            </Beneath>
+          )}
+          {until === undefined && draft.lastYear === null && (
+            <Beneath>
+              {`Runs to ${String(end)}, the last year of the plan.`}
+            </Beneath>
+          )}
+          {until === undefined && draft.lastYear !== null && (
+            <YearField
               hint={ageHint(draft.lastYear, plan)}
               label="Last year"
               onValueCommitted={(lastYear) => {
                 onAmend({ lastYear });
               }}
+              value={draft.lastYear}
             />
           )}
         </div>
@@ -163,11 +213,13 @@ export function LineFields<TKind extends string>({
           {`Plan · ${String(plan.from)}–${String(end)}`}
         </span>
         <SpanBar
+          endsAt={draft.endsAt}
           firstYear={draft.firstYear}
           lastMonth={draft.lastMonth}
           lastYear={draft.lastYear}
           plan={plan}
           side={side}
+          startsAt={draft.startsAt}
         />
       </div>
     </div>
@@ -177,4 +229,28 @@ export function LineFields<TKind extends string>({
 // The age reached in a year, for the hint beneath a year field.
 function ageHint(year: number, plan: Plan): string {
   return `Age ${String(ageIn(year, plan))}`;
+}
+
+// What stands beneath an end's choice in place of its year's field, when
+// the year is the milestone's or the plan's rather than typed.
+function Beneath({ children }: { readonly children: string }): JSX.Element {
+  return <span className="text-xs text-muted-foreground">{children}</span>;
+}
+
+// The choice a milestone is offered as, where either end of a line
+// falls being a word: "fixed", in a year typed into the field beneath
+// the choice; "open", for the last, with the plan, so it has no last
+// year; or a milestone, retirement by its own id and one the household
+// lists by its id written out.
+function choiceOf(tie: Tie): string {
+  return String(tie);
+}
+
+// How a line opens ending: at the milestone it is tied to, in its last
+// year, or with the plan.
+function endingOf(line: LineValues): string {
+  if (line.endsAt !== null) {
+    return choiceOf(line.endsAt);
+  }
+  return line.lastYear === null ? "open" : "fixed";
 }

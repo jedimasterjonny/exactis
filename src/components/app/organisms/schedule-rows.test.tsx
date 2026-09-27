@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { IncomeLine } from "@/data/income";
 
 import { totalOf } from "@/data/income";
-import { incomeLines, plan } from "@/data/income.fixture";
+import { incomeLines, plan, retiring } from "@/data/income.fixture";
+import { markersOf } from "@/data/milestones";
+import { milestones } from "@/data/milestones.fixture";
 import { bySlot } from "@/test/dom";
 
 import type { Summary } from "./schedule-rows";
@@ -34,6 +36,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={incomeLines}
+        milestones={[]}
         plan={plan}
         side="income"
         summarise={summarise}
@@ -80,6 +83,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[{ ...salary, lastMonth: 10 }]}
+        milestones={[]}
         plan={plan}
         side="income"
         summarise={summarise}
@@ -96,6 +100,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[consulting]}
+        milestones={[]}
         plan={plan}
         side="income"
         summarise={summarise}
@@ -116,6 +121,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[statePension]}
+        milestones={[]}
         plan={plan}
         side="expense"
         summarise={summarise}
@@ -135,6 +141,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add a salary to see it scheduled here."
         emptyTitle="No income yet"
         lines={[]}
+        milestones={[]}
         plan={plan}
         side="income"
         summarise={summarise}
@@ -152,6 +159,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add the household's spending."
         emptyTitle="No expenses yet"
         lines={[]}
+        milestones={[]}
         plan={plan}
         side="expense"
         summarise={summarise}
@@ -169,6 +177,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={incomeLines}
+        milestones={[]}
         onDelete={onDelete}
         onEdit={onEdit}
         plan={plan}
@@ -201,6 +210,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[salary]}
+        milestones={[]}
         onDelete={onDelete}
         plan={plan}
         side="income"
@@ -222,6 +232,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[salary]}
+        milestones={[]}
         onEdit={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
         side="income"
@@ -244,6 +255,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[salary, statePension]}
+        milestones={[]}
         onDelete={vi.fn<(line: IncomeLine) => void>()}
         onEdit={onEdit}
         plan={plan}
@@ -287,6 +299,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[salary]}
+        milestones={[]}
         onDelete={vi.fn<(line: IncomeLine) => void>()}
         onEdit={onEdit}
         plan={plan}
@@ -336,6 +349,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[salary]}
+        milestones={[]}
         onDelete={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
         side="income"
@@ -361,6 +375,7 @@ describe("ScheduleRows", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[statePension]}
+        milestones={[]}
         onDelete={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
         side="income"
@@ -376,5 +391,55 @@ describe("ScheduleRows", () => {
     expect(folded?.closest(".unfolded\\:hidden")).not.toBeNull();
     // eslint-disable-next-line testing-library/no-node-access -- the boxes the locks sit in are layout boxes with no role of their own
     expect(column?.parentElement?.parentElement).toHaveClass("folded:hidden");
+  });
+
+  // Retirement at 59 falls in 2049 and the downsize in 2055. A salary
+  // tied to end at retirement runs to 2048 and says so beside its
+  // badge, as a line tied at both ends does, each tied end dotted on its
+  // bar; a line whose milestone has moved past its other end runs no
+  // years.
+  it("names the milestones a line is tied to, and says when they leave it no years", () => {
+    render(
+      <ScheduleRows
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        lines={[
+          { ...salary, endsAt: "retirement", lastYear: 2048 },
+          {
+            ...consulting,
+            endsAt: 2,
+            firstYear: 2049,
+            lastYear: 2054,
+            startsAt: "retirement",
+          },
+          { ...statePension, firstYear: 2058, startsAt: 2 },
+          {
+            ...consulting,
+            firstYear: 2049,
+            id: 5,
+            lastYear: 2040,
+            startsAt: "retirement",
+          },
+        ]}
+        milestones={markersOf(milestones, retiring)}
+        plan={retiring}
+        side="income"
+        summarise={summarise}
+      />,
+    );
+
+    // Each row says it twice, in its columns and on its folded lines.
+    expect(screen.getAllByText("Until Retirement")).toHaveLength(2);
+    expect(screen.getAllByText("Retirement to Downsize")).toHaveLength(2);
+    expect(screen.getAllByText("From Downsize")).toHaveLength(2);
+    expect(screen.getAllByText("From Retirement")).toHaveLength(2);
+    expect(screen.getByText("2026 – 2048")).toHaveClass("figure");
+    expect(screen.getByText("Age 36–58")).toBeInTheDocument();
+    expect(screen.getByText("Runs no years")).toHaveClass("label");
+    // Hidden from the tree, so no query is better than the slot. Five
+    // tied ends, each drawn on the row's two bars.
+    expect(
+      screen.getAllByText(bySlot("span-bar-tie"), { suggest: false }),
+    ).toHaveLength(10);
   });
 });

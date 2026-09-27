@@ -5,8 +5,9 @@ import * as z from "zod";
 import type { Milestone, MilestoneValues } from "@/data/milestones";
 import type { Answer } from "@/lib/answer";
 
+import { untied } from "@/data/milestones";
 import { milestoneValues, recordId, target } from "@/data/schemas";
-import { removed, written } from "@/lib/records";
+import { found, removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
@@ -15,15 +16,30 @@ import { amend } from "@/store/household";
 // holds them.
 const values = z.object(milestoneValues) satisfies z.ZodType<MilestoneValues>;
 
-// Deletes the milestone with that id. Checked as a save is. Retirement
-// is no record, so no id names it and it cannot be deleted.
+// Deletes the milestone with that id, and cuts every line's tie to it,
+// each end tied to it fixed in the year it falls in now, so the lines
+// stay where they were rather than the household refusing a tie to a
+// milestone it no longer lists. Checked as a save is. Retirement is no
+// record, so no id names it and it cannot be deleted.
 export async function removeMilestone(id: number): Promise<Answer<undefined>> {
   await requireSession();
   const at = recordId.parse(id);
-  return amend(({ kept }) => ({
-    kept: { ...kept, milestones: removed(kept.milestones, at, "milestone") },
-    result: undefined,
-  }));
+  return amend(({ kept }) => {
+    const milestone = found(kept.milestones, at, "milestone");
+    return {
+      kept: {
+        ...kept,
+        milestones: removed(kept.milestones, at, "milestone"),
+        schedule: {
+          expenses: kept.schedule.expenses.map((line) =>
+            untied(line, milestone),
+          ),
+          income: kept.schedule.income.map((line) => untied(line, milestone)),
+        },
+      },
+      result: undefined,
+    };
+  });
 }
 
 // Writes a milestone: a new one when the id is null, given the

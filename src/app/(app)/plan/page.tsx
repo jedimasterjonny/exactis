@@ -29,9 +29,11 @@ import {
 // schedules and the accounts together for whichever year it is set to.
 // The page reads all of it from the store, which reads the session
 // first, so it renders behind the loading screen beside it, and lays the
-// milestones and the lines over the plan the projection runs on; the
-// income schedule takes the accounts too, for the pension a salary may
-// feed, and the owners, for the one a salary opens to belong to.
+// milestones and the lines over the plan the projection runs on. The
+// milestones take both schedules, to say which lines are tied to each,
+// and each schedule takes the milestones, to name them and offer them;
+// the income schedule takes the accounts too, for the pension a salary
+// may feed, and the owners, for the one a salary opens to belong to.
 // The header counts the milestones, retirement among them, and both
 // schedules, so it is the page's rather than any card's. The plan is
 // read beside the rest, from the same version of the household.
@@ -55,14 +57,23 @@ export default async function Plan(): Promise<JSX.Element> {
         ].join(" · ")}
       </ScreenHeader>
       <ScreenBody>
-        <MilestoneList milestones={milestones} plan={plan} />
+        <MilestoneList
+          milestones={milestones}
+          plan={plan}
+          schedule={{ expenses: expenseLines, income: incomeLines }}
+        />
         <IncomeSchedule
           accounts={accounts}
           lines={incomeLines}
+          milestones={milestones}
           owners={owners}
           plan={plan}
         />
-        <ExpenseSchedule lines={expenseLines} plan={plan} />
+        <ExpenseSchedule
+          lines={expenseLines}
+          milestones={milestones}
+          plan={plan}
+        />
         <CashFlowCard
           accounts={accounts}
           plan={plan}

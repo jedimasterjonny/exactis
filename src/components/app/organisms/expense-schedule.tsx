@@ -10,6 +10,7 @@ import type {
   ExpenseLine,
   ExpenseLineValues,
 } from "@/data/expenses";
+import type { Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 
 import { saveExpenseLine } from "@/actions/schedule";
@@ -20,6 +21,7 @@ import { LineFields } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
+import { markersOf } from "@/data/milestones";
 import { useEditor } from "@/hooks/use-editor";
 import { isSound, spanOf } from "@/lib/lines";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
@@ -32,6 +34,7 @@ type Draft = ExpenseLineValues;
 
 interface ExpenseScheduleProps {
   readonly lines: readonly ExpenseLine[];
+  readonly milestones: readonly Milestone[];
   readonly plan: Plan;
 }
 
@@ -61,12 +64,15 @@ const tones: Record<ExpenseKind, Summary["badge"]["variant"]> = {
 // the page, a save goes to the store and comes back with the page
 // re-read, the entry doubles as the dialog's open state, and the fields
 // are the ones every line's dialog takes, with nothing to add beneath
-// them, since an expense is paid in no parts. The card takes the next
-// numeral off the screen's after the income card's.
+// them, since an expense is paid in no parts. Its lines are laid out by
+// the milestones the page hands down, as the income schedule's are. The
+// card takes the next numeral off the screen's after the income card's.
 export function ExpenseSchedule({
   lines,
+  milestones,
   plan,
 }: ExpenseScheduleProps): JSX.Element {
+  const markers = markersOf(milestones, plan);
   const { amend, dialogOf, dismiss, entry, open } = useEditor({
     describe: (line) => `${line.name} · ${spanOf(line)}`,
     noun: "Expense line",
@@ -102,6 +108,7 @@ export function ExpenseSchedule({
             emptyDescription="Add the household's spending, childcare or a loan's payments to see them scheduled here."
             emptyTitle="No expenses yet"
             lines={lines}
+            milestones={markers}
             onEdit={edit}
             plan={plan}
             side="expense"
@@ -126,6 +133,7 @@ export function ExpenseSchedule({
             draft={entry.draft}
             initial={entry.initial}
             kinds={kinds}
+            milestones={markers}
             namePlaceholder="Childcare, mortgage, care…"
             onAmend={(patch) => {
               amend(entry, patch);
@@ -143,18 +151,20 @@ export function ExpenseSchedule({
 }
 
 // A new line: a time-bound cost of nothing a month, running ten years
-// from the plan's first, growing with inflation, as the reference's new
-// expense line opens.
+// from the plan's first, growing with inflation and tied to no
+// milestone, as the reference's new expense line opens.
 function blank(plan: Plan): Draft {
   return {
     amount: 0,
     cadence: "month",
+    endsAt: null,
     firstYear: plan.from,
     growth: "inflation",
     kind: "time-bound",
     lastMonth: null,
     lastYear: plan.from + 10,
     name: "",
+    startsAt: null,
   };
 }
 

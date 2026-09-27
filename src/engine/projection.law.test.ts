@@ -219,6 +219,7 @@ function expenseFrom(
   return {
     amount: Math.round(random() * pick(random, [1500, 6000, 25000, 90000])),
     cadence: "month",
+    endsAt: null,
     firstYear,
     growth: "nominal",
     id,
@@ -227,6 +228,7 @@ function expenseFrom(
       lastYear !== null && random() < 0.5 ? Math.floor(random() * 12) : null,
     lastYear,
     name: `Spend ${String(id)}`,
+    startsAt: null,
   };
 }
 
@@ -322,6 +324,7 @@ function lineFrom(random: () => number, id: number, from: number): IncomeLine {
     amount: cadence === "month" ? Math.round(yearly / 12) : yearly,
     bonus: 0,
     cadence,
+    endsAt: null,
     feeds,
     firstYear,
     growth: "nominal",
@@ -333,6 +336,7 @@ function lineFrom(random: () => number, id: number, from: number): IncomeLine {
     name: `Line ${String(id)}`,
     rsu: 0,
     sacrifice: feeds === null ? 0 : pick(random, [0.05, 0.1, 0.3]),
+    startsAt: null,
   };
 }
 
