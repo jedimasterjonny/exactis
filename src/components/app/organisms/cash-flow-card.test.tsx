@@ -6,7 +6,8 @@ import type { Account } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
-import { incomeLines, plan } from "@/data/income.fixture";
+import { incomeLines, plan, retiring } from "@/data/income.fixture";
+import { milestones } from "@/data/milestones.fixture";
 import { slider } from "@/test/dom";
 
 import { CashFlowCard } from "./cash-flow-card";
@@ -44,7 +45,14 @@ function rows(): string[] {
 
 describe("CashFlowCard", () => {
   it("opens on the plan's first year and lays the month out as a ledger", () => {
-    render(<CashFlowCard accounts={held} plan={plan} schedule={schedule} />);
+    render(
+      <CashFlowCard
+        accounts={held}
+        milestones={milestones}
+        plan={plan}
+        schedule={schedule}
+      />,
+    );
 
     expect(screen.getByText("Sect. III.iv")).toHaveClass("label");
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
@@ -96,7 +104,14 @@ describe("CashFlowCard", () => {
   // November 2034, so the ledger stops charging it rather than writing it
   // at nothing for the rest of the plan.
   it("moves the year along the plan with the slider and reads that year's month", () => {
-    render(<CashFlowCard accounts={held} plan={plan} schedule={schedule} />);
+    render(
+      <CashFlowCard
+        accounts={held}
+        milestones={milestones}
+        plan={plan}
+        schedule={schedule}
+      />,
+    );
 
     fireEvent.keyDown(slider("Year"), { key: "ArrowRight" });
 
@@ -134,6 +149,7 @@ describe("CashFlowCard", () => {
     render(
       <CashFlowCard
         accounts={[]}
+        milestones={milestones}
         plan={plan}
         schedule={{ expenses: [retirement], income: [salary] }}
       />,
@@ -158,6 +174,7 @@ describe("CashFlowCard", () => {
     render(
       <CashFlowCard
         accounts={[spareIsa]}
+        milestones={milestones}
         plan={plan}
         schedule={{
           expenses: [{ ...household, amount: 5, cadence: "year" }],
@@ -184,7 +201,14 @@ describe("CashFlowCard", () => {
   // 2051; in 2053 the mortgage payment and the retirement living, whose
   // £58,000 a year is £4,833 a month.
   it("opens the expenses figure into the lines behind it", () => {
-    render(<CashFlowCard accounts={[]} plan={plan} schedule={schedule} />);
+    render(
+      <CashFlowCard
+        accounts={[]}
+        milestones={milestones}
+        plan={plan}
+        schedule={schedule}
+      />,
+    );
 
     const expenses = screen.getByRole("button", { name: /^Expenses/ });
 
@@ -222,6 +246,7 @@ describe("CashFlowCard", () => {
     render(
       <CashFlowCard
         accounts={[]}
+        milestones={milestones}
         plan={plan}
         schedule={{ expenses: [household], income: [] }}
       />,
@@ -236,5 +261,45 @@ describe("CashFlowCard", () => {
         "paragraph",
       ),
     ).toHaveClass("text-muted-foreground");
+  });
+
+  // Retiring at 61, the owner retires in 2053, and the children leave
+  // home in 2040: the caption names each milestone in the year the card
+  // is set to, and two in one year together.
+  it("names the milestones that fall in the year the card is set to", () => {
+    render(
+      <CashFlowCard
+        accounts={held}
+        milestones={[...milestones, { id: 3, name: "Sabbatical", year: 2053 }]}
+        plan={retiring}
+        schedule={schedule}
+      />,
+    );
+
+    expect(
+      screen.getByText("September 2026, age 34, in today's money"),
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(slider("Year"), { key: "End" });
+    for (let year = 2083; year > 2053; year -= 1) {
+      fireEvent.keyDown(slider("Year"), { key: "ArrowLeft" });
+    }
+
+    expect(
+      screen.getByText(
+        "January 2053, age 61, in today's money · Retirement and Sabbatical",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(slider("Year"), { key: "Home" });
+    for (let year = 2026; year < 2040; year += 1) {
+      fireEvent.keyDown(slider("Year"), { key: "ArrowRight" });
+    }
+
+    expect(
+      screen.getByText(
+        "January 2040, age 48, in today's money · Kids leave home",
+      ),
+    ).toBeInTheDocument();
   });
 });
