@@ -309,6 +309,7 @@ describe("IncomeSchedule", () => {
       amount: 80000,
       bonus: 0,
       cadence: "year",
+      endsAfter: 0,
       endsAt: "retirement",
       feeds: 6,
       firstYear: 2026,
@@ -396,6 +397,7 @@ describe("IncomeSchedule", () => {
       amount: 80000,
       bonus: 0,
       cadence: "year",
+      endsAfter: 0,
       endsAt: "retirement",
       feeds: null,
       firstYear: 2026,
@@ -479,6 +481,7 @@ describe("IncomeSchedule", () => {
       amount: 120000,
       bonus: 15000,
       cadence: "year",
+      endsAfter: 0,
       endsAt: null,
       feeds: sipp.id,
       firstYear: 2026,
@@ -539,8 +542,8 @@ describe("IncomeSchedule", () => {
       within(dialog).queryByRole("textbox", { name: "Last year" }),
     ).not.toBeInTheDocument();
     expect(
-      within(dialog).getByText("Runs to 2079, the year before Retirement."),
-    ).toBeInTheDocument();
+      within(dialog).getByRole("textbox", { name: "Years after" }),
+    ).toHaveAccessibleDescription("Runs to 2079, the year before Retirement.");
     expect(within(dialog).getByText("Plan · 2026–2079")).toHaveClass("label");
     expect(
       within(dialog).getByRole("textbox", { name: "Base salary" }),
@@ -635,6 +638,7 @@ describe("IncomeSchedule", () => {
       amount: 12000,
       bonus: 0,
       cadence: "month",
+      endsAfter: 0,
       endsAt: null,
       feeds: null,
       firstYear: 2030,
@@ -656,6 +660,7 @@ describe("IncomeSchedule", () => {
         amount: 12000,
         bonus: 0,
         cadence: "month",
+        endsAfter: 0,
         endsAt: null,
         feeds: null,
         firstYear: 2030,
@@ -775,6 +780,7 @@ describe("IncomeSchedule", () => {
       amount: 23400,
       bonus: 0,
       cadence: "year",
+      endsAfter: 0,
       endsAt: null,
       feeds: null,
       firstYear: 2058,
@@ -845,6 +851,7 @@ describe("IncomeSchedule", () => {
       amount: 120000,
       bonus: 15000,
       cadence: "year",
+      endsAfter: 0,
       endsAt: null,
       feeds: 1,
       firstYear: 2026,
@@ -901,6 +908,7 @@ describe("IncomeSchedule", () => {
       amount: 120000,
       bonus: 15000,
       cadence: "year",
+      endsAfter: 0,
       endsAt: null,
       feeds: 1,
       firstYear: 2050,

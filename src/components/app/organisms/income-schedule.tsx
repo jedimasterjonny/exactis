@@ -247,6 +247,7 @@ function blank(plan: Plan): Draft {
     amount: 0,
     bonus: 0,
     cadence: "year",
+    endsAfter: 0,
     endsAt: retirement > plan.from ? "retirement" : null,
     feeds: null,
     firstYear: plan.from,

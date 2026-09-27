@@ -406,7 +406,15 @@ describe("ScheduleRows", () => {
         lines={[
           { ...salary, endsAt: "retirement", lastYear: 2048 },
           {
+            ...salary,
+            endsAfter: 3,
+            endsAt: "retirement",
+            id: 6,
+            lastYear: 2051,
+          },
+          {
             ...consulting,
+            endsAfter: 1,
             endsAt: 2,
             firstYear: 2049,
             lastYear: 2054,
@@ -430,16 +438,21 @@ describe("ScheduleRows", () => {
 
     // Each row says it twice, in its columns and on its folded lines.
     expect(screen.getAllByText("Until Retirement")).toHaveLength(2);
-    expect(screen.getAllByText("Retirement to Downsize")).toHaveLength(2);
+    expect(screen.getAllByText("Until 3 years after Retirement")).toHaveLength(
+      2,
+    );
+    expect(
+      screen.getAllByText("Retirement to 1 year after Downsize"),
+    ).toHaveLength(2);
     expect(screen.getAllByText("From Downsize")).toHaveLength(2);
     expect(screen.getAllByText("From Retirement")).toHaveLength(2);
     expect(screen.getByText("2026 – 2048")).toHaveClass("figure");
     expect(screen.getByText("Age 36–58")).toBeInTheDocument();
     expect(screen.getByText("Runs no years")).toHaveClass("label");
-    // Hidden from the tree, so no query is better than the slot. Five
+    // Hidden from the tree, so no query is better than the slot. Six
     // tied ends, each drawn on the row's two bars.
     expect(
       screen.getAllByText(bySlot("span-bar-tie"), { suggest: false }),
-    ).toHaveLength(10);
+    ).toHaveLength(12);
   });
 });

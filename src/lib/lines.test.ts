@@ -8,6 +8,7 @@ import { endOf, isSound, runsIn, spanOf } from "./lines";
 const salary: LineValues = {
   amount: 1000,
   cadence: "year",
+  endsAfter: 0,
   endsAt: null,
   firstYear: 2030,
   growth: "inflation",

@@ -112,6 +112,7 @@ describe("toRecords", () => {
       line: {
         amount: 2210,
         cadence: "month",
+        endsAfter: 0,
         endsAt: null,
         firstYear: 2026,
         growth: "nominal",

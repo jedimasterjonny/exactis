@@ -113,6 +113,7 @@ export function securedRecords(
       line: {
         amount: loan.payment,
         cadence: "month",
+        endsAfter: 0,
         endsAt: null,
         firstYear: plan.from,
         growth: "nominal",

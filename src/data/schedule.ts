@@ -11,13 +11,15 @@ export type LineGrowth = (typeof lineGrowths)[number];
 // by year runs the whole of its last year and has none. Either end may
 // be tied to a milestone rather than fixed, and then moves with it: the
 // line starts in the milestone's year, or runs to the year before it,
-// and the year beside the tie is the one the milestone gives. A line
-// tied to none has nothing there. An income line and an expense line
+// or ends a number of whole years after it, and the year beside the tie
+// is the one the milestone gives. A line tied to none has nothing there,
+// and ends no years after anything. An income line and an expense line
 // each add what is theirs, the kind of money it is and, for an
 // employment line, the parts it is paid in.
 export interface LineValues {
   readonly amount: number;
   readonly cadence: Cadence;
+  readonly endsAfter: number;
   readonly endsAt: null | Tie;
   readonly firstYear: number;
   readonly growth: LineGrowth;

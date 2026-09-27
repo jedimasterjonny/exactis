@@ -159,6 +159,7 @@ describe("ExpenseSchedule", () => {
     expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(null, {
       amount: 1150,
       cadence: "month",
+      endsAfter: 0,
       endsAt: null,
       firstYear: 2027,
       growth: "inflation-plus-2",
@@ -174,6 +175,7 @@ describe("ExpenseSchedule", () => {
       accepted({
         amount: 1150,
         cadence: "month",
+        endsAfter: 0,
         endsAt: null,
         firstYear: 2027,
         growth: "inflation-plus-2",
@@ -255,6 +257,7 @@ describe("ExpenseSchedule", () => {
     expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(4, {
       amount: 65000,
       cadence: "year",
+      endsAfter: 0,
       endsAt: null,
       firstYear: 2048,
       growth: "inflation",
@@ -295,8 +298,9 @@ describe("ExpenseSchedule", () => {
 
   // With its owner retiring at 59, the plan's retirement falls in 2049,
   // so a line ending at it runs to 2048, as the dialog says beneath the
-  // choice and the save sends.
-  it("ties a new line's end to a milestone and saves the tie with the year it gives", async () => {
+  // choice, and one ending three years after it runs to 2051, as the
+  // save sends.
+  it("ties a new line's end to years after a milestone and saves the tie with the year it gives", async () => {
     render(
       <ExpenseSchedule
         lines={expenseLines}
@@ -308,13 +312,14 @@ describe("ExpenseSchedule", () => {
     saved({
       amount: 0,
       cadence: "month",
+      endsAfter: 3,
       endsAt: "retirement",
       firstYear: 2026,
       growth: "inflation",
       id: 6,
       kind: "time-bound",
       lastMonth: null,
-      lastYear: 2048,
+      lastYear: 2051,
       name: "Household",
       startsAt: null,
     });
@@ -329,20 +334,29 @@ describe("ExpenseSchedule", () => {
     });
 
     expect(
-      within(dialog).getByText("Runs to 2048, the year before Retirement."),
-    ).toBeInTheDocument();
+      within(dialog).getByRole("textbox", { name: "Years after" }),
+    ).toHaveAccessibleDescription("Runs to 2048, the year before Retirement.");
+
+    commit(within(dialog).getByRole("textbox", { name: "Years after" }), "3");
+
+    expect(
+      within(dialog).getByRole("textbox", { name: "Years after" }),
+    ).toHaveAccessibleDescription(
+      "Runs to 2051, ending 3 years after Retirement.",
+    );
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(null, {
       amount: 0,
       cadence: "month",
+      endsAfter: 3,
       endsAt: "retirement",
       firstYear: 2026,
       growth: "inflation",
       kind: "time-bound",
       lastMonth: null,
-      lastYear: 2048,
+      lastYear: 2051,
       name: "Household",
       startsAt: null,
     });
@@ -353,6 +367,6 @@ describe("ExpenseSchedule", () => {
     });
     expect(
       screen.getByRole("dialog", { name: "Expense line added" }),
-    ).toHaveAccessibleDescription("Household · 2026–2048");
+    ).toHaveAccessibleDescription("Household · 2026–2051");
   });
 });

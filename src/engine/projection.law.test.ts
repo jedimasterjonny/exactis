@@ -219,6 +219,7 @@ function expenseFrom(
   return {
     amount: Math.round(random() * pick(random, [1500, 6000, 25000, 90000])),
     cadence: "month",
+    endsAfter: 0,
     endsAt: null,
     firstYear,
     growth: "nominal",
@@ -324,6 +325,7 @@ function lineFrom(random: () => number, id: number, from: number): IncomeLine {
     amount: cadence === "month" ? Math.round(yearly / 12) : yearly,
     bonus: 0,
     cadence,
+    endsAfter: 0,
     endsAt: null,
     feeds,
     firstYear,

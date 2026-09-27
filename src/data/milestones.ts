@@ -56,7 +56,8 @@ export function markersOf(
 
 // A line as its ties make it: an end tied to a milestone read off it,
 // the first year the milestone's own and the last the year before it,
-// run whole, and an end tied to none as it is. An end tied to a
+// or as many years later as the line ends after it, run whole, and an
+// end tied to none as it is. An end tied to a
 // milestone the household does not list is left as it is, for the
 // household to refuse. The household is read through this, and the
 // dashboard runs it again as the retirement age is dragged, so a line
@@ -75,14 +76,17 @@ export function timed<TLine extends LineValues>(
   return {
     ...line,
     ...(first !== undefined && { firstYear: first }),
-    ...(last !== undefined && { lastMonth: null, lastYear: last - 1 }),
+    ...(last !== undefined && {
+      lastMonth: null,
+      lastYear: last - 1 + line.endsAfter,
+    }),
   };
 }
 
 // A line with its ties to the milestone cut, each end tied to it fixed
-// in the year it falls in now, so a milestone deleted leaves the lines
-// tied to it where they were rather than moving them. An end tied to
-// anything else stays tied.
+// in the year it falls in now, years after the milestone included, so a
+// milestone deleted leaves the lines tied to it where they were rather
+// than moving them. An end tied to anything else stays tied.
 export function untied<TLine extends LineValues>(
   line: TLine,
   milestone: Milestone,
@@ -94,9 +98,10 @@ export function untied<TLine extends LineValues>(
       startsAt: null,
     }),
     ...(line.endsAt === milestone.id && {
+      endsAfter: 0,
       endsAt: null,
       lastMonth: null,
-      lastYear: milestone.year - 1,
+      lastYear: milestone.year - 1 + line.endsAfter,
     }),
   };
 }
