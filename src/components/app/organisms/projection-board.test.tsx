@@ -23,6 +23,12 @@ import { ProjectionBoard, settle } from "./projection-board";
 
 vi.mock("@/actions/plan", () => ({ saveAges: vi.fn() }));
 vi.mock("@/components/kit/toast", () => ({ toast: { add: vi.fn() } }));
+// The engine as it is, watched, so a test can tell when the board runs
+// it.
+vi.mock(import("@/engine/projection"), async (importOriginal) => {
+  const engine = await importOriginal();
+  return { ...engine, project: vi.fn(engine.project) };
+});
 
 const { milestones, schedule } = kept;
 
@@ -363,6 +369,21 @@ describe("ProjectionBoard", () => {
 
     expect(screen.getByText("At Retirement")).toBeInTheDocument();
     expect(screen.getByText("2050 · age 60")).toBeInTheDocument();
+  });
+
+  // Choosing a milestone reads a year off the run the board holds rather
+  // than running the engine again, since a run the chart has not seen is
+  // redrawn column by column, and that held the chip's press back.
+  it("reads the milestone a chip chooses without running the engine again", () => {
+    render(board(retiring, schedule, milestones));
+    vi.mocked(project).mockClear();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Kids leave home 2036" }),
+    );
+
+    expect(screen.getByText("At Kids leave home")).toBeInTheDocument();
+    expect(project).not.toHaveBeenCalled();
   });
 
   // Born in 1990 and retiring at 30, the owner retired in 2020, before
