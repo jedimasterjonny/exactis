@@ -1,7 +1,24 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { formatGbp, formatPercent, negated } from "./money";
+import { formatAxisGbp, formatGbp, formatPercent, negated } from "./money";
+
+describe("formatAxisGbp", () => {
+  it("shortens millions and thousands for an axis, to two places where they need them", () => {
+    expect(formatAxisGbp(12000000)).toBe("£12m");
+    expect(formatAxisGbp(2500000)).toBe("£2.5m");
+    expect(formatAxisGbp(1250000)).toBe("£1.25m");
+    expect(formatAxisGbp(500000)).toBe("£500k");
+    expect(formatAxisGbp(12500)).toBe("£12.5k");
+  });
+
+  it("writes less than a thousand in full, and signs a loss with a real minus", () => {
+    expect(formatAxisGbp(0)).toBe("£0");
+    expect(formatAxisGbp(750)).toBe("£750");
+    expect(formatAxisGbp(-1500000)).toBe("−£1.5m");
+    expect(formatAxisGbp(-250000)).toBe("−£250k");
+  });
+});
 
 describe("formatGbp", () => {
   it("writes pounds with thousands separators and no pence", () => {
