@@ -18,12 +18,13 @@ const plan: Plan = {
 };
 
 describe("SpanBar", () => {
+  // Twenty whole years, 2026 to the end of 2045, are half of forty.
   it("places a line on the plan's span by its years, hidden from the tree", () => {
     render(
       <SpanBar
         firstYear={2026}
         lastMonth={null}
-        lastYear={2046}
+        lastYear={2045}
         plan={plan}
         side="income"
       />,
@@ -58,14 +59,14 @@ describe("SpanBar", () => {
     expect(screen.getByText(bySlot("span-bar-fill"))).toHaveClass("bg-chart-5");
   });
 
-  // A line ending in July 2042 runs half a year into 2042, which over
+  // A line ending in June 2042 runs half a year into 2042, which over
   // thirty-two years is 16.5 of them: 51.5625% along, a share exact in
   // binary so the style is read back as written.
-  it("runs a line into its last year by the month it ends in", () => {
+  it("runs a line into its last year through the month it ends in", () => {
     render(
       <SpanBar
         firstYear={2026}
-        lastMonth={6}
+        lastMonth={5}
         lastYear={2042}
         plan={{ ...plan, years: 32 }}
         side="income"
@@ -78,8 +79,25 @@ describe("SpanBar", () => {
     });
   });
 
-  it("keeps a single year visible and holds a line outside the span to its edge", () => {
+  // A line running the whole of 2045 meets one starting in 2046 where
+  // that one begins, rather than stopping a year short of it.
+  it("runs a line through the whole of its last year, to where the next begins", () => {
     const { rerender } = render(
+      <SpanBar
+        firstYear={2036}
+        lastMonth={null}
+        lastYear={2045}
+        plan={plan}
+        side="income"
+      />,
+    );
+
+    expect(screen.getByText(bySlot("span-bar-fill"))).toHaveStyle({
+      left: "25%",
+      width: "25%",
+    });
+
+    rerender(
       <SpanBar
         firstYear={2046}
         lastMonth={null}
@@ -91,10 +109,12 @@ describe("SpanBar", () => {
 
     expect(screen.getByText(bySlot("span-bar-fill"))).toHaveStyle({
       left: "50%",
-      width: "1.2%",
+      width: "2.5%",
     });
+  });
 
-    rerender(
+  it("keeps a line outside the span visible, held to its edge", () => {
+    render(
       <SpanBar
         firstYear={2000}
         lastMonth={null}

@@ -27,10 +27,12 @@ const fills: Record<Side, string> = {
 // a single year is still seen.
 const sliver = 1.2;
 
-// Where a line sits on the plan's span: a bar over a track, from the
-// line's first year to its last, into it by the month it ends in when it
-// ends part way through, or to the plan's end when it has no last year.
-// A year outside the span is held to its edge rather than drawn past it.
+// Where a line sits on the plan's span: a bar over a track, from where
+// the line's first year begins to where its last ends, through the month
+// it ends in when it ends part way through, or to the plan's end when it
+// has no last year. So a line that ends the year before another starts
+// meets it rather than stopping a year short of it. A year outside the
+// span is held to its edge rather than drawn past it.
 // Decorative, since the years are written beside it: the bar is hidden
 // from the accessibility tree.
 export function SpanBar({
@@ -42,7 +44,7 @@ export function SpanBar({
 }: SpanBarProps): JSX.Element {
   const left = placed(firstYear, plan);
   const right = placed(
-    lastYear === null ? endYear(plan) : lastYear + (lastMonth ?? 0) / 12,
+    lastYear === null ? endYear(plan) : lastYear + ((lastMonth ?? 11) + 1) / 12,
     plan,
   );
   return (
