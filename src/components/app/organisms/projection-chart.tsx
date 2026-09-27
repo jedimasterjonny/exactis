@@ -4,7 +4,7 @@ import type { JSX, ReactNode } from "react";
 import type { TooltipContentProps } from "recharts";
 
 import { cn } from "cn";
-import { ChartArea, ChartColumnStacked } from "lucide-react";
+import { ChartArea, ChartColumnStacked, Droplet, Landmark } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import {
@@ -35,6 +35,12 @@ import { balanceIn, balanceOf, holdsAnything } from "@/engine/projection";
 import { listed } from "@/lib/feeders";
 import { formatAxisGbp, formatGbp } from "@/lib/money";
 import { accountsAndAssets } from "@/lib/nav";
+
+// What the chart counts: the money the plan could spend, its savings less
+// every debt, with a house or a car left out and the loan on it owed as
+// any debt is; or all it is worth, a house or a car counted at its
+// equity, the loan secured on it drawn in it.
+type Basis = "liquidity" | "net-worth";
 
 // The kinds of account that share a colour, and the hues they are drawn
 // in, from the palette's tokens, which name a colour by what it means.
@@ -101,18 +107,26 @@ const families: readonly Family[] = [
   },
 ];
 
+// What each basis is called, on its switch and on the total under the
+// crosshair, which is what the stack comes to on it.
+const basisNames: Record<Basis, string> = {
+  liquidity: "Liquidity",
+  "net-worth": "Net worth",
+};
+
 // The height of the plot's box, the frames standing in for it and the
 // empty state in its place: three times as wide as it is tall, down to a
 // floor that is higher on a phone, where the choices take a row of
 // their own above the plot.
 const boxSize = "aspect-[3/1] min-h-90 sm:min-h-72";
 
-// The dashboard's chart: every account the plan holds or owes, projected
-// a year at a time and each drawn on its own, a house or a car at its
-// equity with the loans secured on it, what it holds stacked up
+// The dashboard's chart: the accounts the plan holds or owes, projected
+// a year at a time and each drawn on its own, what it holds stacked up
 // from nothing and what it owes down from it, as a column per year to
-// begin with or, on the toggle, as areas under lines. The plot alone,
-// with no figure
+// begin with or, on the toggle, as areas under lines. It counts the
+// plan's liquidity to begin with, the savings less every debt, and on
+// a second toggle its net worth, a house or a car at its equity with
+// the loans secured on it. The plot alone, with no figure
 // over it: a hairline grid, the years and the pounds as recessive ticks,
 // and a crosshair with the year's figures on hover and on the arrow
 // keys, which names each series beside its figure, so no legend names
@@ -138,15 +152,16 @@ const boxSize = "aspect-[3/1] min-h-90 sm:min-h-72";
 // than a decade, so the names are the caller's to give, as the choices
 // it sets above the plot, and the crosshair names the milestones in its
 // year. A milestone outside the plan's years has no year to stand on
-// and goes undrawn. The toggle takes its row from
+// and goes undrawn. The toggles take their row from
 // inside the plot's box rather than adding one over it, so the box is
 // the same height as the frames that stand in for it and nothing shifts
 // when the chart arrives; whatever controls the caller gives for what
-// is plotted share the row, at its left, the toggle keeping the right,
+// is plotted share the row, at its left, the toggles keeping the right,
+// side by side and on a phone one above the other,
 // and the choices it gives between them, or on a row of their own
 // beneath on a phone. The row centres what shares it, so a field there,
 // its label above its box and its hint beneath a line each, stands with
-// its box level with the choices and the toggle, where aligning their
+// its box level with the choices and the toggles, where aligning their
 // feet set them level with its hint. The rows stand a gap clear of the
 // plot, so a figure box above the top tick does not crowd it. The box is three
 // times as wide as it is tall down to a floor, and every frame with it:
@@ -165,6 +180,7 @@ export function ProjectionChart({
   points,
   selected,
 }: ProjectionChartProps): JSX.Element {
+  const [basis, setBasis] = useState<Basis>("liquidity");
   const [mark, setMark] = useState<Mark>("bar");
 
   if (!points.some(holdsAnything)) {
@@ -196,7 +212,7 @@ export function ProjectionChart({
   // would set a year's columns side by side.
   const Plot = mark === "bar" ? BarChart : AreaChart;
 
-  const series = seriesOf(accounts);
+  const series = seriesOf(accounts, basis);
   const config = Object.fromEntries(
     series.map(({ color, key, name }) => [key, { color, label: name }]),
   );
@@ -231,7 +247,10 @@ export function ProjectionChart({
               {choices}
             </div>
           )}
-          <MarkToggle mark={mark} onMarkChange={setMark} />
+          <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <BasisToggle basis={basis} onBasisChange={setBasis} />
+            <MarkToggle mark={mark} onMarkChange={setMark} />
+          </div>
         </div>
         <ChartContainer className="aspect-auto min-h-0 flex-1" config={config}>
           <Plot
@@ -287,6 +306,7 @@ export function ProjectionChart({
                   milestones={milestones}
                   points={points}
                   series={series}
+                  total={basisNames[basis]}
                 />
               )}
             />
@@ -377,6 +397,30 @@ export function ProjectionPending(): JSX.Element {
   );
 }
 
+// The switch between the two bases: the name of the one counted now,
+// with the switch on for the net worth. It sits beside the marks'
+// switch, before it, at the right of the plot's top row.
+function BasisToggle({
+  basis,
+  onBasisChange,
+}: {
+  readonly basis: Basis;
+  readonly onBasisChange: (basis: Basis) => void;
+}): JSX.Element {
+  const isNetWorth = basis === "net-worth";
+  return (
+    <LabelledSwitch
+      icon={isNetWorth ? Landmark : Droplet}
+      isChecked={isNetWorth}
+      onCheckedChange={(isChecked) => {
+        onBasisChange(isChecked ? "net-worth" : "liquidity");
+      }}
+    >
+      {basisNames[basis]}
+    </LabelledSwitch>
+  );
+}
+
 // What an area draws for an account, a year at a time: its balance, and
 // a break for a debt that owes nothing, which is a debt paid off, so a
 // debt leaves the plot once it reaches nothing. Its line ends with the
@@ -461,7 +505,8 @@ function Placeholder({ children }: { readonly children: string }): JSX.Element {
 // The year under the crosshair, the age reached that year and the
 // milestones falling in it, and each account's figure, from the top of
 // the stack down as the plot reads, what is held and then what is
-// owed, with the net worth they come to beneath, and under that, for a
+// owed, with what they come to beneath, named for the basis they are
+// counted on, and under that, for a
 // year that drew on a pension early, what
 // it drew so, and for a year that came up short, what it could not
 // cover. The values lead, in mono, with
@@ -474,9 +519,11 @@ function ProjectionTooltip({
   milestones,
   points,
   series,
+  total,
 }: Pick<ProjectionChartProps, "milestones" | "points"> &
   TooltipContentProps & {
     readonly series: readonly Series[];
+    readonly total: string;
   }): JSX.Element | null {
   const point = points.find((candidate) => candidate.year === label);
   if (!isActive || point === undefined) {
@@ -517,7 +564,7 @@ function ProjectionTooltip({
         </span>
       ))}
       <span className="flex items-center gap-2 border-t pt-1.5">
-        <span className="text-muted-foreground">Net worth</span>
+        <span className="text-muted-foreground">{total}</span>
         <span className="ml-auto figure font-medium">
           {formatGbp(
             series.reduce((sum, line) => sum + valueIn(point, line), 0),
@@ -592,12 +639,15 @@ function scaleOf(
 // most, so the family is told by hue and its accounts from each other
 // by hue where it has more than one and by lightness after that, in
 // either theme. An account's colour follows its place among every
-// account of its kind, so what else the plan holds never recolours it,
-// and neither does a debt secured on an asset leaving the debts to be
-// drawn in the asset's equity. A loan is drawn in the asset it names
-// only when the plan lists that asset; one naming an asset the plan
-// does not list is a debt like any other.
-function seriesOf(accounts: readonly Account[]): Series[] {
+// account of its kind, so neither what else the plan holds nor the
+// basis it is counted on ever recolours it. On liquidity a house, a car
+// or another real asset is left out, and every debt is drawn, the loans
+// on them among them; on the net worth each asset is drawn at its
+// equity, and a loan secured on it is drawn in it rather than among the
+// debts. A loan is drawn in the asset it names only when the plan lists
+// that asset; one naming an asset the plan does not list is a debt like
+// any other.
+function seriesOf(accounts: readonly Account[], basis: Basis): Series[] {
   const assets = new Set(accounts.filter(isAsset).map(({ id }) => id));
   const isSecured = ({ secures }: Account): boolean =>
     secures !== undefined && assets.has(secures);
@@ -608,7 +658,9 @@ function seriesOf(accounts: readonly Account[]): Series[] {
         account,
         color: `color-mix(in oklab, ${hueAt(hues, place)}, var(--card) ${String(Math.min(Math.floor(place / hues.length), 2) * 30)}%)`,
       }))
-      .filter(({ account }) => !isSecured(account))
+      .filter(({ account }) =>
+        basis === "net-worth" ? !isSecured(account) : !isAsset(account),
+      )
       .map(({ account: { id, kind, name }, color }) => ({
         color,
         ids: [
