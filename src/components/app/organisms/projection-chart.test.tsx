@@ -18,6 +18,7 @@ const byClass =
 const points = [
   {
     age: 36,
+    balances: { 1: 412880, 2: 286145 },
     deferred: 412880,
     early: 0,
     free: 286145,
@@ -26,6 +27,7 @@ const points = [
   },
   {
     age: 37,
+    balances: { 1: 462079, 2: 321452 },
     deferred: 462079,
     early: 0,
     free: 321452,
@@ -34,6 +36,7 @@ const points = [
   },
   {
     age: 38,
+    balances: { 1: 513737, 2: 358525 },
     deferred: 513737,
     early: 0,
     free: 358525,
@@ -47,14 +50,31 @@ const points = [
 const shortPoints = [
   {
     age: 36,
+    balances: { 1: 412880, 2: 286145 },
     deferred: 412880,
     early: 0,
     free: 286145,
     uncovered: 0,
     year: 2026,
   },
-  { age: 37, deferred: 41209, early: 0, free: 0, uncovered: 18450, year: 2027 },
-  { age: 38, deferred: 0, early: 0, free: 0, uncovered: 52310, year: 2028 },
+  {
+    age: 37,
+    balances: { 1: 41209, 2: 0 },
+    deferred: 41209,
+    early: 0,
+    free: 0,
+    uncovered: 18450,
+    year: 2027,
+  },
+  {
+    age: 38,
+    balances: { 1: 0, 2: 0 },
+    deferred: 0,
+    early: 0,
+    free: 0,
+    uncovered: 52310,
+    year: 2028,
+  },
 ];
 
 // The same plan with its pension drawn early in its second year, before
@@ -62,14 +82,31 @@ const shortPoints = [
 const earlyPoints = [
   {
     age: 36,
+    balances: { 1: 412880, 2: 286145 },
     deferred: 412880,
     early: 0,
     free: 286145,
     uncovered: 0,
     year: 2026,
   },
-  { age: 37, deferred: 41209, early: 26667, free: 0, uncovered: 0, year: 2027 },
-  { age: 38, deferred: 0, early: 0, free: 0, uncovered: 52310, year: 2028 },
+  {
+    age: 37,
+    balances: { 1: 41209, 2: 0 },
+    deferred: 41209,
+    early: 26667,
+    free: 0,
+    uncovered: 0,
+    year: 2027,
+  },
+  {
+    age: 38,
+    balances: { 1: 0, 2: 0 },
+    deferred: 0,
+    early: 0,
+    free: 0,
+    uncovered: 52310,
+    year: 2028,
+  },
 ];
 
 // The vertical rule recharts draws for a ReferenceLine, which carries the
@@ -292,8 +329,24 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         milestones={[]}
         points={[
-          { age: 36, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2026 },
-          { age: 37, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2027 },
+          {
+            age: 36,
+            balances: { 1: 0, 2: 0 },
+            deferred: 0,
+            early: 0,
+            free: 0,
+            uncovered: 0,
+            year: 2026,
+          },
+          {
+            age: 37,
+            balances: { 1: 0, 2: 0 },
+            deferred: 0,
+            early: 0,
+            free: 0,
+            uncovered: 0,
+            year: 2027,
+          },
         ]}
       />,
     );
@@ -327,6 +380,7 @@ describe("ProjectionChart", () => {
   it("marks every milestone in the plan's years, the chosen one solid with a dot where its balance stands", () => {
     const years = Array.from({ length: 15 }, (_, place) => ({
       age: 36 + place,
+      balances: { 1: 100000, 2: 100000 },
       deferred: 100000,
       early: 0,
       free: 100000,
