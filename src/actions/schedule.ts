@@ -4,21 +4,27 @@ import * as z from "zod";
 
 import type { ExpenseLine, ExpenseLineValues } from "@/data/expenses";
 import type { IncomeLine, IncomeLineDraft } from "@/data/income";
+import type { LineValues } from "@/data/schedule";
 import type { Answer } from "@/lib/answer";
+import type { Held } from "@/store/household";
 
 import { toAccount } from "@/data/accounts";
 import { expenseKinds } from "@/data/expenses";
 import { incomeKinds, toPension } from "@/data/income";
+import { timed } from "@/data/milestones";
 import { lineValues, named, pounds, recordId, target } from "@/data/schemas";
+import { Refusal } from "@/lib/answer";
+import { endsAfterItStarts } from "@/lib/lines";
 import { removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
 // What a save of an expense line may carry: the values every line
 // holds, as the model holds them so the two cannot drift, and its kind.
-// That a line ends no earlier than it starts, and in a month only of a
-// year it ends in, is the household's to hold, as every rule across the
-// fields is.
+// That a line with fixed ends ends no earlier than it starts, and in a
+// month only of a year it ends in, is the household's to hold, as every
+// rule across the fields is; that a line tied to a milestone does, as
+// its ends fall on the day, is the save's.
 const expenseValues = z.object({
   ...lineValues,
   kind: z.enum(expenseKinds),
@@ -77,7 +83,8 @@ export async function saveExpenseLine(
   await requireSession();
   const at = target.parse(id);
   const parsed = expenseValues.parse(draft);
-  return amend(({ kept }) => {
+  return amend((held) => {
+    const { kept } = held;
     const {
       next,
       records,
@@ -85,11 +92,15 @@ export async function saveExpenseLine(
     } = written(
       kept.schedule.expenses,
       { at, next: kept.next, noun: "expense line" },
-      (id, listed) => ({
-        ...parsed,
-        id,
-        ...(listed?.pays !== undefined && { pays: listed.pays }),
-      }),
+      (id, listed) =>
+        inOrder(
+          {
+            ...parsed,
+            id,
+            ...(listed?.pays !== undefined && { pays: listed.pays }),
+          },
+          held,
+        ),
     );
     return {
       kept: {
@@ -119,7 +130,8 @@ export async function saveIncomeLine(
   await requireSession();
   const at = target.parse(id);
   const { opens, ...parsed } = incomeValues.parse(draft);
-  return amend(({ kept }) => {
+  return amend((held) => {
+    const { kept } = held;
     const pension =
       opens === null ? null : toAccount(toPension(opens), kept.next);
     const {
@@ -133,7 +145,8 @@ export async function saveIncomeLine(
         next: pension === null ? kept.next : kept.next + 1,
         noun: "income line",
       },
-      (id) => ({ ...parsed, feeds: pension?.id ?? parsed.feeds, id }),
+      (id) =>
+        inOrder({ ...parsed, feeds: pension?.id ?? parsed.feeds, id }, held),
     );
     return {
       kept: {
@@ -146,4 +159,21 @@ export async function saveIncomeLine(
       result: line,
     };
   });
+}
+
+// The line as written, once it is held to ending no earlier than it
+// starts as its ends fall on the day it is saved, each end tied to a
+// milestone read off it. The household holds a line with both ends
+// fixed to the same, and leaves a tied one to run no years when its
+// milestone is later moved past its other end, since the retirement age
+// is moved on the dashboard; a line saved that way would be one made
+// wrong on purpose, so the save refuses it in the household's words.
+function inOrder<TLine extends LineValues>(
+  line: TLine,
+  { household, kept }: Held,
+): TLine {
+  if (!endsAfterItStarts(timed(line, kept.milestones, household.plan))) {
+    throw new Refusal("A line ends no earlier than it starts");
+  }
+  return line;
 }

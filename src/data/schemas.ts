@@ -23,18 +23,24 @@ export const named = z.string().trim().min(1);
 // A sum of money: whole pounds, and never below nothing.
 export const pounds = z.number().int().nonnegative();
 
+// What a line's end is tied to: retirement, or a milestone by its id.
+// That the household lists the milestone is the household's to hold.
+export const tie = z.union([z.literal("retirement"), recordId]);
+
 // What every line of both schedules holds: the amount, whole and never
 // negative; the years whole, the last one absent for a line that runs
-// to the end of the plan; the last month one of the twelve; and the
-// name.
+// to the end of the plan; the last month one of the twelve; the name;
+// and the milestone either end is tied to, or none.
 export const lineValues = {
   amount: pounds,
   cadence: z.enum(cadences),
+  endsAt: tie.nullable(),
   firstYear: z.number().int().positive(),
   growth: z.enum(lineGrowths),
   lastMonth: monthOfYear.nullable(),
   lastYear: z.number().int().positive().nullable(),
   name: named,
+  startsAt: tie.nullable(),
 };
 
 // What a milestone holds: the name, and the year, whole and from one up,

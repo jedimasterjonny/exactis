@@ -26,12 +26,14 @@ const { db } = memory;
 const expense = {
   amount: 1150,
   cadence: "month",
+  endsAt: null,
   firstYear: 2027,
   growth: "inflation-plus-2",
   kind: "time-bound",
   lastMonth: null,
   lastYear: 2035,
   name: " Nursery ",
+  startsAt: null,
 } as const;
 
 // An income line as its dialog sends it, the name as typed, opening no
@@ -40,6 +42,7 @@ const values = {
   amount: 12000,
   bonus: 0,
   cadence: "month",
+  endsAt: null,
   feeds: null,
   firstYear: 2030,
   growth: "triple-lock",
@@ -50,6 +53,7 @@ const values = {
   opens: null,
   rsu: 0,
   sacrifice: 0,
+  startsAt: null,
 } as const;
 
 // The line the household is handed of a draft: the draft less the
@@ -61,6 +65,7 @@ function lineOf(draft: IncomeLineDraft, id: number): IncomeLine {
     amount: draft.amount,
     bonus: draft.bonus,
     cadence: draft.cadence,
+    endsAt: null,
     feeds: draft.feeds,
     firstYear: draft.firstYear,
     growth: draft.growth,
@@ -71,6 +76,7 @@ function lineOf(draft: IncomeLineDraft, id: number): IncomeLine {
     name: draft.name.trim(),
     rsu: draft.rsu,
     sacrifice: draft.sacrifice,
+    startsAt: null,
   };
 }
 
@@ -253,6 +259,11 @@ describe("the schedule actions", () => {
           { ...values, lastYear: 2029 },
           "A line ends no earlier than it starts",
         ],
+        // The line ends in 2035, and retirement at 59 is in 2049.
+        [
+          { ...values, startsAt: "retirement" },
+          "A line ends no earlier than it starts",
+        ],
         [
           { ...values, lastMonth: 3, lastYear: null },
           "A line ends in a month only of a year it ends in",
@@ -393,6 +404,35 @@ describe("the schedule actions", () => {
       }
       await expect(saveExpenseLine(0, expense)).rejects.toThrow(z.ZodError);
       expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+
+    // The children leave home in 2036, so a line tied to end then runs
+    // to 2035; the downsize is in 2055, so a line tied to start then and
+    // ending in 2035 would run no years, and is refused as a line saved
+    // with both ends fixed that way is.
+    it("ties a line to a milestone, keeping the years it gives, and refuses one tied out of order", async () => {
+      const written = { ...expense, endsAt: 1, id: 6, name: "Nursery" };
+
+      expect(
+        await saveExpenseLine(null, { ...expense, endsAt: 1 }),
+      ).toStrictEqual(saved(written));
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          schedule: { expenses: [...kept.schedule.expenses, written] },
+        },
+        version: 2,
+      });
+      await expect(
+        saveExpenseLine(null, { ...expense, startsAt: 2 }),
+      ).resolves.toStrictEqual(
+        refused("A line ends no earlier than it starts"),
+      );
+      await expect(
+        saveExpenseLine(null, { ...expense, endsAt: 99 }),
+      ).resolves.toStrictEqual(
+        refused("A line is tied to a milestone the household lists"),
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 2 });
     });
 
     it("refuses a line the household cannot hold, in its words, and an id no line has", async () => {

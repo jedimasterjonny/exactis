@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import type { Summary } from "@/components/app/organisms/schedule-rows";
 import type { Account } from "@/data/accounts";
 import type { IncomeKind, IncomeLine, IncomeLineDraft } from "@/data/income";
+import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
 import type { Entry } from "@/hooks/use-editor";
@@ -23,6 +24,7 @@ import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { isPension } from "@/data/accounts";
 import { isOpeningSound, totalOf } from "@/data/income";
+import { markersOf } from "@/data/milestones";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { isSound, spanOf } from "@/lib/lines";
@@ -38,6 +40,7 @@ type Draft = IncomeLineDraft;
 interface IncomeScheduleProps {
   readonly accounts: readonly Account[];
   readonly lines: readonly IncomeLine[];
+  readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
 }
@@ -76,16 +79,20 @@ const kinds = optionsOf(kindLabels, [
 // line, so it goes alone. The dialog of a saved line offers a Delete
 // that asks the same question, which is where a row folded to fit a
 // phone is deleted from, and holds while a save is on its way, since a
-// deletion over a save in flight would race it. The card takes a
-// numeral of its own off the screen's, since the reference numbers each
-// of the schedule's cards that way: the next after the milestones', and
-// the expense schedule beneath it takes the one after.
+// deletion over a save in flight would race it. The lines are laid out
+// by the milestones the page hands down: each row names the ones its
+// line is tied to, and the dialog offers them for either end. The card
+// takes a numeral of its own off the screen's, since the reference
+// numbers each of the schedule's cards that way: the next after the
+// milestones', and the expense schedule beneath it takes the one after.
 export function IncomeSchedule({
   accounts,
   lines,
+  milestones,
   owners,
   plan,
 }: IncomeScheduleProps): JSX.Element {
+  const markers = markersOf(milestones, plan);
   const { amend, dialogOf, dismiss, entry, open } = useEditor({
     describe: (line) => `${line.name} · ${spanOf(line)}`,
     noun: "Income line",
@@ -163,6 +170,7 @@ export function IncomeSchedule({
             emptyDescription="Add a salary, a pension or a side line to see it scheduled here."
             emptyTitle="No income yet"
             lines={lines}
+            milestones={markers}
             onDelete={ask}
             onEdit={edit}
             plan={plan}
@@ -196,6 +204,7 @@ export function IncomeSchedule({
             draft={entry.draft}
             initial={entry.initial}
             kinds={kinds}
+            milestones={markers}
             namePlaceholder="Salary, consulting, state pension…"
             onAmend={(patch) => {
               amend(entry, patch);
@@ -225,13 +234,14 @@ export function IncomeSchedule({
 }
 
 // A new line: nothing a year from the plan's first year to its end,
-// growing with inflation and feeding no pension, listed or opened, as
-// the reference's new line opens.
+// growing with inflation, tied to no milestone and feeding no pension,
+// listed or opened, as the reference's new line opens.
 function blank(plan: Plan): Draft {
   return {
     amount: 0,
     bonus: 0,
     cadence: "year",
+    endsAt: null,
     feeds: null,
     firstYear: plan.from,
     growth: "inflation",
@@ -242,6 +252,7 @@ function blank(plan: Plan): Draft {
     opens: null,
     rsu: 0,
     sacrifice: 0,
+    startsAt: null,
   };
 }
 

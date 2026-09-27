@@ -14,7 +14,8 @@ import { saveExpenseLine } from "@/actions/schedule";
 import { Toaster } from "@/components/kit/toast";
 import { expenseKinds } from "@/data/expenses";
 import { expenseLines } from "@/data/expenses.fixture";
-import { plan } from "@/data/income.fixture";
+import { plan, retiring } from "@/data/income.fixture";
+import { milestones } from "@/data/milestones.fixture";
 import { saved as accepted } from "@/lib/answer";
 import { commit, openEditor, openEntry } from "@/test/dom";
 import { heldBack } from "@/test/held-back";
@@ -27,7 +28,10 @@ const [, , mortgagePayment, retirement] = expenseLines;
 
 // Save reports through the toast manager, which needs its Toaster mounted.
 function renderSchedule(lines: readonly ExpenseLine[] = expenseLines): void {
-  render(<ExpenseSchedule lines={lines} plan={plan} />, { wrapper: Toaster });
+  render(
+    <ExpenseSchedule lines={lines} milestones={milestones} plan={plan} />,
+    { wrapper: Toaster },
+  );
 }
 
 // The store's answer to a save: the line as it now has it. The schedule
@@ -74,7 +78,11 @@ describe("ExpenseSchedule", () => {
 
   it("marks a time-bound cost for its end and draws the empty state for none", () => {
     const { rerender } = render(
-      <ExpenseSchedule lines={[expenseLines[1]]} plan={plan} />,
+      <ExpenseSchedule
+        lines={[expenseLines[1]]}
+        milestones={milestones}
+        plan={plan}
+      />,
     );
 
     expect(screen.getByText("Time-bound")).toHaveAttribute(
@@ -82,7 +90,9 @@ describe("ExpenseSchedule", () => {
       "caution",
     );
 
-    rerender(<ExpenseSchedule lines={[]} plan={plan} />);
+    rerender(
+      <ExpenseSchedule lines={[]} milestones={milestones} plan={plan} />,
+    );
 
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
     expect(screen.getByText("No expenses yet")).toBeInTheDocument();
@@ -149,12 +159,14 @@ describe("ExpenseSchedule", () => {
     expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(null, {
       amount: 1150,
       cadence: "month",
+      endsAt: null,
       firstYear: 2027,
       growth: "inflation-plus-2",
       kind: "time-bound",
       lastMonth: null,
       lastYear: 2035,
       name: "Nursery",
+      startsAt: null,
     });
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
 
@@ -162,6 +174,7 @@ describe("ExpenseSchedule", () => {
       accepted({
         amount: 1150,
         cadence: "month",
+        endsAt: null,
         firstYear: 2027,
         growth: "inflation-plus-2",
         id: 6,
@@ -169,6 +182,7 @@ describe("ExpenseSchedule", () => {
         lastMonth: null,
         lastYear: 2035,
         name: "Nursery",
+        startsAt: null,
       }),
     );
 
@@ -241,12 +255,14 @@ describe("ExpenseSchedule", () => {
     expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(4, {
       amount: 65000,
       cadence: "year",
+      endsAt: null,
       firstYear: 2048,
       growth: "inflation",
       kind: "other",
       lastMonth: null,
       lastYear: null,
       name: "Retirement living",
+      startsAt: null,
     });
   });
 
@@ -257,6 +273,7 @@ describe("ExpenseSchedule", () => {
     render(
       <ExpenseSchedule
         lines={[retirement, { ...mortgagePayment, pays: 5 }]}
+        milestones={milestones}
         plan={plan}
       />,
       { wrapper: Toaster },
@@ -274,5 +291,68 @@ describe("ExpenseSchedule", () => {
         name: "Edited with its asset on the accounts screen",
       }),
     ).toHaveLength(2);
+  });
+
+  // With its owner retiring at 59, the plan's retirement falls in 2049,
+  // so a line ending at it runs to 2048, as the dialog says beneath the
+  // choice and the save sends.
+  it("ties a new line's end to a milestone and saves the tie with the year it gives", async () => {
+    render(
+      <ExpenseSchedule
+        lines={expenseLines}
+        milestones={milestones}
+        plan={retiring}
+      />,
+      { wrapper: Toaster },
+    );
+    saved({
+      amount: 0,
+      cadence: "month",
+      endsAt: "retirement",
+      firstYear: 2026,
+      growth: "inflation",
+      id: 6,
+      kind: "time-bound",
+      lastMonth: null,
+      lastYear: 2048,
+      name: "Household",
+      startsAt: null,
+    });
+
+    const dialog = openEntry("Add expense line");
+
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
+      target: { value: "Household" },
+    });
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Ends" }), {
+      target: { value: "retirement" },
+    });
+
+    expect(
+      within(dialog).getByText("Runs to 2048, the year before Retirement."),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(null, {
+      amount: 0,
+      cadence: "month",
+      endsAt: "retirement",
+      firstYear: 2026,
+      growth: "inflation",
+      kind: "time-bound",
+      lastMonth: null,
+      lastYear: 2048,
+      name: "Household",
+      startsAt: null,
+    });
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Household" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("dialog", { name: "Expense line added" }),
+    ).toHaveAccessibleDescription("Household · 2026–2048");
   });
 });

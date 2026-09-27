@@ -260,6 +260,15 @@ const held: readonly Case[] = [
       spending(given, 1, (line) => ({ ...line, lastYear: 2025 })),
   ],
   [
+    "A line is tied to a milestone the household lists",
+    (given): Inputs =>
+      earning(given, 1, (salary) => ({ ...salary, endsAt: 99 })),
+  ],
+  [
+    "A line is tied to a milestone the household lists",
+    (given): Inputs => spending(given, 1, (line) => ({ ...line, startsAt: 3 })),
+  ],
+  [
     "A line ends in a month only of a year it ends in",
     (given): Inputs =>
       earning(given, 4, (pension) => ({ ...pension, lastMonth: 3 })),
@@ -306,6 +315,23 @@ describe("household", () => {
     ).not.toThrow();
   });
 
+  // The children leaving home in 2036 have moved past the salary's last
+  // year, which is its own; a tied end moves with its milestone, and the
+  // move is not refused over a line it leaves running no years.
+  it("keeps a line whose milestone has moved past its other end, running no years", () => {
+    const passed = earning(sound, 1, (salary) => ({
+      ...salary,
+      firstYear: 2036,
+      lastYear: 2030,
+      startsAt: 1,
+    }));
+
+    expect(household.safeParse(passed).success).toBe(true);
+    expect(() =>
+      project(passed.accounts, passed.schedule, passed.plan),
+    ).not.toThrow();
+  });
+
   it.each(thrown)(
     "refuses what the engine throws %s on, as %s",
     (engine, refusal, broken) => {
@@ -345,6 +371,63 @@ describe("soundKept", () => {
       kept: nothingKeptIn(september),
     });
     expect(soundKept(kept).kept).toStrictEqual(kept);
+  });
+
+  // Retirement at 59 falls in 2049 and the downsize in 2055, wherever
+  // the lines tied to them were when they were saved.
+  it("reads each tied end off the milestone it is tied to, as the household stands", () => {
+    const [salary, ...income] = incomeLines;
+    const [household, ...expenses] = expenseLines;
+    const { household: read } = soundKept({
+      ...kept,
+      schedule: {
+        expenses: [{ ...household, endsAt: 2, lastYear: 2040 }, ...expenses],
+        income: [
+          { ...salary, endsAt: "retirement", lastYear: 2060 },
+          ...income,
+        ],
+      },
+    });
+
+    expect(read.schedule.income[0]).toStrictEqual({
+      ...salary,
+      endsAt: "retirement",
+      lastYear: 2048,
+    });
+    expect(read.schedule.expenses[0]).toStrictEqual({
+      ...household,
+      endsAt: 2,
+      lastYear: 2054,
+    });
+  });
+
+  // A line kept before a line could be tied holds no ties at all.
+  // Spelled out key by key, since a rest destructure would bind them to
+  // nothing.
+  it("reads a line kept before a line could be tied as tied to none", () => {
+    const [salary, ...income] = incomeLines;
+    const before = {
+      amount: salary.amount,
+      bonus: salary.bonus,
+      cadence: salary.cadence,
+      feeds: salary.feeds,
+      firstYear: salary.firstYear,
+      growth: salary.growth,
+      id: salary.id,
+      kind: salary.kind,
+      lastMonth: salary.lastMonth,
+      lastYear: salary.lastYear,
+      name: salary.name,
+      rsu: salary.rsu,
+      sacrifice: salary.sacrifice,
+    };
+
+    expect(
+      soundKept({
+        ...kept,
+        schedule: { ...kept.schedule, income: [before, ...income] },
+      }).kept.schedule.income[0],
+    ).toStrictEqual(salary);
   });
 
   // A household kept before there were milestones holds no list of
@@ -501,6 +584,22 @@ describe("a line paying a loan", () => {
         ),
       ),
     ).toMatchObject({ lastMonth: 8, lastYear: 2029 });
+  });
+
+  // The loan says when its payments run, so a tie saved on the line is
+  // read as none.
+  it("ties a loan's payments to no milestone", () => {
+    const { loan, ...records } = toHouseRecords(homeValues, { from: 2026 });
+
+    expect(
+      paymentsOf({
+        ...records,
+        loan:
+          loan === null
+            ? null
+            : { ...loan, line: { ...loan.line, endsAt: 1, startsAt: 2 } },
+      }),
+    ).toMatchObject({ endsAt: null, lastYear: 2047, startsAt: null });
   });
 
   // £1,000 a month is less than the interest on £341,810 at 5.15%.

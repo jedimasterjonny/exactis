@@ -3,8 +3,10 @@ import { refresh } from "next/cache";
 import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
+import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
-import { readLatest } from "@/db/household";
+import { incomeLines } from "@/data/income.fixture";
+import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
@@ -87,6 +89,50 @@ describe("the milestone actions", () => {
 
       await expect(removeMilestone(2)).rejects.toThrow("redirected");
       expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+
+    // The childcare runs to 2035 and the step-up from 2036, each tied to
+    // the children leaving home; the step-up also ends at retirement.
+    it("fixes each line tied to the milestone where it falls, and keeps its other ties", async () => {
+      const [salary, stepUp, ...income] = incomeLines;
+      const [household, childcare, ...expenses] = expenseLines;
+      await keepAfter(db, 1, {
+        ...kept,
+        schedule: {
+          expenses: [household, { ...childcare, endsAt: 1 }, ...expenses],
+          income: [
+            salary,
+            { ...stepUp, endsAt: "retirement", startsAt: 1 },
+            ...income,
+          ],
+        },
+      });
+
+      await removeMilestone(1);
+
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          milestones: [downsize],
+          schedule: {
+            expenses: [
+              household,
+              { ...childcare, endsAt: null, lastYear: 2035 },
+              ...expenses,
+            ],
+            income: [
+              salary,
+              {
+                ...stepUp,
+                endsAt: "retirement",
+                firstYear: 2036,
+                startsAt: null,
+              },
+              ...income,
+            ],
+          },
+        },
+        version: 3,
+      });
     });
 
     it("deletes the milestone with the id and draws the page again", async () => {

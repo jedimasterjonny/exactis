@@ -8,11 +8,13 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { Milestone } from "@/data/milestones";
+import type { Schedule } from "@/engine/cash-flow";
 import type { Answer } from "@/lib/answer";
 
 import { removeMilestone, saveMilestone } from "@/actions/milestones";
 import { Toaster } from "@/components/kit/toast";
-import { retiring } from "@/data/income.fixture";
+import { expenseLines } from "@/data/expenses.fixture";
+import { incomeLines, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { refused, saved } from "@/lib/answer";
 import { bySlot, commit } from "@/test/dom";
@@ -26,13 +28,35 @@ vi.mock("@/actions/milestones", () => ({
 }));
 
 const [kidsLeave, downsize] = milestones;
+const [salary, stepUp] = incomeLines;
+const [household, childcare] = expenseLines;
+
+// The reference schedule with the salary and its step-up tied to end at
+// retirement, the household spending to end at it and the childcare at
+// the children leaving home, and the step-up to start at them.
+const tied = {
+  expenses: [
+    { ...household, endsAt: "retirement" },
+    { ...childcare, endsAt: 1 },
+    ...expenseLines.slice(2),
+  ],
+  income: [
+    { ...salary, endsAt: "retirement" },
+    { ...stepUp, endsAt: "retirement", startsAt: 1 },
+    ...incomeLines.slice(2),
+  ],
+} as const;
 
 // Save and delete report through the toast manager, which needs its
 // Toaster mounted.
-function renderList(listed: readonly Milestone[] = milestones): void {
-  render(<MilestoneList milestones={listed} plan={retiring} />, {
-    wrapper: Toaster,
-  });
+function renderList(
+  listed: readonly Milestone[] = milestones,
+  schedule: Schedule = tied,
+): void {
+  render(
+    <MilestoneList milestones={listed} plan={retiring} schedule={schedule} />,
+    { wrapper: Toaster },
+  );
 }
 
 describe("MilestoneList", () => {
@@ -67,10 +91,10 @@ describe("MilestoneList", () => {
     expect(within(section).getAllByText("Age 46")).toHaveLength(2);
     expect(within(section).getAllByText("Age 65")).toHaveLength(2);
     expect(
-      within(section).getAllByText(
-        "Moves with the retirement age on the dashboard",
+      within(section).getByText(
+        /retirement moves with the age set on the dashboard\.$/,
       ),
-    ).toHaveLength(2);
+    ).toBeInTheDocument();
     // Hidden from the tree, so no query is better than the slot.
     expect(
       within(section)
@@ -105,8 +129,22 @@ describe("MilestoneList", () => {
     ).not.toBeInTheDocument();
   });
 
+  // Each says it twice, in its columns and on its folded lines, and the
+  // downsize, which no line is tied to, says nothing.
+  it("says which lines end and start at each milestone, from either schedule", () => {
+    renderList();
+
+    expect(
+      screen.getAllByText("Ends Childcare · Starts Salary step-up"),
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByText("Ends Salary, Salary step-up and Household"),
+    ).toHaveLength(2);
+    expect(screen.getAllByText(/^(Ends|Starts) /)).toHaveLength(4);
+  });
+
   it("lists retirement alone for a household listing no milestone", () => {
-    renderList([]);
+    renderList([], { expenses: [], income: [] });
 
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
     expect(screen.getAllByText("Retirement")).toHaveLength(2);
@@ -270,7 +308,9 @@ describe("MilestoneList", () => {
       name: "Delete Kids leave home?",
     });
 
-    expect(dialog).toHaveAccessibleDescription("It cannot be brought back.");
+    expect(dialog).toHaveAccessibleDescription(
+      "The 2 lines tied to it stay where they are, in fixed years. It cannot be brought back.",
+    );
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
 
@@ -296,11 +336,28 @@ describe("MilestoneList", () => {
     expect(screen.queryByRole("form")).not.toBeInTheDocument();
     expect(
       screen.getByRole("alertdialog", { name: "Delete Downsize?" }),
-    ).toBeVisible();
+    ).toHaveAccessibleDescription("It cannot be brought back.");
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(removeMilestone).not.toHaveBeenCalled();
+  });
+
+  it("says the one line tied to a milestone stays where it is", () => {
+    renderList(milestones, {
+      expenses: [{ ...childcare, endsAt: 1 }],
+      income: [],
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Kids leave home" }),
+    );
+
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete Kids leave home?" }),
+    ).toHaveAccessibleDescription(
+      "The line tied to it stays where it is, in a fixed year. It cannot be brought back.",
+    );
   });
 });
