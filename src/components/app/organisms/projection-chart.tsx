@@ -106,8 +106,11 @@ const config = Object.fromEntries(
 // when the chart arrives; whatever controls the caller gives for what
 // is plotted share the row, at its left, the toggle keeping the right,
 // and the choices it gives between them, or on a row of their own
-// beneath on a phone, and the rows stand a gap clear of the plot, so a
-// figure box above the top tick does not crowd it. The box is three
+// beneath on a phone. The row centres what shares it, so a field there,
+// its label above its box and its hint beneath a line each, stands with
+// its box level with the choices and the toggle, where aligning their
+// feet set them level with its hint. The rows stand a gap clear of the
+// plot, so a figure box above the top tick does not crowd it. The box is three
 // times as wide as it is tall down to a floor, and every frame with it:
 // the rows, the axis and the legend take the same height at any width,
 // and on a phone a third of the width is less than they need, which
@@ -172,7 +175,7 @@ export function ProjectionChart({
   return (
     <Frame>
       <div className={cn("flex w-full flex-col gap-4", boxSize)}>
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
           <div>{controls}</div>
           {choices !== undefined && (
             <div className="col-span-2 row-start-2 sm:col-span-1 sm:col-start-2 sm:row-start-1">
