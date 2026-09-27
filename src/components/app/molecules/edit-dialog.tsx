@@ -1,18 +1,9 @@
 import type { JSX, ReactNode } from "react";
 
-import { cn } from "cn";
 import { Trash2 } from "lucide-react";
-import { useRef } from "react";
 
+import { DialogFrame } from "@/components/app/atoms/dialog-frame";
 import { Button } from "@/components/kit/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/kit/dialog";
 
 interface EditDialogProps {
   readonly canSave?: boolean;
@@ -26,13 +17,12 @@ interface EditDialogProps {
   readonly title: string;
 }
 
-// The dialog every editor in the product opens: an eyebrow in the brand
-// colour saying what is being entered or edited, the title naming it, the
-// fields the caller gives, and Cancel and Save beneath. It is open for as
-// long as it is mounted, so a caller renders it while it holds an entry
-// and not otherwise, and the fields inside mount fresh with each entry.
-// The dialog opens only from a button, so the only change it can report
-// is a close: Cancel, Escape or a press outside, all of which dismiss.
+// The dialog every editor in the product opens: the dialog frame, its
+// eyebrow saying what is being entered or edited and its title naming
+// it, around the fields the caller gives, with Cancel and Save beneath.
+// It is open for as long as it is mounted, so a caller renders it while
+// it holds an entry and not otherwise, and the fields inside mount fresh
+// with each entry. Cancel dismisses, as the frame's own closes do.
 // Save holds while the caller says the draft cannot be saved, unnamed
 // say, and while a save is on its way to the store, which the dialog
 // holds it for itself rather than every caller folding it into what it
@@ -44,23 +34,8 @@ interface EditDialogProps {
 // it offers nothing to delete. The Delete holds while the caller says a
 // save is on its way to the store, as Save does, since a deletion asked
 // for over a save in flight would race it: the save's answer could
-// report the record saved after the question had deleted it. The dialog
-// is held to the height of the screen, less the margin it keeps at the
-// sides, and the fields scroll between the title and the footer, which
-// stay where they are: a form taller than a phone ran off both ends of
-// it, taking the title and Save with it, and scrolled nowhere. The
-// fields keep the dialog's gap between them in the box they scroll in,
-// as a caller giving more than one, fields and a note, had it before.
-// The footer is one row at every width, where the registry's stacks its
-// buttons the width of the dialog on a phone: three of them, held on
-// screen, took a fifth of it from the fields, and Save sits where a
-// thumb reaches, at the right.
-// Opened on a touch screen, the dialog takes the focus itself rather
-// than handing it to its first field, which opened the keyboard over
-// half the form before anything was asked of it; Base UI does the same
-// for a dialog its trigger opens by touch, but these open from state,
-// with no trigger to tell it how. A mouse or a keyboard still lands in
-// the first field, ready to type.
+// report the record saved after the question had deleted it. Save sits
+// where a thumb reaches, at the right of the frame's one-row footer.
 export function EditDialog({
   canSave = true,
   children,
@@ -72,25 +47,11 @@ export function EditDialog({
   onSave,
   title,
 }: EditDialogProps): JSX.Element {
-  const popupRef = useRef<HTMLDivElement>(null);
   return (
-    <Dialog onOpenChange={onDismiss} open>
-      <DialogContent
-        className={cn(
-          "max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto]",
-          isWide && "sm:max-w-lg",
-        )}
-        initialFocus={() => (isTouch() ? popupRef.current : true)}
-        ref={popupRef}
-      >
-        <DialogHeader>
-          <span className="label text-brand">{eyebrow}</span>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <div className="-mx-4 -my-1 grid content-start gap-4 overflow-y-auto px-4 py-1">
-          {children}
-        </div>
-        <DialogFooter className="flex-row justify-end">
+    <DialogFrame
+      eyebrow={eyebrow}
+      footer={
+        <>
           {onDelete !== undefined && (
             <Button
               className="mr-auto"
@@ -103,24 +64,19 @@ export function EditDialog({
               Delete
             </Button>
           )}
-          <DialogClose render={<Button size="sm" variant="outline" />}>
+          <Button onClick={onDismiss} size="sm" variant="outline">
             Cancel
-          </DialogClose>
+          </Button>
           <Button disabled={!canSave || isSaving} onClick={onSave} size="sm">
             Save
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Whether the screen is worked by touch, where a field focused unasked
-// opens the keyboard. A browser that cannot say is taken to have a
-// mouse, which is what jsdom, having no working matchMedia, has.
-function isTouch(): boolean {
-  return (
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(pointer: coarse)").matches
+        </>
+      }
+      isWide={isWide}
+      onDismiss={onDismiss}
+      title={title}
+    >
+      {children}
+    </DialogFrame>
   );
 }
