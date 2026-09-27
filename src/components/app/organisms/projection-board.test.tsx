@@ -6,13 +6,14 @@ import { describe, expect, it, vi } from "vitest";
 import type { Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
+import type { ProjectionPoint } from "@/engine/projection";
 
 import { saveAges } from "@/actions/plan";
 import { toast } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 import { kept } from "@/data/household.fixture";
 import { retiring } from "@/data/income.fixture";
-import { project } from "@/engine/projection";
+import { balanceIn, balanceOf, project } from "@/engine/projection";
 import { refused } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
 import { commit, slider } from "@/test/dom";
@@ -59,6 +60,12 @@ function board(
   );
 }
 
+// What the milestone tile gives for a year of a plan: the two wrappers.
+function heldIn(held: Plan, year: number, lines: Schedule = schedule): string {
+  const point = pointIn(held, year, lines);
+  return formatGbp(point === undefined ? 0 : balanceOf(point));
+}
+
 // The fixture's schedule with the retirement living starting in the
 // year given.
 function livingFrom(firstYear: number, isTied: boolean): Schedule {
@@ -72,13 +79,30 @@ function livingFrom(firstYear: number, isTied: boolean): Schedule {
   };
 }
 
-// The total the chart gives for a year of a plan, as its tooltip
-// writes it, over the fixture's schedule or the one given.
-function totalIn(held: Plan, year: number, lines: Schedule = schedule): string {
-  const point = project(accounts, lines, held).find(
+// A year of a plan as the engine projects it, over the fixture's
+// schedule or the one given.
+function pointIn(
+  held: Plan,
+  year: number,
+  lines: Schedule,
+): ProjectionPoint | undefined {
+  return project(accounts, lines, held).find(
     (candidate) => candidate.year === year,
   );
-  return formatGbp((point?.deferred ?? 0) + (point?.free ?? 0));
+}
+
+// The total the chart gives for a year of a plan, as its tooltip writes
+// it: every account it draws, which is every one but the mortgage.
+function totalIn(held: Plan, year: number, lines: Schedule = schedule): string {
+  const point = pointIn(held, year, lines);
+  return formatGbp(
+    accounts
+      .filter(({ kind }) => kind !== "debt")
+      .reduce(
+        (sum, { id }) => sum + (point === undefined ? 0 : balanceIn(point, id)),
+        0,
+      ),
+  );
 }
 
 // Types an age into the box and leaves it, which commits it.
@@ -94,7 +118,7 @@ describe("ProjectionBoard", () => {
     render(board());
 
     expect(screen.getByText("At Retirement")).toBeInTheDocument();
-    expect(screen.getByText(totalIn(retiring, 2049))).toHaveClass("figure");
+    expect(screen.getByText(heldIn(retiring, 2049))).toHaveClass("figure");
     expect(screen.getByText("2049 · age 59")).toBeInTheDocument();
     expect(
       screen.getByRole("textbox", { name: "Retirement age" }),
@@ -310,7 +334,7 @@ describe("ProjectionBoard", () => {
     );
 
     expect(screen.getByText("At Kids leave home")).toBeInTheDocument();
-    expect(screen.getByText(totalIn(retiring, 2036))).toHaveClass("figure");
+    expect(screen.getByText(heldIn(retiring, 2036))).toHaveClass("figure");
     expect(screen.getByText("2036 · age 46")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Kids leave home 2036" }),

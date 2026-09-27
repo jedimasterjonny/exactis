@@ -1,6 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import type { Account } from "@/data/accounts";
+
+import { accounts, sipp } from "@/data/accounts.fixture";
 import { bySlot } from "@/test/dom";
 
 import { ProjectionChart, ProjectionPending } from "./projection-chart";
@@ -14,6 +17,11 @@ const byClass =
   (className: string) =>
   (_content: string, element: Element | null): boolean =>
     element?.classList.contains(className) === true;
+
+// The reference plan's pension and ISA, which the points below hold by
+// the ids they are listed under.
+const [pension, isa, cash, home] = accounts;
+const held: readonly Account[] = [pension, isa];
 
 const points = [
   {
@@ -123,18 +131,27 @@ const dots = (): HTMLElement[] =>
     suggest: false,
   });
 
+// The colours the container writes for the series, into a style of its
+// own. A style has no role or text a reader meets, so it is found as
+// the element it is, which the queries skip unless told not to.
+const colours = (): string =>
+  screen.getByText((_content, element) => element?.tagName === "STYLE", {
+    ignore: false,
+    suggest: false,
+  }).textContent;
+
 describe("ProjectionChart", () => {
   it("plots the years with no legend, leaving the series to the crosshair to name", () => {
-    render(<ProjectionChart milestones={[]} points={points} />);
+    render(<ProjectionChart accounts={held} milestones={[]} points={points} />);
 
     expect(screen.getByRole("application")).toHaveClass("recharts-surface");
-    expect(screen.queryByText(/^Tax-/)).not.toBeInTheDocument();
+    expect(screen.queryByText(pension.name)).not.toBeInTheDocument();
   });
 
   // The crosshair moves on the arrow keys as it does under the pointer,
   // and recharts moves it a frame later.
-  it("shows the year, the age, each figure and the total under the crosshair", async () => {
-    render(<ProjectionChart milestones={[]} points={points} />);
+  it("shows the year, the age, each account's figure and the total under the crosshair", async () => {
+    render(<ProjectionChart accounts={held} milestones={[]} points={points} />);
 
     const chart = screen.getByRole("application");
     chart.focus();
@@ -144,15 +161,69 @@ describe("ProjectionChart", () => {
 
     const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
 
+    expect(tooltip.getByText(pension.name)).toBeInTheDocument();
+    expect(tooltip.getByText(isa.name)).toBeInTheDocument();
     expect(tooltip.getByText("£462,079")).toHaveClass("figure");
     expect(tooltip.getByText("£321,452")).toHaveClass("figure");
     expect(tooltip.getByText("£783,531")).toHaveClass("figure");
     expect(tooltip.getByText("Total")).toBeInTheDocument();
   });
 
+  // Two pensions, the ISA, the current account and the home, stacked
+  // family by family from the baseline, the second pension receding
+  // toward the card from the first, and named under the crosshair from
+  // the top of the stack down. The mortgage is not drawn.
+  it("draws each account on its own, family by family, and names each under the crosshair", async () => {
+    const listed = [...accounts, sipp];
+    const years = [2026, 2027].map((year, place) => ({
+      age: 36 + place,
+      balances: { 1: 1000, 2: 2000, 3: 300, 4: 400000, 5: -180000, 6: 600 },
+      deferred: 1600,
+      early: 0,
+      free: 2000,
+      uncovered: 0,
+      year,
+    }));
+    render(
+      <ProjectionChart accounts={listed} milestones={[]} points={years} />,
+    );
+
+    expect(
+      screen
+        .getAllByText(byClass("recharts-area-curve"), { suggest: false })
+        .map((curve) => curve.getAttribute("stroke")),
+    ).toStrictEqual(
+      [1, 6, 2, 3, 4].map((id) => `var(--color-account-${String(id)})`),
+    );
+    expect(colours()).toContain(
+      "--color-account-1: color-mix(in oklab, var(--chart-2), var(--card) 0%);",
+    );
+    expect(colours()).toContain(
+      "--color-account-6: color-mix(in oklab, var(--chart-2), var(--card) 30%);",
+    );
+    expect(colours()).toContain(
+      "--color-account-4: color-mix(in oklab, var(--chart-3), var(--card) 0%);",
+    );
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2027 · Age 37");
+
+    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+
+    expect(
+      tooltip
+        .getAllByText(/^(Home|Current account|Stocks|SIPP|Workplace)/)
+        .map((name) => name.textContent),
+    ).toStrictEqual([home.name, cash.name, isa.name, sipp.name, pension.name]);
+    expect(tooltip.getByText("£403,900")).toHaveClass("figure");
+  });
+
   it("sets the caller's controls and choices beside the toggle, and none over nothing to plot", () => {
     const { rerender } = render(
       <ProjectionChart
+        accounts={held}
         choices={<button type="button">A choice</button>}
         controls={<button type="button">A control</button>}
         milestones={[]}
@@ -170,6 +241,7 @@ describe("ProjectionChart", () => {
 
     rerender(
       <ProjectionChart
+        accounts={held}
         choices={<button type="button">A choice</button>}
         controls={<button type="button">A control</button>}
         milestones={[]}
@@ -186,7 +258,7 @@ describe("ProjectionChart", () => {
   });
 
   it("swaps the areas for a column per year on the toggle, and back", () => {
-    render(<ProjectionChart milestones={[]} points={points} />);
+    render(<ProjectionChart accounts={held} milestones={[]} points={points} />);
 
     expect(
       screen.getAllByText(byClass("recharts-area"), { suggest: false }),
@@ -218,7 +290,7 @@ describe("ProjectionChart", () => {
   });
 
   it("marks no year and names nothing uncovered while the money lasts", async () => {
-    render(<ProjectionChart milestones={[]} points={points} />);
+    render(<ProjectionChart accounts={held} milestones={[]} points={points} />);
 
     const chart = screen.getByRole("application");
     chart.focus();
@@ -235,7 +307,9 @@ describe("ProjectionChart", () => {
   });
 
   it("marks the first year a pension is drawn early apart from the year the money runs out", () => {
-    render(<ProjectionChart milestones={[]} points={earlyPoints} />);
+    render(
+      <ProjectionChart accounts={held} milestones={[]} points={earlyPoints} />,
+    );
 
     expect(marks().map((mark) => mark.getAttribute("x"))).toStrictEqual([
       "2027",
@@ -250,6 +324,7 @@ describe("ProjectionChart", () => {
   it("marks a milestone beside the warnings in oxide, unnamed, under either mark", () => {
     render(
       <ProjectionChart
+        accounts={held}
         milestones={[{ id: "retirement", name: "Retirement", year: 2026 }]}
         points={earlyPoints}
       />,
@@ -273,7 +348,9 @@ describe("ProjectionChart", () => {
   });
 
   it("names what a year drew early under the crosshair", async () => {
-    render(<ProjectionChart milestones={[]} points={earlyPoints} />);
+    render(
+      <ProjectionChart accounts={held} milestones={[]} points={earlyPoints} />,
+    );
 
     const chart = screen.getByRole("application");
     chart.focus();
@@ -293,7 +370,9 @@ describe("ProjectionChart", () => {
   });
 
   it("marks the first year the money runs out, and only that year", () => {
-    render(<ProjectionChart milestones={[]} points={shortPoints} />);
+    render(
+      <ProjectionChart accounts={held} milestones={[]} points={shortPoints} />,
+    );
 
     expect(marks()).toHaveLength(1);
     expect(marks()[0]).toHaveAttribute("x", "2027");
@@ -306,7 +385,9 @@ describe("ProjectionChart", () => {
   });
 
   it("names what a short year could not cover under the crosshair", async () => {
-    render(<ProjectionChart milestones={[]} points={shortPoints} />);
+    render(
+      <ProjectionChart accounts={held} milestones={[]} points={shortPoints} />,
+    );
 
     const chart = screen.getByRole("application");
     chart.focus();
@@ -324,9 +405,10 @@ describe("ProjectionChart", () => {
     );
   });
 
-  it("says so instead of plotting nothing when no account is a wrapper", () => {
+  it("says so instead of plotting nothing when the plan holds nothing", () => {
     render(
       <ProjectionChart
+        accounts={held}
         milestones={[]}
         points={[
           {
@@ -352,9 +434,7 @@ describe("ProjectionChart", () => {
     );
 
     expect(
-      screen.getByText(
-        "Add a tax-free or tax-deferred account to see it projected.",
-      ),
+      screen.getByText("Add an account or an asset to see it projected."),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Accounts & assets" }),
@@ -364,12 +444,10 @@ describe("ProjectionChart", () => {
   });
 
   it("has nothing to plot over no years either", () => {
-    render(<ProjectionChart milestones={[]} points={[]} />);
+    render(<ProjectionChart accounts={held} milestones={[]} points={[]} />);
 
     expect(
-      screen.getByText(
-        "Add a tax-free or tax-deferred account to see it projected.",
-      ),
+      screen.getByText("Add an account or an asset to see it projected."),
     ).toBeInTheDocument();
   });
 
@@ -389,6 +467,7 @@ describe("ProjectionChart", () => {
     }));
     render(
       <ProjectionChart
+        accounts={held}
         milestones={[
           { id: 1, name: "Kids leave home", year: 2026 },
           { id: "retirement", name: "Retirement", year: 2030 },
@@ -416,6 +495,7 @@ describe("ProjectionChart", () => {
   it("draws no dot for a choice the plan's years do not reach, nor for none", () => {
     const { rerender } = render(
       <ProjectionChart
+        accounts={held}
         milestones={[{ id: 5, name: "Care", year: 2060 }]}
         points={points}
         selected={5}
@@ -427,6 +507,7 @@ describe("ProjectionChart", () => {
 
     rerender(
       <ProjectionChart
+        accounts={held}
         milestones={[{ id: "retirement", name: "Retirement", year: 2027 }]}
         points={points}
       />,
@@ -439,6 +520,7 @@ describe("ProjectionChart", () => {
   it("names the milestones falling in the year under the crosshair", async () => {
     render(
       <ProjectionChart
+        accounts={held}
         milestones={[
           { id: "retirement", name: "Retirement", year: 2027 },
           { id: 2, name: "Sabbatical", year: 2027 },

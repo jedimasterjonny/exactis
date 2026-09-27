@@ -9,7 +9,7 @@ import { incomeLines } from "@/data/income.fixture";
 import { endYear } from "@/data/plan";
 import { drawFor, lumpSumAllowance } from "@/lib/tax";
 
-import { balanceOf, project } from "./projection";
+import { balanceIn, balanceOf, holdsAnything, project } from "./projection";
 
 const [pension, isa, cash, home, mortgage] = accounts;
 const [salary, , consulting] = incomeLines;
@@ -1499,6 +1499,16 @@ describe("project", () => {
   });
 });
 
+describe("balanceIn", () => {
+  it("reads what an account holds or owes on a point, and nothing for one it does not carry", () => {
+    const [point] = project([isa, mortgage], funded, { ...plan, years: 0 });
+
+    expect(point && balanceIn(point, isa.id)).toBe(286145);
+    expect(point && balanceIn(point, mortgage.id)).toBe(-182940);
+    expect(point && balanceIn(point, pension.id)).toBe(0);
+  });
+});
+
 describe("balanceOf", () => {
   it("sums both wrappers a point holds", () => {
     expect(
@@ -1512,6 +1522,18 @@ describe("balanceOf", () => {
         year: 2030,
       }),
     ).toBe(1500);
+  });
+});
+
+describe("holdsAnything", () => {
+  it("says whether a point holds or owes anything in any account", () => {
+    const at = (accounts: readonly Account[]): boolean =>
+      project(accounts, funded, { ...plan, years: 0 }).some(holdsAnything);
+
+    expect(at([isa])).toBe(true);
+    expect(at([mortgage])).toBe(true);
+    expect(at([{ ...isa, balance: 0 }])).toBe(false);
+    expect(at([])).toBe(false);
   });
 });
 
