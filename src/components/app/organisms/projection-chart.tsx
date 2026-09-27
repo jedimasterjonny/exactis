@@ -35,7 +35,7 @@ import {
 } from "@/components/kit/chart";
 import { balanceOf } from "@/engine/projection";
 import { listed } from "@/lib/feeders";
-import { formatGbp } from "@/lib/money";
+import { formatAxisGbp, formatGbp } from "@/lib/money";
 import { accountsAndAssets } from "@/lib/nav";
 
 // The mark each series is drawn as: an area under a line, or a column
@@ -78,8 +78,11 @@ const config = Object.fromEntries(
 // on the toggle, as a column per year. The plot alone, with no figure
 // over it: a hairline grid, the years and the pounds as recessive ticks,
 // a legend naming the series, and a crosshair with the year's figures on
-// hover and on the arrow keys. The pounds are written in full, as money
-// is everywhere here. The first year the plan cannot cover is marked
+// hover and on the arrow keys. The pounds on the axis are shortened to
+// millions and thousands, "£12m" and "£500k", since a tick marks a place
+// on the scale and full pounds took a quarter of a phone's plot; every
+// figure under the crosshair is written in full, as money is everywhere
+// else here. The first year the plan cannot cover is marked
 // where it falls, a dashed hairline under either mark, and that year's
 // shortfall joins its figures under the crosshair rather than the
 // stack, which carries balances alone. The first year that draws on a
@@ -218,7 +221,7 @@ export function ProjectionChart({
             />
             <YAxis
               axisLine={false}
-              tickFormatter={formatGbp}
+              tickFormatter={formatAxisGbp}
               tickLine={false}
               width="auto"
             />
