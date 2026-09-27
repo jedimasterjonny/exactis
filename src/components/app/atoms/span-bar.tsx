@@ -6,6 +6,7 @@ import type { Plan } from "@/data/plan";
 import type { Side } from "@/data/schedule";
 
 import { endYear } from "@/data/plan";
+import { placed } from "@/lib/span";
 
 interface SpanBarProps {
   readonly firstYear: number;
@@ -39,12 +40,10 @@ export function SpanBar({
   plan,
   side,
 }: SpanBarProps): JSX.Element {
-  const end = endYear(plan);
-  const left = placed(firstYear, plan.from, end);
+  const left = placed(firstYear, plan);
   const right = placed(
-    lastYear === null ? end : lastYear + (lastMonth ?? 0) / 12,
-    plan.from,
-    end,
+    lastYear === null ? endYear(plan) : lastYear + (lastMonth ?? 0) / 12,
+    plan,
   );
   return (
     <div
@@ -62,11 +61,4 @@ export function SpanBar({
       />
     </div>
   );
-}
-
-// A year's place along the span, as a percentage from its start, held
-// within it.
-function placed(year: number, from: number, end: number): number {
-  const share = (year - from) / (end - from);
-  return Math.min(Math.max(share, 0), 1) * 100;
 }
