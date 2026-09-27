@@ -17,15 +17,18 @@ import {
 } from "@/lib/tax";
 
 // A year of the projection: the balance the plan expects entering it,
-// whole pounds, under the name the progress point gives the same
-// balance, so a point recorded and a point projected can be laid over
-// each other, and the age reached that year, since a plan is read by
+// whole pounds, and the age reached that year, since a plan is read by
 // age as much as by year. The first point is the balances as they are,
 // at the month the plan starts in; each after it is the year before
-// carried to its end. The two wrappers are projected yet, each summed
-// over its accounts; cash is carried, so a shortfall can be drawn from
-// it, but is not plotted, since the progress points these are laid over
-// carry no cash figure. Beside them is what the year could not draw
+// carried to its end. Each account carried is on it by its id, cash
+// and every wrapper, so a chart can draw each on its own; and each
+// wrapper's accounts are summed as well, under the name the progress
+// point gives the same balance, so a point recorded and a point
+// projected can be laid over each other, though the progress points
+// carry no cash figure. An account is rounded to the pound on its own
+// and a wrapper's sum is rounded whole, so two accounts of a kind can
+// add to a pound either side of their wrapper. Beside them is what the
+// year could not draw
 // from anywhere, summed over its months: a point's balances are the
 // ones entering its year and its shortfall is what went uncovered
 // during it, so the two are read together rather than a year apart. It
@@ -44,6 +47,7 @@ import {
 // works.
 export interface ProjectionPoint {
   readonly age: number;
+  readonly balances: Readonly<Record<number, number>>;
   readonly deferred: number;
   readonly early: number;
   readonly free: number;
@@ -188,6 +192,9 @@ export function project(
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
     const age = ageIn(year, plan);
+    const balances = Object.fromEntries(
+      held.map(({ account, balance }) => [account.id, Math.round(balance)]),
+    );
     const deferred = total(held, "tax-deferred");
     const free = total(held, "tax-free");
     let early = 0;
@@ -235,6 +242,7 @@ export function project(
     }
     return {
       age,
+      balances,
       deferred,
       early: upToPound(early),
       free,
