@@ -379,7 +379,7 @@ function MilestoneRow({
         </FoldedLines>
       </div>
       <div className="grid min-w-0 gap-2 folded:hidden">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-baseline gap-2">
           <span className="font-medium">{marker.name}</span>
           {detail !== undefined && (
             <span className="text-xs text-muted-foreground">{detail}</span>
