@@ -141,6 +141,17 @@ const colours = (): string =>
     suggest: false,
   }).textContent;
 
+// The pounds the axis marks, in its own ticks rather than wherever a
+// pound is written: recharts measures a label in a span of its own,
+// which outlives the chart it measured for.
+const pounds = (): string[] =>
+  screen
+    .getAllByText(byClass("recharts-cartesian-axis-tick-value"), {
+      suggest: false,
+    })
+    .map((tick) => tick.textContent)
+    .filter((tick) => tick.includes("£"));
+
 describe("ProjectionChart", () => {
   it("plots the years with no legend, leaving the series to the crosshair to name", () => {
     render(<ProjectionChart accounts={held} milestones={[]} points={points} />);
@@ -298,6 +309,86 @@ describe("ProjectionChart", () => {
     expect(tooltip.queryByText("Car loan")).not.toBeInTheDocument();
   });
 
+  // A car on a PCP is drawn at its equity, what it is worth less what
+  // the PCP owes, and the PCP is not drawn beside it: £20,000 against
+  // £25,000 owed is £5,000 below nothing in 2026, and £18,000 against
+  // £10,000 is £8,000 above it in 2027. The card, secured on nothing, is
+  // a debt of its own, and keeps the oxide it takes as the second debt
+  // listed though the first is drawn in the car. The net worth is the
+  // same either way. The axis reaches down to the car's equity and the
+  // card together, £6,000 below nothing, as it reaches up to £8,000.
+  it("draws an asset at its equity, the loans secured on it drawn in it rather than beside it", async () => {
+    const car: Account = {
+      balance: 20000,
+      growth: { kind: "fixed", rate: -0.1 },
+      id: 10,
+      kind: "car",
+      name: "Car",
+    };
+    const pcp: Account = { ...mortgage, id: 11, name: "PCP", secures: car.id };
+    const card: Account = { ...mortgage, id: 12, name: "Card" };
+    const years = [
+      { 10: 20000, 11: -25000, 12: -1000 },
+      { 10: 18000, 11: -10000, 12: -500 },
+    ].map((balances, place) => ({
+      age: 36 + place,
+      balances,
+      deferred: 0,
+      early: 0,
+      free: 0,
+      uncovered: 0,
+      year: 2026 + place,
+    }));
+    render(
+      <ProjectionChart
+        accounts={[car, pcp, card]}
+        milestones={[]}
+        points={years}
+      />,
+    );
+
+    expect(
+      screen.getAllByText(byClass("recharts-bar"), { suggest: false }),
+    ).toHaveLength(2);
+    expect(colours()).toContain(
+      "--color-account-12: color-mix(in oklab, var(--brand), var(--card) 0%);",
+    );
+    expect(colours()).not.toContain("--color-account-11");
+    expect(pounds()).toStrictEqual([
+      "−£6k",
+      "−£4k",
+      "−£2k",
+      "£0",
+      "£2k",
+      "£4k",
+      "£6k",
+      "£8k",
+    ]);
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2027 · Age 37");
+
+    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+
+    expect(
+      tooltip.getAllByText(/^(Car|PCP|Card)$/).map((name) => name.textContent),
+    ).toStrictEqual(["Car", "Card"]);
+    expect(tooltip.getByText("£8,000")).toHaveClass("figure");
+    expect(tooltip.getByText("−£500")).toHaveClass("figure");
+    expect(tooltip.getByText("£7,500")).toHaveClass("figure");
+
+    fireEvent.keyDown(chart, { key: "ArrowLeft" });
+    await screen.findByText("2026 · Age 36");
+
+    expect(
+      within(screen.getByText(bySlot("projection-tooltip"))).getByText(
+        "−£5,000",
+      ),
+    ).toHaveClass("figure");
+  });
+
   // Held to £1m at most, the axis is marked every £250,000 as recharts
   // would mark it. £100,000 owed takes it below nothing only that far,
   // and reaches no step; £600,000 owed reaches two. Owed alone, £188,000
@@ -313,13 +404,6 @@ describe("ProjectionChart", () => {
         uncovered: 0,
         year,
       }));
-    const pounds = (): string[] =>
-      screen
-        .getAllByText(byClass("recharts-cartesian-axis-tick-value"), {
-          suggest: false,
-        })
-        .map((tick) => tick.textContent)
-        .filter((tick) => tick.includes("£"));
     const listed = [pension, mortgage];
     const { rerender } = render(
       <ProjectionChart

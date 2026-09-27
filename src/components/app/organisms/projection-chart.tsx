@@ -30,6 +30,7 @@ import { LabelledSwitch } from "@/components/app/atoms/labelled-switch";
 import { buttonVariants } from "@/components/kit/button";
 import { Card, CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
+import { isAsset } from "@/data/accounts";
 import { balanceIn, balanceOf, holdsAnything } from "@/engine/projection";
 import { listed } from "@/lib/feeders";
 import { formatAxisGbp, formatGbp } from "@/lib/money";
@@ -61,14 +62,17 @@ interface ProjectionChartProps {
   readonly selected?: Tie | undefined;
 }
 
-// An account the chart draws on its own: its id, its name, whether it
-// is a debt, the colour it is drawn in, and the key that colour is
-// written under. The colour is named once: the container writes it into
-// --color-<key> within its own scope, and everything drawn for the
-// series, the tooltip's key included, reads it back from there.
+// What the chart draws for an account: the ids of the accounts it sums,
+// the account's own and, for a house, a car or another real asset, each
+// loan secured on it, so it stands at its equity; the account's name;
+// whether it is a debt; the colour it is drawn in, and the key that
+// colour is written under. The colour is named once: the container
+// writes it into --color-<key> within its own scope, and everything
+// drawn for the series, the tooltip's key included, reads it back from
+// there.
 interface Series {
   readonly color: string;
-  readonly id: number;
+  readonly ids: readonly number[];
   readonly isOwed: boolean;
   readonly key: string;
   readonly name: string;
@@ -77,7 +81,9 @@ interface Series {
 // The families the chart stacks, in the order they stack, the first at
 // the baseline: the pensions, then the ISAs, so the top of the two is
 // where the balance a milestone is read at stands; then cash; then what
-// the plan owns, a house, a car or another real asset, above them all.
+// the plan owns, a house, a car or another real asset, above them all,
+// each at its equity: what it is worth less the loans secured on it,
+// which are drawn in it rather than on their own.
 // The wrappers keep the colours they had, and cash and the assets take
 // the palette's colours for cash and for property. The debts stack down
 // from nothing, the first listed nearest it, in the palette's reds and
@@ -102,7 +108,8 @@ const families: readonly Family[] = [
 const boxSize = "aspect-[3/1] min-h-90 sm:min-h-72";
 
 // The dashboard's chart: every account the plan holds or owes, projected
-// a year at a time and each drawn on its own, what it holds stacked up
+// a year at a time and each drawn on its own, a house or a car at its
+// equity with the loans secured on it, what it holds stacked up
 // from nothing and what it owes down from it, as a column per year to
 // begin with or, on the toggle, as areas under lines. The plot alone,
 // with no figure
@@ -283,26 +290,26 @@ export function ProjectionChart({
                 />
               )}
             />
-            {series.map(({ id, isOwed, key }) =>
+            {series.map((line) =>
               mark === "area" ? (
                 <Area
                   activeDot={{ r: 4, stroke: "var(--card)", strokeWidth: 2 }}
-                  dataKey={drawnIn({ id, isOwed })}
+                  dataKey={drawnIn(line)}
                   dot={false}
-                  fill={`url(#${washOf(key)})`}
+                  fill={`url(#${washOf(line.key)})`}
                   isAnimationActive={false}
-                  key={key}
+                  key={line.key}
                   stackId="accounts"
-                  stroke={`var(--color-${key})`}
+                  stroke={`var(--color-${line.key})`}
                   strokeWidth={2}
                   type="monotone"
                 />
               ) : (
                 <Bar
-                  dataKey={(point: ProjectionPoint) => balanceIn(point, id)}
-                  fill={`var(--color-${key})`}
+                  dataKey={(point: ProjectionPoint) => valueIn(point, line)}
+                  fill={`var(--color-${line.key})`}
                   isAnimationActive={false}
-                  key={key}
+                  key={line.key}
                   stackId="accounts"
                 />
               ),
@@ -377,13 +384,12 @@ export function ProjectionPending(): JSX.Element {
 // as held, and a debt at nothing would draw its line along the top of
 // the stack for the rest of the plan. The stack reads a break as
 // nothing, so the debts beneath it stack as before.
-function drawnIn({
-  id,
-  isOwed,
-}: Pick<Series, "id" | "isOwed">): (point: ProjectionPoint) => null | number {
+function drawnIn(
+  line: Pick<Series, "ids" | "isOwed">,
+): (point: ProjectionPoint) => null | number {
   return (point) => {
-    const balance = balanceIn(point, id);
-    return isOwed && balance === 0 ? null : balance;
+    const value = valueIn(point, line);
+    return line.isOwed && value === 0 ? null : value;
   };
 }
 
@@ -496,19 +502,17 @@ function ProjectionTooltip({
       </span>
       {[
         ...series.filter(({ isOwed }) => !isOwed).reverse(),
-        ...series.filter(
-          ({ id, isOwed }) => isOwed && balanceIn(point, id) !== 0,
-        ),
-      ].map(({ id, key, name }) => (
-        <span className="flex items-center gap-2" key={key}>
+        ...series.filter((line) => line.isOwed && valueIn(point, line) !== 0),
+      ].map((line) => (
+        <span className="flex items-center gap-2" key={line.key}>
           <span
             aria-hidden
             className="h-0.5 w-3 rounded-full"
-            style={{ backgroundColor: `var(--color-${key})` }}
+            style={{ backgroundColor: `var(--color-${line.key})` }}
           />
-          <span className="text-muted-foreground">{name}</span>
+          <span className="text-muted-foreground">{line.name}</span>
           <span className="ml-auto figure font-medium">
-            {formatGbp(balanceIn(point, id))}
+            {formatGbp(valueIn(point, line))}
           </span>
         </span>
       ))}
@@ -516,7 +520,7 @@ function ProjectionTooltip({
         <span className="text-muted-foreground">Net worth</span>
         <span className="ml-auto figure font-medium">
           {formatGbp(
-            series.reduce((sum, { id }) => sum + balanceIn(point, id), 0),
+            series.reduce((sum, line) => sum + valueIn(point, line), 0),
           )}
         </span>
       </span>
@@ -543,8 +547,8 @@ function ProjectionTooltip({
 // The pounds the axis spans and the ticks it marks. Above nothing they
 // are the ticks recharts would choose itself for the most the stack
 // ever holds, the last at or above it. Below nothing the axis reaches
-// only as deep as the debts ever go, marked at the same step as far as
-// they reach one: recharts spaces its ticks evenly either side of
+// only as deep as the stack ever goes, what is owed and any equity
+// below nothing, marked at the same step as far as it reaches one: recharts spaces its ticks evenly either side of
 // nothing, so £400,000 owed under £10m held took the axis down to
 // minus £3.5m and gave a quarter of the plot to nothing. The step is set
 // by the deeper of the two sides, so a plan of debts alone is marked
@@ -553,12 +557,19 @@ function scaleOf(
   points: readonly ProjectionPoint[],
   series: readonly Series[],
 ): { readonly domain: [number, number]; readonly ticks: number[] } {
-  const sumOf = (point: ProjectionPoint, isOwed: boolean): number =>
-    series
-      .filter((line) => line.isOwed === isOwed)
-      .reduce((sum, { id }) => sum + balanceIn(point, id), 0);
-  const top = Math.max(0, ...points.map((point) => sumOf(point, false)));
-  const bottom = Math.min(0, ...points.map((point) => sumOf(point, true)));
+  const sumOf = (
+    point: ProjectionPoint,
+    side: (value: number) => number,
+  ): number =>
+    series.reduce((sum, line) => sum + side(valueIn(point, line)), 0);
+  const top = Math.max(
+    0,
+    ...points.map((point) => sumOf(point, (value) => Math.max(0, value))),
+  );
+  const bottom = Math.min(
+    0,
+    ...points.map((point) => sumOf(point, (value) => Math.min(0, value))),
+  );
   const nice = getNiceTickValues(
     [0, Math.max(top, -bottom)],
     5,
@@ -580,20 +591,43 @@ function scaleOf(
 // after the first recedes a further 30% toward the card, to 60% at
 // most, so the family is told by hue and its accounts from each other
 // by hue where it has more than one and by lightness after that, in
-// either theme. An account's colour follows its place among its own
-// kind, so what else the plan holds never recolours it.
+// either theme. An account's colour follows its place among every
+// account of its kind, so what else the plan holds never recolours it,
+// and neither does a debt secured on an asset leaving the debts to be
+// drawn in the asset's equity. A loan is drawn in the asset it names
+// only when the plan lists that asset; one naming an asset the plan
+// does not list is a debt like any other.
 function seriesOf(accounts: readonly Account[]): Series[] {
+  const assets = new Set(accounts.filter(isAsset).map(({ id }) => id));
+  const isSecured = ({ secures }: Account): boolean =>
+    secures !== undefined && assets.has(secures);
   return families.flatMap(({ hues, kinds }) =>
     accounts
       .filter(({ kind }) => kinds.includes(kind))
-      .map(({ id, kind, name }, place) => ({
+      .map((account, place) => ({
+        account,
         color: `color-mix(in oklab, ${hueAt(hues, place)}, var(--card) ${String(Math.min(Math.floor(place / hues.length), 2) * 30)}%)`,
-        id,
+      }))
+      .filter(({ account }) => !isSecured(account))
+      .map(({ account: { id, kind, name }, color }) => ({
+        color,
+        ids: [
+          id,
+          ...accounts
+            .filter((loan) => isSecured(loan) && loan.secures === id)
+            .map((loan) => loan.id),
+        ],
         isOwed: kind === "debt",
         key: `account-${String(id)}`,
         name,
       })),
   );
+}
+
+// What a series stands at on a point: what the accounts it sums hold,
+// less what they owe.
+function valueIn(point: ProjectionPoint, { ids }: Pick<Series, "ids">): number {
+  return ids.reduce((sum, id) => sum + balanceIn(point, id), 0);
 }
 
 // The area under each line is its series' colour fading from a quarter
