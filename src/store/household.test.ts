@@ -16,6 +16,7 @@ import { requireSession } from "@/lib/session";
 import {
   amend,
   getAccounts,
+  getCurve,
   getExpenseLines,
   getIncomeLines,
   getMilestones,
@@ -39,6 +40,7 @@ describe("the household store", () => {
 
     for (const read of [
       getAccounts,
+      getCurve,
       getExpenseLines,
       getIncomeLines,
       getMilestones,
@@ -56,6 +58,7 @@ describe("the household store", () => {
     expect(await getIncomeLines()).toStrictEqual([]);
     expect(await getExpenseLines()).toStrictEqual([]);
     expect(await getMilestones()).toStrictEqual([]);
+    expect(await getCurve()).toBeNull();
     expect(await getPlan()).toStrictEqual(planOf(blank.ages, blank.asOf));
   });
 
@@ -68,6 +71,7 @@ describe("the household store", () => {
     expect(await getIncomeLines()).toStrictEqual(reference.schedule.income);
     expect(await getExpenseLines()).toStrictEqual(reference.schedule.expenses);
     expect(await getMilestones()).toStrictEqual(reference.milestones);
+    expect(await getCurve()).toStrictEqual(reference.curve);
     expect(await getPlan()).toStrictEqual({
       born: 1990,
       from: 2026,

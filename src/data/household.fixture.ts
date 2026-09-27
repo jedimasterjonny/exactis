@@ -4,16 +4,19 @@ import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { nothingKeptIn } from "@/data/household";
 import { incomeLines } from "@/data/income.fixture";
+import { curve } from "@/data/inflation.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 
 // The reference kit's invented plan as the store keeps it: the fixtures'
 // records, balances as of September 2026, a plan to 89 whose owner
-// retires at 59, and the next id past every one of theirs. For tests.
+// retires at 59, the curve its card reads, and the next id past every
+// one of theirs. For tests.
 export const kept: Kept = {
   accounts,
   ages: { ends: 89, retires: 59 },
   asOf: { month: 8, year: 2026 },
+  curve,
   milestones,
   next: 6,
   owners,
