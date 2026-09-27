@@ -10,6 +10,7 @@ import type { ProjectionPoint } from "@/engine/projection";
 
 import { saveAges } from "@/actions/plan";
 import { toast } from "@/components/kit/toast";
+import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { kept } from "@/data/household.fixture";
 import { retiring } from "@/data/income.fixture";
@@ -91,15 +92,18 @@ function pointIn(
   );
 }
 
-// The net worth the chart gives for a year of a plan, as its tooltip
-// writes it: every account it draws, the mortgage owed among them.
+// The liquidity the chart gives for a year of a plan, as its tooltip
+// writes it to begin with: every account it draws, which is every one
+// but the home, the mortgage owed among them.
 function totalIn(held: Plan, year: number, lines: Schedule = schedule): string {
   const point = pointIn(held, year, lines);
   return formatGbp(
-    accounts.reduce(
-      (sum, { id }) => sum + (point === undefined ? 0 : balanceIn(point, id)),
-      0,
-    ),
+    accounts
+      .filter((account) => !isAsset(account))
+      .reduce(
+        (sum, { id }) => sum + (point === undefined ? 0 : balanceIn(point, id)),
+        0,
+      ),
   );
 }
 
