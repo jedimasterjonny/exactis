@@ -3,6 +3,7 @@ import * as z from "zod";
 import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
+import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan, PlanAges } from "@/data/plan";
@@ -39,11 +40,13 @@ import { clearsIn, termOf } from "@/lib/loans";
 import { isWithinAllowance } from "@/lib/tax";
 
 // Everything the projection runs on, the owners the wrappers name and
-// the milestones the plan is laid out by: the whole of what the store
-// holds for the household, with the plan as it stands the day it is
-// read.
+// the milestones the plan is laid out by, and the inflation curve last
+// pulled from the Bank of England, or none before one is: the whole of
+// what the store holds for the household, with the plan as it stands
+// the day it is read.
 export interface Household {
   readonly accounts: readonly Account[];
+  readonly curve: Curve | null;
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
@@ -56,7 +59,8 @@ export interface Household {
 // The household as the store keeps it: the records, the month their
 // balances are as of, one for the whole household since they are
 // recorded together, the ages the plan is set to rather than the plan
-// they make, and the id the next record added is given. That id only
+// they make, the curve as the Bank gave it rather than the inflation it
+// makes, and the id the next record added is given. That id only
 // ever counts up, so one a deleted record held is never given to
 // another, which a form left open on the deleted one would otherwise
 // write over.
@@ -64,6 +68,7 @@ export interface Kept {
   readonly accounts: readonly Account[];
   readonly ages: PlanAges;
   readonly asOf: Month;
+  readonly curve: Curve | null;
   readonly milestones: readonly Milestone[];
   readonly next: number;
   readonly owners: readonly Owner[];
@@ -200,6 +205,18 @@ const owner = z.object({
   name: named,
 }) satisfies z.ZodType<Owner>;
 
+// A curve as the Bank gave it: the day it stood on, and a rate at each
+// maturity the plan reads.
+const curve = z.object({
+  asOf: z.iso.date(),
+  implied: z.object({
+    5: z.number(),
+    10: z.number(),
+    20: z.number(),
+    30: z.number(),
+  }),
+}) satisfies z.ZodType<Curve>;
+
 // The plan as the day it is read makes it: a month of the year, whole
 // years forward, the plan rate no lower than losing everything, and the
 // ages the plan action holds, its owner retiring no later than it ends
@@ -241,6 +258,7 @@ const plan = z
 export const household = z
   .object({
     accounts: z.array(account),
+    curve: curve.nullable(),
     milestones: z.array(milestone),
     owners: z.array(owner),
     plan,
@@ -338,7 +356,8 @@ export const household = z
 // own, the ages the plan action holds them to, and every record's id
 // below the one the next is given. A household kept before there were
 // milestones lists none, and is read as listing none rather than
-// refused, so the store need not be emptied to take them.
+// refused, so the store need not be emptied to take them; one kept
+// before there was a curve is read as holding none the same way.
 const kept = z
   .object({
     accounts: z.array(account),
@@ -356,6 +375,7 @@ const kept = z
         `A plan ends by ${String(oldestAge)}`,
       ),
     asOf: month,
+    curve: curve.nullable().default(null),
     milestones: z.array(milestone).default([]),
     next: recordId,
     owners: z.array(owner),
@@ -378,12 +398,13 @@ const kept = z
 
 // The household before anything is saved: no records, balances as of
 // the month given, the ages the dashboard has shown, a plan to 89
-// retiring at 59, and the first id.
+// retiring at 59, no curve pulled, and the first id.
 export function nothingKeptIn(asOf: Month): Kept {
   return {
     accounts: [],
     ages: { ends: 89, retires: 59 },
     asOf,
+    curve: null,
     milestones: [],
     next: 1,
     owners: [],
@@ -448,6 +469,7 @@ function householdOf(kept: Kept): Household {
   const plan = planOf(kept.ages, kept.asOf);
   return {
     accounts: kept.accounts,
+    curve: kept.curve,
     milestones: kept.milestones,
     owners: kept.owners,
     plan,

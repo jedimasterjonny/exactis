@@ -37,11 +37,12 @@ export const quoted = [
 ] as const satisfies readonly Quoted[];
 
 // The Bank's yield-curve file of the workbooks given, each by the name
-// the Bank gives it. For tests.
+// the Bank gives it, on a buffer of its own as a response's body is.
+// For tests.
 export function bankFile(
   books: Readonly<Record<string, Uint8Array>>,
-): Uint8Array {
-  return zipSync(books);
+): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(zipSync(books));
 }
 
 // The Bank's three gilt workbooks for the days given, their spot curves

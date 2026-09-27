@@ -49,12 +49,12 @@ a second file repeating it.
 ## The store
 
 The household, its owners, accounts, milestones, income and expense lines, the
-month its balances are as of and the ages the plan is set to, lives in Postgres
-as one document, a version of it a save, reached through
-[Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The table is
-`src/db/schema.ts`, the migration generated from it is in `drizzle/`, and the
-two queries, reading the latest version and keeping the next, are in
-`src/db/household.ts`.
+month its balances are as of, the ages the plan is set to and the inflation
+curve last pulled from the Bank of England, lives in Postgres as one document, a
+version of it a save, reached through [Drizzle](https://orm.drizzle.team) over
+Neon's HTTP driver. The table is `src/db/schema.ts`, the migration generated
+from it is in `drizzle/`, and the two queries, reading the latest version and
+keeping the next, are in `src/db/household.ts`.
 
 A save reads the latest version, makes the household it leaves, holds the whole
 of it to the rules in `src/data/household.ts`, and keeps it as the version after
@@ -82,10 +82,11 @@ household worth keeping, a change to the shape is made in place, and a store
 holding the old shape is emptied rather than carried forward, with
 `TRUNCATE household_versions`, which the trigger lets through where it refuses a
 delete. The milestones were taken without emptying it: a household kept before
-there were any is read as listing none. A change to the table is a new
-migration, written with `db:generate` and committed with the change. The tests
-apply the migrations to an in-process Postgres ([PGlite](https://pglite.dev)),
-so a migration that does not apply fails the suite before it reaches a database.
+there were any is read as listing none, and one kept before there was a curve as
+holding none. A change to the table is a new migration, written with
+`db:generate` and committed with the change. The tests apply the migrations to
+an in-process Postgres ([PGlite](https://pglite.dev)), so a migration that does
+not apply fails the suite before it reaches a database.
 
 ## The projection
 
@@ -198,6 +199,27 @@ begin with. The reads every screen goes through, one read of the latest version
 a request, and the save every action makes live under `src/store`, and the
 server actions a save goes to under `src/actions`: neither is a route, and the
 organisms that save through an action sit beneath the routes.
+
+## Inflation
+
+The plan's inflation is read off the Bank of England's implied inflation curve,
+which the Bank publishes each working day in one zip of its gilt curves. The
+pull action in `src/actions/inflation.ts` fetches the zip from the server, and
+`src/lib/yield-curves.ts` reads the spot curves of the implied, nominal and real
+workbooks out of it. Nominal less real is then checked against implied at every
+maturity the latest day gives, and only then is that day's curve kept in the
+household, at 5, 10, 20 and 30 years. The check catches a sheet read wrongly,
+since the Bank works the implied curve out as that difference.
+
+The rate is worked out from the curve whenever it is read, in
+`src/data/inflation.ts`. It starts from the implied rate at 20 years, the
+horizon a capital market assumption is quoted over. Index-linked gilts are
+priced on RPI, which runs above CPIH until the two are aligned in February 2030,
+so the share of a 0.65-point wedge carried by the years before then comes off.
+Then 0.3 points comes off for the premium the market pays for protection. The
+household keeps the curve as the Bank gave it rather than the rate it makes, so
+a change to the method moves the rate without another pull. Nothing in the
+projection reads the rate yet: every line is still taken in today's money.
 
 ## Signing in
 
