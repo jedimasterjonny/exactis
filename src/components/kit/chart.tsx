@@ -1,6 +1,1 @@
-export {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-} from "@/components/ui/chart";
+export { ChartContainer, ChartTooltip } from "@/components/ui/chart";
