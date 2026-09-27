@@ -1,12 +1,12 @@
 import type { JSX } from "react";
 
-import { cn } from "cn";
 import { House } from "lucide-react";
 
 import type { Account } from "@/data/accounts";
 import type { Secured } from "@/data/secured";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
+import { EquityBar } from "@/components/app/atoms/equity-bar";
 import { FoldedCell } from "@/components/app/molecules/folded-cell";
 import { RowActions } from "@/components/app/molecules/row-actions";
 import { Badge } from "@/components/kit/badge";
@@ -218,37 +218,6 @@ function describe(pair: Secured): Row {
     share: equity / asset.balance,
     value: formatGbp(asset.balance),
   };
-}
-
-// The share of the value the equity is, as a bar beneath its figure:
-// drawn, since the figure beside it says the amount, and hidden from the
-// accessibility tree for the same reason. A loan above the value leaves
-// no equity to draw, and a value of nothing no share of it. The class is
-// the folded row's, which draws the bar the width of the row.
-function EquityBar({
-  className,
-  share,
-}: {
-  readonly className?: string;
-  readonly share: number;
-}): JSX.Element {
-  const held = Number.isFinite(share) ? Math.min(Math.max(share, 0), 1) : 0;
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "mt-1.5 ml-auto block h-1 w-16 overflow-hidden rounded-full bg-muted",
-        className,
-      )}
-      data-slot="equity-bar"
-    >
-      <span
-        className="block h-full rounded-full bg-positive"
-        data-slot="equity-bar-fill"
-        style={{ width: `${String(held * 100)}%` }}
-      />
-    </span>
-  );
 }
 
 // Whether anything is paid towards the asset, by the loan or of its own.
