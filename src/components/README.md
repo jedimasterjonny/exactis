@@ -32,12 +32,12 @@ in the vendored file works until the next refresh silently discards it.
 
 ## Tier: the app directory
 
-| tier         | what it is                                                   | here                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ------------ | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `atoms/`     | one presentational job, composes nothing of ours             | `app-nav`, `confirm-dialog`, `delta-value`, `dialog-frame`, `empty-state`, `equity-bar`, `field`, `field-row`, `figure-input`, `folded-lines`, `labelled-switch`, `note`, `row-action`, `row-lock`, `screen-body`, `screen-header`, `screen-label`, `section-header`, `span-bar`, `tile-grid`                                                                                                                   |
-| `molecules/` | atoms combined into one reusable control                     | `age-field`, `edit-dialog`, `folded-cell`, `money-field`, `month-field`, `rate-field`, `row-actions`, `section-card`, `select-field`, `slider-field`, `stat-tile`, `term-field`, `text-field`, `theme-toggle`, `year-field`                                                                                                                                                                                     |
-| `organisms/` | a group of molecules: a screen region, a dialog, a field set | `account-dialog`, `account-fields`, `account-ledger`, `account-table`, `asset-table`, `car-dialog`, `car-fields`, `cash-flow-card`, `employment-fields`, `expense-schedule`, `house-dialog`, `house-fields`, `income-schedule`, `line-fields`, `loan-fields`, `owner-list`, `payment-order`, `plan-assumptions`, `progress-points`, `projection-board`, `projection-chart`, `sacrifice-fields`, `schedule-rows` |
-| `templates/` | the shell a page sits in                                     | `app-frame`                                                                                                                                                                                                                                                                                                                                                                                                     |
+| tier         | what it is                                                   | here                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------ | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `atoms/`     | one presentational job, composes nothing of ours             | `app-nav`, `confirm-dialog`, `delta-value`, `dialog-frame`, `empty-state`, `equity-bar`, `field`, `field-row`, `figure-input`, `folded-lines`, `labelled-switch`, `note`, `row-action`, `row-lock`, `screen-body`, `screen-header`, `screen-label`, `section-header`, `span-bar`, `tile-grid`                                                                                                                                     |
+| `molecules/` | atoms combined into one reusable control                     | `age-field`, `edit-dialog`, `folded-cell`, `money-field`, `month-field`, `rate-field`, `row-actions`, `section-card`, `select-field`, `slider-field`, `stat-tile`, `term-field`, `text-field`, `theme-toggle`, `year-field`                                                                                                                                                                                                       |
+| `organisms/` | a group of molecules: a screen region, a dialog, a field set | `account-dialog`, `account-fields`, `account-ledger`, `account-table`, `asset-table`, `balances-month`, `car-dialog`, `car-fields`, `cash-flow-card`, `employment-fields`, `expense-schedule`, `house-dialog`, `house-fields`, `income-schedule`, `line-fields`, `loan-fields`, `owner-list`, `payment-order`, `plan-assumptions`, `progress-points`, `projection-board`, `projection-chart`, `sacrifice-fields`, `schedule-rows` |
+| `templates/` | the shell a page sits in                                     | `app-frame`                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 A component composes what is below it, never above, and only an organism
 composes beside it. There are nineteen of those same-tier edges:
@@ -67,8 +67,9 @@ Ask what it composes, not how big it is. Size correlates but does not decide.
    an organism. Usually that is a region of a screen - a table with its empty
    state, a schedule with its dialogs - but it is the grouping that decides
    rather than the region, which is why the seven `*-fields` here are organisms
-   and not molecules. Each composes four or five molecules into the body of a
-   dialog and owns no region of its own, and a molecule composes atoms, never
+   and not molecules. Six compose four or five molecules into the body of a
+   dialog, and `sacrifice-fields` a rate field for each salary feeding a
+   pension; none owns a region of its own, and a molecule composes atoms, never
    molecules.
 4. Does it arrange regions without knowing what goes in them? It is a template.
 
@@ -77,9 +78,10 @@ wrapper, and so does a molecule, which reaches the rest of what it draws through
 the atoms it composes; an organism imports at most three. So a proposed atom or
 molecule reaching for two is probably an organism, or holds an atom still to be
 lifted out, as the dialog frame was out of the edit dialog. The floor is zero at
-every tier, so a low count says nothing: ten of the organisms import no wrapper
-at all, because an organism built out of molecules rather than primitives, as
-every `*-fields` and every `*-dialog` here is, reaches for them at one remove.
+every tier, so a low count says nothing: eleven of the organisms import no
+wrapper at all, because an organism built out of molecules rather than
+primitives, as every `*-fields` and every `*-dialog` here is, reaches for them
+at one remove.
 
 If a component seems to belong in two tiers it is usually two components.
 
