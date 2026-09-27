@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   accountsAndAssets,
+  assumptions,
   dashboard,
   plan,
   progress,
@@ -22,6 +23,7 @@ describe("sectionLabel", () => {
     expect(sectionLabel(plan)).toBe("Sect. III · Plan");
     expect(sectionLabel(progress)).toBe("Sect. IV · Progress");
     expect(sectionNumeral(progress)).toBe("IV");
+    expect(sectionLabel(assumptions)).toBe("Sect. V · Assumptions");
   });
 
   it("numbers a card within a screen in lower case after the screen's", () => {
@@ -37,6 +39,7 @@ describe("sectionLabel", () => {
     expect(hrefs).toContain("/accounts");
     expect(hrefs).toContain("/plan");
     expect(hrefs).toContain("/progress");
+    expect(hrefs).toContain("/assumptions");
   });
 });
 

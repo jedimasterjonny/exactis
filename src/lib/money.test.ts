@@ -1,7 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { formatAxisGbp, formatGbp, formatPercent, negated } from "./money";
+import {
+  formatAxisGbp,
+  formatCurveRate,
+  formatGbp,
+  formatPercent,
+  formatPoints,
+  negated,
+} from "./money";
 
 describe("formatAxisGbp", () => {
   it("shortens millions and thousands for an axis, to two places where they need them", () => {
@@ -17,6 +24,15 @@ describe("formatAxisGbp", () => {
     expect(formatAxisGbp(750)).toBe("£750");
     expect(formatAxisGbp(-1500000)).toBe("−£1.5m");
     expect(formatAxisGbp(-250000)).toBe("−£250k");
+  });
+});
+
+describe("formatCurveRate", () => {
+  it("writes a curve's rate as a percentage to three places, signing a fall with a real minus", () => {
+    expect(formatCurveRate(0.03365)).toBe("3.365%");
+    expect(formatCurveRate(0.0345855)).toBe("3.459%");
+    expect(formatCurveRate(0)).toBe("0.000%");
+    expect(formatCurveRate(-0.002)).toBe("−0.200%");
   });
 });
 
@@ -37,6 +53,21 @@ describe("formatPercent", () => {
     expect(formatPercent(0.021)).toBe("2.10%");
     expect(formatPercent(0)).toBe("0.00%");
     expect(formatPercent(0.12345)).toBe("12.35%");
+  });
+});
+
+describe("formatPoints", () => {
+  it("writes a difference in percentage points, to three places or the places given", () => {
+    expect(formatPoints(0.003)).toBe("0.300pp");
+    expect(formatPoints(-0.0011114)).toBe("−0.111pp");
+    expect(formatPoints(0.0065, 2)).toBe("0.65pp");
+  });
+
+  // A curve dated the day before RPI is aligned with CPIH leaves a
+  // wedge of less than a millionth to take off.
+  it("writes a difference that rounds to nothing unsigned", () => {
+    expect(formatPoints(-8.9e-7)).toBe("0.000pp");
+    expect(formatPoints(-0)).toBe("0.000pp");
   });
 });
 

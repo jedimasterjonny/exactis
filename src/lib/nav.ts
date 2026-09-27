@@ -1,7 +1,13 @@
 import type { LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
-import { History, LayoutDashboard, ListTree, Wallet } from "lucide-react";
+import {
+  History,
+  LayoutDashboard,
+  ListTree,
+  SlidersHorizontal,
+  Wallet,
+} from "lucide-react";
 
 import { toRoman } from "@/lib/roman";
 
@@ -45,6 +51,13 @@ export const progress: Screen = {
   title: "Progress points",
 };
 
+export const assumptions: Screen = {
+  href: "/assumptions",
+  icon: SlidersHorizontal,
+  label: "Assumptions",
+  title: "Plan assumptions",
+};
+
 // The screens in navigation order. Section numerals derive from this order,
 // so inserting a screen renumbers every header after it and nothing else
 // has to change. Only built screens appear, since a typed route cannot
@@ -54,6 +67,7 @@ export const screens: readonly Screen[] = [
   accountsAndAssets,
   plan,
   progress,
+  assumptions,
 ];
 
 // The screen at a pathname, or undefined where no built screen is.
