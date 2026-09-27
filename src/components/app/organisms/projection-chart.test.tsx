@@ -87,13 +87,11 @@ const dots = (): HTMLElement[] =>
   });
 
 describe("ProjectionChart", () => {
-  it("plots the years with a legend naming each series in stacking order", () => {
+  it("plots the years with no legend, leaving the series to the crosshair to name", () => {
     render(<ProjectionChart milestones={[]} points={points} />);
 
     expect(screen.getByRole("application")).toHaveClass("recharts-surface");
-    expect(
-      screen.getAllByText(/^Tax-/).map((name) => name.textContent),
-    ).toStrictEqual(["Tax-deferred", "Tax-free"]);
+    expect(screen.queryByText(/^Tax-/)).not.toBeInTheDocument();
   });
 
   // The crosshair moves on the arrow keys as it does under the pointer,

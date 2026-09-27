@@ -27,12 +27,7 @@ import { EmptyState } from "@/components/app/atoms/empty-state";
 import { LabelledSwitch } from "@/components/app/atoms/labelled-switch";
 import { buttonVariants } from "@/components/kit/button";
 import { Card, CardContent } from "@/components/kit/card";
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-} from "@/components/kit/chart";
+import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
 import { balanceOf } from "@/engine/projection";
 import { listed } from "@/lib/feeders";
 import { formatAxisGbp, formatGbp } from "@/lib/money";
@@ -77,8 +72,9 @@ const config = Object.fromEntries(
 // stacked so the top of the stack is the total, as areas under lines or,
 // on the toggle, as a column per year. The plot alone, with no figure
 // over it: a hairline grid, the years and the pounds as recessive ticks,
-// a legend naming the series, and a crosshair with the year's figures on
-// hover and on the arrow keys. The pounds on the axis are shortened to
+// and a crosshair with the year's figures on hover and on the arrow
+// keys, which names each series beside its figure, so no legend names
+// them again beneath the plot. The pounds on the axis are shortened to
 // millions and thousands, "£12m" and "£500k", since a tick marks a place
 // on the scale and full pounds took a quarter of a phone's plot; every
 // figure under the crosshair is written in full, as money is everywhere
@@ -112,7 +108,7 @@ const config = Object.fromEntries(
 // feet set them level with its hint. The rows stand a gap clear of the
 // plot, so a figure box above the top tick does not crowd it. The box is three
 // times as wide as it is tall down to a floor, and every frame with it:
-// the rows, the axis and the legend take the same height at any width,
+// the rows and the axis take the same height at any width,
 // and on a phone a third of the width is less than they need, which
 // left no plot at all, so the floor there is higher again.
 // A projection of nothing, because no account
@@ -237,7 +233,6 @@ export function ProjectionChart({
                 />
               )}
             />
-            <ChartLegend content={<ChartLegendContent />} />
             {series.map(({ key }) =>
               mark === "area" ? (
                 <Area
