@@ -105,11 +105,23 @@ const pensionAge = {
   rises: { month: april, year: 2028 },
 } as const;
 
+// What an account holds on a point, or owes as a negative, and nothing
+// for an account the projection did not carry, since a point holds
+// every account it was run over and a reader may hold others.
+export function balanceIn(point: ProjectionPoint, id: number): number {
+  return point.balances[id] ?? 0;
+}
+
 // What a point holds across both wrappers: the balance entering its
-// year, which the chart stacks to and the dashboard's milestone tile
-// reads.
+// year, which the chart stacks the wrappers to and the dashboard's
+// milestone tile reads.
 export function balanceOf(point: ProjectionPoint): number {
   return point.deferred + point.free;
+}
+
+// Whether a point holds or owes anything at all, in any account.
+export function holdsAnything(point: ProjectionPoint): boolean {
+  return Object.values(point.balances).some((balance) => balance !== 0);
 }
 
 // The plan's years, the first holding the balances as they are and each
