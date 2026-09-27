@@ -1,7 +1,22 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { isOnOrBefore, monthName, monthsBetween, thisMonth } from "./months";
+import {
+  formatDay,
+  isOnOrBefore,
+  monthName,
+  monthsBetween,
+  thisMonth,
+} from "./months";
+
+describe("formatDay", () => {
+  // Read in UTC, so the first of the year stays in its own year
+  // wherever the clock is.
+  it("writes an ISO date's day, its month cut short and its year", () => {
+    expect(formatDay("2026-11-04")).toBe("4 Nov 2026");
+    expect(formatDay("2027-01-01")).toBe("1 Jan 2027");
+  });
+});
 
 describe("monthName", () => {
   it("names a month in full or in three letters, January being nought", () => {

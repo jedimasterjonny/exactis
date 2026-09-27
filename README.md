@@ -65,12 +65,13 @@ version is written over or deleted, which the table holds with a trigger, so
 every household the store has held stays. A read holds the latest version to the
 same rules before any screen draws from it.
 
-The accounts and plan screens read and write it, and the dashboard projects what
-it holds and saves the ages the plan runs to and its owner retires at; the
-progress screen still shows the reference kit's figures. `DATABASE_URL` names
-the database, as `.env.example` shows. Nothing reads it until a query runs, so a
-build needs no database. Locally, point it at a Neon branch of your own and
-apply the migrations once:
+The accounts and plan screens read and write it, the dashboard projects what it
+holds and saves the ages the plan runs to and its owner retires at, and the
+assumptions screen pulls the inflation curve into it; the progress screen still
+shows the reference kit's figures. `DATABASE_URL` names the database, as
+`.env.example` shows. Nothing reads it until a query runs, so a build needs no
+database. Locally, point it at a Neon branch of your own and apply the
+migrations once:
 
 ```bash
 bun run db:migrate
@@ -203,8 +204,9 @@ organisms that save through an action sit beneath the routes.
 ## Inflation
 
 The plan's inflation is read off the Bank of England's implied inflation curve,
-which the Bank publishes each working day in one zip of its gilt curves. The
-pull action in `src/actions/inflation.ts` fetches the zip from the server, and
+which the Bank publishes each working day in one zip of its gilt curves.
+Pressing Pull latest curve on the assumptions screen runs the action in
+`src/actions/inflation.ts`, which fetches the zip from the server, and
 `src/lib/yield-curves.ts` reads the spot curves of the implied, nominal and real
 workbooks out of it. Nominal less real is then checked against implied at every
 maturity the latest day gives, and only then is that day's curve kept in the
@@ -218,8 +220,10 @@ priced on RPI, which runs above CPIH until the two are aligned in February 2030,
 so the share of a 0.65-point wedge carried by the years before then comes off.
 Then 0.3 points comes off for the premium the market pays for protection. The
 household keeps the curve as the Bank gave it rather than the rate it makes, so
-a change to the method moves the rate without another pull. Nothing in the
-projection reads the rate yet: every line is still taken in today's money.
+a change to the method moves the rate without another pull. The assumptions
+screen lays those steps out beside the curve at 5, 10, 20 and 30 years. Nothing
+in the projection reads the rate yet: every line is still taken in today's
+money.
 
 ## Signing in
 

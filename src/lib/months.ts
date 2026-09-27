@@ -9,6 +9,21 @@ const forms = {
   short: new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" }),
 };
 
+// A day written in full but for the month, which is cut short: "1 Sept
+// 2026", as the locale spells it. In UTC, as a month's name is, since
+// an ISO date is read as the start of its day there.
+const days = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+  year: "numeric",
+});
+
+// The day an ISO date names, "1 Sept 2026".
+export function formatDay(date: string): string {
+  return days.format(Date.parse(date));
+}
+
 // Whether a month falls in or before another: an earlier year, or the
 // same year and no later month. A line runs to its last month, a loan's
 // payments to the month they clear it in, and a balance is held as of

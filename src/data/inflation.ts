@@ -28,6 +28,9 @@ export interface Inflation {
 // implied inflation curve at.
 export type Maturity = 5 | 10 | 20 | 30;
 
+// The maturities shortest first, as a screen lists the curve.
+export const maturities: readonly Maturity[] = [5, 10, 20, 30];
+
 // The maturity whose rate feeds the plan: the twenty years a capital
 // market assumption is quoted over, so inflation is read over the same
 // years as the returns it is set against.
@@ -51,7 +54,7 @@ const premium = 0.003;
 // The month RPI is aligned with CPIH, February 2030, January being
 // nought as the date gives it, from which a linker's RPI carries no
 // wedge.
-const rpiAligned: Month = { month: 1, year: 2030 };
+export const rpiAligned: Month = { month: 1, year: 2030 };
 
 const yearLength = 365.25 * 86_400_000;
 
