@@ -72,10 +72,6 @@ const earlyPoints = [
   { age: 38, deferred: 0, early: 0, free: 0, uncovered: 52310, year: 2028 },
 ];
 
-// A retirement past every plan here, so no milestone is drawn unless a
-// test asks for one.
-const beyond = 2049;
-
 // The vertical rule recharts draws for a ReferenceLine, which carries the
 // year it stands at as an attribute.
 const marks = (): HTMLElement[] =>
@@ -83,9 +79,16 @@ const marks = (): HTMLElement[] =>
     suggest: false,
   });
 
+// The dot recharts draws for a ReferenceDot, which has no role, label or
+// text either.
+const dots = (): HTMLElement[] =>
+  screen.queryAllByText(byClass("recharts-reference-dot-dot"), {
+    suggest: false,
+  });
+
 describe("ProjectionChart", () => {
   it("plots the years with a legend naming each series in stacking order", () => {
-    render(<ProjectionChart points={points} retirement={beyond} />);
+    render(<ProjectionChart milestones={[]} points={points} />);
 
     expect(screen.getByRole("application")).toHaveClass("recharts-surface");
     expect(
@@ -96,7 +99,7 @@ describe("ProjectionChart", () => {
   // The crosshair moves on the arrow keys as it does under the pointer,
   // and recharts moves it a frame later.
   it("shows the year, the age, each figure and the total under the crosshair", async () => {
-    render(<ProjectionChart points={points} retirement={beyond} />);
+    render(<ProjectionChart milestones={[]} points={points} />);
 
     const chart = screen.getByRole("application");
     chart.focus();
@@ -112,35 +115,43 @@ describe("ProjectionChart", () => {
     expect(tooltip.getByText("Total")).toBeInTheDocument();
   });
 
-  it("sets the caller's controls beside the toggle, and none over nothing to plot", () => {
+  it("sets the caller's controls and choices beside the toggle, and none over nothing to plot", () => {
     const { rerender } = render(
       <ProjectionChart
+        choices={<button type="button">A choice</button>}
         controls={<button type="button">A control</button>}
+        milestones={[]}
         points={points}
-        retirement={beyond}
       />,
     );
 
     expect(
       screen.getByRole("button", { name: "A control" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "A choice" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Areas" })).toBeInTheDocument();
 
     rerender(
       <ProjectionChart
+        choices={<button type="button">A choice</button>}
         controls={<button type="button">A control</button>}
+        milestones={[]}
         points={[]}
-        retirement={beyond}
       />,
     );
 
     expect(
       screen.queryByRole("button", { name: "A control" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "A choice" }),
+    ).not.toBeInTheDocument();
   });
 
   it("swaps the areas for a column per year on the toggle, and back", () => {
-    render(<ProjectionChart points={points} retirement={beyond} />);
+    render(<ProjectionChart milestones={[]} points={points} />);
 
     expect(
       screen.getAllByText(byClass("recharts-area"), { suggest: false }),
@@ -172,7 +183,7 @@ describe("ProjectionChart", () => {
   });
 
   it("marks no year and names nothing uncovered while the money lasts", async () => {
-    render(<ProjectionChart points={points} retirement={beyond} />);
+    render(<ProjectionChart milestones={[]} points={points} />);
 
     const chart = screen.getByRole("application");
     chart.focus();
@@ -189,7 +200,7 @@ describe("ProjectionChart", () => {
   });
 
   it("marks the first year a pension is drawn early apart from the year the money runs out", () => {
-    render(<ProjectionChart points={earlyPoints} retirement={beyond} />);
+    render(<ProjectionChart milestones={[]} points={earlyPoints} />);
 
     expect(marks().map((mark) => mark.getAttribute("x"))).toStrictEqual([
       "2027",
@@ -199,15 +210,23 @@ describe("ProjectionChart", () => {
     expect(screen.getByText("Runs out")).toBeInTheDocument();
   });
 
-  it("marks the year its owner retires in beside the warnings, under either mark", () => {
-    render(<ProjectionChart points={earlyPoints} retirement={2026} />);
+  // A milestone's line carries no name, so the warnings' labels are the
+  // only words on the plot.
+  it("marks a milestone beside the warnings in oxide, unnamed, under either mark", () => {
+    render(
+      <ProjectionChart
+        milestones={[{ id: "retirement", name: "Retirement", year: 2026 }]}
+        points={earlyPoints}
+      />,
+    );
 
     expect(marks().map((mark) => mark.getAttribute("x"))).toStrictEqual([
       "2026",
       "2027",
       "2028",
     ]);
-    expect(screen.getByText("Retirement")).toBeInTheDocument();
+    expect(marks()[0]).toHaveAttribute("stroke", "var(--brand)");
+    expect(screen.queryByText("Retirement")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("switch", { name: "Areas" }));
 
@@ -216,11 +235,10 @@ describe("ProjectionChart", () => {
       "2027",
       "2028",
     ]);
-    expect(screen.getByText("Retirement")).toBeInTheDocument();
   });
 
   it("names what a year drew early under the crosshair", async () => {
-    render(<ProjectionChart points={earlyPoints} retirement={beyond} />);
+    render(<ProjectionChart milestones={[]} points={earlyPoints} />);
 
     const chart = screen.getByRole("application");
     chart.focus();
@@ -240,7 +258,7 @@ describe("ProjectionChart", () => {
   });
 
   it("marks the first year the money runs out, and only that year", () => {
-    render(<ProjectionChart points={shortPoints} retirement={beyond} />);
+    render(<ProjectionChart milestones={[]} points={shortPoints} />);
 
     expect(marks()).toHaveLength(1);
     expect(marks()[0]).toHaveAttribute("x", "2027");
@@ -253,7 +271,7 @@ describe("ProjectionChart", () => {
   });
 
   it("names what a short year could not cover under the crosshair", async () => {
-    render(<ProjectionChart points={shortPoints} retirement={beyond} />);
+    render(<ProjectionChart milestones={[]} points={shortPoints} />);
 
     const chart = screen.getByRole("application");
     chart.focus();
@@ -274,11 +292,11 @@ describe("ProjectionChart", () => {
   it("says so instead of plotting nothing when no account is a wrapper", () => {
     render(
       <ProjectionChart
+        milestones={[]}
         points={[
           { age: 36, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2026 },
           { age: 37, deferred: 0, early: 0, free: 0, uncovered: 0, year: 2027 },
         ]}
-        retirement={beyond}
       />,
     );
 
@@ -295,13 +313,98 @@ describe("ProjectionChart", () => {
   });
 
   it("has nothing to plot over no years either", () => {
-    render(<ProjectionChart points={[]} retirement={beyond} />);
+    render(<ProjectionChart milestones={[]} points={[]} />);
 
     expect(
       screen.getByText(
         "Add a tax-free or tax-deferred account to see it projected.",
       ),
     ).toBeInTheDocument();
+  });
+
+  // Fifteen years from 2026. Every milestone within them is marked, the
+  // chosen one solid with a dot on the top of the stack where the
+  // balance it is read at stands, the rest faint; one past them goes
+  // undrawn. No milestone is named on the plot.
+  it("marks every milestone in the plan's years, the chosen one solid with a dot where its balance stands", () => {
+    const years = Array.from({ length: 15 }, (_, place) => ({
+      age: 36 + place,
+      deferred: 100000,
+      early: 0,
+      free: 100000,
+      uncovered: 0,
+      year: 2026 + place,
+    }));
+    render(
+      <ProjectionChart
+        milestones={[
+          { id: 1, name: "Kids leave home", year: 2026 },
+          { id: "retirement", name: "Retirement", year: 2030 },
+          { id: 5, name: "Care", year: 2060 },
+        ]}
+        points={years}
+        selected="retirement"
+      />,
+    );
+
+    expect(marks().map((mark) => mark.getAttribute("x"))).toStrictEqual([
+      "2026",
+      "2030",
+    ]);
+    expect(
+      marks().map((mark) => mark.getAttribute("stroke-opacity")),
+    ).toStrictEqual(["0.35", "1"]);
+    expect(dots()).toHaveLength(1);
+    expect(dots()[0]).toHaveAttribute("fill", "var(--brand)");
+    expect(
+      screen.queryByText(/^(Kids leave home|Retirement|Care)$/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("draws no dot for a choice the plan's years do not reach, nor for none", () => {
+    const { rerender } = render(
+      <ProjectionChart
+        milestones={[{ id: 5, name: "Care", year: 2060 }]}
+        points={points}
+        selected={5}
+      />,
+    );
+
+    expect(marks()).toHaveLength(0);
+    expect(dots()).toHaveLength(0);
+
+    rerender(
+      <ProjectionChart
+        milestones={[{ id: "retirement", name: "Retirement", year: 2027 }]}
+        points={points}
+      />,
+    );
+
+    expect(marks()).toHaveLength(1);
+    expect(dots()).toHaveLength(0);
+  });
+
+  it("names the milestones falling in the year under the crosshair", async () => {
+    render(
+      <ProjectionChart
+        milestones={[
+          { id: "retirement", name: "Retirement", year: 2027 },
+          { id: 2, name: "Sabbatical", year: 2027 },
+        ]}
+        points={points}
+      />,
+    );
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2027 · Age 37");
+
+    expect(
+      within(screen.getByText(bySlot("projection-tooltip"))).getByText(
+        "Retirement and Sabbatical",
+      ),
+    ).toHaveClass("text-muted-foreground");
   });
 });
 

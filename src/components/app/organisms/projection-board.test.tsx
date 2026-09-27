@@ -1,8 +1,9 @@
 import type { JSX } from "react";
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 
@@ -36,15 +37,20 @@ const marks = (): (null | string)[] =>
     )
     .map((mark) => mark.getAttribute("x"));
 
-// The board over the fixture's schedule, or the one given, on the plan
-// given or the fixture's retiring one: born in 1990 and retiring at 59,
-// its owner retires in 2049, within the plan from 2026, when they are
-// 36, to 2079, when they are 89.
-function board(held: Plan = retiring, lines: Schedule = schedule): JSX.Element {
+// The board over the fixture's schedule, or the one given, and no
+// milestone but retirement, or those given, on the plan given or the
+// fixture's retiring one: born in 1990 and retiring at 59, its owner
+// retires in 2049, within the plan from 2026, when they are 36, to
+// 2079, when they are 89.
+function board(
+  held: Plan = retiring,
+  lines: Schedule = schedule,
+  listed: readonly Milestone[] = [],
+): JSX.Element {
   return (
     <ProjectionBoard
       accounts={accounts}
-      milestones={milestones}
+      milestones={listed}
       plan={held}
       schedule={lines}
     >
@@ -82,11 +88,26 @@ function typeAge(age: string): void {
 }
 
 describe("ProjectionBoard", () => {
-  it("leads the tiles with the retirement tile and charts the engine's projection, marked where its owner retires", () => {
+  // Retirement is chosen to begin with: the tile reads the balance the
+  // plan holds entering 2049, and the age's hint the year before it.
+  it("leads the tiles with the milestone tile at retirement, charts the engine's projection marked there, and gives the last working year under the age", () => {
     render(board());
 
-    expect(screen.getByText("Last working year 58")).toBeInTheDocument();
-    expect(screen.getByRole("paragraph")).toHaveTextContent("The other tiles");
+    expect(screen.getByText("At Retirement")).toBeInTheDocument();
+    expect(screen.getByText(totalIn(retiring, 2049))).toHaveClass("figure");
+    expect(screen.getByText("2049 · age 59")).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Retirement age" }),
+    ).toHaveAccessibleDescription("Last working year 2048");
+    expect(
+      within(screen.getByRole("group", { name: "Milestones" })).getByRole(
+        "button",
+        { name: "Retirement 2049", pressed: true },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("paragraph").map((line) => line.textContent),
+    ).toStrictEqual(["The other tiles", "Last working year 2048"]);
     expect(screen.getByRole("application")).toHaveClass("recharts-surface");
     expect(marks()).toStrictEqual(["2049"]);
     expect(screen.getByRole("textbox", { name: "Retirement age" })).toHaveValue(
@@ -145,13 +166,26 @@ describe("ProjectionBoard", () => {
     expect(screen.getByText(moved)).toHaveClass("figure");
   });
 
+  // The children leave home in 2036 and the downsize is in 2055, either
+  // side of retirement in 2049, and each is marked beside it; the
+  // retirement mark moves with the age as the others stay.
+  it("marks every milestone the household lists beside retirement", () => {
+    render(board(retiring, schedule, milestones));
+
+    expect(marks()).toStrictEqual(["2036", "2049", "2055"]);
+
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
+
+    expect(marks()).toStrictEqual(["2036", "2050", "2055"]);
+  });
+
   it("follows a dragged age at once and saves it once it has settled", () => {
     vi.useFakeTimers();
     render(board());
 
     fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
 
-    expect(screen.getByText("Last working year 59")).toBeInTheDocument();
+    expect(screen.getByText("2050 · age 60")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2050"]);
     expect(saveAges).not.toHaveBeenCalled();
 
@@ -173,7 +207,7 @@ describe("ProjectionBoard", () => {
       vi.advanceTimersByTime(settle);
     });
 
-    expect(screen.getByText("Last working year 61")).toBeInTheDocument();
+    expect(screen.getByText("2052 · age 62")).toBeInTheDocument();
     expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 62 });
   });
 
@@ -186,7 +220,7 @@ describe("ProjectionBoard", () => {
       vi.advanceTimersByTime(settle);
     });
 
-    expect(screen.getByText("Last working year 54")).toBeInTheDocument();
+    expect(screen.getByText("2045 · age 55")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2045"]);
     expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 55 });
   });
@@ -199,11 +233,11 @@ describe("ProjectionBoard", () => {
 
     fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
 
-    expect(screen.getByText("Last working year 59")).toBeInTheDocument();
+    expect(screen.getByText("2050 · age 60")).toBeInTheDocument();
 
     rerender(board({ ...retiring, retires: 62 }));
 
-    expect(screen.getByText("Last working year 61")).toBeInTheDocument();
+    expect(screen.getByText("2052 · age 62")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2052"]);
   });
 
@@ -219,7 +253,7 @@ describe("ProjectionBoard", () => {
       await vi.advanceTimersByTimeAsync(settle);
     });
 
-    expect(screen.getByText("Last working year 58")).toBeInTheDocument();
+    expect(screen.getByText("2049 · age 59")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2049"]);
     expect(toast.add).toHaveBeenCalledExactlyOnceWith({
       description: "A plan's owner retires no later than it ends",
@@ -242,7 +276,10 @@ describe("ProjectionBoard", () => {
     expect(saveAges).toHaveBeenCalledOnce();
   });
 
-  it("keeps the retirement tile over a projection of nothing", () => {
+  // The chart's place says there is nothing to project, so the age and
+  // the chips above it go with the plot, and the tile keeps the last
+  // working year.
+  it("keeps the retirement tile, with no milestone to choose, over a projection of nothing", () => {
     render(
       <ProjectionBoard
         accounts={[]}
@@ -255,6 +292,59 @@ describe("ProjectionBoard", () => {
     );
 
     expect(screen.getByText("Nothing to project yet")).toBeInTheDocument();
-    expect(screen.getByText("Last working year 58")).toBeInTheDocument();
+    expect(screen.getByText("Retirement")).toBeInTheDocument();
+    expect(screen.getByText("Last working year 2048")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "Milestones" }),
+    ).not.toBeInTheDocument();
+  });
+
+  // The children leave home in 2036, when the owner is 46: the tile
+  // reads the plan then, and the chart draws that line solid. Moving
+  // the age chooses retirement again, at the age moved to.
+  it("reads the plan at the milestone a chip chooses, and at retirement again once the age moves", () => {
+    render(board(retiring, schedule, milestones));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Kids leave home 2036" }),
+    );
+
+    expect(screen.getByText("At Kids leave home")).toBeInTheDocument();
+    expect(screen.getByText(totalIn(retiring, 2036))).toHaveClass("figure");
+    expect(screen.getByText("2036 · age 46")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Kids leave home 2036" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: "Retirement 2049" }),
+    ).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
+
+    expect(screen.getByText("At Retirement")).toBeInTheDocument();
+    expect(screen.getByText("2050 · age 60")).toBeInTheDocument();
+  });
+
+  // Born in 1990 and retiring at 30, the owner retired in 2020, before
+  // the plan's years: the tile reads the first milestone they reach,
+  // and with none, keeps the retirement tile.
+  it("reads the first milestone the plan's years reach once retirement is before them, and the retirement tile with none", () => {
+    const retired = { ...retiring, retires: 30 };
+    const { rerender } = render(board(retired, schedule, milestones));
+
+    expect(screen.getByText("At Kids leave home")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("group", { name: "Milestones" })).getAllByRole(
+        "button",
+      ),
+    ).toHaveLength(2);
+
+    rerender(board(retired, schedule, []));
+
+    expect(screen.getByText("Retirement")).toBeInTheDocument();
+    expect(screen.getByText("30")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "Milestones" }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -78,15 +78,12 @@ describe("Dashboard", () => {
     ).toBeInTheDocument();
   });
 
-  // Retiring past the end of the plan, so the chart marks nothing and
-  // each label is the tile's own.
+  // The first tile reads the plan at retirement to begin with.
   it("follows the header with the four dashboard tiles", async () => {
-    vi.mocked(getPlan).mockResolvedValue(plan);
-
     render(await Dashboard());
 
     for (const label of [
-      "Retirement",
+      "At Retirement",
       "Net worth at 89",
       "Chance of success",
       "Net legacy",
@@ -97,13 +94,11 @@ describe("Dashboard", () => {
 
   // A phone keeps the two the plan is steered by, in one row, and
   // leaves the other two to a wider screen.
-  it("keeps the retirement age and the chance of success on a phone, and no other tile", async () => {
-    vi.mocked(getPlan).mockResolvedValue(plan);
-
+  it("keeps the milestone tile and the chance of success on a phone, and no other tile", async () => {
     render(await Dashboard());
 
     // A tile is the card that carries a tone, which the chart's does not,
-    // though it names the retirement too.
+    // though its chips name the retirement too.
     const tileOf = (label: string): HTMLElement =>
       screen.getByText(
         (_content, element) =>
@@ -111,21 +106,32 @@ describe("Dashboard", () => {
           element.textContent.startsWith(label),
       );
 
-    expect(tileOf("Retirement")).not.toHaveClass("max-sm:hidden");
+    expect(tileOf("At Retirement")).not.toHaveClass("max-sm:hidden");
     expect(tileOf("Chance of success")).not.toHaveClass("max-sm:hidden");
     expect(tileOf("Net worth at 89")).toHaveClass("max-sm:hidden");
     expect(tileOf("Net legacy")).toHaveClass("max-sm:hidden");
   });
 
-  // Retirement is named twice, the tile's label and the chart's mark,
-  // and the tile reads the plan's age.
-  it("follows the tiles with the store's projection, marked where its owner retires", async () => {
+  // Retirement is named twice, by the tile and by its chip, among the
+  // household's milestones, and the age reads the plan's.
+  it("follows the tiles with the store's projection and its milestones to choose from, retirement chosen", async () => {
     render(await Dashboard());
 
     expect(screen.getByRole("application")).toHaveClass("recharts-surface");
     expect(screen.getByText("Tax-free")).toBeInTheDocument();
-    expect(screen.getAllByText("Retirement")).toHaveLength(2);
-    expect(screen.getByText("Last working year 58")).toBeInTheDocument();
+    expect(screen.getByText("At Retirement")).toBeInTheDocument();
+    expect(screen.getByText("2049 · age 59")).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("button", { pressed: false })
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual(["Kids leave home 2036", "Downsize 2055"]);
+    expect(
+      screen.getByRole("button", { name: "Retirement 2049", pressed: true }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Retirement age" }),
+    ).toHaveAccessibleDescription("Last working year 2048");
   });
 });
 

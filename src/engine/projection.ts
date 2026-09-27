@@ -98,6 +98,13 @@ const pensionAge = {
   rises: { month: april, year: 2028 },
 } as const;
 
+// What a point holds across both wrappers: the balance entering its
+// year, which the chart stacks to and the dashboard's milestone tile
+// reads.
+export function balanceOf(point: ProjectionPoint): number {
+  return point.deferred + point.free;
+}
+
 // The plan's years, the first holding the balances as they are and each
 // after it the year before carried to its end, a month at a time: what
 // the account is paid that month, then a month's growth at its rate, a
