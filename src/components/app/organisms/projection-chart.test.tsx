@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { ProjectionPoint } from "@/engine/projection";
 
 import { accounts, sipp } from "@/data/accounts.fixture";
 import { bySlot } from "@/test/dom";
@@ -20,7 +21,7 @@ const byClass =
 
 // The reference plan's pension and ISA, which the points below hold by
 // the ids they are listed under.
-const [pension, isa, cash, home] = accounts;
+const [pension, isa, cash, home, mortgage] = accounts;
 const held: readonly Account[] = [pension, isa];
 
 const points = [
@@ -166,13 +167,14 @@ describe("ProjectionChart", () => {
     expect(tooltip.getByText("£462,079")).toHaveClass("figure");
     expect(tooltip.getByText("£321,452")).toHaveClass("figure");
     expect(tooltip.getByText("£783,531")).toHaveClass("figure");
-    expect(tooltip.getByText("Total")).toBeInTheDocument();
+    expect(tooltip.getByText("Net worth")).toBeInTheDocument();
   });
 
   // Two pensions, the ISA, the current account and the home, stacked
   // family by family from the baseline, the second pension receding
-  // toward the card from the first, and named under the crosshair from
-  // the top of the stack down. The mortgage is not drawn.
+  // toward the card from the first, and the mortgage stacked down from
+  // nothing in loss red, each named under the crosshair from the top of
+  // the stack down, over the net worth they come to.
   it("draws each account on its own, family by family, and names each under the crosshair", async () => {
     const listed = [...accounts, sipp];
     const years = [2026, 2027].map((year, place) => ({
@@ -193,7 +195,7 @@ describe("ProjectionChart", () => {
         .getAllByText(byClass("recharts-area-curve"), { suggest: false })
         .map((curve) => curve.getAttribute("stroke")),
     ).toStrictEqual(
-      [1, 6, 2, 3, 4].map((id) => `var(--color-account-${String(id)})`),
+      [1, 6, 2, 3, 4, 5].map((id) => `var(--color-account-${String(id)})`),
     );
     expect(colours()).toContain(
       "--color-account-1: color-mix(in oklab, var(--chart-2), var(--card) 0%);",
@@ -203,6 +205,9 @@ describe("ProjectionChart", () => {
     );
     expect(colours()).toContain(
       "--color-account-4: color-mix(in oklab, var(--chart-3), var(--card) 0%);",
+    );
+    expect(colours()).toContain(
+      "--color-account-5: color-mix(in oklab, var(--chart-5), var(--card) 0%);",
     );
 
     const chart = screen.getByRole("application");
@@ -214,10 +219,143 @@ describe("ProjectionChart", () => {
 
     expect(
       tooltip
-        .getAllByText(/^(Home|Current account|Stocks|SIPP|Workplace)/)
+        .getAllByText(/^(Home|Current account|Stocks|SIPP|Workplace|Mortgage)/)
         .map((name) => name.textContent),
-    ).toStrictEqual([home.name, cash.name, isa.name, sipp.name, pension.name]);
-    expect(tooltip.getByText("£403,900")).toHaveClass("figure");
+    ).toStrictEqual([
+      home.name,
+      cash.name,
+      isa.name,
+      sipp.name,
+      pension.name,
+      mortgage.name,
+    ]);
+    expect(tooltip.getByText("−£180,000")).toHaveClass("figure");
+    expect(tooltip.getByText("Net worth")).toBeInTheDocument();
+    expect(tooltip.getByText("£223,900")).toHaveClass("figure");
+  });
+
+  // Four debts take loss red, oxide and ochre in the order they are
+  // listed, and the fourth loss red again a step toward the card. The
+  // car loan owes nothing from 2027, so from then it is gone: no dot
+  // under the crosshair and no name beside it, where the debts still
+  // owed keep both.
+  it("stacks the debts down from nothing in the reds and orange, and drops a debt once it owes nothing", async () => {
+    const debt = (id: number, name: string): Account => ({
+      ...mortgage,
+      id,
+      name,
+    });
+    const listed = [
+      mortgage,
+      debt(7, "Car loan"),
+      debt(8, "Card"),
+      debt(9, "Family loan"),
+    ];
+    const years = [
+      { 5: -180000, 7: -5000, 8: -2000, 9: -1000 },
+      { 5: -170000, 7: 0, 8: -1500, 9: -1000 },
+      { 5: -160000, 7: 0, 8: -1000, 9: -1000 },
+    ].map((balances, place) => ({
+      age: 36 + place,
+      balances,
+      deferred: 0,
+      early: 0,
+      free: 0,
+      uncovered: 0,
+      year: 2026 + place,
+    }));
+    render(
+      <ProjectionChart accounts={listed} milestones={[]} points={years} />,
+    );
+
+    expect(colours()).toContain(
+      "--color-account-7: color-mix(in oklab, var(--brand), var(--card) 0%);",
+    );
+    expect(colours()).toContain(
+      "--color-account-8: color-mix(in oklab, var(--caution), var(--card) 0%);",
+    );
+    expect(colours()).toContain(
+      "--color-account-9: color-mix(in oklab, var(--chart-5), var(--card) 30%);",
+    );
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2027 · Age 37");
+
+    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+
+    expect(
+      screen
+        .getAllByText(byClass("recharts-dot"), { suggest: false })
+        .map((dot) => dot.getAttribute("fill")),
+    ).toStrictEqual(
+      [5, 8, 9].map((id) => `var(--color-account-${String(id)})`),
+    );
+    expect(tooltip.getByText("Card")).toBeInTheDocument();
+    expect(tooltip.queryByText("Car loan")).not.toBeInTheDocument();
+  });
+
+  // Held to £1m at most, the axis is marked every £250,000 as recharts
+  // would mark it. £100,000 owed takes it below nothing only that far,
+  // and reaches no step; £600,000 owed reaches two. Owed alone, £188,000
+  // is marked every £50,000 down to the three steps it reaches.
+  it("takes the axis below nothing only as far as the debts reach, marked at the steps they reach", () => {
+    const plan = (balances: Record<number, number>): ProjectionPoint[] =>
+      [2026, 2027].map((year, place) => ({
+        age: 36 + place,
+        balances,
+        deferred: 0,
+        early: 0,
+        free: 0,
+        uncovered: 0,
+        year,
+      }));
+    const pounds = (): string[] =>
+      screen
+        .getAllByText(byClass("recharts-cartesian-axis-tick-value"), {
+          suggest: false,
+        })
+        .map((tick) => tick.textContent)
+        .filter((tick) => tick.includes("£"));
+    const listed = [pension, mortgage];
+    const { rerender } = render(
+      <ProjectionChart
+        accounts={listed}
+        milestones={[]}
+        points={plan({ 1: 1000000, 5: -100000 })}
+      />,
+    );
+
+    expect(pounds()).toStrictEqual(["£0", "£250k", "£500k", "£750k", "£1m"]);
+
+    rerender(
+      <ProjectionChart
+        accounts={listed}
+        milestones={[]}
+        points={plan({ 1: 1000000, 5: -600000 })}
+      />,
+    );
+
+    expect(pounds()).toStrictEqual([
+      "−£500k",
+      "−£250k",
+      "£0",
+      "£250k",
+      "£500k",
+      "£750k",
+      "£1m",
+    ]);
+
+    rerender(
+      <ProjectionChart
+        accounts={listed}
+        milestones={[]}
+        points={plan({ 1: 0, 5: -188000 })}
+      />,
+    );
+
+    expect(pounds()).toStrictEqual(["−£150k", "−£100k", "−£50k", "£0"]);
   });
 
   it("sets the caller's controls and choices beside the toggle, and none over nothing to plot", () => {
