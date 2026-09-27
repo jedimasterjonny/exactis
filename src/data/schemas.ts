@@ -37,6 +37,13 @@ export const lineValues = {
   name: named,
 };
 
+// What a milestone holds: the name, and the year, whole and from one up,
+// as a line's years are.
+export const milestoneValues = {
+  name: named,
+  year: z.number().int().positive(),
+};
+
 // A month of a year.
 export const month = z.object({
   month: monthOfYear,

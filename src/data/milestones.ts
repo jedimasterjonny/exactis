@@ -18,8 +18,12 @@ export interface Marker {
 // home, a move, the last of a mortgage. It is the first year of whatever
 // it marks. The id is its identity, handed out by the store as every
 // record's is.
-export interface Milestone {
+export interface Milestone extends MilestoneValues {
   readonly id: number;
+}
+
+// The milestone as its row edits it, which is the milestone less its id.
+export interface MilestoneValues {
   readonly name: string;
   readonly year: number;
 }

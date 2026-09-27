@@ -23,6 +23,7 @@ import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
 import { rules } from "@/data/rules";
 import {
   lineValues,
+  milestoneValues,
   month,
   monthOfYear,
   named,
@@ -174,12 +175,11 @@ const incomeLine = z
     "A salary gives up a share only into a pension it feeds",
   ) satisfies z.ZodType<IncomeLine>;
 
-// A milestone as the model lays it: named, and in a year, whole and from
-// one up, as a line's years are.
+// A milestone as the model lays it: what the actions take, and the id
+// it is listed by.
 const milestone = z.object({
+  ...milestoneValues,
   id: recordId,
-  name: named,
-  year: z.number().int().positive(),
 }) satisfies z.ZodType<Milestone>;
 
 const owner = z.object({
