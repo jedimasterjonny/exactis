@@ -1,6 +1,5 @@
 export {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
