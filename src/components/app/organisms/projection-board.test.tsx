@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Plan } from "@/data/plan";
+import type { Schedule } from "@/engine/cash-flow";
 
 import { saveAges } from "@/actions/plan";
 import { toast } from "@/components/kit/toast";
@@ -20,7 +21,7 @@ import { ProjectionBoard, settle } from "./projection-board";
 vi.mock("@/actions/plan", () => ({ saveAges: vi.fn() }));
 vi.mock("@/components/kit/toast", () => ({ toast: { add: vi.fn() } }));
 
-const { schedule } = kept;
+const { milestones, schedule } = kept;
 
 // The vertical rule recharts draws for a ReferenceLine, which carries the
 // year it stands at as an attribute. A rule has no role, label or text,
@@ -35,22 +36,40 @@ const marks = (): (null | string)[] =>
     )
     .map((mark) => mark.getAttribute("x"));
 
-// The board over the fixture's schedule, on the plan given or the
-// fixture's retiring one: born in 1990 and retiring at 59, its owner
-// retires in 2049, within the plan from 2026, when they are 36, to
-// 2079, when they are 89.
-function board(held: Plan = retiring): JSX.Element {
+// The board over the fixture's schedule, or the one given, on the plan
+// given or the fixture's retiring one: born in 1990 and retiring at 59,
+// its owner retires in 2049, within the plan from 2026, when they are
+// 36, to 2079, when they are 89.
+function board(held: Plan = retiring, lines: Schedule = schedule): JSX.Element {
   return (
-    <ProjectionBoard accounts={accounts} plan={held} schedule={schedule}>
+    <ProjectionBoard
+      accounts={accounts}
+      milestones={milestones}
+      plan={held}
+      schedule={lines}
+    >
       <p>The other tiles</p>
     </ProjectionBoard>
   );
 }
 
+// The fixture's schedule with the retirement living starting in the
+// year given.
+function livingFrom(firstYear: number, isTied: boolean): Schedule {
+  return {
+    ...schedule,
+    expenses: schedule.expenses.map((line) =>
+      line.id === 4
+        ? { ...line, firstYear, startsAt: isTied ? "retirement" : null }
+        : line,
+    ),
+  };
+}
+
 // The total the chart gives for a year of a plan, as its tooltip
-// writes it.
-function totalIn(held: Plan, year: number): string {
-  const point = project(accounts, schedule, held).find(
+// writes it, over the fixture's schedule or the one given.
+function totalIn(held: Plan, year: number, lines: Schedule = schedule): string {
+  const point = project(accounts, lines, held).find(
     (candidate) => candidate.year === year,
   );
   return formatGbp((point?.deferred ?? 0) + (point?.free ?? 0));
@@ -100,6 +119,30 @@ describe("ProjectionBoard", () => {
     expect(screen.getByText(moved)).toHaveClass("figure");
     expect(marks()).toStrictEqual(["2026", "2030", "2033"]);
     expect(saveAges).not.toHaveBeenCalled();
+  });
+
+  // The retirement living is tied to start at retirement, so retiring
+  // at 50 rather than 59 starts it in 2040 rather than 2049, and 2045
+  // pays it beside the household spending that runs to 2047: the chart
+  // gives the engine's figure for the line moved with the age, not the
+  // one handed down.
+  it("moves a line tied to retirement with the age moved to, before it is saved", async () => {
+    render(board(retiring, livingFrom(2049, true)));
+
+    typeAge("50");
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    for (let step = 0; step < 19; step += 1) {
+      fireEvent.keyDown(chart, { key: "ArrowRight" });
+    }
+    await screen.findByText("2045 · Age 55");
+
+    const early = { ...retiring, retires: 50 };
+    const moved = totalIn(early, 2045, livingFrom(2040, false));
+
+    expect(moved).not.toBe(totalIn(early, 2045, livingFrom(2049, false)));
+    expect(screen.getByText(moved)).toHaveClass("figure");
   });
 
   it("follows a dragged age at once and saves it once it has settled", () => {
@@ -201,7 +244,12 @@ describe("ProjectionBoard", () => {
 
   it("keeps the retirement tile over a projection of nothing", () => {
     render(
-      <ProjectionBoard accounts={[]} plan={retiring} schedule={schedule}>
+      <ProjectionBoard
+        accounts={[]}
+        milestones={milestones}
+        plan={retiring}
+        schedule={schedule}
+      >
         {null}
       </ProjectionBoard>,
     );

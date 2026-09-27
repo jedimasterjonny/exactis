@@ -187,14 +187,15 @@ sum allowance is used up over the plan, and the rest is taxed as income on top
 of what the month earned. Every line is taken at the amount it states, in
 today's money, until the plan carries an inflation assumption.
 
-The dashboard reads the accounts, the lines and the plan from the store and
-hands them to the browser, which runs the engine itself, so a save on the
-accounts or the plan screen is a new projection on the next render and a
-retirement age dragged on the dashboard is projected as it moves. The reads
-every screen goes through, one read of the latest version a request, and the
-save every action makes live under `src/store`, and the server actions a save
-goes to under `src/actions`: neither is a route, and the organisms that save
-through an action sit beneath the routes.
+The dashboard reads the accounts, the lines, the milestones and the plan from
+the store and hands them to the browser, which runs the engine itself, so a save
+on the accounts or the plan screen is a new projection on the next render and a
+retirement age dragged on the dashboard is projected as it moves, the lines tied
+to retirement moving with it. The reads every screen goes through, one read of
+the latest version a request, and the save every action makes live under
+`src/store`, and the server actions a save goes to under `src/actions`: neither
+is a route, and the organisms that save through an action sit beneath the
+routes.
 
 ## Signing in
 
