@@ -269,6 +269,11 @@ const held: readonly Case[] = [
     (given): Inputs => spending(given, 1, (line) => ({ ...line, startsAt: 3 })),
   ],
   [
+    "A line ends years after a milestone only",
+    (given): Inputs =>
+      spending(given, 1, (line) => ({ ...line, endsAfter: 2 })),
+  ],
+  [
     "A line ends in a month only of a year it ends in",
     (given): Inputs =>
       earning(given, 4, (pension) => ({ ...pension, lastMonth: 3 })),
@@ -597,9 +602,17 @@ describe("a line paying a loan", () => {
         loan:
           loan === null
             ? null
-            : { ...loan, line: { ...loan.line, endsAt: 1, startsAt: 2 } },
+            : {
+                ...loan,
+                line: { ...loan.line, endsAfter: 3, endsAt: 1, startsAt: 2 },
+              },
       }),
-    ).toMatchObject({ endsAt: null, lastYear: 2047, startsAt: null });
+    ).toMatchObject({
+      endsAfter: 0,
+      endsAt: null,
+      lastYear: 2047,
+      startsAt: null,
+    });
   });
 
   // £1,000 a month is less than the interest on £341,810 at 5.15%.

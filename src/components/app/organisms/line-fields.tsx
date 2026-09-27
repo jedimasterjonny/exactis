@@ -13,6 +13,7 @@ import { TextField } from "@/components/app/molecules/text-field";
 import { YearField } from "@/components/app/molecules/year-field";
 import { ageIn, endYear } from "@/data/plan";
 import { cadenceOptions } from "@/lib/cadence";
+import { counted } from "@/lib/count";
 import { growthLabels } from "@/lib/lines";
 import { optionsOf } from "@/lib/options";
 
@@ -53,16 +54,19 @@ const growths = optionsOf(growthLabels, [
 // schedule adds beneath, where the line starts and ends, and the line's
 // coverage of the plan's span, moving as the years are typed. The fields
 // report each change to the schedule, whose draft mirrors them. They
-// mount with the line as it opened, save the two years, which show the
-// draft's, since a choice moves them as well as the fields do. Each end
-// is a choice before it is a year: a fixed year, typed into the field
-// beneath the choice, or a milestone, in which case the line moves with
-// it and the dialog says which year that is, and the last may end with
-// the plan instead, so it has none. A milestone
-// is the first year of what it marks, so a line starting at one starts
-// in its year, and one ending at one runs to the year before it. An end
-// moved off a milestone stays where the milestone had it, and a line
-// that ran to the end and is given a year ends in its first year.
+// mount with the line as it opened, save the two years and the years
+// after, which show the draft's, since a choice moves them as well as
+// the fields do. Each end is a choice before it is a year: a fixed
+// year, typed into the field beneath the choice, or a milestone, in
+// which case the line moves with it and the dialog says which year that
+// is, and the last may end with the plan instead, so it has none. A
+// milestone is the first year of what it marks, so a line starting at
+// one starts in its year, and one ending at one runs to the year before
+// it, or ends as many whole years after it as the field beneath the
+// choice says, which stay as they are when another milestone is chosen
+// and go when the end is no longer tied. An end moved off a milestone
+// stays where the milestone had it, and a line that ran to the end and
+// is given a year ends in its first year.
 export function LineFields<TKind extends string>({
   amountLabel,
   children,
@@ -99,11 +103,12 @@ export function LineFields<TKind extends string>({
       onAmend({
         endsAt: marker.id,
         lastMonth: null,
-        lastYear: marker.year - 1,
+        lastYear: marker.year - 1 + draft.endsAfter,
       });
       return;
     }
     onAmend({
+      endsAfter: 0,
       endsAt: null,
       lastYear: ending === "open" ? null : (draft.lastYear ?? draft.firstYear),
     });
@@ -187,9 +192,15 @@ export function LineFields<TKind extends string>({
             options={[fixed, ...tied, open]}
           />
           {until !== undefined && (
-            <Beneath>
-              {`Runs to ${String(until.year - 1)}, the year before ${until.name}.`}
-            </Beneath>
+            <YearField
+              hint={runsTo(until, draft.endsAfter)}
+              label="Years after"
+              min={0}
+              onValueCommitted={(endsAfter) => {
+                onAmend({ endsAfter, lastYear: until.year - 1 + endsAfter });
+              }}
+              value={draft.endsAfter}
+            />
           )}
           {until === undefined && draft.lastYear === null && (
             <Beneath>
@@ -253,4 +264,15 @@ function endingOf(line: LineValues): string {
     return choiceOf(line.endsAt);
   }
   return line.lastYear === null ? "open" : "fixed";
+}
+
+// Where a line ending the years given after a milestone runs to: the
+// year before it for none, "Runs to 2048, the year before Retirement",
+// or that many years on, "Runs to 2051, ending 3 years after
+// Retirement".
+function runsTo(until: Marker, after: number): string {
+  const last = String(until.year - 1 + after);
+  return after === 0
+    ? `Runs to ${last}, the year before ${until.name}.`
+    : `Runs to ${last}, ending ${counted(after, "year")} after ${until.name}.`;
 }

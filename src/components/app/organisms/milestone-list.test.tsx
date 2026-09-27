@@ -29,16 +29,18 @@ vi.mock("@/actions/milestones", () => ({
 
 const [kidsLeave, downsize] = milestones;
 const [salary, stepUp] = incomeLines;
-const [household, childcare] = expenseLines;
+const [household, childcare, mortgage] = expenseLines;
 
 // The reference schedule with the salary and its step-up tied to end at
-// retirement, the household spending to end at it and the childcare at
-// the children leaving home, and the step-up to start at them.
+// retirement, the household spending to end at it, the childcare at the
+// children leaving home and the mortgage three years after, and the
+// step-up to start at them.
 const tied = {
   expenses: [
     { ...household, endsAt: "retirement" },
     { ...childcare, endsAt: 1 },
-    ...expenseLines.slice(2),
+    { ...mortgage, endsAfter: 3, endsAt: 1 },
+    ...expenseLines.slice(3),
   ],
   income: [
     { ...salary, endsAt: "retirement" },
@@ -135,7 +137,9 @@ describe("MilestoneList", () => {
     renderList();
 
     expect(
-      screen.getAllByText("Ends Childcare · Starts Salary step-up"),
+      screen.getAllByText(
+        "Ends Childcare · Ends Mortgage payment 3 years after · Starts Salary step-up",
+      ),
     ).toHaveLength(2);
     expect(
       screen.getAllByText("Ends Salary, Salary step-up and Household"),
@@ -309,7 +313,7 @@ describe("MilestoneList", () => {
     });
 
     expect(dialog).toHaveAccessibleDescription(
-      "The 2 lines tied to it stay where they are, in fixed years. It cannot be brought back.",
+      "The 3 lines tied to it stay where they are, in fixed years. It cannot be brought back.",
     );
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));

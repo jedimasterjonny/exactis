@@ -24,6 +24,7 @@ const kinds = optionsOf<Kind>(
 const salary: Line = {
   amount: 1000,
   cadence: "year",
+  endsAfter: 0,
   endsAt: null,
   firstYear: 2030,
   growth: "inflation",
@@ -145,7 +146,7 @@ describe("LineFields", () => {
       [{ firstYear: 2031 }],
       // A line that opened with no last year ends in its first year until
       // told otherwise.
-      [{ endsAt: null, lastYear: 2030 }],
+      [{ endsAfter: 0, endsAt: null, lastYear: 2030 }],
     ]);
   });
 
@@ -168,7 +169,7 @@ describe("LineFields", () => {
 
     expect(onAmend.mock.calls).toStrictEqual([
       [{ lastYear: 2045 }],
-      [{ endsAt: null, lastYear: null }],
+      [{ endsAfter: 0, endsAt: null, lastYear: null }],
     ]);
   });
 
@@ -230,7 +231,7 @@ describe("LineFields", () => {
     ]);
   });
 
-  it("says the year a tied end falls in where its field would be", () => {
+  it("says the year a tied end falls in where its field would be, and asks the years after its milestone the last ends", () => {
     const { onAmend } = renderFields(tied);
 
     expect(screen.getByRole("combobox", { name: "Starts" })).toHaveValue("1");
@@ -244,15 +245,50 @@ describe("LineFields", () => {
     expect(
       screen.getByText("Starts in 2036, the year of Kids leave home."),
     ).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Years after" })).toHaveValue(
+      "0",
+    );
     expect(
-      screen.getByText("Runs to 2054, the year before Downsize."),
-    ).toBeInTheDocument();
+      screen.getByRole("textbox", { name: "Years after" }),
+    ).toHaveAccessibleDescription("Runs to 2054, the year before Downsize.");
 
+    // Three years after the downsize in 2055 is the end of 2057.
+    commit(screen.getByRole("textbox", { name: "Years after" }), "3");
     fireEvent.change(screen.getByRole("combobox", { name: "Ends" }), {
       target: { value: "fixed" },
     });
 
-    expect(onAmend).toHaveBeenLastCalledWith({ endsAt: null, lastYear: 2054 });
+    expect(onAmend.mock.calls).toStrictEqual([
+      [{ endsAfter: 3, lastYear: 2057 }],
+      [{ endsAfter: 0, endsAt: null, lastYear: 2054 }],
+    ]);
+  });
+
+  // The draft is three years after the downsize, and keeps them when
+  // retirement, in 2080, is chosen instead; the field takes no count
+  // below nothing.
+  it("says where the years after a milestone run to, and keeps them for another", () => {
+    const { onAmend } = renderFields(tied, {
+      ...tied,
+      endsAfter: 3,
+      lastYear: 2057,
+    });
+
+    expect(
+      screen.getByRole("textbox", { name: "Years after" }),
+    ).toHaveAccessibleDescription(
+      "Runs to 2057, ending 3 years after Downsize.",
+    );
+
+    commit(screen.getByRole("textbox", { name: "Years after" }), "-2");
+    fireEvent.change(screen.getByRole("combobox", { name: "Ends" }), {
+      target: { value: "retirement" },
+    });
+
+    expect(onAmend.mock.calls).toStrictEqual([
+      [{ endsAfter: 0, lastYear: 2054 }],
+      [{ endsAt: "retirement", lastMonth: null, lastYear: 2082 }],
+    ]);
   });
 
   // The draft moves with the choices, so a field mounted on moving an

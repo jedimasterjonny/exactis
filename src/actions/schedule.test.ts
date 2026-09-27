@@ -26,6 +26,7 @@ const { db } = memory;
 const expense = {
   amount: 1150,
   cadence: "month",
+  endsAfter: 0,
   endsAt: null,
   firstYear: 2027,
   growth: "inflation-plus-2",
@@ -42,6 +43,7 @@ const values = {
   amount: 12000,
   bonus: 0,
   cadence: "month",
+  endsAfter: 0,
   endsAt: null,
   feeds: null,
   firstYear: 2030,
@@ -65,6 +67,7 @@ function lineOf(draft: IncomeLineDraft, id: number): IncomeLine {
     amount: draft.amount,
     bonus: draft.bonus,
     cadence: draft.cadence,
+    endsAfter: 0,
     endsAt: null,
     feeds: draft.feeds,
     firstYear: draft.firstYear,
@@ -410,6 +413,16 @@ describe("the schedule actions", () => {
     // to 2035; the downsize is in 2055, so a line tied to start then and
     // ending in 2035 would run no years, and is refused as a line saved
     // with both ends fixed that way is.
+    // Two years after the children leave home, the nursery runs to the
+    // end of 2037.
+    it("ties a line's end some years after a milestone", async () => {
+      const draft = { ...expense, endsAfter: 2, endsAt: 1, lastYear: 2037 };
+
+      expect(await saveExpenseLine(null, draft)).toStrictEqual(
+        saved({ ...draft, id: 6, name: "Nursery" }),
+      );
+    });
+
     it("ties a line to a milestone, keeping the years it gives, and refuses one tied out of order", async () => {
       const written = { ...expense, endsAt: 1, id: 6, name: "Nursery" };
 
@@ -432,6 +445,14 @@ describe("the schedule actions", () => {
       ).resolves.toStrictEqual(
         refused("A line is tied to a milestone the household lists"),
       );
+      await expect(
+        saveExpenseLine(null, { ...expense, endsAfter: 2 }),
+      ).resolves.toStrictEqual(
+        refused("A line ends years after a milestone only"),
+      );
+      await expect(
+        saveExpenseLine(null, { ...expense, endsAfter: -1, endsAt: 1 }),
+      ).rejects.toThrow(z.ZodError);
       expect(await readLatest(db)).toMatchObject({ version: 2 });
     });
 

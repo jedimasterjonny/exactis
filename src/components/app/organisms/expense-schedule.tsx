@@ -157,6 +157,7 @@ function blank(plan: Plan): Draft {
   return {
     amount: 0,
     cadence: "month",
+    endsAfter: 0,
     endsAt: null,
     firstYear: plan.from,
     growth: "inflation",

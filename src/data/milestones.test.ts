@@ -61,6 +61,17 @@ describe("timed", () => {
     ).toStrictEqual({ ...salary, firstYear: 2036, startsAt: 1 });
   });
 
+  // Three years after retirement in 2049 is the end of 2051.
+  it("runs an end tied some years after its milestone the whole of the last of them", () => {
+    expect(
+      timed(
+        { ...salary, endsAfter: 3, endsAt: "retirement" },
+        milestones,
+        retiring,
+      ),
+    ).toMatchObject({ endsAfter: 3, lastMonth: null, lastYear: 2051 });
+  });
+
   it("leaves an end tied to none as it is, and one tied to a milestone the household does not list", () => {
     expect(timed(salary, milestones, retiring)).toStrictEqual(salary);
     expect(
@@ -90,6 +101,15 @@ describe("untied", () => {
       endsAt: null,
       lastMonth: null,
       lastYear: 2054,
+    });
+    expect(
+      untied({ ...salary, endsAfter: 3, endsAt: 2 }, downsize),
+    ).toStrictEqual({
+      ...salary,
+      endsAfter: 0,
+      endsAt: null,
+      lastMonth: null,
+      lastYear: 2057,
     });
     expect(untied(salary, downsize)).toStrictEqual(salary);
   });

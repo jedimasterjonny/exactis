@@ -73,9 +73,11 @@ export interface Kept {
 // What every line of both schedules holds, as the actions take it, and
 // the id it is listed by. A line kept before a line could be tied to a
 // milestone is read as tied to none, as a household kept before there
-// were milestones is read as listing none.
+// were milestones is read as listing none, and one kept before a tied
+// end could fall years after its milestone as ending at it.
 const line = {
   ...lineValues,
+  endsAfter: z.number().int().nonnegative().default(0),
   endsAt: tie.nullable().default(null),
   id: recordId,
   startsAt: tie.nullable().default(null),
@@ -153,6 +155,7 @@ const expenseLine = z
     pays: recordId.exactOptional(),
   })
   .refine(isInOrder, "A line ends no earlier than it starts")
+  .refine(endsAfterATie, "A line ends years after a milestone only")
   .refine(
     endsInAYear,
     "A line ends in a month only of a year it ends in",
@@ -172,6 +175,7 @@ const incomeLine = z
     sacrifice: z.number().min(0, rules.share).max(1, rules.share),
   })
   .refine(isInOrder, "A line ends no earlier than it starts")
+  .refine(endsAfterATie, "A line ends years after a milestone only")
   .refine(endsInAYear, "A line ends in a month only of a year it ends in")
   .refine(
     (line) =>
@@ -419,6 +423,15 @@ function doesClear(account: Account, plan: Plan): boolean {
   );
 }
 
+// Years after its end are years after a milestone, so a line whose end
+// is tied to none ends no years after anything.
+function endsAfterATie(line: {
+  readonly endsAfter: number;
+  readonly endsAt: null | Tie;
+}): boolean {
+  return line.endsAt !== null || line.endsAfter === 0;
+}
+
 // A month to end in needs a year to end in.
 function endsInAYear(line: {
   readonly lastMonth: null | number;
@@ -507,6 +520,7 @@ function paidOver(
   const end = term === null ? null : clearsIn(term, plan);
   return {
     ...line,
+    endsAfter: 0,
     endsAt: null,
     firstYear: plan.from,
     lastMonth: end?.month ?? null,
