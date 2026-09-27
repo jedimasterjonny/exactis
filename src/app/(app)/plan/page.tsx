@@ -5,47 +5,57 @@ import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { CashFlowCard } from "@/components/app/organisms/cash-flow-card";
 import { ExpenseSchedule } from "@/components/app/organisms/expense-schedule";
 import { IncomeSchedule } from "@/components/app/organisms/income-schedule";
+import { MilestoneList } from "@/components/app/organisms/milestone-list";
+import { markersOf } from "@/data/milestones";
 import { counted } from "@/lib/count";
 import { plan as planScreen, sectionLabel } from "@/lib/nav";
 import {
   getAccounts,
   getExpenseLines,
   getIncomeLines,
+  getMilestones,
   getOwners,
   getPlan,
 } from "@/store/household";
 
 // The reference's plan screen holds accounts, events and the income and
 // expense schedules on three tabs. The accounts have a screen of their
-// own here and the events wait, so the schedules are what this screen is,
-// with no tab strip until there is a second tab to switch to: the income
-// lines, the expense lines beneath them, and beneath both what a month
-// of a year leaves once the accounts are paid, which the card reads from
-// the two schedules and the accounts together for whichever year it is
-// set to. The page reads all three from the store, which reads the
-// session first, so it renders behind the loading screen beside it, and
-// lays the lines over the plan the projection runs on; the income
-// schedule takes the accounts too, for the pension a salary may feed,
-// and the owners, for the one a salary opens to belong to.
-// The header counts both schedules, so it is the page's rather than
-// either's. The plan is read beside the lines, from the same version
-// of the household.
+// own here, and the events are the milestones, which are laid out on the
+// same span as the lines rather than on a tab of their own, so this
+// screen is one column with no tab strip: the milestones first, since
+// the lines are laid out by them, then the income lines, the expense
+// lines beneath them, and beneath both what a month of a year leaves
+// once the accounts are paid, which the card reads from the two
+// schedules and the accounts together for whichever year it is set to.
+// The page reads all of it from the store, which reads the session
+// first, so it renders behind the loading screen beside it, and lays the
+// milestones and the lines over the plan the projection runs on; the
+// income schedule takes the accounts too, for the pension a salary may
+// feed, and the owners, for the one a salary opens to belong to.
+// The header counts the milestones, retirement among them, and both
+// schedules, so it is the page's rather than any card's. The plan is
+// read beside the rest, from the same version of the household.
 export default async function Plan(): Promise<JSX.Element> {
-  const [incomeLines, expenseLines, accounts, owners, plan] = await Promise.all(
-    [
+  const [incomeLines, expenseLines, accounts, milestones, owners, plan] =
+    await Promise.all([
       getIncomeLines(),
       getExpenseLines(),
       getAccounts(),
+      getMilestones(),
       getOwners(),
       getPlan(),
-    ],
-  );
+    ]);
   return (
     <>
       <ScreenHeader label={sectionLabel(planScreen)} title={planScreen.title}>
-        {`${counted(incomeLines.length, "income line")} · ${counted(expenseLines.length, "expense line")}`}
+        {[
+          counted(markersOf(milestones, plan).length, "milestone"),
+          counted(incomeLines.length, "income line"),
+          counted(expenseLines.length, "expense line"),
+        ].join(" · ")}
       </ScreenHeader>
       <ScreenBody>
+        <MilestoneList milestones={milestones} plan={plan} />
         <IncomeSchedule
           accounts={accounts}
           lines={incomeLines}

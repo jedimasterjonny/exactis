@@ -48,9 +48,9 @@ a second file repeating it.
 
 ## The store
 
-The household, its owners, accounts, income and expense lines, the month its
-balances are as of and the ages the plan is set to, lives in Postgres as one
-document, a version of it a save, reached through
+The household, its owners, accounts, milestones, income and expense lines, the
+month its balances are as of and the ages the plan is set to, lives in Postgres
+as one document, a version of it a save, reached through
 [Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The table is
 `src/db/schema.ts`, the migration generated from it is in `drizzle/`, and the
 two queries, reading the latest version and keeping the next, are in
@@ -81,10 +81,11 @@ a change to `src/data/household.ts` and no migration. Until the store holds a
 household worth keeping, a change to the shape is made in place, and a store
 holding the old shape is emptied rather than carried forward, with
 `TRUNCATE household_versions`, which the trigger lets through where it refuses a
-delete. A change to the table is a new migration, written with `db:generate` and
-committed with the change. The tests apply the migrations to an in-process
-Postgres ([PGlite](https://pglite.dev)), so a migration that does not apply
-fails the suite before it reaches a database.
+delete. The milestones were taken without emptying it: a household kept before
+there were any is read as listing none. A change to the table is a new
+migration, written with `db:generate` and committed with the change. The tests
+apply the migrations to an in-process Postgres ([PGlite](https://pglite.dev)),
+so a migration that does not apply fails the suite before it reaches a database.
 
 ## The projection
 

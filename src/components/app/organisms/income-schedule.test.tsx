@@ -56,7 +56,7 @@ describe("IncomeSchedule", () => {
   it("opens with the card, its rows and its note", () => {
     renderSchedule();
 
-    expect(screen.getByText("Sect. III.i")).toHaveClass("label");
+    expect(screen.getByText("Sect. III.ii")).toHaveClass("label");
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       "Income by year",
     );

@@ -3,6 +3,7 @@ import * as z from "zod";
 import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
+import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan, PlanAges } from "@/data/plan";
 import type { Month } from "@/data/schedule";
@@ -34,11 +35,13 @@ import { endsAfterItStarts } from "@/lib/lines";
 import { clearsIn, termOf } from "@/lib/loans";
 import { isWithinAllowance } from "@/lib/tax";
 
-// Everything the projection runs on, and the owners the wrappers name:
-// the whole of what the store holds for the household, with the plan
-// as it stands the day it is read.
+// Everything the projection runs on, the owners the wrappers name and
+// the milestones the plan is laid out by: the whole of what the store
+// holds for the household, with the plan as it stands the day it is
+// read.
 export interface Household {
   readonly accounts: readonly Account[];
+  readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
   readonly schedule: {
@@ -58,6 +61,7 @@ export interface Kept {
   readonly accounts: readonly Account[];
   readonly ages: PlanAges;
   readonly asOf: Month;
+  readonly milestones: readonly Milestone[];
   readonly next: number;
   readonly owners: readonly Owner[];
   readonly schedule: Household["schedule"];
@@ -170,6 +174,14 @@ const incomeLine = z
     "A salary gives up a share only into a pension it feeds",
   ) satisfies z.ZodType<IncomeLine>;
 
+// A milestone as the model lays it: named, and in a year, whole and from
+// one up, as a line's years are.
+const milestone = z.object({
+  id: recordId,
+  name: named,
+  year: z.number().int().positive(),
+}) satisfies z.ZodType<Milestone>;
+
 const owner = z.object({
   id: recordId,
   name: named,
@@ -215,6 +227,7 @@ const plan = z
 export const household = z
   .object({
     accounts: z.array(account),
+    milestones: z.array(milestone),
     owners: z.array(owner),
     plan,
     schedule: z.object({
@@ -223,6 +236,10 @@ export const household = z
     }),
   })
   .refine(({ accounts }) => isListedOnce(accounts), rules.listedOnce)
+  .refine(
+    ({ milestones }) => isListedOnce(milestones),
+    "A milestone is listed once",
+  )
   .refine(({ owners }) => isListedOnce(owners), "An owner is listed once")
   .refine(
     ({ schedule }) => isListedOnce(schedule.income),
@@ -293,7 +310,9 @@ export const household = z
 
 // The household as the store may keep it: its records sound on their
 // own, the ages the plan action holds them to, and every record's id
-// below the one the next is given.
+// below the one the next is given. A household kept before there were
+// milestones lists none, and is read as listing none rather than
+// refused, so the store need not be emptied to take them.
 const kept = z
   .object({
     accounts: z.array(account),
@@ -311,6 +330,7 @@ const kept = z
         `A plan ends by ${String(oldestAge)}`,
       ),
     asOf: month,
+    milestones: z.array(milestone).default([]),
     next: recordId,
     owners: z.array(owner),
     schedule: z.object({
@@ -319,10 +339,14 @@ const kept = z
     }),
   })
   .refine(
-    ({ accounts, next, owners, schedule }) =>
-      [...accounts, ...owners, ...schedule.expenses, ...schedule.income].every(
-        (record) => record.id < next,
-      ),
+    ({ accounts, milestones, next, owners, schedule }) =>
+      [
+        ...accounts,
+        ...milestones,
+        ...owners,
+        ...schedule.expenses,
+        ...schedule.income,
+      ].every((record) => record.id < next),
     "A record's id is below the one the next record is given",
   ) satisfies z.ZodType<Kept>;
 
@@ -334,6 +358,7 @@ export function nothingKeptIn(asOf: Month): Kept {
     accounts: [],
     ages: { ends: 89, retires: 59 },
     asOf,
+    milestones: [],
     next: 1,
     owners: [],
     schedule: { expenses: [], income: [] },
@@ -387,6 +412,7 @@ function householdOf(kept: Kept): Household {
   const plan = planOf(kept.ages, kept.asOf);
   return {
     accounts: kept.accounts,
+    milestones: kept.milestones,
     owners: kept.owners,
     plan,
     schedule: {

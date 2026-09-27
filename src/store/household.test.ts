@@ -18,6 +18,7 @@ import {
   getAccounts,
   getExpenseLines,
   getIncomeLines,
+  getMilestones,
   getOwners,
   getPlan,
 } from "./household";
@@ -40,6 +41,7 @@ describe("the household store", () => {
       getAccounts,
       getExpenseLines,
       getIncomeLines,
+      getMilestones,
       getOwners,
       getPlan,
     ]) {
@@ -53,6 +55,7 @@ describe("the household store", () => {
     expect(await getOwners()).toStrictEqual([]);
     expect(await getIncomeLines()).toStrictEqual([]);
     expect(await getExpenseLines()).toStrictEqual([]);
+    expect(await getMilestones()).toStrictEqual([]);
     expect(await getPlan()).toStrictEqual(planOf(blank.ages, blank.asOf));
   });
 
@@ -64,6 +67,7 @@ describe("the household store", () => {
     expect(await getOwners()).toStrictEqual(reference.owners);
     expect(await getIncomeLines()).toStrictEqual(reference.schedule.income);
     expect(await getExpenseLines()).toStrictEqual(reference.schedule.expenses);
+    expect(await getMilestones()).toStrictEqual(reference.milestones);
     expect(await getPlan()).toStrictEqual({
       born: 1990,
       from: 2026,
