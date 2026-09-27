@@ -89,26 +89,6 @@ function saved(account: Account): void {
 }
 
 describe("AccountLedger", () => {
-  it("opens with the header, the month its balances are as of, and the one action to move it", () => {
-    renderLedger();
-
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Accounts & assets",
-    );
-    expect(screen.getByText("Sect. II · Accounts & assets")).toHaveClass(
-      "label",
-    );
-    expect(
-      screen.getByText("Starting balances for the plan · September 2026"),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByRole("banner"))
-        .getAllByRole("button")
-        .map((button) => button.textContent),
-    ).toStrictEqual(["Balances month"]);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
-
   // Every section is read at once, each a region named by its title and
   // opened with its own buttons, and each followed by its notes. The
   // fixture's mortgage is secured on nothing, so it is listed with the

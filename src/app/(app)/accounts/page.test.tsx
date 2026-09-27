@@ -28,17 +28,41 @@ vi.mock("@/actions/owners", () => ({
   saveOwner: vi.fn(),
 }));
 
+// The page over the fixture's household, as the store reads it.
+async function renderAccounts(): Promise<void> {
+  vi.mocked(getAccounts).mockResolvedValue([...accounts]);
+  vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
+  vi.mocked(getOwners).mockResolvedValue(owners);
+  vi.mocked(getPlan).mockResolvedValue(plan);
+  render(await Accounts());
+}
+
 describe("Accounts", () => {
+  it("opens with the header, the month its balances are as of, and the one action to move it", async () => {
+    await renderAccounts();
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Accounts & assets",
+    );
+    expect(screen.getByText("Sect. II · Accounts & assets")).toHaveClass(
+      "label",
+    );
+    expect(
+      screen.getByText("Starting balances for the plan · September 2026"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner"))
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toStrictEqual(["Balances month"]);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   // The fixture's salary feeds the workplace pension, which the ledger
   // says before the pension goes, and lands £13,800 a year in it in the
   // month the plan is read in, which the row says as £1,150 a month.
   it("hands the store's accounts, income lines and owners to the ledger, in the plan's month", async () => {
-    vi.mocked(getAccounts).mockResolvedValue([...accounts]);
-    vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
-    vi.mocked(getOwners).mockResolvedValue(owners);
-    vi.mocked(getPlan).mockResolvedValue(plan);
-
-    render(await Accounts());
+    await renderAccounts();
 
     expect(
       screen.getByText("+ £1,150 / mo sacrificed from Salary"),
