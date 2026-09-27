@@ -9,8 +9,8 @@ import type { Account } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
 import type { Fed, Paid, Schedule, Spent, Take } from "@/engine/cash-flow";
 
-import { Field } from "@/components/app/atoms/field";
 import { SectionCard } from "@/components/app/molecules/section-card";
+import { SliderField } from "@/components/app/molecules/slider-field";
 import {
   Accordion,
   AccordionContent,
@@ -18,7 +18,6 @@ import {
   AccordionTrigger,
 } from "@/components/kit/accordion";
 import { CardContent } from "@/components/kit/card";
-import { Slider } from "@/components/kit/slider";
 import { ageIn, endYear } from "@/data/plan";
 import { cashFlow } from "@/engine/cash-flow";
 import { cadenceAbbreviations } from "@/lib/cadence";
@@ -26,7 +25,6 @@ import { spanOf } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 import { monthName } from "@/lib/months";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
-import { thumbOf } from "@/lib/slider";
 
 interface CashFlowCardProps {
   readonly accounts: readonly Account[];
@@ -83,20 +81,14 @@ export function CashFlowCard({
     <SectionCard
       caption={`${monthName(month, "long")} ${String(year)}, age ${String(ageIn(year, plan))}, in today's money`}
       controls={
-        <Field
+        <SliderField
           hint={`${String(plan.from)} to ${String(end)}, the years of the plan`}
           label="Year"
-        >
-          <Slider
-            max={end}
-            min={plan.from}
-            onValueChange={(value) => {
-              setYear(thumbOf(value));
-            }}
-            step={1}
-            value={[year]}
-          />
-        </Field>
+          max={end}
+          min={plan.from}
+          onValueChange={setYear}
+          value={year}
+        />
       }
       label={subsectionLabel(planScreen, 3)}
       title="Cash flow each month"
