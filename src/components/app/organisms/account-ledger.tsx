@@ -15,15 +15,12 @@ import type { PlanMonth } from "@/lib/loans";
 import { placeAccountsInOrder, removeAccount } from "@/actions/accounts";
 import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { Note } from "@/components/app/atoms/note";
-import { ScreenBody } from "@/components/app/atoms/screen-body";
-import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { AccountDialog } from "@/components/app/organisms/account-dialog";
 import { AccountTable } from "@/components/app/organisms/account-table";
 import { AssetTable } from "@/components/app/organisms/asset-table";
-import { BalancesMonth } from "@/components/app/organisms/balances-month";
 import { CarDialog } from "@/components/app/organisms/car-dialog";
 import { HouseDialog } from "@/components/app/organisms/house-dialog";
 import { OwnerList } from "@/components/app/organisms/owner-list";
@@ -37,8 +34,7 @@ import { feedersOf, listed } from "@/lib/feeders";
 import { balanceOf, equityOf, paidMonthlyOf, sumOf } from "@/lib/ledger";
 import { runsIn } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
-import { monthName } from "@/lib/months";
-import { accountsAndAssets, sectionLabel, subsectionLabel } from "@/lib/nav";
+import { accountsAndAssets, subsectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
   readonly accounts: readonly Account[];
@@ -56,7 +52,8 @@ type AccountOpening = "new" | Account;
 type AssetOpening = "new" | Secured;
 
 // The accounts screen's ledger and the three dialogs it edits through,
-// under a header holding the month the balances are as of.
+// in the body beneath the header, which is the page's, since the header
+// reads the month and nothing the ledger holds.
 // The rows are the store's, handed down by the page, and a save goes to
 // the store and comes back with the page re-read, so the tables reflect
 // it without the ledger holding rows of its own. The one thing the
@@ -201,127 +198,118 @@ export function AccountLedger({
 
   return (
     <>
-      <ScreenHeader
-        actions={<BalancesMonth at={at} />}
-        label={sectionLabel(accountsAndAssets)}
-        title={accountsAndAssets.title}
-      >
-        {`Starting balances for the plan · ${monthName(at.month, "long")} ${String(at.year)}`}
-      </ScreenHeader>
-      <ScreenBody>
-        <TileGrid>
-          <StatTile
-            caption="The balances the plan starts from"
-            label="Starting net worth"
-            tone="inverse"
-            value={formatGbp(worth)}
-          />
-          <StatTile
-            caption={counted(savings.length, "account")}
-            label="Savings"
-            value={formatGbp(saved)}
-          />
-          <StatTile
-            caption={`${formatGbp(owned)} owned · ${formatGbp(owned - equity)} owed`}
-            isHiddenOnPhone
-            label="Equity"
-            value={formatGbp(equity)}
-          />
-          <StatTile
-            caption="Sacrifice and fixed payments"
-            isHiddenOnPhone
-            label="Paid in"
-            unit="/ mo"
-            value={formatGbp(paidIn)}
-          />
-        </TileGrid>
-        <SectionCard
-          actions={
-            <Button
-              onClick={() => {
-                setAccount("new");
-              }}
-              size="sm"
-            >
-              <Plus aria-hidden />
-              Add account
-            </Button>
-          }
-          className="pb-0"
-          label={subsectionLabel(accountsAndAssets, 1)}
-          title="Savings and investments"
-        >
-          <AccountTable
-            accounts={savings}
-            emptyDescription="Add a pension, an ISA or a savings account to see it listed here."
-            emptyTitle="No accounts yet"
-            lines={running}
-            onDelete={ask}
-            onEdit={edit}
-            owners={owners}
-          />
-        </SectionCard>
-        <Note>
-          Allocation is set once at plan level and applied pro rata to every
-          account.
-        </Note>
-        <SectionCard
-          actions={
-            <>
-              <Button
-                onClick={() => {
-                  setHouse("new");
-                }}
-                size="sm"
-                variant="outline"
-              >
-                <HousePlus aria-hidden />
-                Add house
-              </Button>
-              <Button
-                onClick={() => {
-                  setCar("new");
-                }}
-                size="sm"
-                variant="outline"
-              >
-                <CarFront aria-hidden />
-                Add car
-              </Button>
-            </>
-          }
-          className="pb-0"
-          label={subsectionLabel(accountsAndAssets, 2)}
-          title="Property and vehicles"
-        >
-          <AssetTable assets={assets} onDelete={ask} onEdit={edit} />
-        </SectionCard>
-        {debts.length > 0 && (
-          <SectionCard
-            className="pb-0"
-            label={subsectionLabel(accountsAndAssets, 3)}
-            title="Other debts"
-          >
-            <AccountTable
-              accounts={debts}
-              emptyDescription="A debt secured on nothing, a card or an overdraft, is listed here."
-              emptyTitle="No other debts"
-              onDelete={ask}
-              onEdit={edit}
-            />
-          </SectionCard>
-        )}
-        <PaymentOrder
-          accounts={savings}
-          label={subsectionLabel(accountsAndAssets, orderPlace)}
-          onMove={move}
+      <TileGrid>
+        <StatTile
+          caption="The balances the plan starts from"
+          label="Starting net worth"
+          tone="inverse"
+          value={formatGbp(worth)}
         />
-        <OwnerList
-          accounts={order}
-          label={subsectionLabel(accountsAndAssets, ownersPlace)}
+        <StatTile
+          caption={counted(savings.length, "account")}
+          label="Savings"
+          value={formatGbp(saved)}
+        />
+        <StatTile
+          caption={`${formatGbp(owned)} owned · ${formatGbp(owned - equity)} owed`}
+          isHiddenOnPhone
+          label="Equity"
+          value={formatGbp(equity)}
+        />
+        <StatTile
+          caption="Sacrifice and fixed payments"
+          isHiddenOnPhone
+          label="Paid in"
+          unit="/ mo"
+          value={formatGbp(paidIn)}
+        />
+      </TileGrid>
+      <SectionCard
+        actions={
+          <Button
+            onClick={() => {
+              setAccount("new");
+            }}
+            size="sm"
+          >
+            <Plus aria-hidden />
+            Add account
+          </Button>
+        }
+        className="pb-0"
+        label={subsectionLabel(accountsAndAssets, 1)}
+        title="Savings and investments"
+      >
+        <AccountTable
+          accounts={savings}
+          emptyDescription="Add a pension, an ISA or a savings account to see it listed here."
+          emptyTitle="No accounts yet"
+          lines={running}
+          onDelete={ask}
+          onEdit={edit}
           owners={owners}
         />
-      </ScreenBody>
+      </SectionCard>
+      <Note>
+        Allocation is set once at plan level and applied pro rata to every
+        account.
+      </Note>
+      <SectionCard
+        actions={
+          <>
+            <Button
+              onClick={() => {
+                setHouse("new");
+              }}
+              size="sm"
+              variant="outline"
+            >
+              <HousePlus aria-hidden />
+              Add house
+            </Button>
+            <Button
+              onClick={() => {
+                setCar("new");
+              }}
+              size="sm"
+              variant="outline"
+            >
+              <CarFront aria-hidden />
+              Add car
+            </Button>
+          </>
+        }
+        className="pb-0"
+        label={subsectionLabel(accountsAndAssets, 2)}
+        title="Property and vehicles"
+      >
+        <AssetTable assets={assets} onDelete={ask} onEdit={edit} />
+      </SectionCard>
+      {debts.length > 0 && (
+        <SectionCard
+          className="pb-0"
+          label={subsectionLabel(accountsAndAssets, 3)}
+          title="Other debts"
+        >
+          <AccountTable
+            accounts={debts}
+            emptyDescription="A debt secured on nothing, a card or an overdraft, is listed here."
+            emptyTitle="No other debts"
+            onDelete={ask}
+            onEdit={edit}
+          />
+        </SectionCard>
+      )}
+      <PaymentOrder
+        accounts={savings}
+        label={subsectionLabel(accountsAndAssets, orderPlace)}
+        onMove={move}
+      />
+      <OwnerList
+        accounts={order}
+        label={subsectionLabel(accountsAndAssets, ownersPlace)}
+        owners={owners}
+      />
       {account !== null && (
         <AccountDialog
           account={account === "new" ? null : account}
