@@ -95,3 +95,19 @@ Decide what a pension is worth beside an ISA once the tax on taking it out is
 counted, and the order the plan draws in, so the projection's two lines and its
 drawdown are both after tax; the smaller gaps are figures to add as the plan
 needs them.
+
+## Debt
+
+A debt paid its own fixed sum is paid down to the balloon a PCP leaves, and then
+paid nothing, and nothing in the plan pays the balloon: the projection holds it
+where the payments left it, charged nothing, for the rest of the plan. A debt
+that nothing pays is held where it opened the same way. A loan paid by a line
+refinances its balloon on the same terms and runs until the whole of it clears,
+so only a fixed sum leaves one standing. Charging interest on a sum nobody pays
+would compound it for a lifetime, which no plan carries; in life a balloon is
+paid, refinanced or settled by handing the car back, and each of those moves the
+savings, the car or both.
+
+Decide what the plan does with a balloon when the payments end, and whether a
+debt nothing pays is charged its rate, so every debt the plan carries ends the
+way the model says it does.
