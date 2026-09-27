@@ -12,8 +12,8 @@ import type { Plan } from "@/data/plan";
 import type { Entry } from "@/hooks/use-editor";
 
 import { removeIncomeLine, saveIncomeLine } from "@/actions/schedule";
+import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { Note } from "@/components/app/atoms/note";
-import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { EmploymentFields } from "@/components/app/organisms/employment-fields";

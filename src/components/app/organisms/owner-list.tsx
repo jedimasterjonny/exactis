@@ -8,8 +8,8 @@ import type { Account } from "@/data/accounts";
 import type { Owner, OwnerValues } from "@/data/owners";
 
 import { removeOwner, saveOwner } from "@/actions/owners";
+import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { EmptyState } from "@/components/app/atoms/empty-state";
-import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { RowActions } from "@/components/app/molecules/row-actions";
 import { SectionCard } from "@/components/app/molecules/section-card";

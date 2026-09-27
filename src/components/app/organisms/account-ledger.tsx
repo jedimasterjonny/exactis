@@ -13,11 +13,11 @@ import type { Secured } from "@/data/secured";
 import type { PlanMonth } from "@/lib/loans";
 
 import { placeAccountsInOrder, removeAccount } from "@/actions/accounts";
+import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { Note } from "@/components/app/atoms/note";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { TileGrid } from "@/components/app/atoms/tile-grid";
-import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { AccountDialog } from "@/components/app/organisms/account-dialog";
