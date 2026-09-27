@@ -22,13 +22,14 @@ import {
 // The dashboard, over the accounts, the lines, the milestones they are
 // tied to and the plan read from the store behind the session: titled with the age the plan runs to,
 // which the assumptions in the header set, then the tiles, then the
-// projection. The board holds the retirement
-// tile, since the retirement age is set on it; the badges and the rest
+// projection. The board holds the milestone
+// tile, since the milestone it reads is chosen on it and the retirement
+// age set there; the badges and the rest
 // of the tiles are the reference kit's invented plan, standing in until
 // the engine projects what they show, save the age the net worth is
 // read at, which is the plan's. It is its own component so the page
 // can stream it in behind the pending frame, since every part of it
-// now reads the store. A phone keeps the retirement age and the chance
+// now reads the store. A phone keeps the milestone tile and the chance
 // of success, the two the plan is steered by, in one row, and leaves
 // the net worth and the legacy to a wider screen.
 export async function Dashboard(): Promise<JSX.Element> {

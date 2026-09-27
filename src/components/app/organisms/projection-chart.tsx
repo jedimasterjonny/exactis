@@ -3,6 +3,7 @@
 import type { JSX, ReactNode } from "react";
 import type { TooltipContentProps } from "recharts";
 
+import { cn } from "cn";
 import { ChartArea, ChartColumnStacked } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -12,11 +13,14 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ReferenceDot,
   ReferenceLine,
   XAxis,
   YAxis,
 } from "recharts";
 
+import type { Marker } from "@/data/milestones";
+import type { Tie } from "@/data/schedule";
 import type { ProjectionPoint } from "@/engine/projection";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
@@ -29,6 +33,8 @@ import {
   ChartLegendContent,
   ChartTooltip,
 } from "@/components/kit/chart";
+import { balanceOf } from "@/engine/projection";
+import { listed } from "@/lib/feeders";
 import { formatGbp } from "@/lib/money";
 import { accountsAndAssets } from "@/lib/nav";
 
@@ -37,9 +43,11 @@ import { accountsAndAssets } from "@/lib/nav";
 type Mark = "area" | "bar";
 
 interface ProjectionChartProps {
+  readonly choices?: ReactNode;
   readonly controls?: ReactNode;
+  readonly milestones: readonly Marker[];
   readonly points: readonly ProjectionPoint[];
-  readonly retirement: number;
+  readonly selected?: Tie | undefined;
 }
 
 type Series = (typeof series)[number]["key"];
@@ -54,6 +62,12 @@ const series = [
   { color: "var(--chart-2)", key: "deferred", label: "Tax-deferred" },
   { color: "var(--chart-1)", key: "free", label: "Tax-free" },
 ] as const;
+
+// The height of the plot's box, the frames standing in for it and the
+// empty state in its place: three times as wide as it is tall, down to a
+// floor that is higher on a phone, where the choices take a row of
+// their own above the plot.
+const boxSize = "aspect-[3/1] min-h-90 sm:min-h-72";
 
 const config = Object.fromEntries(
   series.map(({ color, key, label }) => [key, { color, label }]),
@@ -74,37 +88,45 @@ const config = Object.fromEntries(
 // one that works, and what a year drew so joins its figures too. The
 // early mark's label sits a line beneath the run-out mark's and to the
 // right of its own line where the other's is to the left, so neither
-// writes over the other a year apart or in the one year. The year the
-// plan's owner retires in is marked too, a milestone rather than a
-// warning, so in the muted tone, and its label takes a third line to
-// the right of its own, clear of both the others wherever they fall;
-// a retirement outside the plan's years has no year to stand on and
-// goes undrawn. The toggle takes its row from
+// writes over the other a year apart or in the one year. Every
+// milestone is marked too, retirement among them, as a faint hairline
+// in oxide, the palette's colour for milestones, and the one the caller
+// says is chosen as a solid line with a dot on the top of the stack,
+// where the balance it is read at stands. A milestone's line carries no
+// name: on a phone a year is a few pixels wide and a name spans more
+// than a decade, so the names are the caller's to give, as the choices
+// it sets above the plot, and the crosshair names the milestones in its
+// year. A milestone outside the plan's years has no year to stand on
+// and goes undrawn. The toggle takes its row from
 // inside the plot's box rather than adding one over it, so the box is
 // the same height as the frames that stand in for it and nothing shifts
 // when the chart arrives; whatever controls the caller gives for what
 // is plotted share the row, at its left, the toggle keeping the right,
-// and the row stands a gap clear of the plot, so a figure box above
-// the top tick does not crowd it. The box is three times as wide as it
-// is tall down to a floor, and every frame with it: the row, the axis
-// and the legend take the same height at any width, and on a phone a
-// third of the width is less than they need, which left no plot at all.
+// and the choices it gives between them, or on a row of their own
+// beneath on a phone, and the rows stand a gap clear of the plot, so a
+// figure box above the top tick does not crowd it. The box is three
+// times as wide as it is tall down to a floor, and every frame with it:
+// the rows, the axis and the legend take the same height at any width,
+// and on a phone a third of the width is less than they need, which
+// left no plot at all, so the floor there is higher again.
 // A projection of nothing, because no account
 // is a wrapper yet, says so in the plot's place rather than drawing a
 // flat zero over a column of £0 ticks, and points at the screen where
 // the account is added: the dashboard has no way to add one itself.
 export function ProjectionChart({
+  choices,
   controls,
+  milestones,
   points,
-  retirement,
+  selected,
 }: ProjectionChartProps): JSX.Element {
   const [mark, setMark] = useState<Mark>("area");
 
-  if (points.every((point) => totalOf(point) === 0)) {
+  if (points.every((point) => balanceOf(point) === 0)) {
     return (
       <Frame>
         <EmptyState
-          className="aspect-[3/1] min-h-72"
+          className={boxSize}
           description="Add a tax-free or tax-deferred account to see it projected."
           icon={ChartArea}
           title="Nothing to project yet"
@@ -135,15 +157,25 @@ export function ProjectionChart({
   // does, and the mark goes undrawn.
   const drawsEarly = points.find((point) => point.early > 0);
 
-  // Whether the plan's years reach the year its owner retires in, which
-  // is where the milestone stands.
-  const isRetiring = points.some((point) => point.year === retirement);
+  // The milestones the plan's years reach, and the point the chosen one
+  // stands on, if it is among them.
+  const marked = milestones.filter((marker) =>
+    points.some((point) => point.year === marker.year),
+  );
+  const chosen = points.find(
+    (point) => point.year === marked.find(({ id }) => id === selected)?.year,
+  );
 
   return (
     <Frame>
-      <div className="flex aspect-[3/1] min-h-72 w-full flex-col gap-4">
-        <div className="flex items-end gap-4">
-          {controls}
+      <div className={cn("flex w-full flex-col gap-4", boxSize)}>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+          <div>{controls}</div>
+          {choices !== undefined && (
+            <div className="col-span-2 row-start-2 sm:col-span-1 sm:col-start-2 sm:row-start-1">
+              {choices}
+            </div>
+          )}
           <MarkToggle mark={mark} onMarkChange={setMark} />
         </div>
         <ChartContainer className="aspect-auto min-h-0 flex-1" config={config}>
@@ -192,7 +224,11 @@ export function ProjectionChart({
             />
             <ChartTooltip
               content={(props) => (
-                <ProjectionTooltip {...props} points={points} />
+                <ProjectionTooltip
+                  {...props}
+                  milestones={milestones}
+                  points={points}
+                />
               )}
             />
             <ChartLegend content={<ChartLegendContent />} />
@@ -220,18 +256,23 @@ export function ProjectionChart({
                 />
               ),
             )}
-            {isRetiring && (
+            {marked.map((marker) => (
               <ReferenceLine
-                label={{
-                  dy: 32,
-                  fill: "var(--muted-foreground)",
-                  fontSize: 12,
-                  position: "insideTopLeft",
-                  value: "Retirement",
-                }}
-                stroke="var(--muted-foreground)"
-                strokeDasharray="4 4"
-                x={retirement}
+                key={marker.id}
+                stroke="var(--brand)"
+                strokeOpacity={marker.id === selected ? 1 : 0.35}
+                strokeWidth={marker.id === selected ? 1.5 : 1}
+                x={marker.year}
+              />
+            ))}
+            {chosen !== undefined && (
+              <ReferenceDot
+                fill="var(--brand)"
+                r={4}
+                stroke="var(--card)"
+                strokeWidth={2}
+                x={chosen.year}
+                y={balanceOf(chosen)}
               />
             )}
             {drawsEarly !== undefined && (
@@ -316,36 +357,53 @@ function MarkToggle({
 // atom, which closes a section with an icon; this is sized as the plot.
 function Placeholder({ children }: { readonly children: string }): JSX.Element {
   return (
-    <p className="flex aspect-[3/1] min-h-72 w-full items-center justify-center text-sm text-muted-foreground">
+    <p
+      className={cn(
+        "flex w-full items-center justify-center text-sm text-muted-foreground",
+        boxSize,
+      )}
+    >
       {children}
     </p>
   );
 }
 
-// The year under the crosshair, the age reached that year, and each
-// series' figure with the total beneath, and under that, for a year that
-// drew on a pension early, what it drew so, and for a year that came up
-// short, what it could not cover. The values lead, in mono, with
+// The year under the crosshair, the age reached that year and the
+// milestones falling in it, and each series' figure with the total
+// beneath, and under that, for a year that drew on a pension early, what
+// it drew so, and for a year that came up short, what it could not
+// cover. The values lead, in mono, with
 // a stroke of the series' colour keying the name beside each. The point
 // is found by the year the crosshair names rather than read out of the
 // entry recharts hands over, which is untyped.
 function ProjectionTooltip({
   active: isActive,
   label,
+  milestones,
   points,
-}: Pick<ProjectionChartProps, "points"> &
+}: Pick<ProjectionChartProps, "milestones" | "points"> &
   TooltipContentProps): JSX.Element | null {
   const point = points.find((candidate) => candidate.year === label);
   if (!isActive || point === undefined) {
     return null;
   }
+  const falling = milestones
+    .filter((marker) => marker.year === point.year)
+    .map(({ name }) => name);
   return (
     <div
       className="grid min-w-44 gap-1.5 rounded-md border bg-popover px-2.5 py-2 text-xs text-popover-foreground shadow-md"
       data-slot="projection-tooltip"
     >
-      <span className="font-medium">
-        {`${String(point.year)} · Age ${String(point.age)}`}
+      <span className="grid gap-0.5">
+        <span className="font-medium">
+          {`${String(point.year)} · Age ${String(point.age)}`}
+        </span>
+        {falling.length > 0 && (
+          <span className="text-muted-foreground">
+            {listed.format(falling)}
+          </span>
+        )}
       </span>
       {series.map(({ key, label: name }) => (
         <span className="flex items-center gap-2" key={key}>
@@ -363,7 +421,7 @@ function ProjectionTooltip({
       <span className="flex items-center gap-2 border-t pt-1.5">
         <span className="text-muted-foreground">Total</span>
         <span className="ml-auto figure font-medium">
-          {formatGbp(totalOf(point))}
+          {formatGbp(balanceOf(point))}
         </span>
       </span>
       {point.early > 0 && (
@@ -384,11 +442,6 @@ function ProjectionTooltip({
       )}
     </div>
   );
-}
-
-// The top of the stack: every series summed.
-function totalOf(point: ProjectionPoint): number {
-  return series.reduce((sum, { key }) => sum + point[key], 0);
 }
 
 // The area under each line is its series' colour fading from a quarter
