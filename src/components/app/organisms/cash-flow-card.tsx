@@ -6,6 +6,7 @@ import { cn } from "cn";
 import { useState } from "react";
 
 import type { Account } from "@/data/accounts";
+import type { Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Fed, Paid, Schedule, Spent, Take } from "@/engine/cash-flow";
 
@@ -18,9 +19,11 @@ import {
   AccordionTrigger,
 } from "@/components/kit/accordion";
 import { CardContent } from "@/components/kit/card";
+import { markersOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { cashFlow } from "@/engine/cash-flow";
 import { cadenceAbbreviations } from "@/lib/cadence";
+import { listed } from "@/lib/feeders";
 import { spanOf } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 import { monthName } from "@/lib/months";
@@ -28,6 +31,7 @@ import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 
 interface CashFlowCardProps {
   readonly accounts: readonly Account[];
+  readonly milestones: readonly Milestone[];
   readonly plan: Plan;
   readonly schedule: Schedule;
 }
@@ -52,7 +56,10 @@ interface RowProps {
 // something else. The month shown is the first the plan runs in that
 // year, the month the plan starts in for its first year and January
 // after, and the title names it, since a line may end part way through
-// a year and a later month of it would leave something else again. The
+// a year and a later month of it would leave something else again. It
+// names the milestones falling in the year too, retirement among them,
+// since a line tied to one starts or stops in its year, which makes a
+// month then one worth reading. The
 // card runs the engine itself, which is pure and cheap, rather than
 // asking the page for every year. The income comes
 // in, as it is earned, then what a salary sacrifices into its pension
@@ -70,6 +77,7 @@ interface RowProps {
 // expense card's.
 export function CashFlowCard({
   accounts,
+  milestones,
   plan,
   schedule,
 }: CashFlowCardProps): JSX.Element {
@@ -77,9 +85,15 @@ export function CashFlowCard({
   const end = endYear(plan);
   const month = year === plan.from ? plan.month : 0;
   const flow = cashFlow(accounts, schedule, { at: { month, year }, plan });
+  const marked = markersOf(milestones, plan)
+    .filter((marker) => marker.year === year)
+    .map(({ name }) => name);
   return (
     <SectionCard
-      caption={`${monthName(month, "long")} ${String(year)}, age ${String(ageIn(year, plan))}, in today's money`}
+      caption={[
+        `${monthName(month, "long")} ${String(year)}, age ${String(ageIn(year, plan))}, in today's money`,
+        ...(marked.length === 0 ? [] : [listed.format(marked)]),
+      ].join(" · ")}
       controls={
         <SliderField
           hint={`${String(plan.from)} to ${String(end)}, the years of the plan`}

@@ -76,6 +76,7 @@ export default async function Plan(): Promise<JSX.Element> {
         />
         <CashFlowCard
           accounts={accounts}
+          milestones={milestones}
           plan={plan}
           schedule={{ expenses: expenseLines, income: incomeLines }}
         />
