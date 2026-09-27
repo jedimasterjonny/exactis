@@ -182,12 +182,11 @@ export function ProjectionChart({
 
   // The bar chart rather than the composed one, which would hold either
   // mark: recharts draws the crosshair as a band over the year's columns
-  // only when the chart is a bar chart by name. The columns stack in one,
-  // split by sign, since two stacks set a year's columns side by side;
-  // the areas stack in two, what is held and what is owed, since split
-  // by sign a series of nothing counts as held, and a debt paid off would
-  // draw its line along the top of the stack from the year it cleared. A
-  // column of nothing draws nothing wherever it stands.
+  // only when the chart is a bar chart by name. Either mark stacks in
+  // one, split by sign, so what is held stacks up from nothing and what
+  // is owed down from it, and a series whose sign turns crosses nothing
+  // rather than digging into the stack it left; two stacks, one a sign,
+  // would set a year's columns side by side.
   const Plot = mark === "bar" ? BarChart : AreaChart;
 
   const series = seriesOf(accounts);
@@ -231,7 +230,7 @@ export function ProjectionChart({
           <Plot
             data={points}
             margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
-            stackOffset={mark === "bar" ? "sign" : "none"}
+            stackOffset="sign"
           >
             {mark === "area" && (
               <defs>
@@ -293,7 +292,7 @@ export function ProjectionChart({
                   fill={`url(#${washOf(key)})`}
                   isAnimationActive={false}
                   key={key}
-                  stackId={isOwed ? "owed" : "held"}
+                  stackId="accounts"
                   stroke={`var(--color-${key})`}
                   strokeWidth={2}
                   type="monotone"
@@ -373,10 +372,11 @@ export function ProjectionPending(): JSX.Element {
 
 // What an area draws for an account, a year at a time: its balance, and
 // a break for a debt that owes nothing, which is a debt paid off, so a
-// debt leaves the plot once it reaches nothing rather than running
-// along the axis for the rest of the plan. Its line ends with the last
-// year it owes anything. The stack reads a break as nothing, so the
-// debts beneath it stack as before.
+// debt leaves the plot once it reaches nothing. Its line ends with the
+// last year it owes anything. Split by sign, a series of nothing counts
+// as held, and a debt at nothing would draw its line along the top of
+// the stack for the rest of the plan. The stack reads a break as
+// nothing, so the debts beneath it stack as before.
 function drawnIn({
   id,
   isOwed,
