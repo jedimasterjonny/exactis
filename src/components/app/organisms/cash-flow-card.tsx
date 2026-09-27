@@ -44,7 +44,7 @@ interface RowProps {
   readonly label: string;
 }
 
-// The plan screen's third card, beneath the two schedules it is read
+// The plan screen's fourth card, beneath the two schedules it is read
 // from: a month of a year's money, as the engine works it out, laid out
 // as a ledger. The year is the card's own, opening on the plan's first
 // and moved along the plan's span by the slider under the title, since
@@ -90,7 +90,7 @@ export function CashFlowCard({
           value={year}
         />
       }
-      label={subsectionLabel(planScreen, 3)}
+      label={subsectionLabel(planScreen, 4)}
       title="Cash flow each month"
     >
       <CardContent>

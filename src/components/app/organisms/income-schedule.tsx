@@ -78,8 +78,8 @@ const kinds = optionsOf(kindLabels, [
 // phone is deleted from, and holds while a save is on its way, since a
 // deletion over a save in flight would race it. The card takes a
 // numeral of its own off the screen's, since the reference numbers each
-// of the schedule's cards that way, and the expense schedule beneath it
-// takes the next.
+// of the schedule's cards that way: the next after the milestones', and
+// the expense schedule beneath it takes the one after.
 export function IncomeSchedule({
   accounts,
   lines,
@@ -155,7 +155,7 @@ export function IncomeSchedule({
             Add income line
           </Button>
         }
-        label={subsectionLabel(planScreen, 1)}
+        label={subsectionLabel(planScreen, 2)}
         title="Income by year"
       >
         <CardContent>

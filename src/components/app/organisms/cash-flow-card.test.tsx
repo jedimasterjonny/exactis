@@ -46,7 +46,7 @@ describe("CashFlowCard", () => {
   it("opens on the plan's first year and lays the month out as a ledger", () => {
     render(<CashFlowCard accounts={held} plan={plan} schedule={schedule} />);
 
-    expect(screen.getByText("Sect. III.iii")).toHaveClass("label");
+    expect(screen.getByText("Sect. III.iv")).toHaveClass("label");
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       "Cash flow each month",
     );
