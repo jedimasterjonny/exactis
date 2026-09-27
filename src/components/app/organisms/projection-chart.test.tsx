@@ -189,6 +189,7 @@ describe("ProjectionChart", () => {
     render(
       <ProjectionChart accounts={listed} milestones={[]} points={years} />,
     );
+    fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
 
     expect(
       screen
@@ -267,6 +268,7 @@ describe("ProjectionChart", () => {
     render(
       <ProjectionChart accounts={listed} milestones={[]} points={years} />,
     );
+    fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
 
     expect(colours()).toContain(
       "--color-account-7: color-mix(in oklab, var(--brand), var(--card) 0%);",
@@ -375,7 +377,7 @@ describe("ProjectionChart", () => {
     expect(
       screen.getByRole("button", { name: "A choice" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "Areas" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Bars" })).toBeInTheDocument();
 
     rerender(
       <ProjectionChart
@@ -395,28 +397,18 @@ describe("ProjectionChart", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("swaps the areas for a column per year on the toggle, and back", () => {
+  it("draws a column per year to begin with, and swaps it for areas on the toggle and back", () => {
     render(<ProjectionChart accounts={held} milestones={[]} points={points} />);
 
     expect(
-      screen.getAllByText(byClass("recharts-area"), { suggest: false }),
-    ).toHaveLength(2);
-
-    const control = screen.getByRole("switch", { name: "Areas" });
-
-    expect(control).not.toBeChecked();
-
-    fireEvent.click(control);
-
-    expect(screen.getByRole("switch", { name: "Bars" })).toBeChecked();
-    expect(
       screen.getAllByText(byClass("recharts-bar"), { suggest: false }),
     ).toHaveLength(2);
-    expect(
-      screen.queryAllByText(byClass("recharts-area"), { suggest: false }),
-    ).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
+    const control = screen.getByRole("switch", { name: "Bars" });
+
+    expect(control).toBeChecked();
+
+    fireEvent.click(control);
 
     expect(screen.getByRole("switch", { name: "Areas" })).not.toBeChecked();
     expect(
@@ -424,6 +416,16 @@ describe("ProjectionChart", () => {
     ).toHaveLength(2);
     expect(
       screen.queryAllByText(byClass("recharts-bar"), { suggest: false }),
+    ).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("switch", { name: "Areas" }));
+
+    expect(screen.getByRole("switch", { name: "Bars" })).toBeChecked();
+    expect(
+      screen.getAllByText(byClass("recharts-bar"), { suggest: false }),
+    ).toHaveLength(2);
+    expect(
+      screen.queryAllByText(byClass("recharts-area"), { suggest: false }),
     ).toHaveLength(0);
   });
 
@@ -476,7 +478,7 @@ describe("ProjectionChart", () => {
     expect(marks()[0]).toHaveAttribute("stroke", "var(--brand)");
     expect(screen.queryByText("Retirement")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("switch", { name: "Areas" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
 
     expect(marks().map((mark) => mark.getAttribute("x"))).toStrictEqual([
       "2026",
@@ -516,7 +518,7 @@ describe("ProjectionChart", () => {
     expect(marks()[0]).toHaveAttribute("x", "2027");
     expect(screen.getByText("Runs out")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("switch", { name: "Areas" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
 
     expect(marks()).toHaveLength(1);
     expect(marks()[0]).toHaveAttribute("x", "2027");
