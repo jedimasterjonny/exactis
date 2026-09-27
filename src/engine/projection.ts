@@ -21,8 +21,9 @@ import {
 // age as much as by year. The first point is the balances as they are,
 // at the month the plan starts in; each after it is the year before
 // carried to its end. Each account carried is on it by its id, cash,
-// every wrapper and every house, car and other real asset, so a chart
-// can draw each on its own; and each
+// every wrapper and every house, car and other real asset, and every
+// debt below nothing, as the account holds it, so a chart can draw each
+// on its own; and each
 // wrapper's accounts are summed as well, under the name the progress
 // point gives the same balance, so a point recorded and a point
 // projected can be laid over each other, though the progress points
@@ -68,8 +69,9 @@ interface Drawing {
 }
 
 // An account and the balance the projection has carried it to, which
-// opens at what the account holds and is never below nothing: only a
-// debt may be owed, and no debt is held.
+// opens at what the account holds. A held account's is never below
+// nothing, since only a debt may be owed, and no debt is held; a debt
+// is carried apart, owing, and its balance is never above nothing.
 interface Held {
   readonly account: Account;
   readonly balance: number;
@@ -121,7 +123,9 @@ export function balanceOf(point: ProjectionPoint): number {
 // real asset is carried as a saving is, paid what the flow pays it and
 // grown at its own rate, below nothing for one that loses value, and is
 // never drawn on: the plan sells nothing it lives in or drives to cover
-// a month. What an account is paid a
+// a month. A debt is carried apart from them, paid down a month at a
+// time by what the flow pays off it, as the loan maths reads a month,
+// and never drawn on either. What an account is paid a
 // month is what that month's cash flow says, a salary's sacrifice with
 // the NI saved on it, a fixed sum spread over the months as the flow
 // spreads it or the spare money's take, read afresh each month since a
@@ -192,13 +196,19 @@ export function project(
   if (held.some(({ balance }) => balance < 0)) {
     throw new Error(rules.belowNothing);
   }
+  let owing: readonly Held[] = accounts
+    .filter(({ kind }) => kind === "debt")
+    .map((account) => ({ account, balance: account.balance }));
   let allowance = lumpSumAllowance;
   let taxYear: TaxYear = { months: 0, paid: 0, profit: 0, taxable: 0 };
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
     const age = ageIn(year, plan);
     const balances = Object.fromEntries(
-      held.map(({ account, balance }) => [account.id, Math.round(balance)]),
+      [...held, ...owing].map(({ account, balance }) => [
+        account.id,
+        Math.round(balance),
+      ]),
     );
     const deferred = total(held, "tax-deferred");
     const free = total(held, "tax-free");
@@ -240,6 +250,14 @@ export function project(
           balance: carried(
             balance,
             paidIn(account, flow),
+            rateOf(account, plan),
+          ),
+        }));
+        owing = owing.map(({ account, balance }) => ({
+          account,
+          balance: paidDown(
+            balance,
+            paidOff(account, flow),
             rateOf(account, plan),
           ),
         }));
@@ -350,6 +368,24 @@ function isBeforePensionAge(age: number, { month, year }: Month): boolean {
   return age < (hasRisen ? pensionAge.after : pensionAge.before);
 }
 
+// A month of a debt, as the loan maths reads one: interest at a
+// twelfth of the yearly rate on what is owed as the month opens, then
+// the month's payment off it. That is how the term a payment clears a
+// debt in is worked out, and the flow stops a debt's payments in the
+// month that term ends, so a debt carried here is paid down to the
+// balloon it leaves, or to nothing, in the month its payments end. It
+// is paid no more than it owes: the term is rounded up to a whole
+// month, so the last payment is more than is left, and what it pays
+// past nothing is not carried as a debt owing money back. A month that
+// pays nothing is charged nothing, which holds a balloon where the
+// payments leave it and a debt nothing pays where it opened: the plan
+// pays neither off, and a sum compounding for the rest of a lifetime is
+// a debt no plan carries. What the plan does with a balloon is a gap in
+// the model, listed with the model's other gaps.
+function paidDown(balance: number, paid: number, rate: number): number {
+  return paid === 0 ? balance : Math.min(0, balance * (1 + rate / 12) + paid);
+}
+
 // What lands in an account each month of the year: what each salary
 // feeds it, the fixed sum or the spare money's take the flow lists for
 // it, and the relief it lists a pension claiming on what is paid out of
@@ -366,6 +402,20 @@ function paidIn(account: Account, flow: CashFlow): number {
       .filter((entry) => entry.account === account)
       .reduce((sum, entry) => sum + entry.amount, 0);
   return sumOf([...flow.fed, ...flow.fixed, ...flow.relief, ...flow.spare]);
+}
+
+// What the month pays off a debt: its own fixed sum, which the flow
+// lists with the others and which is all a debt is ever listed for, so
+// it is read as what lands in any account is; and what each line paying
+// it costs the month, which the flow pays in place of that sum. A line
+// names the debt it pays by id.
+function paidOff(account: Account, flow: CashFlow): number {
+  return (
+    paidIn(account, flow) +
+    flow.spent
+      .filter(({ line }) => line.pays === account.id)
+      .reduce((sum, { amount }) => sum + amount, 0)
+  );
 }
 
 // The rate a month is carried at, held to losing no more than
