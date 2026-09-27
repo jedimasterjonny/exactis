@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
+import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
@@ -18,6 +19,7 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
 import { homeValues } from "@/data/houses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
+import { curve } from "@/data/inflation.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import { project } from "@/engine/projection";
@@ -34,6 +36,7 @@ type Case = readonly [string, Break];
 
 interface Inputs {
   readonly accounts: readonly Account[];
+  readonly curve: Curve | null;
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
@@ -52,6 +55,7 @@ type Thrown = readonly [string, string, Break];
 // plan runs to and is what the plan action refuses.
 const sound: Inputs = {
   accounts,
+  curve,
   milestones,
   owners,
   plan: retiring,
@@ -361,6 +365,7 @@ describe("soundKept", () => {
     expect(soundKept(nothingKeptIn(september))).toStrictEqual({
       household: {
         accounts: [],
+        curve: null,
         milestones: [],
         owners: [],
         plan: {
@@ -452,6 +457,33 @@ describe("soundKept", () => {
       household: { milestones: [] },
       kept: { milestones: [] },
     });
+  });
+
+  // A household kept before there was a curve holds none at all.
+  // Spelled out key by key, since a rest destructure would bind the
+  // curve to nothing.
+  it("reads a household kept before there was a curve as holding none", () => {
+    const before = {
+      accounts: kept.accounts,
+      ages: kept.ages,
+      asOf: kept.asOf,
+      milestones: kept.milestones,
+      next: kept.next,
+      owners: kept.owners,
+      schedule: kept.schedule,
+    };
+
+    expect(soundKept(before)).toMatchObject({
+      household: { curve: null },
+      kept: { curve: null },
+    });
+  });
+
+  it("keeps the curve as the Bank gave it, and refuses one on no day", () => {
+    expect(soundKept(kept).household.curve).toStrictEqual(curve);
+    expect(() =>
+      soundKept({ ...kept, curve: { ...curve, asOf: "1 Sept 2026" } }),
+    ).toThrow("Invalid ISO date");
   });
 
   it("refuses a record whose id is not below the one the next is given", () => {

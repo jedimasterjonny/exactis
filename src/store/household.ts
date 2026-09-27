@@ -6,6 +6,7 @@ import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { Household, Kept } from "@/data/household";
 import type { IncomeLine } from "@/data/income";
+import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
@@ -71,6 +72,12 @@ export async function amend<TResult>(
 export async function getAccounts(): Promise<readonly Account[]> {
   await requireSession();
   return (await readHousehold()).accounts;
+}
+
+// The inflation curve last pulled from the Bank, or none before one is.
+export async function getCurve(): Promise<Curve | null> {
+  await requireSession();
+  return (await readHousehold()).curve;
 }
 
 export async function getExpenseLines(): Promise<readonly ExpenseLine[]> {
