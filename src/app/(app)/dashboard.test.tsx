@@ -112,13 +112,20 @@ describe("Dashboard", () => {
     expect(tileOf("Net legacy")).toHaveClass("max-sm:hidden");
   });
 
-  // Retirement is named twice, by the tile and by its chip, among the
-  // household's milestones, and the age reads the plan's.
+  // The chart draws the store's two wrappers. Retirement is named
+  // twice, by the tile and by its chip, among the household's
+  // milestones, and the age reads the plan's.
   it("follows the tiles with the store's projection and its milestones to choose from, retirement chosen", async () => {
     render(await Dashboard());
 
     expect(screen.getByRole("application")).toHaveClass("recharts-surface");
-    expect(screen.getByText("Tax-free")).toBeInTheDocument();
+    expect(
+      screen.getAllByText(
+        (_content, element) =>
+          element?.classList.contains("recharts-area") === true,
+        { suggest: false },
+      ),
+    ).toHaveLength(2);
     expect(screen.getByText("At Retirement")).toBeInTheDocument();
     expect(screen.getByText("2049 · age 59")).toBeInTheDocument();
     expect(
