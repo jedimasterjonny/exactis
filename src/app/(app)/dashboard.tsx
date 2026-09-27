@@ -15,11 +15,12 @@ import {
   getAccounts,
   getExpenseLines,
   getIncomeLines,
+  getMilestones,
   getPlan,
 } from "@/store/household";
 
-// The dashboard, over the accounts, the lines and the plan read from
-// the store behind the session: titled with the age the plan runs to,
+// The dashboard, over the accounts, the lines, the milestones they are
+// tied to and the plan read from the store behind the session: titled with the age the plan runs to,
 // which the assumptions in the header set, then the tiles, then the
 // projection. The board holds the retirement
 // tile, since the retirement age is set on it; the badges and the rest
@@ -31,10 +32,11 @@ import {
 // of success, the two the plan is steered by, in one row, and leaves
 // the net worth and the legacy to a wider screen.
 export async function Dashboard(): Promise<JSX.Element> {
-  const [accounts, income, expenses, plan] = await Promise.all([
+  const [accounts, income, expenses, milestones, plan] = await Promise.all([
     getAccounts(),
     getIncomeLines(),
     getExpenseLines(),
+    getMilestones(),
     getPlan(),
   ]);
   const age = String(endAge(plan));
@@ -55,6 +57,7 @@ export async function Dashboard(): Promise<JSX.Element> {
       <ScreenBody>
         <ProjectionBoard
           accounts={accounts}
+          milestones={milestones}
           plan={plan}
           schedule={{ expenses, income }}
         >

@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
+import { milestones } from "@/data/milestones.fixture";
 import {
   getAccounts,
   getExpenseLines,
   getIncomeLines,
+  getMilestones,
   getPlan,
 } from "@/store/household";
 
@@ -18,6 +20,7 @@ vi.mock("@/store/household", () => ({
   getAccounts: vi.fn(),
   getExpenseLines: vi.fn(),
   getIncomeLines: vi.fn(),
+  getMilestones: vi.fn(),
   getPlan: vi.fn(),
 }));
 
@@ -28,6 +31,7 @@ describe("Dashboard", () => {
     vi.mocked(getAccounts).mockResolvedValue([...accounts]);
     vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
     vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
+    vi.mocked(getMilestones).mockResolvedValue([...milestones]);
     vi.mocked(getPlan).mockResolvedValue(retiring);
   });
 

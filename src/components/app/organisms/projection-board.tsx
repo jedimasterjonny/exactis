@@ -6,6 +6,7 @@ import { Flag } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { Account } from "@/data/accounts";
+import type { Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 
@@ -14,6 +15,7 @@ import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { AgeField } from "@/components/app/molecules/age-field";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ProjectionChart } from "@/components/app/organisms/projection-chart";
+import { timed } from "@/data/milestones";
 import { ageIn, endAge, retirementYear } from "@/data/plan";
 import { project } from "@/engine/projection";
 import { useSender } from "@/hooks/use-sender";
@@ -37,6 +39,7 @@ interface Pending {
 interface ProjectionBoardProps {
   readonly accounts: readonly Account[];
   readonly children: ReactNode;
+  readonly milestones: readonly Milestone[];
   readonly plan: Plan;
   readonly schedule: Schedule;
 }
@@ -55,7 +58,11 @@ export const settle = 400;
 // tile, the mark and every figure the engine projects follow it as it
 // is dragged, since the engine is pure and a plan of a lifetime is
 // some hundreds of months, so it runs on every render rather than on
-// the server behind a cache. The age shown is the store's, which the
+// the server behind a cache. So do the lines tied to retirement: each
+// line's tied ends are read off the milestones again at the age
+// dragged to, so a salary ending at retirement stops and the spending
+// starting at it starts wherever the age is, as the store will have
+// them once the age is saved. The age shown is the store's, which the
 // board is handed, save while a draft moved over that same age stands:
 // once the store's age changes, from this board's save or from anywhere
 // else, the draft was drawn over an age that has gone and the store's
@@ -68,6 +75,7 @@ export const settle = 400;
 export function ProjectionBoard({
   accounts,
   children,
+  milestones,
   plan,
   schedule,
 }: ProjectionBoardProps): JSX.Element {
@@ -141,7 +149,18 @@ export function ProjectionBoard({
             />
           </div>
         }
-        points={project(accounts, schedule, drafted)}
+        points={project(
+          accounts,
+          {
+            expenses: schedule.expenses.map((line) =>
+              timed(line, milestones, drafted),
+            ),
+            income: schedule.income.map((line) =>
+              timed(line, milestones, drafted),
+            ),
+          },
+          drafted,
+        )}
         retirement={retirementYear(drafted)}
       />
     </>
