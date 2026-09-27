@@ -9,7 +9,7 @@ import { incomeLines } from "@/data/income.fixture";
 import { endYear } from "@/data/plan";
 import { drawFor, lumpSumAllowance } from "@/lib/tax";
 
-import { project } from "./projection";
+import { balanceOf, project } from "./projection";
 
 const [pension, isa, cash, home, mortgage] = accounts;
 const [salary, , consulting] = incomeLines;
@@ -1091,6 +1091,21 @@ describe("project", () => {
         year: 2026,
       },
     ]);
+  });
+});
+
+describe("balanceOf", () => {
+  it("sums both wrappers a point holds", () => {
+    expect(
+      balanceOf({
+        age: 40,
+        deferred: 1200,
+        early: 5,
+        free: 300,
+        uncovered: 7,
+        year: 2030,
+      }),
+    ).toBe(1500);
   });
 });
 
