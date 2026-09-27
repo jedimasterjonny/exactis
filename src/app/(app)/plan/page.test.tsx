@@ -25,6 +25,10 @@ vi.mock("@/store/household", () => ({
   getOwners: vi.fn(),
   getPlan: vi.fn(),
 }));
+vi.mock("@/actions/milestones", () => ({
+  removeMilestone: vi.fn(),
+  saveMilestone: vi.fn(),
+}));
 vi.mock("@/actions/schedule", () => ({
   removeIncomeLine: vi.fn(),
   saveExpenseLine: vi.fn(),
