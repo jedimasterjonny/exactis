@@ -91,17 +91,15 @@ function pointIn(
   );
 }
 
-// The total the chart gives for a year of a plan, as its tooltip writes
-// it: every account it draws, which is every one but the mortgage.
+// The net worth the chart gives for a year of a plan, as its tooltip
+// writes it: every account it draws, the mortgage owed among them.
 function totalIn(held: Plan, year: number, lines: Schedule = schedule): string {
   const point = pointIn(held, year, lines);
   return formatGbp(
-    accounts
-      .filter(({ kind }) => kind !== "debt")
-      .reduce(
-        (sum, { id }) => sum + (point === undefined ? 0 : balanceIn(point, id)),
-        0,
-      ),
+    accounts.reduce(
+      (sum, { id }) => sum + (point === undefined ? 0 : balanceIn(point, id)),
+      0,
+    ),
   );
 }
 

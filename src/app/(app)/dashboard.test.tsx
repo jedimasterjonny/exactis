@@ -112,9 +112,9 @@ describe("Dashboard", () => {
     expect(tileOf("Net legacy")).toHaveClass("max-sm:hidden");
   });
 
-  // The chart draws each account the store holds but the mortgage: the
-  // pension, the ISA, the current account and the home. Retirement is
-  // named twice, by the tile and by its chip, among the household's
+  // The chart draws each account the store holds: the pension, the ISA,
+  // the current account and the home, and the mortgage owed. Retirement
+  // is named twice, by the tile and by its chip, among the household's
   // milestones, and the age reads the plan's.
   it("follows the tiles with the store's projection and its milestones to choose from, retirement chosen", async () => {
     render(await Dashboard());
@@ -126,7 +126,7 @@ describe("Dashboard", () => {
           element?.classList.contains("recharts-area") === true,
         { suggest: false },
       ),
-    ).toHaveLength(4);
+    ).toHaveLength(5);
     expect(screen.getByText("At Retirement")).toBeInTheDocument();
     expect(screen.getByText("2049 · age 59")).toBeInTheDocument();
     expect(
