@@ -156,6 +156,18 @@ debt's does. Saving a debt whose fixed payment never clears it is refused, since
 a payment the month's interest swallows gives the projection no month to stop
 at.
 
+Any other line may tie its first or last year to a milestone rather than fix it,
+and then runs as the milestone does. A milestone is the first year of what it
+marks, so whenever the household is read a line tied to start at one starts in
+its year, and a line tied to end at one runs the whole of the year before; two
+lines tied to it, one each way, hand over there with no year left unpaid or paid
+twice. Retirement is a milestone of its own, the year the plan's owner retires
+in, so a line tied to it moves with the retirement age. A milestone moved past
+the other end of a line tied to it leaves the line running no years, rather than
+the move being refused over a line on another screen; a line saved that way is
+refused. Deleting a milestone fixes each end tied to it in the year it falls in
+then, so the lines stay where they were.
+
 A month the income does not cover is drawn out of the savings at the start of
 it, before the month's growth: cash first, then the tax-free wrapper, then the
 tax-deferred one, as income from the pension age: from the year its owner turns

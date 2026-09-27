@@ -147,12 +147,14 @@ describe("toRecords", () => {
       line: {
         amount: 290,
         cadence: "month",
+        endsAt: null,
         firstYear: 2026,
         growth: "nominal",
         kind: "debt",
         lastMonth: null,
         lastYear: null,
         name: "Golf PCP",
+        startsAt: null,
       },
     });
   });

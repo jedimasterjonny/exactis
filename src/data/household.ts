@@ -6,7 +6,7 @@ import type { IncomeLine } from "@/data/income";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan, PlanAges } from "@/data/plan";
-import type { Month } from "@/data/schedule";
+import type { Month, Tie } from "@/data/schedule";
 
 import {
   accountKinds,
@@ -19,6 +19,7 @@ import {
 } from "@/data/accounts";
 import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
+import { timed } from "@/data/milestones";
 import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
 import { rules } from "@/data/rules";
 import {
@@ -29,6 +30,7 @@ import {
   named,
   pounds,
   recordId,
+  tie,
 } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { fixedMonthly, monthly } from "@/lib/cadence";
@@ -69,8 +71,15 @@ export interface Kept {
 }
 
 // What every line of both schedules holds, as the actions take it, and
-// the id it is listed by.
-const line = { ...lineValues, id: recordId };
+// the id it is listed by. A line kept before a line could be tied to a
+// milestone is read as tied to none, as a household kept before there
+// were milestones is read as listing none.
+const line = {
+  ...lineValues,
+  endsAt: tie.nullable().default(null),
+  id: recordId,
+  startsAt: tie.nullable().default(null),
+};
 
 // An account as the model lays it, with what the account save holds
 // it to and what the engine refuses of one account alone: a balance
@@ -143,7 +152,7 @@ const expenseLine = z
     kind: z.enum(expenseKinds),
     pays: recordId.exactOptional(),
   })
-  .refine(endsAfterItStarts, "A line ends no earlier than it starts")
+  .refine(isInOrder, "A line ends no earlier than it starts")
   .refine(
     endsInAYear,
     "A line ends in a month only of a year it ends in",
@@ -162,7 +171,7 @@ const incomeLine = z
     rsu: pounds,
     sacrifice: z.number().min(0, rules.share).max(1, rules.share),
   })
-  .refine(endsAfterItStarts, "A line ends no earlier than it starts")
+  .refine(isInOrder, "A line ends no earlier than it starts")
   .refine(endsInAYear, "A line ends in a month only of a year it ends in")
   .refine(
     (line) =>
@@ -217,8 +226,9 @@ const plan = z
 // one record can say. Every record is listed once by its id. Every link
 // names a record the household lists, and one of the kind it has to
 // be: a wrapper its owner, a loan the asset it is secured on, a salary
-// the pension it feeds and a payments line the debt it pays, in the
-// engine's words where the engine refuses the same link. An asset has
+// the pension it feeds, a payments line the debt it pays and a line
+// the milestone it is tied to, in the engine's words where the engine
+// refuses the same link. An asset has
 // one loan and a debt one line paying it, since the house and car
 // dialogs read the one they find. And a debt paying its own fixed sum,
 // rather than through a line, pays it down at the rate it is charged,
@@ -296,6 +306,18 @@ export const household = z
     ({ schedule }) =>
       isHeldOnce(schedule.expenses.map(({ pays }) => pays ?? null)),
     "A debt is paid by one line",
+  )
+  .refine(
+    ({ milestones, schedule }) =>
+      [...schedule.expenses, ...schedule.income]
+        .flatMap(({ endsAt, startsAt }) => [endsAt, startsAt])
+        .every(
+          (tied) =>
+            tied === null ||
+            tied === "retirement" ||
+            milestones.some(({ id }) => id === tied),
+        ),
+    "A line is tied to a milestone the household lists",
   )
   .refine(
     ({ accounts, plan, schedule }) =>
@@ -406,8 +428,9 @@ function endsInAYear(line: {
 }
 
 // The whole a kept household makes, its plan running from the month
-// its balances are as of, and each line paying a loan running as the
-// loan's payments do.
+// its balances are as of, each line's tied ends read off the milestones
+// they are tied to, and each line paying a loan running as the loan's
+// payments do.
 function householdOf(kept: Kept): Household {
   const plan = planOf(kept.ages, kept.asOf);
   return {
@@ -416,9 +439,11 @@ function householdOf(kept: Kept): Household {
     owners: kept.owners,
     plan,
     schedule: {
-      ...kept.schedule,
       expenses: kept.schedule.expenses.map((line) =>
-        paidOver(line, kept.accounts, plan),
+        paidOver(timed(line, kept.milestones, plan), kept.accounts, plan),
+      ),
+      income: kept.schedule.income.map((line) =>
+        timed(line, kept.milestones, plan),
       ),
     },
   };
@@ -429,6 +454,24 @@ function householdOf(kept: Kept): Household {
 function isHeldOnce(links: readonly (null | number)[]): boolean {
   const named = links.filter((link) => link !== null);
   return new Set(named).size === named.length;
+}
+
+// Whether a line ends no earlier than it starts, when both its ends are
+// fixed. An end tied to a milestone moves with it, and a milestone
+// moved past a line's other end, as the retirement age dragged on the
+// dashboard can be, leaves the line running no years rather than the
+// move refused over a line on another screen; a line is held to its
+// ends in order as they fall on the day it is saved, by the action that
+// saves it.
+function isInOrder(line: {
+  readonly endsAt: null | Tie;
+  readonly firstYear: number;
+  readonly lastYear: null | number;
+  readonly startsAt: null | Tie;
+}): boolean {
+  return (
+    line.startsAt !== null || line.endsAt !== null || endsAfterItStarts(line)
+  );
 }
 
 function isListedOnce(records: readonly { readonly id: number }[]): boolean {
@@ -444,8 +487,9 @@ function isListedOnce(records: readonly { readonly id: number }[]): boolean {
 // it clears. The span is the loan's rather than the line's own, so it
 // is worked out here, whenever the household is read, and moves with
 // the balances' month, where one saved with the line would stay where
-// the save left it. A line paying no loan the household lists runs as
-// it was saved, and the rules refuse one naming a loan it does not.
+// the save left it, and it is tied to no milestone, since the loan says
+// when it runs. A line paying no loan the household lists runs as it
+// was saved, and the rules refuse one naming a loan it does not.
 function paidOver(
   line: ExpenseLine,
   accounts: readonly Account[],
@@ -463,9 +507,11 @@ function paidOver(
   const end = term === null ? null : clearsIn(term, plan);
   return {
     ...line,
+    endsAt: null,
     firstYear: plan.from,
     lastMonth: end?.month ?? null,
     lastYear: end?.year ?? null,
+    startsAt: null,
   };
 }
 
