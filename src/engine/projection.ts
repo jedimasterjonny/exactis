@@ -20,8 +20,9 @@ import {
 // whole pounds, and the age reached that year, since a plan is read by
 // age as much as by year. The first point is the balances as they are,
 // at the month the plan starts in; each after it is the year before
-// carried to its end. Each account carried is on it by its id, cash
-// and every wrapper, so a chart can draw each on its own; and each
+// carried to its end. Each account carried is on it by its id, cash,
+// every wrapper and every house, car and other real asset, so a chart
+// can draw each on its own; and each
 // wrapper's accounts are summed as well, under the name the progress
 // point gives the same balance, so a point recorded and a point
 // projected can be laid over each other, though the progress points
@@ -116,7 +117,11 @@ export function balanceOf(point: ProjectionPoint): number {
 // plan starts in, since the balances it opens with are that month's
 // and the months before it are already in them; the last year is not
 // carried at all, since no point follows it. Each account is carried on
-// its own and the year sums them by wrapper. What an account is paid a
+// its own and the year sums them by wrapper. A house, a car or another
+// real asset is carried as a saving is, paid what the flow pays it and
+// grown at its own rate, below nothing for one that loses value, and is
+// never drawn on: the plan sells nothing it lives in or drives to cover
+// a month. What an account is paid a
 // month is what that month's cash flow says, a salary's sacrifice with
 // the NI saved on it, a fixed sum spread over the months as the flow
 // spreads it or the spare money's take, read afresh each month since a
@@ -168,7 +173,7 @@ export function balanceOf(point: ProjectionPoint): number {
 // rather than plotting the twice-counted balance as its one point. A
 // held account opening below nothing is refused the same way: a
 // balance below nothing is a debt's, and no debt is held here, so a
-// wrapper or a cash account at one is a figure nothing can mean,
+// wrapper, a cash account or an asset at one is a figure nothing can mean,
 // compounded deeper every month by the growth and never drawn on, the
 // draw taking the lesser of what the account holds and what the month
 // is short under a floor of nothing. The action refuses the same
@@ -182,7 +187,7 @@ export function project(
     throw new Error(rules.listedOnce);
   }
   let held: readonly Held[] = accounts
-    .filter(takesSpare)
+    .filter(({ kind }) => kind !== "debt")
     .map((account) => ({ account, balance: account.balance }));
   if (held.some(({ balance }) => balance < 0)) {
     throw new Error(rules.belowNothing);
@@ -209,7 +214,7 @@ export function project(
           at: { month, year },
           plan,
           reserve: held
-            .filter(({ account }) => !isPension(account))
+            .filter(({ account }) => takesSpare(account) && !isPension(account))
             .reduce((sum, { balance }) => sum + balance, 0),
           settlement,
         });
