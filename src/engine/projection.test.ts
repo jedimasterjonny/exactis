@@ -82,13 +82,14 @@ describe("project", () => {
   // the same way with its £2,266.25 a month and the basic rate claimed
   // back on it, £2,832.81: 468,431.69, then 526,760.95.
   // The current account is no wrapper, and is carried on its own at the
-  // £18,300 it holds, paid nothing and at no growth; the home and the
-  // mortgage are not carried.
+  // £18,300 it holds, paid nothing and at no growth; the home at its own
+  // 2.1%, 416,386 × 1.021 = 425,130.11, then 434,057.84; and the
+  // mortgage is not carried.
   it("pays a year's sum in a twelfth at a time, each month grown at the plan rate, by wrapper", () => {
     expect(project(accounts, funded, { ...plan, years: 2 })).toStrictEqual([
       {
         age: 36,
-        balances: { 1: 412880, 2: 286145, 3: 18300 },
+        balances: { 1: 412880, 2: 286145, 3: 18300, 4: 416386 },
         deferred: 412880,
         early: 0,
         free: 286145,
@@ -97,7 +98,7 @@ describe("project", () => {
       },
       {
         age: 37,
-        balances: { 1: 468432, 2: 320990, 3: 18300 },
+        balances: { 1: 468432, 2: 320990, 3: 18300, 4: 425130 },
         deferred: 468432,
         early: 0,
         free: 320990,
@@ -106,7 +107,7 @@ describe("project", () => {
       },
       {
         age: 38,
-        balances: { 1: 526761, 2: 357577, 3: 18300 },
+        balances: { 1: 526761, 2: 357577, 3: 18300, 4: 434058 },
         deferred: 526761,
         early: 0,
         free: 357577,
@@ -158,6 +159,41 @@ describe("project", () => {
         year: 2028,
       },
     ]);
+  });
+
+  // A car losing 15% a year is worth 20,000 × 0.85 = 17,000 after one,
+  // and is never drawn on: the £1,200 of cash covers January and £200
+  // of February, and the other £10,800 goes uncovered rather than out
+  // of the car. An extension paid £100 a month out of a month that has
+  // it, at no growth, is 1,000 + 12 × 100 = 2,200.
+  it("carries an asset at its own rate, paid what the flow pays it, and never draws on it", () => {
+    const car: Account = {
+      balance: 20000,
+      growth: { kind: "fixed", rate: -0.15 },
+      id: 8,
+      kind: "car",
+      name: "Car",
+    };
+    const extension: Account = {
+      balance: 1000,
+      contribution: { amount: 100, cadence: "month", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0 },
+      id: 9,
+      kind: "real-asset",
+      name: "Extension",
+    };
+
+    expect(
+      project([pocket, car], short, { ...plan, years: 1 }).map(
+        ({ balances, uncovered }) => ({ balances, uncovered }),
+      ),
+    ).toStrictEqual([
+      { balances: { 3: 1200, 8: 20000 }, uncovered: 10800 },
+      { balances: { 3: 0, 8: 17000 }, uncovered: 0 },
+    ]);
+    expect(
+      project([extension], funded, { ...plan, years: 1 }).at(-1)?.balances,
+    ).toStrictEqual({ 9: 2200 });
   });
 
   // 320,989.88 from the ISA and 10,000 × 1.02 = 10,200 from an account
@@ -436,12 +472,16 @@ describe("project", () => {
   // at minus £500 would be compounded deeper every month and never
   // drawn on, since a draw takes the lesser of what an account holds
   // and what the month is short and stops at nothing, so it would
-  // cover none of a month it was short and plot a wrapper owing money.
-  // A balance of nothing is carried as it stands, and the mortgage,
+  // cover none of a month it was short and plot a wrapper owing money,
+  // and a home at minus £500 would be worth less than nothing. A
+  // balance of nothing is carried as it stands, and the mortgage,
   // owing £182,940 and held by nothing, is left where it is.
   it("refuses a held account below nothing", () => {
     expect(() =>
       project([{ ...flatIsa, balance: -500 }], funded, { ...plan, years: 1 }),
+    ).toThrow("A balance below nothing is a debt's");
+    expect(() =>
+      project([{ ...home, balance: -500 }], funded, { ...plan, years: 1 }),
     ).toThrow("A balance below nothing is a debt's");
     expect(
       project([{ ...flatIsa, balance: 0 }, mortgage], funded, {
@@ -1342,13 +1382,15 @@ describe("project", () => {
     });
   });
 
-  it("projects nothing when no account is a wrapper", () => {
+  // The home is carried at its own 2.1% and is in neither wrapper, so
+  // both sums are nothing.
+  it("sums no wrapper when no account is one, carrying the home all the same", () => {
     expect(
       project([home, mortgage], funded, { ...plan, years: 1 }),
     ).toStrictEqual([
       {
         age: 36,
-        balances: {},
+        balances: { 4: 416386 },
         deferred: 0,
         early: 0,
         free: 0,
@@ -1357,7 +1399,7 @@ describe("project", () => {
       },
       {
         age: 37,
-        balances: {},
+        balances: { 4: 425130 },
         deferred: 0,
         early: 0,
         free: 0,
