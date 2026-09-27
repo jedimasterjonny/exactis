@@ -34,7 +34,7 @@ in the vendored file works until the next refresh silently discards it.
 
 | tier         | what it is                                                   | here                                                                                                                                                                                                                                                                                                                                                                                                            |
 | ------------ | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `atoms/`     | one presentational job, composes nothing of ours             | `app-nav`, `confirm-dialog`, `delta-value`, `empty-state`, `equity-bar`, `field`, `field-row`, `figure-input`, `folded-lines`, `labelled-switch`, `note`, `row-action`, `row-lock`, `screen-body`, `screen-header`, `screen-label`, `section-header`, `span-bar`, `tile-grid`                                                                                                                                   |
+| `atoms/`     | one presentational job, composes nothing of ours             | `app-nav`, `confirm-dialog`, `delta-value`, `dialog-frame`, `empty-state`, `equity-bar`, `field`, `field-row`, `figure-input`, `folded-lines`, `labelled-switch`, `note`, `row-action`, `row-lock`, `screen-body`, `screen-header`, `screen-label`, `section-header`, `span-bar`, `tile-grid`                                                                                                                   |
 | `molecules/` | atoms combined into one reusable control                     | `age-field`, `edit-dialog`, `folded-cell`, `money-field`, `month-field`, `rate-field`, `row-actions`, `section-card`, `select-field`, `slider-field`, `stat-tile`, `term-field`, `text-field`, `theme-toggle`, `year-field`                                                                                                                                                                                     |
 | `organisms/` | a group of molecules: a screen region, a dialog, a field set | `account-dialog`, `account-fields`, `account-ledger`, `account-table`, `asset-table`, `car-dialog`, `car-fields`, `cash-flow-card`, `employment-fields`, `expense-schedule`, `house-dialog`, `house-fields`, `income-schedule`, `line-fields`, `loan-fields`, `owner-list`, `payment-order`, `plan-assumptions`, `progress-points`, `projection-board`, `projection-chart`, `sacrifice-fields`, `schedule-rows` |
 | `templates/` | the shell a page sits in                                     | `app-frame`                                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -72,13 +72,14 @@ Ask what it composes, not how big it is. Size correlates but does not decide.
    molecules.
 4. Does it arrange regions without knowing what goes in them? It is a template.
 
-A useful check, though it only runs one way. The ceiling rises with the tier -
-an atom imports at most one `kit/` wrapper, a molecule two, an organism four -
-so a proposed atom reaching for two is probably a molecule, and one reaching for
-three is probably an organism. The floor is zero at every tier, so a low count
-says nothing: ten of the organisms import no wrapper at all, because an organism
-built out of molecules rather than primitives, as every `*-fields` and every
-`*-dialog` here is, reaches for them at one remove.
+A useful check, though it only runs one way. An atom imports at most one `kit/`
+wrapper, and so does a molecule, which reaches the rest of what it draws through
+the atoms it composes; an organism imports at most four. So a proposed atom or
+molecule reaching for two is probably an organism, or holds an atom still to be
+lifted out, as the dialog frame was out of the edit dialog. The floor is zero at
+every tier, so a low count says nothing: ten of the organisms import no wrapper
+at all, because an organism built out of molecules rather than primitives, as
+every `*-fields` and every `*-dialog` here is, reaches for them at one remove.
 
 If a component seems to belong in two tiers it is usually two components.
 
