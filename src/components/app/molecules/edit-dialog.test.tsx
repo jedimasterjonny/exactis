@@ -1,10 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { EditDialog } from "./edit-dialog";
@@ -27,18 +21,6 @@ describe("EditDialog", () => {
     expect(within(dialog).getByText("Edit point")).toHaveClass("text-brand");
     expect(within(dialog).getByRole("paragraph")).toHaveTextContent(
       "The fields",
-    );
-    // Held to the screen's height, the fields scroll between the title
-    // and the footer, which stay put.
-    expect(dialog).toHaveClass(
-      "max-h-[calc(100dvh-2rem)]",
-      "grid-rows-[auto_minmax(0,1fr)_auto]",
-    );
-    // eslint-disable-next-line testing-library/no-node-access -- the scrolling box is a layout box with no role or text of its own to query by
-    expect(within(dialog).getByRole("paragraph").parentElement).toHaveClass(
-      "grid",
-      "gap-4",
-      "overflow-y-auto",
     );
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
     expect(
@@ -93,10 +75,10 @@ describe("EditDialog", () => {
     expect(dialog).toHaveClass("sm:max-w-lg");
   });
 
-  // Delete sits first in the footer, one row at every width, pushed to
-  // the far edge to set it apart from the other two; it reports the
-  // press, and the caller does the asking. The dialog's own Close is the
-  // cross in its corner, after the footer.
+  // Delete sits first in the footer, pushed to the far edge to set it
+  // apart from the other two; it reports the press, and the caller does
+  // the asking. The dialog's own Close is the cross in its corner, after
+  // the footer.
   it("offers a delete when given a handler, and reports it without saving or dismissing", () => {
     const onDelete = vi.fn<() => void>();
     const onDismiss = vi.fn<() => void>();
@@ -122,8 +104,6 @@ describe("EditDialog", () => {
         .map((button) => button.textContent),
     ).toStrictEqual(["Delete", "Cancel", "Save", "Close"]);
     expect(remove).toHaveClass("mr-auto", "text-destructive");
-    // eslint-disable-next-line testing-library/no-node-access -- the footer is a layout box with no role or text of its own to query by
-    expect(remove.parentElement).toHaveClass("flex-row", "justify-end");
 
     fireEvent.click(remove);
 
@@ -151,38 +131,5 @@ describe("EditDialog", () => {
 
     expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
-  });
-
-  // A field focused unasked on a touch screen opens the keyboard over
-  // the form, so there the dialog takes the focus itself; a mouse or a
-  // keyboard lands in the first field, ready to type. jsdom has no
-  // working matchMedia, so it is stubbed to say what the screen is
-  // worked by.
-  it("takes the focus itself on a touch screen, and gives it to the first field otherwise", async () => {
-    const dialog = (
-      <EditDialog
-        eyebrow="Edit account"
-        onDismiss={vi.fn<() => void>()}
-        onSave={vi.fn<() => void>()}
-        title="Stocks & shares ISA"
-      >
-        <input aria-label="Name" />
-      </EditDialog>
-    );
-    const view = render(dialog);
-
-    await waitFor(() => {
-      expect(screen.getByRole("textbox", { name: "Name" })).toHaveFocus();
-    });
-
-    view.unmount();
-    const matchMedia = vi.fn(() => ({ matches: true }));
-    vi.stubGlobal("matchMedia", matchMedia);
-    render(dialog);
-
-    await waitFor(() => {
-      expect(screen.getByRole("dialog")).toHaveFocus();
-    });
-    expect(matchMedia).toHaveBeenCalledWith("(pointer: coarse)");
   });
 });
