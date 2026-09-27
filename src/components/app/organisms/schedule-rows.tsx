@@ -164,9 +164,9 @@ export function ScheduleRows<TLine extends Line>({
               </FoldedLines>
             </div>
             <div className="grid min-w-0 gap-2 folded:hidden">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-baseline gap-2">
                 <span className="font-medium">{line.name}</span>
-                <Badge variant={summary.badge.variant}>
+                <Badge className="self-center" variant={summary.badge.variant}>
                   {summary.badge.label}
                 </Badge>
                 {summary.detail !== undefined && (
@@ -273,11 +273,14 @@ function nameOf(tie: null | Tie, milestones: readonly Marker[]): null | string {
 }
 
 // The milestones a line is tied to, after a flag in oxide, the colour
-// the milestones are pinned in.
+// the milestones are pinned in. The words set its baseline, so they sit
+// on the line of the name they follow, and the flag is centred on them:
+// leading with the flag, the tie took its baseline from the flag's foot
+// and stood two pixels above the name's line.
 function Ties({ children }: { readonly children: string }): JSX.Element {
   return (
-    <span className="inline-flex items-center gap-1">
-      <Flag aria-hidden className="size-3 text-brand" />
+    <span className="inline-flex items-baseline gap-1">
+      <Flag aria-hidden className="size-3 self-center text-brand" />
       {children}
     </span>
   );
