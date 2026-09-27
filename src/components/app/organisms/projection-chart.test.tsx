@@ -178,14 +178,15 @@ describe("ProjectionChart", () => {
     expect(tooltip.getByText("£462,079")).toHaveClass("figure");
     expect(tooltip.getByText("£321,452")).toHaveClass("figure");
     expect(tooltip.getByText("£783,531")).toHaveClass("figure");
-    expect(tooltip.getByText("Net worth")).toBeInTheDocument();
+    expect(tooltip.getByText("Liquidity")).toBeInTheDocument();
   });
 
   // Two pensions, the ISA, the current account and the home, stacked
   // family by family from the baseline, the second pension receding
   // toward the card from the first, and the mortgage stacked down from
   // nothing in loss red, each named under the crosshair from the top of
-  // the stack down, over the net worth they come to.
+  // the stack down, over the net worth they come to, which counts the
+  // home.
   it("draws each account on its own, family by family, and names each under the crosshair", async () => {
     const listed = [...accounts, sipp];
     const years = [2026, 2027].map((year, place) => ({
@@ -200,6 +201,7 @@ describe("ProjectionChart", () => {
     render(
       <ProjectionChart accounts={listed} milestones={[]} points={years} />,
     );
+    fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
     fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
 
     expect(
@@ -309,7 +311,7 @@ describe("ProjectionChart", () => {
     expect(tooltip.queryByText("Car loan")).not.toBeInTheDocument();
   });
 
-  // A car on a PCP is drawn at its equity, what it is worth less what
+  // On the net worth, a car on a PCP is drawn at its equity, what it is worth less what
   // the PCP owes, and the PCP is not drawn beside it: £20,000 against
   // £25,000 owed is £5,000 below nothing in 2026, and £18,000 against
   // £10,000 is £8,000 above it in 2027. The card, secured on nothing, is
@@ -346,6 +348,7 @@ describe("ProjectionChart", () => {
         points={years}
       />,
     );
+    fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
 
     expect(
       screen.getAllByText(byClass("recharts-bar"), { suggest: false }),
@@ -387,6 +390,70 @@ describe("ProjectionChart", () => {
         "−£5,000",
       ),
     ).toHaveClass("figure");
+  });
+
+  // The plan's liquidity to begin with: the ISA, and every debt, the
+  // loan on the flat among them, but not the flat, so £250,000 less the
+  // £200,000 owed on it is £50,000. On the switch its net worth: the
+  // flat at its equity, £500,000 less the £200,000, and the loan in it
+  // rather than beside it, £550,000 in all. And back.
+  it("counts the plan's liquidity to begin with, and its net worth on the switch", async () => {
+    const flat: Account = {
+      balance: 500000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      kind: "house",
+      name: "Flat",
+    };
+    const loan: Account = {
+      ...mortgage,
+      id: 11,
+      name: "Flat mortgage",
+      secures: flat.id,
+    };
+    const years = [2026, 2027].map((year, place) => ({
+      age: 36 + place,
+      balances: { 2: 250000, 10: 500000, 11: -200000 },
+      deferred: 0,
+      early: 0,
+      free: 250000,
+      uncovered: 0,
+      year,
+    }));
+    render(
+      <ProjectionChart
+        accounts={[isa, flat, loan]}
+        milestones={[]}
+        points={years}
+      />,
+    );
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2027 · Age 37");
+    const tooltip = (): HTMLElement =>
+      screen.getByText(bySlot("projection-tooltip"));
+    const named = (): (null | string)[] =>
+      within(tooltip())
+        .getAllByText(/^(Stocks|Flat)/)
+        .map((name) => name.textContent);
+
+    expect(screen.getByRole("switch", { name: "Liquidity" })).not.toBeChecked();
+    expect(named()).toStrictEqual([isa.name, loan.name]);
+    expect(within(tooltip()).getByText("Liquidity")).toBeInTheDocument();
+    expect(within(tooltip()).getByText("£50,000")).toHaveClass("figure");
+
+    fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
+
+    expect(screen.getByRole("switch", { name: "Net worth" })).toBeChecked();
+    expect(named()).toStrictEqual([flat.name, isa.name]);
+    expect(within(tooltip()).getByText("£300,000")).toHaveClass("figure");
+    expect(within(tooltip()).getByText("Net worth")).toBeInTheDocument();
+    expect(within(tooltip()).getByText("£550,000")).toHaveClass("figure");
+
+    fireEvent.click(screen.getByRole("switch", { name: "Net worth" }));
+
+    expect(named()).toStrictEqual([isa.name, loan.name]);
   });
 
   // Held to £1m at most, the axis is marked every £250,000 as recharts
@@ -462,6 +529,9 @@ describe("ProjectionChart", () => {
       screen.getByRole("button", { name: "A choice" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Bars" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: "Liquidity" }),
+    ).toBeInTheDocument();
 
     rerender(
       <ProjectionChart
