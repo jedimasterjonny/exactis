@@ -25,6 +25,7 @@ import { CardContent } from "@/components/kit/card";
 import { isPension } from "@/data/accounts";
 import { isOpeningSound, totalOf } from "@/data/income";
 import { markersOf } from "@/data/milestones";
+import { retirementYear } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { isSound, spanOf } from "@/lib/lines";
@@ -233,21 +234,26 @@ export function IncomeSchedule({
   );
 }
 
-// A new line: nothing a year from the plan's first year to its end,
-// growing with inflation, tied to no milestone and feeding no pension,
-// listed or opened, as the reference's new line opens.
+// A new line: a salary of nothing a year from the plan's first year,
+// growing with inflation and feeding no pension, listed or opened, as
+// the reference's new line opens, and ending at retirement, since the
+// engine stops a salary there whatever its own end says, so a salary
+// that says so is drawn where it is paid. One opened after the owner
+// has retired runs with the plan instead, as the reference's does,
+// rather than opening on an end before its start.
 function blank(plan: Plan): Draft {
+  const retirement = retirementYear(plan);
   return {
     amount: 0,
     bonus: 0,
     cadence: "year",
-    endsAt: null,
+    endsAt: retirement > plan.from ? "retirement" : null,
     feeds: null,
     firstYear: plan.from,
     growth: "inflation",
     kind: "employment",
     lastMonth: null,
-    lastYear: null,
+    lastYear: retirement > plan.from ? retirement - 1 : null,
     name: "",
     opens: null,
     rsu: 0,

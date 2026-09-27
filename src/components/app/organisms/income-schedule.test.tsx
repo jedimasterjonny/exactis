@@ -309,13 +309,13 @@ describe("IncomeSchedule", () => {
       amount: 80000,
       bonus: 0,
       cadence: "year",
-      endsAt: null,
+      endsAt: "retirement",
       feeds: 6,
       firstYear: 2026,
       growth: "inflation",
       kind: "employment",
       lastMonth: null,
-      lastYear: null,
+      lastYear: 2079,
       name: "New job",
       opens: null,
       rsu: 0,
@@ -396,13 +396,13 @@ describe("IncomeSchedule", () => {
       amount: 80000,
       bonus: 0,
       cadence: "year",
-      endsAt: null,
+      endsAt: "retirement",
       feeds: null,
       firstYear: 2026,
       growth: "inflation",
       kind: "employment",
       lastMonth: null,
-      lastYear: null,
+      lastYear: 2079,
       name: "New job",
       opens: { balance: 2500, name: " Aviva ", owner: 1 },
       rsu: 0,
@@ -494,6 +494,30 @@ describe("IncomeSchedule", () => {
     });
   });
 
+  // Born in 1990 and retiring at 30, the owner retired in 2020, before
+  // the plan starts, and a salary ending then would end before it
+  // started.
+  it("opens a new line running with the plan once its owner has retired", () => {
+    render(
+      <IncomeSchedule
+        accounts={accounts}
+        lines={incomeLines}
+        milestones={milestones}
+        owners={owners}
+        plan={{ ...plan, retires: 30 }}
+      />,
+    );
+
+    const dialog = openEntry("Add income line");
+
+    expect(within(dialog).getByRole("combobox", { name: "Ends" })).toHaveValue(
+      "open",
+    );
+    expect(
+      within(dialog).getByText("Runs to 2079, the last year of the plan."),
+    ).toBeInTheDocument();
+  });
+
   it("adds a named line ending in a year and reports it", async () => {
     renderSchedule();
 
@@ -506,14 +530,16 @@ describe("IncomeSchedule", () => {
       within(dialog).getByRole("heading", { name: "Untitled line" }),
     ).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    // A new salary ends at retirement, which the fixture's plan has in
+    // 2080, the year after it ends.
     expect(within(dialog).getByRole("combobox", { name: "Ends" })).toHaveValue(
-      "open",
+      "retirement",
     );
     expect(
       within(dialog).queryByRole("textbox", { name: "Last year" }),
     ).not.toBeInTheDocument();
     expect(
-      within(dialog).getByText("Runs to 2079, the last year of the plan."),
+      within(dialog).getByText("Runs to 2079, the year before Retirement."),
     ).toBeInTheDocument();
     expect(within(dialog).getByText("Plan · 2026–2079")).toHaveClass("label");
     expect(
@@ -585,11 +611,11 @@ describe("IncomeSchedule", () => {
       target: { value: "fixed" },
     });
 
-    // A line that opened with no last year ends in its first year until
-    // told otherwise, the one typed above it.
+    // An end moved off a milestone stays where the milestone had it until
+    // told otherwise.
     expect(
       within(dialog).getByRole("textbox", { name: "Last year" }),
-    ).toHaveValue("2030");
+    ).toHaveValue("2079");
 
     commit(within(dialog).getByRole("textbox", { name: "Last year" }), "2035");
 
