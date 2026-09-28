@@ -142,10 +142,10 @@ its months earned and drew from a pension, and its Class 4 on all their profit,
 less what they paid, is refunded into that month's money or owed out of it.
 Class 1 is charged a pay period at a time, as the months charge it, and is not
 settled. The first tax year is the months of it the plan holds, against their
-share of each band. The bands are held in today's money, as the lines are: they
-are the 2026/27 figures in the tax year the plan starts in, and rise with the
-plan's inflation each April after it, so each tax year is charged and settled
-against its own.
+share of each band. The bands are frozen until April 2031 and are held so: flat
+in pounds through the 2030/31 tax year, so an income rising with prices is
+dragged into a higher band, and rising with the plan's inflation each April from
+2031/32, so each tax year is charged and settled against its own.
 
 A debt's own fixed sum is a loan's payments, so it runs only until the loan
 maths in `src/lib/loans.ts` says they clear what is owed: the term the payment
@@ -244,7 +244,7 @@ a change to the method moves the rate without another pull. The assumptions
 screen lays those steps out beside the curve at 5, 10, 20 and 30 years. The plan
 carries the rate, or the Bank of England's 2% target before any curve has been
 pulled, which the screen's header then says it takes, and the projection grows
-the lines and the tax bands with it, as above.
+the lines with it, and the tax bands once their freeze ends, as above.
 
 ## Signing in
 

@@ -1557,15 +1557,15 @@ describe("project", () => {
     ).toStrictEqual([26667, 26667, 0]);
   });
 
-  // Read from April 2026 at 3%, £36,000 a year fixed in nominal terms
-  // runs two whole tax years, to March 2028. The first pays £390.50 of
-  // income tax and £156.20 of NI a month against the figures, leaving
-  // £2,453.30; the second pays £384.22 and £153.69 against them risen
-  // 3%, leaving £2,462.10. Each tax year's months are alike, so each
-  // settles nothing in the April after it, against its own year's bands:
-  // £58,984.79 is held entering 2029, when prices have risen by 1.03 to
-  // the power of two and three quarters, which is £54,380 of today's
-  // money.
+  // Read from April 2030 at 3%, £36,000 a year fixed in nominal terms
+  // runs two whole tax years, to March 2032. The first, the last the
+  // bands are frozen for, pays £390.50 of income tax and £156.20 of NI a
+  // month against the figures, leaving £2,453.30; the second pays
+  // £384.22 and £153.69 against them risen 3%, leaving £2,462.10. Each
+  // tax year's months are alike, so each settles nothing in the April
+  // after it, against its own year's bands: £58,984.79 is held entering
+  // 2033, when prices have risen by 1.03 to the power of two and three
+  // quarters, which is £54,380 of today's money.
   it("taxes each tax year against its bands as they have risen, and settles it against them", () => {
     const earning = {
       ...salary,
@@ -1573,18 +1573,18 @@ describe("project", () => {
       bonus: 0,
       feeds: null,
       lastMonth: 2,
-      lastYear: 2028,
+      lastYear: 2032,
       rsu: 0,
       sacrifice: 0,
     };
 
-    const [, , , entering2029] = project(
+    const [, , , entering2033] = project(
       [{ ...cash, balance: 0, contribution: { cap: null, kind: "spare" } }],
       { expenses: [], income: [earning] },
-      { ...plan, inflation: 0.03, month: 3, years: 3 },
+      { ...plan, from: 2030, inflation: 0.03, month: 3, years: 3 },
     );
 
-    expect(entering2029?.balances[3]).toBe(54380);
+    expect(entering2033?.balances[3]).toBe(54380);
   });
 });
 

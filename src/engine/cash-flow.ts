@@ -305,8 +305,9 @@ const nanopound = 1e-9;
 // money, the money of the month the plan starts in, and is paid it risen
 // since then at the rate its growth gives, a month at a time: with the
 // plan's inflation, a point or two over it, or not at all for a line
-// fixed in nominal terms. The tax bands rise with prices a tax year at
-// a time, as the tax module holds them. Everything an account states,
+// fixed in nominal terms. The tax bands are frozen to April 2031 and
+// rise with prices a tax year at a time after it, as the tax module
+// holds them. Everything an account states,
 // its fixed sum, its cap and the allowance it is held to, is taken in
 // the pounds of the day it is paid, as a loan's payment and the law's
 // figures are. A plan whose prices fall by everything in a year, or
