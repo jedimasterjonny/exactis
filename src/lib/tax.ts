@@ -58,11 +58,11 @@ interface Band {
 // rates over the whole income, the tax is the figure the allowance and
 // the bands give at every income, without a second reading of the
 // allowance to keep in step with the first. The figures are frozen
-// until April 2031, but are held here in today's money as every line
-// is, rising with the plan's inflation a tax year at a time from the one
-// the plan starts in, so what the freeze drags into a higher band as
-// prices rise is not charged. The National Insurance thresholds rise
-// with them.
+// until April 2031, and are held so: flat in pounds through the 2030/31
+// tax year, so an income rising with prices is dragged into a higher
+// band as it would be, and rising with the plan's inflation each April
+// from 2031/32, as the law raises them once the freeze ends. The
+// National Insurance thresholds follow them.
 const incomeTax: readonly Band[] = [
   { from: 0, rate: 0 },
   { from: 12570, rate: 0.2 },
@@ -96,6 +96,10 @@ export const april = 3;
 // The basic rate, which a pension claims back on what is paid into it
 // out of taxed money.
 const basicRate = 0.2;
+
+// The year the last tax year the bands are frozen for opens in:
+// 2030/31, the freeze ending in April 2031.
+const frozenThrough = 2030;
 
 // The least a year's payments into a person's pensions out of taxed
 // money are relieved on, whatever they earn.
@@ -234,18 +238,11 @@ export function relievableOn(earned: number, months: number): number {
 }
 
 // How far the bands have risen by the tax year a month falls in, as a
-// multiple of the figures above: held, as every line is, in today's
-// money, so they rise with the plan's inflation a whole year at a time,
-// each April, from the tax year the plan starts in, where they are the
-// figures themselves.
-export function upratingIn(
-  plan: Pick<Plan, "from" | "inflation" | "month">,
-  at: Month,
-): number {
-  return (
-    (1 + plan.inflation) **
-    (taxYearOf(at) - taxYearOf({ month: plan.month, year: plan.from }))
-  );
+// multiple of the figures above: not at all while they are frozen, and
+// by the plan's inflation a whole year at a time, each April, from the
+// first tax year after the freeze.
+export function upratingIn(plan: Pick<Plan, "inflation">, at: Month): number {
+  return (1 + plan.inflation) ** Math.max(0, taxYearOf(at) - frozenThrough);
 }
 
 // What the bands charge on a share of them: each band's rate on the
