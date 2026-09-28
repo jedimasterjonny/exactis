@@ -84,10 +84,11 @@ holding the old shape is emptied rather than carried forward, with
 `TRUNCATE household_versions`, which the trigger lets through where it refuses a
 delete. The milestones were taken without emptying it: a household kept before
 there were any is read as listing none, and one kept before there was a curve as
-holding none. A change to the table is a new migration, written with
-`db:generate` and committed with the change. The tests apply the migrations to
-an in-process Postgres ([PGlite](https://pglite.dev)), so a migration that does
-not apply fails the suite before it reaches a database.
+holding none. The triple lock was dropped the same way: a line kept growing by
+it is read as growing with inflation. A change to the table is a new migration,
+written with `db:generate` and committed with the change. The tests apply the
+migrations to an in-process Postgres ([PGlite](https://pglite.dev)), so a
+migration that does not apply fails the suite before it reaches a database.
 
 ## The projection
 

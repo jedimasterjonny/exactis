@@ -44,7 +44,6 @@ const growths = optionsOf(growthLabels, [
   "inflation",
   "inflation-plus-1",
   "inflation-plus-2",
-  "triple-lock",
   "nominal",
 ]);
 

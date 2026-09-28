@@ -47,7 +47,7 @@ const values = {
   endsAt: null,
   feeds: null,
   firstYear: 2030,
-  growth: "triple-lock",
+  growth: "inflation-plus-2",
   kind: "self-employment",
   lastMonth: null,
   lastYear: 2035,

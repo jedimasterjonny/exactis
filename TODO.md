@@ -9,8 +9,7 @@ noticed. None is small.
 A line's growth choice is stored and shown and never read: every line is taken
 flat, in today's money, for the whole plan. Decide the inflation assumption the
 plan carries, then apply each line's growth against it, so a salary rising with
-inflation is flat in real terms, a nominal payment falls, and the triple lock
-rises.
+inflation is flat in real terms and a nominal payment falls.
 
 ## Allowances
 

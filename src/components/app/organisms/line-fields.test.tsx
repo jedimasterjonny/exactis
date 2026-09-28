@@ -100,7 +100,7 @@ describe("LineFields", () => {
       "year",
     );
     expect(
-      screen.getAllByRole("option", { name: /Inflation|Triple|Nominal/ }),
+      screen.getAllByRole("option", { name: /Inflation|Nominal/ }),
     ).toHaveLength(lineGrowths.length);
     expect(screen.getByRole("textbox", { name: "First year" })).toHaveValue(
       "2030",
@@ -130,7 +130,7 @@ describe("LineFields", () => {
       target: { value: "month" },
     });
     fireEvent.change(screen.getByRole("combobox", { name: "Grows with" }), {
-      target: { value: "triple-lock" },
+      target: { value: "inflation-plus-2" },
     });
     commit(screen.getByRole("textbox", { name: "First year" }), "2031");
     fireEvent.change(screen.getByRole("combobox", { name: "Ends" }), {
@@ -142,7 +142,7 @@ describe("LineFields", () => {
       [{ name: "Bonus" }],
       [{ amount: 2000 }],
       [{ cadence: "month" }],
-      [{ growth: "triple-lock" }],
+      [{ growth: "inflation-plus-2" }],
       [{ firstYear: 2031 }],
       // A line that opened with no last year ends in its first year until
       // told otherwise.
