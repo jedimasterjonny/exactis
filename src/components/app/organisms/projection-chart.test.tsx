@@ -1,5 +1,9 @@
+import type { JSX } from "react";
+import type { BarProps } from "recharts";
+
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { Bar } from "recharts";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 import type { ProjectionPoint } from "@/engine/projection";
@@ -8,6 +12,17 @@ import { accounts, sipp } from "@/data/accounts.fixture";
 import { bySlot } from "@/test/dom";
 
 import { ProjectionChart, ProjectionPending } from "./projection-chart";
+
+// recharts' column as it is, watched, so a test can tell what each
+// column is handed.
+vi.mock(import("recharts"), async (importOriginal) => {
+  const recharts = await importOriginal();
+  return {
+    ...recharts,
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- the mock factory's key mirrors the component's name
+    Bar: vi.fn((props: BarProps): JSX.Element => <recharts.Bar {...props} />),
+  };
+});
 
 // recharts names the layer it draws each series in after the mark, which
 // is what tells the plot's areas from its bars. A layer has no role,
@@ -454,6 +469,55 @@ describe("ProjectionChart", () => {
     fireEvent.click(screen.getByRole("switch", { name: "Net worth" }));
 
     expect(named()).toStrictEqual([isa.name, loan.name]);
+  });
+
+  // A column both bases draw is handed the one dataKey on either, so
+  // recharts, which draws a column again for a dataKey it has not seen,
+  // leaves the ISA's be through a switch to the net worth and back,
+  // where the flat's and its loan's come and go.
+  it("hands a column both bases draw the same dataKey on either", () => {
+    const flat: Account = {
+      balance: 500000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      kind: "house",
+      name: "Flat",
+    };
+    const loan: Account = {
+      ...mortgage,
+      id: 11,
+      name: "Flat mortgage",
+      secures: flat.id,
+    };
+    const years = [2026, 2027].map((year, place) => ({
+      age: 36 + place,
+      balances: { 2: 250000, 10: 500000, 11: -200000 },
+      deferred: 0,
+      early: 0,
+      free: 250000,
+      uncovered: 0,
+      year,
+    }));
+    render(
+      <ProjectionChart
+        accounts={[isa, flat, loan]}
+        milestones={[]}
+        points={years}
+      />,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Net worth" }));
+    const handed = (key: string): Set<BarProps["dataKey"]> =>
+      new Set(
+        vi
+          .mocked(Bar)
+          .mock.calls.filter(([props]) => props.fill === `var(--color-${key})`)
+          .map(([props]) => props.dataKey),
+      );
+
+    expect(handed("account-2").size).toBe(1);
+    expect(handed("account-10").size).toBe(1);
+    expect(handed("account-11").size).toBe(1);
   });
 
   // Held to £1m at most, the axis is marked every £250,000 as recharts
