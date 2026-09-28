@@ -87,6 +87,7 @@ export const incomeLines = [
 export const plan: Plan = {
   born: 1990,
   from: 2026,
+  inflation: 0,
   month: 8,
   rate: 0.05,
   retires: 90,

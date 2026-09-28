@@ -84,10 +84,15 @@ describe("InflationSource", () => {
     expect(panel).toHaveTextContent("The 20-year point feeds the plan.");
   });
 
-  it("says no curve has been pulled before one is, and offers the pull", () => {
+  it("says no curve has been pulled before one is, what the plan takes until then, and offers the pull", () => {
     renderSource(null);
 
     expect(screen.getByText("No curve pulled yet")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Pull the latest curve to read the plan's inflation off the gilt market. Until then the plan takes the Bank of England's 2.00% target.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Pull latest curve" }),

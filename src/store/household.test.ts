@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { Answer } from "@/lib/answer";
 
 import { blank, kept as reference, today } from "@/data/household.fixture";
+import { inflationOf } from "@/data/inflation";
+import { curve } from "@/data/inflation.fixture";
 import { planOf } from "@/data/plan";
 import { getDb } from "@/db/client";
 import { keepAfter, readLatest } from "@/db/household";
@@ -59,7 +61,9 @@ describe("the household store", () => {
     expect(await getExpenseLines()).toStrictEqual([]);
     expect(await getMilestones()).toStrictEqual([]);
     expect(await getCurve()).toBeNull();
-    expect(await getPlan()).toStrictEqual(planOf(blank.ages, blank.asOf));
+    expect(await getPlan()).toStrictEqual(
+      planOf(blank.ages, blank.asOf, blank.curve),
+    );
   });
 
   it("reads each part of the latest version, and the plan on the day it is read", async () => {
@@ -75,6 +79,7 @@ describe("the household store", () => {
     expect(await getPlan()).toStrictEqual({
       born: 1990,
       from: 2026,
+      inflation: inflationOf(curve).rate,
       month: 8,
       rate: 0.05,
       retires: 59,
@@ -123,7 +128,7 @@ describe("the household store", () => {
 
     const result = await amend(({ household, kept }) => {
       expect(household.plan).toStrictEqual(
-        planOf(reference.ages, reference.asOf),
+        planOf(reference.ages, reference.asOf, reference.curve),
       );
       return {
         kept: {

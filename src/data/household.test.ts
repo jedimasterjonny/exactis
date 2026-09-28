@@ -371,6 +371,7 @@ describe("soundKept", () => {
         plan: {
           born: 1990,
           from: 2026,
+          inflation: 0.02,
           month: 8,
           rate: 0.05,
           retires: 59,
