@@ -1553,30 +1553,36 @@ describe("cashFlow", () => {
     expect(flow.expenses).toBe(3201);
   });
 
-  // Read from April 2026 at 3%, April 2027 opens the next tax year: a
-  // salary rising with prices is paid 3% more, and the bands have risen
-  // 3% with it, so the month pays 3% more of each tax. March 2027 is
-  // still the first tax year, so the salary has risen eleven months
-  // against bands that have not moved, and pays a larger share of itself
-  // in tax than it did in April.
-  it("taxes a month against the bands of its tax year, risen with prices", () => {
-    const rising = { ...plan, inflation: 0.03, month: 3 };
+  // Read from April 2026 at 3%, a salary rising with prices is paid 3%
+  // more a year on, against bands still frozen, so it pays a larger
+  // share of itself in income tax. From April 2030, a year on is April
+  // 2031, when the freeze ends and the bands rise 3% with the salary, so
+  // the month pays 3% more of each tax and no larger a share.
+  it("taxes a month against the bands of its tax year, frozen to April 2031 and risen with prices after", () => {
     const earning: Schedule = {
       expenses: [],
       income: [{ ...plain, amount: 60000, growth: "inflation" }],
     };
-    const flowIn = (at: Month): CashFlow =>
-      cashFlow([], earning, { at, plan: rising });
-    const opening = flowIn({ month: 3, year: 2026 });
-    const closing = flowIn({ month: 2, year: 2027 });
-    const next = flowIn({ month: 3, year: 2027 });
+    const aYearOn = (from: number): readonly [CashFlow, CashFlow] => {
+      const rising = { ...plan, from, inflation: 0.03, month: 3 };
+      return [
+        cashFlow([], earning, { at: { month: 3, year: from }, plan: rising }),
+        cashFlow([], earning, {
+          at: { month: 3, year: from + 1 },
+          plan: rising,
+        }),
+      ];
+    };
+    const [frozen, dragged] = aYearOn(2026);
+    const [last, first] = aYearOn(2030);
 
-    expect(next.income).toBeCloseTo(opening.income * 1.03, 9);
-    expect(next.incomeTax).toBeCloseTo(opening.incomeTax * 1.03, 9);
-    expect(next.insurance).toBeCloseTo(opening.insurance * 1.03, 9);
-    expect(closing.incomeTax / closing.income).toBeGreaterThan(
-      opening.incomeTax / opening.income,
+    expect(dragged.income).toBeCloseTo(frozen.income * 1.03, 9);
+    expect(dragged.incomeTax / dragged.income).toBeGreaterThan(
+      frozen.incomeTax / frozen.income,
     );
+    expect(first.income).toBeCloseTo(last.income * 1.03, 9);
+    expect(first.incomeTax).toBeCloseTo(last.incomeTax * 1.03, 9);
+    expect(first.insurance).toBeCloseTo(last.insurance * 1.03, 9);
   });
 
   // Prices falling by everything leave nothing to read a pound of

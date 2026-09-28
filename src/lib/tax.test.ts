@@ -405,22 +405,17 @@ describe("isWithinAllowance", () => {
 });
 
 describe("upratingIn", () => {
-  // At 3%, a plan from September 2026 holds the figures through its
-  // first tax year, to March 2027, and raises them 3% each April after,
-  // so January 2030 is three tax years on. A plan from February 2027
-  // starts in the same tax year, and reaches the next two months in.
-  it("raises the bands with the plan's inflation each April from the tax year the plan starts in", () => {
-    const plan = { from: 2026, inflation: 0.03, month: 8 };
+  // At 3%, the figures hold through the 2030/31 tax year, to March 2031,
+  // and rise 3% each April after, so January 2034 is three tax years on.
+  it("holds the bands frozen to April 2031 and raises them with the plan's inflation each April after", () => {
+    const plan = { inflation: 0.03 };
 
     expect(upratingIn(plan, { month: 8, year: 2026 })).toBe(1);
-    expect(upratingIn(plan, { month: 2, year: 2027 })).toBe(1);
-    expect(upratingIn(plan, { month: 3, year: 2027 })).toBeCloseTo(1.03, 12);
-    expect(upratingIn(plan, { month: 0, year: 2030 })).toBeCloseTo(
+    expect(upratingIn(plan, { month: 2, year: 2031 })).toBe(1);
+    expect(upratingIn(plan, { month: 3, year: 2031 })).toBeCloseTo(1.03, 12);
+    expect(upratingIn(plan, { month: 0, year: 2034 })).toBeCloseTo(
       1.03 ** 3,
       12,
     );
-    expect(
-      upratingIn({ ...plan, from: 2027, month: 1 }, { month: 3, year: 2027 }),
-    ).toBeCloseTo(1.03, 12);
   });
 });
