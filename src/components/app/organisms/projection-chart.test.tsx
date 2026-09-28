@@ -511,6 +511,59 @@ describe("ProjectionChart", () => {
     expect(pounds()).toStrictEqual(["−£150k", "−£100k", "−£50k", "£0"]);
   });
 
+  // The axis holds one width whatever it marks, so a label no wider or
+  // narrower than the last leaves recharts nothing to measure: every
+  // label ends 8px short of the 57px the axis takes, on the liquidity's
+  // marks, down to £195,000 owed, and on the net worth's alike.
+  it("holds the axis to one width whatever it marks", () => {
+    const flat: Account = {
+      balance: 500000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      kind: "house",
+      name: "Flat",
+    };
+    const loan: Account = {
+      ...mortgage,
+      id: 11,
+      name: "Flat mortgage",
+      secures: flat.id,
+    };
+    const years = [2026, 2027].map((year, place) => ({
+      age: 36 + place,
+      balances: { 2: 250000, 10: 500000, 11: -200000 },
+      deferred: 0,
+      early: 0,
+      free: 250000,
+      uncovered: 0,
+      year,
+    }));
+    render(
+      <ProjectionChart
+        accounts={[isa, flat, loan]}
+        milestones={[]}
+        points={years}
+      />,
+    );
+    const ends = (): Set<null | string> =>
+      new Set(
+        screen
+          .getAllByText(byClass("recharts-cartesian-axis-tick-value"), {
+            suggest: false,
+          })
+          .filter((tick) => tick.textContent.includes("£"))
+          .map((tick) => tick.getAttribute("x")),
+      );
+
+    expect(pounds()).toContain("−£195k");
+    expect(ends()).toStrictEqual(new Set(["49"]));
+
+    fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
+
+    expect(pounds()).toContain("£600k");
+    expect(ends()).toStrictEqual(new Set(["49"]));
+  });
+
   it("sets the caller's controls and choices beside the toggle, and none over nothing to plot", () => {
     const { rerender } = render(
       <ProjectionChart
