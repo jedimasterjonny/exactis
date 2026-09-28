@@ -479,6 +479,31 @@ describe("soundKept", () => {
     });
   });
 
+  it("reads a line kept growing by the triple lock as growing with inflation", () => {
+    const [salary, ...income] = incomeLines;
+    const [household, ...expenses] = expenseLines;
+    const read = soundKept({
+      ...kept,
+      schedule: {
+        expenses: [{ ...household, growth: "triple-lock" }, ...expenses],
+        income: [{ ...salary, growth: "triple-lock" }, ...income],
+      },
+    });
+
+    expect(read.kept.schedule.income[0]?.growth).toBe("inflation");
+    expect(read.kept.schedule.expenses[0]?.growth).toBe("inflation");
+    expect(read.household.schedule.income[0]?.growth).toBe("inflation");
+    expect(() =>
+      soundKept({
+        ...kept,
+        schedule: {
+          ...kept.schedule,
+          income: [{ ...salary, growth: "earnings" }, ...income],
+        },
+      }),
+    ).toThrow("Invalid option");
+  });
+
   it("keeps the curve as the Bank gave it, and refuses one on no day", () => {
     expect(soundKept(kept).household.curve).toStrictEqual(curve);
     expect(() =>

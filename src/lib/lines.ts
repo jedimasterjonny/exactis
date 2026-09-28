@@ -4,13 +4,12 @@ import { isOnOrBefore, monthName } from "@/lib/months";
 
 // What each growth choice is called, on the rows and in the dialog that
 // offers them: the amount rises with inflation, a point or two over it,
-// the triple lock, or not at all.
+// or not at all.
 export const growthLabels: Record<LineGrowth, string> = {
   inflation: "Inflation",
   "inflation-plus-1": "Inflation +1%",
   "inflation-plus-2": "Inflation +2%",
   nominal: "Nominal, fixed",
-  "triple-lock": "Triple lock",
 };
 
 // Where a line ends, for the rows and the toast: its last year, with

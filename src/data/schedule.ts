@@ -45,12 +45,11 @@ export type Tie = "retirement" | number;
 
 // The growth choices as a list, so each store's column takes the same
 // words the type does and cannot drift from them. Growth is stated
-// against inflation: with it, a point or two over it, the state pension's
-// triple lock, or fixed in nominal terms and so falling behind it.
+// against inflation: with it, a point or two over it, or fixed in
+// nominal terms and so falling behind it.
 export const lineGrowths = [
   "inflation",
   "inflation-plus-1",
   "inflation-plus-2",
   "nominal",
-  "triple-lock",
 ] as const;
