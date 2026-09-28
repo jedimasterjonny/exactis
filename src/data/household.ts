@@ -234,6 +234,7 @@ const plan = z
   .object({
     born: z.number().int(),
     from: z.number().int(),
+    inflation: z.number(),
     month: monthOfYear,
     rate: z.number().min(-1, rules.beyondLoss),
     retires: z.number().int().nonnegative(),
@@ -472,7 +473,7 @@ function endsInAYear(line: {
 // they are tied to, and each line paying a loan running as the loan's
 // payments do.
 function householdOf(kept: Kept): Household {
-  const plan = planOf(kept.ages, kept.asOf);
+  const plan = planOf(kept.ages, kept.asOf, kept.curve);
   return {
     accounts: kept.accounts,
     curve: kept.curve,

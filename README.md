@@ -222,9 +222,10 @@ so the share of a 0.65-point wedge carried by the years before then comes off.
 Then 0.3 points comes off for the premium the market pays for protection. The
 household keeps the curve as the Bank gave it rather than the rate it makes, so
 a change to the method moves the rate without another pull. The assumptions
-screen lays those steps out beside the curve at 5, 10, 20 and 30 years. Nothing
-in the projection reads the rate yet: every line is still taken in today's
-money.
+screen lays those steps out beside the curve at 5, 10, 20 and 30 years. The plan
+carries the rate, or the Bank of England's 2% target before any curve has been
+pulled, which the screen's header then says it takes, but nothing in the
+projection reads it yet: every line is still taken in today's money.
 
 ## Signing in
 

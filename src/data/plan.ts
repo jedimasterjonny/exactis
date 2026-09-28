@@ -1,10 +1,13 @@
 import type { Account } from "@/data/accounts";
+import type { Curve } from "@/data/inflation";
 import type { Month } from "@/data/schedule";
 
+import { inflationOf, target } from "@/data/inflation";
 import { termOf } from "@/lib/loans";
 
 // What the projection runs on: the rate every account on the plan rate
-// grows at, the first year plotted, which holds the balances, and the
+// grows at, and the inflation the plan takes, a fraction a year as
+// every rate is; the first year plotted, which holds the balances, and the
 // month of it they are as of, January being nought as the date gives
 // it, so the first year runs from there rather than from its start; how many years it runs forward; the year the plan's owner
 // was born, which turns a year into an age; and the age they retire at,
@@ -15,6 +18,7 @@ import { termOf } from "@/lib/loans";
 export interface Plan {
   readonly born: number;
   readonly from: number;
+  readonly inflation: number;
   readonly month: number;
   readonly rate: number;
   readonly retires: number;
@@ -79,14 +83,20 @@ export function endYear(plan: Plan): number {
 
 // The plan from the month given, the month the balances are as of,
 // since they are what its first year opens with, to the age the ages
-// say it runs to and with the age they say its owner retires at: what
-// the projection runs on and what the plan screen lays its lines over.
-// A plan whose age is already reached runs no years forward rather than
-// a count below nothing.
-export function planOf(ages: PlanAges, start: Month): Plan {
+// say it runs to and with the age they say its owner retires at, taking
+// the inflation the curve given makes, or the Bank's target when no
+// curve has been pulled: what the projection runs on and what the plan
+// screen lays its lines over. A plan whose age is already reached runs
+// no years forward rather than a count below nothing.
+export function planOf(
+  ages: PlanAges,
+  start: Month,
+  curve: Curve | null,
+): Plan {
   return {
     born,
     from: start.year,
+    inflation: curve === null ? target : inflationOf(curve).rate,
     month: start.month,
     rate,
     retires: ages.retires,

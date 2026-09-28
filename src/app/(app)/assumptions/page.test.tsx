@@ -30,13 +30,15 @@ describe("Assumptions", () => {
     ).toBeInTheDocument();
   });
 
-  it("says no curve has been pulled before one is", async () => {
+  it("says the plan takes the Bank's target before a curve is pulled", async () => {
     vi.mocked(getCurve).mockResolvedValue(null);
 
     render(await Assumptions());
 
     expect(
-      screen.getByText("No inflation curve pulled yet"),
+      screen.getByText(
+        "Inflation 2.00% · Bank of England target until a curve is pulled",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText("No curve pulled yet")).toBeInTheDocument();
   });
