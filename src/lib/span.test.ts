@@ -9,6 +9,7 @@ import { placed } from "./span";
 const plan: Plan = {
   born: 1990,
   from: 2026,
+  inflation: 0,
   month: 0,
   rate: 0.05,
   retires: 90,

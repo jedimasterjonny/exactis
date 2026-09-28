@@ -19,6 +19,7 @@ import {
   maturities,
   rpiAligned,
   rpiWedge,
+  target,
 } from "@/data/inflation";
 import { useSender } from "@/hooks/use-sender";
 import { formatCurveRate, formatPercent, formatPoints } from "@/lib/money";
@@ -48,7 +49,7 @@ interface StepProps {
 // ledger. Beside them the curve at each maturity the plan reads, the
 // horizon's point in the foreground, since it is the one the plan
 // takes. Before a curve has been pulled there are no steps to lay out,
-// and the card says so. The footer states the check a curve passes
+// and the card says so, and what the plan takes until one is. The footer states the check a curve passes
 // before it is kept, since that is what the figures rest on.
 export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
   const { isSending: isPulling, send } = useSender();
@@ -88,7 +89,7 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
       <CardContent>
         {curve === null ? (
           <EmptyState
-            description="Pull the latest curve to read the plan's inflation off the gilt market."
+            description={`Pull the latest curve to read the plan's inflation off the gilt market. Until then the plan takes the Bank of England's ${formatPercent(target)} target.`}
             icon={Landmark}
             title="No curve pulled yet"
           />

@@ -389,6 +389,7 @@ function planFrom(random: () => number, born: number): Plan {
   return {
     born,
     from: 2026,
+    inflation: 0,
     month: Math.floor(random() * 12),
     rate: 0,
     retires: 90,

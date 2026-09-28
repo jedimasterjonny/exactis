@@ -3,13 +3,19 @@ import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
 
+import { inflationOf } from "@/data/inflation";
+import { curve } from "@/data/inflation.fixture";
 import { termOf } from "@/lib/loans";
 
 import { ageIn, debtTermOf, endAge, planOf } from "./plan";
 
 describe("ageIn", () => {
   it("reads the age the plan's owner reaches in a year, and in the plan's last", () => {
-    const plan = planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 });
+    const plan = planOf(
+      { ends: 89, retires: 59 },
+      { month: 8, year: 2026 },
+      null,
+    );
 
     expect(ageIn(2026, plan)).toBe(36);
     expect(endAge(plan)).toBe(89);
@@ -17,7 +23,11 @@ describe("ageIn", () => {
 });
 
 describe("debtTermOf", () => {
-  const plan = planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 });
+  const plan = planOf(
+    { ends: 89, retires: 59 },
+    { month: 8, year: 2026 },
+    null,
+  );
 
   // A PCP owing £14,000, £6,000 of it the balloon, at its own 7.9%.
   const finance: Account = {
@@ -55,10 +65,11 @@ describe("debtTermOf", () => {
 describe("planOf", () => {
   it("runs from the month given to the ages given", () => {
     expect(
-      planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }),
+      planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }, curve),
     ).toStrictEqual({
       born: 1990,
       from: 2026,
+      inflation: inflationOf(curve).rate,
       month: 8,
       rate: 0.05,
       retires: 59,
@@ -66,11 +77,17 @@ describe("planOf", () => {
     });
   });
 
+  it("takes the Bank's 2% target for inflation before a curve is pulled", () => {
+    expect(
+      planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }, null),
+    ).toMatchObject({ inflation: 0.02 });
+  });
+
   // Born in 1990, a plan to 30 has run its course by 2026, and runs no
   // years forward rather than a count below nothing.
   it("runs no years forward once its age is reached", () => {
     expect(
-      planOf({ ends: 30, retires: 30 }, { month: 8, year: 2026 }),
+      planOf({ ends: 30, retires: 30 }, { month: 8, year: 2026 }, null),
     ).toMatchObject({ from: 2026, years: 0 });
   });
 });

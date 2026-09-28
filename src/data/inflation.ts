@@ -28,6 +28,11 @@ export interface Inflation {
 // implied inflation curve at.
 export type Maturity = 5 | 10 | 20 | 30;
 
+// The inflation a plan takes before any curve has been pulled: the Bank
+// of England's target, 2% a year on CPI, which policy is set to bring
+// prices back to and which stands in until the market is read.
+export const target = 0.02;
+
 // The maturities shortest first, as a screen lists the curve.
 export const maturities: readonly Maturity[] = [5, 10, 20, 30];
 
