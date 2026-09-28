@@ -72,7 +72,7 @@ export const incomeLines = [
     endsAt: null,
     feeds: null,
     firstYear: 2058,
-    growth: "triple-lock",
+    growth: "inflation",
     id: 4,
     kind: "pension",
     lastMonth: null,

@@ -602,7 +602,7 @@ describe("IncomeSchedule", () => {
     );
     fireEvent.change(
       within(dialog).getByRole("combobox", { name: "Grows with" }),
-      { target: { value: "triple-lock" } },
+      { target: { value: "inflation-plus-2" } },
     );
     commit(within(dialog).getByRole("textbox", { name: "First year" }), "2030");
 
@@ -642,7 +642,7 @@ describe("IncomeSchedule", () => {
       endsAt: null,
       feeds: null,
       firstYear: 2030,
-      growth: "triple-lock",
+      growth: "inflation-plus-2",
       kind: "self-employment",
       lastMonth: null,
       lastYear: 2035,
@@ -664,7 +664,7 @@ describe("IncomeSchedule", () => {
         endsAt: null,
         feeds: null,
         firstYear: 2030,
-        growth: "triple-lock",
+        growth: "inflation-plus-2",
         id: 5,
         kind: "self-employment",
         lastMonth: null,
@@ -743,7 +743,7 @@ describe("IncomeSchedule", () => {
     ).toHaveValue("year");
     expect(
       within(dialog).getByRole("combobox", { name: "Grows with" }),
-    ).toHaveValue("triple-lock");
+    ).toHaveValue("inflation");
     expect(
       within(dialog).getByRole("textbox", { name: "First year" }),
     ).toHaveValue("2058");
@@ -784,7 +784,7 @@ describe("IncomeSchedule", () => {
       endsAt: null,
       feeds: null,
       firstYear: 2058,
-      growth: "triple-lock",
+      growth: "inflation",
       kind: "pension",
       lastMonth: null,
       lastYear: 2070,

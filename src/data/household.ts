@@ -23,6 +23,7 @@ import { incomeKinds } from "@/data/income";
 import { timed } from "@/data/milestones";
 import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
 import { rules } from "@/data/rules";
+import { lineGrowths } from "@/data/schedule";
 import {
   lineValues,
   milestoneValues,
@@ -79,11 +80,16 @@ export interface Kept {
 // the id it is listed by. A line kept before a line could be tied to a
 // milestone is read as tied to none, as a household kept before there
 // were milestones is read as listing none, and one kept before a tied
-// end could fall years after its milestone as ending at it.
+// end could fall years after its milestone as ending at it. A line kept
+// growing by the triple lock, which is no longer offered, is read as
+// growing with inflation, which the lock never rose by less than.
 const line = {
   ...lineValues,
   endsAfter: z.number().int().nonnegative().default(0),
   endsAt: tie.nullable().default(null),
+  growth: z
+    .enum([...lineGrowths, "triple-lock"])
+    .transform((growth) => (growth === "triple-lock" ? "inflation" : growth)),
   id: recordId,
   startsAt: tie.nullable().default(null),
 };
