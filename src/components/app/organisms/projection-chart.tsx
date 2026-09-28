@@ -120,6 +120,15 @@ const basisNames: Record<Basis, string> = {
 // their own above the plot.
 const boxSize = "aspect-[3/1] min-h-90 sm:min-h-72";
 
+// The width the pounds' axis takes, held rather than measured. The
+// widest label it writes, "−£2.55m", is 49px in the tick's face, and
+// recharts sets a label 8px clear of the plot. Measured, the axis cost
+// every column two more draws whenever the axis was drawn again, which
+// is on every age dragged and every basis switched: recharts registers
+// the axis afresh each time it renders, and registering it afresh drops
+// the width it measured back to its own 60px until it measures again.
+const axisWidth = 57;
+
 // The dashboard's chart: the accounts the plan holds or owes, projected
 // a year at a time and each drawn on its own, what it holds stacked up
 // from nothing and what it owes down from it, as a column per year to
@@ -301,7 +310,7 @@ export function ProjectionChart({
               tickFormatter={formatAxisGbp}
               tickLine={false}
               ticks={scale.ticks}
-              width="auto"
+              width={axisWidth}
             />
             <ChartTooltip
               content={(props) => (
