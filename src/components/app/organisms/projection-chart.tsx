@@ -75,13 +75,16 @@ interface ProjectionChartProps {
 // colour is written under. The colour is named once: the container
 // writes it into --color-<key> within its own scope, and everything
 // drawn for the series, the tooltip's key included, reads it back from
-// there.
+// there. Last, what the series stands at on a point, as a function of
+// its own, which its column takes as the dataKey: made with the series,
+// it is the same function for as long as the series is.
 interface Series {
   readonly color: string;
   readonly ids: readonly number[];
   readonly isOwed: boolean;
   readonly key: string;
   readonly name: string;
+  readonly valueAt: (point: ProjectionPoint) => number;
 }
 
 // The families the chart stacks, in the order they stack, the first at
@@ -194,8 +197,12 @@ export function ProjectionChart({
   // Memoised by hand, as the board memoises its points: left to the
   // compiler, the series shared one scope with the milestone chosen, so
   // choosing one gave every mark a new dataKey and recharts recomputed
-  // every column to move a line.
-  const series = useMemo(() => seriesOf(accounts, basis), [accounts, basis]);
+  // every column to move a line. Both bases are made at once, from one
+  // series for each account, so a column the basis switched to still
+  // draws keeps the dataKey it had, and recharts does not draw it again
+  // before its figures have moved.
+  const bases = useMemo(() => seriesOf(accounts), [accounts]);
+  const series = bases[basis];
 
   if (!points.some(holdsAnything)) {
     return (
@@ -339,7 +346,7 @@ export function ProjectionChart({
                 />
               ) : (
                 <Bar
-                  dataKey={(point: ProjectionPoint) => valueIn(point, line)}
+                  dataKey={line.valueAt}
                   fill={`var(--color-${line.key})`}
                   isAnimationActive={false}
                   key={line.key}
@@ -659,34 +666,45 @@ function scaleOf(
 // equity, and a loan secured on it is drawn in it rather than among the
 // debts. A loan is drawn in the asset it names only when the plan lists
 // that asset; one naming an asset the plan does not list is a debt like
-// any other.
-function seriesOf(accounts: readonly Account[], basis: Basis): Series[] {
+// any other. Each account's series is made once, for both bases, and
+// each basis draws the ones it counts, so an account either basis draws
+// is drawn from the one series on both.
+function seriesOf(
+  accounts: readonly Account[],
+): Record<Basis, readonly Series[]> {
   const assets = new Set(accounts.filter(isAsset).map(({ id }) => id));
   const isSecured = ({ secures }: Account): boolean =>
     secures !== undefined && assets.has(secures);
-  return families.flatMap(({ hues, kinds }) =>
+  const drawn = families.flatMap(({ hues, kinds }) =>
     accounts
       .filter(({ kind }) => kinds.includes(kind))
-      .map((account, place) => ({
-        account,
-        color: `color-mix(in oklab, ${hueAt(hues, place)}, var(--card) ${String(Math.min(Math.floor(place / hues.length), 2) * 30)}%)`,
-      }))
-      .filter(({ account }) =>
-        basis === "net-worth" ? !isSecured(account) : !isAsset(account),
-      )
-      .map(({ account: { id, kind, name }, color }) => ({
-        color,
-        ids: [
+      .map((account, place) => {
+        const { id, kind, name } = account;
+        const ids = [
           id,
           ...accounts
             .filter((loan) => isSecured(loan) && loan.secures === id)
             .map((loan) => loan.id),
-        ],
-        isOwed: kind === "debt",
-        key: `account-${String(id)}`,
-        name,
-      })),
+        ];
+        const series: Series = {
+          color: `color-mix(in oklab, ${hueAt(hues, place)}, var(--card) ${String(Math.min(Math.floor(place / hues.length), 2) * 30)}%)`,
+          ids,
+          isOwed: kind === "debt",
+          key: `account-${String(id)}`,
+          name,
+          valueAt: (point) => valueIn(point, { ids }),
+        };
+        return { account, series };
+      }),
   );
+  const counted = (isCounted: (account: Account) => boolean): Series[] =>
+    drawn
+      .filter(({ account }) => isCounted(account))
+      .map(({ series }) => series);
+  return {
+    liquidity: counted((account) => !isAsset(account)),
+    "net-worth": counted((account) => !isSecured(account)),
+  };
 }
 
 // What a series stands at on a point: what the accounts it sums hold,
