@@ -133,7 +133,11 @@ describe("InflationSource", () => {
         `As at ${formatDay("2026-09-24")}, plan inflation 3.05%`,
       );
     });
-    expect(button).toBeEnabled();
+    // The toast lands before the transition ends, so the pull frees a
+    // beat after it.
+    await waitFor(() => {
+      expect(button).toBeEnabled();
+    });
   });
 
   it("says why when the pull is refused", async () => {
