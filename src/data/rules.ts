@@ -10,6 +10,7 @@ export const rules = {
   beyondLoss: "A rate loses no more than everything",
   debtEnds: "A debt's payments end",
   feedsPension: "A salary feeds a pension alone",
+  inflation: "Inflation is a rate, and prices fall by less than everything",
   listedOnce: "An account is listed once",
   owned: "An ISA or a pension belongs to an owner, and nothing else",
   paysDebt: "A line pays a debt alone",

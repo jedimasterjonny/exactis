@@ -1,5 +1,7 @@
 import type { AccountKind, AccountValues } from "@/data/accounts";
 import type { IncomeKind } from "@/data/income";
+import type { Plan } from "@/data/plan";
+import type { Month } from "@/data/schedule";
 
 import { allowanceOf, isPension } from "@/data/accounts";
 import { yearly } from "@/lib/cadence";
@@ -56,9 +58,11 @@ interface Band {
 // rates over the whole income, the tax is the figure the allowance and
 // the bands give at every income, without a second reading of the
 // allowance to keep in step with the first. The figures are frozen
-// until April 2031 and are held as they stand, in today's money as
-// every line is, so what the freeze drags into a higher band as prices
-// rise waits on the inflation assumption the plan does not carry yet.
+// until April 2031, but are held here in today's money as every line
+// is, rising with the plan's inflation a tax year at a time from the one
+// the plan starts in, so what the freeze drags into a higher band as
+// prices rise is not charged. The National Insurance thresholds rise
+// with them.
 const incomeTax: readonly Band[] = [
   { from: 0, rate: 0 },
   { from: 12570, rate: 0.2 },
@@ -229,6 +233,21 @@ export function relievableOn(earned: number, months: number): number {
   return Math.max((leastRelievable * months) / 12, earned);
 }
 
+// How far the bands have risen by the tax year a month falls in, as a
+// multiple of the figures above: held, as every line is, in today's
+// money, so they rise with the plan's inflation a whole year at a time,
+// each April, from the tax year the plan starts in, where they are the
+// figures themselves.
+export function upratingIn(
+  plan: Pick<Plan, "from" | "inflation" | "month">,
+  at: Month,
+): number {
+  return (
+    (1 + plan.inflation) **
+    (taxYearOf(at) - taxYearOf({ month: plan.month, year: plan.from }))
+  );
+}
+
 // What the bands charge on a share of them: each band's rate on the
 // part of the amount between where it starts and where the next one
 // does, both taken as that share of the year's figures.
@@ -318,4 +337,10 @@ function grossFor(net: number, standing: Standing): number {
 // twelfth a month of the figures as they have risen.
 function shareOf({ months, uprating }: Stretch): number {
   return (months / 12) * uprating;
+}
+
+// The year a month's tax year opens in: the month's own from April, and
+// the one before until then.
+function taxYearOf({ month, year }: Month): number {
+  return month < april ? year - 1 : year;
 }

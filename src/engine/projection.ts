@@ -4,7 +4,7 @@ import type { Month } from "@/data/schedule";
 import type { CashFlow, Paid, Schedule } from "@/engine/cash-flow";
 
 import { isPension, takesSpare } from "@/data/accounts";
-import { ageIn, rateFrom } from "@/data/plan";
+import { ageIn, pricesIn, rateFrom } from "@/data/plan";
 import { rules } from "@/data/rules";
 import { cashFlow } from "@/engine/cash-flow";
 import { isOnOrBefore } from "@/lib/months";
@@ -15,6 +15,7 @@ import {
   incomeTaxOn,
   insuranceOn,
   lumpSumAllowance,
+  upratingIn,
 } from "@/lib/tax";
 
 // A year of the projection: the balance the plan expects entering it,
@@ -47,7 +48,13 @@ import {
 // is what the year drew out of a pension before the pension age, gross
 // and summed and read the same way: a last resort, charged 55%, and
 // marked so that a plan lasting only by it is not read as a plan that
-// works.
+// works. Every figure on a point is in today's money, the money of the
+// month the plan starts in: the projection carries each month in its
+// own pounds, and a balance is read onto its point divided by how far
+// prices have risen by the start of the point's year, and a month's
+// shortfall or early draw by how far they have risen by that month,
+// before either is summed. So a balance that keeps pace with prices
+// reads level, and the first point is the balances as they are.
 export interface ProjectionPoint {
   readonly age: number;
   readonly balances: Readonly<Record<number, number>>;
@@ -60,13 +67,14 @@ export interface ProjectionPoint {
 
 // The month a shortfall is drawn in, as the draw reads it: what is left
 // of the lump sum allowance; what the month earned that the tax is
-// charged on, which a draw on a pension is taxed on top of; and whether
+// charged on, which a draw on a pension is taxed on top of; whether
 // the month falls before the pension age, when a pension is drawn only
-// early.
+// early; and how far the bands have risen by its tax year.
 interface Drawing {
   readonly allowance: number;
   readonly below: number;
   readonly isEarly: boolean;
+  readonly uprating: number;
 }
 
 // An account and the balance the projection has carried it to, which
@@ -154,11 +162,12 @@ export function holdsAnything(point: ProjectionPoint): boolean {
 // projection carries each tax year as well, what its months were taxed
 // on and what they were charged, and settles it in the April after: the
 // year's tax on all of it, against as much of each band as the months
-// it held, less what the months paid, refunded into April's money or
-// owed out of it. Income tax is settled so, and Class 4 with it, since
-// it too is due on the year's profit rather than a month's; Class 1 is
-// charged a pay period at a time, as the flow charges it, and owes
-// nothing more at the year's end. The first tax year is the months of
+// it held, as the bands stood that year, less what the months paid,
+// refunded into April's money or owed out of it. Income tax is settled
+// so, and Class 4 with it, since it too is due on the year's profit
+// rather than a month's; Class 1 is charged a pay period at a time, as
+// the flow charges it, and owes nothing more at the year's end. The
+// first tax year is the months of
 // it the plan holds, taxed against their share of each band, and the
 // last is cut off where the plan ends and never settled. A draw
 // and a payment into savings never meet in one month: the flow pays a
@@ -213,24 +222,33 @@ export function project(
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
     const age = ageIn(year, plan);
+    const prices = pricesIn(plan, {
+      month: offset === 0 ? plan.month : 0,
+      year,
+    });
     const balances = Object.fromEntries(
       [...held, ...owing].map(({ account, balance }) => [
         account.id,
-        Math.round(balance),
+        Math.round(balance / prices),
       ]),
     );
-    const deferred = total(held, "tax-deferred");
-    const free = total(held, "tax-free");
+    const deferred = total(held, "tax-deferred", prices);
+    const free = total(held, "tax-free", prices);
     let early = 0;
     let uncovered = 0;
     if (offset < plan.years) {
       for (let month = offset === 0 ? plan.month : 0; month < 12; month += 1) {
-        const settlement = month === april ? settled(taxYear) : 0;
+        const at = { month, year };
+        const stretch = { months: 1, uprating: upratingIn(plan, at) };
+        const settlement =
+          month === april
+            ? settled(taxYear, upratingIn(plan, { month: april - 1, year }))
+            : 0;
         if (month === april) {
           taxYear = { months: 0, paid: 0, profit: 0, taxable: 0 };
         }
         const flow = cashFlow(accounts, schedule, {
-          at: { month, year },
+          at,
           plan,
           reserve: held
             .filter(({ account }) => takesSpare(account) && !isPension(account))
@@ -240,23 +258,22 @@ export function project(
         const draw = drawnFrom(held, Math.max(0, -flow.left), {
           allowance,
           below: flow.taxable,
-          isEarly: isBeforePensionAge(age, { month, year }),
+          isEarly: isBeforePensionAge(age, at),
+          uprating: stretch.uprating,
         });
+        const risen = pricesIn(plan, at);
         allowance = draw.allowance;
-        early += draw.early;
+        early += draw.early / risen;
         taxYear = {
           months: taxYear.months + 1,
           paid:
             taxYear.paid +
-            incomeTaxOn(draw.taxable, { months: 1, uprating: 1 }) +
-            insuranceOn("self-employment", flow.profit, {
-              months: 1,
-              uprating: 1,
-            }),
+            incomeTaxOn(draw.taxable, stretch) +
+            insuranceOn("self-employment", flow.profit, stretch),
           profit: taxYear.profit + flow.profit,
           taxable: taxYear.taxable + draw.taxable,
         };
-        uncovered += draw.uncovered;
+        uncovered += draw.uncovered / risen;
         held = draw.held.map(({ account, balance }) => ({
           account,
           balance: carried(
@@ -327,7 +344,7 @@ function carried(balance: number, paid: number, rate: number): number {
 function drawnFrom(
   held: readonly Held[],
   shortfall: number,
-  { allowance, below, isEarly }: Drawing,
+  { allowance, below, isEarly, uprating }: Drawing,
 ): {
   readonly allowance: number;
   readonly early: number;
@@ -339,7 +356,7 @@ function drawnFrom(
   let drawn = held;
   let left = shortfall;
   let early = 0;
-  let taxed = { allowance, below, isEarly, months: 1, uprating: 1 };
+  let taxed = { allowance, below, isEarly, months: 1, uprating };
   for (const kind of kinds) {
     drawn = drawn.map(({ account, balance }) => {
       if (account.kind !== kind || !isPension(account)) {
@@ -452,22 +469,31 @@ function rateOf(account: Account, plan: Plan): number {
 // what its months paid, each a twelfth of a year's income tax and
 // Class 4 on itself, less the income tax on everything they were taxed
 // on together and the Class 4 on all their profit, each against as much
-// of each band as the months the plan held of the year. A year of no
-// months, the one before a plan starting in April, settles nothing.
-function settled({ months, paid, profit, taxable }: TaxYear): number {
+// of each band as the months the plan held of the year, as the bands
+// had risen by it. A year of no months, the one before a plan starting
+// in April, settles nothing.
+function settled(
+  { months, paid, profit, taxable }: TaxYear,
+  uprating: number,
+): number {
   return months === 0
     ? 0
     : paid -
-        incomeTaxOn(taxable, { months, uprating: 1 }) -
-        insuranceOn("self-employment", profit, { months, uprating: 1 });
+        incomeTaxOn(taxable, { months, uprating }) -
+        insuranceOn("self-employment", profit, { months, uprating });
 }
 
-// The wrapper's balance this year, whole pounds.
-function total(held: readonly Held[], kind: AccountKind): number {
+// The wrapper's balance this year, whole pounds of today's money, read
+// at how far prices have risen by then.
+function total(
+  held: readonly Held[],
+  kind: AccountKind,
+  prices: number,
+): number {
   return Math.round(
     held
       .filter(({ account }) => account.kind === kind)
-      .reduce((sum, { balance }) => sum + balance, 0),
+      .reduce((sum, { balance }) => sum + balance, 0) / prices,
   );
 }
 

@@ -1,20 +1,23 @@
 import type { Account } from "@/data/accounts";
 import type { Curve } from "@/data/inflation";
-import type { Month } from "@/data/schedule";
+import type { LineGrowth, Month } from "@/data/schedule";
 
 import { inflationOf, target } from "@/data/inflation";
 import { termOf } from "@/lib/loans";
+import { monthsBetween } from "@/lib/months";
 
 // What the projection runs on: the rate every account on the plan rate
-// grows at, and the inflation the plan takes, a fraction a year as
-// every rate is; the first year plotted, which holds the balances, and the
-// month of it they are as of, January being nought as the date gives
-// it, so the first year runs from there rather than from its start; how many years it runs forward; the year the plan's owner
-// was born, which turns a year into an age; and the age they retire at,
-// from which they earn nothing by working. It sits beside the
-// accounts and the lines rather than inside the engine, since the flow
-// and the projection each read it and the flow is what the projection
-// is built on.
+// grows at, a nominal return as a fixed rate is, and the inflation the
+// plan takes, which the lines, stated in today's money, rise with, each
+// a fraction a year as every rate is; the first year plotted, which
+// holds the balances, and the month of it they are as of, January being
+// nought as the date gives it, so the first year runs from there rather
+// than from its start; how many years it runs forward; the year the
+// plan's owner was born, which turns a year into an age; and the age
+// they retire at, from which they earn nothing by working. It sits
+// beside the accounts and the lines rather than inside the engine,
+// since the flow and the projection each read it and the flow is what
+// the projection is built on.
 export interface Plan {
   readonly born: number;
   readonly from: number;
@@ -81,6 +84,27 @@ export function endYear(plan: Plan): number {
   return plan.from + plan.years;
 }
 
+// The rate a line's amount rises at a year, in the pounds of the day the
+// projection counts in: the plan's inflation for a line kept level in
+// today's money, a point or two over it for one that outpaces prices,
+// and nothing for one fixed in nominal terms, which so falls behind
+// them.
+export function growthFrom(
+  line: { readonly growth: LineGrowth },
+  plan: Plan,
+): number {
+  switch (line.growth) {
+    case "inflation":
+      return plan.inflation;
+    case "inflation-plus-1":
+      return plan.inflation + 0.01;
+    case "inflation-plus-2":
+      return plan.inflation + 0.02;
+    case "nominal":
+      return 0;
+  }
+}
+
 // The plan from the month given, the month the balances are as of,
 // since they are what its first year opens with, to the age the ages
 // say it runs to and with the age they say its owner retires at, taking
@@ -104,6 +128,17 @@ export function planOf(
   };
 }
 
+// How far prices have risen by a month at the plan's inflation, from
+// the month the plan starts in, whose money is today's money: what a
+// pound of today's money costs in that month's pounds, and what a pound
+// of that month's is divided by to be read in today's money.
+export function pricesIn(
+  plan: Pick<Plan, "from" | "inflation" | "month">,
+  at: Month,
+): number {
+  return risenBy(plan.inflation, plan, at);
+}
+
 // The rate an account is carried at, its own fixed one or the plan's,
 // whichever it is carried on. A debt is charged at the same rate it
 // grows at, so its payments are worked out against this one too.
@@ -123,4 +158,19 @@ export function rateFrom(account: Account, plan: Plan): number {
 // as reaching it, and the year before is their last working year.
 export function retirementYear(plan: Plan): number {
   return plan.born + plan.retires;
+}
+
+// How many times over a sum rising at a rate a year has risen by a
+// month, from the month the plan starts in, compounding a month at a
+// time as the projection carries a balance: once over in the plan's
+// first month, and by a whole year's rate twelve months on.
+export function risenBy(
+  rate: number,
+  plan: Pick<Plan, "from" | "month">,
+  at: Month,
+): number {
+  return (
+    (1 + rate) **
+    (monthsBetween({ month: plan.month, year: plan.from }, at) / 12)
+  );
 }

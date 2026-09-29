@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { IncomeLine } from "@/data/income";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
@@ -12,7 +13,11 @@ import { drawFor, lumpSumAllowance } from "@/lib/tax";
 import { balanceIn, balanceOf, holdsAnything, project } from "./projection";
 
 const [pension, isa, cash, home, mortgage] = accounts;
-const [salary, , consulting] = incomeLines;
+// The fixture's salary fixed in nominal terms, so it pays what it states
+// in every month whatever prices do and every figure below is one it
+// states; how a line grows is read on its own.
+const salary: IncomeLine = { ...incomeLines[0], growth: "nominal" };
+const [, , consulting] = incomeLines;
 const [household] = expenseLines;
 
 // Read at the start of its first year, so every year is carried whole,
@@ -1504,6 +1509,82 @@ describe("project", () => {
         year: 2026,
       },
     ]);
+  });
+
+  // At 10% a year, £10,000 of cash earning nothing is worth £9,091 of
+  // today's money entering 2027 and £8,264 entering 2028, and a debt
+  // nothing pays, held where it opened, owes that much less of it too.
+  it("reads each balance on a point in today's money", () => {
+    const unpaid: Account = {
+      balance: -182940,
+      growth: mortgage.growth,
+      id: 5,
+      kind: "debt",
+      name: "Mortgage",
+    };
+
+    expect(
+      project(
+        [{ ...cash, balance: 10000 }, unpaid],
+        { expenses: [], income: [] },
+        { ...plan, inflation: 0.1, years: 2 },
+      ).map(({ balances }) => balances),
+    ).toStrictEqual([
+      { 3: 10000, 5: -182940 },
+      { 3: 9091, 5: -166309 },
+      { 3: 8264, 5: -151190 },
+    ]);
+  });
+
+  // £1,000 a month of today's money rising with prices at 10% a year
+  // is short £12,000 of today's money a year, whichever year it is;
+  // drawn instead from a pension before the pension age, each month
+  // takes £2,222.22 of today's money, £26,667 a year.
+  it("reads what a year goes short by or draws early in today's money, a month at a time", () => {
+    const rising = {
+      expenses: [{ ...household, amount: 1000, growth: "inflation" as const }],
+      income: [],
+    };
+    const tenPercent = { ...plan, inflation: 0.1, years: 2 };
+
+    expect(
+      project([], rising, tenPercent).map(({ uncovered }) => uncovered),
+    ).toStrictEqual([12000, 12000, 0]);
+    expect(
+      project([{ ...sipp, balance: 1000000 }], rising, tenPercent).map(
+        ({ early }) => early,
+      ),
+    ).toStrictEqual([26667, 26667, 0]);
+  });
+
+  // Read from April 2026 at 3%, £36,000 a year fixed in nominal terms
+  // runs two whole tax years, to March 2028. The first pays £390.50 of
+  // income tax and £156.20 of NI a month against the figures, leaving
+  // £2,453.30; the second pays £384.22 and £153.69 against them risen
+  // 3%, leaving £2,462.10. Each tax year's months are alike, so each
+  // settles nothing in the April after it, against its own year's bands:
+  // £58,984.79 is held entering 2029, when prices have risen by 1.03 to
+  // the power of two and three quarters, which is £54,380 of today's
+  // money.
+  it("taxes each tax year against its bands as they have risen, and settles it against them", () => {
+    const earning = {
+      ...salary,
+      amount: 36000,
+      bonus: 0,
+      feeds: null,
+      lastMonth: 2,
+      lastYear: 2028,
+      rsu: 0,
+      sacrifice: 0,
+    };
+
+    const [, , , entering2029] = project(
+      [{ ...cash, balance: 0, contribution: { cap: null, kind: "spare" } }],
+      { expenses: [], income: [earning] },
+      { ...plan, inflation: 0.03, month: 3, years: 3 },
+    );
+
+    expect(entering2029?.balances[3]).toBe(54380);
   });
 });
 

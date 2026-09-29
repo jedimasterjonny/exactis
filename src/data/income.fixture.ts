@@ -7,7 +7,8 @@ import type { Plan } from "@/data/plan";
 // sacrificing a tenth of its base into the reference's workplace
 // pension, which is the first of the accounts fixture, and the plan they
 // are laid over, which runs from September 2026 to 2079 for someone born
-// in 1990. For tests, since the screen reads the store. A
+// in 1990, with prices held level, so every line pays what it states in
+// every year. For tests, since the screen reads the store. A
 // tuple, so a test reading a line by its place gets a line.
 export const incomeLines = [
   {

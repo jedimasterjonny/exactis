@@ -4,13 +4,6 @@ Gaps in the engine's model, found by review. Each is a decision about the model
 as a whole, to be closed in the general case rather than patched where it was
 noticed. None is small.
 
-## Growth
-
-A line's growth choice is stored and shown and never read: every line is taken
-flat, in today's money, for the whole plan. Decide the inflation assumption the
-plan carries, then apply each line's growth against it, so a salary rising with
-inflation is flat in real terms and a nominal payment falls.
-
 ## Allowances
 
 Each owner has one ISA and one pension allowance, shared across their accounts
@@ -20,7 +13,9 @@ in the month for the accounts after it; what none of them takes is spent. A
 fixed sum that alone is past it is refused when it is saved. It is held a
 twelfth a month rather than across the tax year, so a month short of spare money
 loses its twelfth for good, and a sum paid once a year is spread as if paid
-monthly.
+monthly. Each allowance is held in pounds as the law sets it and never raised,
+so over a plan of decades it shrinks in today's money as prices rise, as it
+would if no government changed it again.
 
 What the law adds on top is not held. There is no taper above £260,000 of
 adjusted income, no carry-forward of the three years before, and no money
@@ -53,12 +48,6 @@ Decide whose each income line is, and the year each owner was born and retires,
 so tax, the pension age, the lump sum allowance, the earnings relief is held to
 and the last working year are each a person's rather than the plan's, and a
 salary feeds only its own owner's pension.
-
-## Today's money
-
-Lines are in today's money, a fixed account rate is hinted as nominal, and the
-plan rate states no basis. Decide one basis for the whole projection, state it,
-and deflate or inflate whatever is entered on the other.
 
 ## Tax
 
