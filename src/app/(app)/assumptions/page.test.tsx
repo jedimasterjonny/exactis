@@ -3,21 +3,26 @@ import { describe, expect, it, vi } from "vitest";
 
 import { retiring } from "@/data/income.fixture";
 import { curve } from "@/data/inflation.fixture";
-import { rates } from "@/data/rates.fixture";
-import { getCurve, getPlan, getRates } from "@/store/household";
+import { allocation, rates } from "@/data/rates.fixture";
+import { getAllocation, getCurve, getPlan, getRates } from "@/store/household";
 
 import Assumptions from "./page";
 
 vi.mock("@/store/household", () => ({
+  getAllocation: vi.fn(),
   getCurve: vi.fn(),
   getPlan: vi.fn(),
   getRates: vi.fn(),
 }));
 vi.mock("@/actions/inflation", () => ({ pullCurve: vi.fn() }));
-vi.mock("@/actions/plan", () => ({ saveRates: vi.fn() }));
+vi.mock("@/actions/plan", () => ({
+  saveAllocation: vi.fn(),
+  saveRates: vi.fn(),
+}));
 
 describe("Assumptions", () => {
-  it("says what the plan grows at and what its prices rise by, and hands the store's rates and curve to their cards", async () => {
+  it("says what the plan grows at and what its prices rise by, and hands the store's rates, split and curve to their cards", async () => {
+    vi.mocked(getAllocation).mockResolvedValue(allocation);
     vi.mocked(getCurve).mockResolvedValue(curve);
     vi.mocked(getRates).mockResolvedValue(rates);
     vi.mocked(getPlan).mockResolvedValue({
@@ -38,12 +43,16 @@ describe("Assumptions", () => {
     expect(screen.getByRole("textbox", { name: "Stocks growth" })).toHaveValue(
       "5.95%",
     );
+    expect(screen.getByRole("textbox", { name: "Stocks share" })).toHaveValue(
+      "80.00%",
+    );
     expect(
       screen.getByRole("region", { name: "Curve, by maturity" }),
     ).toBeInTheDocument();
   });
 
   it("hands the card no curve before one is pulled", async () => {
+    vi.mocked(getAllocation).mockResolvedValue(allocation);
     vi.mocked(getCurve).mockResolvedValue(null);
     vi.mocked(getPlan).mockResolvedValue(retiring);
     vi.mocked(getRates).mockResolvedValue(rates);
