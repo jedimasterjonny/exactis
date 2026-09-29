@@ -94,6 +94,19 @@ const thrown: readonly Thrown[] = [
     (given): Inputs => ({ ...given, plan: { ...given.plan, rate: -1.5 } }),
   ],
   [
+    "Inflation is a rate, and prices fall by less than everything",
+    "Inflation is a rate, and prices fall by less than everything",
+    (given): Inputs => ({ ...given, plan: { ...given.plan, inflation: -1 } }),
+  ],
+  [
+    "Inflation is a rate, and prices fall by less than everything",
+    "Invalid input: expected number, received Infinity",
+    (given): Inputs => ({
+      ...given,
+      plan: { ...given.plan, inflation: Number.POSITIVE_INFINITY },
+    }),
+  ],
+  [
     "An ISA or a pension belongs to an owner, and nothing else",
     "An ISA or a pension belongs to an owner, and nothing else",
     (given): Inputs => changed(given, 3, (cash) => ({ ...cash, owner: 1 })),

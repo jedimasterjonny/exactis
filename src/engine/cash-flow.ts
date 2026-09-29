@@ -18,20 +18,32 @@ import {
   sacrificeOf,
   totalOf,
 } from "@/data/income";
-import { debtTermOf, retirementYear } from "@/data/plan";
+import {
+  debtTermOf,
+  growthFrom,
+  pricesIn,
+  retirementYear,
+  risenBy,
+} from "@/data/plan";
 import { rules } from "@/data/rules";
 import { fixedMonthly, monthly } from "@/lib/cadence";
 import { runsIn } from "@/lib/lines";
 import { clearsIn } from "@/lib/loans";
 import { isOnOrBefore } from "@/lib/months";
-import { incomeTaxOn, insuranceOn, reliefOf, relievableOn } from "@/lib/tax";
+import {
+  incomeTaxOn,
+  insuranceOn,
+  reliefOf,
+  relievableOn,
+  upratingIn,
+} from "@/lib/tax";
 
-// A month of a year's money, in pounds as the lines state them and
-// unrounded, formatted where it is rendered: what comes in, what goes
-// out, in sum and line by line, what each pension is fed, the income
-// tax and the National Insurance the month pays, what each account is
-// paid, what each pension paid out of taxed money claims back on it,
-// and what is left after all of it.
+// A month of a year's money, in the pounds of that month and unrounded,
+// formatted where it is rendered: what comes in, what goes out, in sum
+// and line by line, what each pension is fed, the income tax and the
+// National Insurance the month pays, what each account is paid, what
+// each pension paid out of taxed money claims back on it, and what is
+// left after all of it.
 export interface CashFlow extends Taxed {
   readonly expenses: number;
   readonly fed: readonly Fed[];
@@ -288,10 +300,19 @@ const nanopound = 1e-9;
 // profit earn a year, less what they sacrifice, or of £3,600 when that
 // is more, shared across the owner's pensions in the order the month
 // pays them, and a pound paid past it lands as a pound. The earnings
-// are the plan's, since no line names whose they are. Every line is
-// taken at the amount it states, in today's money; how it grows
-// against inflation waits on an inflation assumption the plan does not
-// carry yet.
+// are the plan's, since no line names whose they are. The month is
+// worked out in its own pounds. A line states its amount in today's
+// money, the money of the month the plan starts in, and is paid it risen
+// since then at the rate its growth gives, a month at a time: with the
+// plan's inflation, a point or two over it, or not at all for a line
+// fixed in nominal terms. The tax bands rise with prices a tax year at
+// a time, as the tax module holds them. Everything an account states,
+// its fixed sum, its cap and the allowance it is held to, is taken in
+// the pounds of the day it is paid, as a loan's payment and the law's
+// figures are. A plan whose prices fall by everything in a year, or
+// whose inflation is no finite number, is refused, since no amount can
+// be read in today's money against it and every figure after the plan's
+// first month would be no number at all; the store refuses to keep one.
 export function cashFlow(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -300,6 +321,10 @@ export function cashFlow(
   const { at, settlement = 0 } = reading;
   if (new Set(accounts.map(({ id }) => id)).size !== accounts.length) {
     throw new Error(rules.listedOnce);
+  }
+  const { inflation } = reading.plan;
+  if (!(inflation > -1 && Number.isFinite(inflation))) {
+    throw new Error(rules.inflation);
   }
   if (
     accounts.some(
@@ -321,11 +346,11 @@ export function cashFlow(
       runsIn(line, at) &&
       (!isEarned(line) || at.year < retirementYear(reading.plan)),
   );
-  const income = sumOf(running, at, totalOf);
+  const income = sumOf(running, reading, totalOf);
   const offered: Rooms = new Map();
   const feeding = running.flatMap((line) => {
     const account = accountAt(accounts, line.feeds);
-    const wanted = monthly(contributionOf(line), line.cadence);
+    const wanted = monthlyOf(line, contributionOf(line), reading);
     if (account === undefined || wanted === 0) {
       return [];
     }
@@ -338,13 +363,13 @@ export function cashFlow(
             account,
             amount: wanted * share,
             line,
-            sacrificed: monthly(sacrificeOf(line), line.cadence) * share,
+            sacrificed: monthlyOf(line, sacrificeOf(line), reading) * share,
           },
         ];
   });
   const spent = schedule.expenses
     .filter((line) => runsIn(line, at))
-    .map((line) => ({ amount: monthly(line.amount, line.cadence), line }));
+    .map((line) => ({ amount: monthlyOf(line, line.amount, reading), line }));
   const expenses = total(spent);
   const paid = new Set(
     schedule.expenses.flatMap((line) =>
@@ -358,7 +383,7 @@ export function cashFlow(
   const outgoings = expenses + total(owed);
   const leftWith = (
     feeds: readonly Fed[],
-    taxed: Taxed = taxOn(running, feeds),
+    taxed: Taxed = taxOn(running, feeds, reading),
   ): number =>
     income -
     feeds.reduce((sum, entry) => sum + entry.sacrificed, 0) -
@@ -380,12 +405,12 @@ export function cashFlow(
   const fed = feeding.filter(({ account }) =>
     account.isAlwaysFunded === true ? isKeeping : isSacrificing,
   );
-  const taxed = taxOn(running, fed);
+  const taxed = taxOn(running, fed, reading);
   const month = leftWith(fed, taxed);
   const purse: Purse = {
     relief: [],
     reliefs: new Map(),
-    relievable: relievableOn(payOf(running.filter(isEarned), fed), 1),
+    relievable: relievableOn(payOf(running.filter(isEarned), fed, reading), 1),
     rooms: new Map(),
   };
   for (const entry of fed) {
@@ -416,6 +441,50 @@ export function cashFlow(
     spare: takes,
     spent,
     taxable: taxed.taxable,
+  };
+}
+
+// A month's money read in today's money: every sum the flow worked out
+// in the pounds of its month, divided by how far prices have risen by
+// then from the month the plan starts in, so a line rising with
+// inflation reads at what it states in every year of the plan and a sum
+// fixed in nominal terms reads the smaller the further on it is paid.
+// What each sum is paid to or by is kept as it is, and so is the cap a
+// take of the spare money is held to, which is a limit as it is stated
+// rather than a sum the month pays, as a line keeps the amount it
+// states.
+export function inTodaysMoney(
+  flow: CashFlow,
+  { at, plan }: Pick<Reading, "at" | "plan">,
+): CashFlow {
+  const prices = pricesIn(plan, at);
+  const read = (amount: number): number => amount / prices;
+  return {
+    expenses: read(flow.expenses),
+    fed: flow.fed.map((entry) => ({
+      ...entry,
+      amount: read(entry.amount),
+      sacrificed: read(entry.sacrificed),
+    })),
+    fixed: flow.fixed.map((entry) => ({
+      ...entry,
+      amount: read(entry.amount),
+    })),
+    income: read(flow.income),
+    incomeTax: read(flow.incomeTax),
+    insurance: read(flow.insurance),
+    left: read(flow.left),
+    profit: read(flow.profit),
+    relief: flow.relief.map((entry) => ({
+      ...entry,
+      amount: read(entry.amount),
+    })),
+    spare: flow.spare.map((take) => ({ ...take, amount: read(take.amount) })),
+    spent: flow.spent.map((entry) => ({
+      ...entry,
+      amount: read(entry.amount),
+    })),
+    taxable: read(flow.taxable),
   };
 }
 
@@ -565,6 +634,20 @@ function landWithRelief(account: Account, paid: number, purse: Purse): void {
   landIn(purse.rooms, account, paid + relieved * rate);
 }
 
+// What a sum a line states is paid a month in the month read, in that
+// month's pounds: a twelfth of a yearly one, risen from the money of
+// the month the plan starts in, which is what the line states it in, at
+// the rate its growth gives.
+function monthlyOf(
+  line: LineValues,
+  amount: number,
+  { at, plan }: Reading,
+): number {
+  return (
+    monthly(amount, line.cadence) * risenBy(growthFrom(line, plan), plan, at)
+  );
+}
+
 // The most an account may be paid out of taxed money for what lands in
 // it to stay within a limit, once it claims the relief its owner has
 // left: all of it relieved while the limit is within that relief, and
@@ -579,23 +662,20 @@ function payableInto(account: Account, limit: number, purse: Purse): number {
     : limit - (room * rate) / (1 + rate);
 }
 
-// What the lines of the kinds given pay in the month, every kind when
-// none is given, each as it is earned less what it gives up into the
-// pension it feeds.
+// What the lines given pay in the month, each as it is earned less
+// what it gives up into the pension it feeds.
 function payOf(
   lines: readonly IncomeLine[],
   fed: readonly Fed[],
-  kinds: readonly IncomeKind[] = incomeKinds,
+  reading: Reading,
 ): number {
-  return lines
-    .filter((line) => kinds.includes(line.kind))
-    .reduce(
-      (sum, line) =>
-        sum +
-        monthly(totalOf(line), line.cadence) -
-        (fed.find((entry) => entry.line === line)?.sacrificed ?? 0),
-      0,
-    );
+  return lines.reduce(
+    (sum, line) =>
+      sum +
+      monthlyOf(line, totalOf(line), reading) -
+      (fed.find((entry) => entry.line === line)?.sacrificed ?? 0),
+    0,
+  );
 }
 
 // What is left of the relief an account's owner may claim in the month,
@@ -688,15 +768,15 @@ function spareMoney(
 }
 
 // What the lines running in the month pay, taking each at what the
-// schedule says it pays.
+// schedule says it pays, risen as its growth says.
 function sumOf<TLine extends LineValues>(
   lines: readonly TLine[],
-  at: Month,
+  reading: Reading,
   amountOf: (line: TLine) => number,
 ): number {
   return lines
-    .filter((line) => runsIn(line, at))
-    .reduce((sum, line) => sum + monthly(amountOf(line), line.cadence), 0);
+    .filter((line) => runsIn(line, reading.at))
+    .reduce((sum, line) => sum + monthlyOf(line, amountOf(line), reading), 0);
 }
 
 // What the month pays in tax, all of it.
@@ -709,23 +789,30 @@ function taxOf({ incomeTax, insurance }: Taxed): number {
 // of it, and National Insurance on each kind of income that pays it,
 // the lines of a kind summed first, since a step-up is a second line
 // of the one job rather than a second job with a threshold of its own.
-// Each is charged on the month alone against a twelfth of each band,
-// which is a twelfth of what a year of the month would pay, so a month
-// is charged the same whenever in the year it falls.
-function taxOn(lines: readonly IncomeLine[], fed: readonly Fed[]): Taxed {
-  const taxable = payOf(lines, fed);
+// Each is charged on the month alone against a twelfth of each band as
+// the bands stand in its tax year, which is a twelfth of what a year of
+// the month would pay, so a month is charged the same whenever in the
+// tax year it falls.
+function taxOn(
+  lines: readonly IncomeLine[],
+  fed: readonly Fed[],
+  reading: Reading,
+): Taxed {
+  const stretch = { months: 1, uprating: upratingIn(reading.plan, reading.at) };
+  const ofKind = (kind: IncomeKind): number =>
+    payOf(
+      lines.filter((line) => line.kind === kind),
+      fed,
+      reading,
+    );
+  const taxable = payOf(lines, fed, reading);
   return {
-    incomeTax: incomeTaxOn(taxable, { months: 1, uprating: 1 }),
+    incomeTax: incomeTaxOn(taxable, stretch),
     insurance: incomeKinds.reduce(
-      (sum, kind) =>
-        sum +
-        insuranceOn(kind, payOf(lines, fed, [kind]), {
-          months: 1,
-          uprating: 1,
-        }),
+      (sum, kind) => sum + insuranceOn(kind, ofKind(kind), stretch),
       0,
     ),
-    profit: payOf(lines, fed, ["self-employment"]),
+    profit: ofKind("self-employment"),
     taxable,
   };
 }
