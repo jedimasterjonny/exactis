@@ -1,8 +1,8 @@
 import type { Account } from "@/data/accounts";
-import type { Curve } from "@/data/inflation";
+import type { Allocation, Rates } from "@/data/rates";
 import type { LineGrowth, Month } from "@/data/schedule";
 
-import { inflationOf, target } from "@/data/inflation";
+import { planRate } from "@/data/rates";
 import { termOf } from "@/lib/loans";
 import { monthsBetween } from "@/lib/months";
 
@@ -37,10 +37,9 @@ export interface PlanAges {
   readonly retires: number;
 }
 
-// The rest of the plan, until there is somewhere to set it: five per
-// cent a year, for someone born in 1990.
+// The rest of the plan, until there is somewhere to set it: someone
+// born in 1990.
 const born = 1990;
-const rate = 0.05;
 
 // The age the plan's owner reaches in a year. The plan holds the year
 // they were born in and not the day, so it is the age reached that
@@ -115,22 +114,27 @@ export function growthFrom(
 
 // The plan from the month given, the month the balances are as of,
 // since they are what its first year opens with, to the age the ages
-// say it runs to and with the age they say its owner retires at, taking
-// the inflation the curve given makes, or the Bank's target when no
-// curve has been pulled: what the projection runs on and what the plan
-// screen lays its lines over. A plan whose age is already reached runs
-// no years forward rather than a count below nothing.
+// say it runs to and with the age they say its owner retires at,
+// growing at the rate the rates given make with the savings split as
+// the allocation given splits them, and taking the rates' inflation:
+// what the projection runs on and what the plan screen lays its lines
+// over. The rates and the split are taken together, as the household
+// keeps them. A plan whose age is already reached runs no years forward
+// rather than a count below nothing.
 export function planOf(
   ages: PlanAges,
   start: Month,
-  curve: Curve | null,
+  {
+    allocation,
+    rates,
+  }: { readonly allocation: Allocation; readonly rates: Rates },
 ): Plan {
   return {
     born,
     from: start.year,
-    inflation: curve === null ? target : inflationOf(curve).rate,
+    inflation: rates.inflation,
     month: start.month,
-    rate,
+    rate: planRate(rates, allocation),
     retires: ages.retires,
     years: Math.max(0, born + ages.ends - start.year),
   };

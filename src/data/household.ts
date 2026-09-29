@@ -7,6 +7,7 @@ import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan, PlanAges } from "@/data/plan";
+import type { Allocation, Rates } from "@/data/rates";
 import type { Month, Tie } from "@/data/schedule";
 
 import {
@@ -22,6 +23,7 @@ import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
 import { timed } from "@/data/milestones";
 import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
+import { allInStocks, openingRates } from "@/data/rates";
 import { rules } from "@/data/rules";
 import { lineGrowths } from "@/data/schedule";
 import {
@@ -41,16 +43,19 @@ import { clearsIn, termOf } from "@/lib/loans";
 import { isWithinAllowance } from "@/lib/tax";
 
 // Everything the projection runs on, the owners the wrappers name and
-// the milestones the plan is laid out by, and the inflation curve last
-// pulled from the Bank of England, or none before one is: the whole of
-// what the store holds for the household, with the plan as it stands
-// the day it is read.
+// the milestones the plan is laid out by, the inflation curve last
+// pulled from the Bank of England, or none before one is, and the rates
+// and the split of the savings the plan's rate and inflation are made
+// from: the whole of what the store holds for the household, with the
+// plan as it stands the day it is read.
 export interface Household {
   readonly accounts: readonly Account[];
+  readonly allocation: Allocation;
   readonly curve: Curve | null;
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
+  readonly rates: Rates;
   readonly schedule: {
     readonly expenses: readonly ExpenseLine[];
     readonly income: readonly IncomeLine[];
@@ -61,18 +66,21 @@ export interface Household {
 // balances are as of, one for the whole household since they are
 // recorded together, the ages the plan is set to rather than the plan
 // they make, the curve as the Bank gave it rather than the inflation it
-// makes, and the id the next record added is given. That id only
+// makes, the rates and the split as typed rather than the rate they
+// make, and the id the next record added is given. That id only
 // ever counts up, so one a deleted record held is never given to
 // another, which a form left open on the deleted one would otherwise
 // write over.
 export interface Kept {
   readonly accounts: readonly Account[];
   readonly ages: PlanAges;
+  readonly allocation: Allocation;
   readonly asOf: Month;
   readonly curve: Curve | null;
   readonly milestones: readonly Milestone[];
   readonly next: number;
   readonly owners: readonly Owner[];
+  readonly rates: Rates;
   readonly schedule: Household["schedule"];
 }
 
@@ -223,6 +231,27 @@ const curve = z.object({
   }),
 }) satisfies z.ZodType<Curve>;
 
+// The rates as typed: each class growing at a rate no lower than losing
+// everything, a yield on stocks of nothing or more, since a dividend is
+// paid and never charged, and prices falling by less than everything,
+// in the words the plan they make is refused in. Stocks' total is then
+// no lower than losing everything either, and so is the rate the plan
+// blends from it.
+const rates = z.object({
+  bonds: z.number().min(-1, rules.beyondLoss),
+  dividends: z.number().min(0, "A dividend yield is nothing or more"),
+  inflation: z.number().gt(-1, rules.inflation),
+  stocks: z.number().min(-1, rules.beyondLoss),
+}) satisfies z.ZodType<Rates>;
+
+// A split of the savings: the share in stocks, from none of them to all.
+const allocation = z.object({
+  stocks: z
+    .number()
+    .min(0, "Stocks hold none of the savings, all of them, or a share")
+    .max(1, "Stocks hold none of the savings, all of them, or a share"),
+}) satisfies z.ZodType<Allocation>;
+
 // The plan as the day it is read makes it: a month of the year, whole
 // years forward, the plan rate no lower than losing everything, prices
 // falling by less than everything, and the ages the plan action holds,
@@ -266,10 +295,12 @@ const plan = z
 export const household = z
   .object({
     accounts: z.array(account),
+    allocation,
     curve: curve.nullable(),
     milestones: z.array(milestone),
     owners: z.array(owner),
     plan,
+    rates,
     schedule: z.object({
       expenses: z.array(expenseLine),
       income: z.array(incomeLine),
@@ -365,7 +396,10 @@ export const household = z
 // below the one the next is given. A household kept before there were
 // milestones lists none, and is read as listing none rather than
 // refused, so the store need not be emptied to take them; one kept
-// before there was a curve is read as holding none the same way.
+// before there was a curve is read as holding none the same way. One
+// kept before there were rates is read with the rates it ran on, as
+// its curve makes them, and everything in stocks, so its plan grows
+// and rises as it did until a rate is typed.
 const kept = z
   .object({
     accounts: z.array(account),
@@ -382,11 +416,13 @@ const kept = z
         (ages) => ages.ends <= oldestAge,
         `A plan ends by ${String(oldestAge)}`,
       ),
+    allocation: allocation.default(allInStocks),
     asOf: month,
     curve: curve.nullable().default(null),
     milestones: z.array(milestone).default([]),
     next: recordId,
     owners: z.array(owner),
+    rates: rates.optional(),
     schedule: z.object({
       expenses: z.array(expenseLine),
       income: z.array(incomeLine),
@@ -402,20 +438,27 @@ const kept = z
         ...schedule.income,
       ].every((record) => record.id < next),
     "A record's id is below the one the next record is given",
-  ) satisfies z.ZodType<Kept>;
+  )
+  .transform(({ rates, ...read }) => ({
+    ...read,
+    rates: rates ?? openingRates(read.curve),
+  })) satisfies z.ZodType<Kept>;
 
 // The household before anything is saved: no records, balances as of
 // the month given, the ages the dashboard has shown, a plan to 89
-// retiring at 59, no curve pulled, and the first id.
+// retiring at 59, no curve pulled, the rates a household opens with and
+// everything in stocks, and the first id.
 export function nothingKeptIn(asOf: Month): Kept {
   return {
     accounts: [],
     ages: { ends: 89, retires: 59 },
+    allocation: allInStocks,
     asOf,
     curve: null,
     milestones: [],
     next: 1,
     owners: [],
+    rates: openingRates(null),
     schedule: { expenses: [], income: [] },
   };
 }
@@ -470,17 +513,19 @@ function endsInAYear(line: {
 }
 
 // The whole a kept household makes, its plan running from the month
-// its balances are as of, each line's tied ends read off the milestones
-// they are tied to, and each line paying a loan running as the loan's
-// payments do.
+// its balances are as of on the rates and the split kept, each line's
+// tied ends read off the milestones they are tied to, and each line
+// paying a loan running as the loan's payments do.
 function householdOf(kept: Kept): Household {
-  const plan = planOf(kept.ages, kept.asOf, kept.curve);
+  const plan = planOf(kept.ages, kept.asOf, kept);
   return {
     accounts: kept.accounts,
+    allocation: kept.allocation,
     curve: kept.curve,
     milestones: kept.milestones,
     owners: kept.owners,
     plan,
+    rates: kept.rates,
     schedule: {
       expenses: kept.schedule.expenses.map((line) =>
         paidOver(timed(line, kept.milestones, plan), kept.accounts, plan),

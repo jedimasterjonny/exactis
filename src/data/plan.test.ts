@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
 
-import { inflationOf } from "@/data/inflation";
-import { curve } from "@/data/inflation.fixture";
+import { allInStocks, openingRates, planRate } from "@/data/rates";
+import { allocation, rates } from "@/data/rates.fixture";
 import { termOf } from "@/lib/loans";
 
 import {
@@ -17,12 +17,16 @@ import {
   risenBy,
 } from "./plan";
 
+// The rates a household opens with, 5% for stocks and bonds alike and
+// the Bank's 2% target, and everything in stocks.
+const opening = { allocation: allInStocks, rates: openingRates(null) };
+
 describe("ageIn", () => {
   it("reads the age the plan's owner reaches in a year, and in the plan's last", () => {
     const plan = planOf(
       { ends: 89, retires: 59 },
       { month: 8, year: 2026 },
-      null,
+      opening,
     );
 
     expect(ageIn(2026, plan)).toBe(36);
@@ -34,7 +38,7 @@ describe("debtTermOf", () => {
   const plan = planOf(
     { ends: 89, retires: 59 },
     { month: 8, year: 2026 },
-    null,
+    opening,
   );
 
   // A PCP owing £14,000, £6,000 of it the balloon, at its own 7.9%.
@@ -71,31 +75,31 @@ describe("debtTermOf", () => {
 });
 
 describe("planOf", () => {
-  it("runs from the month given to the ages given", () => {
+  // Four fifths at stocks' 7.95% and a fifth at bonds' 4.45%, with the
+  // 2.95% typed for inflation.
+  it("runs from the month given to the ages given, on the rates given as the savings are split", () => {
     expect(
-      planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }, curve),
+      planOf(
+        { ends: 89, retires: 59 },
+        { month: 8, year: 2026 },
+        { allocation, rates },
+      ),
     ).toStrictEqual({
       born: 1990,
       from: 2026,
-      inflation: inflationOf(curve).rate,
+      inflation: 0.0295,
       month: 8,
-      rate: 0.05,
+      rate: planRate(rates, allocation),
       retires: 59,
       years: 53,
     });
-  });
-
-  it("takes the Bank's 2% target for inflation before a curve is pulled", () => {
-    expect(
-      planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }, null),
-    ).toMatchObject({ inflation: 0.02 });
   });
 
   // Born in 1990, a plan to 30 has run its course by 2026, and runs no
   // years forward rather than a count below nothing.
   it("runs no years forward once its age is reached", () => {
     expect(
-      planOf({ ends: 30, retires: 30 }, { month: 8, year: 2026 }, null),
+      planOf({ ends: 30, retires: 30 }, { month: 8, year: 2026 }, opening),
     ).toMatchObject({ from: 2026, years: 0 });
   });
 });
@@ -105,7 +109,7 @@ describe("growthFrom", () => {
   // two over it, and not at all fixed in nominal terms.
   it("reads each growth choice against the plan's inflation", () => {
     const plan = {
-      ...planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }, null),
+      ...planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }, opening),
       inflation: 0.03,
     };
 
@@ -123,7 +127,7 @@ describe("growthFrom", () => {
 
   it("grows a line paying a loan at nothing, whatever it says", () => {
     const plan = {
-      ...planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }, null),
+      ...planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }, opening),
       inflation: 0.03,
     };
 
