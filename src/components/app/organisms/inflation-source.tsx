@@ -84,7 +84,7 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
           </Button>
         </>
       }
-      label={subsectionLabel(assumptions, 1)}
+      label={subsectionLabel(assumptions, 2)}
       title="Inflation source"
     >
       <CardContent>

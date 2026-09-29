@@ -68,11 +68,11 @@ same rules before any screen draws from it.
 
 The accounts and plan screens read and write it, the dashboard projects what it
 holds and saves the ages the plan runs to and its owner retires at, and the
-assumptions screen pulls the inflation curve into it; the progress screen still
-shows the reference kit's figures. `DATABASE_URL` names the database, as
-`.env.example` shows. Nothing reads it until a query runs, so a build needs no
-database. Locally, point it at a Neon branch of your own and apply the
-migrations once:
+assumptions screen types the rates into it and pulls the inflation curve into
+it; the progress screen still shows the reference kit's figures. `DATABASE_URL`
+names the database, as `.env.example` shows. Nothing reads it until a query
+runs, so a build needs no database. Locally, point it at a Neon branch of your
+own and apply the migrations once:
 
 ```bash
 bun run db:migrate
