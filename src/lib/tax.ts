@@ -17,16 +17,23 @@ export interface Draw {
 
 // Where a draw on a pension stands when it is taxed: what is left of the
 // lump sum allowance, which its free quarter comes out of; the taxable
-// income already had over the months it is taxed with, which it is
-// taxed on top of; how many months those are, whose share of each band
-// it is charged against; and whether it is taken before the pension
-// age, when it is no income at all but a payment the rules do not
-// allow, and is charged as one.
-export interface Standing {
+// income already had over the stretch of the tax year it is taxed
+// with, which it is taxed on top of, and that stretch; and whether it is
+// taken before the pension age, when it is no income at all but a
+// payment the rules do not allow, and is charged as one.
+export interface Standing extends Stretch {
   readonly allowance: number;
   readonly below: number;
   readonly isEarly: boolean;
+}
+
+// A stretch of a tax year as a charge meets the bands: how many months
+// of the year it holds, whose share of each band the charge is held to,
+// a twelfth a month, and how far the bands have risen by that year, as a
+// multiple of the figures here.
+export interface Stretch {
   readonly months: number;
+  readonly uprating: number;
 }
 
 // A band of a tax: the rate charged on each pound of a year's income
@@ -78,6 +85,10 @@ const classFour: readonly Band[] = [
   { from: 50270, rate: 0.02 },
 ];
 
+// The month a tax year opens in, April, January being nought. The year
+// opens on the sixth, and is taken here from the first.
+export const april = 3;
+
 // The basic rate, which a pension claims back on what is paid into it
 // out of taxed money.
 const basicRate = 0.2;
@@ -108,7 +119,7 @@ const unauthorisedCharge = 0.55;
 // bands from where the income below it stands, or by the charge alone
 // before the pension age.
 export function drawFor(net: number, standing: Standing): Draw {
-  checkCharge(standing.months, net, standing.allowance, standing.below);
+  checkCharge(standing, net, standing.allowance, standing.below);
   return drawOf(
     standing.isEarly ? net / (1 - unauthorisedCharge) : grossFor(net, standing),
     standing,
@@ -121,11 +132,9 @@ export function drawFor(net: number, standing: Standing): Draw {
 // taxed at the salary's rate and one beside nothing uses the personal
 // allowance first. Before the pension age it is 45p a pound of it, the
 // charge taken, and none of it is income or free.
-export function drawOf(
-  gross: number,
-  { allowance, below, isEarly, months }: Standing,
-): Draw {
-  checkCharge(months, gross, allowance, below);
+export function drawOf(gross: number, standing: Standing): Draw {
+  const { allowance, below, isEarly } = standing;
+  checkCharge(standing, gross, allowance, below);
   if (isEarly) {
     return {
       gross,
@@ -136,35 +145,37 @@ export function drawOf(
   }
   const taxFree = Math.min(gross * taxFreeShare, allowance);
   const taxable = gross - taxFree;
-  const tax = incomeTaxOn(below + taxable, months) - incomeTaxOn(below, months);
+  const tax =
+    incomeTaxOn(below + taxable, standing) - incomeTaxOn(below, standing);
   return { gross, net: gross - tax, taxable, taxFree };
 }
 
-// The income tax on what so many months of the year earned, which is
+// The income tax on what a stretch of the year earned, which is
 // everything the lines pay less what a salary gives up into a pension,
 // since a sacrifice is never paid to its owner at all.
-export function incomeTaxOn(taxable: number, months: number): number {
-  checkCharge(months, taxable);
-  return chargedOn(incomeTax, taxable, months);
+export function incomeTaxOn(taxable: number, stretch: Stretch): number {
+  checkCharge(stretch, taxable);
+  return chargedOn(incomeTax, taxable, shareOf(stretch));
 }
 
-// The National Insurance a kind of income pays on what so many months
-// of it earned: Class 1 on a salary and Class 4 on self-employed profit.
-// A pension and other income pay income tax alone.
+// The National Insurance a kind of income pays on what a stretch of the
+// year earned: Class 1 on a salary and Class 4 on self-employed profit,
+// each against its thresholds as the income tax bands have risen. A
+// pension and other income pay income tax alone.
 export function insuranceOn(
   kind: IncomeKind,
   pay: number,
-  months: number,
+  stretch: Stretch,
 ): number {
-  checkCharge(months, pay);
+  checkCharge(stretch, pay);
   switch (kind) {
     case "employment":
-      return chargedOn(classOne, pay, months);
+      return chargedOn(classOne, pay, shareOf(stretch));
     case "other":
     case "pension":
       return 0;
     case "self-employment":
-      return chargedOn(classFour, pay, months);
+      return chargedOn(classFour, pay, shareOf(stretch));
   }
 }
 
@@ -218,15 +229,14 @@ export function relievableOn(earned: number, months: number): number {
   return Math.max((leastRelievable * months) / 12, earned);
 }
 
-// What the bands charge on what so many months earned: each band's rate
-// on the part of the amount between where it starts and where the next
-// one does, both taken as that share of the year's.
+// What the bands charge on a share of them: each band's rate on the
+// part of the amount between where it starts and where the next one
+// does, both taken as that share of the year's figures.
 function chargedOn(
   bands: readonly Band[],
   amount: number,
-  months: number,
+  share: number,
 ): number {
-  const share = months / 12;
   return bands.reduce((sum, { from, rate }, index) => {
     const to = (bands[index + 1]?.from ?? Number.POSITIVE_INFINITY) * share;
     return sum + rate * Math.max(0, Math.min(amount, to) - from * share);
@@ -234,15 +244,23 @@ function chargedOn(
 }
 
 // Refuses what no tax can be charged on: a stretch of the year that is
-// not one to twelve whole months of it, or a sum below nothing or not a
-// number at all. Every figure that reaches here is one the engine worked
-// out, so either is a caller's mistake rather than a result; charged,
-// the one takes a share of each band that is nothing or not a number,
-// and the other comes back as a tax that is not a number, which every
-// figure after it carries and no comparison against it catches.
-function checkCharge(months: number, ...sums: readonly number[]): void {
+// not one to twelve whole months of it, bands risen by a multiple that
+// is nothing or less or not a number at all, or a sum below nothing or
+// not a number. Every figure that reaches here is one the engine worked
+// out, so any of them is a caller's mistake rather than a result;
+// charged, the first two take a share of each band that is nothing or
+// not a number, and the last comes back as a tax that is not a number,
+// which every figure after it carries and no comparison against it
+// catches.
+function checkCharge(
+  { months, uprating }: Stretch,
+  ...sums: readonly number[]
+): void {
   if (!Number.isInteger(months) || months < 1 || months > 12) {
     throw new Error("A tax year holds one to twelve months");
+  }
+  if (!(uprating > 0 && Number.isFinite(uprating))) {
+    throw new Error("The bands rise by a multiple above nothing");
   }
   if (!sums.every((sum) => Number.isFinite(sum) && sum >= 0)) {
     throw new Error("A tax is charged on nothing or more");
@@ -261,8 +279,8 @@ function checkCharge(months: number, ...sums: readonly number[]): void {
 // from is checked before the first step, since a figure that is not a
 // number compares false against every band and would walk for ever.
 function grossFor(net: number, standing: Standing): number {
-  const { allowance, below, months } = standing;
-  const share = months / 12;
+  const { allowance, below } = standing;
+  const share = shareOf(standing);
   const { rate, to } = incomeTax.reduce(
     (found, band, index) =>
       band.from * share <= below
@@ -294,4 +312,10 @@ function grossFor(net: number, standing: Standing): number {
       below: stretch === toBand ? to : below + stretch * part,
     })
   );
+}
+
+// The share of each band's yearly figure a stretch of the year meets: a
+// twelfth a month of the figures as they have risen.
+function shareOf({ months, uprating }: Stretch): number {
+  return (months / 12) * uprating;
 }
