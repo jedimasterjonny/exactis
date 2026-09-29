@@ -28,12 +28,12 @@ function renderSource(held: Curve | null = curve): void {
 }
 
 describe("InflationSource", () => {
-  it("heads the card as the screen's first, naming the source", () => {
+  it("heads the card as the screen's second, naming the source", () => {
     renderSource();
 
     const card = screen.getByRole("region", { name: "Inflation source" });
 
-    expect(within(card).getByText("Sect. V.i")).toHaveClass("label");
+    expect(within(card).getByText("Sect. V.ii")).toHaveClass("label");
     expect(within(card).getByText("BoE implied curve")).toHaveClass("label");
     expect(
       within(card).getByRole("button", { name: "Pull latest curve" }),
