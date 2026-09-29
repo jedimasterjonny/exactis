@@ -196,17 +196,19 @@ The engine works in the pounds of each month and reads out in today's money, the
 money of the month the plan starts in. A line states its amount in today's
 money, and is paid it risen from there a month at a time at the rate its growth
 gives: the plan's inflation, a point or two over it, or nothing for a line fixed
-in nominal terms. Everything an account states is in the pounds of the day, as a
-statement or an agreement gives it: its balance, its fixed sum, its cap and its
-rate, the plan rate among them, which is a nominal return. So are the figures
-the law sets and does not raise, the ISA and pension allowances, the lump sum
-allowance and the £3,600 of relief. A point divides every balance by how far
-prices have risen by the start of its year, and what the year went short or drew
-early by a month at a time by how far they had risen by that month, so the chart
-and its tiles are in today's money. The plan screen's month is read the same
-way, so a line rising with inflation reads at what it states in whichever year
-is shown, and what an account is paid reads at what it is worth then; the cap it
-is paid to is shown as it is stated, as the line is.
+in nominal terms. A loan's payments are always fixed so, whatever the line was
+saved with, since the loan maths reads one payment for the whole term.
+Everything an account states is in the pounds of the day, as a statement or an
+agreement gives it: its balance, its fixed sum, its cap and its rate, the plan
+rate among them, which is a nominal return. So are the figures the law sets and
+does not raise, the ISA and pension allowances, the lump sum allowance and the
+£3,600 of relief. A point divides every balance by how far prices have risen by
+the start of its year, and what the year went short or drew early by a month at
+a time by how far they had risen by that month, so the chart and its tiles are
+in today's money. The plan screen's month is read the same way, so a line rising
+with inflation reads at what it states in whichever year is shown, and what an
+account is paid reads at what it is worth then; the cap it is paid to is shown
+as it is stated, as the line is.
 
 The dashboard reads the accounts, the lines, the milestones and the plan from
 the store and hands them to the browser, which runs the engine itself, so a save

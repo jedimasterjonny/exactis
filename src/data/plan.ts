@@ -88,11 +88,19 @@ export function endYear(plan: Plan): number {
 // projection counts in: the plan's inflation for a line kept level in
 // today's money, a point or two over it for one that outpaces prices,
 // and nothing for one fixed in nominal terms, which so falls behind
-// them.
+// them. A line paying a loan grows at nothing whatever it says, since a
+// loan's payment is the one sum for every month of its term, which is
+// how the loan maths reads it and how the line's end is worked out; a
+// payment rising with prices would clear the loan early and go on being
+// paid after it. The dialogs write such a line fixed, so this holds
+// one written any other way to the same.
 export function growthFrom(
-  line: { readonly growth: LineGrowth },
+  line: { readonly growth: LineGrowth; readonly pays?: number },
   plan: Plan,
 ): number {
+  if (line.pays !== undefined) {
+    return 0;
+  }
   switch (line.growth) {
     case "inflation":
       return plan.inflation;
