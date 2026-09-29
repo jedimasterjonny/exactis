@@ -3,18 +3,19 @@ import type { Month } from "@/data/schedule";
 // The Bank of England's implied inflation curve as it stood on a day:
 // the day, as an ISO date, and the rate the gilt market implies at each
 // maturity the plan reads, held as a fraction as every rate here is.
-// It is the market's breakeven, not yet the plan's inflation, since it
-// is priced on RPI and carries a premium for the protection it buys.
+// It is the market's breakeven, not yet the inflation derived from it,
+// since it is priced on RPI and carries a premium for the protection it
+// buys.
 export interface Curve {
   readonly asOf: string;
   readonly implied: Readonly<Record<Maturity, number>>;
 }
 
-// The plan's inflation as a curve gives it, and each step on the way:
-// the implied rate at the horizon; the years of the horizon before RPI
-// is aligned with CPIH, and the share of RPI's wedge over CPIH they
-// carry; the premium for protection; and the rate the plan takes, the
-// implied rate less the other two. Each is a fraction, and the years
+// The inflation a curve gives, and each step on the way: the implied
+// rate at the horizon; the years of the horizon before RPI is aligned
+// with CPIH, and the share of RPI's wedge over CPIH they carry; the
+// premium for protection; and the rate derived, the implied rate less
+// the other two. Each is a fraction, and the years
 // are years.
 export interface Inflation {
   readonly implied: number;
@@ -28,15 +29,16 @@ export interface Inflation {
 // implied inflation curve at.
 export type Maturity = 5 | 10 | 20 | 30;
 
-// The inflation a plan takes before any curve has been pulled: the Bank
-// of England's target, 2% a year on CPI, which policy is set to bring
-// prices back to and which stands in until the market is read.
+// The inflation a household's rates open with when no curve has been
+// pulled: the Bank of England's target, 2% a year on CPI, which policy
+// is set to bring prices back to and which stands in until the market
+// is read.
 export const target = 0.02;
 
 // The maturities shortest first, as a screen lists the curve.
 export const maturities: readonly Maturity[] = [5, 10, 20, 30];
 
-// The maturity whose rate feeds the plan: the twenty years a capital
+// The maturity the rate is derived from: the twenty years a capital
 // market assumption is quoted over, so inflation is read over the same
 // years as the returns it is set against.
 export const horizon = 20;
@@ -63,7 +65,7 @@ export const rpiAligned: Month = { month: 1, year: 2030 };
 
 const yearLength = 365.25 * 86_400_000;
 
-// The plan's inflation off a curve, in three steps. The implied rate at
+// The inflation a curve gives, in three steps. The implied rate at
 // the horizon is the market's breakeven on RPI; only the years of the
 // horizon before RPI is aligned with CPIH carry RPI's wedge, so that
 // share of it is taken off, and none once the day is past February

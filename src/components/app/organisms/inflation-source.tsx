@@ -19,7 +19,6 @@ import {
   maturities,
   rpiAligned,
   rpiWedge,
-  target,
 } from "@/data/inflation";
 import { useSender } from "@/hooks/use-sender";
 import { formatCurveRate, formatPercent, formatPoints } from "@/lib/money";
@@ -36,21 +35,23 @@ interface StepProps {
   readonly label: string;
 }
 
-// The assumptions screen's first card: where the plan's inflation comes
-// from and how it is reached. The header names the source and pulls
-// the Bank's latest curve; the pull holds while it is on its way, and
-// the store's answer draws the screen again from the curve kept, with a
-// toast saying what the plan now takes, or says why under a toast when
-// the Bank or its file is refused. Beneath, the steps from the curve to
-// the plan's rate are laid out as a ledger, each figure with what it
-// rests on beneath its name: the implied rate at the horizon on the
-// curve's day, the share of RPI's wedge the years before 2030 carry,
-// and the premium held for protection, with the plan's rate closing the
-// ledger. Beside them the curve at each maturity the plan reads, the
-// horizon's point in the foreground, since it is the one the plan
-// takes. Before a curve has been pulled there are no steps to lay out,
-// and the card says so, and what the plan takes until one is. The footer states the check a curve passes
-// before it is kept, since that is what the figures rest on.
+// The assumptions screen's inflation card: the rate the gilt market
+// gives and how it is derived, which the plan does not take, since it
+// runs on the inflation typed into its rates, and which is here to check
+// that against. The header names the source and pulls the Bank's latest
+// curve; the pull holds while it is on its way, and the store's answer
+// draws the screen again from the curve kept, with a toast saying what
+// it derives, or says why under a toast when the Bank or its file is
+// refused. Beneath, the steps from the curve to the derived rate are
+// laid out as a ledger, each figure with what it rests on beneath its
+// name: the implied rate at the horizon on the curve's day, the share
+// of RPI's wedge the years before 2030 carry, and the premium held for
+// protection, with the derived rate closing the ledger. Beside them the
+// curve at each maturity it is read at, the horizon's point in the
+// foreground, since it is the one derived from. Before a curve has been
+// pulled there are no steps to lay out, and the card says so. The
+// footer states the check a curve passes before it is kept, since that
+// is what the figures rest on.
 export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
   const { isSending: isPulling, send } = useSender();
 
@@ -58,7 +59,7 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
     send(pullCurve, {
       failure: "Curve not pulled",
       success: (pulled) => ({
-        description: `As at ${formatDay(pulled.asOf)}, plan inflation ${formatPercent(inflationOf(pulled).rate)}`,
+        description: `As at ${formatDay(pulled.asOf)}, derived inflation ${formatPercent(inflationOf(pulled).rate)}`,
         title: "Curve pulled",
       }),
     });
@@ -89,7 +90,7 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
       <CardContent>
         {curve === null ? (
           <EmptyState
-            description={`Pull the latest curve to read the plan's inflation off the gilt market. Until then the plan takes the Bank of England's ${formatPercent(target)} target.`}
+            description="Pull the latest curve to derive inflation from the gilt market, as a check on the rate the plan is set to."
             icon={Landmark}
             title="No curve pulled yet"
           />
@@ -105,8 +106,8 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
   );
 }
 
-// The curve at each maturity the plan reads, on a sunken panel headed
-// as a region of its own, the horizon's point in the foreground and the
+// The curve at each maturity it is read at, on a sunken panel headed as
+// a region of its own, the horizon's point in the foreground and the
 // rest muted, and the source beneath.
 function ByMaturity({ curve }: { readonly curve: Curve }): JSX.Element {
   const id = useId();
@@ -130,13 +131,13 @@ function ByMaturity({ curve }: { readonly curve: Curve }): JSX.Element {
         })}
       </dl>
       <p className="text-sm text-muted-foreground">
-        {`Source: Bank of England implied inflation (gilt) curve. The ${String(horizon)}-year point feeds the plan.`}
+        {`Source: Bank of England implied inflation (gilt) curve. The ${String(horizon)}-year point is the one derived from.`}
       </p>
     </section>
   );
 }
 
-// The steps from the curve to the plan's rate beside the curve they
+// The steps from the curve to the derived rate beside the curve they
 // start from, side by side where the card is wide enough and the curve
 // beneath where it is not.
 function Derivation({ curve }: { readonly curve: Curve }): JSX.Element {
@@ -162,7 +163,7 @@ function Derivation({ curve }: { readonly curve: Curve }): JSX.Element {
           />
         </ul>
         <p className="flex items-baseline justify-between gap-4 pt-6">
-          <span className="label text-muted-foreground">Plan inflation</span>
+          <span className="label text-muted-foreground">Derived inflation</span>
           <span className="figure text-3xl font-medium">
             {formatPercent(inflation.rate)}
           </span>

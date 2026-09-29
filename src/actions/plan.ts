@@ -3,6 +3,7 @@
 import * as z from "zod";
 
 import type { PlanAges } from "@/data/plan";
+import type { Allocation, Rates } from "@/data/rates";
 import type { Answer } from "@/lib/answer";
 
 import { ageIn, oldestAge } from "@/data/plan";
@@ -18,6 +19,20 @@ const patch = z.object({
   ends: z.number().int().nonnegative().optional(),
   retires: z.number().int().nonnegative().optional(),
 });
+
+// What a save of the rates may carry: any of them, each a number, and
+// whichever is not sent is kept as the household has it, so the
+// assumptions screen can save the one it holds as each is typed. A rate
+// sent as nothing at all is refused rather than read as not sent.
+const ratesPatch = z.object({
+  bonds: z.number().exactOptional(),
+  dividends: z.number().exactOptional(),
+  inflation: z.number().exactOptional(),
+  stocks: z.number().exactOptional(),
+});
+
+// What a save of the split carries: the share in stocks.
+const split = z.object({ stocks: z.number() });
 
 // Writes the plan's ages, the ones sent over the ones the household
 // has, and hands back the ages as it now has them. An action answers a
@@ -52,5 +67,39 @@ export async function saveAges(
       retires: parsed.retires ?? kept.ages.retires,
     };
     return { kept: { ...kept, ages }, result: ages };
+  });
+}
+
+// Writes how the savings are split, and hands it back as written. An
+// action answers a POST from anywhere, so it checks the session for
+// itself and parses what it was sent rather than trusting the form. The
+// share is held to none of the savings, all of them or a share by the
+// household, and so is the plan rate the split makes, as a debt charged
+// it must still be paid off at it; a refusal is in the rule's words,
+// since the screen says so under a toast.
+export async function saveAllocation(
+  draft: Allocation,
+): Promise<Answer<Allocation>> {
+  await requireSession();
+  const allocation = split.parse(draft);
+  return amend(({ kept }) => ({
+    kept: { ...kept, allocation },
+    result: allocation,
+  }));
+}
+
+// Writes the plan's rates, the ones sent over the ones the household
+// has, and hands back the rates as it now has them. An action answers a
+// POST from anywhere, so it checks the session for itself and parses
+// what it was sent rather than trusting the form. Each rate is held to
+// its rule by the household, and so is the plan the rates make, as a
+// debt charged the plan rate must still be paid off at it; a refusal is
+// in the rule's words, since the screen says so under a toast.
+export async function saveRates(draft: Partial<Rates>): Promise<Answer<Rates>> {
+  await requireSession();
+  const parsed = ratesPatch.parse(draft);
+  return amend(({ kept }) => {
+    const rates = { ...kept.rates, ...parsed };
+    return { kept: { ...kept, rates }, result: rates };
   });
 }
