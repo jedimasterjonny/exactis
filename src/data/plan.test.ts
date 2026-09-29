@@ -120,6 +120,15 @@ describe("growthFrom", () => {
     );
     expect(growthFrom({ growth: "nominal" }, plan)).toBe(0);
   });
+
+  it("grows a line paying a loan at nothing, whatever it says", () => {
+    const plan = {
+      ...planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }, null),
+      inflation: 0.03,
+    };
+
+    expect(growthFrom({ growth: "inflation-plus-2", pays: 5 }, plan)).toBe(0);
+  });
 });
 
 describe("pricesIn", () => {

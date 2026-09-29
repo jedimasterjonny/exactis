@@ -1534,6 +1534,25 @@ describe("cashFlow", () => {
     ]);
   });
 
+  // A loan's payment is the one sum for every month of its term, so the
+  // mortgage's £3,201 is paid as it states in 2040 at 3% a year, though
+  // the line says it rises two points over prices, where a line paying
+  // no loan saying so would be paid 5% more a year.
+  it("pays a line paying a loan fixed in nominal terms, whatever it says", () => {
+    const flow = cashFlow(
+      [mortgage],
+      {
+        expenses: [
+          { ...mortgagePayment, growth: "inflation-plus-2", pays: mortgage.id },
+        ],
+        income: [],
+      },
+      { at: { month: 0, year: 2040 }, plan: { ...plan, inflation: 0.03 } },
+    );
+
+    expect(flow.expenses).toBe(3201);
+  });
+
   // Read from April 2026 at 3%, April 2027 opens the next tax year: a
   // salary rising with prices is paid 3% more, and the bands have risen
   // 3% with it, so the month pays 3% more of each tax. March 2027 is
