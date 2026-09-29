@@ -49,12 +49,13 @@ a second file repeating it.
 ## The store
 
 The household, its owners, accounts, milestones, income and expense lines, the
-month its balances are as of, the ages the plan is set to and the inflation
-curve last pulled from the Bank of England, lives in Postgres as one document, a
-version of it a save, reached through [Drizzle](https://orm.drizzle.team) over
-Neon's HTTP driver. The table is `src/db/schema.ts`, the migration generated
-from it is in `drizzle/`, and the two queries, reading the latest version and
-keeping the next, are in `src/db/household.ts`.
+month its balances are as of, the ages the plan is set to, the rates and the
+split of the savings the plan runs on and the inflation curve last pulled from
+the Bank of England, lives in Postgres as one document, a version of it a save,
+reached through [Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The
+table is `src/db/schema.ts`, the migration generated from it is in `drizzle/`,
+and the two queries, reading the latest version and keeping the next, are in
+`src/db/household.ts`.
 
 A save reads the latest version, makes the household it leaves, holds the whole
 of it to the rules in `src/data/household.ts`, and keeps it as the version after
@@ -84,11 +85,15 @@ holding the old shape is emptied rather than carried forward, with
 `TRUNCATE household_versions`, which the trigger lets through where it refuses a
 delete. The milestones were taken without emptying it: a household kept before
 there were any is read as listing none, and one kept before there was a curve as
-holding none. The triple lock was dropped the same way: a line kept growing by
-it is read as growing with inflation. A change to the table is a new migration,
-written with `db:generate` and committed with the change. The tests apply the
-migrations to an in-process Postgres ([PGlite](https://pglite.dev)), so a
-migration that does not apply fails the suite before it reaches a database.
+holding none. The rates were taken the same way: a household kept before there
+were any is read with the ones it ran on, 5% for stocks and bonds alike with no
+yield split out, everything in stocks, and the inflation its curve made, so it
+projects as it did until a rate is typed. The triple lock was dropped the same
+way: a line kept growing by it is read as growing with inflation. A change to
+the table is a new migration, written with `db:generate` and committed with the
+change. The tests apply the migrations to an in-process Postgres
+([PGlite](https://pglite.dev)), so a migration that does not apply fails the
+suite before it reaches a database.
 
 ## The projection
 
@@ -96,23 +101,25 @@ The engine is `src/engine/projection.ts`: a pure function over the accounts, the
 income and expense lines and a plan, giving a point per year to the plan's
 horizon, each the balance entering that year. So far it plots the two wrappers,
 tax-free and tax-deferred, each paid into a month at a time as its accounts say
-and grown at a plan rate held as a constant until there is an assumptions screen
-to set it on. Cash is carried beside them, so a short month can be drawn from
-it, but it is not plotted, since the progress points a projection is laid over
-carry no cash figure. The first year runs from the month the household's
-balances are as of, since they are what it opens with, whatever day the plan is
-read on; a household read before anything is saved takes the month it is read
-in, and keeps it from its first save. What an account is paid in a month is what
-`src/engine/cash-flow.ts` works out: the month's income, less what the salaries
-sacrifice, the tax on the rest, what the expense lines cost and each debt's own
-fixed sum, pays the other fixed sums, handed down the accounts in the order they
-are listed, and what survives them is the spare money, handed down the accounts
-that take it the same way, each to a twelfth of its cap. A fixed sum into
-savings is therefore paid only out of what the month has, so a contribution
-stops when the income funding it ends. A debt's is owed rather than saved, so it
-is paid whole and first wherever the debt is listed, and a month short of it
-draws on the savings as it would for an expense; the order sets which saving is
-paid first, and a debt is no saving.
+and grown at the plan rate. That is made from the rates the household keeps, one
+to a class and flat for life: what stocks return in all, their growth and the
+dividend yield on top, which every wrapper reinvests, and what bonds return,
+each in the share of the savings the household holds in it. Cash is carried
+beside them, so a short month can be drawn from it, but it is not plotted, since
+the progress points a projection is laid over carry no cash figure. The first
+year runs from the month the household's balances are as of, since they are what
+it opens with, whatever day the plan is read on; a household read before
+anything is saved takes the month it is read in, and keeps it from its first
+save. What an account is paid in a month is what `src/engine/cash-flow.ts` works
+out: the month's income, less what the salaries sacrifice, the tax on the rest,
+what the expense lines cost and each debt's own fixed sum, pays the other fixed
+sums, handed down the accounts in the order they are listed, and what survives
+them is the spare money, handed down the accounts that take it the same way,
+each to a twelfth of its cap. A fixed sum into savings is therefore paid only
+out of what the month has, so a contribution stops when the income funding it
+ends. A debt's is owed rather than saved, so it is paid whole and first wherever
+the debt is listed, and a month short of it draws on the savings as it would for
+an expense; the order sets which saving is paid first, and a debt is no saving.
 
 A pension can be marked always funded, for a pension worth keeping paid when the
 month cannot, since what it is paid out of taxed money is relieved. It is paid
@@ -178,10 +185,10 @@ A month the income does not cover is drawn out of the savings at the start of
 it, before the month's growth: cash first, then the tax-free wrapper, then the
 tax-deferred one, as income from the pension age: from the year its owner turns
 55 until the age rises in April 2028, and from the year they turn 57 after it,
-ages held as constants in the engine until that same assumptions screen exists,
-as the plan rate is held in the store. Before the pension age a pension is drawn
-only as the last resort, once cash and the tax-free wrapper are empty, and at
-the 55% a payment before the pension age is charged; a registered scheme will
+ages held as constants in the engine until the assumptions screen sets them, as
+the plan's rates are held in the store. Before the pension age a pension is
+drawn only as the last resort, once cash and the tax-free wrapper are empty, and
+at the 55% a payment before the pension age is charged; a registered scheme will
 not normally make one, so what a year draws that way is carried on its point to
 be marked rather than counted on. Each account is drawn to nothing and no lower,
 and what a year could not draw from anywhere is carried on its point, so the
@@ -223,7 +230,8 @@ organisms that save through an action sit beneath the routes.
 
 ## Inflation
 
-The plan's inflation is read off the Bank of England's implied inflation curve,
+The plan's inflation is one of its rates, typed by hand. Beside it a rate is
+derived from the Bank of England's implied inflation curve, to check it against,
 which the Bank publishes each working day in one zip of its gilt curves.
 Pressing Pull latest curve on the assumptions screen runs the action in
 `src/actions/inflation.ts`, which fetches the zip from the server, and
@@ -242,9 +250,10 @@ Then 0.3 points comes off for the premium the market pays for protection. The
 household keeps the curve as the Bank gave it rather than the rate it makes, so
 a change to the method moves the rate without another pull. The assumptions
 screen lays those steps out beside the curve at 5, 10, 20 and 30 years. The plan
-carries the rate, or the Bank of England's 2% target before any curve has been
-pulled, which the screen's header then says it takes, and the projection grows
-the lines with it, and the tax bands once their freeze ends, as above.
+does not take the derived rate: it takes the inflation in its rates, which a
+household kept before there were rates opens on at the derived rate, or at the
+Bank of England's 2% target when no curve had been pulled, and the projection
+grows the lines with it, and the tax bands once their freeze ends, as above.
 
 ## Signing in
 

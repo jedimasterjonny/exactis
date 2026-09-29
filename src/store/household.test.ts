@@ -8,6 +8,7 @@ import { blank, kept as reference, today } from "@/data/household.fixture";
 import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
 import { planOf } from "@/data/plan";
+import { allInStocks, openingRates } from "@/data/rates";
 import { getDb } from "@/db/client";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -18,12 +19,14 @@ import { requireSession } from "@/lib/session";
 import {
   amend,
   getAccounts,
+  getAllocation,
   getCurve,
   getExpenseLines,
   getIncomeLines,
   getMilestones,
   getOwners,
   getPlan,
+  getRates,
 } from "./household";
 
 vi.mock("server-only", () => ({}));
@@ -42,12 +45,14 @@ describe("the household store", () => {
 
     for (const read of [
       getAccounts,
+      getAllocation,
       getCurve,
       getExpenseLines,
       getIncomeLines,
       getMilestones,
       getOwners,
       getPlan,
+      getRates,
     ]) {
       await expect(read()).rejects.toThrow("redirected");
     }
@@ -61,8 +66,10 @@ describe("the household store", () => {
     expect(await getExpenseLines()).toStrictEqual([]);
     expect(await getMilestones()).toStrictEqual([]);
     expect(await getCurve()).toBeNull();
+    expect(await getRates()).toStrictEqual(openingRates(null));
+    expect(await getAllocation()).toStrictEqual(allInStocks);
     expect(await getPlan()).toStrictEqual(
-      planOf(blank.ages, blank.asOf, blank.curve),
+      planOf(blank.ages, blank.asOf, blank),
     );
   });
 
@@ -76,6 +83,8 @@ describe("the household store", () => {
     expect(await getExpenseLines()).toStrictEqual(reference.schedule.expenses);
     expect(await getMilestones()).toStrictEqual(reference.milestones);
     expect(await getCurve()).toStrictEqual(reference.curve);
+    expect(await getRates()).toStrictEqual(reference.rates);
+    expect(await getAllocation()).toStrictEqual(reference.allocation);
     expect(await getPlan()).toStrictEqual({
       born: 1990,
       from: 2026,
@@ -128,7 +137,7 @@ describe("the household store", () => {
 
     const result = await amend(({ household, kept }) => {
       expect(household.plan).toStrictEqual(
-        planOf(reference.ages, reference.asOf, reference.curve),
+        planOf(reference.ages, reference.asOf, reference),
       );
       return {
         kept: {

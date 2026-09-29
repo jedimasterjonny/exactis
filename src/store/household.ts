@@ -10,6 +10,7 @@ import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
+import type { Allocation, Rates } from "@/data/rates";
 import type { Answer } from "@/lib/answer";
 
 import { nothingKeptIn, soundKept } from "@/data/household";
@@ -74,6 +75,12 @@ export async function getAccounts(): Promise<readonly Account[]> {
   return (await readHousehold()).accounts;
 }
 
+// How the savings are split between stocks and bonds.
+export async function getAllocation(): Promise<Allocation> {
+  await requireSession();
+  return (await readHousehold()).allocation;
+}
+
 // The inflation curve last pulled from the Bank, or none before one is.
 export async function getCurve(): Promise<Curve | null> {
   await requireSession();
@@ -105,6 +112,12 @@ export async function getOwners(): Promise<readonly Owner[]> {
 export async function getPlan(): Promise<Plan> {
   await requireSession();
   return (await readHousehold()).plan;
+}
+
+// The rates the plan runs on, as typed.
+export async function getRates(): Promise<Rates> {
+  await requireSession();
+  return (await readHousehold()).rates;
 }
 
 // The latest version the store has kept, or the household before

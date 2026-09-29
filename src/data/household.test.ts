@@ -8,6 +8,7 @@ import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
+import type { Allocation, Rates } from "@/data/rates";
 import type { Month } from "@/data/schedule";
 import type { SecuredRecords } from "@/data/secured";
 
@@ -19,9 +20,12 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
 import { homeValues } from "@/data/houses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
+import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
+import { planRate } from "@/data/rates";
+import { allocation, rates } from "@/data/rates.fixture";
 import { project } from "@/engine/projection";
 
 import { household, nothingKeptIn, soundKept } from "./household";
@@ -36,10 +40,12 @@ type Case = readonly [string, Break];
 
 interface Inputs {
   readonly accounts: readonly Account[];
+  readonly allocation: Allocation;
   readonly curve: Curve | null;
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
+  readonly rates: Rates;
   readonly schedule: {
     readonly expenses: readonly ExpenseLine[];
     readonly income: readonly IncomeLine[];
@@ -55,10 +61,12 @@ type Thrown = readonly [string, string, Break];
 // plan runs to and is what the plan action refuses.
 const sound: Inputs = {
   accounts,
+  allocation,
   curve,
   milestones,
   owners,
   plan: retiring,
+  rates,
   schedule: { expenses: expenseLines, income: incomeLines },
 };
 
@@ -313,6 +321,33 @@ const held: readonly Case[] = [
     "A plan ends by 120",
     (given): Inputs => ({ ...given, plan: { ...given.plan, years: 200 } }),
   ],
+  [
+    "A rate loses no more than everything",
+    (given): Inputs => ({ ...given, rates: { ...given.rates, stocks: -1.5 } }),
+  ],
+  [
+    "A rate loses no more than everything",
+    (given): Inputs => ({ ...given, rates: { ...given.rates, bonds: -1.5 } }),
+  ],
+  [
+    "A dividend yield is nothing or more",
+    (given): Inputs => ({
+      ...given,
+      rates: { ...given.rates, dividends: -0.01 },
+    }),
+  ],
+  [
+    "Inflation is a rate, and prices fall by less than everything",
+    (given): Inputs => ({ ...given, rates: { ...given.rates, inflation: -1 } }),
+  ],
+  [
+    "Stocks hold none of the savings, all of them, or a share",
+    (given): Inputs => ({ ...given, allocation: { stocks: -0.1 } }),
+  ],
+  [
+    "Stocks hold none of the savings, all of them, or a share",
+    (given): Inputs => ({ ...given, allocation: { stocks: 1.1 } }),
+  ],
 ];
 
 describe("household", () => {
@@ -378,6 +413,7 @@ describe("soundKept", () => {
     expect(soundKept(nothingKeptIn(september))).toStrictEqual({
       household: {
         accounts: [],
+        allocation: { stocks: 1 },
         curve: null,
         milestones: [],
         owners: [],
@@ -390,6 +426,7 @@ describe("soundKept", () => {
           retires: 59,
           years: 53,
         },
+        rates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
         schedule: { expenses: [], income: [] },
       },
       kept: nothingKeptIn(september),
@@ -490,6 +527,54 @@ describe("soundKept", () => {
     expect(soundKept(before)).toMatchObject({
       household: { curve: null },
       kept: { curve: null },
+    });
+  });
+
+  // A household kept before there were rates holds neither the rates
+  // nor the split. Spelled out key by key, since a rest destructure
+  // would bind them to nothing.
+  it("reads a household kept before there were rates with the rates it ran on, everything in stocks", () => {
+    const before = {
+      accounts: kept.accounts,
+      ages: kept.ages,
+      asOf: kept.asOf,
+      curve: kept.curve,
+      milestones: kept.milestones,
+      next: kept.next,
+      owners: kept.owners,
+      schedule: kept.schedule,
+    };
+    const opened = {
+      allocation: { stocks: 1 },
+      rates: {
+        bonds: 0.05,
+        dividends: 0,
+        inflation: inflationOf(curve).rate,
+        stocks: 0.05,
+      },
+    };
+
+    expect(soundKept(before)).toMatchObject({
+      household: {
+        ...opened,
+        plan: { inflation: inflationOf(curve).rate, rate: 0.05 },
+      },
+      kept: opened,
+    });
+    expect(soundKept({ ...before, curve: null })).toMatchObject({
+      kept: { rates: { inflation: 0.02 } },
+    });
+  });
+
+  // Four fifths at stocks' 7.95% and a fifth at bonds' 4.45%, and the
+  // 2.95% typed for inflation rather than what the curve kept makes.
+  it("runs the plan on the rates and the split as typed", () => {
+    const { household: read } = soundKept({ ...kept, allocation, rates });
+
+    expect(read).toMatchObject({ allocation, rates });
+    expect(read.plan).toMatchObject({
+      inflation: 0.0295,
+      rate: planRate(rates, allocation),
     });
   });
 

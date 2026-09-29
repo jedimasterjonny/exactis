@@ -43,7 +43,7 @@ describe("InflationSource", () => {
   // The reference kit's card: 3.365% on 1 September 2026, less 0.111
   // of the wedge for the 3.42 years before February 2030 and 0.3 for
   // the premium.
-  it("lays out the steps from the curve to the plan's inflation", () => {
+  it("lays out the steps from the curve to the inflation it derives", () => {
     renderSource();
 
     const steps = screen.getAllByRole("listitem");
@@ -55,10 +55,10 @@ describe("InflationSource", () => {
     ]);
     expect(
       screen.getByRole("region", { name: "Inflation source" }),
-    ).toHaveTextContent("−0.300ppPlan inflation2.95%");
+    ).toHaveTextContent("−0.300ppDerived inflation2.95%");
   });
 
-  it("sets the curve beside the steps, the point the plan takes in the foreground", () => {
+  it("sets the curve beside the steps, the point derived from in the foreground", () => {
     renderSource();
 
     const panel = screen.getByRole("region", { name: "Curve, by maturity" });
@@ -81,16 +81,18 @@ describe("InflationSource", () => {
     expect(rates[2]).not.toHaveClass("text-muted-foreground");
     expect(terms[0]).toHaveClass("text-muted-foreground");
     expect(rates[3]).toHaveClass("text-muted-foreground");
-    expect(panel).toHaveTextContent("The 20-year point feeds the plan.");
+    expect(panel).toHaveTextContent(
+      "The 20-year point is the one derived from.",
+    );
   });
 
-  it("says no curve has been pulled before one is, what the plan takes until then, and offers the pull", () => {
+  it("says no curve has been pulled before one is, what one is for, and offers the pull", () => {
     renderSource(null);
 
     expect(screen.getByText("No curve pulled yet")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Pull the latest curve to read the plan's inflation off the gilt market. Until then the plan takes the Bank of England's 2.00% target.",
+        "Pull the latest curve to derive inflation from the gilt market, as a check on the rate the plan is set to.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
@@ -112,7 +114,7 @@ describe("InflationSource", () => {
   // The page is drawn again from the store's curve, which the toast
   // reads: 3.459% at 20 years on 24 September, less 0.109 of the wedge
   // and the premium.
-  it("holds the pull while it is on its way, then says what the plan now takes", async () => {
+  it("holds the pull while it is on its way, then says what it derives", async () => {
     const pulled = {
       asOf: "2026-09-24",
       implied: { 5: 0.03777, 10: 0.0346, 20: 0.03459, 30: 0.03492 },
@@ -135,7 +137,7 @@ describe("InflationSource", () => {
       expect(
         screen.getByRole("dialog", { name: "Curve pulled" }),
       ).toHaveAccessibleDescription(
-        `As at ${formatDay("2026-09-24")}, plan inflation 3.05%`,
+        `As at ${formatDay("2026-09-24")}, derived inflation 3.05%`,
       );
     });
     // The toast lands before the transition ends, so the pull frees a
