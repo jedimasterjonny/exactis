@@ -1059,6 +1059,7 @@ describe("project", () => {
       below: 0,
       isEarly: false,
       months: 1,
+      uprating: 1,
     });
     const exact: Account = {
       ...sipp,

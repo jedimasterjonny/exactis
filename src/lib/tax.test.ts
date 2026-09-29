@@ -21,9 +21,15 @@ const alone = {
   below: 0,
   isEarly: false,
   months: 1,
+  uprating: 1,
 };
 
 const beside = { ...alone, below: 50270 / 12 };
+
+// A whole tax year and a month of one, against the figures as they
+// stand.
+const wholeYear = { months: 12, uprating: 1 };
+const oneMonth = { months: 1, uprating: 1 };
 
 describe("drawOf", () => {
   // £1,000 is £250 free and £750 taxed, which alone sits under a twelfth
@@ -83,6 +89,15 @@ describe("drawFor", () => {
       2000,
       10,
     );
+  });
+
+  // Bands risen to twice the figures double every stretch, so twice
+  // what fills the basic rate band as it stands fills it as it has risen.
+  it("grosses up through the bands as they have risen", () => {
+    const doubled = { ...alone, allowance: 0, months: 12, uprating: 2 };
+
+    expect(drawFor(85460, doubled).gross).toBeCloseTo(100540, 10);
+    expect(drawOf(100540, doubled).net).toBeCloseTo(85460, 10);
   });
 
   // £100 of the allowance frees a quarter of the first £400, which
@@ -161,11 +176,11 @@ describe("incomeTaxOn", () => {
   // £50,270 fills the basic rate band, £7,540; £100,000 is that and 40%
   // on the £49,730 above it, £27,432.
   it("charges nothing on the allowance, then the basic and higher rates", () => {
-    expect(incomeTaxOn(0, 12)).toBe(0);
-    expect(incomeTaxOn(12570, 12)).toBe(0);
-    expect(incomeTaxOn(36000, 12)).toBeCloseTo(4686, 10);
-    expect(incomeTaxOn(50270, 12)).toBeCloseTo(7540, 10);
-    expect(incomeTaxOn(100000, 12)).toBeCloseTo(27432, 10);
+    expect(incomeTaxOn(0, wholeYear)).toBe(0);
+    expect(incomeTaxOn(12570, wholeYear)).toBe(0);
+    expect(incomeTaxOn(36000, wholeYear)).toBeCloseTo(4686, 10);
+    expect(incomeTaxOn(50270, wholeYear)).toBeCloseTo(7540, 10);
+    expect(incomeTaxOn(100000, wholeYear)).toBeCloseTo(27432, 10);
   });
 
   // A month's £3,000 meets a twelfth of the allowance, £1,047.50, and
@@ -173,9 +188,12 @@ describe("incomeTaxOn", () => {
   // the £4,686 on a year of such months; seven months of £3,000 meet
   // seven twelfths of it and pay seven times as much.
   it("charges what part of a year earned against that part of each band", () => {
-    expect(incomeTaxOn(3000, 1)).toBeCloseTo(390.5, 10);
-    expect(incomeTaxOn(21000, 7)).toBeCloseTo(7 * 390.5, 10);
-    expect(incomeTaxOn(1047.5, 1)).toBe(0);
+    expect(incomeTaxOn(3000, oneMonth)).toBeCloseTo(390.5, 10);
+    expect(incomeTaxOn(21000, { months: 7, uprating: 1 })).toBeCloseTo(
+      7 * 390.5,
+      10,
+    );
+    expect(incomeTaxOn(1047.5, oneMonth)).toBe(0);
   });
 
   // £110,000 leaves £7,570 of the allowance, so £102,430 is taxed:
@@ -186,10 +204,21 @@ describe("incomeTaxOn", () => {
   it("withdraws the allowance over £100,000 and charges the additional rate above £125,140", () => {
     const tapered = 0.2 * 37700 + 0.4 * (110000 - (12570 - 5000) - 37700);
 
-    expect(incomeTaxOn(110000, 12)).toBeCloseTo(tapered, 10);
-    expect(incomeTaxOn(110000, 12)).toBeCloseTo(33432, 10);
-    expect(incomeTaxOn(125140, 12)).toBeCloseTo(42516, 10);
-    expect(incomeTaxOn(150000, 12)).toBeCloseTo(53703, 10);
+    expect(incomeTaxOn(110000, wholeYear)).toBeCloseTo(tapered, 10);
+    expect(incomeTaxOn(110000, wholeYear)).toBeCloseTo(33432, 10);
+    expect(incomeTaxOn(125140, wholeYear)).toBeCloseTo(42516, 10);
+    expect(incomeTaxOn(150000, wholeYear)).toBeCloseTo(53703, 10);
+  });
+
+  // Bands risen to twice the figures charge twice the tax on twice the
+  // income: £100,540 against them pays what £50,270 does against the
+  // figures, twice over.
+  it("charges against the bands as they have risen", () => {
+    expect(incomeTaxOn(100540, { months: 12, uprating: 2 })).toBeCloseTo(
+      15080,
+      10,
+    );
+    expect(incomeTaxOn(6000, { months: 1, uprating: 2 })).toBeCloseTo(781, 10);
   });
 });
 
@@ -199,23 +228,40 @@ describe("insuranceOn", () => {
   // above it. A month of the first is charged against a twelfth of the
   // threshold, as a pay period is.
   it("charges a salary Class 1", () => {
-    expect(insuranceOn("employment", 12570, 12)).toBe(0);
-    expect(insuranceOn("employment", 36000, 12)).toBeCloseTo(1874.4, 10);
-    expect(insuranceOn("employment", 60000, 12)).toBeCloseTo(3210.6, 10);
-    expect(insuranceOn("employment", 3000, 1)).toBeCloseTo(156.2, 10);
+    expect(insuranceOn("employment", 12570, wholeYear)).toBe(0);
+    expect(insuranceOn("employment", 36000, wholeYear)).toBeCloseTo(1874.4, 10);
+    expect(insuranceOn("employment", 60000, wholeYear)).toBeCloseTo(3210.6, 10);
+    expect(insuranceOn("employment", 3000, oneMonth)).toBeCloseTo(156.2, 10);
   });
 
   // 6% on the £23,430, and on £60,000, 6% to the upper limit, £2,262,
   // and 2% on the £9,730 above it.
   it("charges self-employed profit Class 4", () => {
-    expect(insuranceOn("self-employment", 12570, 12)).toBe(0);
-    expect(insuranceOn("self-employment", 36000, 12)).toBeCloseTo(1405.8, 10);
-    expect(insuranceOn("self-employment", 60000, 12)).toBeCloseTo(2456.6, 10);
+    expect(insuranceOn("self-employment", 12570, wholeYear)).toBe(0);
+    expect(insuranceOn("self-employment", 36000, wholeYear)).toBeCloseTo(
+      1405.8,
+      10,
+    );
+    expect(insuranceOn("self-employment", 60000, wholeYear)).toBeCloseTo(
+      2456.6,
+      10,
+    );
+  });
+
+  // The thresholds rise with the income tax bands, so twice the pay
+  // against thresholds risen to twice pays twice as much.
+  it("charges against the thresholds as they have risen", () => {
+    expect(
+      insuranceOn("employment", 72000, { months: 12, uprating: 2 }),
+    ).toBeCloseTo(3748.8, 10);
+    expect(
+      insuranceOn("self-employment", 72000, { months: 12, uprating: 2 }),
+    ).toBeCloseTo(2811.6, 10);
   });
 
   it("charges a pension and other income nothing", () => {
-    expect(insuranceOn("pension", 60000, 12)).toBe(0);
-    expect(insuranceOn("other", 60000, 12)).toBe(0);
+    expect(insuranceOn("pension", 60000, wholeYear)).toBe(0);
+    expect(insuranceOn("other", 60000, wholeYear)).toBe(0);
   });
 });
 
@@ -225,11 +271,31 @@ describe("refusing a charge", () => {
   // month or more than a year is no stretch a tax year holds.
   it("refuses a stretch that is not one to twelve whole months", () => {
     for (const months of [0, -1, 0.5, 13, Number.NaN]) {
-      expect(() => incomeTaxOn(1000, months)).toThrow(
+      expect(() => incomeTaxOn(1000, { months, uprating: 1 })).toThrow(
         "A tax year holds one to twelve months",
       );
-      expect(() => insuranceOn("pension", 1000, months)).toThrow(
-        "A tax year holds one to twelve months",
+      expect(() =>
+        insuranceOn("pension", 1000, { months, uprating: 1 }),
+      ).toThrow("A tax year holds one to twelve months");
+    }
+  });
+
+  // Bands risen by nothing or less would start every band at nothing
+  // or below it, and by no number at all would leave the walk up them
+  // nowhere to stop.
+  it("refuses bands risen by a multiple that is nothing or less, or no number", () => {
+    for (const uprating of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => incomeTaxOn(1000, { months: 12, uprating })).toThrow(
+        "The bands rise by a multiple above nothing",
+      );
+      expect(() =>
+        insuranceOn("pension", 1000, { months: 12, uprating }),
+      ).toThrow("The bands rise by a multiple above nothing");
+      expect(() => drawFor(1000, { ...alone, uprating })).toThrow(
+        "The bands rise by a multiple above nothing",
+      );
+      expect(() => drawOf(1000, { ...alone, uprating })).toThrow(
+        "The bands rise by a multiple above nothing",
       );
     }
   });
@@ -238,14 +304,14 @@ describe("refusing a charge", () => {
   // one below nothing as no tax at all, either of them quietly.
   it("refuses a sum below nothing or not a number, whatever the kind", () => {
     for (const sum of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
-      expect(() => incomeTaxOn(sum, 12)).toThrow(
+      expect(() => incomeTaxOn(sum, wholeYear)).toThrow(
         "A tax is charged on nothing or more",
       );
-      expect(() => insuranceOn("other", sum, 12)).toThrow(
+      expect(() => insuranceOn("other", sum, wholeYear)).toThrow(
         "A tax is charged on nothing or more",
       );
     }
-    expect(incomeTaxOn(0, 1)).toBe(0);
+    expect(incomeTaxOn(0, oneMonth)).toBe(0);
   });
 });
 

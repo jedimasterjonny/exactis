@@ -715,9 +715,14 @@ function taxOf({ incomeTax, insurance }: Taxed): number {
 function taxOn(lines: readonly IncomeLine[], fed: readonly Fed[]): Taxed {
   const taxable = payOf(lines, fed);
   return {
-    incomeTax: incomeTaxOn(taxable, 1),
+    incomeTax: incomeTaxOn(taxable, { months: 1, uprating: 1 }),
     insurance: incomeKinds.reduce(
-      (sum, kind) => sum + insuranceOn(kind, payOf(lines, fed, [kind]), 1),
+      (sum, kind) =>
+        sum +
+        insuranceOn(kind, payOf(lines, fed, [kind]), {
+          months: 1,
+          uprating: 1,
+        }),
       0,
     ),
     profit: payOf(lines, fed, ["self-employment"]),
