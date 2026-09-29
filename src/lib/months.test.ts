@@ -15,13 +15,17 @@ describe("formatDay", () => {
   it("writes an ISO date's day, its month cut short and its year", () => {
     expect(formatDay("2026-11-04")).toBe("4 Nov 2026");
     expect(formatDay("2027-01-01")).toBe("1 Jan 2027");
+    expect(formatDay("2026-09-24")).toBe("24 Sep 2026");
   });
 });
 
 describe("monthName", () => {
+  // Three letters whatever the runtime's locale data abbreviates to, so
+  // a server's September and a browser's are spelt alike.
   it("names a month in full or in three letters, January being nought", () => {
     expect(monthName(0, "long")).toBe("January");
     expect(monthName(8, "long")).toBe("September");
+    expect(monthName(8, "short")).toBe("Sep");
     expect(monthName(10, "short")).toBe("Nov");
     expect(monthName(11, "short")).toBe("Dec");
   });
