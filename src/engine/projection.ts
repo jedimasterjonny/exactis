@@ -9,6 +9,7 @@ import { rules } from "@/data/rules";
 import { cashFlow } from "@/engine/cash-flow";
 import { isOnOrBefore } from "@/lib/months";
 import {
+  april,
   drawFor,
   drawOf,
   incomeTaxOn,
@@ -87,10 +88,6 @@ interface TaxYear {
   readonly profit: number;
   readonly taxable: number;
 }
-
-// The month a tax year opens in, April, January being nought. The year
-// opens on the sixth, and is taken here from the first.
-const april = 3;
 
 // The age the plan's owner may draw a pension at as income, the UK
 // normal minimum pension age: 55, until it rises to 57 on 6 April 2028,
@@ -251,8 +248,11 @@ export function project(
           months: taxYear.months + 1,
           paid:
             taxYear.paid +
-            incomeTaxOn(draw.taxable, 1) +
-            insuranceOn("self-employment", flow.profit, 1),
+            incomeTaxOn(draw.taxable, { months: 1, uprating: 1 }) +
+            insuranceOn("self-employment", flow.profit, {
+              months: 1,
+              uprating: 1,
+            }),
           profit: taxYear.profit + flow.profit,
           taxable: taxYear.taxable + draw.taxable,
         };
@@ -339,7 +339,7 @@ function drawnFrom(
   let drawn = held;
   let left = shortfall;
   let early = 0;
-  let taxed = { allowance, below, isEarly, months: 1 };
+  let taxed = { allowance, below, isEarly, months: 1, uprating: 1 };
   for (const kind of kinds) {
     drawn = drawn.map(({ account, balance }) => {
       if (account.kind !== kind || !isPension(account)) {
@@ -458,8 +458,8 @@ function settled({ months, paid, profit, taxable }: TaxYear): number {
   return months === 0
     ? 0
     : paid -
-        incomeTaxOn(taxable, months) -
-        insuranceOn("self-employment", profit, months);
+        incomeTaxOn(taxable, { months, uprating: 1 }) -
+        insuranceOn("self-employment", profit, { months, uprating: 1 });
 }
 
 // The wrapper's balance this year, whole pounds.
