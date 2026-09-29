@@ -3,22 +3,39 @@ import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
-import type { Month } from "@/data/schedule";
+import type { LineValues, Month } from "@/data/schedule";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
-import { kept } from "@/data/household.fixture";
 import { incomeLines } from "@/data/income.fixture";
 
 import type { CashFlow, Schedule } from "./cash-flow";
 
-import { cashFlow } from "./cash-flow";
+import { cashFlow, inTodaysMoney } from "./cash-flow";
+
+// The fixture's lines, each fixed in nominal terms, so it pays what it
+// states in every month whatever prices do and every figure below is
+// one a line states; how a line grows is read on its own.
+const [salary, stepUp, consulting, statePension] = [
+  flat(incomeLines[0]),
+  flat(incomeLines[1]),
+  flat(incomeLines[2]),
+  flat(incomeLines[3]),
+] as const;
+const [household, childcare, mortgagePayment, retirement, care] = [
+  flat(expenseLines[0]),
+  flat(expenseLines[1]),
+  flat(expenseLines[2]),
+  flat(expenseLines[3]),
+  flat(expenseLines[4]),
+] as const;
 
 const [pension, isa, cash, home, mortgage] = accounts;
-const [salary, stepUp, consulting, statePension] = incomeLines;
-const [household, childcare, mortgagePayment, retirement, care] = expenseLines;
 
-const { schedule } = kept;
+const schedule: Schedule = {
+  expenses: [household, childcare, mortgagePayment, retirement, care],
+  income: [salary, stepUp, consulting, statePension],
+};
 
 // Read at the start of 2026, so a debt's payments are counted from
 // January and the months a month is charged for are read off there,
@@ -69,6 +86,11 @@ const plain: IncomeLine = {
   rsu: 0,
   sacrifice: 0,
 };
+
+// A line as it is, fixed in nominal terms.
+function flat<TLine extends LineValues>(line: TLine): TLine {
+  return { ...line, growth: "nominal" };
+}
 
 // A flow's entries with what each is paid read to the penny: a figure
 // worked out after tax is a fraction of a penny off the one written
@@ -1485,6 +1507,73 @@ describe("cashFlow", () => {
     expect(Object.is(flow.left, 0)).toBe(true);
   });
 
+  // At 3% a year from January 2026, a year on the household's £3,500 a
+  // month is paid 3% more with inflation, 4% and 5% more a point or two
+  // over it, and the same fixed in nominal terms; half a year on, each
+  // rise is compounded to the month. In the plan's first month every
+  // line pays what it states.
+  it("pays each line risen as its growth says from the month the plan starts in", () => {
+    const rising = { ...plan, inflation: 0.03 };
+    const lines = (
+      ["inflation", "inflation-plus-1", "inflation-plus-2", "nominal"] as const
+    ).map((growth, index) => ({ ...household, growth, id: index + 1 }));
+    const spentIn = (at: Month): number[] =>
+      pennies(
+        cashFlow([], { expenses: lines, income: [] }, { at, plan: rising })
+          .spent,
+      ).map(({ amount }) => amount);
+
+    expect(spentIn({ month: 0, year: 2026 })).toStrictEqual([
+      3500, 3500, 3500, 3500,
+    ]);
+    expect(spentIn({ month: 6, year: 2026 })).toStrictEqual([
+      3552.11, 3569.31, 3586.43, 3500,
+    ]);
+    expect(spentIn({ month: 0, year: 2027 })).toStrictEqual([
+      3605, 3640, 3675, 3500,
+    ]);
+  });
+
+  // Read from April 2026 at 3%, April 2027 opens the next tax year: a
+  // salary rising with prices is paid 3% more, and the bands have risen
+  // 3% with it, so the month pays 3% more of each tax. March 2027 is
+  // still the first tax year, so the salary has risen eleven months
+  // against bands that have not moved, and pays a larger share of itself
+  // in tax than it did in April.
+  it("taxes a month against the bands of its tax year, risen with prices", () => {
+    const rising = { ...plan, inflation: 0.03, month: 3 };
+    const earning: Schedule = {
+      expenses: [],
+      income: [{ ...plain, amount: 60000, growth: "inflation" }],
+    };
+    const flowIn = (at: Month): CashFlow =>
+      cashFlow([], earning, { at, plan: rising });
+    const opening = flowIn({ month: 3, year: 2026 });
+    const closing = flowIn({ month: 2, year: 2027 });
+    const next = flowIn({ month: 3, year: 2027 });
+
+    expect(next.income).toBeCloseTo(opening.income * 1.03, 9);
+    expect(next.incomeTax).toBeCloseTo(opening.incomeTax * 1.03, 9);
+    expect(next.insurance).toBeCloseTo(opening.insurance * 1.03, 9);
+    expect(closing.incomeTax / closing.income).toBeGreaterThan(
+      opening.incomeTax / opening.income,
+    );
+  });
+
+  // Prices falling by everything leave nothing to read a pound of
+  // today's money against, and falling by more, or rising by no finite
+  // rate, leave no figure at all after the plan's first month.
+  it("refuses a plan whose prices fall by everything, or whose inflation is no finite rate", () => {
+    for (const inflation of [-1, -1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() =>
+        cashFlow([], schedule, {
+          at: { month: 0, year: 2026 },
+          plan: { ...plan, inflation },
+        }),
+      ).toThrow("Inflation is a rate, and prices fall by less than everything");
+    }
+  });
+
   it("finds nothing in a year with no lines and no accounts", () => {
     expect(
       cashFlow([], schedule, { at: { month: 0, year: 2025 }, plan }),
@@ -1502,5 +1591,56 @@ describe("cashFlow", () => {
       spent: [],
       taxable: 0,
     });
+  });
+});
+
+describe("inTodaysMoney", () => {
+  // A year on at 3%, prices have risen by 3% exactly. The salary and the
+  // household's £1,000, rising with them, read at what they state, and
+  // so does the tenth of the base given up; the mortgage's £2,210,
+  // fixed in nominal terms, reads 3% smaller; every other sum the month
+  // worked out is read the same way; and each cap is left as it is
+  // stated, the ISA's £20,000 and the current account's none.
+  it("reads every figure of a month in today's money", () => {
+    const reading = {
+      at: { month: 0, year: 2027 },
+      plan: { ...plan, inflation: 0.03 },
+    };
+    const flow = cashFlow(
+      [pension, spareIsa, spareCash, mortgage],
+      {
+        expenses: [{ ...household, amount: 1000, growth: "inflation" }],
+        income: [{ ...lean, growth: "inflation" }],
+      },
+      reading,
+    );
+    const read = inTodaysMoney(flow, reading);
+
+    expect(read.income).toBeCloseTo(5000, 9);
+    expect(read.fed[0]?.sacrificed).toBeCloseTo(500, 9);
+    expect(read.spent.map(({ amount }) => Math.round(amount))).toStrictEqual([
+      1000,
+    ]);
+    expect(read.fixed.map(({ account }) => account)).toStrictEqual([
+      mortgage,
+      pension,
+    ]);
+    expect(read.fixed[0]?.amount).toBeCloseTo(2210 / 1.03, 9);
+    expect(read.spare.map(({ cap }) => cap)).toStrictEqual([20000, null]);
+    expect(read.relief).toHaveLength(1);
+    for (const [was, is] of [
+      [flow.expenses, read.expenses],
+      [flow.fed[0]?.amount, read.fed[0]?.amount],
+      [flow.fixed[1]?.amount, read.fixed[1]?.amount],
+      [flow.incomeTax, read.incomeTax],
+      [flow.insurance, read.insurance],
+      [flow.left, read.left],
+      [flow.profit, read.profit],
+      [flow.relief[0]?.amount, read.relief[0]?.amount],
+      [flow.spare[0]?.amount, read.spare[0]?.amount],
+      [flow.taxable, read.taxable],
+    ]) {
+      expect(is).toBeCloseTo((was ?? Number.NaN) / 1.03, 9);
+    }
   });
 });

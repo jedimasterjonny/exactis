@@ -7,7 +7,15 @@ import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
 import { termOf } from "@/lib/loans";
 
-import { ageIn, debtTermOf, endAge, planOf } from "./plan";
+import {
+  ageIn,
+  debtTermOf,
+  endAge,
+  growthFrom,
+  planOf,
+  pricesIn,
+  risenBy,
+} from "./plan";
 
 describe("ageIn", () => {
   it("reads the age the plan's owner reaches in a year, and in the plan's last", () => {
@@ -89,5 +97,54 @@ describe("planOf", () => {
     expect(
       planOf({ ends: 30, retires: 30 }, { month: 8, year: 2026 }, null),
     ).toMatchObject({ from: 2026, years: 0 });
+  });
+});
+
+describe("growthFrom", () => {
+  // At 3% a year, a line rises 3% with inflation, 4% or 5% a point or
+  // two over it, and not at all fixed in nominal terms.
+  it("reads each growth choice against the plan's inflation", () => {
+    const plan = {
+      ...planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }, null),
+      inflation: 0.03,
+    };
+
+    expect(growthFrom({ growth: "inflation" }, plan)).toBeCloseTo(0.03, 15);
+    expect(growthFrom({ growth: "inflation-plus-1" }, plan)).toBeCloseTo(
+      0.04,
+      15,
+    );
+    expect(growthFrom({ growth: "inflation-plus-2" }, plan)).toBeCloseTo(
+      0.05,
+      15,
+    );
+    expect(growthFrom({ growth: "nominal" }, plan)).toBe(0);
+  });
+});
+
+describe("pricesIn", () => {
+  // At 10% from September 2026, prices stand where they are that month,
+  // today's money, and have risen by a tenth the September after.
+  it("reads how far prices have risen at the plan's inflation since the plan's first month", () => {
+    const plan = { from: 2026, inflation: 0.1, month: 8 };
+
+    expect(pricesIn(plan, { month: 8, year: 2026 })).toBe(1);
+    expect(pricesIn(plan, { month: 8, year: 2027 })).toBeCloseTo(1.1, 12);
+  });
+});
+
+describe("risenBy", () => {
+  // From September 2026, a rate has risen nothing that month, a whole
+  // year's by the September after and half as much again, compounded,
+  // six months on from that.
+  it("compounds a rate a month at a time from the month the plan starts in", () => {
+    const start = { from: 2026, month: 8 };
+
+    expect(risenBy(0.1, start, { month: 8, year: 2026 })).toBe(1);
+    expect(risenBy(0.1, start, { month: 8, year: 2027 })).toBeCloseTo(1.1, 12);
+    expect(risenBy(0.1, start, { month: 2, year: 2028 })).toBeCloseTo(
+      1.1 ** 1.5,
+      12,
+    );
   });
 });

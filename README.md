@@ -142,8 +142,10 @@ its months earned and drew from a pension, and its Class 4 on all their profit,
 less what they paid, is refunded into that month's money or owed out of it.
 Class 1 is charged a pay period at a time, as the months charge it, and is not
 settled. The first tax year is the months of it the plan holds, against their
-share of each band. The bands are held as they stand, in today's money as the
-lines are, until the plan carries an inflation assumption.
+share of each band. The bands are held in today's money, as the lines are: they
+are the 2026/27 figures in the tax year the plan starts in, and rise with the
+plan's inflation each April after it, so each tax year is charged and settled
+against its own.
 
 A debt's own fixed sum is a loan's payments, so it runs only until the loan
 maths in `src/lib/loans.ts` says they clear what is owed: the term the payment
@@ -188,8 +190,23 @@ year. Cash and the tax-free wrapper give up what the month is short, and a
 pension is grossed up so that what is left of the draw once taxed is what the
 month is short: a quarter of each draw is free of tax until the £268,275 lump
 sum allowance is used up over the plan, and the rest is taxed as income on top
-of what the month earned. Every line is taken at the amount it states, in
-today's money, until the plan carries an inflation assumption.
+of what the month earned.
+
+The engine works in the pounds of each month and reads out in today's money, the
+money of the month the plan starts in. A line states its amount in today's
+money, and is paid it risen from there a month at a time at the rate its growth
+gives: the plan's inflation, a point or two over it, or nothing for a line fixed
+in nominal terms. Everything an account states is in the pounds of the day, as a
+statement or an agreement gives it: its balance, its fixed sum, its cap and its
+rate, the plan rate among them, which is a nominal return. So are the figures
+the law sets and does not raise, the ISA and pension allowances, the lump sum
+allowance and the £3,600 of relief. A point divides every balance by how far
+prices have risen by the start of its year, and what the year went short or drew
+early by a month at a time by how far they had risen by that month, so the chart
+and its tiles are in today's money. The plan screen's month is read the same
+way, so a line rising with inflation reads at what it states in whichever year
+is shown, and what an account is paid reads at what it is worth then; the cap it
+is paid to is shown as it is stated, as the line is.
 
 The dashboard reads the accounts, the lines, the milestones and the plan from
 the store and hands them to the browser, which runs the engine itself, so a save
@@ -224,8 +241,8 @@ household keeps the curve as the Bank gave it rather than the rate it makes, so
 a change to the method moves the rate without another pull. The assumptions
 screen lays those steps out beside the curve at 5, 10, 20 and 30 years. The plan
 carries the rate, or the Bank of England's 2% target before any curve has been
-pulled, which the screen's header then says it takes, but nothing in the
-projection reads it yet: every line is still taken in today's money.
+pulled, which the screen's header then says it takes, and the projection grows
+the lines and the tax bands with it, as above.
 
 ## Signing in
 

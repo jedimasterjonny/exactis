@@ -2,6 +2,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { LineValues } from "@/data/schedule";
+import type { Schedule } from "@/engine/cash-flow";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
@@ -13,8 +15,12 @@ import { slider } from "@/test/dom";
 import { CashFlowCard } from "./cash-flow-card";
 
 const [pension, isa, cash, , mortgage] = accounts;
-const [salary] = incomeLines;
 const [household, , , retirement] = expenseLines;
+
+// The fixture's lines, each fixed in nominal terms, so a month reads
+// what the lines state whichever year it falls in; how a line grows is
+// read on its own.
+const salary = flat(incomeLines[0]);
 
 // The fixture's accounts with the ISA and the current account paid the
 // spare money, the ISA to its allowance and the account uncapped, so a
@@ -37,7 +43,15 @@ const spareCash: Account = {
 
 const held = [pension, spareIsa, spareCash, mortgage];
 
-const { schedule } = kept;
+const schedule: Schedule = {
+  expenses: kept.schedule.expenses.map(flat),
+  income: kept.schedule.income.map(flat),
+};
+
+// A line as it is, fixed in nominal terms.
+function flat<TLine extends LineValues>(line: TLine): TLine {
+  return { ...line, growth: "nominal" };
+}
 
 function rows(): string[] {
   return screen.getAllByRole("listitem").map((row) => row.textContent);
@@ -240,6 +254,48 @@ describe("CashFlowCard", () => {
     expect(
       screen.queryByRole("region", { name: /^Expenses/ }),
     ).not.toBeInTheDocument();
+  });
+
+  // At 3% a year, prices have risen 1.03 to the power of nine and a
+  // third by January 2036, the 112th month from September 2026, 31.8%
+  // in all. The household's £3,500, rising with them, reads as £3,500
+  // in today's money as it does in 2026, where £1,000 a month fixed in
+  // nominal terms reads as £759.
+  it("reads a later year's month in today's money", () => {
+    render(
+      <CashFlowCard
+        accounts={[]}
+        milestones={milestones}
+        plan={{ ...plan, inflation: 0.03 }}
+        schedule={{
+          expenses: [
+            household,
+            {
+              ...household,
+              amount: 1000,
+              growth: "nominal",
+              id: 9,
+              lastYear: null,
+              name: "Subscription",
+            },
+          ],
+          income: [],
+        }}
+      />,
+    );
+
+    fireEvent.change(slider("Year"), { target: { value: "2036" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Expenses/ }));
+
+    expect(
+      within(screen.getByRole("region", { name: /^Expenses/ }))
+        .getAllByRole("listitem")
+        .map((row) => row.textContent),
+    ).toStrictEqual([
+      "Household£3,500 / mo · 2026–2047−£3,500",
+      "Subscription£1,000 / mo · 2026–end of plan−£759",
+    ]);
+    expect(rows().at(-1)).toBe("Left over−£4,259");
   });
 
   it("says when no expense line runs in the year", () => {

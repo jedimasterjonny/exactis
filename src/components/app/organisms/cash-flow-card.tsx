@@ -21,7 +21,7 @@ import {
 import { CardContent } from "@/components/kit/card";
 import { markersOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
-import { cashFlow } from "@/engine/cash-flow";
+import { cashFlow, inTodaysMoney } from "@/engine/cash-flow";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { listed } from "@/lib/feeders";
 import { spanOf } from "@/lib/lines";
@@ -73,8 +73,10 @@ interface RowProps {
 // expenses figure opens into the lines behind it, each under its name
 // with what it is paid at and the years it runs, since a sum over a
 // schedule that starts and ends line by line is a question as often as
-// an answer. The card takes the next numeral off the screen's after the
-// expense card's.
+// an answer. Every figure is read in today's money, as the engine gives
+// it for the month once prices have risen by then, so a line rising
+// with inflation reads at what it states whichever year is shown. The
+// card takes the next numeral off the screen's after the expense card's.
 export function CashFlowCard({
   accounts,
   milestones,
@@ -84,7 +86,8 @@ export function CashFlowCard({
   const [year, setYear] = useState(plan.from);
   const end = endYear(plan);
   const month = year === plan.from ? plan.month : 0;
-  const flow = cashFlow(accounts, schedule, { at: { month, year }, plan });
+  const reading = { at: { month, year }, plan };
+  const flow = inTodaysMoney(cashFlow(accounts, schedule, reading), reading);
   const marked = markersOf(milestones, plan)
     .filter((marker) => marker.year === year)
     .map(({ name }) => name);
