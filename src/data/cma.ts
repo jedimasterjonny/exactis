@@ -1,5 +1,5 @@
 import type { Curve } from "@/data/inflation";
-import type { Rates } from "@/data/rates";
+import type { Allocation, Rates } from "@/data/rates";
 import type { Month } from "@/data/schedule";
 import type { Target, Targets } from "@/data/targets";
 
@@ -56,6 +56,13 @@ export interface Cma {
 export interface Deductions {
   readonly dividends: number;
   readonly fees: number;
+}
+
+// What the CMA gives the plan to run on: the rates, and the split of the
+// savings between stocks and bonds.
+export interface DerivedSet {
+  readonly allocation: Allocation;
+  readonly rates: Rates;
 }
 
 // A category of the target allocation mapped onto an asset class a
@@ -190,13 +197,16 @@ export function cmaRates(
   };
 }
 
-// The rates the household's latest vintage gives the plan: its blends
-// by the target allocation and the mappings less the deductions, with
-// the inflation the curve gives, since BlackRock's returns are nominal
-// and the market's inflation is the one they are priced against. There
-// are none before a vintage or a curve is pulled, or while the vintage
-// makes no blend, and what is missing is said.
-export function derivedRates({
+// What the household's latest vintage gives the plan to run on. The
+// rates are its blends by the target allocation and the mappings less
+// the deductions, with the inflation the curve gives, since BlackRock's
+// returns are nominal and the market's inflation is the one they are
+// priced against. The split is the target allocation's between the
+// sleeves, so the plan holds stocks and bonds in the shares the rates
+// were blended for, and the two cannot be set apart. There is nothing
+// before a vintage or a curve is pulled, or while the vintage makes no
+// blend, and what is missing is said.
+export function derivedSet({
   cma,
   curve,
   deductions,
@@ -208,7 +218,7 @@ export function derivedRates({
   readonly deductions: Deductions;
   readonly mappings: readonly Mapping[];
   readonly targets: null | Targets;
-}): Rates | Shortfall {
+}): DerivedSet | Shortfall {
   if (cma === null) {
     return { short: "No CMA is pulled" };
   }
@@ -219,7 +229,10 @@ export function derivedRates({
   if (curve === null) {
     return { short: "No inflation curve is pulled" };
   }
-  return cmaRates(blends, deductions, inflationOf(curve).rate);
+  return {
+    allocation: { stocks: blends.stocks.share },
+    rates: cmaRates(blends, deductions, inflationOf(curve).rate),
+  };
 }
 
 // How far stocks' return in all moved from the previous vintage to the

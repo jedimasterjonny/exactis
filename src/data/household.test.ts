@@ -18,7 +18,7 @@ import { toAccount, toValues } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { toRecords as toCarRecords } from "@/data/cars";
 import { golfValues } from "@/data/cars.fixture";
-import { derivedRates } from "@/data/cma";
+import { derivedSet } from "@/data/cma";
 import { cma, mappings } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
@@ -840,19 +840,26 @@ describe("soundKept", () => {
   });
 
   // August's blends less 0.20% of fees and a 2% yield, the first of
-  // September's 2.95%, and everything in stocks at 7.84% in all, while
-  // the rates typed are kept as they were.
-  it("runs the plan on the CMA's rates when they are chosen", () => {
+  // September's 2.95%, and the target allocation's four fifths in
+  // stocks at 7.84% in all and a fifth in bonds at 4.25%, 7.13%, where
+  // the split typed holds everything in stocks. The rates and the split
+  // typed are kept as they were.
+  it("runs the plan on the CMA's rates and the target allocation's split when they are chosen", () => {
     const { household: read } = soundKept({ ...kept, rateSet: "cma" });
-    const derived = derivedRates(kept);
+    const derived = derivedSet(kept);
 
-    expect(read.liveRates).toStrictEqual(derived);
-    expect(read.rates).toStrictEqual(kept.rates);
-    expect(read.plan).toMatchObject({
-      inflation: inflationOf(curve).rate,
-      rate: planRate(read.liveRates, kept.allocation),
+    expect(derived).toMatchObject({
+      allocation: { stocks: expect.closeTo(0.8, 12) as unknown },
+      rates: read.liveRates,
     });
-    expect(read.plan.rate).toBeCloseTo(0.078441, 12);
+    expect(read.rates).toStrictEqual(kept.rates);
+    expect(read.allocation).toStrictEqual(kept.allocation);
+    expect(read.plan.inflation).toBe(inflationOf(curve).rate);
+    expect(read.plan.rate).toBeCloseTo(
+      planRate(read.liveRates, { stocks: 0.8 }),
+      12,
+    );
+    expect(read.plan.rate).toBeCloseTo(0.0712544, 12);
   });
 
   // All in equities, everything is in stocks at their 7.84% in all, and
@@ -875,9 +882,10 @@ describe("soundKept", () => {
     ).toThrow(
       "FTSE Global All Cap ex-UK has no CMA class, so the plan cannot run on the CMA's rates",
     );
-    expect(
-      soundKept({ ...kept, mappings: [] }).household.liveRates,
-    ).toStrictEqual(kept.rates);
+    const { household: typed } = soundKept({ ...kept, mappings: [] });
+
+    expect(typed.liveRates).toStrictEqual(kept.rates);
+    expect(typed.plan.rate).toBe(planRate(kept.rates, kept.allocation));
   });
 
   it("reads a line kept growing by the triple lock as growing with inflation", () => {
