@@ -5,11 +5,13 @@ import type { LoanFigure } from "@/lib/figures";
 import type { PlanMonth } from "@/lib/loans";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
-import { MoneyField } from "@/components/app/molecules/money-field";
+import {
+  MoneyField,
+  RateField,
+  TermField,
+  YearField,
+} from "@/components/app/molecules/figure-field";
 import { MonthField } from "@/components/app/molecules/month-field";
-import { RateField } from "@/components/app/molecules/rate-field";
-import { TermField } from "@/components/app/molecules/term-field";
-import { YearField } from "@/components/app/molecules/year-field";
 import { clearsIn, termTo } from "@/lib/loans";
 
 // A loan as the fields read it: what is owed, and the three figures any

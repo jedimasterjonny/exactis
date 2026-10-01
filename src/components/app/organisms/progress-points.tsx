@@ -8,7 +8,7 @@ import type { ProgressPoint } from "@/data/points";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
-import { MoneyField } from "@/components/app/molecules/money-field";
+import { MoneyField } from "@/components/app/molecules/figure-field";
 import { RowActions } from "@/components/app/molecules/row-actions";
 import { Card } from "@/components/kit/card";
 import {

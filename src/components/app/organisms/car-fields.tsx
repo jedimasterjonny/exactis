@@ -6,8 +6,7 @@ import type { LoanFigure } from "@/lib/figures";
 import type { PlanMonth } from "@/lib/loans";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
-import { MoneyField } from "@/components/app/molecules/money-field";
-import { RateField } from "@/components/app/molecules/rate-field";
+import { MoneyField, RateField } from "@/components/app/molecules/figure-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { LoanFields } from "@/components/app/organisms/loan-fields";
