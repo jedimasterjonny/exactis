@@ -1,7 +1,7 @@
 import * as z from "zod";
 
 import type { Account } from "@/data/accounts";
-import type { Asset, Cma, Vintages } from "@/data/cma";
+import type { Asset, Cma, Mapping, Vintages } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
@@ -52,15 +52,16 @@ import { isWithinAllowance } from "@/lib/tax";
 // pulled from the Bank of England, or none before one is, the vintages
 // of BlackRock's capital market assumptions last pulled, or none before
 // one is, the rates and the split of the savings the plan's rate and
-// inflation are made from, and the target allocation last imported from
-// Portfolio Performance, or none before one is: the whole of what the
-// store holds for the household, with the plan as it stands the day it
-// is read.
+// inflation are made from, the target allocation last imported from
+// Portfolio Performance, or none before one is, and the class each of
+// its categories is mapped onto: the whole of what the store holds for
+// the household, with the plan as it stands the day it is read.
 export interface Household {
   readonly accounts: readonly Account[];
   readonly allocation: Allocation;
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
+  readonly mappings: readonly Mapping[];
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
@@ -78,7 +79,8 @@ export interface Household {
 // they make, the curve as the Bank gave it rather than the inflation it
 // makes, the vintages as BlackRock priced them, the rates and the split
 // as typed rather than the rate they make, the target allocation as it
-// was imported, and the id the next record added is given. That id only
+// was imported, the classes its categories are mapped onto, and the id
+// the next record added is given. That id only
 // ever counts up, so one a deleted record held is never given to
 // another, which a form left open on the deleted one would otherwise
 // write over.
@@ -89,6 +91,7 @@ export interface Kept {
   readonly asOf: Month;
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
+  readonly mappings: readonly Mapping[];
   readonly milestones: readonly Milestone[];
   readonly next: number;
   readonly owners: readonly Owner[];
@@ -291,6 +294,26 @@ const vintages = z
     "A CMA's previous vintage is an earlier one",
   ) satisfies z.ZodType<Vintages>;
 
+// A category mapped onto an asset class, each by what names it.
+const mapping = z.object({
+  asset: named,
+  category: z.string().min(1),
+}) satisfies z.ZodType<Mapping>;
+
+// The categories mapped onto asset classes, each mapped once, since a
+// category's return is the one class's it is mapped onto. A mapping is
+// kept for a category the target allocation no longer lists, and onto a
+// class the latest vintage no longer prices, so a category dropped from
+// Portfolio Performance and brought back, or a class a vintage misses
+// and the next prices again, keeps the class it was given.
+const mappings = z
+  .array(mapping)
+  .refine(
+    (listed) =>
+      new Set(listed.map(({ category }) => category)).size === listed.length,
+    "A category is mapped onto one asset class",
+  );
+
 // The rates as typed: each class growing at a rate no lower than losing
 // everything, a yield on stocks of nothing or more, since a dividend is
 // paid and never charged, and prices falling by less than everything,
@@ -390,6 +413,7 @@ export const household = z
     allocation,
     cma: vintages.nullable(),
     curve: curve.nullable(),
+    mappings,
     milestones: z.array(milestone),
     owners: z.array(owner),
     plan,
@@ -492,7 +516,8 @@ export const household = z
 // refused, so the store need not be emptied to take them; one kept
 // before there was a curve is read as holding none the same way, and
 // so is one kept before there was a target allocation, and one kept
-// before there was a CMA. One
+// before there was a CMA, and one kept before a category was mapped is
+// read as mapping none. One
 // kept before there were rates is read with the rates it ran on, as
 // its curve makes them, and everything in stocks, so its plan grows
 // and rises as it did until a rate is typed.
@@ -516,6 +541,7 @@ const kept = z
     asOf: month,
     cma: vintages.nullable().default(null),
     curve: curve.nullable().default(null),
+    mappings: mappings.default([]),
     milestones: z.array(milestone).default([]),
     next: recordId,
     owners: z.array(owner),
@@ -545,8 +571,8 @@ const kept = z
 // The household before anything is saved: no records, balances as of
 // the month given, the ages the dashboard has shown, a plan to 89
 // retiring at 59, no curve or CMA pulled, the rates a household opens
-// with and everything in stocks, no target allocation imported, and the
-// first id.
+// with and everything in stocks, no target allocation imported or
+// category mapped, and the first id.
 export function nothingKeptIn(asOf: Month): Kept {
   return {
     accounts: [],
@@ -555,6 +581,7 @@ export function nothingKeptIn(asOf: Month): Kept {
     asOf,
     cma: null,
     curve: null,
+    mappings: [],
     milestones: [],
     next: 1,
     owners: [],
@@ -624,6 +651,7 @@ function householdOf(kept: Kept): Household {
     allocation: kept.allocation,
     cma: kept.cma,
     curve: kept.curve,
+    mappings: kept.mappings,
     milestones: kept.milestones,
     owners: kept.owners,
     plan,

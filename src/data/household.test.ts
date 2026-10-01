@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { Cma, Vintages } from "@/data/cma";
+import type { Cma, Mapping, Vintages } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
@@ -18,7 +18,7 @@ import { toAccount, toValues } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { toRecords as toCarRecords } from "@/data/cars";
 import { golfValues } from "@/data/cars.fixture";
-import { cma } from "@/data/cma.fixture";
+import { cma, mappings } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
 import { homeValues } from "@/data/houses.fixture";
@@ -47,6 +47,7 @@ interface Inputs {
   readonly allocation: Allocation;
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
+  readonly mappings: readonly Mapping[];
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
@@ -70,6 +71,7 @@ const sound: Inputs = {
   allocation,
   cma: { latest: cma, previous: null },
   curve,
+  mappings,
   milestones,
   owners,
   plan: retiring,
@@ -418,6 +420,18 @@ const held: readonly Case[] = [
     (given): Inputs => ({ ...given, cma: { latest: cma, previous: cma } }),
   ],
   [
+    "A category is mapped onto one asset class",
+    (given): Inputs => ({
+      ...given,
+      mappings: [
+        ...given.mappings,
+        ...given.mappings
+          .slice(0, 1)
+          .map(({ category }) => ({ asset: "UK cash", category })),
+      ],
+    }),
+  ],
+  [
     "A CMA's previous vintage is an earlier one",
     (given): Inputs => ({
       ...given,
@@ -495,6 +509,7 @@ describe("soundKept", () => {
         allocation: { stocks: 1 },
         cma: null,
         curve: null,
+        mappings: [],
         milestones: [],
         owners: [],
         plan: {
@@ -652,6 +667,45 @@ describe("soundKept", () => {
       household: { cma: null },
       kept: { cma: null },
     });
+  });
+
+  // Spelled out key by key, as above.
+  it("reads a household kept before a category was mapped as mapping none", () => {
+    const before = {
+      accounts: kept.accounts,
+      ages: kept.ages,
+      allocation: kept.allocation,
+      asOf: kept.asOf,
+      cma: kept.cma,
+      curve: kept.curve,
+      milestones: kept.milestones,
+      next: kept.next,
+      owners: kept.owners,
+      rates: kept.rates,
+      schedule: kept.schedule,
+      targets: kept.targets,
+    };
+
+    expect(soundKept(before)).toMatchObject({
+      household: { mappings: [] },
+      kept: { mappings: [] },
+    });
+  });
+
+  // A category the allocation no longer lists, and a class the vintage
+  // no longer prices, keep the class they were given.
+  it("keeps a mapping of a category no longer listed, and onto a class no longer priced", () => {
+    const stale = [
+      ...mappings,
+      {
+        asset: "Canada large cap equities",
+        category: "Asset Allocation/Canada",
+      },
+    ];
+
+    expect(
+      soundKept({ ...kept, mappings: stale }).household.mappings,
+    ).toStrictEqual(stale);
   });
 
   // The May vintage, a quarter before August's, as the previous.

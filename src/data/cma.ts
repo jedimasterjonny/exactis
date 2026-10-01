@@ -27,6 +27,14 @@ export interface Cma {
   readonly vintage: Month;
 }
 
+// A category of the target allocation mapped onto an asset class a
+// vintage prices: the category by the id Portfolio Performance gives
+// it, which a file saved again keeps, and the class by its name.
+export interface Mapping {
+  readonly asset: string;
+  readonly category: string;
+}
+
 // The plan's two classes, which an asset class's return blends into.
 export type Sleeve = (typeof sleeves)[number];
 
