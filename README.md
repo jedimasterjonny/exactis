@@ -350,7 +350,9 @@ with the classes above it, the class of the latest CMA it is mapped onto with
 that class's 20-year return, and its target, and flags one that asks for a share
 but has nothing assigned to it, no class, or a class the vintage no longer
 prices. The class is chosen in the row, from the vintage's classes under their
-sleeves' headings, and saved as it is chosen.
+sleeves' headings, and saved as it is chosen. While any category the CMA cannot
+blend has a class its name suggests, the card offers to map them all by name at
+once, saying how many.
 
 ## Signing in
 
