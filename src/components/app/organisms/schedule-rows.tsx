@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
 
-import { cn } from "cn";
 import { Banknote, Flag, Receipt } from "lucide-react";
 
 import type { Marker } from "@/data/milestones";
@@ -53,7 +52,7 @@ interface ScheduleRowsProps<TLine extends Line> {
   readonly lines: readonly TLine[];
   readonly milestones: readonly Marker[];
   readonly onDelete?: (line: TLine) => void;
-  readonly onEdit?: (line: TLine) => void;
+  readonly onEdit: (line: TLine) => void;
   readonly plan: Plan;
   readonly side: Side;
   readonly summarise: (line: TLine) => Summary;
@@ -69,9 +68,9 @@ const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
 // placing the line on the plan's span; what the line pays at its cadence
 // over what it grows with; the years it runs over the ages reached, to
 // the month when it ends part way through a year and an open-ended line
-// running to the end; and, when given an edit handler, a pencil that
-// reports the row's line, whose id says where a save writes back, and
-// when given a delete handler a bin beside it, in the one actions
+// running to the end; and a pencil that reports the row's line, whose
+// id says where a save writes back, and when given a delete handler a
+// bin beside it, in the one actions
 // column, which reports the line the schedule asks about before it
 // goes. A locked line draws its lock in place of both, since it is
 // neither edited nor deleted here. The schedule reads its own lines, so
@@ -88,8 +87,8 @@ const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
 // what the line pays on the first, then its kind and how it grows, then
 // its detail when it has one, then its milestones when it is tied to
 // any, then the bar across the row, then the years and the ages. The list is the container it folds by, at the
-// width the ledgers fold at. A row given an edit handler opens from
-// anywhere on it, the bar letting a tap through to the row beneath it,
+// width the ledgers fold at. A row opens from anywhere on it, the bar
+// letting a tap through to the row beneath it,
 // and its actions fold away with the columns, the dialog it opens being
 // where it is deleted from; a locked row opens nothing and draws its
 // lock where the chevron would be, the same lock as its column, which
@@ -116,15 +115,13 @@ export function ScheduleRows<TLine extends Line>({
     );
   }
 
-  const hasActions = onEdit !== undefined || onDelete !== undefined;
-
   return (
     <ul className="@container divide-y">
       {lines.map((line) => {
         const summary = summarise(line);
         const row = describe(line, { milestones, plan }, summary);
         const lock =
-          hasActions && summary.lock !== undefined ? (
+          summary.lock !== undefined ? (
             <RowLock reason={summary.lock} />
           ) : undefined;
         const bar = (
@@ -149,7 +146,7 @@ export function ScheduleRows<TLine extends Line>({
                 lock={lock}
                 name={line.name}
                 onOpen={
-                  onEdit === undefined || lock !== undefined
+                  lock !== undefined
                     ? undefined
                     : (): void => {
                         onEdit(line);
@@ -197,27 +194,20 @@ export function ScheduleRows<TLine extends Line>({
               <span className="figure">{row.years}</span>
               <span className="label text-muted-foreground/60">{row.ages}</span>
             </div>
-            {hasActions && (
-              <div
-                className={cn(
-                  (onEdit !== undefined || lock !== undefined) &&
-                    "folded:hidden",
-                )}
-              >
-                {lock === undefined ? (
-                  <RowActions
-                    name={line.name}
-                    onDelete={onDelete}
-                    onEdit={onEdit}
-                    row={line}
-                  />
-                ) : (
-                  <span className="inline-flex size-7 items-center justify-center">
-                    {lock}
-                  </span>
-                )}
-              </div>
-            )}
+            <div className="folded:hidden">
+              {lock === undefined ? (
+                <RowActions
+                  name={line.name}
+                  onDelete={onDelete}
+                  onEdit={onEdit}
+                  row={line}
+                />
+              ) : (
+                <span className="inline-flex size-7 items-center justify-center">
+                  {lock}
+                </span>
+              )}
+            </div>
           </li>
         );
       })}
