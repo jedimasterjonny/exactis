@@ -1,6 +1,4 @@
-import type { Curve } from "@/data/inflation";
-
-import { inflationOf, target } from "@/data/inflation";
+import { target } from "@/data/inflation";
 
 // A figure for each class and for the portfolio the split makes of
 // them, each a fraction a year.
@@ -37,24 +35,20 @@ export type RateSet = (typeof rateSets)[number];
 
 export const rateSets = ["cma", "custom"] as const;
 
-// The split a household opens with before one is set, and is read with
-// when it was kept before there was one: everything in stocks.
+// The split a household opens with before one is set: everything in
+// stocks.
 export const allInStocks: Allocation = { stocks: 1 };
 
-// The rates a household opens with before any is typed, and is read with
-// when it was kept before there were any: the plan it ran on until then,
-// carried onto each class so that it projects as it did whatever split
-// is set. That is the 5% the plan rate was held at, for stocks and bonds
-// alike, with none of it split out as a yield, and the inflation the
-// curve kept makes, or the Bank's target when none has been pulled.
-export function openingRates(curve: Curve | null): Rates {
-  return {
-    bonds: 0.05,
-    dividends: 0,
-    inflation: curve === null ? target : inflationOf(curve).rate,
-    stocks: 0.05,
-  };
-}
+// The rates a household opens with before any is typed: the 5% the plan
+// rate was held at, for stocks and bonds alike, with none of it split
+// out as a yield, so it projects the same whatever split is set, and
+// the Bank's target for inflation.
+export const openingRates: Rates = {
+  bonds: 0.05,
+  dividends: 0,
+  inflation: target,
+  stocks: 0.05,
+};
 
 // The rate every account on the plan rate grows at: what stocks return
 // in all and what bonds return, each in the share the split holds of it.

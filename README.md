@@ -76,18 +76,15 @@ a change to `src/data/household.ts` and no migration. Until the store holds a
 household worth keeping, a change to the shape is made in place, and a store
 holding the old shape is emptied rather than carried forward, with
 `TRUNCATE household_versions`, which the trigger lets through where it refuses a
-delete. The milestones were taken without emptying it: a household kept before
-there were any is read as listing none, one kept before there was a curve as
-holding none, and one kept before there was a target allocation or a CMA as
-holding none too. The rates were taken the same way: a household kept before
-there were any is read with the ones it ran on, 5% for stocks and bonds alike
-with no yield split out, everything in stocks, and the inflation its curve made,
-so it projects as it did until a rate is typed. The triple lock was dropped the
-same way: a line kept growing by it is read as growing with inflation. A change
-to the table is a new migration, written with `db:generate` and committed with
-the change. The tests apply the migrations to an in-process Postgres
-([PGlite](https://pglite.dev)), so a migration that does not apply fails the
-suite before it reaches a database.
+delete. Nothing is read into the new shape: every save writes the household as
+the model parses it, and only the latest version is read whole, so a store whose
+latest version is in an old shape is refused on read until it is emptied. An
+older version is read only for the sources its rates rest on, to show what moved
+them, through a schema of their own that defaults what a version too old to hold
+them lacks. A change to the table is a new migration, written with `db:generate`
+and committed with the change. The tests apply the migrations to an in-process
+Postgres ([PGlite](https://pglite.dev)), so a migration that does not apply
+fails the suite before it reaches a database.
 
 ## The projection
 
@@ -248,9 +245,8 @@ a change to the method moves the rate without another pull. The assumptions
 screen lays those steps out beside the curve at 5, 10, 20 and 30 years. The plan
 takes the derived rate when it runs on the rates derived from the capital market
 assumptions, below, and otherwise the inflation typed into its rates, which a
-household kept before there were rates opens on at the derived rate, or at the
-Bank of England's 2% target when no curve had been pulled. The projection grows
-the lines with whichever it takes, and the tax bands once their freeze ends, as
+household opens on at the Bank of England's 2% target. The projection grows the
+lines with whichever it takes, and the tax bands once their freeze ends, as
 above.
 
 ## Capital market assumptions

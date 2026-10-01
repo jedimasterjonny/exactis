@@ -35,7 +35,6 @@ import { timed } from "@/data/milestones";
 import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
 import { allInStocks, openingRates, rateSets } from "@/data/rates";
 import { rules } from "@/data/rules";
-import { lineGrowths } from "@/data/schedule";
 import {
   categoryValues,
   lineValues,
@@ -45,7 +44,6 @@ import {
   named,
   pounds,
   recordId,
-  tie,
 } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { fixedMonthly, monthly } from "@/lib/cadence";
@@ -116,22 +114,8 @@ export interface Kept {
 }
 
 // What every line of both schedules holds, as the actions take it, and
-// the id it is listed by. A line kept before a line could be tied to a
-// milestone is read as tied to none, as a household kept before there
-// were milestones is read as listing none, and one kept before a tied
-// end could fall years after its milestone as ending at it. A line kept
-// growing by the triple lock, which is no longer offered, is read as
-// growing with inflation, which the lock never rose by less than.
-const line = {
-  ...lineValues,
-  endsAfter: z.number().int().nonnegative().default(0),
-  endsAt: tie.nullable().default(null),
-  growth: z
-    .enum([...lineGrowths, "triple-lock"])
-    .transform((growth) => (growth === "triple-lock" ? "inflation" : growth)),
-  id: recordId,
-  startsAt: tie.nullable().default(null),
-};
+// the id it is listed by.
+const line = { ...lineValues, id: recordId };
 
 // An account as the model lays it, with what the account save holds
 // it to and what the engine refuses of one account alone: a balance
@@ -545,8 +529,10 @@ export type Sources = Pick<
   "cma" | "curve" | "deductions" | "mappings" | "targets"
 >;
 
-// The sources as a kept household holds them, each read with the
-// default a household kept before it had one is read with.
+// The sources as a kept household holds them, each defaulted where a
+// version kept before it had one holds none: an older version is read
+// for these alone, to compare its rates with the latest's, and may
+// predate any of them.
 const sources = z.object({
   cma: vintages.nullable().default(null),
   curve: curve.nullable().default(null),
@@ -557,19 +543,11 @@ const sources = z.object({
 
 // The household as the store may keep it: its records sound on their
 // own, the ages the plan action holds them to, and every record's id
-// below the one the next is given. A household kept before there were
-// milestones lists none, and is read as listing none rather than
-// refused, so the store need not be emptied to take them; one kept
-// before there was a curve is read as holding none the same way, and
-// so is one kept before there was a target allocation, and one kept
-// before there was a CMA, and one kept before a category was mapped is
-// read as mapping none. One kept before there was a choice of rate set
-// is read as running on the rates typed, as it ran, with the deductions
-// a household opens with, which move nothing while the rates typed are
-// live. One
-// kept before there were rates is read with the rates it ran on, as
-// its curve makes them, and everything in stocks, so its plan grows
-// and rises as it did until a rate is typed.
+// below the one the next is given. Every save writes the household as
+// read here, and only the latest version is read whole, so nothing is
+// defaulted: a version kept in a shape since changed is refused rather
+// than read, and the store holding one is emptied. An older version is
+// read only for its sources, above.
 const kept = z
   .object({
     accounts: z.array(account),
@@ -586,22 +564,22 @@ const kept = z
         (ages) => ages.ends <= oldestAge,
         `A plan ends by ${String(oldestAge)}`,
       ),
-    allocation: allocation.default(allInStocks),
+    allocation,
     asOf: month,
-    cma: vintages.nullable().default(null),
-    curve: curve.nullable().default(null),
-    deductions: deductions.default(openingDeductions),
-    mappings: mappings.default([]),
-    milestones: z.array(milestone).default([]),
+    cma: vintages.nullable(),
+    curve: curve.nullable(),
+    deductions,
+    mappings,
+    milestones: z.array(milestone),
     next: recordId,
     owners: z.array(owner),
-    rates: rates.optional(),
-    rateSet: z.enum(rateSets).default("custom"),
+    rates,
+    rateSet: z.enum(rateSets),
     schedule: z.object({
       expenses: z.array(expenseLine),
       income: z.array(incomeLine),
     }),
-    targets: targets.nullable().default(null),
+    targets: targets.nullable(),
   })
   .refine(
     ({ accounts, milestones, next, owners, schedule }) =>
@@ -613,11 +591,7 @@ const kept = z
         ...schedule.income,
       ].every((record) => record.id < next),
     "A record's id is below the one the next record is given",
-  )
-  .transform(({ rates, ...read }) => ({
-    ...read,
-    rates: rates ?? openingRates(read.curve),
-  })) satisfies z.ZodType<Kept>;
+  ) satisfies z.ZodType<Kept>;
 
 // Holds a change that can be made only under the rates typed: one that
 // would leave the CMA's rates live with none to give, as an import of a
@@ -663,7 +637,7 @@ export function nothingKeptIn(asOf: Month): Kept {
     milestones: [],
     next: 1,
     owners: [],
-    rates: openingRates(null),
+    rates: openingRates,
     rateSet: "custom",
     schedule: { expenses: [], income: [] },
     targets: null,
