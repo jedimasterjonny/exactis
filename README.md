@@ -69,11 +69,12 @@ same rules before any screen draws from it.
 
 The accounts and plan screens read and write it, the dashboard projects what it
 holds and saves the ages the plan runs to and its owner retires at, and the
-assumptions screen types the rates and the split of the savings into it and
-pulls the inflation curve into it; the progress screen still shows the reference
-kit's figures. `DATABASE_URL` names the database, as `.env.example` shows.
-Nothing reads it until a query runs, so a build needs no database. Locally,
-point it at a Neon branch of your own and apply the migrations once:
+assumptions screen types the rates and the split of the savings into it, pulls
+the inflation curve into it and imports the target allocation into it; the
+progress screen still shows the reference kit's figures. `DATABASE_URL` names
+the database, as `.env.example` shows. Nothing reads it until a query runs, so a
+build needs no database. Locally, point it at a Neon branch of your own and
+apply the migrations once:
 
 ```bash
 bun run db:migrate
@@ -273,6 +274,13 @@ holdings and transactions the file holds beside them are not needed, and keeps
 them with the day they were imported. The household refuses a set whose shares
 do not add up to 100%, or that lists a category twice. The plan does not read
 the target allocation yet.
+
+The assumptions screen holds it in a tab of its own beside the rates. Pressing
+Reload from Portfolio Performance picks the file on the device, and the reader
+runs in the browser, so the file never leaves it and no upload limit applies:
+only the categories are posted to the action. The tab lays each category out
+with the classes above it and its target, and flags one that asks for a share
+but has nothing assigned to it.
 
 ## Signing in
 

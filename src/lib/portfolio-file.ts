@@ -21,7 +21,7 @@ interface Class {
 }
 
 // The taxonomy the target allocation is read from, as tradey reads it.
-const taxonomy = "Asset Allocation";
+export const taxonomy = "Asset Allocation";
 
 // What Portfolio Performance writes ahead of the protobuf in a file
 // saved in binary, and the part of the zip it writes both to.

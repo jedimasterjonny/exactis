@@ -6,6 +6,7 @@ import { ChevronRight } from "lucide-react";
 interface FoldedLinesProps {
   readonly children?: ReactNode;
   readonly figure: string;
+  readonly isFigureMuted?: boolean;
   readonly lock?: ReactNode;
   readonly name: string;
   readonly onOpen?: (() => void) | undefined;
@@ -30,10 +31,13 @@ interface FoldedLinesProps {
 // itself. A row locked against editing here draws the lock it is given
 // in the chevron's place instead, the lock its caller draws in the
 // row's actions too, so a row that will not open says why rather than
-// seeming not to answer; its caller gives it nothing to open.
+// seeming not to answer; its caller gives it nothing to open. A figure
+// its caller mutes in the row's column, as a target of nothing is, is
+// muted here too.
 export function FoldedLines({
   children,
   figure,
+  isFigureMuted = false,
   lock,
   name,
   onOpen,
@@ -52,7 +56,14 @@ export function FoldedLines({
             {name}
           </button>
         )}
-        <span className="figure font-medium">{figure}</span>
+        <span
+          className={cn(
+            "figure font-medium",
+            isFigureMuted && "text-muted-foreground",
+          )}
+        >
+          {figure}
+        </span>
         {lock === undefined ? (
           <ChevronRight
             aria-hidden
