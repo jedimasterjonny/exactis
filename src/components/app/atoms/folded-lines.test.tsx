@@ -14,6 +14,19 @@ function renderInItem(lines: React.JSX.Element): void {
 }
 
 describe("FoldedLines", () => {
+  it("mutes a figure its caller mutes", () => {
+    renderInItem(
+      <FoldedLines figure="0.00%" isFigureMuted name="FTSE 100">
+        <span>Equity · UK</span>
+      </FoldedLines>,
+    );
+
+    expect(screen.getByText("0.00%")).toHaveClass(
+      "figure",
+      "text-muted-foreground",
+    );
+  });
+
   it("draws the name and the figure across the first line, and the rest beneath, faint", () => {
     renderInItem(
       <FoldedLines figure="£103,972" name="Stocks & shares ISA">
@@ -28,6 +41,9 @@ describe("FoldedLines", () => {
       "font-medium",
     );
     expect(within(item).getByText("£103,972")).toHaveClass("figure");
+    expect(within(item).getByText("£103,972")).not.toHaveClass(
+      "text-muted-foreground",
+    );
     // eslint-disable-next-line testing-library/no-node-access -- the lines beneath are a layout box with no role or text of their own to query by
     expect(within(item).getByText("Tax-free · Me").parentElement).toHaveClass(
       "text-xs",
