@@ -104,7 +104,7 @@ export function TargetAllocation({
           </Button>
         </>
       }
-      label={subsectionLabel(assumptions, 4)}
+      label={subsectionLabel(assumptions, 5)}
       title="Target allocation"
     >
       {targets === null ? (

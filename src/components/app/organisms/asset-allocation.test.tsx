@@ -42,7 +42,7 @@ describe("AssetAllocation", () => {
 
     const card = screen.getByRole("region", { name: "Allocation" });
 
-    expect(within(card).getByText("Sect. V.ii")).toHaveClass("label");
+    expect(within(card).getByText("Sect. V.iii")).toHaveClass("label");
     expect(field("Stocks share", card)).toHaveValue("80.00%");
     expect(field("Stocks share", card)).toHaveAccessibleDescription(
       "The rest is held in bonds, flat for life",

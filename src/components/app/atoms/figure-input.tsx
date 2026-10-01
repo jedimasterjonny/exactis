@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 
 import { NumberField } from "@base-ui/react/number-field";
+import { cn } from "cn";
 
 import { Input } from "@/components/kit/input";
 
@@ -16,6 +17,7 @@ export type Figure =
 
 type FigureInputProps = Figure & {
   readonly format: Intl.NumberFormatOptions;
+  readonly isReadOnly?: boolean | undefined;
   readonly largeStep: number;
   readonly max?: number | undefined;
   readonly min?: number | undefined;
@@ -34,11 +36,16 @@ type FigureInputProps = Figure & {
 // caller wanted the same. A figure with bounds is held inside them:
 // the number field clamps what is typed to the nearest bound when it
 // commits, so a share of the base is never more than the whole of it.
+// A figure worked out elsewhere and only shown here is read-only: it can
+// be focused, selected and read out, but not typed over or stepped, and
+// it is set on the muted ground in either theme, over the input's own
+// dark ground, so it reads as shown rather than asked for.
 // Every money, rate and year value is entered through this rather than
 // a text input.
 export function FigureInput({
   defaultValue,
   format,
+  isReadOnly = false,
   largeStep,
   max,
   min,
@@ -59,11 +66,21 @@ export function FigureInput({
           onValueCommitted?.(committed);
         }
       }}
+      readOnly={isReadOnly}
       step={step}
       value={value}
     >
       <NumberField.Group>
-        <NumberField.Input render={<Input className="text-right figure" />} />
+        <NumberField.Input
+          render={
+            <Input
+              className={cn(
+                "text-right figure",
+                isReadOnly && "bg-muted dark:bg-muted",
+              )}
+            />
+          }
+        />
       </NumberField.Group>
     </NumberField.Root>
   );

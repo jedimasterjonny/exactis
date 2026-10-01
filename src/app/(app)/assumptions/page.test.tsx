@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Targets } from "@/data/targets";
@@ -21,9 +27,12 @@ import {
   getAllocation,
   getCma,
   getCurve,
+  getDeductions,
+  getLiveRates,
   getMappings,
   getPlan,
   getRates,
+  getRateSet,
   getTargets,
 } from "@/store/household";
 import { heldBack } from "@/test/held-back";
@@ -34,11 +43,15 @@ vi.mock("@/store/household", () => ({
   getAllocation: vi.fn(),
   getCma: vi.fn(),
   getCurve: vi.fn(),
+  getDeductions: vi.fn(),
+  getLiveRates: vi.fn(),
   getMappings: vi.fn(),
   getPlan: vi.fn(),
   getRates: vi.fn(),
+  getRateSet: vi.fn(),
   getTargets: vi.fn(),
 }));
+vi.mock("@/actions/cma", () => ({ pullCma: vi.fn() }));
 vi.mock("@/actions/inflation", () => ({ pullCurve: vi.fn() }));
 vi.mock("@/actions/targets", () => ({
   importTargets: vi.fn(),
@@ -46,15 +59,23 @@ vi.mock("@/actions/targets", () => ({
 }));
 vi.mock("@/actions/plan", () => ({
   saveAllocation: vi.fn(),
+  saveDeductions: vi.fn(),
   saveRates: vi.fn(),
+  saveRateSet: vi.fn(),
 }));
 
 describe("Assumptions", () => {
-  // The August vintage and the reference's mappings onto it, which only
-  // the target allocation's tab reads.
+  // The August vintage and the reference's mappings onto it, 0.20% of
+  // fees and a 2% yield, and the rates typed by hand live.
   beforeEach(() => {
     vi.mocked(getCma).mockResolvedValue({ latest: cma, previous: null });
+    vi.mocked(getDeductions).mockResolvedValue({
+      dividends: 0.02,
+      fees: 0.002,
+    });
+    vi.mocked(getLiveRates).mockResolvedValue(rates);
     vi.mocked(getMappings).mockResolvedValue(mappings);
+    vi.mocked(getRateSet).mockResolvedValue("custom");
   });
 
   it("says what the plan grows at and what its prices rise by, and hands the store's rates, split and curve to their cards", async () => {
@@ -180,5 +201,49 @@ describe("Assumptions", () => {
     await waitFor(() => {
       expect(button).toBeEnabled();
     });
+  });
+
+  // August's blends less the deductions run stocks at 7.84% in all and
+  // bonds at 4.25%, so four fifths in stocks grow at 7.13%; the rates
+  // typed by hand are kept, not shown.
+  it("says the CMA-derived rates are live, lays out their return source, and splits the savings at them", async () => {
+    const live = {
+      bonds: 0.042508,
+      dividends: 0.02,
+      inflation: 0.0295,
+      stocks: 0.058441,
+    };
+    vi.mocked(getAllocation).mockResolvedValue(allocation);
+    vi.mocked(getCurve).mockResolvedValue(curve);
+    vi.mocked(getLiveRates).mockResolvedValue(live);
+    vi.mocked(getPlan).mockResolvedValue({
+      ...retiring,
+      inflation: 0.0295,
+      rate: 0.071255,
+    });
+    vi.mocked(getRates).mockResolvedValue(rates);
+    vi.mocked(getRateSet).mockResolvedValue("cma");
+    vi.mocked(getTargets).mockResolvedValue(targets);
+
+    render(await Assumptions());
+
+    expect(
+      screen.getByText("Plan rate 7.13% · inflation 2.95% · CMA-derived rates"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "From CMA" })).toBeChecked();
+    expect(
+      screen.getByRole("textbox", { name: "Stocks growth" }),
+    ).toHaveAttribute("readonly");
+    expect(
+      screen.getByRole("region", { name: "Return source" }),
+    ).toHaveTextContent("BlackRock CMA · Aug 2026");
+    expect(screen.getByRole("textbox", { name: "Fee drag" })).toHaveValue(
+      "0.20%",
+    );
+    expect(
+      within(screen.getByRole("region", { name: "Allocation" }))
+        .getAllByRole("definition")
+        .map((definition) => definition.textContent),
+    ).toStrictEqual(["20.00%", "7.13%"]);
   });
 });

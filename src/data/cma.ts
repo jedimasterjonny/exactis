@@ -222,6 +222,39 @@ export function derivedRates({
   return cmaRates(blends, deductions, inflationOf(curve).rate);
 }
 
+// How far stocks' return in all moved from the previous vintage to the
+// latest, under the target allocation and the mappings as they are now,
+// so it is the move the new vintage made and nothing else; the fees and
+// the yield come off both alike, so they are left out. None before a
+// second vintage is pulled, while either makes no blend, or while
+// nothing in the target allocation blends into stocks.
+export function stocksMoved(
+  { latest, previous }: Vintages,
+  targets: null | Targets,
+  mappings: readonly Mapping[],
+): null | number {
+  if (previous === null) {
+    return null;
+  }
+  const now = blendsOf(latest, targets, mappings);
+  const then = blendsOf(previous, targets, mappings);
+  if ("short" in now || "short" in then || now.stocks.parts.length === 0) {
+    return null;
+  }
+  return (
+    now.stocks.rate +
+    now.stocks.hedging -
+    then.stocks.rate -
+    then.stocks.hedging
+  );
+}
+
+// A vintage by its month cut short and its year, as a figure names it,
+// "Aug 2026".
+export function vintageMonth({ vintage }: Cma): string {
+  return `${monthName(vintage.month, "short")} ${String(vintage.year)}`;
+}
+
 // A vintage by its month and year, as BlackRock names it, "August 2026".
 export function vintageName({ vintage }: Cma): string {
   return `${monthName(vintage.month, "long")} ${String(vintage.year)}`;

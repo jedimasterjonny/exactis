@@ -81,4 +81,13 @@ describe("RateField", () => {
       screen.getByText("No rate clears the balance over the term."),
     ).toHaveClass("text-destructive");
   });
+
+  it("shows a rate worked out elsewhere read-only", () => {
+    render(<RateField isReadOnly label="Stocks growth" value={0.0595} />);
+
+    const field = screen.getByRole("textbox", { name: "Stocks growth" });
+
+    expect(field).toHaveAttribute("readonly");
+    expect(field).toHaveValue("5.95%");
+  });
 });
