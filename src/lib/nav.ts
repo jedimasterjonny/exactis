@@ -9,8 +9,6 @@ import {
   Wallet,
 } from "lucide-react";
 
-import { toRoman } from "@/lib/roman";
-
 // A screen as the navigation lists it and its header names it: where
 // it is, its icon and its label in the navigation, and the title its
 // header opens with, which the screen and the header standing in for
@@ -70,6 +68,13 @@ export const screens: readonly Screen[] = [
   assumptions,
 ];
 
+// Section numerals are roman, decorative and consistent, never the only
+// way to identify a screen. There are five screens and no screen has
+// more than five cards, so the numerals are listed rather than worked
+// out; a place past the list is written in figures, so it shows rather
+// than vanishing.
+const numerals = ["I", "II", "III", "IV", "V"] as const;
+
 // The screen at a pathname, or undefined where no built screen is.
 export function screenAt(pathname: string): Screen | undefined {
   return screens.find((screen) => screen.href === pathname);
@@ -82,12 +87,17 @@ export function sectionLabel(screen: Screen): string {
 
 // The screen's numeral alone, as the navigation shows it beside the label.
 export function sectionNumeral(screen: Screen): string {
-  return toRoman(screens.indexOf(screen) + 1);
+  return numeral(screens.indexOf(screen) + 1);
 }
 
 // The label a card within a screen opens with, "Sect. III.ii": the
 // screen's numeral and the card's own in lower case, counted from one in
 // the order the cards are read down the screen.
 export function subsectionLabel(screen: Screen, place: number): string {
-  return `Sect. ${sectionNumeral(screen)}.${toRoman(place).toLowerCase()}`;
+  return `Sect. ${sectionNumeral(screen)}.${numeral(place).toLowerCase()}`;
+}
+
+// The numeral for a place counted from one.
+function numeral(place: number): string {
+  return numerals[place - 1] ?? String(place);
 }
