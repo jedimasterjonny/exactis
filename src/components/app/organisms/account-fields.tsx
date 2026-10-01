@@ -4,8 +4,7 @@ import type { AccountKind, AccountValues, Funding } from "@/data/accounts";
 import type { Owner } from "@/data/owners";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
-import { MoneyField } from "@/components/app/molecules/money-field";
-import { RateField } from "@/components/app/molecules/rate-field";
+import { MoneyField, RateField } from "@/components/app/molecules/figure-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import {

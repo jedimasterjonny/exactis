@@ -8,7 +8,7 @@ import type { Allocation, Rates } from "@/data/rates";
 
 import { saveAllocation } from "@/actions/plan";
 import { NamedFigure } from "@/components/app/atoms/named-figure";
-import { RateField } from "@/components/app/molecules/rate-field";
+import { RateField } from "@/components/app/molecules/figure-field";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { CardContent } from "@/components/kit/card";
 import { planRate } from "@/data/rates";
