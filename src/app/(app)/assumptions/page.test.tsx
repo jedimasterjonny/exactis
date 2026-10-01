@@ -1,11 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
 import { importTargets } from "@/actions/targets";
 import { Toaster } from "@/components/kit/toast";
+import { cma, mappings } from "@/data/cma.fixture";
 import { retiring } from "@/data/income.fixture";
 import { curve } from "@/data/inflation.fixture";
 import { allocation, rates } from "@/data/rates.fixture";
@@ -18,7 +19,9 @@ import {
 } from "@/lib/portfolio-file.fixture";
 import {
   getAllocation,
+  getCma,
   getCurve,
+  getMappings,
   getPlan,
   getRates,
   getTargets,
@@ -29,19 +32,31 @@ import Assumptions from "./page";
 
 vi.mock("@/store/household", () => ({
   getAllocation: vi.fn(),
+  getCma: vi.fn(),
   getCurve: vi.fn(),
+  getMappings: vi.fn(),
   getPlan: vi.fn(),
   getRates: vi.fn(),
   getTargets: vi.fn(),
 }));
 vi.mock("@/actions/inflation", () => ({ pullCurve: vi.fn() }));
-vi.mock("@/actions/targets", () => ({ importTargets: vi.fn() }));
+vi.mock("@/actions/targets", () => ({
+  importTargets: vi.fn(),
+  mapCategory: vi.fn(),
+}));
 vi.mock("@/actions/plan", () => ({
   saveAllocation: vi.fn(),
   saveRates: vi.fn(),
 }));
 
 describe("Assumptions", () => {
+  // The August vintage and the reference's mappings onto it, which only
+  // the target allocation's tab reads.
+  beforeEach(() => {
+    vi.mocked(getCma).mockResolvedValue({ latest: cma, previous: null });
+    vi.mocked(getMappings).mockResolvedValue(mappings);
+  });
+
   it("says what the plan grows at and what its prices rise by, and hands the store's rates, split and curve to their cards", async () => {
     vi.mocked(getAllocation).mockResolvedValue(allocation);
     vi.mocked(getCurve).mockResolvedValue(curve);
@@ -73,19 +88,27 @@ describe("Assumptions", () => {
     ).toBeInTheDocument();
   });
 
-  it("hands the card no curve before one is pulled", async () => {
+  it("hands the cards no curve and no CMA before either is pulled", async () => {
     vi.mocked(getAllocation).mockResolvedValue(allocation);
+    vi.mocked(getCma).mockResolvedValue(null);
     vi.mocked(getCurve).mockResolvedValue(null);
     vi.mocked(getPlan).mockResolvedValue(retiring);
     vi.mocked(getRates).mockResolvedValue(rates);
-    vi.mocked(getTargets).mockResolvedValue(null);
+    vi.mocked(getTargets).mockResolvedValue(targets);
 
     render(await Assumptions());
 
     expect(screen.getByText("No curve pulled yet")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Target allocation" }));
+
+    expect(screen.getAllByRole("row")).toHaveLength(
+      targets.categories.length + 1,
+    );
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
 
-  it("opens on the rates, and hands the store's target allocation to its card in the tab beside them", async () => {
+  it("opens on the rates, and hands the store's target allocation, the latest CMA and the mappings to its card in the tab beside them", async () => {
     vi.mocked(getAllocation).mockResolvedValue(allocation);
     vi.mocked(getCurve).mockResolvedValue(curve);
     vi.mocked(getPlan).mockResolvedValue(retiring);
@@ -107,6 +130,9 @@ describe("Assumptions", () => {
     expect(
       screen.getByRole("region", { name: "Target allocation" }),
     ).toHaveTextContent("Imported 3 Sep 2026");
+    expect(
+      screen.getAllByRole("combobox", { name: "CMA class for UK equity" })[0],
+    ).toHaveValue("UK large cap equities");
     expect(
       screen.queryByRole("region", { name: "Custom rates" }),
     ).not.toBeInTheDocument();
