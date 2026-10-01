@@ -93,10 +93,7 @@ export function RateSet({
     rates,
     (current: Rates, patch: Partial<Rates>) => ({ ...current, ...patch }),
   );
-  const [chosen, choose] = useOptimistic(
-    rateSet,
-    (_current: Chosen, next: Chosen) => next,
-  );
+  const [chosen, choose] = useOptimistic(rateSet);
   const { send } = useSender();
 
   function save(key: keyof Rates, value: number): void {

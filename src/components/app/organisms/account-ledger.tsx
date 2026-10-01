@@ -98,10 +98,7 @@ export function AccountLedger({
     remove: removeAccount,
   });
   const { send } = useSender();
-  const [order, placeOptimistically] = useOptimistic(
-    accounts,
-    (_current: readonly Account[], next: readonly Account[]) => next,
-  );
+  const [order, placeOptimistically] = useOptimistic(accounts);
   // Each asset with the loan it shares a row with, and the accounts paid
   // out of the month: every one but an asset, a paired loan among them.
   // The savings section lists them less the paired loans, which are read

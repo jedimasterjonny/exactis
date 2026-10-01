@@ -38,10 +38,7 @@ export function AssetAllocation({
   allocation,
   rates,
 }: AssetAllocationProps): JSX.Element {
-  const [shown, show] = useOptimistic(
-    allocation,
-    (_current: Allocation, next: Allocation) => next,
-  );
+  const [shown, show] = useOptimistic(allocation);
   const { send } = useSender();
 
   function save(stocks: number): void {
