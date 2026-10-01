@@ -57,8 +57,9 @@ ESLint runs `strictTypeChecked` and `stylisticTypeChecked` at
   class, two classes setting the same property, and a class built from string
   pieces are errors.
 
-JSON and YAML are linted too, so `package.json`, `renovate.json` and the
-workflow are not exempt. knip fails on an unused dependency, export or file.
+ESLint reads only code. JSON and YAML, `package.json`, `renovate.json` and the
+workflows among them, are formatted by Prettier and not linted. knip fails on an
+unused dependency, export or file.
 
 The `.mjs` config files stay outside the TypeScript program. ESLint loads a
 `.ts` config only through jiti or an unstable flag, and neither is worth a
