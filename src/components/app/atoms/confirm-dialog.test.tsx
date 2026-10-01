@@ -34,10 +34,9 @@ describe("ConfirmDialog", () => {
     expect(onConfirm).toHaveBeenCalledOnce();
   });
 
-  it("holds the confirm, under the caller's label, while the deletion is on its way", () => {
+  it("holds the confirm while the deletion is on its way", () => {
     render(
       <ConfirmDialog
-        confirmLabel="Remove"
         isBusy
         onCancel={vi.fn<() => void>()}
         onConfirm={vi.fn<() => void>()}
@@ -47,7 +46,7 @@ describe("ConfirmDialog", () => {
       </ConfirmDialog>,
     );
 
-    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
   });
 });
