@@ -4,6 +4,7 @@ import type { Curve } from "@/data/inflation";
 import type { Answer } from "@/lib/answer";
 
 import { Refusal, refused } from "@/lib/answer";
+import { download } from "@/lib/download";
 import { requireSession } from "@/lib/session";
 import { readCurve } from "@/lib/yield-curves";
 import { amend } from "@/store/household";
@@ -12,10 +13,6 @@ import { amend } from "@/store/household";
 // zip, replaced each working day.
 const latest =
   "https://www.bankofengland.co.uk/-/media/boe/files/statistics/yield-curves/latest-yield-curve-data.zip";
-
-// How long the Bank has to send the file, which is some 400KB and
-// arrives in a second or two.
-const patience = 30_000;
 
 // Pulls the Bank's latest yield curves and keeps the implied inflation
 // curve they give over whatever curve the household held, handing back
@@ -29,7 +26,11 @@ const patience = 30_000;
 // under a toast.
 export async function pullCurve(): Promise<Answer<Curve>> {
   await requireSession();
-  const sent = await download();
+  const sent = await download(
+    latest,
+    "The Bank of England",
+    "its yield curves",
+  );
   if (typeof sent === "string") {
     return refused(sent);
   }
@@ -42,24 +43,4 @@ export async function pullCurve(): Promise<Answer<Curve>> {
     }
     return { kept: { ...kept, curve }, result: curve };
   });
-}
-
-// The Bank's file, fresh rather than any copy a cache holds, or why it
-// did not come: the status the Bank answered with instead, its body let
-// go unread rather than holding the connection open, or that nothing
-// came in time.
-async function download(): Promise<string | Uint8Array> {
-  try {
-    const response = await fetch(latest, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(patience),
-    });
-    if (!response.ok) {
-      await response.body?.cancel();
-      return `The Bank of England answered ${String(response.status)} rather than sending its yield curves`;
-    }
-    return new Uint8Array(await response.arrayBuffer());
-  } catch {
-    return "The Bank of England did not send its yield curves";
-  }
 }

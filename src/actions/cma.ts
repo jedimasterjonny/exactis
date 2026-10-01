@@ -7,6 +7,7 @@ import { vintageName } from "@/data/cma";
 import { holdWhileLive } from "@/data/household";
 import { Refusal, refused } from "@/lib/answer";
 import { readCma } from "@/lib/cma-workbook";
+import { download } from "@/lib/download";
 import { monthsBetween } from "@/lib/months";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
@@ -15,10 +16,6 @@ import { amend } from "@/store/household";
 // workbook, replaced with each vintage.
 const latest =
   "https://www.blackrock.com/blk-inst-c-assets/images/tools/blackrock-investment-institute/cma/blackrock-capital-market-assumptions.xlsx";
-
-// How long BlackRock has to send the workbook, which is some 350KB and
-// arrives in a second or two.
-const patience = 30_000;
 
 // Pulls BlackRock's latest capital market assumptions and keeps them as
 // the household's latest vintage, handing back the vintage as kept. A
@@ -38,7 +35,11 @@ const patience = 30_000;
 // toast.
 export async function pullCma(): Promise<Answer<Cma>> {
   await requireSession();
-  const sent = await download();
+  const sent = await download(
+    latest,
+    "BlackRock",
+    "its capital market assumptions",
+  );
   if (typeof sent === "string") {
     return refused(sent);
   }
@@ -51,26 +52,6 @@ export async function pullCma(): Promise<Answer<Cma>> {
     });
     return { kept: next, result: pulled };
   });
-}
-
-// BlackRock's workbook, fresh rather than any copy a cache holds, or why
-// it did not come: the status BlackRock answered with instead, its body
-// let go unread rather than holding the connection open, or that nothing
-// came in time.
-async function download(): Promise<string | Uint8Array> {
-  try {
-    const response = await fetch(latest, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(patience),
-    });
-    if (!response.ok) {
-      await response.body?.cancel();
-      return `BlackRock answered ${String(response.status)} rather than sending its capital market assumptions`;
-    }
-    return new Uint8Array(await response.arrayBuffer());
-  } catch {
-    return "BlackRock did not send its capital market assumptions";
-  }
 }
 
 // The vintages held with the one pulled as the latest: the latest held
