@@ -68,6 +68,37 @@ describe("importTargets", () => {
     });
   });
 
+  // Japan takes five points from the developed world and has no class.
+  it("refuses an allocation the CMA's rates cannot be derived from while they are live, saying how to import it, and keeps nothing", async () => {
+    const [developed, ...rest] = targets.categories;
+    const adding = [
+      ...(developed === undefined ? [] : [{ ...developed, share: 0.43 }]),
+      ...rest,
+      {
+        classes: ["Equity"],
+        id: "Asset Allocation/Equity/Japan",
+        isImplemented: true,
+        name: "Japan",
+        share: 0.05,
+      },
+    ];
+    await keepAfter(db, 0, { ...reference, rateSet: "cma" });
+
+    expect(await importTargets(adding)).toStrictEqual(
+      refused(
+        "Japan has no CMA class, so this allocation cannot be imported while the plan runs on the CMA's rates. Choose custom rates, import it and give its new categories a class, then choose From CMA again",
+      ),
+    );
+    expect(await importTargets(targets.categories)).toStrictEqual(
+      saved(importedToday),
+    );
+    expect(await readLatest(db)).toMatchObject({ version: 2 });
+
+    await keepAfter(db, 2, reference);
+
+    expect(await importTargets(adding)).toMatchObject({ kind: "saved" });
+  });
+
   it("refuses categories that do not add up to the whole, and keeps nothing", async () => {
     expect(await importTargets(targets.categories.slice(1))).toStrictEqual(
       refused("A target allocation's categories add up to 100%"),

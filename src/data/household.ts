@@ -592,6 +592,31 @@ const kept = z
     rates: rates ?? openingRates(read.curve),
   })) satisfies z.ZodType<Kept>;
 
+// Holds a change that can be made only under the rates typed: one that
+// would leave the CMA's rates live with none to give, as an import of a
+// category with no class or a pull of a vintage no longer pricing a
+// mapped one would. It is refused saying what is missing, as any save
+// leaving them short is, and how to make it: choose the rates typed,
+// make it there and set the classes it needs, and choose the CMA's
+// again. Neither can be done the other way round while the CMA's are
+// live, since a category is mapped once it is imported and onto a class
+// the latest vintage kept prices. A change under the rates typed, or one
+// leaving the CMA's whole, is let through.
+export function holdWhileLive(
+  kept: Kept,
+  change: { readonly cannot: string; readonly then: string },
+): void {
+  if (kept.rateSet === "custom") {
+    return;
+  }
+  const derived = derivedRates(kept);
+  if ("short" in derived) {
+    throw new Refusal(
+      `${derived.short}, so ${change.cannot} while the plan runs on the CMA's rates. Choose custom rates, ${change.then}, then choose From CMA again`,
+    );
+  }
+}
+
 // The household before anything is saved: no records, balances as of
 // the month given, the ages the dashboard has shown, a plan to 89
 // retiring at 59, no curve or CMA pulled, the rates a household opens

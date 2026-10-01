@@ -4,6 +4,7 @@ import type { Cma, Vintages } from "@/data/cma";
 import type { Answer } from "@/lib/answer";
 
 import { vintageName } from "@/data/cma";
+import { holdWhileLive } from "@/data/household";
 import { Refusal, refused } from "@/lib/answer";
 import { readCma } from "@/lib/cma-workbook";
 import { monthsBetween } from "@/lib/months";
@@ -30,8 +31,11 @@ const patience = 30_000;
 // anything goes out to BlackRock. BlackRock not answering, or answering
 // with anything but its workbook, is refused, with the status it
 // answered when it did, so a block reads apart from an outage; so is a
-// workbook no vintage can be read from, in the reader's words. Nothing
-// is kept on a refusal: the screen says why under a toast.
+// workbook no vintage can be read from, in the reader's words, and a
+// vintage the CMA's rates, while live, cannot be derived from, as one no
+// longer pricing a mapped class is, saying how it can be kept, under the
+// rates typed. Nothing is kept on a refusal: the screen says why under a
+// toast.
 export async function pullCma(): Promise<Answer<Cma>> {
   await requireSession();
   const sent = await download();
@@ -40,10 +44,12 @@ export async function pullCma(): Promise<Answer<Cma>> {
   }
   return amend(({ kept }) => {
     const pulled = readCma(sent);
-    return {
-      kept: { ...kept, cma: vintagesWith(kept.cma, pulled) },
-      result: pulled,
-    };
+    const next = { ...kept, cma: vintagesWith(kept.cma, pulled) };
+    holdWhileLive(next, {
+      cannot: "this vintage cannot be kept",
+      then: "pull it and map onto its classes",
+    });
+    return { kept: next, result: pulled };
   });
 }
 
