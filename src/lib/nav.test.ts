@@ -30,6 +30,12 @@ describe("sectionLabel", () => {
     expect(subsectionLabel(plan, 1)).toBe("Sect. III.i");
     expect(subsectionLabel(plan, 3)).toBe("Sect. III.iii");
     expect(subsectionLabel(progress, 4)).toBe("Sect. IV.iv");
+    expect(subsectionLabel(assumptions, 5)).toBe("Sect. V.v");
+    expect(subsectionLabel(assumptions, 2)).toBe("Sect. V.ii");
+  });
+
+  it("writes a place past the numerals in figures", () => {
+    expect(subsectionLabel(plan, 6)).toBe("Sect. III.6");
   });
 
   it("lists every screen with a distinct typed route", () => {
