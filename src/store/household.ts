@@ -3,7 +3,7 @@ import { refresh } from "next/cache";
 import { cache } from "react";
 
 import type { Account } from "@/data/accounts";
-import type { Vintages } from "@/data/cma";
+import type { Deductions, Vintages } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
 import type { Household, Kept } from "@/data/household";
 import type { IncomeLine } from "@/data/income";
@@ -11,7 +11,7 @@ import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
-import type { Allocation, Rates } from "@/data/rates";
+import type { Allocation, Rates, RateSet } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
@@ -96,6 +96,12 @@ export async function getCurve(): Promise<Curve | null> {
   return (await readHousehold()).curve;
 }
 
+// What comes off the CMA's returns to derive the rates from them.
+export async function getDeductions(): Promise<Deductions> {
+  await requireSession();
+  return (await readHousehold()).deductions;
+}
+
 export async function getExpenseLines(): Promise<readonly ExpenseLine[]> {
   await requireSession();
   return (await readHousehold()).schedule.expenses;
@@ -104,6 +110,13 @@ export async function getExpenseLines(): Promise<readonly ExpenseLine[]> {
 export async function getIncomeLines(): Promise<readonly IncomeLine[]> {
   await requireSession();
   return (await readHousehold()).schedule.income;
+}
+
+// The rates the plan runs on as it is: the ones typed, or the CMA's
+// when they are chosen.
+export async function getLiveRates(): Promise<Rates> {
+  await requireSession();
+  return (await readHousehold()).liveRates;
 }
 
 export async function getMilestones(): Promise<readonly Milestone[]> {
@@ -123,10 +136,16 @@ export async function getPlan(): Promise<Plan> {
   return (await readHousehold()).plan;
 }
 
-// The rates the plan runs on, as typed.
+// The rates typed by hand, whether or not the plan runs on them.
 export async function getRates(): Promise<Rates> {
   await requireSession();
   return (await readHousehold()).rates;
+}
+
+// Which set of rates the plan runs on.
+export async function getRateSet(): Promise<RateSet> {
+  await requireSession();
+  return (await readHousehold()).rateSet;
 }
 
 // The target allocation last imported from Portfolio Performance, or

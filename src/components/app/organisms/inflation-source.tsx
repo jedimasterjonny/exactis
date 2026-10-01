@@ -36,9 +36,9 @@ interface StepProps {
 }
 
 // The assumptions screen's inflation card: the rate the gilt market
-// gives and how it is derived, which the plan does not take, since it
-// runs on the inflation typed into its rates, and which is here to check
-// that against. The header names the source and pulls the Bank's latest
+// gives and how it is derived, which the plan takes while it runs on the
+// CMA-derived rates, and which is there to check the inflation typed
+// against while it runs on the rates typed by hand. The header names the source and pulls the Bank's latest
 // curve; the pull holds while it is on its way, and the store's answer
 // draws the screen again from the curve kept, with a toast saying what
 // it derives, or says why under a toast when the Bank or its file is

@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 import type { Blend, Cma, Mapping } from "./cma";
 import type { Targets } from "./targets";
 
-import { blendsOf, cmaRates, vintageName } from "./cma";
+import { blendsOf, cmaRates, derivedRates, vintageName } from "./cma";
 import { cma, mappings } from "./cma.fixture";
+import { inflationOf } from "./inflation";
+import { curve } from "./inflation.fixture";
 import { targets } from "./targets.fixture";
 
 // The blends the vintage, allocation and mappings given make, the
@@ -231,6 +233,37 @@ describe("cmaRates", () => {
     expect(rates.dividends).toBeCloseTo(0.02, 12);
     expect(rates.bonds).toBeCloseTo(0.042508, 12);
     expect(rates.inflation).toBeCloseTo(0.0295, 12);
+  });
+});
+
+describe("derivedRates", () => {
+  // What the reference household derives from: August's vintage, the
+  // first of September's curve, its allocation and mappings, and 0.20%
+  // of fees and a 2% yield.
+  const sources = {
+    cma: { latest: cma, previous: null },
+    curve,
+    deductions: { dividends: 0.02, fees: 0.002 },
+    mappings,
+    targets,
+  };
+
+  it("derives the rates from the latest vintage's blends, with the curve's inflation", () => {
+    expect(derivedRates(sources)).toStrictEqual(
+      cmaRates(blended(), sources.deductions, inflationOf(curve).rate),
+    );
+  });
+
+  it("derives none before a vintage or a curve is pulled, or while the vintage makes no blend", () => {
+    expect(derivedRates({ ...sources, cma: null })).toStrictEqual({
+      short: "No CMA is pulled",
+    });
+    expect(derivedRates({ ...sources, curve: null })).toStrictEqual({
+      short: "No inflation curve is pulled",
+    });
+    expect(derivedRates({ ...sources, targets: null })).toStrictEqual({
+      short: "No target allocation is imported to weight the CMA by",
+    });
   });
 });
 
