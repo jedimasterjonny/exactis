@@ -13,7 +13,6 @@ import {
 
 interface ConfirmDialogProps {
   readonly children: ReactNode;
-  readonly confirmLabel?: string;
   readonly isBusy?: boolean;
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
@@ -30,7 +29,6 @@ interface ConfirmDialogProps {
 // the caller says the deletion is on its way to the store.
 export function ConfirmDialog({
   children,
-  confirmLabel = "Delete",
   isBusy = false,
   onCancel,
   onConfirm,
@@ -51,7 +49,7 @@ export function ConfirmDialog({
             size="sm"
             variant="destructive"
           >
-            {confirmLabel}
+            Delete
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
