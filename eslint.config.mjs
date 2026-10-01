@@ -4,7 +4,6 @@ import json from "@eslint/json";
 import vitest from "@vitest/eslint-plugin";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
-import eslintConfigPrettier from "eslint-config-prettier";
 import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 import jestDom from "eslint-plugin-jest-dom";
 import jsxA11y from "eslint-plugin-jsx-a11y";
@@ -652,8 +651,8 @@ const eslintConfig = defineConfig([
   },
   // YAML, which today means .github/workflows/ci.yml - the file that
   // decides whether anything else here is checked at all, and the only
-  // one that was not itself checked. flat/prettier last, for the same
-  // reason eslintConfigPrettier is last below.
+  // one that was not itself checked. flat/prettier last, so it switches
+  // off whatever flat/standard turns on that Prettier owns.
   {
     extends: [yml.configs["flat/standard"], yml.configs["flat/prettier"]],
     files: ["**/*.{yaml,yml}"],
@@ -665,8 +664,6 @@ const eslintConfig = defineConfig([
     files: [".github/workflows/*.{yaml,yml}"],
     rules: { "yml/no-empty-mapping-value": "off" },
   },
-  // Must stay last: switches off any stylistic rule Prettier owns.
-  { extends: [eslintConfigPrettier], files: codeFiles },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
