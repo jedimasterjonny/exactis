@@ -25,7 +25,6 @@ import {
   getDeductions,
   getExpenseLines,
   getIncomeLines,
-  getLiveRates,
   getMappings,
   getMilestones,
   getOwners,
@@ -57,7 +56,6 @@ describe("the household store", () => {
       getDeductions,
       getExpenseLines,
       getIncomeLines,
-      getLiveRates,
       getMappings,
       getMilestones,
       getOwners,
@@ -80,7 +78,6 @@ describe("the household store", () => {
     expect(await getCurve()).toBeNull();
     expect(await getCma()).toBeNull();
     expect(await getRates()).toStrictEqual(openingRates(null));
-    expect(await getLiveRates()).toStrictEqual(openingRates(null));
     expect(await getRateSet()).toBe("custom");
     expect(await getDeductions()).toStrictEqual({
       dividends: 0.02,
@@ -106,7 +103,6 @@ describe("the household store", () => {
     expect(await getCurve()).toStrictEqual(reference.curve);
     expect(await getCma()).toStrictEqual(reference.cma);
     expect(await getRates()).toStrictEqual(reference.rates);
-    expect(await getLiveRates()).toStrictEqual(reference.rates);
     expect(await getRateSet()).toBe(reference.rateSet);
     expect(await getDeductions()).toStrictEqual(reference.deductions);
     expect(await getAllocation()).toStrictEqual(reference.allocation);

@@ -21,12 +21,13 @@ interface AssetAllocationProps {
   readonly rates: Rates;
 }
 
-// The assumptions screen's third section: how the savings are split
-// between stocks and bonds, one split for the whole plan and flat for
-// life, and the plan rate it makes of the rates live, which every
-// account on the plan rate grows at. The share in stocks is typed, held
-// between none and all, and the rest is in bonds. It is saved as the
-// focus leaves it, and one typed back to what it was is not sent. The
+// The assumptions screen's third section while the rates typed by hand
+// are live: how the savings are split between stocks and bonds, one
+// split for the whole plan and flat for life, and the plan rate it makes
+// of the rates live, which every account on the plan rate grows at.
+// The share in stocks is typed, held between none and all, and the rest
+// is in bonds. It is saved as the focus leaves it, and one typed back to
+// what it was is not sent. The
 // bonds' share and the plan rate beside it follow the share typed at
 // once while the store is asked; its answer draws the page again from
 // the split kept, under a toast giving the split, or puts the share
