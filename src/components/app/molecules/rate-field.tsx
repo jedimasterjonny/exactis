@@ -9,6 +9,7 @@ import { percentFormat } from "@/lib/money";
 type RateFieldProps = Figure & {
   readonly error?: string;
   readonly hint?: string;
+  readonly isReadOnly?: boolean;
   readonly label: string;
   readonly max?: number;
   readonly min?: number;
@@ -22,10 +23,11 @@ type RateFieldProps = Figure & {
 // step by a tenth of a point, a whole point with shift. The figure is
 // held as the caller says, by default or by value, inside the bounds
 // it gives if any, and an error is the caller's, for a rate it could
-// not work out.
+// not work out. A rate worked out elsewhere is shown read-only.
 export function RateField({
   error,
   hint,
+  isReadOnly,
   label,
   max,
   min,
@@ -37,6 +39,7 @@ export function RateField({
       <FigureInput
         {...figure}
         format={percentFormat}
+        isReadOnly={isReadOnly}
         largeStep={0.01}
         max={max}
         min={min}

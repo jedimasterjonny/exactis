@@ -140,4 +140,31 @@ describe("FigureInput", () => {
 
     expect(input).toHaveValue("2017");
   });
+
+  // A browser types nothing into a read-only input, which jsdom does
+  // not hold it to, so what is checked is the attribute it is held by
+  // and the key that would step it.
+  it("shows a figure worked out elsewhere read-only, on the muted ground, and steps nothing", () => {
+    const onValueCommitted = vi.fn<(value: number) => void>();
+    render(
+      <FigureInput
+        format={plain}
+        isReadOnly
+        largeStep={10}
+        onValueCommitted={onValueCommitted}
+        step={1}
+        value={2026}
+      />,
+    );
+    const input = screen.getByRole("textbox");
+
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    fireEvent.blur(input);
+
+    expect(input).toHaveAttribute("readonly");
+    expect(input).toHaveClass("bg-muted", "dark:bg-muted");
+    expect(input).not.toHaveClass("dark:bg-input/30");
+    expect(input).toHaveValue("2026");
+    expect(onValueCommitted).not.toHaveBeenCalled();
+  });
 });

@@ -4,7 +4,14 @@ import { describe, expect, it } from "vitest";
 import type { Blend, Cma, Mapping } from "./cma";
 import type { Targets } from "./targets";
 
-import { blendsOf, cmaRates, derivedRates, vintageName } from "./cma";
+import {
+  blendsOf,
+  cmaRates,
+  derivedRates,
+  stocksMoved,
+  vintageMonth,
+  vintageName,
+} from "./cma";
 import { cma, mappings } from "./cma.fixture";
 import { inflationOf } from "./inflation";
 import { curve } from "./inflation.fixture";
@@ -264,6 +271,56 @@ describe("derivedRates", () => {
     expect(derivedRates({ ...sources, targets: null })).toStrictEqual({
       short: "No target allocation is imported to weight the CMA by",
     });
+  });
+});
+
+describe("stocksMoved", () => {
+  // May's vintage with every class returning a tenth of a point more,
+  // and one with no UK large cap equities at all.
+  const may = {
+    ...cma,
+    assets: cma.assets.map((asset) => ({ ...asset, rate: asset.rate + 0.001 })),
+    vintage: { month: 4, year: 2026 },
+  };
+  const unpriced = {
+    ...may,
+    assets: may.assets.filter(({ name }) => name !== "UK large cap equities"),
+  };
+
+  it("gives the move in stocks' return in all from the previous vintage to the latest", () => {
+    expect(
+      stocksMoved({ latest: cma, previous: may }, targets, mappings),
+    ).toBeCloseTo(-0.001, 12);
+  });
+
+  // All in bonds, stocks stand in at bonds' return, which says nothing
+  // of how stocks moved.
+  it("gives none while nothing blends into stocks", () => {
+    expect(
+      stocksMoved(
+        { latest: cma, previous: may },
+        onlyIn("Short-dated gilts"),
+        mappings,
+      ),
+    ).toBeNull();
+  });
+
+  it("gives none before a second vintage, or while either makes no blend", () => {
+    expect(
+      stocksMoved({ latest: cma, previous: null }, targets, mappings),
+    ).toBeNull();
+    expect(
+      stocksMoved({ latest: cma, previous: unpriced }, targets, mappings),
+    ).toBeNull();
+    expect(
+      stocksMoved({ latest: unpriced, previous: cma }, targets, mappings),
+    ).toBeNull();
+  });
+});
+
+describe("vintageMonth", () => {
+  it("names a vintage by its month cut short and its year", () => {
+    expect(vintageMonth(cma)).toBe("Aug 2026");
   });
 });
 

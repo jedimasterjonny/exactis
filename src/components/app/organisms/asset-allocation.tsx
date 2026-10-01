@@ -21,9 +21,9 @@ interface AssetAllocationProps {
   readonly rates: Rates;
 }
 
-// The assumptions screen's second section: how the savings are split
+// The assumptions screen's third section: how the savings are split
 // between stocks and bonds, one split for the whole plan and flat for
-// life, and the plan rate it makes of the rates above, which every
+// life, and the plan rate it makes of the rates live, which every
 // account on the plan rate grows at. The share in stocks is typed, held
 // between none and all, and the rest is in bonds. It is saved as the
 // focus leaves it, and one typed back to what it was is not sent. The
@@ -64,7 +64,7 @@ export function AssetAllocation({
   }
 
   return (
-    <SectionCard label={subsectionLabel(assumptions, 2)} title="Allocation">
+    <SectionCard label={subsectionLabel(assumptions, 3)} title="Allocation">
       <CardContent className="grid items-start gap-6 sm:grid-cols-2">
         <RateField
           hint="The rest is held in bonds, flat for life"
