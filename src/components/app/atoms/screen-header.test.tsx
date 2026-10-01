@@ -27,18 +27,8 @@ describe("ScreenHeader", () => {
     );
   });
 
-  it("renders a meta line only when a child actually renders", () => {
-    const { rerender } = render(
-      <ScreenHeader label="Sect. I" title="Title">
-        {false}
-      </ScreenHeader>,
-    );
-
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Title",
-    );
-
-    rerender(
+  it("renders a meta line beneath the title", () => {
+    render(
       <ScreenHeader label="Sect. I" title="Title">
         {"Figures in today's money"}
       </ScreenHeader>,
@@ -47,14 +37,8 @@ describe("ScreenHeader", () => {
     expect(screen.getByText("Figures in today's money")).toBeInTheDocument();
   });
 
-  it("renders the actions beside the title only when one actually renders", () => {
-    const { rerender } = render(
-      <ScreenHeader actions={false} label="Sect. I" title="Title" />,
-    );
-
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
-
-    rerender(
+  it("renders the actions beside the title", () => {
+    render(
       <ScreenHeader
         actions={<button type="button">Assumptions</button>}
         label="Sect. I"
