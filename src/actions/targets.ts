@@ -7,6 +7,7 @@ import type { Target, Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
 import { suggestedMappings } from "@/data/class-table";
+import { holdWhileLive } from "@/data/household";
 import { categoryValues, named } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { today } from "@/lib/months";
@@ -32,7 +33,9 @@ const mapped = z.object({ asset: named.nullable(), category: z.string() });
 // the reader that sent it. The categories are held by the household to
 // shares of the whole that add up to it, each listed once, and a
 // refusal is in the rule's words, since the screen says so under a
-// toast.
+// toast. An allocation the CMA's rates, while live, cannot be derived
+// from, as one adding a category with no class is, is refused saying how
+// it can be imported, under the rates typed.
 export async function importTargets(
   read: readonly Target[],
 ): Promise<Answer<Targets>> {
@@ -40,7 +43,12 @@ export async function importTargets(
   const parsed = categories.parse(read);
   return amend(({ kept }) => {
     const targets = { categories: parsed, importedOn: today() };
-    return { kept: { ...kept, targets }, result: targets };
+    const next = { ...kept, targets };
+    holdWhileLive(next, {
+      cannot: "this allocation cannot be imported",
+      then: "import it and give its new categories a class",
+    });
+    return { kept: next, result: targets };
   });
 }
 
