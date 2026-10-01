@@ -59,25 +59,21 @@ export function formatMonthly(amount: number): string {
   return `${formatGbp(amount)} / ${cadenceAbbreviations.month}`;
 }
 
-// What lands in an account a month that the month decides in advance:
-// its own fixed sum, and what the salaries running then sacrifice into
-// it with the employer's NI saved. The spare money's take is left out,
-// since it is decided month by month from what is left.
-export function paidMonthly(
-  account: Account,
-  lines: readonly IncomeLine[],
-): number {
-  return fixedMonthly(account) + monthly(fedOf(account.id, lines), "year");
-}
-
 // What the accounts are paid a month between them that the month
 // decides in advance, as the account table totals it beneath its rows
-// and the screen's tile states it over them.
+// and the screen's tile states it over them: each one's own fixed sum,
+// and what the salaries running then sacrifice into it with the
+// employer's NI saved. The spare money's take is left out, since it is
+// decided month by month from what is left.
 export function paidMonthlyOf(
   accounts: readonly Account[],
   lines: readonly IncomeLine[],
 ): number {
-  return sumOf(accounts, (account) => paidMonthly(account, lines));
+  return sumOf(
+    accounts,
+    (account) =>
+      fixedMonthly(account) + monthly(fedOf(account.id, lines), "year"),
+  );
 }
 
 // A figure summed down a list, for a total beneath the rows or a tile

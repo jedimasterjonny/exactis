@@ -10,7 +10,6 @@ import {
   formatContribution,
   formatGrowth,
   formatMonthly,
-  paidMonthly,
   paidMonthlyOf,
   sumOf,
 } from "./ledger";
@@ -38,20 +37,23 @@ describe("equityOf", () => {
 
 // The fixture's salary sacrifices £16,560 a year into the pension, with
 // the employer's NI saved, on top of the pension's own £28,512.
-describe("paidMonthly", () => {
+describe("paidMonthlyOf", () => {
   it("adds what the salaries sacrifice a month to an account's own fixed sum", () => {
     const [salary] = incomeLines;
 
-    expect(paidMonthly(pension, [salary])).toBeCloseTo((28512 + 16560) / 12);
-    expect(paidMonthly(pension, [])).toBe(28512 / 12);
-    expect(paidMonthly(isa, [salary])).toBeCloseTo(20000 / 12);
+    expect(paidMonthlyOf([pension], [salary])).toBeCloseTo(
+      (28512 + 16560) / 12,
+    );
+    expect(paidMonthlyOf([pension], [])).toBe(28512 / 12);
+    expect(paidMonthlyOf([isa], [salary])).toBeCloseTo(20000 / 12);
     expect(
-      paidMonthly({ ...cash, contribution: { cap: null, kind: "spare" } }, []),
+      paidMonthlyOf(
+        [{ ...cash, contribution: { cap: null, kind: "spare" } }],
+        [],
+      ),
     ).toBe(0);
   });
-});
 
-describe("paidMonthlyOf", () => {
   it("adds up what each account is paid a month, the sacrifice with it", () => {
     const [salary] = incomeLines;
 
