@@ -17,14 +17,12 @@ interface Question {
 
 // What the caller gets back: the record the question is open on, which a
 // screen holds one or none of, so it doubles as the confirm dialog's open
-// state; the three things that move it; and whether a deletion is in
+// state; the ask that opens it; and the question the dialog is handed,
+// which carries the answers that close it and whether a deletion is in
 // flight, which is what holds the confirm.
 interface Remover<TDoomed> {
   readonly ask: (doomed: TDoomed) => void;
-  readonly cancel: () => void;
-  readonly confirm: (current: TDoomed) => void;
   readonly doomed: null | TDoomed;
-  readonly isRemoving: boolean;
   readonly questionOf: (current: TDoomed) => Question;
 }
 
@@ -47,8 +45,7 @@ interface RemoverProps<TDoomed> {
 // which says what goes with the record, since what goes with an account
 // is not what goes with an income line. Cancel and confirm are its words
 // rather than the editor's dismiss and save, because the dialog they
-// drive says Cancel and Delete, and because an organism holding both
-// hooks would otherwise have two dismisses to tell apart.
+// drive says Cancel and Delete.
 export function useRemover<TDoomed extends { readonly id: number }>({
   describe,
   noun,
@@ -99,5 +96,5 @@ export function useRemover<TDoomed extends { readonly id: number }>({
     };
   }
 
-  return { ask, cancel, confirm, doomed, isRemoving, questionOf };
+  return { ask, doomed, questionOf };
 }
