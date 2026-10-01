@@ -2,11 +2,13 @@
 
 import * as z from "zod";
 
+import type { Deductions } from "@/data/cma";
 import type { PlanAges } from "@/data/plan";
-import type { Allocation, Rates } from "@/data/rates";
+import type { Allocation, Rates, RateSet } from "@/data/rates";
 import type { Answer } from "@/lib/answer";
 
 import { ageIn, oldestAge } from "@/data/plan";
+import { rateSets } from "@/data/rates";
 import { Refusal } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
@@ -29,6 +31,14 @@ const ratesPatch = z.object({
   dividends: z.number().exactOptional(),
   inflation: z.number().exactOptional(),
   stocks: z.number().exactOptional(),
+});
+
+// What a save of the deductions may carry: either, each a number, and
+// whichever is not sent is kept as the household has it, as with the
+// rates.
+const deductionsPatch = z.object({
+  dividends: z.number().exactOptional(),
+  fees: z.number().exactOptional(),
 });
 
 // What a save of the split carries: the share in stocks.
@@ -88,6 +98,25 @@ export async function saveAllocation(
   }));
 }
 
+// Writes what comes off the CMA's returns to derive the rates, the
+// deductions sent over the ones the household has, and hands back the
+// deductions as it now has them. An action answers a POST from
+// anywhere, so it checks the session for itself and parses what it was
+// sent rather than trusting the form. Each is held to its rule by the
+// household, and, while the plan runs on the CMA's rates, so are the
+// rates they make and the plan those make; a refusal is in the rule's
+// words, since the screen says so under a toast.
+export async function saveDeductions(
+  draft: Partial<Deductions>,
+): Promise<Answer<Deductions>> {
+  await requireSession();
+  const parsed = deductionsPatch.parse(draft);
+  return amend(({ kept }) => {
+    const deductions = { ...kept.deductions, ...parsed };
+    return { kept: { ...kept, deductions }, result: deductions };
+  });
+}
+
 // Writes the plan's rates, the ones sent over the ones the household
 // has, and hands back the rates as it now has them. An action answers a
 // POST from anywhere, so it checks the session for itself and parses
@@ -102,4 +131,17 @@ export async function saveRates(draft: Partial<Rates>): Promise<Answer<Rates>> {
     const rates = { ...kept.rates, ...parsed };
     return { kept: { ...kept, rates }, result: rates };
   });
+}
+
+// Writes which set of rates the plan runs on, and hands it back as
+// written. An action answers a POST from anywhere, so it checks the
+// session for itself and parses what it was sent rather than trusting
+// the form. The CMA's are chosen only while the CMA gives some, and the
+// household refuses them otherwise saying what is missing, as it holds
+// the plan they make to every rule; the rates typed are always there to
+// choose.
+export async function saveRateSet(set: RateSet): Promise<Answer<RateSet>> {
+  await requireSession();
+  const rateSet = z.enum(rateSets).parse(set);
+  return amend(({ kept }) => ({ kept: { ...kept, rateSet }, result: rateSet }));
 }

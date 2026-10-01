@@ -1,7 +1,9 @@
+import type { Curve } from "@/data/inflation";
 import type { Rates } from "@/data/rates";
 import type { Month } from "@/data/schedule";
 import type { Target, Targets } from "@/data/targets";
 
+import { inflationOf } from "@/data/inflation";
 import { monthName } from "@/lib/months";
 
 // An asset class as BlackRock's capital market assumptions price it in
@@ -34,8 +36,7 @@ export interface Blend {
 // The two sleeves' blends, or why the target allocation and the
 // mappings make none.
 export type Blends =
-  | { readonly bonds: Blend; readonly stocks: Blend }
-  | { readonly short: string };
+  Shortfall | { readonly bonds: Blend; readonly stocks: Blend };
 
 // A vintage of BlackRock's capital market assumptions: the month it was
 // published in, the day its data are as of, as an ISO date, and the
@@ -65,6 +66,12 @@ export interface Mapping {
   readonly category: string;
 }
 
+// Why the CMA gives the plan nothing: what is missing, in words naming
+// it.
+export interface Shortfall {
+  readonly short: string;
+}
+
 // The plan's two classes, which an asset class's return blends into.
 export type Sleeve = (typeof sleeves)[number];
 
@@ -86,6 +93,16 @@ interface Part {
 }
 
 export const sleeves = ["bonds", "stocks"] as const;
+
+// What a household deducts from the CMA's returns before anything is
+// typed: the figures the manual method settled on in September 2026.
+// Fees of 0.20%, its estimate of 0.167% for the funds' charges and the
+// platform's flat fee, rounded up as it was three runs running; the
+// platform's share falls as the savings grow, so the figure is a start
+// to type over rather than a reading. And a dividend yield of 2.00%,
+// the index yields weighted by the equity sleeve, which moves only the
+// split of stocks' return between growth and yield, never its total.
+export const openingDeductions: Deductions = { dividends: 0.02, fees: 0.002 };
 
 // Names as a sentence lists them, "A, B and C".
 const listed = new Intl.ListFormat("en-GB", { type: "conjunction" });
@@ -171,6 +188,38 @@ export function cmaRates(
     inflation,
     stocks: stocks.rate + stocks.hedging - fees - dividends,
   };
+}
+
+// The rates the household's latest vintage gives the plan: its blends
+// by the target allocation and the mappings less the deductions, with
+// the inflation the curve gives, since BlackRock's returns are nominal
+// and the market's inflation is the one they are priced against. There
+// are none before a vintage or a curve is pulled, or while the vintage
+// makes no blend, and what is missing is said.
+export function derivedRates({
+  cma,
+  curve,
+  deductions,
+  mappings,
+  targets,
+}: {
+  readonly cma: null | Vintages;
+  readonly curve: Curve | null;
+  readonly deductions: Deductions;
+  readonly mappings: readonly Mapping[];
+  readonly targets: null | Targets;
+}): Rates | Shortfall {
+  if (cma === null) {
+    return { short: "No CMA is pulled" };
+  }
+  const blends = blendsOf(cma.latest, targets, mappings);
+  if ("short" in blends) {
+    return blends;
+  }
+  if (curve === null) {
+    return { short: "No inflation curve is pulled" };
+  }
+  return cmaRates(blends, deductions, inflationOf(curve).rate);
 }
 
 // A vintage by its month and year, as BlackRock names it, "August 2026".

@@ -10,17 +10,24 @@ export interface Allocation {
   readonly stocks: number;
 }
 
-// The rates the plan runs on, typed by hand, one to a class and flat for
-// life, each a fraction a year as every rate is: what stocks grow at in
-// price, the dividend yield they pay on top of it, what bonds return,
-// and the inflation the lines rise with. Each is nominal, as a fixed
-// rate on an account is.
+// A set of rates the plan can run on, typed by hand or derived from the
+// capital market assumptions, one to a class and flat for life, each a
+// fraction a year as every rate is: what stocks grow at in price, the
+// dividend yield they pay on top of it, what bonds return, and the
+// inflation the lines rise with. Each is nominal, as a fixed rate on an
+// account is.
 export interface Rates {
   readonly bonds: number;
   readonly dividends: number;
   readonly inflation: number;
   readonly stocks: number;
 }
+
+// Where the rates the plan runs on come from: derived from the capital
+// market assumptions, or typed by hand.
+export type RateSet = (typeof rateSets)[number];
+
+export const rateSets = ["cma", "custom"] as const;
 
 // The split a household opens with before one is set, and is read with
 // when it was kept before there was one: everything in stocks.

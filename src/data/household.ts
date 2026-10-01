@@ -1,14 +1,14 @@
 import * as z from "zod";
 
 import type { Account } from "@/data/accounts";
-import type { Asset, Cma, Mapping, Vintages } from "@/data/cma";
+import type { Asset, Cma, Deductions, Mapping, Vintages } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan, PlanAges } from "@/data/plan";
-import type { Allocation, Rates } from "@/data/rates";
+import type { Allocation, Rates, RateSet } from "@/data/rates";
 import type { Month, Tie } from "@/data/schedule";
 import type { Target, Targets } from "@/data/targets";
 
@@ -21,12 +21,12 @@ import {
   takesSpare,
   toValues,
 } from "@/data/accounts";
-import { sleeves } from "@/data/cma";
+import { derivedRates, openingDeductions, sleeves } from "@/data/cma";
 import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
 import { timed } from "@/data/milestones";
 import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
-import { allInStocks, openingRates } from "@/data/rates";
+import { allInStocks, openingRates, rateSets } from "@/data/rates";
 import { rules } from "@/data/rules";
 import { lineGrowths } from "@/data/schedule";
 import {
@@ -51,21 +51,26 @@ import { isWithinAllowance } from "@/lib/tax";
 // the milestones the plan is laid out by, the inflation curve last
 // pulled from the Bank of England, or none before one is, the vintages
 // of BlackRock's capital market assumptions last pulled, or none before
-// one is, the rates and the split of the savings the plan's rate and
-// inflation are made from, the target allocation last imported from
-// Portfolio Performance, or none before one is, and the class each of
-// its categories is mapped onto: the whole of what the store holds for
-// the household, with the plan as it stands the day it is read.
+// one is, the rates typed by hand, what comes off the CMA's returns to
+// derive them instead, which of the two sets is chosen and the rates
+// the plan runs on as it is, the split of the savings the plan's rate
+// is made from, the target allocation last imported from Portfolio
+// Performance, or none before one is, and the class each of its
+// categories is mapped onto: the whole of what the store holds for the
+// household, with the plan as it stands the day it is read.
 export interface Household {
   readonly accounts: readonly Account[];
   readonly allocation: Allocation;
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
+  readonly deductions: Deductions;
+  readonly liveRates: Rates;
   readonly mappings: readonly Mapping[];
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
   readonly rates: Rates;
+  readonly rateSet: RateSet;
   readonly schedule: {
     readonly expenses: readonly ExpenseLine[];
     readonly income: readonly IncomeLine[];
@@ -78,9 +83,10 @@ export interface Household {
 // recorded together, the ages the plan is set to rather than the plan
 // they make, the curve as the Bank gave it rather than the inflation it
 // makes, the vintages as BlackRock priced them, the rates and the split
-// as typed rather than the rate they make, the target allocation as it
-// was imported, the classes its categories are mapped onto, and the id
-// the next record added is given. That id only
+// as typed rather than the rate they make, the deductions and the rate
+// set chosen rather than the rates they make, the target allocation as
+// it was imported, the classes its categories are mapped onto, and the
+// id the next record added is given. That id only
 // ever counts up, so one a deleted record held is never given to
 // another, which a form left open on the deleted one would otherwise
 // write over.
@@ -91,11 +97,13 @@ export interface Kept {
   readonly asOf: Month;
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
+  readonly deductions: Deductions;
   readonly mappings: readonly Mapping[];
   readonly milestones: readonly Milestone[];
   readonly next: number;
   readonly owners: readonly Owner[];
   readonly rates: Rates;
+  readonly rateSet: RateSet;
   readonly schedule: Household["schedule"];
   readonly targets: null | Targets;
 }
@@ -314,6 +322,14 @@ const mappings = z
     "A category is mapped onto one asset class",
   );
 
+// What comes off the CMA's returns: a dividend yield of nothing or
+// more, as a typed one is, and fees of nothing or more, since a fee is
+// charged and never paid.
+const deductions = z.object({
+  dividends: z.number().min(0, "A dividend yield is nothing or more"),
+  fees: z.number().min(0, "A fee is nothing or more"),
+}) satisfies z.ZodType<Deductions>;
+
 // The rates as typed: each class growing at a rate no lower than losing
 // everything, a yield on stocks of nothing or more, since a dividend is
 // paid and never charged, and prices falling by less than everything,
@@ -413,11 +429,14 @@ export const household = z
     allocation,
     cma: vintages.nullable(),
     curve: curve.nullable(),
+    deductions,
+    liveRates: rates,
     mappings,
     milestones: z.array(milestone),
     owners: z.array(owner),
     plan,
     rates,
+    rateSet: z.enum(rateSets),
     schedule: z.object({
       expenses: z.array(expenseLine),
       income: z.array(incomeLine),
@@ -517,7 +536,10 @@ export const household = z
 // before there was a curve is read as holding none the same way, and
 // so is one kept before there was a target allocation, and one kept
 // before there was a CMA, and one kept before a category was mapped is
-// read as mapping none. One
+// read as mapping none. One kept before there was a choice of rate set
+// is read as running on the rates typed, as it ran, with the deductions
+// a household opens with, which move nothing while the rates typed are
+// live. One
 // kept before there were rates is read with the rates it ran on, as
 // its curve makes them, and everything in stocks, so its plan grows
 // and rises as it did until a rate is typed.
@@ -541,11 +563,13 @@ const kept = z
     asOf: month,
     cma: vintages.nullable().default(null),
     curve: curve.nullable().default(null),
+    deductions: deductions.default(openingDeductions),
     mappings: mappings.default([]),
     milestones: z.array(milestone).default([]),
     next: recordId,
     owners: z.array(owner),
     rates: rates.optional(),
+    rateSet: z.enum(rateSets).default("custom"),
     schedule: z.object({
       expenses: z.array(expenseLine),
       income: z.array(incomeLine),
@@ -571,7 +595,8 @@ const kept = z
 // The household before anything is saved: no records, balances as of
 // the month given, the ages the dashboard has shown, a plan to 89
 // retiring at 59, no curve or CMA pulled, the rates a household opens
-// with and everything in stocks, no target allocation imported or
+// with live and everything in stocks, the manual method's fees and yield
+// to deduct from a CMA's returns, no target allocation imported or
 // category mapped, and the first id.
 export function nothingKeptIn(asOf: Month): Kept {
   return {
@@ -581,11 +606,13 @@ export function nothingKeptIn(asOf: Month): Kept {
     asOf,
     cma: null,
     curve: null,
+    deductions: openingDeductions,
     mappings: [],
     milestones: [],
     next: 1,
     owners: [],
     rates: openingRates(null),
+    rateSet: "custom",
     schedule: { expenses: [], income: [] },
     targets: null,
   };
@@ -641,21 +668,28 @@ function endsInAYear(line: {
 }
 
 // The whole a kept household makes, its plan running from the month
-// its balances are as of on the rates and the split kept, each line's
+// its balances are as of on the rates live and the split kept, each line's
 // tied ends read off the milestones they are tied to, and each line
 // paying a loan running as the loan's payments do.
 function householdOf(kept: Kept): Household {
-  const plan = planOf(kept.ages, kept.asOf, kept);
+  const liveRates = liveRatesOf(kept);
+  const plan = planOf(kept.ages, kept.asOf, {
+    allocation: kept.allocation,
+    rates: liveRates,
+  });
   return {
     accounts: kept.accounts,
     allocation: kept.allocation,
     cma: kept.cma,
     curve: kept.curve,
+    deductions: kept.deductions,
+    liveRates,
     mappings: kept.mappings,
     milestones: kept.milestones,
     owners: kept.owners,
     plan,
     rates: kept.rates,
+    rateSet: kept.rateSet,
     schedule: {
       expenses: kept.schedule.expenses.map((line) =>
         paidOver(timed(line, kept.milestones, plan), kept.accounts, plan),
@@ -695,6 +729,29 @@ function isInOrder(line: {
 
 function isListedOnce(records: readonly { readonly id: number }[]): boolean {
   return new Set(records.map((record) => record.id)).size === records.length;
+}
+
+// The rates the plan runs on: those typed, or those the CMA gives when
+// they are chosen, which a household holds to giving them, since a plan
+// set to run on the CMA's rates has none to run on otherwise. A save
+// that leaves the CMA giving none while they are chosen, as an import
+// of a category with no class would, is refused saying what is
+// missing, rather than the plan falling back on the rates typed without
+// a word.
+function liveRatesOf(kept: Kept): Rates {
+  switch (kept.rateSet) {
+    case "cma": {
+      const derived = derivedRates(kept);
+      if ("short" in derived) {
+        throw new Refusal(
+          `${derived.short}, so the plan cannot run on the CMA's rates`,
+        );
+      }
+      return derived;
+    }
+    case "custom":
+      return kept.rates;
+  }
 }
 
 // A line as it runs once the loan it pays is read with the plan: from

@@ -11,7 +11,13 @@ import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
-import { saveAges, saveAllocation, saveRates } from "./plan";
+import {
+  saveAges,
+  saveAllocation,
+  saveDeductions,
+  saveRates,
+  saveRateSet,
+} from "./plan";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -218,6 +224,106 @@ describe("saveAllocation", () => {
 
     await expect(saveAllocation({ stocks: 1 })).resolves.toStrictEqual(
       refused("A debt's payments end"),
+    );
+    expect(await readLatest(db)).toMatchObject({ version: 1 });
+  });
+});
+
+describe("saveDeductions", () => {
+  it("writes nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(saveDeductions({ fees: 0.002 })).rejects.toThrow("redirected");
+    expect(await readLatest(db)).toBeNull();
+  });
+
+  it("writes the deductions sent over the household's, keeping the rest, and draws the page again", async () => {
+    expect(await saveDeductions({ fees: 0.0025 })).toStrictEqual(
+      saved({ dividends: 0.02, fees: 0.0025 }),
+    );
+    expect(await readLatest(db)).toStrictEqual({
+      household: { ...blank, deductions: { dividends: 0.02, fees: 0.0025 } },
+      version: 1,
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+
+    expect(await saveDeductions({ dividends: 0.019 })).toStrictEqual(
+      saved({ dividends: 0.019, fees: 0.0025 }),
+    );
+  });
+
+  it("refuses a deduction that is not a number", async () => {
+    await expect(saveDeductions({ fees: Number.NaN })).rejects.toThrow(
+      z.ZodError,
+    );
+    expect(await readLatest(db)).toBeNull();
+  });
+
+  it("holds each deduction to its rule, in the household's words", async () => {
+    await expect(saveDeductions({ fees: -0.001 })).resolves.toStrictEqual(
+      refused("A fee is nothing or more"),
+    );
+    await expect(saveDeductions({ dividends: -0.01 })).resolves.toStrictEqual(
+      refused("A dividend yield is nothing or more"),
+    );
+    expect(await readLatest(db)).toBeNull();
+  });
+
+  // Fees of 150% leave stocks growing at less than losing everything,
+  // which the rates typed are never asked to make while they are not
+  // the ones live.
+  it("holds the rates the deductions make to their rules while the CMA's are live", async () => {
+    await keepAfter(db, 0, reference);
+
+    expect(await saveDeductions({ fees: 1.5 })).toStrictEqual(
+      saved({ dividends: 0.02, fees: 1.5 }),
+    );
+
+    await keepAfter(db, 2, { ...reference, rateSet: "cma" });
+
+    await expect(saveDeductions({ fees: 1.5 })).resolves.toStrictEqual(
+      refused("A rate loses no more than everything"),
+    );
+    expect(await readLatest(db)).toMatchObject({ version: 3 });
+  });
+});
+
+describe("saveRateSet", () => {
+  it("writes nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(saveRateSet("custom")).rejects.toThrow("redirected");
+    expect(await readLatest(db)).toBeNull();
+  });
+
+  it("chooses the CMA's rates while the CMA gives some, draws the page again, and chooses the rates typed back", async () => {
+    await keepAfter(db, 0, reference);
+
+    expect(await saveRateSet("cma")).toStrictEqual(saved("cma"));
+    expect(await readLatest(db)).toStrictEqual({
+      household: { ...reference, rateSet: "cma" },
+      version: 2,
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+
+    expect(await saveRateSet("custom")).toStrictEqual(saved("custom"));
+    expect(await readLatest(db)).toMatchObject({
+      household: { rateSet: "custom" },
+      version: 3,
+    });
+  });
+
+  it("refuses the CMA's rates while the CMA gives none, saying what is missing, and keeps nothing", async () => {
+    await expect(saveRateSet("cma")).resolves.toStrictEqual(
+      refused("No CMA is pulled, so the plan cannot run on the CMA's rates"),
+    );
+
+    await keepAfter(db, 0, { ...reference, curve: null });
+
+    await expect(saveRateSet("cma")).resolves.toStrictEqual(
+      refused(
+        "No inflation curve is pulled, so the plan cannot run on the CMA's rates",
+      ),
     );
     expect(await readLatest(db)).toMatchObject({ version: 1 });
   });
