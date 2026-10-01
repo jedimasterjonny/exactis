@@ -27,6 +27,7 @@ import {
   getOwners,
   getPlan,
   getRates,
+  getTargets,
 } from "./household";
 
 vi.mock("server-only", () => ({}));
@@ -53,6 +54,7 @@ describe("the household store", () => {
       getOwners,
       getPlan,
       getRates,
+      getTargets,
     ]) {
       await expect(read()).rejects.toThrow("redirected");
     }
@@ -68,6 +70,7 @@ describe("the household store", () => {
     expect(await getCurve()).toBeNull();
     expect(await getRates()).toStrictEqual(openingRates(null));
     expect(await getAllocation()).toStrictEqual(allInStocks);
+    expect(await getTargets()).toBeNull();
     expect(await getPlan()).toStrictEqual(
       planOf(blank.ages, blank.asOf, blank),
     );
@@ -85,6 +88,7 @@ describe("the household store", () => {
     expect(await getCurve()).toStrictEqual(reference.curve);
     expect(await getRates()).toStrictEqual(reference.rates);
     expect(await getAllocation()).toStrictEqual(reference.allocation);
+    expect(await getTargets()).toStrictEqual(reference.targets);
     expect(await getPlan()).toStrictEqual({
       born: 1990,
       from: 2026,
