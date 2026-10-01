@@ -296,8 +296,13 @@ gives each, and whether any holding is assigned to it. The import action in
 `src/actions/targets.ts` takes the categories rather than the file, since the
 holdings and transactions the file holds beside them are not needed, and keeps
 them with the day they were imported. The household refuses a set whose shares
-do not add up to 100%, or that lists a category twice. The plan does not read
-the target allocation yet.
+do not add up to 100%, or that lists a category twice. Each category can be
+mapped onto an asset class the latest CMA prices, by `mapCategory` in the same
+file, and the mapping is kept by the id Portfolio Performance gives the
+category, so an import of the file saved again keeps it. A mapping outlives the
+category leaving the allocation and the class leaving a vintage, so neither has
+to be chosen again when it comes back. The plan does not read the target
+allocation yet.
 
 The assumptions screen holds it in a tab of its own beside the rates. Pressing
 Reload from Portfolio Performance picks the file on the device, and the reader
