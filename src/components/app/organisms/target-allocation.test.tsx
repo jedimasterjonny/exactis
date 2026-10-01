@@ -12,6 +12,7 @@ import type { Answer } from "@/lib/answer";
 
 import { importTargets } from "@/actions/targets";
 import { Toaster } from "@/components/kit/toast";
+import { cma, mappings } from "@/data/cma.fixture";
 import { targets } from "@/data/targets.fixture";
 import { refused, saved } from "@/lib/answer";
 import { readTargets } from "@/lib/portfolio-file";
@@ -24,7 +25,10 @@ import { heldBack } from "@/test/held-back";
 
 import { TargetAllocation } from "./target-allocation";
 
-vi.mock("@/actions/targets", () => ({ importTargets: vi.fn() }));
+vi.mock("@/actions/targets", () => ({
+  importTargets: vi.fn(),
+  mapCategory: vi.fn(),
+}));
 
 // The reference taxonomy as Portfolio Performance saves it, chosen as
 // a file on the device.
@@ -43,11 +47,13 @@ function choose(files: null | readonly File[]): HTMLInputElement {
   return picker;
 }
 
-// The card over the targets given, the reference's by default. An
-// import reports through the toast manager, which needs its Toaster
-// mounted.
+// The card over the targets given, the reference's by default, with
+// the reference's mappings onto August's vintage. An import reports
+// through the toast manager, which needs its Toaster mounted.
 function renderCard(held: null | Targets = targets): void {
-  render(<TargetAllocation targets={held} />, { wrapper: Toaster });
+  render(<TargetAllocation cma={cma} mappings={mappings} targets={held} />, {
+    wrapper: Toaster,
+  });
 }
 
 describe("TargetAllocation", () => {
@@ -65,12 +71,15 @@ describe("TargetAllocation", () => {
     ).toBeEnabled();
   });
 
-  it("lays out the categories imported", () => {
+  it("lays out the categories imported, each with its CMA class", () => {
     renderCard();
 
     expect(screen.getAllByRole("row")).toHaveLength(
       targets.categories.length + 1,
     );
+    expect(
+      screen.getAllByRole("combobox", { name: "CMA class for UK equity" })[0],
+    ).toHaveValue("UK large cap equities");
     expect(
       screen.queryByText("No allocation imported yet"),
     ).not.toBeInTheDocument();
@@ -99,7 +108,9 @@ describe("TargetAllocation", () => {
       screen.getByText(
         /^A target is its class's weight times the weights of the classes above it in the Asset Allocation taxonomy, and the targets are checked to add up to 100%/,
       ),
-    ).toHaveTextContent("only the targets leave it.");
+    ).toHaveTextContent(
+      "only the targets leave it. Each category blends at the 20-year GBP return of its CMA class.",
+    );
   });
 
   it("opens the file picker, which takes a Portfolio Performance file", () => {

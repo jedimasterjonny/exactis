@@ -335,8 +335,11 @@ The assumptions screen holds it in a tab of its own beside the rates. Pressing
 Reload from Portfolio Performance picks the file on the device, and the reader
 runs in the browser, so the file never leaves it and no upload limit applies:
 only the categories are posted to the action. The tab lays each category out
-with the classes above it and its target, and flags one that asks for a share
-but has nothing assigned to it.
+with the classes above it, the class of the latest CMA it is mapped onto with
+that class's 20-year return, and its target, and flags one that asks for a share
+but has nothing assigned to it, no class, or a class the vintage no longer
+prices. The class is chosen in the row, from the vintage's classes under their
+sleeves' headings, and saved as it is chosen.
 
 ## Signing in
 

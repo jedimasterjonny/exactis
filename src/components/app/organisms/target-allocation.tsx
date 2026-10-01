@@ -5,6 +5,7 @@ import type { ChangeEvent, JSX } from "react";
 import { ChartPie, FolderSync, RefreshCw } from "lucide-react";
 import { useRef } from "react";
 
+import type { Cma, Mapping } from "@/data/cma";
 import type { Targets } from "@/data/targets";
 
 import { importTargets } from "@/actions/targets";
@@ -20,12 +21,15 @@ import { assumptions, subsectionLabel } from "@/lib/nav";
 import { readTargets, taxonomy } from "@/lib/portfolio-file";
 
 interface TargetAllocationProps {
+  readonly cma: Cma | null;
+  readonly mappings: readonly Mapping[];
   readonly targets: null | Targets;
 }
 
 // The assumptions screen's target allocation: the categories Portfolio
-// Performance's Asset Allocation taxonomy holds and the share of the
-// whole it sets each, which the plan does not read yet. The header says
+// Performance's Asset Allocation taxonomy holds, the share of the whole
+// it sets each, and the class of the latest CMA each is mapped onto,
+// which the rates derived from the CMA are blended from. The header says
 // the day the targets were imported, and imports them again from a file
 // chosen on this device, Portfolio Performance's own file as it saves
 // it. The file is read here in the browser rather than sent, since it
@@ -40,6 +44,8 @@ interface TargetAllocationProps {
 // to lay out, and the card says so. The footer states how a target is
 // worked out and the check the targets pass before they are kept.
 export function TargetAllocation({
+  cma,
+  mappings,
   targets,
 }: TargetAllocationProps): JSX.Element {
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -110,10 +116,14 @@ export function TargetAllocation({
           />
         </CardContent>
       ) : (
-        <TargetTable categories={targets.categories} />
+        <TargetTable
+          categories={targets.categories}
+          cma={cma}
+          mappings={mappings}
+        />
       )}
       <CardFooter className="text-sm text-muted-foreground">
-        {`A target is its class's weight times the weights of the classes above it in the ${taxonomy} taxonomy, and the targets are checked to add up to 100% before they are kept. The file is read in the browser, and only the targets leave it.`}
+        {`A target is its class's weight times the weights of the classes above it in the ${taxonomy} taxonomy, and the targets are checked to add up to 100% before they are kept. The file is read in the browser, and only the targets leave it. Each category blends at the 20-year GBP return of its CMA class.`}
       </CardFooter>
     </SectionCard>
   );

@@ -11,7 +11,9 @@ import { formatPercent } from "@/lib/money";
 import { assumptions, sectionLabel } from "@/lib/nav";
 import {
   getAllocation,
+  getCma,
   getCurve,
+  getMappings,
   getPlan,
   getRates,
   getTargets,
@@ -22,20 +24,24 @@ import {
 // from, then how the savings are split between stocks and bonds, and
 // beneath them the inflation source, over the curve last pulled from
 // the Bank, which the rates typed by hand set aside. The second holds
-// the target allocation last imported from Portfolio Performance. The
+// the target allocation last imported from Portfolio Performance, with
+// the class of the latest CMA each category is mapped onto. The
 // header says what the plan grows at and what its prices rise by, both
 // made from the rates typed by hand, so the screen answers its question
 // before a card is read, whichever tab is open. The page reads the
 // store, which reads the session first, so it renders behind the
 // loading screen beside it.
 export default async function Assumptions(): Promise<JSX.Element> {
-  const [allocation, curve, plan, rates, targets] = await Promise.all([
-    getAllocation(),
-    getCurve(),
-    getPlan(),
-    getRates(),
-    getTargets(),
-  ]);
+  const [allocation, cma, curve, mappings, plan, rates, targets] =
+    await Promise.all([
+      getAllocation(),
+      getCma(),
+      getCurve(),
+      getMappings(),
+      getPlan(),
+      getRates(),
+      getTargets(),
+    ]);
   return (
     <>
       <ScreenHeader label={sectionLabel(assumptions)} title={assumptions.title}>
@@ -55,7 +61,13 @@ export default async function Assumptions(): Promise<JSX.Element> {
               label: "Rates",
             },
             {
-              children: <TargetAllocation targets={targets} />,
+              children: (
+                <TargetAllocation
+                  cma={cma?.latest ?? null}
+                  mappings={mappings}
+                  targets={targets}
+                />
+              ),
               label: "Target allocation",
             },
           ]}

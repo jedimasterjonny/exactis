@@ -3,7 +3,7 @@ import { refresh } from "next/cache";
 import { cache } from "react";
 
 import type { Account } from "@/data/accounts";
-import type { Deductions, Vintages } from "@/data/cma";
+import type { Deductions, Mapping, Vintages } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
 import type { Household, Kept } from "@/data/household";
 import type { IncomeLine } from "@/data/income";
@@ -117,6 +117,13 @@ export async function getIncomeLines(): Promise<readonly IncomeLine[]> {
 export async function getLiveRates(): Promise<Rates> {
   await requireSession();
   return (await readHousehold()).liveRates;
+}
+
+// The class of a CMA each category of the target allocation is mapped
+// onto.
+export async function getMappings(): Promise<readonly Mapping[]> {
+  await requireSession();
+  return (await readHousehold()).mappings;
 }
 
 export async function getMilestones(): Promise<readonly Milestone[]> {
