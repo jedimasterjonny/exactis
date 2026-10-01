@@ -1,11 +1,16 @@
 import type { JSX, ReactNode } from "react";
 
 interface ScreenHeaderProps {
-  readonly actions?: ReactNode;
-  readonly children?: ReactNode;
+  readonly actions?: Slot;
+  readonly children?: Slot;
   readonly label: string;
   readonly title: string;
 }
+
+// What a slot takes: anything React draws but what a condition that came
+// out false gives, so a slot filled as cond && <x /> is a type error rather
+// than an empty row under the title or an empty column beside it.
+type Slot = Exclude<ReactNode, boolean | null>;
 
 // The frame every screen opens with: a mono section label, the title in the
 // heading face, and a meta line beneath when the screen has one. Actions sit
@@ -29,21 +34,15 @@ export function ScreenHeader({
         <h1 className="font-heading text-3xl font-semibold tracking-tight">
           {title}
         </h1>
-        {isRendered(children) && (
+        {children !== undefined && (
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {children}
           </div>
         )}
       </div>
-      {isRendered(actions) && (
+      {actions !== undefined && (
         <div className="flex items-center gap-2">{actions}</div>
       )}
     </header>
   );
-}
-
-// A conditional slot that came out false, or an absent one, must not leave
-// an empty row under the title or an empty column beside it.
-function isRendered(node: ReactNode): boolean {
-  return node !== undefined && node !== null && typeof node !== "boolean";
 }
