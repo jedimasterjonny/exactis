@@ -12,9 +12,11 @@ interface SectionHeaderProps {
 // scale: a mono section label, the title as the second-level heading in
 // the heading face, and a meta line beneath when the card has one.
 // Actions sit to the right of the title and wrap beneath when the card is
-// too narrow for both. The heading takes the id it is given, so a card
-// can be named by its title. Composes nothing of ours and no kit; the
-// caller puts it in the card's header.
+// too narrow for both, and wrap among themselves when it is too narrow
+// for all of them in a row, as a phone is for a badge beside a long
+// button. The heading takes the id it is given, so a card can be named
+// by its title. Composes nothing of ours and no kit; the caller puts it
+// in the card's header.
 export function SectionHeader({
   actions,
   children,
@@ -34,7 +36,7 @@ export function SectionHeader({
         )}
       </div>
       {actions !== undefined && (
-        <div className="flex items-center gap-2">{actions}</div>
+        <div className="flex flex-wrap items-center gap-2">{actions}</div>
       )}
     </div>
   );
