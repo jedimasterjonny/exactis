@@ -22,6 +22,8 @@ describe("AccountTable", () => {
         accounts={held}
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
+        onDelete={vi.fn<(account: Account) => void>()}
+        onEdit={vi.fn<(account: Account) => void>()}
       />,
     );
 
@@ -29,8 +31,7 @@ describe("AccountTable", () => {
 
     // The header, a row for each account, and the totals beneath them.
     expect(within(table).getAllByRole("row")).toHaveLength(held.length + 2);
-    expect(within(table).getAllByRole("columnheader")).toHaveLength(5);
-    expect(within(table).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(6);
     expect(
       within(table).getByRole("cell", { name: "Workplace pension" }),
     ).toHaveClass("font-medium");
@@ -64,6 +65,8 @@ describe("AccountTable", () => {
         accounts={held}
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
+        onDelete={vi.fn<(account: Account) => void>()}
+        onEdit={vi.fn<(account: Account) => void>()}
         owners={owners}
       />,
     );
@@ -89,6 +92,8 @@ describe("AccountTable", () => {
         accounts={assets}
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
+        onDelete={vi.fn<(account: Account) => void>()}
+        onEdit={vi.fn<(account: Account) => void>()}
       />,
     );
 
@@ -123,6 +128,8 @@ describe("AccountTable", () => {
         ]}
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
+        onDelete={vi.fn<(account: Account) => void>()}
+        onEdit={vi.fn<(account: Account) => void>()}
       />,
     );
 
@@ -161,6 +168,8 @@ describe("AccountTable", () => {
           { ...stepUp, feeds: 6, sacrifice: 0.05 },
           { ...salary, feeds: 6, id: 5, name: "Second job" },
         ]}
+        onDelete={vi.fn<(account: Account) => void>()}
+        onEdit={vi.fn<(account: Account) => void>()}
       />,
     );
 
@@ -199,6 +208,7 @@ describe("AccountTable", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[salary]}
+        onDelete={vi.fn<(account: Account) => void>()}
         onEdit={vi.fn<(account: Account) => void>()}
       />,
     );
@@ -224,6 +234,8 @@ describe("AccountTable", () => {
         accounts={accounts.slice(0, 1)}
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
+        onDelete={vi.fn<(account: Account) => void>()}
+        onEdit={vi.fn<(account: Account) => void>()}
       />,
     );
 
@@ -244,6 +256,8 @@ describe("AccountTable", () => {
         ]}
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
+        onDelete={vi.fn<(account: Account) => void>()}
+        onEdit={vi.fn<(account: Account) => void>()}
       />,
     );
 
@@ -267,6 +281,8 @@ describe("AccountTable", () => {
         accounts={[]}
         emptyDescription="A house, a car, anything owned outright."
         emptyTitle="No assets yet"
+        onDelete={vi.fn<(account: Account) => void>()}
+        onEdit={vi.fn<(account: Account) => void>()}
       />,
     );
 
@@ -284,6 +300,7 @@ describe("AccountTable", () => {
         accounts={assets}
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
+        onDelete={vi.fn<(account: Account) => void>()}
         onEdit={onEdit}
       />,
     );
@@ -302,12 +319,11 @@ describe("AccountTable", () => {
     expect(onEdit).toHaveBeenCalledExactlyOnceWith(assets[1]);
   });
 
-  // The bin sits beside the pencil in the one actions column, and a
-  // table given only a delete handler still has the column.
+  // The bin sits beside the pencil in the one actions column.
   it("closes each row with a bin when given a delete handler, and reports the row's account", () => {
     const onDelete = vi.fn<(account: Account) => void>();
     const onEdit = vi.fn<(account: Account) => void>();
-    const view = render(
+    render(
       <AccountTable
         accounts={assets}
         emptyDescription="Add one."
@@ -326,23 +342,6 @@ describe("AccountTable", () => {
 
     expect(onDelete).toHaveBeenCalledExactlyOnceWith(assets[1]);
     expect(onEdit).not.toHaveBeenCalled();
-
-    view.rerender(
-      <AccountTable
-        accounts={assets}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
-        onDelete={onDelete}
-      />,
-    );
-
-    expect(screen.getAllByRole("columnheader")).toHaveLength(6);
-    expect(
-      screen.queryByRole("button", { name: /^Edit / }),
-    ).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /^Delete / })).toHaveLength(
-      assets.length,
-    );
   });
 
   // Narrow, each row is one cell: the name and the balance, then what
@@ -359,17 +358,21 @@ describe("AccountTable", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[salary]}
+        onDelete={vi.fn<(account: Account) => void>()}
+        onEdit={vi.fn<(account: Account) => void>()}
         owners={owners}
       />,
     );
 
     const [header] = screen.getAllByRole("rowgroup");
-    const row = screen.getByRole("row", { name: /^Workplace pension£412,880/ });
+    const row = screen.getByRole("row", {
+      name: /^Workplace pension £412,880/,
+    });
     // The folded cell's name runs its lines together, as a cell's does,
     // so it starts with the name and the balance where the column's
     // starts with the name and the owner.
     const pension = within(row).getByRole("cell", {
-      name: /^Workplace pension£412,880/,
+      name: /^Workplace pension £412,880/,
     });
 
     expect(header).toHaveClass("folded:hidden");
@@ -387,13 +390,13 @@ describe("AccountTable", () => {
       .getAllByRole("cell")
       .filter((cell) => cell !== pension);
 
-    expect(columns).toHaveLength(5);
+    expect(columns).toHaveLength(6);
     for (const column of columns) {
       expect(column).toHaveClass("folded:hidden");
     }
     expect(
       screen.getByRole("cell", {
-        name: "Current account£18,300 Cash · grows at 0.00%",
+        name: "Current account £18,300 Cash · grows at 0.00%",
       }),
     ).toHaveClass("unfolded:hidden");
   });
@@ -414,29 +417,30 @@ describe("AccountTable", () => {
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
         lines={[salary]}
+        onDelete={vi.fn<(account: Account) => void>()}
+        onEdit={vi.fn<(account: Account) => void>()}
       />,
     );
 
     expect(
       screen.getByRole("cell", {
-        name: "SIPP£18,300 Tax-deferred · grows at 0.00%£1,150 / mo sacrificed from Salary",
+        name: "SIPP £18,300 Tax-deferred · grows at 0.00%£1,150 / mo sacrificed from Salary",
       }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("cell", {
-        name: "Mortgage−£182,940 Debt · at 5.15%£2,210 / mo paid",
+        name: "Mortgage −£182,940 Debt · at 5.15%£2,210 / mo paid",
       }),
     ).toBeInTheDocument();
   });
 
   // The folded row has no room for a pencil or a bin, so it opens from
   // anywhere on it and its actions fold away with the other columns,
-  // the dialog it opens being where it is deleted from. A table given no
-  // edit handler has no dialog to send a bin to, so it keeps its bins.
-  it("opens a folded row from its name and folds its actions away, unless it cannot open", () => {
+  // the dialog it opens being where it is deleted from.
+  it("opens a folded row from its name and folds its actions away", () => {
     const onDelete = vi.fn<(account: Account) => void>();
     const onEdit = vi.fn<(account: Account) => void>();
-    const view = render(
+    render(
       <AccountTable
         accounts={assets}
         emptyDescription="Add one."
@@ -464,28 +468,5 @@ describe("AccountTable", () => {
     for (const column of [...columns, ...totals]) {
       expect(column).toHaveClass("folded:hidden");
     }
-
-    view.rerender(
-      <AccountTable
-        accounts={assets}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
-        onDelete={onDelete}
-      />,
-    );
-
-    expect(
-      screen.queryByRole("button", { name: "Mortgage" }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByRole("row", { name: /^Mortgage/ }))
-        .getAllByRole("cell")
-        .at(-1),
-    ).not.toHaveClass("folded:hidden");
-    expect(
-      within(screen.getByRole("row", { name: /^Total/ }))
-        .getAllByRole("cell")
-        .at(-1),
-    ).not.toHaveClass("folded:hidden");
   });
 });
