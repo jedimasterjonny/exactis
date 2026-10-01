@@ -22,12 +22,15 @@ import {
   getAllocation,
   getCma,
   getCurve,
+  getDeductions,
   getExpenseLines,
   getIncomeLines,
+  getLiveRates,
   getMilestones,
   getOwners,
   getPlan,
   getRates,
+  getRateSet,
   getTargets,
 } from "./household";
 
@@ -50,12 +53,15 @@ describe("the household store", () => {
       getAllocation,
       getCma,
       getCurve,
+      getDeductions,
       getExpenseLines,
       getIncomeLines,
+      getLiveRates,
       getMilestones,
       getOwners,
       getPlan,
       getRates,
+      getRateSet,
       getTargets,
     ]) {
       await expect(read()).rejects.toThrow("redirected");
@@ -72,6 +78,12 @@ describe("the household store", () => {
     expect(await getCurve()).toBeNull();
     expect(await getCma()).toBeNull();
     expect(await getRates()).toStrictEqual(openingRates(null));
+    expect(await getLiveRates()).toStrictEqual(openingRates(null));
+    expect(await getRateSet()).toBe("custom");
+    expect(await getDeductions()).toStrictEqual({
+      dividends: 0.02,
+      fees: 0.002,
+    });
     expect(await getAllocation()).toStrictEqual(allInStocks);
     expect(await getTargets()).toBeNull();
     expect(await getPlan()).toStrictEqual(
@@ -91,6 +103,9 @@ describe("the household store", () => {
     expect(await getCurve()).toStrictEqual(reference.curve);
     expect(await getCma()).toStrictEqual(reference.cma);
     expect(await getRates()).toStrictEqual(reference.rates);
+    expect(await getLiveRates()).toStrictEqual(reference.rates);
+    expect(await getRateSet()).toBe(reference.rateSet);
+    expect(await getDeductions()).toStrictEqual(reference.deductions);
     expect(await getAllocation()).toStrictEqual(reference.allocation);
     expect(await getTargets()).toStrictEqual(reference.targets);
     expect(await getPlan()).toStrictEqual({

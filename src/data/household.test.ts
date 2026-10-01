@@ -2,14 +2,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { Cma, Mapping, Vintages } from "@/data/cma";
+import type { Cma, Deductions, Mapping, Vintages } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
-import type { Allocation, Rates } from "@/data/rates";
+import type { Allocation, Rates, RateSet } from "@/data/rates";
 import type { Month } from "@/data/schedule";
 import type { SecuredRecords } from "@/data/secured";
 import type { Target, Targets } from "@/data/targets";
@@ -18,6 +18,7 @@ import { toAccount, toValues } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { toRecords as toCarRecords } from "@/data/cars";
 import { golfValues } from "@/data/cars.fixture";
+import { derivedRates } from "@/data/cma";
 import { cma, mappings } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
@@ -29,7 +30,7 @@ import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import { planRate } from "@/data/rates";
 import { allocation, rates } from "@/data/rates.fixture";
-import { targets } from "@/data/targets.fixture";
+import { targets, targetsUnder } from "@/data/targets.fixture";
 import { project } from "@/engine/projection";
 
 import { household, nothingKeptIn, soundKept } from "./household";
@@ -47,11 +48,14 @@ interface Inputs {
   readonly allocation: Allocation;
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
+  readonly deductions: Deductions;
+  readonly liveRates: Rates;
   readonly mappings: readonly Mapping[];
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
   readonly rates: Rates;
+  readonly rateSet: RateSet;
   readonly schedule: {
     readonly expenses: readonly ExpenseLine[];
     readonly income: readonly IncomeLine[];
@@ -71,11 +75,14 @@ const sound: Inputs = {
   allocation,
   cma: { latest: cma, previous: null },
   curve,
+  deductions: { dividends: 0.02, fees: 0.002 },
+  liveRates: rates,
   mappings,
   milestones,
   owners,
   plan: retiring,
   rates,
+  rateSet: "custom",
   schedule: { expenses: expenseLines, income: incomeLines },
   targets,
 };
@@ -420,6 +427,20 @@ const held: readonly Case[] = [
     (given): Inputs => ({ ...given, cma: { latest: cma, previous: cma } }),
   ],
   [
+    "A fee is nothing or more",
+    (given): Inputs => ({
+      ...given,
+      deductions: { ...given.deductions, fees: -0.001 },
+    }),
+  ],
+  [
+    "A dividend yield is nothing or more",
+    (given): Inputs => ({
+      ...given,
+      deductions: { ...given.deductions, dividends: -0.01 },
+    }),
+  ],
+  [
     "A category is mapped onto one asset class",
     (given): Inputs => ({
       ...given,
@@ -509,6 +530,8 @@ describe("soundKept", () => {
         allocation: { stocks: 1 },
         cma: null,
         curve: null,
+        deductions: { dividends: 0.02, fees: 0.002 },
+        liveRates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
         mappings: [],
         milestones: [],
         owners: [],
@@ -522,6 +545,7 @@ describe("soundKept", () => {
           years: 53,
         },
         rates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
+        rateSet: "custom",
         schedule: { expenses: [], income: [] },
         targets: null,
       },
@@ -783,6 +807,77 @@ describe("soundKept", () => {
       inflation: 0.0295,
       rate: planRate(rates, allocation),
     });
+  });
+
+  // Spelled out key by key, as above.
+  // The deductions are the manual method's 0.20% of fees and 2% yield,
+  // which move nothing while the rates typed are live.
+  it("reads a household kept before there was a choice of rate set as running on the rates typed, with the deductions a household opens with", () => {
+    const before = {
+      accounts: kept.accounts,
+      ages: kept.ages,
+      allocation: kept.allocation,
+      asOf: kept.asOf,
+      cma: kept.cma,
+      curve: kept.curve,
+      mappings: kept.mappings,
+      milestones: kept.milestones,
+      next: kept.next,
+      owners: kept.owners,
+      rates: kept.rates,
+      schedule: kept.schedule,
+      targets: kept.targets,
+    };
+
+    expect(soundKept(before)).toMatchObject({
+      household: {
+        deductions: { dividends: 0.02, fees: 0.002 },
+        liveRates: kept.rates,
+        rateSet: "custom",
+      },
+      kept: { deductions: { dividends: 0.02, fees: 0.002 }, rateSet: "custom" },
+    });
+  });
+
+  // August's blends less 0.20% of fees and a 2% yield, the first of
+  // September's 2.95%, and everything in stocks at 7.84% in all, while
+  // the rates typed are kept as they were.
+  it("runs the plan on the CMA's rates when they are chosen", () => {
+    const { household: read } = soundKept({ ...kept, rateSet: "cma" });
+    const derived = derivedRates(kept);
+
+    expect(read.liveRates).toStrictEqual(derived);
+    expect(read.rates).toStrictEqual(kept.rates);
+    expect(read.plan).toMatchObject({
+      inflation: inflationOf(curve).rate,
+      rate: planRate(read.liveRates, kept.allocation),
+    });
+    expect(read.plan.rate).toBeCloseTo(0.078441, 12);
+  });
+
+  // All in equities, everything is in stocks at their 7.84% in all, and
+  // bonds' rate weighs nothing.
+  it("runs the plan on the CMA's rates for an allocation with nothing in one sleeve", () => {
+    const { household: read } = soundKept({
+      ...kept,
+      rateSet: "cma",
+      targets: targetsUnder("Equity"),
+    });
+
+    expect(read.plan.rate).toBeCloseTo(0.078441, 12);
+  });
+
+  // An import of a category asking for a share with no class leaves the
+  // CMA's rates none to give, and the plan none to run on.
+  it("refuses the CMA's rates chosen while the CMA gives none, saying what is missing", () => {
+    expect(() =>
+      soundKept({ ...kept, mappings: kept.mappings.slice(1), rateSet: "cma" }),
+    ).toThrow(
+      "FTSE Global All Cap ex-UK has no CMA class, so the plan cannot run on the CMA's rates",
+    );
+    expect(
+      soundKept({ ...kept, mappings: [] }).household.liveRates,
+    ).toStrictEqual(kept.rates);
   });
 
   it("reads a line kept growing by the triple lock as growing with inflation", () => {

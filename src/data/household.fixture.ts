@@ -17,7 +17,8 @@ import { targets } from "@/data/targets.fixture";
 // retires at 59, the curve its card reads, the August 2026 CMA with no
 // vintage before it, the rates it ran on before
 // there were rates to type, 5% for stocks and bonds alike and the
-// curve's inflation, with everything in stocks, the reference target
+// curve's inflation, live, with everything in stocks, 0.20% of fees and
+// a 2% yield to deduct from a CMA's returns, the reference target
 // allocation with its categories mapped onto August's classes, and the
 // next id past every one of theirs. For tests.
 export const kept: Kept = {
@@ -27,6 +28,7 @@ export const kept: Kept = {
   asOf: { month: 8, year: 2026 },
   cma: { latest: cma, previous: null },
   curve,
+  deductions: { dividends: 0.02, fees: 0.002 },
   mappings,
   milestones,
   next: 6,
@@ -37,6 +39,7 @@ export const kept: Kept = {
     inflation: inflationOf(curve).rate,
     stocks: 0.05,
   },
+  rateSet: "custom",
   schedule: { expenses: expenseLines, income: incomeLines },
   targets,
 };

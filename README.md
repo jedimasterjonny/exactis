@@ -105,25 +105,26 @@ The engine is `src/engine/projection.ts`: a pure function over the accounts, the
 income and expense lines and a plan, giving a point per year to the plan's
 horizon, each the balance entering that year. So far it plots the two wrappers,
 tax-free and tax-deferred, each paid into a month at a time as its accounts say
-and grown at the plan rate. That is made from the rates the household keeps, one
-to a class and flat for life: what stocks return in all, their growth and the
-dividend yield on top, which every wrapper reinvests, and what bonds return,
-each in the share of the savings the household holds in it. Cash is carried
-beside them, so a short month can be drawn from it, but it is not plotted, since
-the progress points a projection is laid over carry no cash figure. The first
-year runs from the month the household's balances are as of, since they are what
-it opens with, whatever day the plan is read on; a household read before
-anything is saved takes the month it is read in, and keeps it from its first
-save. What an account is paid in a month is what `src/engine/cash-flow.ts` works
-out: the month's income, less what the salaries sacrifice, the tax on the rest,
-what the expense lines cost and each debt's own fixed sum, pays the other fixed
-sums, handed down the accounts in the order they are listed, and what survives
-them is the spare money, handed down the accounts that take it the same way,
-each to a twelfth of its cap. A fixed sum into savings is therefore paid only
-out of what the month has, so a contribution stops when the income funding it
-ends. A debt's is owed rather than saved, so it is paid whole and first wherever
-the debt is listed, and a month short of it draws on the savings as it would for
-an expense; the order sets which saving is paid first, and a debt is no saving.
+and grown at the plan rate. That is made from the rates live, one to a class and
+flat for life, either those typed or those derived from the capital market
+assumptions, below: what stocks return in all, their growth and the dividend
+yield on top, which every wrapper reinvests, and what bonds return, each in the
+share of the savings the household holds in it. Cash is carried beside them, so
+a short month can be drawn from it, but it is not plotted, since the progress
+points a projection is laid over carry no cash figure. The first year runs from
+the month the household's balances are as of, since they are what it opens with,
+whatever day the plan is read on; a household read before anything is saved
+takes the month it is read in, and keeps it from its first save. What an account
+is paid in a month is what `src/engine/cash-flow.ts` works out: the month's
+income, less what the salaries sacrifice, the tax on the rest, what the expense
+lines cost and each debt's own fixed sum, pays the other fixed sums, handed down
+the accounts in the order they are listed, and what survives them is the spare
+money, handed down the accounts that take it the same way, each to a twelfth of
+its cap. A fixed sum into savings is therefore paid only out of what the month
+has, so a contribution stops when the income funding it ends. A debt's is owed
+rather than saved, so it is paid whole and first wherever the debt is listed,
+and a month short of it draws on the savings as it would for an expense; the
+order sets which saving is paid first, and a debt is no saving.
 
 A pension can be marked always funded, for a pension worth keeping paid when the
 month cannot, since what it is paid out of taxed money is relieved. It is paid
@@ -234,16 +235,16 @@ organisms that save through an action sit beneath the routes.
 
 ## Inflation
 
-The plan's inflation is one of its rates, typed by hand. Beside it a rate is
-derived from the Bank of England's implied inflation curve, to check it against,
-which the Bank publishes each working day in one zip of its gilt curves.
-Pressing Pull latest curve on the assumptions screen runs the action in
-`src/actions/inflation.ts`, which fetches the zip from the server, and
-`src/lib/yield-curves.ts` reads the spot curves of the implied, nominal and real
-workbooks out of it. Nominal less real is then checked against implied at every
-maturity the latest day gives, and only then is that day's curve kept in the
-household, at 5, 10, 20 and 30 years. The check catches a sheet read wrongly,
-since the Bank works the implied curve out as that difference.
+The plan's inflation is one of its rates, typed by hand or derived. A rate is
+derived from the Bank of England's implied inflation curve, which the Bank
+publishes each working day in one zip of its gilt curves. Pressing Pull latest
+curve on the assumptions screen runs the action in `src/actions/inflation.ts`,
+which fetches the zip from the server, and `src/lib/yield-curves.ts` reads the
+spot curves of the implied, nominal and real workbooks out of it. Nominal less
+real is then checked against implied at every maturity the latest day gives, and
+only then is that day's curve kept in the household, at 5, 10, 20 and 30 years.
+The check catches a sheet read wrongly, since the Bank works the implied curve
+out as that difference.
 
 The rate is worked out from the curve whenever it is read, in
 `src/data/inflation.ts`. It starts from the implied rate at 20 years, the
@@ -254,10 +255,12 @@ Then 0.3 points comes off for the premium the market pays for protection. The
 household keeps the curve as the Bank gave it rather than the rate it makes, so
 a change to the method moves the rate without another pull. The assumptions
 screen lays those steps out beside the curve at 5, 10, 20 and 30 years. The plan
-does not take the derived rate: it takes the inflation in its rates, which a
+takes the derived rate when it runs on the rates derived from the capital market
+assumptions, below, and otherwise the inflation typed into its rates, which a
 household kept before there were rates opens on at the derived rate, or at the
-Bank of England's 2% target when no curve had been pulled, and the projection
-grows the lines with it, and the tax bands once their freeze ends, as above.
+Bank of England's 2% target when no curve had been pulled. The projection grows
+the lines with whichever it takes, and the tax bands once their freeze ends, as
+above.
 
 ## Capital market assumptions
 
@@ -280,7 +283,29 @@ classes every block prices.
 
 The household keeps the latest vintage and the one it replaced, so what a new
 vintage moves can be read. The same vintage pulled again replaces the latest,
-and an earlier one is refused. Nothing reads the vintages yet.
+and an earlier one is refused.
+
+The rates are derived in `src/data/cma.ts`. Each sleeve's return is the target
+allocation's blend of the classes its categories are mapped onto, each category
+weighted by its share of the sleeve; a class hedged to sterling is blended at
+the return of the class it hedges, with the hedging kept apart as an adjustment.
+A sleeve nothing blends into, as bonds in an allocation all in equities, stands
+in at the other's return with none of the whole, so its rate weighs nothing, and
+the screen shows it as empty. The household keeps two deductions, typed: the
+fees every fund charges, which BlackRock's index returns are gross of and the
+plan charges nowhere else, and the dividend yield, which the workbook does not
+carry. Both open on the figures the manual method settled on in September 2026,
+0.20% of fees and a 2.00% yield, until they are typed over. Stocks grow at their
+blend less both, with the yield on top as their dividend yield, so the two add
+back to the blend less fees; bonds grow at theirs less the fees. Inflation is
+the curve's derived rate, since the returns are nominal.
+
+The household keeps which set the plan runs on, the rates typed or the derived,
+and leaves the other as it was. The derived set is held to being whole while it
+is chosen: a vintage, a curve and a target allocation pulled, and every category
+asking for a share mapped onto a class the vintage prices. A save that would
+leave it short, the choice of it included, is refused saying what is missing,
+rather than the plan falling back on the rates typed without a word.
 
 ## Target allocation
 
@@ -301,8 +326,8 @@ mapped onto an asset class the latest CMA prices, by `mapCategory` in the same
 file, and the mapping is kept by the id Portfolio Performance gives the
 category, so an import of the file saved again keeps it. A mapping outlives the
 category leaving the allocation and the class leaving a vintage, so neither has
-to be chosen again when it comes back. The plan does not read the target
-allocation yet.
+to be chosen again when it comes back. The plan reads the target allocation only
+through the rates derived from it.
 
 The assumptions screen holds it in a tab of its own beside the rates. Pressing
 Reload from Portfolio Performance picks the file on the device, and the reader
