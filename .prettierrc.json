@@ -1,23 +1,7 @@
 {
-  "arrowParens": "always",
-  "bracketSameLine": false,
-  "bracketSpacing": true,
-  "embeddedLanguageFormatting": "auto",
-  "endOfLine": "lf",
-  "experimentalOperatorPosition": "end",
-  "experimentalTernaries": false,
-  "jsxSingleQuote": false,
   "objectWrap": "collapse",
   "plugins": ["prettier-plugin-tailwindcss"],
-  "printWidth": 80,
   "proseWrap": "always",
-  "quoteProps": "as-needed",
-  "semi": true,
-  "singleAttributePerLine": false,
-  "singleQuote": false,
-  "tabWidth": 2,
   "tailwindFunctions": ["cn", "cva"],
-  "tailwindStylesheet": "./src/app/globals.css",
-  "trailingComma": "all",
-  "useTabs": false
+  "tailwindStylesheet": "./src/app/globals.css"
 }
