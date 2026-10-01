@@ -3,7 +3,7 @@ import type { JSX } from "react";
 import { cn } from "cn";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
-export type DeltaFormat = "currency" | "percent" | "plain" | "points";
+export type DeltaFormat = "currency" | "points";
 
 interface DeltaValueProps {
   readonly format?: DeltaFormat | undefined;
@@ -22,12 +22,6 @@ const formatters: Record<DeltaFormat, Intl.NumberFormat> = {
     signDisplay: "exceptZero",
     style: "currency",
   }),
-  percent: new Intl.NumberFormat("en-GB", {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-    signDisplay: "exceptZero",
-  }),
-  plain: new Intl.NumberFormat("en-GB", { signDisplay: "exceptZero" }),
   points: new Intl.NumberFormat("en-GB", {
     maximumFractionDigits: 2,
     minimumFractionDigits: 2,
@@ -36,12 +30,7 @@ const formatters: Record<DeltaFormat, Intl.NumberFormat> = {
 };
 
 // A percentage-point difference is written pp, never %.
-const suffixes: Record<DeltaFormat, string> = {
-  currency: "",
-  percent: "%",
-  plain: "",
-  points: "pp",
-};
+const suffixes: Record<DeltaFormat, string> = { currency: "", points: "pp" };
 
 const toneClasses: Record<Direction, string> = {
   down: "text-destructive",
