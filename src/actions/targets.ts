@@ -6,6 +6,7 @@ import type { Mapping } from "@/data/cma";
 import type { Target, Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
+import { suggestedMappings } from "@/data/class-table";
 import { categoryValues, named } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { today } from "@/lib/months";
@@ -40,6 +41,41 @@ export async function importTargets(
   return amend(({ kept }) => {
     const targets = { categories: parsed, importedOn: today() };
     return { kept: { ...kept, targets }, result: targets };
+  });
+}
+
+// Maps every category of the target allocation the latest CMA cannot
+// blend, with no class or one it does not price, onto the class its name
+// suggests, and hands back what it mapped. A category on a class the CMA
+// prices is left as it was chosen, so nothing chosen by hand is written
+// over. An action answers a POST from anywhere, so it checks the session
+// for itself. Mapping by name before a CMA is pulled and a target
+// allocation imported is refused, as is mapping when no category without
+// a class has one suggested, since the screen offers it only when there
+// is something to map.
+export async function mapByName(): Promise<Answer<readonly Mapping[]>> {
+  await requireSession();
+  return amend(({ kept }) => {
+    if (kept.cma === null || kept.targets === null) {
+      throw new Refusal(
+        "Categories are mapped by name once a CMA is pulled and a target allocation imported",
+      );
+    }
+    const suggested = suggestedMappings(
+      kept.cma.latest,
+      kept.targets,
+      kept.mappings,
+    );
+    if (suggested.length === 0) {
+      throw new Refusal("No category without a class has one suggested");
+    }
+    const mappings = [
+      ...kept.mappings.filter(
+        ({ category }) => !suggested.some((each) => each.category === category),
+      ),
+      ...suggested,
+    ];
+    return { kept: { ...kept, mappings }, result: suggested };
   });
 }
 
