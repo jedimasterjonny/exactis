@@ -411,7 +411,7 @@ export function cashFlow(
   const purse: Purse = {
     relief: [],
     reliefs: new Map(),
-    relievable: relievableOn(payOf(running.filter(isEarned), fed, reading), 1),
+    relievable: relievableOn(payOf(running.filter(isEarned), fed, reading)),
     rooms: new Map(),
   };
   for (const entry of fed) {
