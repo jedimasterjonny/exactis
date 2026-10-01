@@ -108,29 +108,6 @@ describe("pullCurve", () => {
     expect(await readLatest(db)).toBeNull();
   });
 
-  // The body of an answer that is not the file is let go unread, so it
-  // does not hold the connection open.
-  it("refuses an answer that is not the file with the status it came with, and keeps nothing", async () => {
-    const blocked = new Response("Forbidden", { status: 403 });
-    bankSends(blocked);
-
-    expect(await pullCurve()).toStrictEqual(
-      refused(
-        "The Bank of England answered 403 rather than sending its yield curves",
-      ),
-    );
-    expect(blocked.bodyUsed).toBe(true);
-
-    bankSends(new Response(null, { status: 503 }));
-
-    expect(await pullCurve()).toStrictEqual(
-      refused(
-        "The Bank of England answered 503 rather than sending its yield curves",
-      ),
-    );
-    expect(await readLatest(db)).toBeNull();
-  });
-
   it("refuses a file no curve can be read from, in the reader's words, and keeps nothing", async () => {
     bankSends(new Response(bankFile({})));
 

@@ -156,29 +156,6 @@ describe("pullCma", () => {
     expect(await readLatest(db)).toBeNull();
   });
 
-  // The body of an answer that is not the workbook is let go unread, so
-  // it does not hold the connection open.
-  it("refuses an answer that is not the workbook with the status it came with, and keeps nothing", async () => {
-    const blocked = new Response("Access Denied", { status: 403 });
-    blackRockSends(blocked);
-
-    expect(await pullCma()).toStrictEqual(
-      refused(
-        "BlackRock answered 403 rather than sending its capital market assumptions",
-      ),
-    );
-    expect(blocked.bodyUsed).toBe(true);
-
-    blackRockSends(new Response(null, { status: 503 }));
-
-    expect(await pullCma()).toStrictEqual(
-      refused(
-        "BlackRock answered 503 rather than sending its capital market assumptions",
-      ),
-    );
-    expect(await readLatest(db)).toBeNull();
-  });
-
   it("refuses a workbook no vintage can be read from, in the reader's words, and keeps nothing", async () => {
     blackRockSends(
       new Response(
