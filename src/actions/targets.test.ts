@@ -12,7 +12,7 @@ import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
-import { importTargets, mapCategory } from "./targets";
+import { importTargets, mapByName, mapCategory } from "./targets";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -195,5 +195,80 @@ describe("mapCategory", () => {
       mapCategory({ asset: " ", category: ukEquity ?? "" }),
     ).rejects.toThrow(z.ZodError);
     expect(await readLatest(db)).toBeNull();
+  });
+});
+
+describe("mapByName", () => {
+  // FTSE North America has no class in the reference, and its name
+  // suggests US large caps; UK equity is mapped onto Canada, which no
+  // vintage prices, and its name suggests UK large caps.
+  const idOf = (name: string): string =>
+    targets.categories.find((category) => category.name === name)?.id ?? "";
+  const northAmerica = idOf("FTSE North America");
+  const ukEquity = idOf("UK equity");
+
+  it("writes nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(mapByName()).rejects.toThrow("redirected");
+    expect(await readLatest(db)).toBeNull();
+  });
+
+  it("maps each category the CMA cannot blend onto its suggestion, draws the page again and hands back what it mapped", async () => {
+    const stale = mappings.map((mapping) =>
+      mapping.category === ukEquity
+        ? { ...mapping, asset: "Canada large cap equities" }
+        : mapping,
+    );
+    await keepAfter(db, 0, { ...reference, mappings: stale });
+    const mapped = [
+      { asset: "UK large cap equities", category: ukEquity },
+      { asset: "US large cap equities", category: northAmerica },
+    ];
+
+    expect(await mapByName()).toStrictEqual(saved(mapped));
+    expect(await readLatest(db)).toStrictEqual({
+      household: {
+        ...reference,
+        mappings: [
+          ...stale.filter(({ category }) => category !== ukEquity),
+          ...mapped,
+        ],
+      },
+      version: 2,
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("refuses when no category without a class has one suggested, and keeps nothing", async () => {
+    await keepAfter(db, 0, {
+      ...reference,
+      mappings: [
+        ...mappings,
+        { asset: "US large cap equities", category: northAmerica },
+      ],
+    });
+
+    expect(await mapByName()).toStrictEqual(
+      refused("No category without a class has one suggested"),
+    );
+    expect(await readLatest(db)).toMatchObject({ version: 1 });
+  });
+
+  it("refuses before a CMA is pulled or a target allocation imported", async () => {
+    const refusal = refused(
+      "Categories are mapped by name once a CMA is pulled and a target allocation imported",
+    );
+
+    expect(await mapByName()).toStrictEqual(refusal);
+
+    await keepAfter(db, 0, { ...reference, cma: null });
+
+    expect(await mapByName()).toStrictEqual(refusal);
+
+    await keepAfter(db, 1, { ...reference, targets: null });
+
+    expect(await mapByName()).toStrictEqual(refusal);
+    expect(await readLatest(db)).toMatchObject({ version: 2 });
   });
 });

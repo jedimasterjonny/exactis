@@ -324,10 +324,12 @@ them with the day they were imported. The household refuses a set whose shares
 do not add up to 100%, or that lists a category twice. Each category can be
 mapped onto an asset class the latest CMA prices, by `mapCategory` in the same
 file, and the mapping is kept by the id Portfolio Performance gives the
-category, so an import of the file saved again keeps it. A mapping outlives the
-category leaving the allocation and the class leaving a vintage, so neither has
-to be chosen again when it comes back. The plan reads the target allocation only
-through the rates derived from it.
+category, so an import of the file saved again keeps it. `mapByName` maps every
+category the CMA cannot blend onto the class its name suggests, from the table
+in `src/data/class-table.ts`, and leaves a category on a priced class as it was
+chosen. A mapping outlives the category leaving the allocation and the class
+leaving a vintage, so neither has to be chosen again when it comes back. The
+plan reads the target allocation only through the rates derived from it.
 
 The assumptions screen holds it in a tab of its own beside the rates. Pressing
 Reload from Portfolio Performance picks the file on the device, and the reader
