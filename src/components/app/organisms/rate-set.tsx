@@ -23,7 +23,7 @@ import { CardContent } from "@/components/kit/card";
 import { RadioGroup } from "@/components/kit/radio-group";
 import {
   blendsOf,
-  derivedRates,
+  derivedSet,
   sleeves,
   stocksMoved,
   vintageMonth,
@@ -252,8 +252,8 @@ function Derived({
   mappings,
   targets,
 }: Omit<RateSetProps, "rates" | "rateSet">): JSX.Element {
-  const derived = derivedRates({ cma, curve, deductions, mappings, targets });
-  const rates = "short" in derived ? null : derived;
+  const derived = derivedSet({ cma, curve, deductions, mappings, targets });
+  const rates = "short" in derived ? null : derived.rates;
   const empty = emptySleeveOf(cma, targets, mappings);
   const held = (sleeve: Sleeve): null | Rates =>
     empty === sleeve ? null : rates;

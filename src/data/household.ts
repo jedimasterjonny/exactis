@@ -1,7 +1,14 @@
 import * as z from "zod";
 
 import type { Account } from "@/data/accounts";
-import type { Asset, Cma, Deductions, Mapping, Vintages } from "@/data/cma";
+import type {
+  Asset,
+  Cma,
+  Deductions,
+  DerivedSet,
+  Mapping,
+  Vintages,
+} from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
@@ -21,7 +28,7 @@ import {
   takesSpare,
   toValues,
 } from "@/data/accounts";
-import { derivedRates, openingDeductions, sleeves } from "@/data/cma";
+import { derivedSet, openingDeductions, sleeves } from "@/data/cma";
 import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
 import { timed } from "@/data/milestones";
@@ -52,10 +59,10 @@ import { isWithinAllowance } from "@/lib/tax";
 // pulled from the Bank of England, or none before one is, the vintages
 // of BlackRock's capital market assumptions last pulled, or none before
 // one is, the rates typed by hand, what comes off the CMA's returns to
-// derive them instead, which of the two sets is chosen and the rates
-// the plan runs on as it is, the split of the savings the plan's rate
-// is made from, the target allocation last imported from Portfolio
-// Performance, or none before one is, and the class each of its
+// derive them instead, which of the two sets is chosen, the split of the
+// savings typed by hand, the rates the plan runs on as it is, held to the
+// rules every rate is, the target allocation last imported from
+// Portfolio Performance, or none before one is, and the class each of its
 // categories is mapped onto: the whole of what the store holds for the
 // household, with the plan as it stands the day it is read.
 export interface Household {
@@ -609,7 +616,7 @@ export function holdWhileLive(
   if (kept.rateSet === "custom") {
     return;
   }
-  const derived = derivedRates(kept);
+  const derived = derivedSet(kept);
   if ("short" in derived) {
     throw new Refusal(
       `${derived.short}, so ${change.cannot} while the plan runs on the CMA's rates. Choose custom rates, ${change.then}, then choose From CMA again`,
@@ -693,22 +700,19 @@ function endsInAYear(line: {
 }
 
 // The whole a kept household makes, its plan running from the month
-// its balances are as of on the rates live and the split kept, each line's
+// its balances are as of on the rates and the split live, each line's
 // tied ends read off the milestones they are tied to, and each line
 // paying a loan running as the loan's payments do.
 function householdOf(kept: Kept): Household {
-  const liveRates = liveRatesOf(kept);
-  const plan = planOf(kept.ages, kept.asOf, {
-    allocation: kept.allocation,
-    rates: liveRates,
-  });
+  const live = liveOf(kept);
+  const plan = planOf(kept.ages, kept.asOf, live);
   return {
     accounts: kept.accounts,
     allocation: kept.allocation,
     cma: kept.cma,
     curve: kept.curve,
     deductions: kept.deductions,
-    liveRates,
+    liveRates: live.rates,
     mappings: kept.mappings,
     milestones: kept.milestones,
     owners: kept.owners,
@@ -756,17 +760,19 @@ function isListedOnce(records: readonly { readonly id: number }[]): boolean {
   return new Set(records.map((record) => record.id)).size === records.length;
 }
 
-// The rates the plan runs on: those typed, or those the CMA gives when
-// they are chosen, which a household holds to giving them, since a plan
-// set to run on the CMA's rates has none to run on otherwise. A save
-// that leaves the CMA giving none while they are chosen, as an import
-// of a category with no class would, is refused saying what is
-// missing, rather than the plan falling back on the rates typed without
-// a word.
-function liveRatesOf(kept: Kept): Rates {
+// The rates and the split the plan runs on: those typed, or those the
+// CMA gives when its rates are chosen, the split then the target
+// allocation's, which a household holds to giving them, since a plan set
+// to run on the CMA's rates has none to run on otherwise. A save that
+// leaves the CMA giving none while they are chosen, as an import of a
+// category with no class would, is refused saying what is missing,
+// rather than the plan falling back on the rates typed without a word.
+// The split typed is kept as it was while the CMA's is live, for the day
+// the rates typed are chosen again.
+function liveOf(kept: Kept): DerivedSet {
   switch (kept.rateSet) {
     case "cma": {
-      const derived = derivedRates(kept);
+      const derived = derivedSet(kept);
       if ("short" in derived) {
         throw new Refusal(
           `${derived.short}, so the plan cannot run on the CMA's rates`,
@@ -775,7 +781,7 @@ function liveRatesOf(kept: Kept): Rates {
       return derived;
     }
     case "custom":
-      return kept.rates;
+      return { allocation: kept.allocation, rates: kept.rates };
   }
 }
 
