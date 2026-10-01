@@ -1,10 +1,8 @@
-import react from "@vitejs/plugin-react";
 import { configDefaults, defineConfig } from "vitest/config";
 
 // A deliberately unforgiving runner. Everything here turns something that
 // would otherwise pass quietly into a failure at the point it is written.
 export default defineConfig({
-  plugins: [react()],
   // Resolves the @/* alias from tsconfig.json. Vite does this natively
   // now, so the vite-tsconfig-paths plugin the Next guide still
   // recommends is not installed.
