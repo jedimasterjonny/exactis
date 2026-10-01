@@ -3,7 +3,7 @@ import type { JSX } from "react";
 import type { Share } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
 
-import { RateField } from "@/components/app/molecules/rate-field";
+import { RateField } from "@/components/app/molecules/figure-field";
 import { contributionOf } from "@/data/income";
 import { yearly } from "@/lib/cadence";
 import { formatGbp } from "@/lib/money";

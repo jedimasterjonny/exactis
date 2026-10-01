@@ -16,7 +16,7 @@ import { EmptyState } from "@/components/app/atoms/empty-state";
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { Ledger } from "@/components/app/atoms/ledger";
 import { Note } from "@/components/app/atoms/note";
-import { RateField } from "@/components/app/molecules/rate-field";
+import { RateField } from "@/components/app/molecules/figure-field";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";

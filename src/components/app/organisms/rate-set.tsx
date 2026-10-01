@@ -16,7 +16,7 @@ import { DeltaValue } from "@/components/app/atoms/delta-value";
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { NamedFigure } from "@/components/app/atoms/named-figure";
 import { RadioChoice } from "@/components/app/atoms/radio-choice";
-import { RateField } from "@/components/app/molecules/rate-field";
+import { RateField } from "@/components/app/molecules/figure-field";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { Badge } from "@/components/kit/badge";
 import { CardContent } from "@/components/kit/card";

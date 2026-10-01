@@ -7,10 +7,9 @@ import type { Option } from "@/lib/options";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { SpanBar } from "@/components/app/atoms/span-bar";
-import { MoneyField } from "@/components/app/molecules/money-field";
+import { MoneyField, YearField } from "@/components/app/molecules/figure-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
-import { YearField } from "@/components/app/molecules/year-field";
 import { ageIn, endYear } from "@/data/plan";
 import { cadenceOptions } from "@/lib/cadence";
 import { counted } from "@/lib/count";
