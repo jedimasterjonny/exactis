@@ -2,19 +2,20 @@
 
 import type { ChangeEvent, JSX } from "react";
 
-import { ChartPie, FolderSync, RefreshCw } from "lucide-react";
+import { ChartPie, FolderSync, RefreshCw, WandSparkles } from "lucide-react";
 import { useRef } from "react";
 
 import type { Cma, Mapping } from "@/data/cma";
 import type { Targets } from "@/data/targets";
 
-import { importTargets } from "@/actions/targets";
+import { importTargets, mapByName } from "@/actions/targets";
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { TargetTable } from "@/components/app/organisms/target-table";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";
+import { suggestedMappings } from "@/data/class-table";
 import { useSender } from "@/hooks/use-sender";
 import { formatDay } from "@/lib/months";
 import { assumptions, subsectionLabel } from "@/lib/nav";
@@ -43,6 +44,14 @@ interface TargetAllocationProps {
 // since, is read again. Before anything is imported there is no table
 // to lay out, and the card says so. The footer states how a target is
 // worked out and the check the targets pass before they are kept.
+//
+// While a category the CMA cannot blend has a class its name suggests,
+// the header offers to map every such category by name, saying how many
+// it would map. The mapping holds while it is on its way, and the
+// store's answer draws the screen again from the mappings kept, under a
+// toast saying how many it mapped, or says why under a toast. A class
+// chosen by hand is never written over, and the table shows each class
+// mapped, so what was suggested can be checked and changed.
 export function TargetAllocation({
   cma,
   mappings,
@@ -50,6 +59,21 @@ export function TargetAllocation({
 }: TargetAllocationProps): JSX.Element {
   const pickerRef = useRef<HTMLInputElement>(null);
   const { isSending: isImporting, send } = useSender();
+  const { isSending: isMapping, send: sendMapping } = useSender();
+  const suggested =
+    cma === null || targets === null
+      ? 0
+      : suggestedMappings(cma, targets, mappings).length;
+
+  function mapNames(): void {
+    sendMapping(mapByName, {
+      failure: "Classes not mapped",
+      success: (mapped) => ({
+        description: `${String(mapped.length)} ${mapped.length === 1 ? "category" : "categories"} mapped onto the class its name suggests`,
+        title: "Classes mapped by name",
+      }),
+    });
+  }
 
   function take(event: ChangeEvent<HTMLInputElement>): void {
     const input = event.currentTarget;
@@ -80,6 +104,17 @@ export function TargetAllocation({
               <FolderSync aria-hidden />
               {`Imported ${formatDay(targets.importedOn)}`}
             </Badge>
+          )}
+          {suggested > 0 && (
+            <Button
+              disabled={isMapping}
+              onClick={mapNames}
+              size="sm"
+              variant="outline"
+            >
+              <WandSparkles aria-hidden />
+              {`Map ${String(suggested)} by name`}
+            </Button>
           )}
           <input
             accept=".portfolio"

@@ -7,10 +7,11 @@ import {
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { Mapping } from "@/data/cma";
 import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
-import { importTargets } from "@/actions/targets";
+import { importTargets, mapByName } from "@/actions/targets";
 import { Toaster } from "@/components/kit/toast";
 import { cma, mappings } from "@/data/cma.fixture";
 import { targets } from "@/data/targets.fixture";
@@ -27,6 +28,7 @@ import { TargetAllocation } from "./target-allocation";
 
 vi.mock("@/actions/targets", () => ({
   importTargets: vi.fn(),
+  mapByName: vi.fn(),
   mapCategory: vi.fn(),
 }));
 
@@ -208,5 +210,101 @@ describe("TargetAllocation", () => {
     expect(
       screen.getByRole("button", { name: "Reload from Portfolio Performance" }),
     ).toBeEnabled();
+  });
+
+  // FTSE North America has no class in the reference, and its name
+  // suggests US large caps.
+  it("offers to map by name the categories it has a class for, holding while it maps, and says how many it mapped", async () => {
+    const answer = heldBack<Answer<readonly Mapping[]>>();
+    vi.mocked(mapByName).mockReturnValue(answer.promise);
+    renderCard();
+    const map = screen.getByRole("button", { name: "Map 1 by name" });
+
+    fireEvent.click(map);
+
+    expect(mapByName).toHaveBeenCalledOnce();
+    await waitFor(() => {
+      expect(map).toBeDisabled();
+    });
+
+    answer.answer(
+      saved([{ asset: "US large cap equities", category: "north-america" }]),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Classes mapped by name" }),
+      ).toHaveAccessibleDescription(
+        "1 category mapped onto the class its name suggests",
+      );
+    });
+  });
+
+  // Short-dated gilts is the one category of the reference the table
+  // has no name for.
+  it("counts every category without a class its name suggests one for, and says how many it mapped", async () => {
+    vi.mocked(mapByName).mockResolvedValue(saved(mappings));
+    render(<TargetAllocation cma={cma} mappings={[]} targets={targets} />, {
+      wrapper: Toaster,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Map 8 by name" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Classes mapped by name" }),
+      ).toHaveAccessibleDescription(
+        "8 categories mapped onto the class its name suggests",
+      );
+    });
+  });
+
+  it("says why when mapping by name is refused", async () => {
+    vi.mocked(mapByName).mockResolvedValue(
+      refused("No category without a class has one suggested"),
+    );
+    renderCard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Map 1 by name" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Classes not mapped" }),
+      ).toHaveAccessibleDescription(
+        "No category without a class has one suggested",
+      );
+    });
+  });
+
+  it("offers no mapping by name with nothing to map, no CMA or no allocation", () => {
+    const northAmerica = targets.categories.find(
+      ({ name }) => name === "FTSE North America",
+    );
+    const { rerender } = render(
+      <TargetAllocation
+        cma={cma}
+        mappings={[
+          ...mappings,
+          { asset: "US large cap equities", category: northAmerica?.id ?? "" },
+        ]}
+        targets={targets}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /by name$/ }),
+    ).not.toBeInTheDocument();
+
+    rerender(<TargetAllocation cma={null} mappings={[]} targets={targets} />);
+
+    expect(
+      screen.queryByRole("button", { name: /by name$/ }),
+    ).not.toBeInTheDocument();
+
+    rerender(<TargetAllocation cma={cma} mappings={[]} targets={null} />);
+
+    expect(
+      screen.queryByRole("button", { name: /by name$/ }),
+    ).not.toBeInTheDocument();
   });
 });
