@@ -52,16 +52,6 @@ jobs:
         with:
           bun-version-file: package.json
 
-      - id: bun-cache
-        run: |
-          dir="$(bun pm cache)"
-          echo "dir=$dir" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          key: bun-vendor-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          path: ${{ steps.bun-cache.outputs.dir }}
-          restore-keys: bun-vendor-${{ runner.os }}-
-
       - run: bun install --frozen-lockfile
 
       # The component list is read off the directory rather than written

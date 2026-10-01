@@ -97,42 +97,6 @@ jobs:
           # once and Renovate updates it in one place.
           bun-version-file: package.json
 
-      # setup-bun does not do this, so the entry below is not redundant
-      # config. Read at the digest pinned above: its post step is
-      # cache-save.ts, whose body is saveCache([state.bunPath]) and nothing
-      # else, and its one cache input is no-cache - "Disable caching of bun
-      # executable". The binary is all it has ever meant.
-      #
-      # The path is asked of bun rather than written down. `bun pm cache`
-      # resolves BUN_INSTALL_CACHE_DIR, else $BUN_INSTALL/install/cache, else
-      # $XDG_CACHE_HOME/.bun/install/cache, else $HOME/.bun/install/cache -
-      # confirmed by running it under each. setup-bun sets none of them, so a
-      # hardcoded ~/.bun/install/cache is right today and silently a cache
-      # that never hits the day one of them is set.
-      - id: bun-cache
-        run: |
-          dir="$(bun pm cache)"
-          echo "dir=$dir" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          key: bun-check-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          # node_modules is deliberately not here and must not be added. bun
-          # install --frozen-lockfile does not prune, so a restored tree
-          # resolves a dependency the commit no longer declares and the run
-          # goes green on a tree that cannot install - the false pass the
-          # commit job avoids by starting every commit on a fresh runner.
-          # The install cache cannot do that. It is content-addressed, keyed
-          # by what was fetched rather than by what is wanted, so a stale
-          # entry is dead weight rather than a wrong answer: it can only
-          # make an install that was going to happen anyway faster.
-          path: ${{ steps.bun-cache.outputs.dir }}
-          # Prefixed per job rather than shared with the commit job. Each
-          # keys on the lockfile it installs from, and a save onto a key
-          # that exists is a no-op, so a shared prefix would race only on
-          # identical content; the prefixes stay so a restore reads off its
-          # key as the tip's or a commit's.
-          restore-keys: bun-check-${{ runner.os }}-
-
       - id: install
         run: bun install --frozen-lockfile
 
@@ -476,21 +440,6 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
-
-      - id: bun-cache
-        run: |
-          dir="$(bun pm cache)"
-          echo "dir=$dir" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          # Keyed on this commit's own lockfile, which is what it installs
-          # from. Most of a series shares one, so the first job to finish
-          # saves the entry and the rest find it already there; a series
-          # that changes the lockfile mid-way saves one entry per lockfile.
-          # node_modules stays out for the reason given in the check job.
-          key: bun-commits-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          path: ${{ steps.bun-cache.outputs.dir }}
-          restore-keys: bun-commits-${{ runner.os }}-
 
       # A fresh runner, so there is nothing to clean: no node_modules from
       # another commit for bun install to leave unpruned, no stale
