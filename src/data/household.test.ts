@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { Cma, Vintages } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
@@ -17,6 +18,7 @@ import { toAccount, toValues } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { toRecords as toCarRecords } from "@/data/cars";
 import { golfValues } from "@/data/cars.fixture";
+import { cma } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
 import { homeValues } from "@/data/houses.fixture";
@@ -43,6 +45,7 @@ type Case = readonly [string, Break];
 interface Inputs {
   readonly accounts: readonly Account[];
   readonly allocation: Allocation;
+  readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
@@ -65,6 +68,7 @@ type Thrown = readonly [string, string, Break];
 const sound: Inputs = {
   accounts,
   allocation,
+  cma: { latest: cma, previous: null },
   curve,
   milestones,
   owners,
@@ -387,6 +391,42 @@ const held: readonly Case[] = [
     "A target allocation's categories add up to 100%",
     (given): Inputs => targeted(given, () => []),
   ],
+  [
+    "A CMA prices an asset class once",
+    (given): Inputs =>
+      priced(given, (assets) => [
+        ...assets,
+        ...assets.slice(0, 1).map((asset) => ({ ...asset, rate: 0.08 })),
+      ]),
+  ],
+  [
+    "A hedged asset class hedges one its CMA prices unhedged",
+    (given): Inputs =>
+      priced(given, (assets) =>
+        assets.filter(({ name }) => name !== "Global aggregate bonds"),
+      ),
+  ],
+  [
+    "A hedged asset class hedges one its CMA prices unhedged",
+    (given): Inputs =>
+      priced(given, (assets) =>
+        assets.map((asset) => ({ ...asset, hedges: asset.name })),
+      ),
+  ],
+  [
+    "A CMA's previous vintage is an earlier one",
+    (given): Inputs => ({ ...given, cma: { latest: cma, previous: cma } }),
+  ],
+  [
+    "A CMA's previous vintage is an earlier one",
+    (given): Inputs => ({
+      ...given,
+      cma: {
+        latest: cma,
+        previous: { ...cma, vintage: { month: 8, year: 2026 } },
+      },
+    }),
+  ],
 ];
 
 describe("household", () => {
@@ -453,6 +493,7 @@ describe("soundKept", () => {
       household: {
         accounts: [],
         allocation: { stocks: 1 },
+        cma: null,
         curve: null,
         milestones: [],
         owners: [],
@@ -589,6 +630,50 @@ describe("soundKept", () => {
       household: { targets: null },
       kept: { targets: null },
     });
+  });
+
+  // Spelled out key by key, as above.
+  it("reads a household kept before there was a CMA as holding none", () => {
+    const before = {
+      accounts: kept.accounts,
+      ages: kept.ages,
+      allocation: kept.allocation,
+      asOf: kept.asOf,
+      curve: kept.curve,
+      milestones: kept.milestones,
+      next: kept.next,
+      owners: kept.owners,
+      rates: kept.rates,
+      schedule: kept.schedule,
+      targets: kept.targets,
+    };
+
+    expect(soundKept(before)).toMatchObject({
+      household: { cma: null },
+      kept: { cma: null },
+    });
+  });
+
+  // The May vintage, a quarter before August's, as the previous.
+  it("keeps the vintages as BlackRock priced them, and refuses one dated to no day", () => {
+    const vintages = {
+      latest: cma,
+      previous: {
+        ...cma,
+        asOf: "2026-03-31",
+        vintage: { month: 4, year: 2026 },
+      },
+    };
+
+    expect(soundKept({ ...kept, cma: vintages }).household.cma).toStrictEqual(
+      vintages,
+    );
+    expect(() =>
+      soundKept({
+        ...kept,
+        cma: { latest: { ...cma, asOf: "30 June 2026" }, previous: null },
+      }),
+    ).toThrow("Invalid ISO date");
   });
 
   it("keeps the target allocation as it was imported, and refuses one on no day", () => {
@@ -892,6 +977,17 @@ function paying(given: Inputs, id: number, amount: number): Inputs {
     ...debt,
     contribution: { amount, cadence: "month", kind: "fixed" },
   }));
+}
+
+// The household with the asset classes of its latest CMA changed.
+function priced(
+  given: Inputs,
+  change: (assets: Cma["assets"]) => Cma["assets"],
+): Inputs {
+  return {
+    ...given,
+    cma: { latest: { ...cma, assets: change(cma.assets) }, previous: null },
+  };
 }
 
 function refusalsOf(given: Inputs): string[] {
