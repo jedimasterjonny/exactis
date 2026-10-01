@@ -8,7 +8,7 @@ import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
-import { cmaFile } from "@/lib/cma-workbook.fixture";
+import { cmaFile, priced, startingPointOf } from "@/lib/cma-workbook.fixture";
 import { requireSession } from "@/lib/session";
 import { workbookOf } from "@/lib/workbook.fixture";
 
@@ -94,6 +94,37 @@ describe("pullCma", () => {
     expect(await pullCma()).toStrictEqual(saved(cma));
     expect(await readLatest(db)).toMatchObject({
       household: { cma: { latest: cma, previous: may } },
+      version: 2,
+    });
+  });
+
+  // With no US cash, August gives no sterling-hedged global bonds, which
+  // the reference maps its hedged global bonds onto.
+  it("refuses a vintage the CMA's rates cannot be derived from while they are live, saying how to keep it, and keeps nothing", async () => {
+    const uncarried = new Uint8Array(
+      cmaFile(
+        startingPointOf(priced.filter(([, , name]) => name !== "US cash")),
+      ),
+    );
+    await keepAfter(db, 0, {
+      ...kept,
+      cma: { latest: may, previous: null },
+      rateSet: "cma",
+    });
+    blackRockSends(new Response(uncarried));
+
+    expect(await pullCma()).toStrictEqual(
+      refused(
+        "Global bonds, hedged is mapped onto a class the August 2026 CMA does not price, so this vintage cannot be kept while the plan runs on the CMA's rates. Choose custom rates, pull it and map onto its classes, then choose From CMA again",
+      ),
+    );
+    expect(await readLatest(db)).toMatchObject({ version: 1 });
+
+    blackRockSends(new Response(file));
+
+    expect(await pullCma()).toStrictEqual(saved(cma));
+    expect(await readLatest(db)).toMatchObject({
+      household: { rateSet: "cma" },
       version: 2,
     });
   });
