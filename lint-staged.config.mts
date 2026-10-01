@@ -25,10 +25,10 @@ export default defineConfig({
   // A second everything-glob rather than a list of extensions, because every
   // hole in such a list is a real one - knip resolves dependencies out of
   // package.json, .prettierrc.json, commitlint.config.mjs and
-  // vitest.config.mts, and binaries out of .github/workflows/ci.yml and the
-  // two extensionless hooks in .husky. It cannot share the `*` key above: a
-  // sequential list stops at its first failure, so an unformatted file would
-  // suppress the very result --continue-on-error exists to still report.
+  // vitest.config.mts, and binaries out of .github/workflows/ci.yml. It
+  // cannot share the `*` key above: a sequential list stops at its first
+  // failure, so an unformatted file would suppress the very result
+  // --continue-on-error exists to still report.
   "**/*": (): string => "bun run knip",
   // Cycles, over the whole import graph rather than the staged files: a cycle
   // is a property of the graph, and the file that closes one need not be the
