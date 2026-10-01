@@ -20,7 +20,6 @@
       "automerge": false,
       "matchPackageNames": [
         "@neondatabase/serverless",
-        "@next/env",
         "eslint-config-next",
         "next"
       ]
