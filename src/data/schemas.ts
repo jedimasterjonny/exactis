@@ -25,7 +25,7 @@ export const pounds = z.number().int().nonnegative();
 
 // What a line's end is tied to: retirement, or a milestone by its id.
 // That the household lists the milestone is the household's to hold.
-export const tie = z.union([z.literal("retirement"), recordId]);
+const tie = z.union([z.literal("retirement"), recordId]);
 
 // What every line of both schedules holds: the amount, whole and never
 // negative; the years whole, the last one absent for a line that runs
