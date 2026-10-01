@@ -11,7 +11,7 @@ import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { getHousehold } from "@/store/household";
 
-import { Dashboard, DashboardPending } from "./dashboard";
+import Dashboard from "./page";
 
 vi.mock("@/actions/plan", () => ({ saveAges: vi.fn() }));
 vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
@@ -142,19 +142,5 @@ describe("Dashboard", () => {
     expect(
       screen.getByRole("textbox", { name: "Retirement age" }),
     ).toHaveAccessibleDescription("Last working year 2048");
-  });
-});
-
-describe("DashboardPending", () => {
-  it("holds the header and the chart's frame while the store answers", () => {
-    render(<DashboardPending />);
-
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Projected to age …",
-    );
-    expect(screen.getByRole("paragraph")).toHaveTextContent(
-      "Reading the store…",
-    );
-    expect(screen.queryByRole("application")).not.toBeInTheDocument();
   });
 });
