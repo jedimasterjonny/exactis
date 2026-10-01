@@ -10,6 +10,7 @@ import { InflationSource } from "@/components/app/organisms/inflation-source";
 import { RateSet } from "@/components/app/organisms/rate-set";
 import { ReturnSource } from "@/components/app/organisms/return-source";
 import { TargetAllocation } from "@/components/app/organisms/target-allocation";
+import { WeightedReturn } from "@/components/app/organisms/weighted-return";
 import { formatPercent } from "@/lib/money";
 import { assumptions, sectionLabel } from "@/lib/nav";
 import {
@@ -17,7 +18,6 @@ import {
   getCma,
   getCurve,
   getDeductions,
-  getLiveRates,
   getMappings,
   getPlan,
   getRates,
@@ -34,8 +34,10 @@ const setNames: Record<Chosen, string> = {
 // The assumptions the plan runs on, in two tabs. The first holds the
 // rates: the set the plan runs on and the rates in it, the CMA-derived
 // ones or the ones typed by hand, then the return source the derived
-// ones are blended from, how the savings are split between stocks and
-// bonds at the rates live, and beneath them the inflation source, over
+// ones are blended from, then under the derived rates the target split
+// and what the vintage expects of it, or under the rates typed how the
+// savings are split between stocks and bonds, typed, and beneath them
+// the inflation source, over
 // the curve last pulled from the Bank, which the derived rates take and
 // the rates typed by hand set aside. The second holds the target
 // allocation last imported from Portfolio Performance, with the class
@@ -51,7 +53,6 @@ export default async function Assumptions(): Promise<JSX.Element> {
     cma,
     curve,
     deductions,
-    liveRates,
     mappings,
     plan,
     rates,
@@ -62,7 +63,6 @@ export default async function Assumptions(): Promise<JSX.Element> {
     getCma(),
     getCurve(),
     getDeductions(),
-    getLiveRates(),
     getMappings(),
     getPlan(),
     getRates(),
@@ -95,7 +95,15 @@ export default async function Assumptions(): Promise<JSX.Element> {
                     mappings={mappings}
                     targets={targets}
                   />
-                  <AssetAllocation allocation={allocation} rates={liveRates} />
+                  {rateSet === "cma" ? (
+                    <WeightedReturn
+                      cma={cma}
+                      mappings={mappings}
+                      targets={targets}
+                    />
+                  ) : (
+                    <AssetAllocation allocation={allocation} rates={rates} />
+                  )}
                   <InflationSource curve={curve} />
                 </>
               ),

@@ -112,13 +112,6 @@ export async function getIncomeLines(): Promise<readonly IncomeLine[]> {
   return (await readHousehold()).schedule.income;
 }
 
-// The rates the plan runs on as it is: the ones typed, or the CMA's
-// when they are chosen.
-export async function getLiveRates(): Promise<Rates> {
-  await requireSession();
-  return (await readHousehold()).liveRates;
-}
-
 // The class of a CMA each category of the target allocation is mapped
 // onto.
 export async function getMappings(): Promise<readonly Mapping[]> {

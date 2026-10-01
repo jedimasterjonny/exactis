@@ -319,8 +319,11 @@ the one before, and the vintage; under the rates typed it shows them to type.
 The return source card beneath pulls the workbook, types the two deductions, and
 lays out a ledger a sleeve from the blended return to the growth the rates take,
 the hedging adjustment under bonds, beside every category's share of the whole.
-A line above the cards says which set is live, since the manual method's worst
-failure was a plan running on a set nobody knew was live.
+Beneath it, under the derived set, the target split the plan runs on is drawn
+with what the vintage expects of each sleeve and of the portfolio before fees,
+where the rates typed show the split typed. A line above the cards says which
+set is live, since the manual method's worst failure was a plan running on a set
+nobody knew was live.
 
 ## Target allocation
 

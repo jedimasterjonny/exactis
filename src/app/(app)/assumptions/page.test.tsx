@@ -1,10 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Targets } from "@/data/targets";
@@ -28,7 +22,6 @@ import {
   getCma,
   getCurve,
   getDeductions,
-  getLiveRates,
   getMappings,
   getPlan,
   getRates,
@@ -44,7 +37,6 @@ vi.mock("@/store/household", () => ({
   getCma: vi.fn(),
   getCurve: vi.fn(),
   getDeductions: vi.fn(),
-  getLiveRates: vi.fn(),
   getMappings: vi.fn(),
   getPlan: vi.fn(),
   getRates: vi.fn(),
@@ -74,7 +66,6 @@ describe("Assumptions", () => {
       dividends: 0.02,
       fees: 0.002,
     });
-    vi.mocked(getLiveRates).mockResolvedValue(rates);
     vi.mocked(getMappings).mockResolvedValue(mappings);
     vi.mocked(getRateSet).mockResolvedValue("custom");
   });
@@ -205,18 +196,11 @@ describe("Assumptions", () => {
   });
 
   // August's blends less the deductions run stocks at 7.84% in all and
-  // bonds at 4.25%, so four fifths in stocks grow at 7.13%; the rates
-  // typed by hand are kept, not shown.
-  it("says the CMA-derived rates are live, lays out their return source, and splits the savings at them", async () => {
-    const live = {
-      bonds: 0.042508,
-      dividends: 0.02,
-      inflation: 0.0295,
-      stocks: 0.058441,
-    };
+  // bonds at 4.25%, so the target allocation's four fifths in stocks grow
+  // at 7.13%; the rates and the split typed by hand are kept, not shown.
+  it("says the CMA-derived rates are live, lays out their return source, and shows the target split in place of the split typed", async () => {
     vi.mocked(getAllocation).mockResolvedValue(allocation);
     vi.mocked(getCurve).mockResolvedValue(curve);
-    vi.mocked(getLiveRates).mockResolvedValue(live);
     vi.mocked(getPlan).mockResolvedValue({
       ...retiring,
       inflation: 0.0295,
@@ -242,9 +226,13 @@ describe("Assumptions", () => {
       "0.20%",
     );
     expect(
-      within(screen.getByRole("region", { name: "Allocation" }))
-        .getAllByRole("definition")
-        .map((definition) => definition.textContent),
-    ).toStrictEqual(["20.00%", "7.13%"]);
+      screen.getByRole("region", { name: "Weighted CMA return" }),
+    ).toHaveTextContent("80.0 / 20.0");
+    expect(
+      screen.queryByRole("region", { name: "Allocation" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Stocks share" }),
+    ).not.toBeInTheDocument();
   });
 });
