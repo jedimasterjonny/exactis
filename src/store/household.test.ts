@@ -26,6 +26,7 @@ import {
   getExpenseLines,
   getIncomeLines,
   getLiveRates,
+  getMappings,
   getMilestones,
   getOwners,
   getPlan,
@@ -57,6 +58,7 @@ describe("the household store", () => {
       getExpenseLines,
       getIncomeLines,
       getLiveRates,
+      getMappings,
       getMilestones,
       getOwners,
       getPlan,
@@ -86,6 +88,7 @@ describe("the household store", () => {
     });
     expect(await getAllocation()).toStrictEqual(allInStocks);
     expect(await getTargets()).toBeNull();
+    expect(await getMappings()).toStrictEqual([]);
     expect(await getPlan()).toStrictEqual(
       planOf(blank.ages, blank.asOf, blank),
     );
@@ -108,6 +111,7 @@ describe("the household store", () => {
     expect(await getDeductions()).toStrictEqual(reference.deductions);
     expect(await getAllocation()).toStrictEqual(reference.allocation);
     expect(await getTargets()).toStrictEqual(reference.targets);
+    expect(await getMappings()).toStrictEqual(reference.mappings);
     expect(await getPlan()).toStrictEqual({
       born: 1990,
       from: 2026,
