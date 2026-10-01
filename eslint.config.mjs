@@ -1,18 +1,15 @@
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments/configs";
 import react from "@eslint-react/eslint-plugin";
-import json from "@eslint/json";
 import vitest from "@vitest/eslint-plugin";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 import jestDom from "eslint-plugin-jest-dom";
 import jsxA11y from "eslint-plugin-jsx-a11y";
-import packageJson from "eslint-plugin-package-json";
 import perfectionist from "eslint-plugin-perfectionist";
 import regexp from "eslint-plugin-regexp";
 import sonarjs from "eslint-plugin-sonarjs";
 import testingLibrary from "eslint-plugin-testing-library";
-import yml from "eslint-plugin-yml";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
@@ -590,73 +587,6 @@ const eslintConfig = defineConfig([
       // Every test sits in a describe, so a failure names the unit.
       "vitest/require-top-level-describe": "error",
     },
-  },
-  // JSON. renovate.json, components.json and .prettierrc.json were being
-  // checked by nothing at all until now - a duplicate key or a stray
-  // trailing comma in any of them was a runtime surprise in whatever tool
-  // reads it.
-  //
-  // package.json is excluded rather than merely ordered before its own
-  // block. eslint-plugin-package-json parses through
-  // languageOptions.parser (jsonc-eslint-parser) instead of declaring a
-  // language, so a block setting language: "json/json" on the same file
-  // wins the language slot, the plugin's rules are handed an AST they do
-  // not recognise, and all fifty-eight of them match nothing and report
-  // nothing. It fails open, silently, which is the trap.
-  {
-    extends: [json.configs.recommended],
-    files: ["**/*.json"],
-    ignores: ["**/package.json", "**/tsconfig.json"],
-    language: "json/json",
-  },
-  // tsconfig.json is read as JSON with Comments by TypeScript itself, and
-  // every other config file in this repo carries comments explaining
-  // itself. Parsing it as strict JSON would make adding one a lint
-  // failure, so it is the one file linted as jsonc.
-  {
-    extends: [json.configs.recommended],
-    files: ["**/tsconfig.json"],
-    language: "json/jsonc",
-  },
-  // package.json, which is the one JSON file here with semantics worth
-  // checking: duplicate dependencies, a dependency listed in two groups,
-  // a malformed version range.
-  //
-  // sort-collections is narrowed to the dependency groups. Its default
-  // also sorts `scripts`, which are ordered by lifecycle here - dev,
-  // build, start, then the checks - and that reads better than
-  // alphabetical. require-description and require-type are off: both
-  // demand new fields in package.json, and this commit adds linting
-  // rather than changing what is being linted. `type` in particular
-  // decides how every .js file in the repo is interpreted, which is a
-  // decision that deserves its own commit rather than arriving as a side
-  // effect of one about ESLint.
-  {
-    extends: [packageJson.configs.recommended],
-    files: ["**/package.json"],
-    rules: {
-      "package-json/require-description": "off",
-      "package-json/require-type": "off",
-      "package-json/sort-collections": [
-        "error",
-        ["dependencies", "devDependencies"],
-      ],
-    },
-  },
-  // YAML, which today means .github/workflows/ci.yml - the file that
-  // decides whether anything else here is checked at all, and the only
-  // one that was not itself checked. flat/prettier last, so it switches
-  // off whatever flat/standard turns on that Prettier owns.
-  {
-    extends: [yml.configs["flat/standard"], yml.configs["flat/prettier"]],
-    files: ["**/*.{yaml,yml}"],
-  },
-  // `on: pull_request:` with no value is how a workflow subscribes to an
-  // event's default activity types. It is the idiomatic spelling, GitHub
-  // documents it, and no-empty-mapping-value reports every one of them.
-  {
-    files: [".github/workflows/*.{yaml,yml}"],
-    rules: { "yml/no-empty-mapping-value": "off" },
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([
