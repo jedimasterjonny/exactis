@@ -20,8 +20,6 @@ describe("AccountTable", () => {
     render(
       <AccountTable
         accounts={held}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
         onDelete={vi.fn<(account: Account) => void>()}
         onEdit={vi.fn<(account: Account) => void>()}
       />,
@@ -63,8 +61,6 @@ describe("AccountTable", () => {
     render(
       <AccountTable
         accounts={held}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
         onDelete={vi.fn<(account: Account) => void>()}
         onEdit={vi.fn<(account: Account) => void>()}
         owners={owners}
@@ -90,8 +86,6 @@ describe("AccountTable", () => {
     render(
       <AccountTable
         accounts={assets}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
         onDelete={vi.fn<(account: Account) => void>()}
         onEdit={vi.fn<(account: Account) => void>()}
       />,
@@ -126,8 +120,6 @@ describe("AccountTable", () => {
           { ...isa, contribution: { cap: 4000, kind: "spare" } },
           { ...cash, contribution: { cap: null, kind: "spare" } },
         ]}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
         onDelete={vi.fn<(account: Account) => void>()}
         onEdit={vi.fn<(account: Account) => void>()}
       />,
@@ -161,8 +153,6 @@ describe("AccountTable", () => {
           isa,
           { ...cash, id: 6, kind: "tax-deferred", name: "SIPP" },
         ]}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
         lines={[
           salary,
           { ...stepUp, feeds: 6, sacrifice: 0.05 },
@@ -205,8 +195,6 @@ describe("AccountTable", () => {
     const view = render(
       <AccountTable
         accounts={held}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
         lines={[salary]}
         onDelete={vi.fn<(account: Account) => void>()}
         onEdit={vi.fn<(account: Account) => void>()}
@@ -232,8 +220,6 @@ describe("AccountTable", () => {
     view.rerender(
       <AccountTable
         accounts={accounts.slice(0, 1)}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
         onDelete={vi.fn<(account: Account) => void>()}
         onEdit={vi.fn<(account: Account) => void>()}
       />,
@@ -254,8 +240,6 @@ describe("AccountTable", () => {
           pension,
           { ...isa, contribution: { cap: null, kind: "spare" } },
         ]}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
         onDelete={vi.fn<(account: Account) => void>()}
         onEdit={vi.fn<(account: Account) => void>()}
       />,
@@ -279,17 +263,17 @@ describe("AccountTable", () => {
     render(
       <AccountTable
         accounts={[]}
-        emptyDescription="A house, a car, anything owned outright."
-        emptyTitle="No assets yet"
         onDelete={vi.fn<(account: Account) => void>()}
         onEdit={vi.fn<(account: Account) => void>()}
       />,
     );
 
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.getByText("No assets yet")).toBeInTheDocument();
+    expect(screen.getByText("No accounts yet")).toBeInTheDocument();
     expect(
-      screen.getByText("A house, a car, anything owned outright."),
+      screen.getByText(
+        "Add a pension, an ISA or a savings account to see it listed here.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -298,8 +282,6 @@ describe("AccountTable", () => {
     render(
       <AccountTable
         accounts={assets}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
         onDelete={vi.fn<(account: Account) => void>()}
         onEdit={onEdit}
       />,
@@ -324,13 +306,7 @@ describe("AccountTable", () => {
     const onDelete = vi.fn<(account: Account) => void>();
     const onEdit = vi.fn<(account: Account) => void>();
     render(
-      <AccountTable
-        accounts={assets}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
-        onDelete={onDelete}
-        onEdit={onEdit}
-      />,
+      <AccountTable accounts={assets} onDelete={onDelete} onEdit={onEdit} />,
     );
 
     expect(screen.getAllByRole("columnheader")).toHaveLength(6);
@@ -355,8 +331,6 @@ describe("AccountTable", () => {
     render(
       <AccountTable
         accounts={held}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
         lines={[salary]}
         onDelete={vi.fn<(account: Account) => void>()}
         onEdit={vi.fn<(account: Account) => void>()}
@@ -414,8 +388,6 @@ describe("AccountTable", () => {
           { ...cash, id: pension.id, kind: "tax-deferred", name: "SIPP" },
           mortgage,
         ]}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
         lines={[salary]}
         onDelete={vi.fn<(account: Account) => void>()}
         onEdit={vi.fn<(account: Account) => void>()}
@@ -441,13 +413,7 @@ describe("AccountTable", () => {
     const onDelete = vi.fn<(account: Account) => void>();
     const onEdit = vi.fn<(account: Account) => void>();
     render(
-      <AccountTable
-        accounts={assets}
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
-        onDelete={onDelete}
-        onEdit={onEdit}
-      />,
+      <AccountTable accounts={assets} onDelete={onDelete} onEdit={onEdit} />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Mortgage" }));

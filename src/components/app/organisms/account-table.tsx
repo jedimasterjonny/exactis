@@ -35,8 +35,6 @@ import { formatGbp } from "@/lib/money";
 
 interface AccountTableProps {
   readonly accounts: readonly Account[];
-  readonly emptyDescription: string;
-  readonly emptyTitle: string;
   readonly lines?: readonly IncomeLine[];
   readonly onDelete: (account: Account) => void;
   readonly onEdit: (account: Account) => void;
@@ -89,9 +87,10 @@ const tones: Record<AccountKind, Tone> = {
 // caller asks about before it does anything. A ledger holding
 // nothing draws its empty state instead of the table, since a header
 // row over no rows states five column names and no information. The
-// words are the caller's, because accounts and assets are the same
-// table and want different sentences. The table draws no card of its
-// own: it sits in the caller's section, beneath the header naming it.
+// words are the savings', the one list it is handed that can be empty,
+// since the ledger draws the debts' section only when it holds a debt.
+// The table draws no card of its own: it sits in the caller's section,
+// beneath the header naming it.
 // Beneath two rows or more it totals what they are paid a month and
 // what they hold; a row alone is its own total, so one row draws none.
 // While the table is too narrow to read across, as on a phone, each row
@@ -103,8 +102,6 @@ const tones: Record<AccountKind, Tone> = {
 // way.
 export function AccountTable({
   accounts,
-  emptyDescription,
-  emptyTitle,
   lines = [],
   onDelete,
   onEdit,
@@ -116,9 +113,9 @@ export function AccountTable({
   if (accounts.length === 0) {
     return (
       <EmptyState
-        description={emptyDescription}
+        description="Add a pension, an ISA or a savings account to see it listed here."
         icon={Wallet}
-        title={emptyTitle}
+        title="No accounts yet"
       />
     );
   }

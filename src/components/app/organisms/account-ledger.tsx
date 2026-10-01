@@ -242,8 +242,6 @@ export function AccountLedger({
       >
         <AccountTable
           accounts={savings}
-          emptyDescription="Add a pension, an ISA or a savings account to see it listed here."
-          emptyTitle="No accounts yet"
           lines={running}
           onDelete={ask}
           onEdit={edit}
@@ -291,13 +289,7 @@ export function AccountLedger({
           label={subsectionLabel(accountsAndAssets, 3)}
           title="Other debts"
         >
-          <AccountTable
-            accounts={debts}
-            emptyDescription="A debt secured on nothing, a card or an overdraft, is listed here."
-            emptyTitle="No other debts"
-            onDelete={ask}
-            onEdit={edit}
-          />
+          <AccountTable accounts={debts} onDelete={ask} onEdit={edit} />
         </SectionCard>
       )}
       <PaymentOrder
