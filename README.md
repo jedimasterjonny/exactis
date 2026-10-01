@@ -50,11 +50,12 @@ a second file repeating it.
 
 The household, its owners, accounts, milestones, income and expense lines, the
 month its balances are as of, the ages the plan is set to, the rates and the
-split of the savings the plan runs on and the inflation curve last pulled from
-the Bank of England, lives in Postgres as one document, a version of it a save,
-reached through [Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The
-table is `src/db/schema.ts`, the migration generated from it is in `drizzle/`,
-and the two queries, reading the latest version and keeping the next, are in
+split of the savings the plan runs on, the inflation curve last pulled from the
+Bank of England and the target allocation last imported from Portfolio
+Performance, lives in Postgres as one document, a version of it a save, reached
+through [Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The table
+is `src/db/schema.ts`, the migration generated from it is in `drizzle/`, and the
+two queries, reading the latest version and keeping the next, are in
 `src/db/household.ts`.
 
 A save reads the latest version, makes the household it leaves, holds the whole
@@ -84,10 +85,11 @@ household worth keeping, a change to the shape is made in place, and a store
 holding the old shape is emptied rather than carried forward, with
 `TRUNCATE household_versions`, which the trigger lets through where it refuses a
 delete. The milestones were taken without emptying it: a household kept before
-there were any is read as listing none, and one kept before there was a curve as
-holding none. The rates were taken the same way: a household kept before there
-were any is read with the ones it ran on, 5% for stocks and bonds alike with no
-yield split out, everything in stocks, and the inflation its curve made, so it
+there were any is read as listing none, one kept before there was a curve as
+holding none, and one kept before there was a target allocation as holding none
+too. The rates were taken the same way: a household kept before there were any
+is read with the ones it ran on, 5% for stocks and bonds alike with no yield
+split out, everything in stocks, and the inflation its curve made, so it
 projects as it did until a rate is typed. The triple lock was dropped the same
 way: a line kept growing by it is read as growing with inflation. A change to
 the table is a new migration, written with `db:generate` and committed with the
@@ -254,6 +256,23 @@ does not take the derived rate: it takes the inflation in its rates, which a
 household kept before there were rates opens on at the derived rate, or at the
 Bank of England's 2% target when no curve had been pulled, and the projection
 grows the lines with it, and the tax bands once their freeze ends, as above.
+
+## Target allocation
+
+The target allocation is read from the file Portfolio Performance saves in
+binary: a zip holding `data.portfolio`, the signature `PPPBV1` and then the
+protobuf of the whole client. `src/lib/portfolio-file.ts` reads its Asset
+Allocation taxonomy and nothing else, through the wire reader in
+`src/lib/protobuf.ts`, using the field numbers from Portfolio Performance's
+`client.proto`. Each class with no class beneath it is a category, and its share
+of the whole is its weight multiplied by the weight of every class above it. The
+categories are kept with the classes above them, the id Portfolio Performance
+gives each, and whether any holding is assigned to it. The import action in
+`src/actions/targets.ts` takes the categories rather than the file, since the
+holdings and transactions the file holds beside them are not needed, and keeps
+them with the day they were imported. The household refuses a set whose shares
+do not add up to 100%, or that lists a category twice. The plan does not read
+the target allocation yet.
 
 ## Signing in
 

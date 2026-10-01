@@ -9,6 +9,7 @@ import type { Owner } from "@/data/owners";
 import type { Plan, PlanAges } from "@/data/plan";
 import type { Allocation, Rates } from "@/data/rates";
 import type { Month, Tie } from "@/data/schedule";
+import type { Target, Targets } from "@/data/targets";
 
 import {
   accountKinds,
@@ -27,6 +28,7 @@ import { allInStocks, openingRates } from "@/data/rates";
 import { rules } from "@/data/rules";
 import { lineGrowths } from "@/data/schedule";
 import {
+  categoryValues,
   lineValues,
   milestoneValues,
   month,
@@ -44,10 +46,11 @@ import { isWithinAllowance } from "@/lib/tax";
 
 // Everything the projection runs on, the owners the wrappers name and
 // the milestones the plan is laid out by, the inflation curve last
-// pulled from the Bank of England, or none before one is, and the rates
+// pulled from the Bank of England, or none before one is, the rates
 // and the split of the savings the plan's rate and inflation are made
-// from: the whole of what the store holds for the household, with the
-// plan as it stands the day it is read.
+// from, and the target allocation last imported from Portfolio
+// Performance, or none before one is: the whole of what the store holds
+// for the household, with the plan as it stands the day it is read.
 export interface Household {
   readonly accounts: readonly Account[];
   readonly allocation: Allocation;
@@ -60,6 +63,7 @@ export interface Household {
     readonly expenses: readonly ExpenseLine[];
     readonly income: readonly IncomeLine[];
   };
+  readonly targets: null | Targets;
 }
 
 // The household as the store keeps it: the records, the month their
@@ -67,7 +71,8 @@ export interface Household {
 // recorded together, the ages the plan is set to rather than the plan
 // they make, the curve as the Bank gave it rather than the inflation it
 // makes, the rates and the split as typed rather than the rate they
-// make, and the id the next record added is given. That id only
+// make, the target allocation as it was imported, and the id the next
+// record added is given. That id only
 // ever counts up, so one a deleted record held is never given to
 // another, which a form left open on the deleted one would otherwise
 // write over.
@@ -82,6 +87,7 @@ export interface Kept {
   readonly owners: readonly Owner[];
   readonly rates: Rates;
   readonly schedule: Household["schedule"];
+  readonly targets: null | Targets;
 }
 
 // What every line of both schedules holds, as the actions take it, and
@@ -244,6 +250,38 @@ const rates = z.object({
   stocks: z.number().min(-1, rules.beyondLoss),
 }) satisfies z.ZodType<Rates>;
 
+// A category of the target allocation as the file gave it, its share
+// from none of the whole to all of it.
+const target = z.object({
+  ...categoryValues,
+  share: z
+    .number()
+    .min(0, "A category holds none of the whole, all of it, or a share")
+    .max(1, "A category holds none of the whole, all of it, or a share"),
+}) satisfies z.ZodType<Target>;
+
+// How far the categories' shares may sum from the whole: nothing but
+// the rounding of multiplying weights down the taxonomy.
+const tolerance = 1e-9;
+
+// The target allocation as imported: the day it was imported on, and
+// its categories, each listed once by its id and adding up to the
+// whole, since a target allocation that does not is no allocation of
+// it, and nothing the plan could blend a rate from.
+const targets = z
+  .object({ categories: z.array(target), importedOn: z.iso.date() })
+  .refine(
+    ({ categories }) =>
+      new Set(categories.map(({ id }) => id)).size === categories.length,
+    "A category is listed once",
+  )
+  .refine(
+    ({ categories }) =>
+      Math.abs(categories.reduce((sum, { share }) => sum + share, 0) - 1) <=
+      tolerance,
+    "A target allocation's categories add up to 100%",
+  ) satisfies z.ZodType<Targets>;
+
 // A split of the savings: the share in stocks, from none of them to all.
 const allocation = z.object({
   stocks: z
@@ -305,6 +343,7 @@ export const household = z
       expenses: z.array(expenseLine),
       income: z.array(incomeLine),
     }),
+    targets: targets.nullable(),
   })
   .refine(({ accounts }) => isListedOnce(accounts), rules.listedOnce)
   .refine(
@@ -396,7 +435,8 @@ export const household = z
 // below the one the next is given. A household kept before there were
 // milestones lists none, and is read as listing none rather than
 // refused, so the store need not be emptied to take them; one kept
-// before there was a curve is read as holding none the same way. One
+// before there was a curve is read as holding none the same way, and
+// so is one kept before there was a target allocation. One
 // kept before there were rates is read with the rates it ran on, as
 // its curve makes them, and everything in stocks, so its plan grows
 // and rises as it did until a rate is typed.
@@ -427,6 +467,7 @@ const kept = z
       expenses: z.array(expenseLine),
       income: z.array(incomeLine),
     }),
+    targets: targets.nullable().default(null),
   })
   .refine(
     ({ accounts, milestones, next, owners, schedule }) =>
@@ -447,7 +488,8 @@ const kept = z
 // The household before anything is saved: no records, balances as of
 // the month given, the ages the dashboard has shown, a plan to 89
 // retiring at 59, no curve pulled, the rates a household opens with and
-// everything in stocks, and the first id.
+// everything in stocks, no target allocation imported, and the first
+// id.
 export function nothingKeptIn(asOf: Month): Kept {
   return {
     accounts: [],
@@ -460,6 +502,7 @@ export function nothingKeptIn(asOf: Month): Kept {
     owners: [],
     rates: openingRates(null),
     schedule: { expenses: [], income: [] },
+    targets: null,
   };
 }
 
@@ -534,6 +577,7 @@ function householdOf(kept: Kept): Household {
         timed(line, kept.milestones, plan),
       ),
     },
+    targets: kept.targets,
   };
 }
 

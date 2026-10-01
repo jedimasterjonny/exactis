@@ -11,6 +11,7 @@ import type { Plan } from "@/data/plan";
 import type { Allocation, Rates } from "@/data/rates";
 import type { Month } from "@/data/schedule";
 import type { SecuredRecords } from "@/data/secured";
+import type { Target, Targets } from "@/data/targets";
 
 import { toAccount, toValues } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
@@ -26,6 +27,7 @@ import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import { planRate } from "@/data/rates";
 import { allocation, rates } from "@/data/rates.fixture";
+import { targets } from "@/data/targets.fixture";
 import { project } from "@/engine/projection";
 
 import { household, nothingKeptIn, soundKept } from "./household";
@@ -50,6 +52,7 @@ interface Inputs {
     readonly expenses: readonly ExpenseLine[];
     readonly income: readonly IncomeLine[];
   };
+  readonly targets: null | Targets;
 }
 
 // A rule the engine throws on: the words it throws in, the words the
@@ -68,6 +71,7 @@ const sound: Inputs = {
   plan: retiring,
   rates,
   schedule: { expenses: expenseLines, income: incomeLines },
+  targets,
 };
 
 // Every input the engine throws on, in the words it throws in, as the
@@ -348,6 +352,41 @@ const held: readonly Case[] = [
     "Stocks hold none of the savings, all of them, or a share",
     (given): Inputs => ({ ...given, allocation: { stocks: 1.1 } }),
   ],
+  [
+    "A category holds none of the whole, all of it, or a share",
+    (given): Inputs =>
+      targeted(given, (categories) =>
+        categories.map((category, index) =>
+          index === 0 ? { ...category, share: -0.1 } : category,
+        ),
+      ),
+  ],
+  [
+    "A category holds none of the whole, all of it, or a share",
+    (given): Inputs =>
+      targeted(given, (categories) =>
+        categories.map((category, index) =>
+          index === 0 ? { ...category, share: 1.1 } : category,
+        ),
+      ),
+  ],
+  [
+    "A category is listed once",
+    (given): Inputs =>
+      targeted(given, (categories) =>
+        categories.map((category, index) =>
+          index === 1 ? { ...category, id: categories[0]?.id ?? "" } : category,
+        ),
+      ),
+  ],
+  [
+    "A target allocation's categories add up to 100%",
+    (given): Inputs => targeted(given, (categories) => categories.slice(1)),
+  ],
+  [
+    "A target allocation's categories add up to 100%",
+    (given): Inputs => targeted(given, () => []),
+  ],
 ];
 
 describe("household", () => {
@@ -428,6 +467,7 @@ describe("soundKept", () => {
         },
         rates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
         schedule: { expenses: [], income: [] },
+        targets: null,
       },
       kept: nothingKeptIn(september),
     });
@@ -528,6 +568,34 @@ describe("soundKept", () => {
       household: { curve: null },
       kept: { curve: null },
     });
+  });
+
+  // Spelled out key by key, as above.
+  it("reads a household kept before there was a target allocation as holding none", () => {
+    const before = {
+      accounts: kept.accounts,
+      ages: kept.ages,
+      allocation: kept.allocation,
+      asOf: kept.asOf,
+      curve: kept.curve,
+      milestones: kept.milestones,
+      next: kept.next,
+      owners: kept.owners,
+      rates: kept.rates,
+      schedule: kept.schedule,
+    };
+
+    expect(soundKept(before)).toMatchObject({
+      household: { targets: null },
+      kept: { targets: null },
+    });
+  });
+
+  it("keeps the target allocation as it was imported, and refuses one on no day", () => {
+    expect(soundKept(kept).household.targets).toStrictEqual(targets);
+    expect(() =>
+      soundKept({ ...kept, targets: { ...targets, importedOn: "3 Sep 2026" } }),
+    ).toThrow("Invalid ISO date");
   });
 
   // A household kept before there were rates holds neither the rates
@@ -846,5 +914,17 @@ function spending(
         line.id === id ? change(line) : line,
       ),
     },
+  };
+}
+
+// The household with the categories of its target allocation changed.
+function targeted(
+  given: Inputs,
+  change: (categories: readonly Target[]) => readonly Target[],
+): Inputs {
+  const imported = given.targets ?? targets;
+  return {
+    ...given,
+    targets: { ...imported, categories: change(imported.categories) },
   };
 }

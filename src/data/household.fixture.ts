@@ -9,13 +9,14 @@ import { curve } from "@/data/inflation.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import { allInStocks } from "@/data/rates";
+import { targets } from "@/data/targets.fixture";
 
 // The reference kit's invented plan as the store keeps it: the fixtures'
 // records, balances as of September 2026, a plan to 89 whose owner
 // retires at 59, the curve its card reads, the rates it ran on before
 // there were rates to type, 5% for stocks and bonds alike and the
-// curve's inflation, with everything in stocks, and the next id past
-// every one of theirs. For tests.
+// curve's inflation, with everything in stocks, the reference target
+// allocation, and the next id past every one of theirs. For tests.
 export const kept: Kept = {
   accounts,
   ages: { ends: 89, retires: 59 },
@@ -32,6 +33,7 @@ export const kept: Kept = {
     stocks: 0.05,
   },
   schedule: { expenses: expenseLines, income: incomeLines },
+  targets,
 };
 
 // The household before anything is saved, its balances as of the same
