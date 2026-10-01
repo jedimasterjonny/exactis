@@ -147,15 +147,21 @@ export function AccountLedger({
   // the two dialogs that let a loan's end be picked as a date.
   const plan: PlanMonth = { from: at.year, month: at.month };
 
+  // Closes whichever dialog is open, there being only ever one, on a
+  // dismiss, a save or a Delete alike.
+  function close(): void {
+    setAccount(null);
+    setHouse(null);
+    setCar(null);
+  }
+
   // A dialog's Delete asks as a row's bin does, about the account the
   // dialog is open on, or for a house or a car its own account, which
   // takes the loan with it. Whichever dialog it was closes first, so the
   // question stands alone and a cancel lands back on the screen rather
   // than on the draft of what was nearly deleted.
   function drop(account: Account): void {
-    setAccount(null);
-    setHouse(null);
-    setCar(null);
+    close();
     ask(account);
   }
 
@@ -307,12 +313,8 @@ export function AccountLedger({
           account={account === "new" ? null : account}
           lines={lines}
           onDelete={drop}
-          onDismiss={() => {
-            setAccount(null);
-          }}
-          onSaved={() => {
-            setAccount(null);
-          }}
+          onDismiss={close}
+          onSaved={close}
           owners={owners}
         />
       )}
@@ -325,12 +327,8 @@ export function AccountLedger({
         <HouseDialog
           house={house === "new" ? null : house}
           onDelete={drop}
-          onDismiss={() => {
-            setHouse(null);
-          }}
-          onSaved={() => {
-            setHouse(null);
-          }}
+          onDismiss={close}
+          onSaved={close}
           plan={plan}
         />
       )}
@@ -338,12 +336,8 @@ export function AccountLedger({
         <CarDialog
           car={car === "new" ? null : car}
           onDelete={drop}
-          onDismiss={() => {
-            setCar(null);
-          }}
-          onSaved={() => {
-            setCar(null);
-          }}
+          onDismiss={close}
+          onSaved={close}
           plan={plan}
         />
       )}
