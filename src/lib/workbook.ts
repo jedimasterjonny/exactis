@@ -38,11 +38,13 @@ const entities: ReadonlyMap<string, string> = new Map([
 
 // The rows of the named sheet of an Excel workbook, from the top down,
 // as the sheet lists them. What is read is the part of the format the
-// Bank of England's workbooks are written in and no more: the sheets
-// the workbook lists and where it keeps them, the strings it keeps
-// once, and each cell's number or text. What the reader cannot find is
-// refused in words naming it, since the screen says why a curve was not
-// pulled.
+// Bank of England's and BlackRock's workbooks are written in and no
+// more: the sheets the workbook lists and where it keeps them, the
+// strings it keeps once, and each cell's number or text. A sheet is
+// found by its name with any spaces around it let go, since BlackRock
+// writes one sheet's name with a space after it that no one reading the
+// tab could see. What the reader cannot find is refused in words naming
+// it, since the screen says why a file was not pulled.
 export function readSheet(workbook: Uint8Array, name: string): readonly Row[] {
   const parts = unzipped(workbook, "The workbook is not a zip");
   const strings = stringsOf(parts);
@@ -130,7 +132,7 @@ function rowOf(cells: string, strings: readonly string[]): Row {
 // relationship that points at its part, relative to the workbook's.
 function sheetPath(parts: Unzipped, name: string): string {
   const sheet = tagsOf(partOf(parts, "xl/workbook.xml"), sheetTag).find(
-    (attributes) => attributes.get("name") === name,
+    (attributes) => attributes.get("name")?.trim() === name,
   );
   if (sheet === undefined) {
     throw new Refusal(`The workbook has no sheet ${name}`);

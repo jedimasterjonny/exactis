@@ -140,6 +140,23 @@ describe("readSheet", () => {
     ]);
   });
 
+  // BlackRock names its first sheet "Starting point " with a space
+  // after it, which the tab gives no sign of.
+  it("finds the sheet by its name with the spaces around it let go", () => {
+    const workbook = workbookFrom({
+      "xl/_rels/workbook.xml.rels":
+        '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+      "xl/workbook.xml":
+        '<workbook><sheets><sheet name=" Starting point " sheetId="1" r:id="rId1"/></sheets></workbook>',
+      "xl/worksheets/sheet1.xml":
+        '<worksheet><sheetData><row r="1"><c r="A1"><v>2</v></c></row></sheetData></worksheet>',
+    });
+
+    expect(readSheet(workbook, "Starting point")).toStrictEqual([
+      new Map([[0, 2]]),
+    ]);
+  });
+
   it("reads a workbook keeping no strings", () => {
     const workbook = workbookFrom({
       "xl/_rels/workbook.xml.rels":
