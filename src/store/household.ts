@@ -2,17 +2,7 @@ import "server-only";
 import { refresh } from "next/cache";
 import { cache } from "react";
 
-import type { Account } from "@/data/accounts";
-import type { Deductions, Mapping, Vintages } from "@/data/cma";
-import type { ExpenseLine } from "@/data/expenses";
 import type { Household, Kept } from "@/data/household";
-import type { IncomeLine } from "@/data/income";
-import type { Curve } from "@/data/inflation";
-import type { Milestone } from "@/data/milestones";
-import type { Owner } from "@/data/owners";
-import type { Plan } from "@/data/plan";
-import type { Allocation, Rates, RateSet } from "@/data/rates";
-import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
 import { nothingKeptIn, soundKept } from "@/data/household";
@@ -37,7 +27,7 @@ interface Amended<TResult> {
 }
 
 // The household as it stands, read once a request however many parts of
-// a page ask for a part of it. Every part is read out of the one read,
+// a page ask for it. Every part is read out of the one read,
 // so a page never lays one version's accounts beside another's lines.
 const readHousehold = cache(
   async (): Promise<Household> => (await readHeld()).household,
@@ -72,87 +62,9 @@ export async function amend<TResult>(
   }
 }
 
-export async function getAccounts(): Promise<readonly Account[]> {
+export async function getHousehold(): Promise<Household> {
   await requireSession();
-  return (await readHousehold()).accounts;
-}
-
-// How the savings are split between stocks and bonds.
-export async function getAllocation(): Promise<Allocation> {
-  await requireSession();
-  return (await readHousehold()).allocation;
-}
-
-// The vintages of BlackRock's capital market assumptions last pulled,
-// or none before one is.
-export async function getCma(): Promise<null | Vintages> {
-  await requireSession();
-  return (await readHousehold()).cma;
-}
-
-// The inflation curve last pulled from the Bank, or none before one is.
-export async function getCurve(): Promise<Curve | null> {
-  await requireSession();
-  return (await readHousehold()).curve;
-}
-
-// What comes off the CMA's returns to derive the rates from them.
-export async function getDeductions(): Promise<Deductions> {
-  await requireSession();
-  return (await readHousehold()).deductions;
-}
-
-export async function getExpenseLines(): Promise<readonly ExpenseLine[]> {
-  await requireSession();
-  return (await readHousehold()).schedule.expenses;
-}
-
-export async function getIncomeLines(): Promise<readonly IncomeLine[]> {
-  await requireSession();
-  return (await readHousehold()).schedule.income;
-}
-
-// The class of a CMA each category of the target allocation is mapped
-// onto.
-export async function getMappings(): Promise<readonly Mapping[]> {
-  await requireSession();
-  return (await readHousehold()).mappings;
-}
-
-export async function getMilestones(): Promise<readonly Milestone[]> {
-  await requireSession();
-  return (await readHousehold()).milestones;
-}
-
-export async function getOwners(): Promise<readonly Owner[]> {
-  await requireSession();
-  return (await readHousehold()).owners;
-}
-
-// The plan as it stands, from the month the household's balances are
-// as of.
-export async function getPlan(): Promise<Plan> {
-  await requireSession();
-  return (await readHousehold()).plan;
-}
-
-// The rates typed by hand, whether or not the plan runs on them.
-export async function getRates(): Promise<Rates> {
-  await requireSession();
-  return (await readHousehold()).rates;
-}
-
-// Which set of rates the plan runs on.
-export async function getRateSet(): Promise<RateSet> {
-  await requireSession();
-  return (await readHousehold()).rateSet;
-}
-
-// The target allocation last imported from Portfolio Performance, or
-// none before one is.
-export async function getTargets(): Promise<null | Targets> {
-  await requireSession();
-  return (await readHousehold()).targets;
+  return readHousehold();
 }
 
 // The latest version the store has kept, or the household before

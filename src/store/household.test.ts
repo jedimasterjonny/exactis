@@ -16,23 +16,7 @@ import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
-import {
-  amend,
-  getAccounts,
-  getAllocation,
-  getCma,
-  getCurve,
-  getDeductions,
-  getExpenseLines,
-  getIncomeLines,
-  getMappings,
-  getMilestones,
-  getOwners,
-  getPlan,
-  getRates,
-  getRateSet,
-  getTargets,
-} from "./household";
+import { amend, getHousehold } from "./household";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -48,74 +32,56 @@ describe("the household store", () => {
   it("reads nothing without a session", async () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-    for (const read of [
-      getAccounts,
-      getAllocation,
-      getCma,
-      getCurve,
-      getDeductions,
-      getExpenseLines,
-      getIncomeLines,
-      getMappings,
-      getMilestones,
-      getOwners,
-      getPlan,
-      getRates,
-      getRateSet,
-      getTargets,
-    ]) {
-      await expect(read()).rejects.toThrow("redirected");
-    }
+    await expect(getHousehold()).rejects.toThrow("redirected");
     expect(getDb).not.toHaveBeenCalled();
   });
 
   it("reads the household before anything is saved as empty, to 89 retiring at 59", async () => {
-    expect(await getAccounts()).toStrictEqual([]);
-    expect(await getOwners()).toStrictEqual([]);
-    expect(await getIncomeLines()).toStrictEqual([]);
-    expect(await getExpenseLines()).toStrictEqual([]);
-    expect(await getMilestones()).toStrictEqual([]);
-    expect(await getCurve()).toBeNull();
-    expect(await getCma()).toBeNull();
-    expect(await getRates()).toStrictEqual(openingRates(null));
-    expect(await getRateSet()).toBe("custom");
-    expect(await getDeductions()).toStrictEqual({
-      dividends: 0.02,
-      fees: 0.002,
+    expect(await getHousehold()).toStrictEqual({
+      accounts: [],
+      allocation: allInStocks,
+      cma: null,
+      curve: null,
+      deductions: { dividends: 0.02, fees: 0.002 },
+      liveRates: openingRates(null),
+      mappings: [],
+      milestones: [],
+      owners: [],
+      plan: planOf(blank.ages, blank.asOf, blank),
+      rates: openingRates(null),
+      rateSet: "custom",
+      schedule: { expenses: [], income: [] },
+      targets: null,
     });
-    expect(await getAllocation()).toStrictEqual(allInStocks);
-    expect(await getTargets()).toBeNull();
-    expect(await getMappings()).toStrictEqual([]);
-    expect(await getPlan()).toStrictEqual(
-      planOf(blank.ages, blank.asOf, blank),
-    );
   });
 
   it("reads each part of the latest version, and the plan on the day it is read", async () => {
     await keepAfter(db, 0, blank);
     await keepAfter(db, 1, reference);
 
-    expect(await getAccounts()).toStrictEqual(reference.accounts);
-    expect(await getOwners()).toStrictEqual(reference.owners);
-    expect(await getIncomeLines()).toStrictEqual(reference.schedule.income);
-    expect(await getExpenseLines()).toStrictEqual(reference.schedule.expenses);
-    expect(await getMilestones()).toStrictEqual(reference.milestones);
-    expect(await getCurve()).toStrictEqual(reference.curve);
-    expect(await getCma()).toStrictEqual(reference.cma);
-    expect(await getRates()).toStrictEqual(reference.rates);
-    expect(await getRateSet()).toBe(reference.rateSet);
-    expect(await getDeductions()).toStrictEqual(reference.deductions);
-    expect(await getAllocation()).toStrictEqual(reference.allocation);
-    expect(await getTargets()).toStrictEqual(reference.targets);
-    expect(await getMappings()).toStrictEqual(reference.mappings);
-    expect(await getPlan()).toStrictEqual({
-      born: 1990,
-      from: 2026,
-      inflation: inflationOf(curve).rate,
-      month: 8,
-      rate: 0.05,
-      retires: 59,
-      years: 53,
+    expect(await getHousehold()).toStrictEqual({
+      accounts: reference.accounts,
+      allocation: reference.allocation,
+      cma: reference.cma,
+      curve: reference.curve,
+      deductions: reference.deductions,
+      liveRates: reference.rates,
+      mappings: reference.mappings,
+      milestones: reference.milestones,
+      owners: reference.owners,
+      plan: {
+        born: 1990,
+        from: 2026,
+        inflation: inflationOf(curve).rate,
+        month: 8,
+        rate: 0.05,
+        retires: 59,
+        years: 53,
+      },
+      rates: reference.rates,
+      rateSet: reference.rateSet,
+      schedule: reference.schedule,
+      targets: reference.targets,
     });
   });
 
@@ -126,11 +92,11 @@ describe("the household store", () => {
   it("runs the plan from the month the balances are as of, whatever day it is read", async () => {
     await keepAfter(db, 0, { ...reference, asOf: { month: 2, year: 2026 } });
 
-    expect(await getPlan()).toMatchObject({ from: 2026, month: 2 });
+    expect((await getHousehold()).plan).toMatchObject({ from: 2026, month: 2 });
 
     vi.setSystemTime(new Date("2027-01-15T12:00:00Z"));
 
-    expect(await getPlan()).toMatchObject({ from: 2026, month: 2 });
+    expect((await getHousehold()).plan).toMatchObject({ from: 2026, month: 2 });
   });
 
   // The first save keeps the month the household was read in, so the
@@ -142,7 +108,7 @@ describe("the household store", () => {
     expect(await readLatest(db)).toMatchObject({
       household: { asOf: { month: 8, year: 2026 } },
     });
-    expect(await getPlan()).toMatchObject({ from: 2026, month: 8 });
+    expect((await getHousehold()).plan).toMatchObject({ from: 2026, month: 8 });
   });
 
   // Written past the rules, as a version kept before they tightened.
@@ -152,7 +118,7 @@ describe("the household store", () => {
       accounts: [...reference.accounts, ...reference.accounts],
     });
 
-    await expect(getAccounts()).rejects.toThrow("An account is listed once");
+    await expect(getHousehold()).rejects.toThrow("An account is listed once");
   });
 
   it("keeps the household an edit makes as the next version, draws the page again and hands back what the edit says", async () => {

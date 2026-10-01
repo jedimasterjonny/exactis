@@ -1,12 +1,15 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Household } from "@/data/household";
 import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
 import { importTargets } from "@/actions/targets";
 import { Toaster } from "@/components/kit/toast";
 import { cma, mappings } from "@/data/cma.fixture";
+import { soundKept } from "@/data/household";
+import { blank } from "@/data/household.fixture";
 import { retiring } from "@/data/income.fixture";
 import { curve } from "@/data/inflation.fixture";
 import { allocation, rates } from "@/data/rates.fixture";
@@ -17,32 +20,12 @@ import {
   portfolioFile,
   reference,
 } from "@/lib/portfolio-file.fixture";
-import {
-  getAllocation,
-  getCma,
-  getCurve,
-  getDeductions,
-  getMappings,
-  getPlan,
-  getRates,
-  getRateSet,
-  getTargets,
-} from "@/store/household";
+import { getHousehold } from "@/store/household";
 import { heldBack } from "@/test/held-back";
 
 import Assumptions from "./page";
 
-vi.mock("@/store/household", () => ({
-  getAllocation: vi.fn(),
-  getCma: vi.fn(),
-  getCurve: vi.fn(),
-  getDeductions: vi.fn(),
-  getMappings: vi.fn(),
-  getPlan: vi.fn(),
-  getRates: vi.fn(),
-  getRateSet: vi.fn(),
-  getTargets: vi.fn(),
-}));
+vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
 vi.mock("@/actions/cma", () => ({ pullCma: vi.fn() }));
 vi.mock("@/actions/inflation", () => ({ pullCurve: vi.fn() }));
 vi.mock("@/actions/targets", () => ({
@@ -57,28 +40,33 @@ vi.mock("@/actions/plan", () => ({
   saveRateSet: vi.fn(),
 }));
 
+// The fixtures' August vintage and the reference's mappings onto it,
+// 0.20% of fees and a 2% yield, the rates typed by hand live, the
+// fixtures' split, curve and target allocation, and a plan whose owner
+// retires at 59, laid over the household before anything is saved as
+// the store reads it.
+const household: Household = {
+  ...soundKept(blank).household,
+  allocation,
+  cma: { latest: cma, previous: null },
+  curve,
+  deductions: { dividends: 0.02, fees: 0.002 },
+  mappings,
+  plan: retiring,
+  rates,
+  rateSet: "custom",
+  targets,
+};
+
 describe("Assumptions", () => {
-  // The August vintage and the reference's mappings onto it, 0.20% of
-  // fees and a 2% yield, and the rates typed by hand live.
   beforeEach(() => {
-    vi.mocked(getCma).mockResolvedValue({ latest: cma, previous: null });
-    vi.mocked(getDeductions).mockResolvedValue({
-      dividends: 0.02,
-      fees: 0.002,
-    });
-    vi.mocked(getMappings).mockResolvedValue(mappings);
-    vi.mocked(getRateSet).mockResolvedValue("custom");
+    vi.mocked(getHousehold).mockResolvedValue(household);
   });
 
   it("says what the plan grows at and what its prices rise by, and hands the store's rates, split and curve to their cards", async () => {
-    vi.mocked(getAllocation).mockResolvedValue(allocation);
-    vi.mocked(getCurve).mockResolvedValue(curve);
-    vi.mocked(getRates).mockResolvedValue(rates);
-    vi.mocked(getTargets).mockResolvedValue(targets);
-    vi.mocked(getPlan).mockResolvedValue({
-      ...retiring,
-      inflation: 0.0295,
-      rate: 0.0725,
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      plan: { ...retiring, inflation: 0.0295, rate: 0.0725 },
     });
 
     render(await Assumptions());
@@ -102,12 +90,11 @@ describe("Assumptions", () => {
   });
 
   it("hands the cards no curve and no CMA before either is pulled", async () => {
-    vi.mocked(getAllocation).mockResolvedValue(allocation);
-    vi.mocked(getCma).mockResolvedValue(null);
-    vi.mocked(getCurve).mockResolvedValue(null);
-    vi.mocked(getPlan).mockResolvedValue(retiring);
-    vi.mocked(getRates).mockResolvedValue(rates);
-    vi.mocked(getTargets).mockResolvedValue(targets);
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      cma: null,
+      curve: null,
+    });
 
     render(await Assumptions());
 
@@ -122,12 +109,6 @@ describe("Assumptions", () => {
   });
 
   it("opens on the rates, and hands the store's target allocation, the latest CMA and the mappings to its card in the tab beside them", async () => {
-    vi.mocked(getAllocation).mockResolvedValue(allocation);
-    vi.mocked(getCurve).mockResolvedValue(curve);
-    vi.mocked(getPlan).mockResolvedValue(retiring);
-    vi.mocked(getRates).mockResolvedValue(rates);
-    vi.mocked(getTargets).mockResolvedValue(targets);
-
     render(await Assumptions());
 
     expect(screen.getByRole("tab", { name: "Rates" })).toHaveAttribute(
@@ -156,11 +137,6 @@ describe("Assumptions", () => {
   // held when the tab is opened again, and a second cannot be started
   // over it.
   it("keeps an import held while the rates are open", async () => {
-    vi.mocked(getAllocation).mockResolvedValue(allocation);
-    vi.mocked(getCurve).mockResolvedValue(curve);
-    vi.mocked(getPlan).mockResolvedValue(retiring);
-    vi.mocked(getRates).mockResolvedValue(rates);
-    vi.mocked(getTargets).mockResolvedValue(targets);
     const answer = heldBack<Answer<Targets>>();
     vi.mocked(importTargets).mockReturnValue(answer.promise);
     render(await Assumptions(), { wrapper: Toaster });
@@ -199,16 +175,11 @@ describe("Assumptions", () => {
   // bonds at 4.25%, so the target allocation's four fifths in stocks grow
   // at 7.13%; the rates and the split typed by hand are kept, not shown.
   it("says the CMA-derived rates are live, lays out their return source, and shows the target split in place of the split typed", async () => {
-    vi.mocked(getAllocation).mockResolvedValue(allocation);
-    vi.mocked(getCurve).mockResolvedValue(curve);
-    vi.mocked(getPlan).mockResolvedValue({
-      ...retiring,
-      inflation: 0.0295,
-      rate: 0.071255,
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      plan: { ...retiring, inflation: 0.0295, rate: 0.071255 },
+      rateSet: "cma",
     });
-    vi.mocked(getRates).mockResolvedValue(rates);
-    vi.mocked(getRateSet).mockResolvedValue("cma");
-    vi.mocked(getTargets).mockResolvedValue(targets);
 
     render(await Assumptions());
 

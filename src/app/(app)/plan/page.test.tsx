@@ -3,28 +3,16 @@ import { describe, expect, it, vi } from "vitest";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
+import { soundKept } from "@/data/household";
+import { blank } from "@/data/household.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
-import {
-  getAccounts,
-  getExpenseLines,
-  getIncomeLines,
-  getMilestones,
-  getOwners,
-  getPlan,
-} from "@/store/household";
+import { getHousehold } from "@/store/household";
 
 import Plan from "./page";
 
-vi.mock("@/store/household", () => ({
-  getAccounts: vi.fn(),
-  getExpenseLines: vi.fn(),
-  getIncomeLines: vi.fn(),
-  getMilestones: vi.fn(),
-  getOwners: vi.fn(),
-  getPlan: vi.fn(),
-}));
+vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
 vi.mock("@/actions/milestones", () => ({
   removeMilestone: vi.fn(),
   saveMilestone: vi.fn(),
@@ -37,6 +25,10 @@ vi.mock("@/actions/schedule", () => ({
 
 const [salary] = incomeLines;
 
+// The household before anything is saved, as the store reads it, for
+// each test to lay what the page reads over.
+const { household } = soundKept(blank);
+
 describe("Plan", () => {
   // The fixture's first year: the salary's £12,250 a month, less the
   // £1,000 sacrificed into the pension and the tax on the rest, against
@@ -44,12 +36,14 @@ describe("Plan", () => {
   // taking all that leaves before the mortgage's is reached, so the last
   // of the ledger's figures, what is left, is nothing.
   it("hands the store's milestones, lines and plan to their cards under one header, and this year's cash flow beneath", async () => {
-    vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
-    vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
-    vi.mocked(getAccounts).mockResolvedValue([...accounts]);
-    vi.mocked(getMilestones).mockResolvedValue([...milestones]);
-    vi.mocked(getOwners).mockResolvedValue([...owners]);
-    vi.mocked(getPlan).mockResolvedValue(plan);
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      accounts: [...accounts],
+      milestones: [...milestones],
+      owners: [...owners],
+      plan,
+      schedule: { expenses: [...expenseLines], income: [...incomeLines] },
+    });
 
     render(await Plan());
 
@@ -96,11 +90,13 @@ describe("Plan", () => {
   // leaves all of its £12,250 a month that the tax does not take,
   // £7,474.70.
   it("counts a single line in the singular and none as none", async () => {
-    vi.mocked(getIncomeLines).mockResolvedValue([salary]);
-    vi.mocked(getExpenseLines).mockResolvedValue([]);
-    vi.mocked(getAccounts).mockResolvedValue([]);
-    vi.mocked(getMilestones).mockResolvedValue([]);
-    vi.mocked(getPlan).mockResolvedValue(plan);
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      accounts: [],
+      milestones: [],
+      plan,
+      schedule: { expenses: [], income: [salary] },
+    });
 
     render(await Plan());
 

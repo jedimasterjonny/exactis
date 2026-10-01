@@ -2,23 +2,15 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { accounts } from "@/data/accounts.fixture";
+import { soundKept } from "@/data/household";
+import { blank } from "@/data/household.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
-import {
-  getAccounts,
-  getIncomeLines,
-  getOwners,
-  getPlan,
-} from "@/store/household";
+import { getHousehold } from "@/store/household";
 
 import Accounts from "./page";
 
-vi.mock("@/store/household", () => ({
-  getAccounts: vi.fn(),
-  getIncomeLines: vi.fn(),
-  getOwners: vi.fn(),
-  getPlan: vi.fn(),
-}));
+vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
 vi.mock("@/actions/accounts", () => ({
   removeAccount: vi.fn(),
   saveAccount: vi.fn(),
@@ -30,10 +22,13 @@ vi.mock("@/actions/owners", () => ({
 
 // The page over the fixture's household, as the store reads it.
 async function renderAccounts(): Promise<void> {
-  vi.mocked(getAccounts).mockResolvedValue([...accounts]);
-  vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
-  vi.mocked(getOwners).mockResolvedValue(owners);
-  vi.mocked(getPlan).mockResolvedValue(plan);
+  vi.mocked(getHousehold).mockResolvedValue({
+    ...soundKept(blank).household,
+    accounts: [...accounts],
+    owners,
+    plan,
+    schedule: { expenses: [], income: [...incomeLines] },
+  });
   render(await Accounts());
 }
 

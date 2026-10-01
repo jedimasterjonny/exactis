@@ -11,13 +11,7 @@ import { ProjectionPending } from "@/components/app/organisms/projection-chart";
 import { Badge } from "@/components/kit/badge";
 import { endAge } from "@/data/plan";
 import { dashboard, sectionLabel } from "@/lib/nav";
-import {
-  getAccounts,
-  getExpenseLines,
-  getIncomeLines,
-  getMilestones,
-  getPlan,
-} from "@/store/household";
+import { getHousehold } from "@/store/household";
 
 // The dashboard, over the accounts, the lines, the milestones they are
 // tied to and the plan read from the store behind the session: titled with the age the plan runs to,
@@ -33,13 +27,7 @@ import {
 // of success, the two the plan is steered by, in one row, and leaves
 // the net worth and the legacy to a wider screen.
 export async function Dashboard(): Promise<JSX.Element> {
-  const [accounts, income, expenses, milestones, plan] = await Promise.all([
-    getAccounts(),
-    getIncomeLines(),
-    getExpenseLines(),
-    getMilestones(),
-    getPlan(),
-  ]);
+  const { accounts, milestones, plan, schedule } = await getHousehold();
   const age = String(endAge(plan));
   return (
     <>
@@ -60,7 +48,7 @@ export async function Dashboard(): Promise<JSX.Element> {
           accounts={accounts}
           milestones={milestones}
           plan={plan}
-          schedule={{ expenses, income }}
+          schedule={schedule}
         >
           <StatTile
             caption="vs Aug run"

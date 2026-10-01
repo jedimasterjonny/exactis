@@ -1,38 +1,36 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Household } from "@/data/household";
+
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
+import { soundKept } from "@/data/household";
+import { blank } from "@/data/household.fixture";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
-import {
-  getAccounts,
-  getExpenseLines,
-  getIncomeLines,
-  getMilestones,
-  getPlan,
-} from "@/store/household";
+import { getHousehold } from "@/store/household";
 
 import { Dashboard, DashboardPending } from "./dashboard";
 
 vi.mock("@/actions/plan", () => ({ saveAges: vi.fn() }));
-vi.mock("@/store/household", () => ({
-  getAccounts: vi.fn(),
-  getExpenseLines: vi.fn(),
-  getIncomeLines: vi.fn(),
-  getMilestones: vi.fn(),
-  getPlan: vi.fn(),
-}));
+vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
+
+// The fixtures' records, laid over the household before anything is
+// saved as the store reads it. The fixture's plan runs to 2079 for
+// someone born in 1990, so to 89, and they retire at 59, in 2049,
+// within it.
+const household: Household = {
+  ...soundKept(blank).household,
+  accounts: [...accounts],
+  milestones: [...milestones],
+  plan: retiring,
+  schedule: { expenses: [...expenseLines], income: [...incomeLines] },
+};
 
 describe("Dashboard", () => {
-  // The fixture's plan runs to 2079 for someone born in 1990, so to 89,
-  // and they retire at 59, in 2049, within it.
   beforeEach(() => {
-    vi.mocked(getAccounts).mockResolvedValue([...accounts]);
-    vi.mocked(getIncomeLines).mockResolvedValue([...incomeLines]);
-    vi.mocked(getExpenseLines).mockResolvedValue([...expenseLines]);
-    vi.mocked(getMilestones).mockResolvedValue([...milestones]);
-    vi.mocked(getPlan).mockResolvedValue(retiring);
+    vi.mocked(getHousehold).mockResolvedValue(household);
   });
 
   it("opens with the dashboard header, titled with the age the plan runs to", async () => {
@@ -47,7 +45,10 @@ describe("Dashboard", () => {
   // Born in 1990, a plan that runs 30 years from 2026 runs to 66, and
   // the header and the net worth tile both read it.
   it("reads the age from the plan rather than holding one", async () => {
-    vi.mocked(getPlan).mockResolvedValue({ ...plan, years: 30 });
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      plan: { ...plan, years: 30 },
+    });
 
     render(await Dashboard());
 

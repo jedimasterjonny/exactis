@@ -9,14 +9,7 @@ import { MilestoneList } from "@/components/app/organisms/milestone-list";
 import { markersOf } from "@/data/milestones";
 import { counted } from "@/lib/count";
 import { plan as planScreen, sectionLabel } from "@/lib/nav";
-import {
-  getAccounts,
-  getExpenseLines,
-  getIncomeLines,
-  getMilestones,
-  getOwners,
-  getPlan,
-} from "@/store/household";
+import { getHousehold } from "@/store/household";
 
 // The reference's plan screen holds accounts, events and the income and
 // expense schedules on three tabs. The accounts have a screen of their
@@ -38,39 +31,31 @@ import {
 // schedules, so it is the page's rather than any card's. The plan is
 // read beside the rest, from the same version of the household.
 export default async function Plan(): Promise<JSX.Element> {
-  const [incomeLines, expenseLines, accounts, milestones, owners, plan] =
-    await Promise.all([
-      getIncomeLines(),
-      getExpenseLines(),
-      getAccounts(),
-      getMilestones(),
-      getOwners(),
-      getPlan(),
-    ]);
+  const { accounts, milestones, owners, plan, schedule } = await getHousehold();
   return (
     <>
       <ScreenHeader label={sectionLabel(planScreen)} title={planScreen.title}>
         {[
           counted(markersOf(milestones, plan).length, "milestone"),
-          counted(incomeLines.length, "income line"),
-          counted(expenseLines.length, "expense line"),
+          counted(schedule.income.length, "income line"),
+          counted(schedule.expenses.length, "expense line"),
         ].join(" · ")}
       </ScreenHeader>
       <ScreenBody>
         <MilestoneList
           milestones={milestones}
           plan={plan}
-          schedule={{ expenses: expenseLines, income: incomeLines }}
+          schedule={schedule}
         />
         <IncomeSchedule
           accounts={accounts}
-          lines={incomeLines}
+          lines={schedule.income}
           milestones={milestones}
           owners={owners}
           plan={plan}
         />
         <ExpenseSchedule
-          lines={expenseLines}
+          lines={schedule.expenses}
           milestones={milestones}
           plan={plan}
         />
@@ -78,7 +63,7 @@ export default async function Plan(): Promise<JSX.Element> {
           accounts={accounts}
           milestones={milestones}
           plan={plan}
-          schedule={{ expenses: expenseLines, income: incomeLines }}
+          schedule={schedule}
         />
       </ScreenBody>
     </>
