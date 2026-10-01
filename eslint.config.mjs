@@ -9,7 +9,6 @@ import jestDom from "eslint-plugin-jest-dom";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import packageJson from "eslint-plugin-package-json";
 import perfectionist from "eslint-plugin-perfectionist";
-import promise from "eslint-plugin-promise";
 import regexp from "eslint-plugin-regexp";
 import sonarjs from "eslint-plugin-sonarjs";
 import testingLibrary from "eslint-plugin-testing-library";
@@ -133,18 +132,13 @@ const eslintConfig = defineConfig([
       },
     },
   },
-  // Three plugins that each cover a class of bug the TypeScript rules
-  // cannot see. promise catches a floating or mis-nested then/catch;
-  // regexp catches a pattern that is wrong rather than merely ugly - a
-  // character class that can never match, a quantifier that backtracks
-  // catastrophically; sonarjs covers duplicated branches, unreachable
-  // conditions and the cognitive-complexity ceiling.
+  // Two plugins that each cover a class of bug the TypeScript rules
+  // cannot see. regexp catches a pattern that is wrong rather than merely
+  // ugly - a character class that can never match, a quantifier that
+  // backtracks catastrophically; sonarjs covers duplicated branches,
+  // unreachable conditions and the cognitive-complexity ceiling.
   {
-    extends: [
-      promise.configs["flat/recommended"],
-      regexp.configs["flat/recommended"],
-      sonarjs.configs.recommended,
-    ],
+    extends: [regexp.configs["flat/recommended"], sonarjs.configs.recommended],
     files: codeFiles,
   },
   // sonarjs/argument-type cannot instantiate a type parameter under the
