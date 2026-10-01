@@ -51,10 +51,11 @@ a second file repeating it.
 The household, its owners, accounts, milestones, income and expense lines, the
 month its balances are as of, the ages the plan is set to, the rates and the
 split of the savings the plan runs on, the inflation curve last pulled from the
-Bank of England and the target allocation last imported from Portfolio
-Performance, lives in Postgres as one document, a version of it a save, reached
-through [Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The table
-is `src/db/schema.ts`, the migration generated from it is in `drizzle/`, and the
+Bank of England, the vintages of BlackRock's capital market assumptions last
+pulled and the target allocation last imported from Portfolio Performance, lives
+in Postgres as one document, a version of it a save, reached through
+[Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The table is
+`src/db/schema.ts`, the migration generated from it is in `drizzle/`, and the
 two queries, reading the latest version and keeping the next, are in
 `src/db/household.ts`.
 
@@ -87,14 +88,14 @@ holding the old shape is emptied rather than carried forward, with
 `TRUNCATE household_versions`, which the trigger lets through where it refuses a
 delete. The milestones were taken without emptying it: a household kept before
 there were any is read as listing none, one kept before there was a curve as
-holding none, and one kept before there was a target allocation as holding none
-too. The rates were taken the same way: a household kept before there were any
-is read with the ones it ran on, 5% for stocks and bonds alike with no yield
-split out, everything in stocks, and the inflation its curve made, so it
-projects as it did until a rate is typed. The triple lock was dropped the same
-way: a line kept growing by it is read as growing with inflation. A change to
-the table is a new migration, written with `db:generate` and committed with the
-change. The tests apply the migrations to an in-process Postgres
+holding none, and one kept before there was a target allocation or a CMA as
+holding none too. The rates were taken the same way: a household kept before
+there were any is read with the ones it ran on, 5% for stocks and bonds alike
+with no yield split out, everything in stocks, and the inflation its curve made,
+so it projects as it did until a rate is typed. The triple lock was dropped the
+same way: a line kept growing by it is read as growing with inflation. A change
+to the table is a new migration, written with `db:generate` and committed with
+the change. The tests apply the migrations to an in-process Postgres
 ([PGlite](https://pglite.dev)), so a migration that does not apply fails the
 suite before it reaches a database.
 
@@ -257,6 +258,29 @@ does not take the derived rate: it takes the inflation in its rates, which a
 household kept before there were rates opens on at the derived rate, or at the
 Bank of England's 2% target when no curve had been pulled, and the projection
 grows the lines with it, and the tax bands once their freeze ends, as above.
+
+## Capital market assumptions
+
+BlackRock publishes its capital market assumptions as one workbook, replaced
+with each vintage. `src/actions/cma.ts` fetches it from the server and
+`src/lib/cma-workbook.ts` reads its starting point: the vintage, the day its
+data are as of, and the 20-year expected return of each asset class it prices in
+sterling, equities blending into the plan's stocks and fixed income into its
+bonds, private markets left out. Nothing is read by position. The header is
+found by its first cell and the 20-year column within the block of expected
+returns, since the interquartile ranges beside it head their columns the same
+way. BlackRock prices a hedged return only in dollars, so each class it prices
+hedged in dollars and unhedged in sterling gains a sterling-hedged form, the
+dollar-hedged return carried from US to UK cash. Japan's large caps, which
+sterling stopped pricing in August 2026, and US small caps are priced only in
+their own markets' currencies, so each is carried into sterling by its gap over
+US large caps there, added to sterling's US large caps: the currency moves out
+of a gap between two unhedged classes, as BlackRock's own figures show for the
+classes every block prices.
+
+The household keeps the latest vintage and the one it replaced, so what a new
+vintage moves can be read. The same vintage pulled again replaces the latest,
+and an earlier one is refused. Nothing reads the vintages yet.
 
 ## Target allocation
 

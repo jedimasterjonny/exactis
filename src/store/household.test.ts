@@ -20,6 +20,7 @@ import {
   amend,
   getAccounts,
   getAllocation,
+  getCma,
   getCurve,
   getExpenseLines,
   getIncomeLines,
@@ -47,6 +48,7 @@ describe("the household store", () => {
     for (const read of [
       getAccounts,
       getAllocation,
+      getCma,
       getCurve,
       getExpenseLines,
       getIncomeLines,
@@ -68,6 +70,7 @@ describe("the household store", () => {
     expect(await getExpenseLines()).toStrictEqual([]);
     expect(await getMilestones()).toStrictEqual([]);
     expect(await getCurve()).toBeNull();
+    expect(await getCma()).toBeNull();
     expect(await getRates()).toStrictEqual(openingRates(null));
     expect(await getAllocation()).toStrictEqual(allInStocks);
     expect(await getTargets()).toBeNull();
@@ -86,6 +89,7 @@ describe("the household store", () => {
     expect(await getExpenseLines()).toStrictEqual(reference.schedule.expenses);
     expect(await getMilestones()).toStrictEqual(reference.milestones);
     expect(await getCurve()).toStrictEqual(reference.curve);
+    expect(await getCma()).toStrictEqual(reference.cma);
     expect(await getRates()).toStrictEqual(reference.rates);
     expect(await getAllocation()).toStrictEqual(reference.allocation);
     expect(await getTargets()).toStrictEqual(reference.targets);

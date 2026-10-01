@@ -3,6 +3,7 @@ import { refresh } from "next/cache";
 import { cache } from "react";
 
 import type { Account } from "@/data/accounts";
+import type { Vintages } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
 import type { Household, Kept } from "@/data/household";
 import type { IncomeLine } from "@/data/income";
@@ -80,6 +81,13 @@ export async function getAccounts(): Promise<readonly Account[]> {
 export async function getAllocation(): Promise<Allocation> {
   await requireSession();
   return (await readHousehold()).allocation;
+}
+
+// The vintages of BlackRock's capital market assumptions last pulled,
+// or none before one is.
+export async function getCma(): Promise<null | Vintages> {
+  await requireSession();
+  return (await readHousehold()).cma;
 }
 
 // The inflation curve last pulled from the Bank, or none before one is.
