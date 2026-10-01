@@ -7,7 +7,6 @@ import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { PlanAssumptions } from "@/components/app/organisms/plan-assumptions";
 import { ProjectionBoard } from "@/components/app/organisms/projection-board";
-import { ProjectionPending } from "@/components/app/organisms/projection-chart";
 import { Badge } from "@/components/kit/badge";
 import { endAge } from "@/data/plan";
 import { dashboard, sectionLabel } from "@/lib/nav";
@@ -21,12 +20,13 @@ import { getHousehold } from "@/store/household";
 // age set there; the badges and the rest
 // of the tiles are the reference kit's invented plan, standing in until
 // the engine projects what they show, save the age the net worth is
-// read at, which is the plan's. It is its own component so the page
-// can stream it in behind the pending frame, since every part of it
-// now reads the store. A phone keeps the milestone tile and the chance
+// read at, which is the plan's. It reads the store from its header
+// down, since the header is titled with the age the plan runs to, so the
+// whole of it renders behind the loading screen beside it rather than
+// the chart alone. A phone keeps the milestone tile and the chance
 // of success, the two the plan is steered by, in one row, and leaves
 // the net worth and the legacy to a wider screen.
-export async function Dashboard(): Promise<JSX.Element> {
+export default async function Dashboard(): Promise<JSX.Element> {
   const { accounts, milestones, plan, schedule } = await getHousehold();
   const age = String(endAge(plan));
   return (
@@ -74,26 +74,6 @@ export async function Dashboard(): Promise<JSX.Element> {
             value="£1,771,204"
           />
         </ProjectionBoard>
-      </ScreenBody>
-    </>
-  );
-}
-
-// What stands in the dashboard's place while the store answers: its
-// label and its title, less the age it has yet to read, and the
-// chart's frame, which says what is being waited on. The badges, the
-// assumptions and the tiles are not stood in for, so when the
-// dashboard arrives they land around the frame and the frame moves
-// down beneath the tiles.
-export function DashboardPending(): JSX.Element {
-  return (
-    <>
-      <ScreenHeader
-        label={sectionLabel(dashboard)}
-        title={`${dashboard.title} …`}
-      />
-      <ScreenBody>
-        <ProjectionPending />
       </ScreenBody>
     </>
   );
