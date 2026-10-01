@@ -1,5 +1,7 @@
 import type { Month } from "@/data/schedule";
 
+import { monthName } from "@/lib/months";
+
 // An asset class as BlackRock's capital market assumptions price it in
 // sterling: its name, the class of the plan its return blends into,
 // and the return expected of it a year over the horizon, a fraction,
@@ -26,4 +28,19 @@ export interface Cma {
 }
 
 // The plan's two classes, which an asset class's return blends into.
-export type Sleeve = "bonds" | "stocks";
+export type Sleeve = (typeof sleeves)[number];
+
+// The vintages of the capital market assumptions the household keeps:
+// the latest pulled, and the one it replaced, or none before a second
+// vintage is pulled, kept so what a new vintage moves can be read.
+export interface Vintages {
+  readonly latest: Cma;
+  readonly previous: Cma | null;
+}
+
+export const sleeves = ["bonds", "stocks"] as const;
+
+// A vintage by its month and year, as BlackRock names it, "August 2026".
+export function vintageName({ vintage }: Cma): string {
+  return `${monthName(vintage.month, "long")} ${String(vintage.year)}`;
+}

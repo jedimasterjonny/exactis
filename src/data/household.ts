@@ -1,6 +1,7 @@
 import * as z from "zod";
 
 import type { Account } from "@/data/accounts";
+import type { Asset, Cma, Vintages } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
@@ -20,6 +21,7 @@ import {
   takesSpare,
   toValues,
 } from "@/data/accounts";
+import { sleeves } from "@/data/cma";
 import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
 import { timed } from "@/data/milestones";
@@ -42,18 +44,22 @@ import { Refusal } from "@/lib/answer";
 import { fixedMonthly, monthly } from "@/lib/cadence";
 import { endsAfterItStarts } from "@/lib/lines";
 import { clearsIn, termOf } from "@/lib/loans";
+import { monthsBetween } from "@/lib/months";
 import { isWithinAllowance } from "@/lib/tax";
 
 // Everything the projection runs on, the owners the wrappers name and
 // the milestones the plan is laid out by, the inflation curve last
-// pulled from the Bank of England, or none before one is, the rates
-// and the split of the savings the plan's rate and inflation are made
-// from, and the target allocation last imported from Portfolio
-// Performance, or none before one is: the whole of what the store holds
-// for the household, with the plan as it stands the day it is read.
+// pulled from the Bank of England, or none before one is, the vintages
+// of BlackRock's capital market assumptions last pulled, or none before
+// one is, the rates and the split of the savings the plan's rate and
+// inflation are made from, and the target allocation last imported from
+// Portfolio Performance, or none before one is: the whole of what the
+// store holds for the household, with the plan as it stands the day it
+// is read.
 export interface Household {
   readonly accounts: readonly Account[];
   readonly allocation: Allocation;
+  readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
@@ -70,9 +76,9 @@ export interface Household {
 // balances are as of, one for the whole household since they are
 // recorded together, the ages the plan is set to rather than the plan
 // they make, the curve as the Bank gave it rather than the inflation it
-// makes, the rates and the split as typed rather than the rate they
-// make, the target allocation as it was imported, and the id the next
-// record added is given. That id only
+// makes, the vintages as BlackRock priced them, the rates and the split
+// as typed rather than the rate they make, the target allocation as it
+// was imported, and the id the next record added is given. That id only
 // ever counts up, so one a deleted record held is never given to
 // another, which a form left open on the deleted one would otherwise
 // write over.
@@ -81,6 +87,7 @@ export interface Kept {
   readonly ages: PlanAges;
   readonly allocation: Allocation;
   readonly asOf: Month;
+  readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly milestones: readonly Milestone[];
   readonly next: number;
@@ -237,6 +244,53 @@ const curve = z.object({
   }),
 }) satisfies z.ZodType<Curve>;
 
+// An asset class as a vintage priced it: its name, the class of the
+// plan it blends into, and a return no lower than losing everything,
+// the class it is the hedged form of, if it is one, and the currency it
+// was carried into sterling from, if it was.
+const asset = z.object({
+  carriedFrom: named.exactOptional(),
+  hedges: named.exactOptional(),
+  name: named,
+  rate: z.number().min(-1, rules.beyondLoss),
+  sleeve: z.enum(sleeves),
+}) satisfies z.ZodType<Asset>;
+
+// A vintage as BlackRock priced it: its month, the day its data are as
+// of, and its asset classes, each priced once by its name, since a
+// category of the target allocation is mapped onto one by its name, and
+// a hedged class the hedged form of an unhedged one it prices, since the
+// adjustment hedging makes is read against it.
+const vintage = z
+  .object({ asOf: z.iso.date(), assets: z.array(asset), vintage: month })
+  .refine(
+    ({ assets }) =>
+      new Set(assets.map(({ name }) => name)).size === assets.length,
+    "A CMA prices an asset class once",
+  )
+  .refine(
+    ({ assets }) =>
+      assets.every(
+        ({ hedges }) =>
+          hedges === undefined ||
+          assets.some(
+            (listed) => listed.name === hedges && listed.hedges === undefined,
+          ),
+      ),
+    "A hedged asset class hedges one its CMA prices unhedged",
+  ) satisfies z.ZodType<Cma>;
+
+// The vintages kept: the latest, and the one it replaced, which is an
+// earlier vintage, since a pull of the same vintage again replaces the
+// latest rather than moving it back.
+const vintages = z
+  .object({ latest: vintage, previous: vintage.nullable() })
+  .refine(
+    ({ latest, previous }) =>
+      previous === null || monthsBetween(previous.vintage, latest.vintage) > 0,
+    "A CMA's previous vintage is an earlier one",
+  ) satisfies z.ZodType<Vintages>;
+
 // The rates as typed: each class growing at a rate no lower than losing
 // everything, a yield on stocks of nothing or more, since a dividend is
 // paid and never charged, and prices falling by less than everything,
@@ -334,6 +388,7 @@ export const household = z
   .object({
     accounts: z.array(account),
     allocation,
+    cma: vintages.nullable(),
     curve: curve.nullable(),
     milestones: z.array(milestone),
     owners: z.array(owner),
@@ -436,7 +491,8 @@ export const household = z
 // milestones lists none, and is read as listing none rather than
 // refused, so the store need not be emptied to take them; one kept
 // before there was a curve is read as holding none the same way, and
-// so is one kept before there was a target allocation. One
+// so is one kept before there was a target allocation, and one kept
+// before there was a CMA. One
 // kept before there were rates is read with the rates it ran on, as
 // its curve makes them, and everything in stocks, so its plan grows
 // and rises as it did until a rate is typed.
@@ -458,6 +514,7 @@ const kept = z
       ),
     allocation: allocation.default(allInStocks),
     asOf: month,
+    cma: vintages.nullable().default(null),
     curve: curve.nullable().default(null),
     milestones: z.array(milestone).default([]),
     next: recordId,
@@ -487,15 +544,16 @@ const kept = z
 
 // The household before anything is saved: no records, balances as of
 // the month given, the ages the dashboard has shown, a plan to 89
-// retiring at 59, no curve pulled, the rates a household opens with and
-// everything in stocks, no target allocation imported, and the first
-// id.
+// retiring at 59, no curve or CMA pulled, the rates a household opens
+// with and everything in stocks, no target allocation imported, and the
+// first id.
 export function nothingKeptIn(asOf: Month): Kept {
   return {
     accounts: [],
     ages: { ends: 89, retires: 59 },
     allocation: allInStocks,
     asOf,
+    cma: null,
     curve: null,
     milestones: [],
     next: 1,
@@ -564,6 +622,7 @@ function householdOf(kept: Kept): Household {
   return {
     accounts: kept.accounts,
     allocation: kept.allocation,
+    cma: kept.cma,
     curve: kept.curve,
     milestones: kept.milestones,
     owners: kept.owners,
