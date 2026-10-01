@@ -347,7 +347,7 @@ export function cashFlow(
       runsIn(line, at) &&
       (!isEarned(line) || at.year < retirementYear(reading.plan)),
   );
-  const income = sumOf(running, reading, totalOf);
+  const income = payOf(running, [], reading);
   const offered: Rooms = new Map();
   const feeding = running.flatMap((line) => {
     const account = accountAt(accounts, line.feeds);
@@ -388,7 +388,7 @@ export function cashFlow(
   ): number =>
     income -
     feeds.reduce((sum, entry) => sum + entry.sacrificed, 0) -
-    taxOf(taxed) +
+    (taxed.incomeTax + taxed.insurance) +
     settlement -
     outgoings;
   const floor = -Math.max(
@@ -766,23 +766,6 @@ function spareMoney(
     }
   }
   return { left, takes };
-}
-
-// What the lines running in the month pay, taking each at what the
-// schedule says it pays, risen as its growth says.
-function sumOf<TLine extends LineValues>(
-  lines: readonly TLine[],
-  reading: Reading,
-  amountOf: (line: TLine) => number,
-): number {
-  return lines
-    .filter((line) => runsIn(line, reading.at))
-    .reduce((sum, line) => sum + monthlyOf(line, amountOf(line), reading), 0);
-}
-
-// What the month pays in tax, all of it.
-function taxOf({ incomeTax, insurance }: Taxed): number {
-  return incomeTax + insurance;
 }
 
 // The tax on the lines running in the month, each as it is earned less
