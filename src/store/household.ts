@@ -11,6 +11,7 @@ import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
 import type { Allocation, Rates } from "@/data/rates";
+import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
 import { nothingKeptIn, soundKept } from "@/data/household";
@@ -118,6 +119,13 @@ export async function getPlan(): Promise<Plan> {
 export async function getRates(): Promise<Rates> {
   await requireSession();
   return (await readHousehold()).rates;
+}
+
+// The target allocation last imported from Portfolio Performance, or
+// none before one is.
+export async function getTargets(): Promise<null | Targets> {
+  await requireSession();
+  return (await readHousehold()).targets;
 }
 
 // The latest version the store has kept, or the household before

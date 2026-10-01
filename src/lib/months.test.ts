@@ -7,6 +7,7 @@ import {
   monthName,
   monthsBetween,
   thisMonth,
+  today,
 } from "./months";
 
 describe("formatDay", () => {
@@ -66,5 +67,35 @@ describe("thisMonth", () => {
     vi.useFakeTimers({ now: new Date(2026, 8, 26), toFake: ["Date"] });
 
     expect(thisMonth()).toStrictEqual({ month: 8, year: 2026 });
+  });
+});
+
+describe("today", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reads the day it is off the clock as an ISO date", () => {
+    vi.useFakeTimers({
+      now: new Date("2026-09-03T12:00:00Z"),
+      toFake: ["Date"],
+    });
+
+    expect(today()).toBe("2026-09-03");
+  });
+
+  // Half past eleven in UTC is half past midnight in British Summer
+  // Time, and still half past eleven in Greenwich Mean Time.
+  it("reads the day in the UK's time, whatever zone the clock keeps", () => {
+    vi.useFakeTimers({
+      now: new Date("2026-10-01T23:30:00Z"),
+      toFake: ["Date"],
+    });
+
+    expect(today()).toBe("2026-10-02");
+
+    vi.setSystemTime(new Date("2026-12-31T23:30:00Z"));
+
+    expect(today()).toBe("2026-12-31");
   });
 });

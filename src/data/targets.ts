@@ -14,3 +14,11 @@ export interface Target {
   readonly name: string;
   readonly share: number;
 }
+
+// The target allocation as last imported from Portfolio Performance:
+// its categories in the order the file gives them, and the day it was
+// imported on, as an ISO date.
+export interface Targets {
+  readonly categories: readonly Target[];
+  readonly importedOn: string;
+}

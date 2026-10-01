@@ -12,6 +12,14 @@ const names = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
+// A day as the UK writes it in figures, "02/10/2026", in the UK's time.
+const ukDay = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "2-digit",
+  timeZone: "Europe/London",
+  year: "numeric",
+});
+
 // The day an ISO date names, its month cut short: "1 Sep 2026". Read in
 // UTC, as a month's name is, since an ISO date is read as the start of
 // its day there, and put together here rather than by Intl, whose
@@ -53,4 +61,14 @@ export function monthsBetween(from: Month, to: Month): number {
 export function thisMonth(): Month {
   const now = new Date();
   return { month: now.getMonth(), year: now.getFullYear() };
+}
+
+// The day it is, read from the clock, as an ISO date names it. Read in
+// the UK's time rather than the clock's own, since the household is in
+// the UK and a server keeps UTC, as Vercel's does, which would date
+// what is done in the hour after midnight in summer to the day before.
+// Intl writes the day, the month and the year in that order for en-GB,
+// each in figures, and they are turned about into an ISO date.
+export function today(): string {
+  return ukDay.format(new Date()).split("/").reverse().join("-");
 }
