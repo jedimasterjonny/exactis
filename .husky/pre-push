@@ -1,3 +1,4 @@
+#!/bin/sh -e
 # The suite under coverage, once per push rather than once per commit. It was 83s
 # of an 88s pre-commit, and AGENTS.md asks for one decision per commit, so a
 # five-commit series paid for it five times over to be pushed once. Every other
