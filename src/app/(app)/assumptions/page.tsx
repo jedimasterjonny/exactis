@@ -13,17 +13,7 @@ import { TargetAllocation } from "@/components/app/organisms/target-allocation";
 import { WeightedReturn } from "@/components/app/organisms/weighted-return";
 import { formatPercent } from "@/lib/money";
 import { assumptions, sectionLabel } from "@/lib/nav";
-import {
-  getAllocation,
-  getCma,
-  getCurve,
-  getDeductions,
-  getMappings,
-  getPlan,
-  getRates,
-  getRateSet,
-  getTargets,
-} from "@/store/household";
+import { getHousehold } from "@/store/household";
 
 // What the header calls each set of rates.
 const setNames: Record<Chosen, string> = {
@@ -48,7 +38,7 @@ const setNames: Record<Chosen, string> = {
 // store, which reads the session first, so it renders behind the
 // loading screen beside it.
 export default async function Assumptions(): Promise<JSX.Element> {
-  const [
+  const {
     allocation,
     cma,
     curve,
@@ -58,17 +48,7 @@ export default async function Assumptions(): Promise<JSX.Element> {
     rates,
     rateSet,
     targets,
-  ] = await Promise.all([
-    getAllocation(),
-    getCma(),
-    getCurve(),
-    getDeductions(),
-    getMappings(),
-    getPlan(),
-    getRates(),
-    getRateSet(),
-    getTargets(),
-  ]);
+  } = await getHousehold();
   return (
     <>
       <ScreenHeader label={sectionLabel(assumptions)} title={assumptions.title}>
