@@ -25,8 +25,8 @@ ceiling is only a stale range. The other two do use them —
 `context.parserPath`, `isSpaceBetweenTokens`, `getJSDocComment`,
 `getTokenOrCommentBefore` and `getTokenOrCommentAfter` — across thirty-one call
 sites, none of which fall in the eighteen rules of theirs this config enables.
-They sit in the stylistic rules `eslint-config-prettier` switches off and in
-rules Next does not turn on.
+They sit in stylistic rules, which Prettier owns and nothing here enables, and
+in rules Next does not turn on.
 
 The exposure is therefore latent rather than absent. Enabling a further `react/`
 or `import/` rule is what reaches a removed API, and it fails when that rule
