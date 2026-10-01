@@ -19,7 +19,7 @@ import {
 
 // The rates a household opens with, 5% for stocks and bonds alike and
 // the Bank's 2% target, and everything in stocks.
-const opening = { allocation: allInStocks, rates: openingRates(null) };
+const opening = { allocation: allInStocks, rates: openingRates };
 
 describe("ageIn", () => {
   it("reads the age the plan's owner reaches in a year, and in the plan's last", () => {

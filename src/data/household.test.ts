@@ -582,140 +582,6 @@ describe("soundKept", () => {
     });
   });
 
-  // A line kept before a line could be tied holds no ties at all.
-  // Spelled out key by key, since a rest destructure would bind them to
-  // nothing.
-  it("reads a line kept before a line could be tied as tied to none", () => {
-    const [salary, ...income] = incomeLines;
-    const before = {
-      amount: salary.amount,
-      bonus: salary.bonus,
-      cadence: salary.cadence,
-      feeds: salary.feeds,
-      firstYear: salary.firstYear,
-      growth: salary.growth,
-      id: salary.id,
-      kind: salary.kind,
-      lastMonth: salary.lastMonth,
-      lastYear: salary.lastYear,
-      name: salary.name,
-      rsu: salary.rsu,
-      sacrifice: salary.sacrifice,
-    };
-
-    expect(
-      soundKept({
-        ...kept,
-        schedule: { ...kept.schedule, income: [before, ...income] },
-      }).kept.schedule.income[0],
-    ).toStrictEqual(salary);
-  });
-
-  // A household kept before there were milestones holds no list of
-  // them at all. Spelled out key by key, since a rest destructure would
-  // bind the milestones to nothing.
-  it("reads a household kept before there were milestones as listing none", () => {
-    const before = {
-      accounts: kept.accounts,
-      ages: kept.ages,
-      asOf: kept.asOf,
-      next: kept.next,
-      owners: kept.owners,
-      schedule: kept.schedule,
-    };
-
-    expect(soundKept(before)).toMatchObject({
-      household: { milestones: [] },
-      kept: { milestones: [] },
-    });
-  });
-
-  // A household kept before there was a curve holds none at all.
-  // Spelled out key by key, since a rest destructure would bind the
-  // curve to nothing.
-  it("reads a household kept before there was a curve as holding none", () => {
-    const before = {
-      accounts: kept.accounts,
-      ages: kept.ages,
-      asOf: kept.asOf,
-      milestones: kept.milestones,
-      next: kept.next,
-      owners: kept.owners,
-      schedule: kept.schedule,
-    };
-
-    expect(soundKept(before)).toMatchObject({
-      household: { curve: null },
-      kept: { curve: null },
-    });
-  });
-
-  // Spelled out key by key, as above.
-  it("reads a household kept before there was a target allocation as holding none", () => {
-    const before = {
-      accounts: kept.accounts,
-      ages: kept.ages,
-      allocation: kept.allocation,
-      asOf: kept.asOf,
-      curve: kept.curve,
-      milestones: kept.milestones,
-      next: kept.next,
-      owners: kept.owners,
-      rates: kept.rates,
-      schedule: kept.schedule,
-    };
-
-    expect(soundKept(before)).toMatchObject({
-      household: { targets: null },
-      kept: { targets: null },
-    });
-  });
-
-  // Spelled out key by key, as above.
-  it("reads a household kept before there was a CMA as holding none", () => {
-    const before = {
-      accounts: kept.accounts,
-      ages: kept.ages,
-      allocation: kept.allocation,
-      asOf: kept.asOf,
-      curve: kept.curve,
-      milestones: kept.milestones,
-      next: kept.next,
-      owners: kept.owners,
-      rates: kept.rates,
-      schedule: kept.schedule,
-      targets: kept.targets,
-    };
-
-    expect(soundKept(before)).toMatchObject({
-      household: { cma: null },
-      kept: { cma: null },
-    });
-  });
-
-  // Spelled out key by key, as above.
-  it("reads a household kept before a category was mapped as mapping none", () => {
-    const before = {
-      accounts: kept.accounts,
-      ages: kept.ages,
-      allocation: kept.allocation,
-      asOf: kept.asOf,
-      cma: kept.cma,
-      curve: kept.curve,
-      milestones: kept.milestones,
-      next: kept.next,
-      owners: kept.owners,
-      rates: kept.rates,
-      schedule: kept.schedule,
-      targets: kept.targets,
-    };
-
-    expect(soundKept(before)).toMatchObject({
-      household: { mappings: [] },
-      kept: { mappings: [] },
-    });
-  });
-
   // A category the allocation no longer lists, and a class the vintage
   // no longer prices, keep the class they were given.
   it("keeps a mapping of a category no longer listed, and onto a class no longer priced", () => {
@@ -761,42 +627,6 @@ describe("soundKept", () => {
     ).toThrow("Invalid ISO date");
   });
 
-  // A household kept before there were rates holds neither the rates
-  // nor the split. Spelled out key by key, since a rest destructure
-  // would bind them to nothing.
-  it("reads a household kept before there were rates with the rates it ran on, everything in stocks", () => {
-    const before = {
-      accounts: kept.accounts,
-      ages: kept.ages,
-      asOf: kept.asOf,
-      curve: kept.curve,
-      milestones: kept.milestones,
-      next: kept.next,
-      owners: kept.owners,
-      schedule: kept.schedule,
-    };
-    const opened = {
-      allocation: { stocks: 1 },
-      rates: {
-        bonds: 0.05,
-        dividends: 0,
-        inflation: inflationOf(curve).rate,
-        stocks: 0.05,
-      },
-    };
-
-    expect(soundKept(before)).toMatchObject({
-      household: {
-        ...opened,
-        plan: { inflation: inflationOf(curve).rate, rate: 0.05 },
-      },
-      kept: opened,
-    });
-    expect(soundKept({ ...before, curve: null })).toMatchObject({
-      kept: { rates: { inflation: 0.02 } },
-    });
-  });
-
   // Four fifths at stocks' 7.95% and a fifth at bonds' 4.45%, and the
   // 2.95% typed for inflation rather than what the curve kept makes.
   it("runs the plan on the rates and the split as typed", () => {
@@ -806,36 +636,6 @@ describe("soundKept", () => {
     expect(read.plan).toMatchObject({
       inflation: 0.0295,
       rate: planRate(rates, allocation),
-    });
-  });
-
-  // Spelled out key by key, as above.
-  // The deductions are the manual method's 0.20% of fees and 2% yield,
-  // which move nothing while the rates typed are live.
-  it("reads a household kept before there was a choice of rate set as running on the rates typed, with the deductions a household opens with", () => {
-    const before = {
-      accounts: kept.accounts,
-      ages: kept.ages,
-      allocation: kept.allocation,
-      asOf: kept.asOf,
-      cma: kept.cma,
-      curve: kept.curve,
-      mappings: kept.mappings,
-      milestones: kept.milestones,
-      next: kept.next,
-      owners: kept.owners,
-      rates: kept.rates,
-      schedule: kept.schedule,
-      targets: kept.targets,
-    };
-
-    expect(soundKept(before)).toMatchObject({
-      household: {
-        deductions: { dividends: 0.02, fees: 0.002 },
-        liveRates: kept.rates,
-        rateSet: "custom",
-      },
-      kept: { deductions: { dividends: 0.02, fees: 0.002 }, rateSet: "custom" },
     });
   });
 
@@ -888,20 +688,9 @@ describe("soundKept", () => {
     expect(typed.plan.rate).toBe(planRate(kept.rates, kept.allocation));
   });
 
-  it("reads a line kept growing by the triple lock as growing with inflation", () => {
+  it("refuses a line growing by a growth not offered", () => {
     const [salary, ...income] = incomeLines;
-    const [household, ...expenses] = expenseLines;
-    const read = soundKept({
-      ...kept,
-      schedule: {
-        expenses: [{ ...household, growth: "triple-lock" }, ...expenses],
-        income: [{ ...salary, growth: "triple-lock" }, ...income],
-      },
-    });
 
-    expect(read.kept.schedule.income[0]?.growth).toBe("inflation");
-    expect(read.kept.schedule.expenses[0]?.growth).toBe("inflation");
-    expect(read.household.schedule.income[0]?.growth).toBe("inflation");
     expect(() =>
       soundKept({
         ...kept,
