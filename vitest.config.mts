@@ -28,7 +28,7 @@ export default defineConfig({
       exclude: ["src/**/*.test.{ts,tsx}", "src/components/ui/**"],
       include: ["src/**/*.{ts,tsx}"],
       provider: "v8",
-      reporter: ["text", "html"],
+      reporter: ["text"],
       // perFile, because an aggregate total lets a well covered file pay
       // for an untested one.
       thresholds: { 100: true, perFile: true },

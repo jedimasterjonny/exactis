@@ -175,28 +175,6 @@ jobs:
           ${{ !cancelled() && steps.install.outcome == 'success' &&
           steps.proven.outputs.proven != 'true' }}
         run: bun run test:coverage
-      # vitest writes an HTML report alongside the text summary and nothing
-      # has ever looked at it: the runner is thrown away, so a coverage
-      # failure can only be read by reproducing the run locally. Gated on
-      # the same condition as every other step rather than on the coverage
-      # step succeeding, because a red run is the case this exists for.
-      - if:
-          ${{ !cancelled() && steps.install.outcome == 'success' &&
-          steps.proven.outputs.proven != 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          # warn rather than error. A suite that died before writing a
-          # report has already failed the step above, and failing again for
-          # the missing artifact reports one problem as two.
-          if-no-files-found: warn
-          name: coverage-html
-          # Where vitest puts it: coverage.reportsDirectory is unset in
-          # vitest.config.mts, so the default, and .gitignore names the
-          # same path.
-          path: coverage/
-          # Long enough to read a failure from the run that produced it.
-          # This is a diagnostic, not coverage history.
-          retention-days: 7
       # Kept alongside typecheck even though next build type checks too: a
       # type error should fail in seconds rather than after a full build, and
       # the build catches what tsc alone does not.
