@@ -37,6 +37,7 @@ describe("ScheduleRows", () => {
         emptyTitle="Nothing yet"
         lines={incomeLines}
         milestones={[]}
+        onEdit={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
         side="income"
         summarise={summarise}
@@ -44,7 +45,6 @@ describe("ScheduleRows", () => {
     );
 
     expect(screen.getAllByRole("listitem")).toHaveLength(incomeLines.length);
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
     // Every row is drawn in its columns and again in its folded lines,
     // only one of which is on screen at any width, so the name and the
     // detail are found twice, the columns' copy after the lines'.
@@ -84,6 +84,7 @@ describe("ScheduleRows", () => {
         emptyTitle="Nothing yet"
         lines={[{ ...salary, lastMonth: 10 }]}
         milestones={[]}
+        onEdit={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
         side="income"
         summarise={summarise}
@@ -101,6 +102,7 @@ describe("ScheduleRows", () => {
         emptyTitle="Nothing yet"
         lines={[consulting]}
         milestones={[]}
+        onEdit={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
         side="income"
         summarise={summarise}
@@ -122,6 +124,7 @@ describe("ScheduleRows", () => {
         emptyTitle="Nothing yet"
         lines={[statePension]}
         milestones={[]}
+        onEdit={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
         side="expense"
         summarise={summarise}
@@ -142,6 +145,7 @@ describe("ScheduleRows", () => {
         emptyTitle="No income yet"
         lines={[]}
         milestones={[]}
+        onEdit={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
         side="income"
         summarise={summarise}
@@ -160,6 +164,7 @@ describe("ScheduleRows", () => {
         emptyTitle="No expenses yet"
         lines={[]}
         milestones={[]}
+        onEdit={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
         side="expense"
         summarise={summarise}
@@ -203,30 +208,7 @@ describe("ScheduleRows", () => {
     expect(onDelete).toHaveBeenCalledExactlyOnceWith(salary);
   });
 
-  it("draws the column for either handler alone", () => {
-    const onDelete = vi.fn<(line: IncomeLine) => void>();
-    const { unmount } = render(
-      <ScheduleRows
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
-        lines={[salary]}
-        milestones={[]}
-        onDelete={onDelete}
-        plan={plan}
-        side="income"
-        summarise={summarise}
-      />,
-    );
-
-    expect(
-      screen.queryByRole("button", { name: "Edit Salary" }),
-    ).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Delete Salary" }));
-
-    expect(onDelete).toHaveBeenCalledExactlyOnceWith(salary);
-
-    unmount();
+  it("draws the pencil alone when given no delete handler", () => {
     render(
       <ScheduleRows
         emptyDescription="Add one."
@@ -341,35 +323,10 @@ describe("ScheduleRows", () => {
     expect(onEdit).toHaveBeenCalledExactlyOnceWith(salary);
   });
 
-  // A schedule given no edit handler has no dialog to send a bin to, so
-  // its row keeps its bin while folded, and opens nothing.
-  it("keeps a bin on a folded row that cannot open", () => {
-    render(
-      <ScheduleRows
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
-        lines={[salary]}
-        milestones={[]}
-        onDelete={vi.fn<(line: IncomeLine) => void>()}
-        plan={plan}
-        side="income"
-        summarise={summarise}
-      />,
-    );
-
-    const bin = screen.getByRole("button", { name: "Delete Salary" });
-
-    expect(
-      screen.queryByRole("button", { name: "Salary" }),
-    ).not.toBeInTheDocument();
-    // eslint-disable-next-line testing-library/no-node-access -- the actions' box is a layout box with no role of its own
-    expect(bin.parentElement?.parentElement).not.toHaveClass("folded:hidden");
-  });
-
-  // A locked row given only a delete handler keeps its lock on the
-  // folded lines and folds the column's away, so the lock is drawn once
-  // at either width rather than twice while folded.
-  it("draws a locked row's lock once while folded, with only a delete handler", () => {
+  // A locked row keeps its lock on the folded lines and folds the
+  // column's away, so the lock is drawn once at either width rather than
+  // twice while folded.
+  it("draws a locked row's lock once while folded", () => {
     render(
       <ScheduleRows
         emptyDescription="Add one."
@@ -377,6 +334,7 @@ describe("ScheduleRows", () => {
         lines={[statePension]}
         milestones={[]}
         onDelete={vi.fn<(line: IncomeLine) => void>()}
+        onEdit={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
         side="income"
         summarise={(line) => ({ ...summarise(line), lock: "Set by the state" })}
@@ -430,6 +388,7 @@ describe("ScheduleRows", () => {
           },
         ]}
         milestones={markersOf(milestones, retiring)}
+        onEdit={vi.fn<(line: IncomeLine) => void>()}
         plan={retiring}
         side="income"
         summarise={summarise}
