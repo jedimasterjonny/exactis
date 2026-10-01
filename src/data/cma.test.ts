@@ -7,7 +7,7 @@ import type { Targets } from "./targets";
 import {
   blendsOf,
   cmaRates,
-  derivedRates,
+  derivedSet,
   stocksMoved,
   vintageMonth,
   vintageName,
@@ -243,7 +243,7 @@ describe("cmaRates", () => {
   });
 });
 
-describe("derivedRates", () => {
+describe("derivedSet", () => {
   // What the reference household derives from: August's vintage, the
   // first of September's curve, its allocation and mappings, and 0.20%
   // of fees and a 2% yield.
@@ -255,20 +255,39 @@ describe("derivedRates", () => {
     targets,
   };
 
-  it("derives the rates from the latest vintage's blends, with the curve's inflation", () => {
-    expect(derivedRates(sources)).toStrictEqual(
-      cmaRates(blended(), sources.deductions, inflationOf(curve).rate),
+  // Four fifths of the reference blend into stocks and a fifth into
+  // bonds.
+  it("derives the rates from the latest vintage's blends, with the curve's inflation, and the split from the target allocation's", () => {
+    const derived = derivedSet(sources);
+
+    expect(derived).toMatchObject({
+      rates: cmaRates(blended(), sources.deductions, inflationOf(curve).rate),
+    });
+    expect("short" in derived ? null : derived.allocation.stocks).toBeCloseTo(
+      0.8,
+      12,
     );
   });
 
+  // All in UK equities, the plan holds everything in stocks, and bonds'
+  // rate is stocks' return in all less the fees, which weighs nothing.
+  it("derives a set for an allocation with nothing in one sleeve, splitting everything into the other", () => {
+    const derived = derivedSet({ ...sources, targets: onlyIn("UK equity") });
+    const all = "short" in derived ? null : derived;
+
+    expect(all?.allocation.stocks).toBeCloseTo(1, 12);
+    expect(all?.rates.bonds).toBeCloseTo(0.08156 - 0.002, 12);
+    expect(all?.rates.stocks).toBeCloseTo(0.08156 - 0.002 - 0.02, 12);
+  });
+
   it("derives none before a vintage or a curve is pulled, or while the vintage makes no blend", () => {
-    expect(derivedRates({ ...sources, cma: null })).toStrictEqual({
+    expect(derivedSet({ ...sources, cma: null })).toStrictEqual({
       short: "No CMA is pulled",
     });
-    expect(derivedRates({ ...sources, curve: null })).toStrictEqual({
+    expect(derivedSet({ ...sources, curve: null })).toStrictEqual({
       short: "No inflation curve is pulled",
     });
-    expect(derivedRates({ ...sources, targets: null })).toStrictEqual({
+    expect(derivedSet({ ...sources, targets: null })).toStrictEqual({
       short: "No target allocation is imported to weight the CMA by",
     });
   });
