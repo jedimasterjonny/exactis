@@ -2,7 +2,6 @@
 
 import type { JSX } from "react";
 
-import { cn } from "cn";
 import { Wallet } from "lucide-react";
 
 import type { Account, AccountKind } from "@/data/accounts";
@@ -39,8 +38,8 @@ interface AccountTableProps {
   readonly emptyDescription: string;
   readonly emptyTitle: string;
   readonly lines?: readonly IncomeLine[];
-  readonly onDelete?: (account: Account) => void;
-  readonly onEdit?: (account: Account) => void;
+  readonly onDelete: (account: Account) => void;
+  readonly onEdit: (account: Account) => void;
   readonly owners?: readonly Owner[];
 }
 
@@ -84,11 +83,10 @@ const tones: Record<AccountKind, Tone> = {
 // a table given none, as the assets' is, writes each account's own
 // contribution alone, since nothing feeds an asset. A table given the
 // owners writes whose an ISA or a pension is beneath its name, faint,
-// as the sacrifice is beneath the contribution. A table given an
-// edit handler closes each row with a pencil that reports
-// the row's account, whose id says where a save writes back, and one
-// given a delete handler with a bin that reports the account to delete,
-// which the caller asks about before it does anything. A ledger holding
+// as the sacrifice is beneath the contribution. Each row closes with a
+// pencil that reports the row's account, whose id says where a save
+// writes back, and a bin that reports the account to delete, which the
+// caller asks about before it does anything. A ledger holding
 // nothing draws its empty state instead of the table, since a header
 // row over no rows states five column names and no information. The
 // words are the caller's, because accounts and assets are the same
@@ -99,11 +97,10 @@ const tones: Record<AccountKind, Tone> = {
 // While the table is too narrow to read across, as on a phone, each row
 // folds into one cell: the name and the balance on its first line, then
 // the treatment, the owner and the growth, then what it is paid, and the
-// header goes, having no columns left to name. A row given an edit
-// handler opens from anywhere on it, and its actions go with the other
-// columns, since the dialog it opens is where a folded row is deleted
-// from; a table given only a delete handler keeps its bins, having no
-// dialog to send them to. The totals fold the same way.
+// header goes, having no columns left to name. A row opens from anywhere
+// on it, and its actions go with the other columns, since the dialog it
+// opens is where a folded row is deleted from. The totals fold the same
+// way.
 export function AccountTable({
   accounts,
   emptyDescription,
@@ -113,7 +110,6 @@ export function AccountTable({
   onEdit,
   owners = [],
 }: AccountTableProps): JSX.Element {
-  const hasActions = onEdit !== undefined || onDelete !== undefined;
   const held = formatGbp(balanceOf(accounts));
   const paidIn = paidInOf(accounts, lines);
 
@@ -136,11 +132,9 @@ export function AccountTable({
           <TableHead className="text-right">Contribution</TableHead>
           <TableHead className="text-right">Growth</TableHead>
           <TableHead className="text-right">Balance</TableHead>
-          {hasActions && (
-            <TableHead className="w-px">
-              <span className="sr-only">Actions</span>
-            </TableHead>
-          )}
+          <TableHead className="w-px">
+            <span className="sr-only">Actions</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -151,13 +145,9 @@ export function AccountTable({
               <FoldedCell
                 figure={row.balance}
                 name={account.name}
-                onOpen={
-                  onEdit === undefined
-                    ? undefined
-                    : (): void => {
-                        onEdit(account);
-                      }
-                }
+                onOpen={(): void => {
+                  onEdit(account);
+                }}
               >
                 <span>{aboutOf(account, row)}</span>
                 {row.paid !== undefined && <span>{row.paid}</span>}
@@ -187,21 +177,14 @@ export function AccountTable({
               <TableCell className="text-right figure font-medium folded:hidden">
                 {row.balance}
               </TableCell>
-              {hasActions && (
-                <TableCell
-                  className={cn(
-                    "py-1",
-                    onEdit !== undefined && "folded:hidden",
-                  )}
-                >
-                  <RowActions
-                    name={account.name}
-                    onDelete={onDelete}
-                    onEdit={onEdit}
-                    row={account}
-                  />
-                </TableCell>
-              )}
+              <TableCell className="py-1 folded:hidden">
+                <RowActions
+                  name={account.name}
+                  onDelete={onDelete}
+                  onEdit={onEdit}
+                  row={account}
+                />
+              </TableCell>
             </TableRow>
           );
         })}
@@ -221,11 +204,7 @@ export function AccountTable({
             <TableCell className="text-right figure folded:hidden">
               {held}
             </TableCell>
-            {hasActions && (
-              <TableCell
-                className={cn(onEdit !== undefined && "folded:hidden")}
-              />
-            )}
+            <TableCell className="folded:hidden" />
           </TableRow>
         </TableFooter>
       )}
