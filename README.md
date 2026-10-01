@@ -70,12 +70,13 @@ same rules before any screen draws from it.
 
 The accounts and plan screens read and write it, the dashboard projects what it
 holds and saves the ages the plan runs to and its owner retires at, and the
-assumptions screen types the rates and the split of the savings into it, pulls
-the inflation curve into it and imports the target allocation into it; the
-progress screen still shows the reference kit's figures. `DATABASE_URL` names
-the database, as `.env.example` shows. Nothing reads it until a query runs, so a
-build needs no database. Locally, point it at a Neon branch of your own and
-apply the migrations once:
+assumptions screen types the rates, the deductions and the split of the savings
+into it, chooses the set of rates the plan runs on, pulls the inflation curve
+and the CMA into it, and imports the target allocation into it and maps its
+categories; the progress screen still shows the reference kit's figures.
+`DATABASE_URL` names the database, as `.env.example` shows. Nothing reads it
+until a query runs, so a build needs no database. Locally, point it at a Neon
+branch of your own and apply the migrations once:
 
 ```bash
 bun run db:migrate
@@ -306,6 +307,16 @@ is chosen: a vintage, a curve and a target allocation pulled, and every category
 asking for a share mapped onto a class the vintage prices. A save that would
 leave it short, the choice of it included, is refused saying what is missing,
 rather than the plan falling back on the rates typed without a word.
+
+The assumptions screen's rates tab chooses the set as a radio is pressed. Under
+the CMA-derived set it shows the derived rates read-only, each with where it
+comes from, beside stocks' total, the move the latest vintage made in it from
+the one before, and the vintage; under the rates typed it shows them to type.
+The return source card beneath pulls the workbook, types the two deductions, and
+lays out a ledger a sleeve from the blended return to the growth the rates take,
+the hedging adjustment under bonds, beside every category's share of the whole.
+A line above the cards says which set is live, since the manual method's worst
+failure was a plan running on a set nobody knew was live.
 
 ## Target allocation
 

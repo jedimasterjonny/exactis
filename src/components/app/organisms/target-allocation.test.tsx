@@ -57,12 +57,12 @@ function renderCard(held: null | Targets = targets): void {
 }
 
 describe("TargetAllocation", () => {
-  it("heads the card as the screen's fourth, saying when the targets were imported", () => {
+  it("heads the card as the screen's fifth, saying when the targets were imported", () => {
     renderCard();
 
     const card = screen.getByRole("region", { name: "Target allocation" });
 
-    expect(within(card).getByText("Sect. V.iv")).toHaveClass("label");
+    expect(within(card).getByText("Sect. V.v")).toHaveClass("label");
     expect(within(card).getByText("Imported 3 Sep 2026")).toHaveClass("label");
     expect(
       within(card).getByRole("button", {
