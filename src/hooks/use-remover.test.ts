@@ -46,10 +46,10 @@ describe("useRemover", () => {
     });
 
     expect(result.current.doomed).toStrictEqual(doomed);
-    expect(result.current.isRemoving).toBe(false);
+    expect(result.current.questionOf(doomed).isBusy).toBe(false);
 
     act(() => {
-      result.current.cancel();
+      result.current.questionOf(doomed).onCancel();
     });
 
     expect(result.current.doomed).toBeNull();
@@ -123,11 +123,11 @@ describe("useRemover", () => {
       result.current.ask(doomed);
     });
     act(() => {
-      result.current.confirm(doomed);
+      result.current.questionOf(doomed).onConfirm();
     });
 
     expect(store).toHaveBeenCalledExactlyOnceWith(6);
-    expect(result.current.isRemoving).toBe(true);
+    expect(result.current.questionOf(doomed).isBusy).toBe(true);
     expect(result.current.doomed).not.toBeNull();
     expect(toast.add).not.toHaveBeenCalled();
 
@@ -136,7 +136,7 @@ describe("useRemover", () => {
     await waitFor(() => {
       expect(result.current.doomed).toBeNull();
     });
-    expect(result.current.isRemoving).toBe(false);
+    expect(result.current.questionOf(doomed).isBusy).toBe(false);
     expect(toast.add).toHaveBeenCalledExactlyOnceWith({
       description: "Lifetime ISA",
       title: "Account deleted",
@@ -176,11 +176,11 @@ describe("useRemover", () => {
       result.current.ask(doomed);
     });
     act(() => {
-      result.current.confirm(doomed);
+      result.current.questionOf(doomed).onConfirm();
     });
 
     await waitFor(() => {
-      expect(result.current.isRemoving).toBe(false);
+      expect(result.current.questionOf(doomed).isBusy).toBe(false);
     });
     expect(result.current.doomed).toStrictEqual(doomed);
     expect(toast.add).toHaveBeenCalledExactlyOnceWith({
