@@ -537,6 +537,24 @@ export const household = z
     rules.debtEnds,
   ) satisfies z.ZodType<Household>;
 
+// The sources the CMA-derived rates rest on, as the store keeps them:
+// the vintages, the curve, the deductions, the target allocation and the
+// classes its categories are mapped onto.
+export type Sources = Pick<
+  Kept,
+  "cma" | "curve" | "deductions" | "mappings" | "targets"
+>;
+
+// The sources as a kept household holds them, each read with the
+// default a household kept before it had one is read with.
+const sources = z.object({
+  cma: vintages.nullable().default(null),
+  curve: curve.nullable().default(null),
+  deductions: deductions.default(openingDeductions),
+  mappings: mappings.default([]),
+  targets: targets.nullable().default(null),
+}) satisfies z.ZodType<Sources>;
+
 // The household as the store may keep it: its records sound on their
 // own, the ages the plan action holds them to, and every record's id
 // below the one the next is given. A household kept before there were
@@ -670,6 +688,17 @@ export function soundKept(value: unknown): {
     throw refusalOf(whole.error);
   }
   return { household: whole.data, kept: parsed.data };
+}
+
+// The sources a value kept as a household holds, or null where they
+// break a rule: what a version kept long ago is read as to compare its
+// rates with the latest's, since one the rules have since tightened past
+// leaves nothing to compare rather than a refusal to show. Only the
+// sources are read, so a version whose other records the rules have
+// since tightened past can still be compared.
+export function sourcesIn(value: unknown): null | Sources {
+  const parsed = sources.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 // Whether a debt's own fixed sum pays it off at the rate it is charged,

@@ -69,6 +69,7 @@ function renderSet(
   render(
     <RateSet
       allocation={allocation}
+      before={null}
       cma={{ latest: cma, previous: may }}
       curve={curve}
       deductions={{ dividends: 0.02, fees: 0.002 }}

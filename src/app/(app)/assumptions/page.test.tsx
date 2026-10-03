@@ -20,13 +20,16 @@ import {
   portfolioFile,
   reference,
 } from "@/lib/portfolio-file.fixture";
-import { getHousehold } from "@/store/household";
+import { getHousehold, getSourcesDaysAgo } from "@/store/household";
 import { worksheet } from "@/test/dom";
 import { heldBack } from "@/test/held-back";
 
 import Assumptions from "./page";
 
-vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
+vi.mock("@/store/household", () => ({
+  getHousehold: vi.fn(),
+  getSourcesDaysAgo: vi.fn(),
+}));
 vi.mock("@/actions/cma", () => ({ pullCma: vi.fn() }));
 vi.mock("@/actions/inflation", () => ({ pullCurve: vi.fn() }));
 vi.mock("@/actions/targets", () => ({
@@ -62,6 +65,7 @@ const household: Household = {
 describe("Assumptions", () => {
   beforeEach(() => {
     vi.mocked(getHousehold).mockResolvedValue(household);
+    vi.mocked(getSourcesDaysAgo).mockResolvedValue(null);
   });
 
   it("says what the plan grows at and what its prices rise by, and hands the store's rates, split and curve to their cards", async () => {
@@ -233,5 +237,28 @@ describe("Assumptions", () => {
     expect(
       screen.getByRole("region", { name: "Inflation source" }),
     ).toHaveTextContent("Sect. V.ii");
+  });
+
+  // The household thirty days ago, with the same sources, so nothing has
+  // moved the rates since.
+  it("sets the CMA's rates beside the household's sources as they stood thirty days before", async () => {
+    vi.mocked(getHousehold).mockResolvedValue({ ...household, rateSet: "cma" });
+    vi.mocked(getSourcesDaysAgo).mockResolvedValue({
+      savedOn: "2026-09-03",
+      sources: {
+        cma: household.cma,
+        curve,
+        deductions: household.deductions,
+        mappings,
+        targets,
+      },
+    });
+
+    render(await Assumptions());
+
+    expect(getSourcesDaysAgo).toHaveBeenCalledExactlyOnceWith(30);
+    expect(
+      screen.getByRole("region", { name: "What moved since 3 Sep 2026" }),
+    ).toHaveTextContent("Nothing has moved the rates since 3 Sep 2026.");
   });
 });

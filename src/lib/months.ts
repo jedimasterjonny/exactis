@@ -20,6 +20,16 @@ const ukDay = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
 });
 
+// The day a moment falls on, as an ISO date names it. Read in the UK's
+// time rather than the clock's own, since the household is in the UK
+// and a server keeps UTC, as Vercel's does, which would date what is
+// done in the hour after midnight in summer to the day before. Intl
+// writes the day, the month and the year in that order for en-GB, each
+// in figures, and they are turned about into an ISO date.
+export function dayOf(moment: Date): string {
+  return ukDay.format(moment).split("/").reverse().join("-");
+}
+
 // How many whole days one ISO date falls after another: nothing for the
 // same day, and fewer than nothing for a day before it. Both are read as
 // the start of their day in UTC, so the count is of days rather than of
@@ -71,12 +81,7 @@ export function thisMonth(): Month {
   return { month: now.getMonth(), year: now.getFullYear() };
 }
 
-// The day it is, read from the clock, as an ISO date names it. Read in
-// the UK's time rather than the clock's own, since the household is in
-// the UK and a server keeps UTC, as Vercel's does, which would date
-// what is done in the hour after midnight in summer to the day before.
-// Intl writes the day, the month and the year in that order for en-GB,
-// each in figures, and they are turned about into an ISO date.
+// The day it is, read from the clock, as dayOf names it.
 export function today(): string {
-  return ukDay.format(new Date()).split("/").reverse().join("-");
+  return dayOf(new Date());
 }
