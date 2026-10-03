@@ -65,7 +65,9 @@ describe("TargetAllocation", () => {
     const card = screen.getByRole("region", { name: "Target allocation" });
 
     expect(within(card).getByText("Sect. V.iii")).toHaveClass("label");
-    expect(within(card).getByText("Imported 3 Sep 2026")).toHaveClass("label");
+    expect(within(card).getByText("Imported 3 Sep 2026")).not.toHaveClass(
+      "label",
+    );
     expect(
       within(card).getByRole("button", {
         name: "Reload from Portfolio Performance",
