@@ -306,10 +306,12 @@ function groupsIn(
   const isBlended = priced.every(
     ({ asset, category }) => asset !== null || category.share === 0,
   );
+  const bySleeve = Object.groupBy(
+    priced,
+    ({ asset }) => asset?.sleeve ?? "none",
+  );
   return (["stocks", "bonds", "none"] as const).flatMap((group) => {
-    const members = priced.filter(
-      ({ asset }) => (asset?.sleeve ?? "none") === group,
-    );
+    const members = bySleeve[group] ?? [];
     const share = members.reduce(
       (sum, { category }) => sum + category.share,
       0,
