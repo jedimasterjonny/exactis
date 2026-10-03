@@ -5,6 +5,7 @@ import type { Curve } from "@/data/inflation";
 import type { Targets } from "@/data/targets";
 
 import { vintageMonth } from "@/data/cma";
+import { counted } from "@/lib/count";
 import { daysBetween, formatDay } from "@/lib/months";
 
 interface SourceDatesProps {
@@ -77,5 +78,5 @@ function ageOf(days: number): string {
   if (days === 0) {
     return "today";
   }
-  return `${String(days)} ${days === 1 ? "day" : "days"} old`;
+  return `${counted(days, "day")} old`;
 }
