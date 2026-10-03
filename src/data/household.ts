@@ -272,12 +272,13 @@ const vintage = z
   )
   .refine(
     ({ assets }) =>
-      assets.every(
-        ({ hedges }) =>
-          hedges === undefined ||
-          assets.some(
-            (listed) => listed.name === hedges && listed.hedges === undefined,
-          ),
+      new Set(assets.map(({ hedges }) => hedges)).isSubsetOf(
+        new Set([
+          undefined,
+          ...assets
+            .filter(({ hedges }) => hedges === undefined)
+            .map(({ name }) => name),
+        ]),
       ),
     "A hedged asset class hedges one its CMA prices unhedged",
   ) satisfies z.ZodType<Cma>;
@@ -452,19 +453,15 @@ export const household = z
   )
   .refine(
     ({ accounts, owners }) =>
-      accounts.every(
-        (account) =>
-          account.owner === undefined ||
-          owners.some((listed) => listed.id === account.owner),
+      new Set(accounts.map(({ owner }) => owner)).isSubsetOf(
+        new Set([undefined, ...owners.map(({ id }) => id)]),
       ),
     "An ISA or a pension belongs to an owner the household lists",
   )
   .refine(
     ({ accounts }) =>
-      accounts.every(
-        ({ secures }) =>
-          secures === undefined ||
-          accounts.some((listed) => listed.id === secures && isAsset(listed)),
+      new Set(accounts.map(({ secures }) => secures)).isSubsetOf(
+        new Set([undefined, ...accounts.filter(isAsset).map(({ id }) => id)]),
       ),
     "A loan is secured on an asset the household lists",
   )
@@ -475,21 +472,18 @@ export const household = z
   )
   .refine(
     ({ accounts, schedule }) =>
-      schedule.income.every(
-        ({ feeds }) =>
-          feeds === null ||
-          accounts.some((listed) => listed.id === feeds && isPension(listed)),
+      new Set(schedule.income.map(({ feeds }) => feeds)).isSubsetOf(
+        new Set([null, ...accounts.filter(isPension).map(({ id }) => id)]),
       ),
     rules.feedsPension,
   )
   .refine(
     ({ accounts, schedule }) =>
-      schedule.expenses.every(
-        ({ pays }) =>
-          pays === undefined ||
-          accounts.some(
-            (listed) => listed.id === pays && listed.kind === "debt",
-          ),
+      new Set(schedule.expenses.map(({ pays }) => pays)).isSubsetOf(
+        new Set([
+          undefined,
+          ...accounts.filter(({ kind }) => kind === "debt").map(({ id }) => id),
+        ]),
       ),
     rules.paysDebt,
   )
@@ -500,14 +494,13 @@ export const household = z
   )
   .refine(
     ({ milestones, schedule }) =>
-      [...schedule.expenses, ...schedule.income]
-        .flatMap(({ endsAt, startsAt }) => [endsAt, startsAt])
-        .every(
-          (tied) =>
-            tied === null ||
-            tied === "retirement" ||
-            milestones.some(({ id }) => id === tied),
+      new Set(
+        [...schedule.expenses, ...schedule.income].flatMap(
+          ({ endsAt, startsAt }) => [endsAt, startsAt],
         ),
+      ).isSubsetOf(
+        new Set([null, "retirement", ...milestones.map(({ id }) => id)]),
+      ),
     "A line is tied to a milestone the household lists",
   )
   .refine(
