@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { Download } from "lucide-react";
+import { Check, Download } from "lucide-react";
 import { useId, useOptimistic } from "react";
 
 import type { Deductions, Mapping, Vintages } from "@/data/cma";
@@ -25,7 +25,7 @@ import { RadioGroup } from "@/components/kit/radio-group";
 import { stocksMoved, vintageMonth, vintageName } from "@/data/cma";
 import { useSender } from "@/hooks/use-sender";
 import { formatPercent, formatPoints } from "@/lib/money";
-import { formatDay } from "@/lib/months";
+import { formatDay, today } from "@/lib/months";
 import { assumptions, subsectionLabel } from "@/lib/nav";
 
 interface RateSetProps {
@@ -73,7 +73,10 @@ const runsOn: Record<Chosen, string> = {
 // is saved as the focus leaves it, alone, and one typed back to what it
 // was is not sent; what they come to follows it at once while the store
 // is asked, and the store's answer draws the screen again, under a
-// toast, or puts it back and says why.
+// toast, or puts it back and says why. Nothing pulled moves them, so
+// beneath them is the day they were last set, or that none is kept, and
+// a press that confirms them still right as they stand, which dates them
+// today and is answered in the same way.
 //
 // The header's meta line says what the figures come from: the vintage
 // and the day its data are as of, and how far it moved stocks' return
@@ -97,28 +100,33 @@ export function RateSet({
       ...patch,
     }),
   );
-  const { send } = useSender();
+  const { isSending, send } = useSender();
   const { isSending: isPulling, send: sendPull } = useSender();
   const asideId = useId();
 
-  function save(key: "dividends" | "fees", value: number): void {
-    if (formatPercent(value) === formatPercent(shown[key])) {
-      return;
-    }
-    const patch = { [key]: value };
+  function sendDeductions(
+    patch: Partial<Pick<Deductions, "dividends" | "fees">>,
+    title: string,
+  ): void {
     send(
       async () => {
-        show(patch);
+        show({ ...patch, setOn: today() });
         return saveDeductions(patch);
       },
       {
         failure: "Deductions not saved",
         success: (saved) => ({
           description: `Fees ${formatPercent(saved.fees)} · dividend yield ${formatPercent(saved.dividends)}`,
-          title: "Deductions saved",
+          title,
         }),
       },
     );
+  }
+
+  function save(key: "dividends" | "fees", value: number): void {
+    if (formatPercent(value) !== formatPercent(shown[key])) {
+      sendDeductions({ [key]: value }, "Deductions saved");
+    }
   }
 
   // Historical is never chosen, since it cannot be pressed, so what is
@@ -151,26 +159,46 @@ export function RateSet({
   }
 
   const fields = (
-    <FieldRow layout="pair">
-      <RateField
-        hint="Fund OCFs plus platform charge, off both sleeves"
-        label="Fee drag"
-        min={0}
-        onValueCommitted={(value) => {
-          save("fees", value);
-        }}
-        value={shown.fees}
-      />
-      <RateField
-        hint="Split out of stocks' return and added back on top"
-        label="Dividend yield"
-        min={0}
-        onValueCommitted={(value) => {
-          save("dividends", value);
-        }}
-        value={shown.dividends}
-      />
-    </FieldRow>
+    <div className="grid gap-4">
+      <FieldRow layout="pair">
+        <RateField
+          hint="Fund OCFs plus platform charge, off both sleeves"
+          label="Fee drag"
+          min={0}
+          onValueCommitted={(value) => {
+            save("fees", value);
+          }}
+          value={shown.fees}
+        />
+        <RateField
+          hint="Split out of stocks' return and added back on top"
+          label="Dividend yield"
+          min={0}
+          onValueCommitted={(value) => {
+            save("dividends", value);
+          }}
+          value={shown.dividends}
+        />
+      </FieldRow>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {shown.setOn === undefined
+            ? "Fees and yield are not dated: they were set before the day was kept"
+            : `Fees and yield last set or confirmed ${formatDay(shown.setOn)}`}
+        </p>
+        <Button
+          disabled={isSending}
+          onClick={() => {
+            sendDeductions({}, "Deductions confirmed");
+          }}
+          size="sm"
+          variant="outline"
+        >
+          <Check aria-hidden />
+          Still right
+        </Button>
+      </div>
+    </div>
   );
 
   return (
