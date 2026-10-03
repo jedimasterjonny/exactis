@@ -102,9 +102,10 @@ const groupNames: Record<"none" | Sleeve, string> = {
 // wound down. While the
 // table is too narrow to read across, as on a phone, each row folds into
 // one cell: the name and the target on its first line, then the
-// flags and the class with its return beneath, and the header goes with
-// the other columns; a group's row folds the same way, its return
-// beneath its name and share. Nothing opens from a row.
+// flags, the class, and its return on a line of its own, so the class
+// has the cell's whole width and its longest names show in full, and the
+// header goes with the other columns; a group's row folds the same way,
+// its return beneath its name and share. Nothing opens from a row.
 export function TargetTable({
   categories,
   cma,
@@ -214,11 +215,9 @@ export function TargetTable({
                         {text}
                       </span>
                     ))}
-                    <span className="flex items-center gap-3 pt-1">
-                      {choice}
-                      <span className="w-14 shrink-0 text-right figure">
-                        {rate}
-                      </span>
+                    <span className="pt-1">{choice}</span>
+                    <span>
+                      20y return <span className="figure">{rate}</span>
                     </span>
                   </FoldedCell>
                   <TableCell className="folded:hidden">
