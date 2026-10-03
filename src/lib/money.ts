@@ -67,19 +67,19 @@ export function formatPercent(value: number): string {
 
 // A difference between two rates, in percentage points and written pp,
 // never %, to three places or two: 0.00111 taken off a rate reads
-// −0.111pp, and 0.0065 to two places 0.65pp. exceptZero signs only
-// what is not nothing once rounded, so a sliver taken off reads 0.000pp
-// rather than minus nothing, and the plus it gives a rise is dropped.
+// −0.111pp, and 0.0065 to two places 0.65pp. negative signs only what
+// is below nothing once rounded, so a sliver taken off reads 0.000pp
+// rather than minus nothing, and a rise carries no plus.
 const points = {
   2: new Intl.NumberFormat("en-GB", {
     maximumFractionDigits: 2,
     minimumFractionDigits: 2,
-    signDisplay: "exceptZero",
+    signDisplay: "negative",
   }),
   3: new Intl.NumberFormat("en-GB", {
     maximumFractionDigits: 3,
     minimumFractionDigits: 3,
-    signDisplay: "exceptZero",
+    signDisplay: "negative",
   }),
 };
 
@@ -88,5 +88,5 @@ export function formatPoints(
   places: keyof typeof points = 3,
 ): string {
   const text = points[places].format(value * 100);
-  return `${text.replace(/^\+/, "").replace(/^-/, "−")}pp`;
+  return `${text.replace(/^-/, "−")}pp`;
 }
