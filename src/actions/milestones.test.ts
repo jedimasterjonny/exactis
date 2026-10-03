@@ -94,17 +94,17 @@ describe("the milestone actions", () => {
     // The childcare runs to 2035 and the step-up from 2036, each tied to
     // the children leaving home; the step-up also ends at retirement.
     it("fixes each line tied to the milestone where it falls, and keeps its other ties", async () => {
-      const [salary, stepUp, ...income] = incomeLines;
-      const [household, childcare, ...expenses] = expenseLines;
+      const [, stepUp] = incomeLines;
+      const [, childcare] = expenseLines;
       await keepAfter(db, 1, {
         ...kept,
         schedule: {
-          expenses: [household, { ...childcare, endsAt: 1 }, ...expenses],
-          income: [
-            salary,
-            { ...stepUp, endsAt: "retirement", startsAt: 1 },
-            ...income,
-          ],
+          expenses: kept.schedule.expenses.with(1, { ...childcare, endsAt: 1 }),
+          income: kept.schedule.income.with(1, {
+            ...stepUp,
+            endsAt: "retirement",
+            startsAt: 1,
+          }),
         },
       });
 
@@ -114,21 +114,17 @@ describe("the milestone actions", () => {
         household: {
           milestones: [downsize],
           schedule: {
-            expenses: [
-              household,
-              { ...childcare, endsAt: null, lastYear: 2035 },
-              ...expenses,
-            ],
-            income: [
-              salary,
-              {
-                ...stepUp,
-                endsAt: "retirement",
-                firstYear: 2036,
-                startsAt: null,
-              },
-              ...income,
-            ],
+            expenses: kept.schedule.expenses.with(1, {
+              ...childcare,
+              endsAt: null,
+              lastYear: 2035,
+            }),
+            income: kept.schedule.income.with(1, {
+              ...stepUp,
+              endsAt: "retirement",
+              firstYear: 2036,
+              startsAt: null,
+            }),
           },
         },
         version: 3,
