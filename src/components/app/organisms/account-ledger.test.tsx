@@ -29,7 +29,6 @@ import { incomeLines } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 import { saved as accepted, refused } from "@/lib/answer";
 import { bySlot, commit, openEditor, openEntry } from "@/test/dom";
-import { heldBack } from "@/test/held-back";
 
 import { AccountLedger } from "./account-ledger";
 
@@ -253,7 +252,8 @@ describe("AccountLedger", () => {
     ).toBeInTheDocument();
 
     // The store's answer is held back, so the save can be seen in flight.
-    const { answer, promise } = heldBack<Answer<Account>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<Account>>();
     vi.mocked(saveAccount).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
@@ -771,7 +771,8 @@ describe("AccountLedger", () => {
   it("moves a row onto another from the keyboard, shows the order at once and sends it whole to the store", async () => {
     renderLedger();
     fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
-    const { answer, promise } = heldBack<Answer<undefined>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<undefined>>();
     vi.mocked(placeAccountsInOrder).mockReturnValue(promise);
 
     expect(names()).toStrictEqual([
@@ -1001,7 +1002,8 @@ describe("AccountLedger", () => {
   // and closes on the answer; the row goes when the page re-reads.
   it("asks before deleting an account, and deletes it on confirm", async () => {
     renderLedger();
-    const { answer, promise } = heldBack<Answer<undefined>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<undefined>>();
     vi.mocked(removeAccount).mockReturnValue(promise);
 
     fireEvent.click(

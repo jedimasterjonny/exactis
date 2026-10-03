@@ -21,7 +21,6 @@ import { house as houseAsset, houseLoan } from "@/data/houses.fixture";
 import { plan } from "@/data/income.fixture";
 import { saved as accepted, refused } from "@/lib/answer";
 import { commit, field, openDialog } from "@/test/dom";
-import { heldBack } from "@/test/held-back";
 
 import { HouseDialog } from "./house-dialog";
 
@@ -104,7 +103,8 @@ describe("HouseDialog", () => {
     );
 
     // The store's answer is held back, so the save can be seen in flight.
-    const { answer, promise } = heldBack<Answer<Account>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<Account>>();
     vi.mocked(saveHouse).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 

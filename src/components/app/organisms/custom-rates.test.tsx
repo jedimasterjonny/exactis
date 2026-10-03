@@ -11,7 +11,6 @@ import { Toaster } from "@/components/kit/toast";
 import { allocation, rates } from "@/data/rates.fixture";
 import { refused, saved } from "@/lib/answer";
 import { commit, field, worksheet } from "@/test/dom";
-import { heldBack } from "@/test/held-back";
 
 import { CustomRates } from "./custom-rates";
 
@@ -76,7 +75,7 @@ describe("CustomRates", () => {
   // answer, so once the store has answered the worksheet shows the rates
   // it was given again.
   it("saves a rate alone as the focus leaves it, the worksheet following at once", async () => {
-    const answer = heldBack<Answer<Rates>>();
+    const answer = Promise.withResolvers<Answer<Rates>>();
     vi.mocked(saveRates).mockReturnValue(answer.promise);
     renderRates();
 
@@ -99,7 +98,7 @@ describe("CustomRates", () => {
     expect(field("Stocks growth")).toHaveValue("6.45%");
     expect(saveRates).toHaveBeenCalledExactlyOnceWith({ stocks: 0.0645 });
 
-    answer.answer(saved({ ...rates, stocks: 0.0645 }));
+    answer.resolve(saved({ ...rates, stocks: 0.0645 }));
 
     await waitFor(() => {
       expect(
@@ -180,7 +179,7 @@ describe("CustomRates", () => {
   // the page rather than with the answer, so once the store has answered
   // the worksheet shows the split it was given again.
   it("saves the share in stocks as the focus leaves it, the worksheet following at once", async () => {
-    const answer = heldBack<Answer<Allocation>>();
+    const answer = Promise.withResolvers<Answer<Allocation>>();
     vi.mocked(saveAllocation).mockReturnValue(answer.promise);
     renderRates();
 
@@ -197,7 +196,7 @@ describe("CustomRates", () => {
     });
     expect(saveAllocation).toHaveBeenCalledExactlyOnceWith({ stocks: 0.6 });
 
-    answer.answer(saved({ stocks: 0.6 }));
+    answer.resolve(saved({ stocks: 0.6 }));
 
     await waitFor(() => {
       expect(

@@ -22,7 +22,6 @@ import {
   portfolioFile,
   reference,
 } from "@/lib/portfolio-file.fixture";
-import { heldBack } from "@/test/held-back";
 
 import { TargetAllocation } from "./target-allocation";
 
@@ -141,7 +140,7 @@ describe("TargetAllocation", () => {
   // The page is drawn again from the store's targets, which the toast
   // reads.
   it("reads the file chosen here, sends the store its categories alone, and says what was imported", async () => {
-    const answer = heldBack<Answer<Targets>>();
+    const answer = Promise.withResolvers<Answer<Targets>>();
     vi.mocked(importTargets).mockReturnValue(answer.promise);
     renderCard();
 
@@ -158,7 +157,7 @@ describe("TargetAllocation", () => {
     expect(picker).toHaveValue("");
     expect(button).toBeDisabled();
 
-    answer.answer(saved({ ...targets, importedOn: "2026-09-15" }));
+    answer.resolve(saved({ ...targets, importedOn: "2026-09-15" }));
 
     await waitFor(() => {
       expect(
@@ -219,7 +218,7 @@ describe("TargetAllocation", () => {
   // FTSE North America has no class in the reference, and its name
   // suggests US large caps.
   it("offers to map by name the categories it has a class for, holding while it maps, and says how many it mapped", async () => {
-    const answer = heldBack<Answer<readonly Mapping[]>>();
+    const answer = Promise.withResolvers<Answer<readonly Mapping[]>>();
     vi.mocked(mapByName).mockReturnValue(answer.promise);
     renderCard();
     const map = screen.getByRole("button", { name: "Map 1 by name" });
@@ -231,7 +230,7 @@ describe("TargetAllocation", () => {
       expect(map).toBeDisabled();
     });
 
-    answer.answer(
+    answer.resolve(
       saved([{ asset: "US large cap equities", category: "north-america" }]),
     );
 
