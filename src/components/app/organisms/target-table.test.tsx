@@ -308,7 +308,8 @@ describe("TargetTable", () => {
     const badge = within(name ?? document.body).getByText("No CMA class");
 
     expect(badge).toHaveAttribute("data-variant", "outline");
-    expect(badge).toHaveClass("label", "text-muted-foreground");
+    expect(badge).toHaveClass("text-muted-foreground");
+    expect(badge).not.toHaveClass("label");
     expect(
       within(folded ?? document.body).getByText("No CMA class"),
     ).not.toHaveClass("text-caution");
@@ -358,7 +359,7 @@ describe("TargetTable", () => {
     );
 
     expect(flag).toHaveAttribute("data-variant", "caution");
-    expect(flag).toHaveClass("label");
+    expect(flag).not.toHaveClass("label");
     expect(
       within(folded ?? document.body).getByText("Nothing implements it"),
     ).toHaveClass("text-caution");
