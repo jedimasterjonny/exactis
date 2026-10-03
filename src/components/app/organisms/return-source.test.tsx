@@ -108,16 +108,34 @@ describe("ReturnSource", () => {
     expect(totalOf("Equities")).toBe("Stocks growth5.84%");
   });
 
-  it("lays every category's share of the whole beside the ledgers, a share of nothing muted", () => {
+  // Each category under the sleeve its class blends into, in the file's
+  // order. FTSE North America asks for nothing and has no class, so it
+  // blends into neither and is left out; FTSE 100 asks for nothing too,
+  // and is muted under equities.
+  it("lays every category's share of the whole beneath the ledgers under the sleeve it blends into, a share of nothing muted", () => {
     renderSource();
 
     const weights = screen.getByRole("region", { name: "Target weights" });
-    const terms = within(weights).getAllByRole("term");
-    const shares = within(weights).getAllByRole("definition");
+    const equities = within(weights).getByRole("group", { name: "Equities" });
+    const terms = within(equities).getAllByRole("term");
+    const shares = within(equities).getAllByRole("definition");
 
-    expect(terms.map((term) => term.textContent)).toStrictEqual(
-      targets.categories.map(({ name }) => name),
-    );
+    expect(terms.map((term) => term.textContent)).toStrictEqual([
+      "FTSE Global All Cap ex-UK",
+      "Global emerging markets",
+      "UK equity",
+      "Global small cap",
+      "FTSE 100",
+    ]);
+    expect(
+      within(within(weights).getByRole("group", { name: "Bonds" }))
+        .getAllByRole("term")
+        .map((term) => term.textContent),
+    ).toStrictEqual([
+      "Global bonds, hedged",
+      "UK index-linked gilts, 5y+",
+      "Short-dated gilts",
+    ]);
     expect(shares[0]).toHaveTextContent("48.00%");
     expect(shares[0]).not.toHaveClass("text-muted-foreground");
     expect(shares[4]).toHaveTextContent("0.00%");
