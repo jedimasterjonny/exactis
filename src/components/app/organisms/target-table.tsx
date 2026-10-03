@@ -46,8 +46,10 @@ interface TargetTableProps {
   readonly mappings: readonly Mapping[];
 }
 
-// What the flag on a category nothing is assigned to says.
-const unimplemented = "Nothing implements it";
+// What the flag on a category nothing is assigned to says: that no fund
+// is assigned to it in Portfolio Performance, in the words its owner
+// assigns one in.
+const unimplemented = "No fund assigned";
 
 // The headings the select groups the classes under, by the sleeve they
 // blend into, as BlackRock heads them.
@@ -94,13 +96,14 @@ const groupNames: Record<"none" | Sleeve, string> = {
 // A category that asks for something is flagged beside its name in the
 // caution tone where the CMA cannot blend it, mapped onto no class or
 // onto one the vintage no longer prices, since the rates cannot be
-// derived until it is, and where nothing is assigned to it, since the
-// target cannot be met until a holding is chosen for it. One asking for
+// derived until it is. Where no fund is assigned to it, it is flagged
+// muted: its target cannot be met until a holding is chosen for it,
+// but it blends at its class's return all the same, so nothing waits on
+// it, and it is not to read as the flag that does. One asking for
 // nothing is flagged for the class muted, since it weighs nothing and
 // keeps nothing from being derived, but would the day it is given a
-// share; and not for nothing implementing it, since it is there to be
-// wound down. While the
-// table is too narrow to read across, as on a phone, each row folds into
+// share; and not for having no fund, since it is there to be wound
+// down. While the table is too narrow to read across, as on a phone, each row folds into
 // one cell: the name and the target on its first line, then the
 // flags, the class, and its return on a line of its own, so the class
 // has the cell's whole width and its longest names show in full, and the
@@ -179,7 +182,7 @@ export function TargetTable({
                   text,
                 })),
                 ...(isAsked && !category.isImplemented
-                  ? [{ isMuted: false, text: unimplemented }]
+                  ? [{ isMuted: true, text: unimplemented }]
                   : []),
               ];
               const rate =
