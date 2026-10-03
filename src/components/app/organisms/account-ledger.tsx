@@ -189,7 +189,7 @@ export function AccountLedger({
     const place =
       without.findIndex((a) => a.id === target.id) +
       (at(account.id) < at(target.id) ? 1 : 0);
-    const next = [...without.slice(0, place), account, ...without.slice(place)];
+    const next = without.toSpliced(place, 0, account);
     send(
       async () => {
         placeOptimistically(next);

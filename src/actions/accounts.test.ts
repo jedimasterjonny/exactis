@@ -12,6 +12,7 @@ import {
 } from "@/data/cars.fixture";
 import { kept, today } from "@/data/household.fixture";
 import { homeValues } from "@/data/houses.fixture";
+import { incomeLines } from "@/data/income.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
@@ -34,6 +35,9 @@ vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 
 const memory = inMemory();
 const { db } = memory;
+
+// The salary, first of the kept income, feeding the workplace pension.
+const [salary] = incomeLines;
 
 // An ISA as the dialog sends it, with the shares no ISA has, belonging
 // to the first owner, and as the household holds it once written.
@@ -258,10 +262,7 @@ describe("the account actions", () => {
 
       expect(await latest()).toMatchObject({
         schedule: {
-          income: [
-            { ...kept.schedule.income[0], sacrifice: 1 },
-            ...kept.schedule.income.slice(1),
-          ],
+          income: kept.schedule.income.with(0, { ...salary, sacrifice: 1 }),
         },
       });
       expect(await versions()).toBe(3);
@@ -715,10 +716,11 @@ describe("the account actions", () => {
         accounts: kept.accounts.filter(({ id }) => id !== 1),
         schedule: {
           ...kept.schedule,
-          income: [
-            { ...kept.schedule.income[0], feeds: null, sacrifice: 0 },
-            ...kept.schedule.income.slice(1),
-          ],
+          income: kept.schedule.income.with(0, {
+            ...salary,
+            feeds: null,
+            sacrifice: 0,
+          }),
         },
       });
     });
@@ -827,7 +829,7 @@ describe("the account actions", () => {
 
       expect(await latest()).toStrictEqual({
         ...kept,
-        accounts: [...kept.accounts].reverse(),
+        accounts: kept.accounts.toReversed(),
       });
       expect(refresh).toHaveBeenCalledOnce();
     });
