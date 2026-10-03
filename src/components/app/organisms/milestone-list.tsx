@@ -422,18 +422,15 @@ function tiesAt(
   marker: Marker,
   lines: readonly LineValues[],
 ): string | undefined {
-  const ending = lines.filter(({ endsAt }) => endsAt === marker.id);
-  const starting = lines.filter(({ startsAt }) => startsAt === marker.id);
-  const afters = [...new Set(ending.map(({ endsAfter }) => endsAfter))].sort(
-    (first, second) => first - second,
+  const ending = Map.groupBy(
+    lines.filter(({ endsAt }) => endsAt === marker.id),
+    ({ endsAfter }) => endsAfter,
   );
+  const starting = lines.filter(({ startsAt }) => startsAt === marker.id);
   const said = [
-    ...afters.map((after) =>
-      endingAfter(
-        ending.filter(({ endsAfter }) => endsAfter === after),
-        after,
-      ),
-    ),
+    ...[...ending]
+      .sort(([first], [second]) => first - second)
+      .map(([after, tied]) => endingAfter(tied, after)),
     ...(starting.length === 0 ? [] : [`Starts ${namesOf(starting)}`]),
   ];
   return said.length === 0 ? undefined : said.join(" · ");
