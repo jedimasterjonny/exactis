@@ -1,10 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Household } from "@/data/household";
@@ -27,6 +21,7 @@ import {
   reference,
 } from "@/lib/portfolio-file.fixture";
 import { getHousehold } from "@/store/household";
+import { worksheet } from "@/test/dom";
 import { heldBack } from "@/test/held-back";
 
 import Assumptions from "./page";
@@ -90,11 +85,12 @@ describe("Assumptions", () => {
     expect(screen.getByRole("textbox", { name: "Stocks share" })).toHaveValue(
       "80.00%",
     );
-    expect(
-      within(screen.getByRole("region", { name: "Custom rates" }))
-        .getAllByRole("definition")
-        .at(-1),
-    ).toHaveTextContent("4.18%");
+    expect(worksheet("Custom rates, worked out").at(-1)).toStrictEqual([
+      "Real return",
+      "4.86%",
+      "1.46%",
+      "4.18%",
+    ]);
     expect(
       screen.getByRole("region", { name: "Curve, by maturity" }),
     ).toBeInTheDocument();
@@ -185,7 +181,7 @@ describe("Assumptions", () => {
   // August's blends less the deductions run stocks at 7.84% in all and
   // bonds at 4.25%, so the target allocation's four fifths in stocks grow
   // at 7.13%; the rates and the split typed by hand are kept, not shown.
-  it("says the CMA-derived rates are live, lays out their return source, and shows the target split in place of the split typed", async () => {
+  it("says the CMA-derived rates are live and lays out their worksheet, with the target split in place of the split typed", async () => {
     vi.mocked(getHousehold).mockResolvedValue({
       ...household,
       plan: { ...retiring, inflation: 0.0295, rate: 0.071255 },
@@ -199,22 +195,28 @@ describe("Assumptions", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "From CMA" })).toBeChecked();
     expect(
-      screen.getByRole("textbox", { name: "Stocks growth" }),
-    ).toHaveAttribute("readonly");
-    expect(
-      screen.getByRole("region", { name: "Return source" }),
-    ).toHaveTextContent("BlackRock CMA · Aug 2026");
+      screen.getByRole("region", { name: "CMA-derived rates" }),
+    ).toHaveTextContent("August 2026 CMA, data as of 30 Jun 2026");
     expect(screen.getByRole("textbox", { name: "Fee drag" })).toHaveValue(
       "0.20%",
     );
-    expect(
-      screen.getByRole("region", { name: "Weighted CMA return" }),
-    ).toHaveTextContent("80.0 / 20.0");
-    expect(
-      screen.queryByRole("region", { name: "Allocation" }),
-    ).not.toBeInTheDocument();
+    expect(worksheet("CMA-derived rates, worked out")[0]).toStrictEqual([
+      "Target weight",
+      "80.00%",
+      "20.00%",
+      "100.00%",
+    ]);
+    expect(worksheet("CMA-derived rates, worked out")[4]).toStrictEqual([
+      "Return",
+      "7.84%",
+      "4.25%",
+      "7.13%",
+    ]);
     expect(
       screen.queryByRole("textbox", { name: "Stocks share" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Inflation source" }),
+    ).toHaveTextContent("Sect. V.ii");
   });
 });

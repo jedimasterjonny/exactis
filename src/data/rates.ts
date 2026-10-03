@@ -2,6 +2,14 @@ import type { Curve } from "@/data/inflation";
 
 import { inflationOf, target } from "@/data/inflation";
 
+// A figure for each class and for the portfolio the split makes of
+// them, each a fraction a year.
+export interface Across {
+  readonly bonds: number;
+  readonly portfolio: number;
+  readonly stocks: number;
+}
+
 // How the plan's savings are split between the two classes: the share
 // held in stocks, a fraction of the whole, the rest held in bonds. One
 // split for the whole plan, flat for life, and applied pro rata to every
@@ -51,10 +59,7 @@ export function openingRates(curve: Curve | null): Rates {
 // The rate every account on the plan rate grows at: what stocks return
 // in all and what bonds return, each in the share the split holds of it.
 export function planRate(rates: Rates, allocation: Allocation): number {
-  return (
-    allocation.stocks * stocksTotal(rates) +
-    (1 - allocation.stocks) * rates.bonds
-  );
+  return weighted(allocation, stocksTotal(rates), rates.bonds);
 }
 
 // What a rate comes to once prices have risen by the inflation given: a
@@ -65,8 +70,53 @@ export function realRate(rate: number, inflation: number): number {
   return (1 + rate) / (1 + inflation) - 1;
 }
 
+// What a set of rates comes to under a split, for each class and the
+// portfolio: the return in all, the growth and the yield it is made of,
+// and the return over inflation. Bonds pay no yield, so their growth is
+// their return. The portfolio's figure is each class's in the share the
+// split holds of it, so its return is the plan rate, and its growth and
+// yield add up to its return as each class's do.
+export function resultsOf(
+  rates: Rates,
+  allocation: Allocation,
+): {
+  readonly growth: Across;
+  readonly nominal: Across;
+  readonly real: Across;
+  readonly yield: Across;
+} {
+  const across = (stocks: number, bonds: number): Across => ({
+    bonds,
+    portfolio: weighted(allocation, stocks, bonds),
+    stocks,
+  });
+  const nominal = across(stocksTotal(rates), rates.bonds);
+  const real = (rate: number): number => realRate(rate, rates.inflation);
+  return {
+    growth: across(rates.stocks, rates.bonds),
+    nominal,
+    real: {
+      bonds: real(nominal.bonds),
+      portfolio: real(nominal.portfolio),
+      stocks: real(nominal.stocks),
+    },
+    yield: across(rates.dividends, 0),
+  };
+}
+
 // What stocks return in all: their growth and the yield on top of it,
 // added, since every account the plan holds them in reinvests it.
 export function stocksTotal(rates: Rates): number {
   return rates.stocks + rates.dividends;
+}
+
+// The portfolio's figure from a figure for each class, each in the share
+// the split holds of it, as the plan rate is made and every figure the
+// worksheets give the portfolio.
+function weighted(
+  allocation: Allocation,
+  stocks: number,
+  bonds: number,
+): number {
+  return allocation.stocks * stocks + (1 - allocation.stocks) * bonds;
 }
