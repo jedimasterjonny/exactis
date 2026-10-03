@@ -36,7 +36,7 @@ when it applies only sometimes.
 # Code style
 
 `tsconfig.json` is strict well beyond `strict`. Read it before assuming a
-default. `lib` is ES2023, so an API newer than that is a type error rather than
+default. `lib` is ES2024, so an API newer than that is a type error rather than
 a runtime one.
 
 ESLint runs `strictTypeChecked` and `stylisticTypeChecked` at
