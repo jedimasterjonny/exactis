@@ -222,8 +222,17 @@ jobs:
       # development server that is never started answers nobody. Nothing
       # here can drop the declaration, so the advisory is accepted until
       # drizzle-kit does.
+      #
+      # GHSA-vfj7-8cjw-p6xm is braces overflowing the stack on a deeply
+      # nested pattern, with no fixed release: 3.0.3 is the latest and is
+      # affected. It arrives through fast-glob, under shadcn, ts-morph and
+      # @next/eslint-plugin-next, all of them development tools. Each globs
+      # patterns written here - the lint config's rootDir, the project's
+      # own paths - and none is reached from anything that serves a
+      # request. A pattern nobody hostile writes overflows nothing, so the
+      # advisory is accepted until braces ships a fix.
       - if: ${{ !cancelled() }}
-        run: bun audit --ignore GHSA-67mh-4wv8-2f99
+        run: bun audit --ignore GHSA-67mh-4wv8-2f99 --ignore GHSA-vfj7-8cjw-p6xm
 
       # The commit-msg hook is bypassable with --no-verify. This is not, and
       # it runs for a push as well as a pull request. Most of this history
