@@ -7,7 +7,7 @@ import { useOptimistic } from "react";
 
 import type { Deductions, Mapping, Sleeve, Vintages } from "@/data/cma";
 import type { Curve } from "@/data/inflation";
-import type { RateSet as Chosen, Rates } from "@/data/rates";
+import type { Allocation, RateSet as Chosen, Rates } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 
 import { saveRates, saveRateSet } from "@/actions/plan";
@@ -28,13 +28,14 @@ import {
   stocksMoved,
   vintageMonth,
 } from "@/data/cma";
-import { stocksTotal } from "@/data/rates";
+import { planRate, realRate, stocksTotal } from "@/data/rates";
 import { useSender } from "@/hooks/use-sender";
 import { formatPercent } from "@/lib/money";
 import { formatDay } from "@/lib/months";
 import { assumptions, subsectionLabel } from "@/lib/nav";
 
 interface RateSetProps {
+  readonly allocation: Allocation;
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
@@ -68,19 +69,26 @@ const runsOn: Record<Chosen, string> = {
 // curve and the deductions make them, read-only under a badge saying
 // they are edited at their sources, each with where it comes from
 // beneath it, then stocks' total, how far the latest vintage moved it
-// from the one before, and the vintage. Before the CMA gives any, the
-// figures are left blank. The rates typed by hand are typed where they
-// are shown, with no dialog, and saved as the focus leaves each, alone,
-// so the others are kept as the store has them. One that reads as it
-// did, typed back to it or only passed through, is not sent: the field
-// commits a rate as it shows it, to a hundredth of a point, so a rate
-// kept finer than that, as a curve's inflation is carried in, would
-// otherwise be written over by its own rounding. The figure shows the
-// rate typed at once, and stocks' total beneath follows it, while the
-// store is asked; the store's answer draws the screen again from the
-// rates kept, with a toast saying what they now are, or puts the figure
-// back and says why under a toast when a rate is refused.
+// from the one before, bonds' total, and the vintage. Before the CMA
+// gives any, the figures are left blank. The rates typed by hand are
+// typed where they are shown, with no dialog, and saved as the focus
+// leaves each, alone, so the others are kept as the store has them. One
+// that reads as it did, typed back to it or only passed through, is not
+// sent: the field commits a rate as it shows it, to a hundredth of a
+// point, so a rate kept finer than that, as a curve's inflation is
+// carried in, would otherwise be written over by its own rounding. The
+// figure shows the rate typed at once, and the totals beneath follow
+// it, while the store is asked; the store's answer draws the screen
+// again from the rates kept, with a toast saying what they now are, or
+// puts the figure back and says why under a toast when a rate is
+// refused.
+//
+// Beneath either set, what it comes to over inflation: stocks, bonds and
+// the portfolio the split makes of them, the CMA's under the target
+// allocation and the rates typed under the split typed, following a rate
+// as it is typed.
 export function RateSet({
+  allocation,
   cma,
   curve,
   deductions,
@@ -225,11 +233,20 @@ export function RateSet({
                   value={shown.inflation}
                 />
               </FieldRow>
-              <dl className="flex border-t pt-6">
+              <dl className="flex flex-wrap gap-x-10 gap-y-6 border-t pt-6">
                 <NamedFigure name="Stocks total">
                   {formatPercent(stocksTotal(shown))}
                 </NamedFigure>
+                <NamedFigure name="Bonds total">
+                  {formatPercent(shown.bonds)}
+                </NamedFigure>
               </dl>
+              <RealReturns
+                bonds={shown.bonds}
+                inflation={shown.inflation}
+                portfolio={planRate(shown, allocation)}
+                stocks={stocksTotal(shown)}
+              />
             </CardContent>
           </SectionCard>
         )}
@@ -240,7 +257,8 @@ export function RateSet({
 
 // The rates the CMA gives, read-only, each with where it comes from,
 // and what they come to: stocks' total, the move the latest vintage
-// made in it, once there is a vintage before it to move from, and the
+// made in it, once there is a vintage before it to move from, bonds'
+// total, which is their growth, since they pay no yield on top, and the
 // vintage.
 function Derived({
   cma,
@@ -248,12 +266,14 @@ function Derived({
   deductions,
   mappings,
   targets,
-}: Omit<RateSetProps, "rates" | "rateSet">): JSX.Element {
+}: Omit<RateSetProps, "allocation" | "rates" | "rateSet">): JSX.Element {
   const derived = derivedSet({ cma, curve, deductions, mappings, targets });
   const rates = "short" in derived ? null : derived.rates;
   const empty = emptySleeveOf(cma, targets, mappings);
   const held = (sleeve: Sleeve): null | Rates =>
     empty === sleeve ? null : rates;
+  const stocks = held("stocks");
+  const bonds = held("bonds")?.bonds ?? null;
   const vintage = cma === null ? "—" : vintageMonth(cma.latest);
   const before = cma?.previous ?? null;
   const moved = cma === null ? null : stocksMoved(cma, targets, mappings);
@@ -319,8 +339,21 @@ function Derived({
               </dd>
             </div>
           )}
+          <NamedFigure name="Bonds total">
+            {bonds === null ? "—" : formatPercent(bonds)}
+          </NamedFigure>
           <NamedFigure name="CMA vintage">{vintage}</NamedFigure>
         </dl>
+        <RealReturns
+          bonds={bonds}
+          inflation={rates?.inflation ?? null}
+          portfolio={
+            "short" in derived
+              ? null
+              : planRate(derived.rates, derived.allocation)
+          }
+          stocks={stocks === null ? null : stocksTotal(stocks)}
+        />
       </CardContent>
     </SectionCard>
   );
@@ -344,6 +377,37 @@ function emptySleeveOf(
 // its rate comes from.
 function nothingIn(sleeve: Sleeve): string {
   return `Nothing in the target allocation blends into ${sleeve}`;
+}
+
+// What stocks, bonds and the portfolio return in all come to over
+// inflation, in today's money, each a dash where there is no rate for
+// it. A line under them says the two compound, since subtracting is the
+// sum a reader checks them by and comes out a little high.
+function RealReturns({
+  inflation,
+  ...nominal
+}: Readonly<
+  Record<"bonds" | "inflation" | "portfolio" | "stocks", null | number>
+>): JSX.Element {
+  const real = (rate: null | number): string =>
+    rate === null || inflation === null
+      ? "—"
+      : formatPercent(realRate(rate, inflation));
+  return (
+    <div className="grid gap-3">
+      <dl className="flex flex-wrap gap-x-10 gap-y-6">
+        <NamedFigure name="Real stocks">{real(nominal.stocks)}</NamedFigure>
+        <NamedFigure name="Real bonds">{real(nominal.bonds)}</NamedFigure>
+        <NamedFigure name="Real portfolio">
+          {real(nominal.portfolio)}
+        </NamedFigure>
+      </dl>
+      <p className="text-sm text-muted-foreground">
+        Over inflation, compounded rather than subtracted — what a balance grows
+        at in today&apos;s money.
+      </p>
+    </div>
+  );
 }
 
 // Where stocks' growth comes from: the vintage, once one is pulled, or
