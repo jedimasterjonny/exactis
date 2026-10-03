@@ -96,6 +96,19 @@ describe("Assumptions", () => {
     ).toBeInTheDocument();
   });
 
+  // The page reads the day from the clock, so the ages are left unread.
+  it("says above the tabs when each source was brought in, from the store's sources", async () => {
+    render(await Assumptions());
+
+    const [vintage, curveDay, imported, deductions] =
+      screen.getAllByRole("definition");
+
+    expect(vintage).toHaveTextContent(/^Aug 2026, data 30 Jun 2026 · /);
+    expect(curveDay).toHaveTextContent(/^1 Sep 2026 · /);
+    expect(imported).toHaveTextContent(/^Imported 3 Sep 2026 · /);
+    expect(deductions).toHaveTextContent("Not dated");
+  });
+
   it("hands the cards no curve and no CMA before either is pulled", async () => {
     vi.mocked(getHousehold).mockResolvedValue({
       ...household,

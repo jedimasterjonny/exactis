@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  daysBetween,
   formatDay,
   isOnOrBefore,
   monthName,
@@ -9,6 +10,23 @@ import {
   thisMonth,
   today,
 } from "./months";
+
+describe("daysBetween", () => {
+  it("counts the whole days from one date to a later one, over a month's end", () => {
+    expect(daysBetween("2026-09-24", "2026-10-03")).toBe(9);
+  });
+
+  it("counts nothing for the same day, and fewer than nothing for one before", () => {
+    expect(daysBetween("2026-10-03", "2026-10-03")).toBe(0);
+    expect(daysBetween("2026-10-03", "2026-10-01")).toBe(-2);
+  });
+
+  // The clocks go back on the 25th of October, but the dates are read in
+  // UTC, so the day is not an hour short.
+  it("counts across a change of the clocks as whole days", () => {
+    expect(daysBetween("2026-10-24", "2026-10-26")).toBe(2);
+  });
+});
 
 describe("formatDay", () => {
   // Read in UTC, so the first of the year stays in its own year
