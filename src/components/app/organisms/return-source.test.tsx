@@ -151,7 +151,7 @@ describe("ReturnSource", () => {
 
     expect(
       screen.getByText(
-        "GBP rows, 20-year column, data as of 30 Jun 2026. Figures are nominal. Growth and dividend yield are added — never change one without the other.",
+        "GBP rows, 20-year column, data as of 30 Jun 2026. Figures are nominal. The dividend yield moves stocks' return between growth and yield, and their total stays as it is.",
       ),
     ).toBeInTheDocument();
   });
@@ -287,7 +287,7 @@ describe("ReturnSource", () => {
     expect(field("Fee drag")).toHaveValue("0.20%");
     expect(
       screen.getByText(
-        "GBP rows, 20-year column. Figures are nominal. Growth and dividend yield are added — never change one without the other.",
+        "GBP rows, 20-year column. Figures are nominal. The dividend yield moves stocks' return between growth and yield, and their total stays as it is.",
       ),
     ).toBeInTheDocument();
   });

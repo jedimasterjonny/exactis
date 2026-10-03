@@ -199,7 +199,7 @@ export function ReturnSource({
         )}
       </CardContent>
       <CardFooter className="text-sm text-muted-foreground">
-        {`${cma === null ? "GBP rows, 20-year column" : asOf(cma)}. Figures are nominal. Growth and dividend yield are added — never change one without the other.`}
+        {`${cma === null ? "GBP rows, 20-year column" : asOf(cma)}. Figures are nominal. The dividend yield moves stocks' return between growth and yield, and their total stays as it is.`}
       </CardFooter>
     </SectionCard>
   );
