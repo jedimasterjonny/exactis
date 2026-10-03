@@ -293,7 +293,7 @@ describe("ScheduleRows", () => {
     const item = screen.getByRole("listitem");
     const open = within(item).getByRole("button", { name: "Salary" });
     // eslint-disable-next-line testing-library/no-node-access -- the row's boxes are layout boxes with no role of their own; the folded lines' is the first
-    const [folded, ...columns] = Array.from(item.children);
+    const [folded, ...columns] = item.children;
 
     expect(screen.getByRole("list")).toHaveClass("@container");
     expect(item).toHaveClass("relative", "folded:grid-cols-1");
