@@ -101,7 +101,7 @@ export function RateSet({
   const { isSending: isPulling, send: sendPull } = useSender();
   const asideId = useId();
 
-  function save(key: keyof Deductions, value: number): void {
+  function save(key: "dividends" | "fees", value: number): void {
     if (formatPercent(value) === formatPercent(shown[key])) {
       return;
     }

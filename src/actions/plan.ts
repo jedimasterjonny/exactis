@@ -10,6 +10,7 @@ import type { Answer } from "@/lib/answer";
 import { ageIn, oldestAge } from "@/data/plan";
 import { rateSets } from "@/data/rates";
 import { Refusal } from "@/lib/answer";
+import { today } from "@/lib/months";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
@@ -35,7 +36,7 @@ const ratesPatch = z.object({
 
 // What a save of the deductions may carry: either, each a number, and
 // whichever is not sent is kept as the household has it, as with the
-// rates.
+// rates; neither, to confirm them still right as they are.
 const deductionsPatch = z.object({
   dividends: z.number().exactOptional(),
   fees: z.number().exactOptional(),
@@ -99,8 +100,10 @@ export async function saveAllocation(
 }
 
 // Writes what comes off the CMA's returns to derive the rates, the
-// deductions sent over the ones the household has, and hands back the
-// deductions as it now has them. An action answers a POST from
+// deductions sent over the ones the household has, dated today, and
+// hands back the deductions as it now has them. Sent neither, it keeps
+// both and dates them today, which is how they are confirmed still
+// right. An action answers a POST from
 // anywhere, so it checks the session for itself and parses what it was
 // sent rather than trusting the form. Each is held to its rule by the
 // household, and, while the plan runs on the CMA's rates, so are the
@@ -112,7 +115,7 @@ export async function saveDeductions(
   await requireSession();
   const parsed = deductionsPatch.parse(draft);
   return amend(({ kept }) => {
-    const deductions = { ...kept.deductions, ...parsed };
+    const deductions = { ...kept.deductions, ...parsed, setOn: today() };
     return { kept: { ...kept, deductions }, result: deductions };
   });
 }
