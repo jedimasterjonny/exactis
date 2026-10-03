@@ -34,6 +34,11 @@ describe("formatCurveRate", () => {
     expect(formatCurveRate(0)).toBe("0.000%");
     expect(formatCurveRate(-0.002)).toBe("−0.200%");
   });
+
+  it("writes a fall that rounds to nothing unsigned", () => {
+    expect(formatCurveRate(-0.000004)).toBe("0.000%");
+    expect(formatCurveRate(-0)).toBe("0.000%");
+  });
 });
 
 describe("formatGbp", () => {
@@ -46,6 +51,11 @@ describe("formatGbp", () => {
     expect(formatGbp(1234.56)).toBe("£1,235");
     expect(formatGbp(-182940)).toBe("−£182,940");
   });
+
+  it("writes a loss that rounds to nothing unsigned", () => {
+    expect(formatGbp(-0.4)).toBe("£0");
+    expect(formatGbp(-0)).toBe("£0");
+  });
 });
 
 describe("formatPercent", () => {
@@ -53,6 +63,11 @@ describe("formatPercent", () => {
     expect(formatPercent(0.021)).toBe("2.10%");
     expect(formatPercent(0)).toBe("0.00%");
     expect(formatPercent(0.12345)).toBe("12.35%");
+  });
+
+  it("writes a fall that rounds to nothing unsigned", () => {
+    expect(formatPercent(-0.00004)).toBe("0.00%");
+    expect(formatPercent(-0)).toBe("0.00%");
   });
 });
 
