@@ -61,7 +61,7 @@ describe("movesBetween", () => {
       ...reference,
       cma: { latest: cma, previous: cma },
       deductions: { ...reference.deductions, setOn: "2026-10-01" },
-      mappings: [...mappings].reverse(),
+      mappings: mappings.toReversed(),
       targets: { ...targets, importedOn: "2026-10-01" },
     });
 
