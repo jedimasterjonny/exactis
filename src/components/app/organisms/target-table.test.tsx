@@ -153,7 +153,7 @@ describe("TargetTable", () => {
           "14.00%",
         ],
         [
-          "UK index-linked gilts, 5y+Nothing implements it",
+          "UK index-linked gilts, 5y+No fund assigned",
           "UK index-linked gilts (5+ year)",
           "4.570%",
           "4.00%",
@@ -436,20 +436,22 @@ describe("TargetTable", () => {
     expect(name).toHaveTextContent(/^UK equity$/);
   });
 
-  it("flags a category asking for something that nothing implements, in the caution tone", () => {
+  // No fund is assigned to the index-linked gilts, so their target
+  // cannot be met, but they blend at their class's return all the same,
+  // so the flag is muted rather than in the caution tone that keeps the
+  // rates from being derived.
+  it("flags a category asking for something that no fund is assigned to, muted", () => {
     renderTable();
 
     const [folded, name] = rowOf("UK index-linked gilts, 5y+");
-    const flag = within(name ?? document.body).getByText(
-      "Nothing implements it",
-    );
+    const flag = within(name ?? document.body).getByText("No fund assigned");
 
-    expect(flag).toHaveAttribute("data-variant", "caution");
-    expect(flag).not.toHaveClass("label");
+    expect(flag).toHaveAttribute("data-variant", "outline");
+    expect(flag).toHaveClass("text-muted-foreground");
     expect(
-      within(folded ?? document.body).getByText("Nothing implements it"),
-    ).toHaveClass("text-caution");
-    expect(screen.getAllByText("Nothing implements it")).toHaveLength(2);
+      within(folded ?? document.body).getByText("No fund assigned"),
+    ).not.toHaveClass("text-caution");
+    expect(screen.getAllByText("No fund assigned")).toHaveLength(2);
   });
 
   it("mutes a target of nothing, and flags one that asks for nothing for its class alone", () => {
@@ -467,7 +469,7 @@ describe("TargetTable", () => {
       within(foldedHeld ?? document.body).getByText("12.00%"),
     ).not.toHaveClass("text-muted-foreground");
     expect(rowOf("Cash")[1]).toHaveTextContent(/^CashNo CMA class$/);
-    expect(rowOf("Cash")[1]).not.toHaveTextContent("Nothing implements it");
+    expect(rowOf("Cash")[1]).not.toHaveTextContent("No fund assigned");
   });
 
   it("folds a category with nothing to map it onto into its name, its target and dashes", () => {
