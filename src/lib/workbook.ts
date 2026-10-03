@@ -66,10 +66,9 @@ export function unzipped(file: Uint8Array, refusal: string): Unzipped {
 
 function attributesOf(tag: string): ReadonlyMap<string, string> {
   return new Map(
-    [...tag.matchAll(attribute)].map(([, key = "", value = ""]) => [
-      key,
-      unescaped(value),
-    ]),
+    tag
+      .matchAll(attribute)
+      .map(([, key = "", value = ""]) => [key, unescaped(value)]),
   );
 }
 
@@ -122,9 +121,11 @@ function partOf(parts: Unzipped, path: string): string {
 
 function rowOf(cells: string, strings: readonly string[]): Row {
   return new Map(
-    [...cells.matchAll(cellTag)].flatMap(([, tag = "", content]) =>
-      cellOf(attributesOf(tag), content ?? "", strings),
-    ),
+    cells
+      .matchAll(cellTag)
+      .flatMap(([, tag = "", content]) =>
+        cellOf(attributesOf(tag), content ?? "", strings),
+      ),
   );
 }
 
@@ -175,10 +176,10 @@ function stringsOf(parts: Unzipped): readonly string[] {
 function tagsOf(
   xml: string,
   tag: RegExp,
-): readonly ReadonlyMap<string, string>[] {
-  return [...xml.matchAll(tag)].map(([, attributes = ""]) =>
-    attributesOf(attributes),
-  );
+): IteratorObject<ReadonlyMap<string, string>> {
+  return xml
+    .matchAll(tag)
+    .map(([, attributes = ""]) => attributesOf(attributes));
 }
 
 // Text with the five entities XML writes read back as their
