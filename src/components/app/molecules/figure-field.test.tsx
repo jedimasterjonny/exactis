@@ -176,3 +176,25 @@ describe("RateField", () => {
     expect(field).toHaveValue("5.95%");
   });
 });
+
+describe("YearField", () => {
+  // The store takes a whole year and refuses any other, so a fraction
+  // typed is rounded, as an age is, rather than committed and refused.
+  it("commits a typed fraction of a year as the whole year it rounds to", () => {
+    const onValueCommitted = vi.fn<(value: number) => void>();
+    render(
+      <YearField
+        defaultValue={2026}
+        label="Year"
+        onValueCommitted={onValueCommitted}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Year" });
+
+    commit(input, "2030.5");
+
+    expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(2031);
+    expect(input).toHaveValue("2031");
+  });
+});

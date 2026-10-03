@@ -47,8 +47,12 @@ const presets = {
   // showing.
   term: { format: { maximumFractionDigits: 1 }, largeStep: 5, step: 1 },
   // A year is a whole number written without a separator, so 2026 never
-  // reads 2,026.
-  year: { format: { useGrouping: false }, largeStep: 10, step: 1 },
+  // reads 2,026, and a fraction typed is rounded to one, as an age is.
+  year: {
+    format: { maximumFractionDigits: 0, useGrouping: false },
+    largeStep: 10,
+    step: 1,
+  },
 } satisfies Record<
   string,
   Pick<FigureFieldProps, "format" | "largeStep" | "step">
