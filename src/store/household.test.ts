@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Answer } from "@/lib/answer";
 
+import { cma } from "@/data/cma.fixture";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
@@ -12,11 +13,12 @@ import { allInStocks, openingRates } from "@/data/rates";
 import { getDb } from "@/db/client";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
+import { householdVersions } from "@/db/schema";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
-import { amend, getHousehold } from "./household";
+import { amend, getHousehold, getSourcesDaysAgo } from "./household";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -222,5 +224,70 @@ describe("the household store", () => {
       "redirected",
     );
     expect(await readLatest(db)).toBeNull();
+  });
+
+  // Saved half an hour into the sixth of September by the UK's clock,
+  // which UTC still dates the fifth, and read ten days after midday on
+  // the fifteenth, which is midday on the fifth.
+  it("reads the sources as they stood so many days ago, with the day the version was saved on as the UK names it", async () => {
+    await db
+      .insert(householdVersions)
+      .values([
+        {
+          household: { ...reference, rateSet: "cma" },
+          savedAt: new Date("2026-09-05T23:30:00Z"),
+          version: 1,
+        },
+      ]);
+
+    expect(await getSourcesDaysAgo(0)).toMatchObject({ savedOn: "2026-09-06" });
+    expect(await getSourcesDaysAgo(10)).toMatchObject({
+      savedOn: "2026-09-06",
+    });
+    expect(await getSourcesDaysAgo(0)).toStrictEqual({
+      savedOn: "2026-09-06",
+      sources: {
+        cma: reference.cma,
+        curve: reference.curve,
+        deductions: reference.deductions,
+        mappings: reference.mappings,
+        targets: reference.targets,
+      },
+    });
+  });
+
+  // August's vintage kept with May's before it, which no comparison reads.
+  it("leaves out the vintage before the latest one kept then", async () => {
+    await keepAfter(db, 0, {
+      ...reference,
+      cma: {
+        latest: cma,
+        previous: { ...cma, vintage: { month: 4, year: 2026 } },
+      },
+      rateSet: "cma",
+    });
+
+    expect(await getSourcesDaysAgo(0)).toMatchObject({
+      sources: { cma: { latest: cma, previous: null } },
+    });
+  });
+
+  it("reads nothing before anything is kept, or where the sources kept then break a rule", async () => {
+    expect(await getSourcesDaysAgo(30)).toBeNull();
+
+    await keepAfter(db, 0, {
+      ...reference,
+      deductions: { dividends: -0.01, fees: 0.002 },
+      rateSet: "cma",
+    });
+
+    expect(await getSourcesDaysAgo(30)).toBeNull();
+  });
+
+  it("reads no sources as they stood without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(getSourcesDaysAgo(30)).rejects.toThrow("redirected");
+    expect(getDb).not.toHaveBeenCalled();
   });
 });

@@ -3,13 +3,14 @@ import { refresh } from "next/cache";
 import { cache } from "react";
 
 import type { Household, Kept } from "@/data/household";
+import type { Before } from "@/data/moves";
 import type { Answer } from "@/lib/answer";
 
-import { nothingKeptIn, soundKept } from "@/data/household";
+import { nothingKeptIn, soundKept, sourcesIn } from "@/data/household";
 import { getDb } from "@/db/client";
-import { keepAfter, readLatest } from "@/db/household";
+import { keepAfter, readAsOf, readLatest } from "@/db/household";
 import { Refusal, refused, saved } from "@/lib/answer";
-import { thisMonth } from "@/lib/months";
+import { dayOf, thisMonth } from "@/lib/months";
 import { requireSession } from "@/lib/session";
 
 // What a save works from: the household as it stands, the whole it makes
@@ -65,6 +66,32 @@ export async function amend<TResult>(
 export async function getHousehold(): Promise<Household> {
   await requireSession();
   return readHousehold();
+}
+
+// The sources the CMA-derived rates rested on as the household stood so
+// many days ago, and the day that version was saved on, as the UK names
+// it, to say what has moved them since; or null before anything is
+// kept, or where the sources kept then break a rule since tightened,
+// which leaves nothing to compare. The vintage before the latest one
+// kept then is left out, since no comparison reads it and the page
+// would carry it to the browser for nothing. The session is checked first, as
+// every read's is.
+export async function getSourcesDaysAgo(days: number): Promise<Before | null> {
+  await requireSession();
+  const kept = await readAsOf(
+    getDb(),
+    new Date(Date.now() - days * 86_400_000),
+  );
+  const sources = kept === null ? null : sourcesIn(kept.household);
+  return kept === null || sources === null
+    ? null
+    : {
+        savedOn: dayOf(kept.savedAt),
+        sources: {
+          ...sources,
+          cma: sources.cma && { latest: sources.cma.latest, previous: null },
+        },
+      };
 }
 
 // The latest version the store has kept, or the household before

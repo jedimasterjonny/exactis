@@ -3,6 +3,8 @@ import type { ComponentProps } from "react";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import type { Sources } from "@/data/household";
+
 import { cma, mappings } from "@/data/cma.fixture";
 import { curve } from "@/data/inflation.fixture";
 import { targets, targetsUnder } from "@/data/targets.fixture";
@@ -13,6 +15,15 @@ import { CmaWorksheet } from "./cma-worksheet";
 // The worksheet's name.
 const sheet = "CMA-derived rates, worked out";
 
+// The body's own sources, as the store would keep them.
+const sources: Sources = {
+  cma: { latest: cma, previous: null },
+  curve,
+  deductions: { dividends: 0.02, fees: 0.002 },
+  mappings,
+  targets,
+};
+
 // The body over the reference household's sources, August's vintage,
 // the first of September's curve, its target allocation and mappings,
 // and 0.20% of fees and a 2% yield, with no fields at its head, and
@@ -22,6 +33,7 @@ function renderSheet(
 ): void {
   render(
     <CmaWorksheet
+      before={null}
       cma={{ latest: cma, previous: null }}
       curve={curve}
       deductions={{ dividends: 0.02, fees: 0.002 }}
@@ -165,6 +177,85 @@ describe("CmaWorksheet", () => {
     expect(weights).toHaveTextContent(
       "From the Target allocation tab — portfolio targets, not current holdings.",
     );
+  });
+
+  // On the first of September the fees were a tenth of a point less, so
+  // the plan rate was 7.23% where it is 7.13% now, 4.15% real where it
+  // is 4.05%, at the same 2.95% of inflation.
+  it("lays out what moved the rates since the household stood a while ago, adding up down the columns", () => {
+    renderSheet({
+      before: {
+        savedOn: "2026-09-01",
+        sources: { ...sources, deductions: { dividends: 0.02, fees: 0.001 } },
+      },
+    });
+
+    const moved = screen.getByRole("region", {
+      name: "What moved since 1 Sep 2026",
+    });
+
+    expect(worksheet("What moved the rates, worked out", moved)).toStrictEqual([
+      ["Then", "7.23%", "2.95%", "4.15%"],
+      ["Fees and yield", "−0.10pp", "0.00pp", "−0.10pp"],
+      ["Now", "7.13%", "2.95%", "4.05%"],
+    ]);
+    expect(
+      within(moved).getByRole("rowheader", { name: "Then" }),
+    ).toHaveAccessibleDescription("As the household stood on 1 Sep 2026");
+  });
+
+  // Since the first of September UK cash has gone from the vintage and
+  // short-dated gilts have been mapped onto global aggregate bonds
+  // instead: the vintage alone leaves the gilts on a class it no longer
+  // prices, so the two are one row.
+  it("names the sources a step takes together, where the first alone derives no rates", () => {
+    const gilts = targets.categories.find(
+      ({ name }) => name === "Short-dated gilts",
+    );
+    renderSheet({
+      before: { savedOn: "2026-09-01", sources },
+      cma: {
+        latest: {
+          ...cma,
+          assets: cma.assets.filter(({ name }) => name !== "UK cash"),
+        },
+        previous: cma,
+      },
+      mappings: mappings.map((mapping) =>
+        mapping.category === gilts?.id
+          ? { ...mapping, asset: "Global aggregate bonds" }
+          : mapping,
+      ),
+    });
+
+    expect(
+      screen.getByRole("rowheader", {
+        name: "BlackRock CMA and Target allocation",
+      }),
+    ).toHaveAccessibleDescription(
+      "Taken together, since the first alone derives no rates",
+    );
+  });
+
+  it("says nothing has moved the rates where no source has changed", () => {
+    renderSheet({ before: { savedOn: "2026-09-01", sources } });
+
+    expect(
+      screen.getByRole("region", { name: "What moved since 1 Sep 2026" }),
+    ).toHaveTextContent("Nothing has moved the rates since 1 Sep 2026.");
+    expect(
+      screen.queryByRole("table", { name: "What moved the rates, worked out" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("leaves out what moved where the sources then derived no rates, or there are none to compare", () => {
+    renderSheet({
+      before: { savedOn: "2026-09-01", sources: { ...sources, cma: null } },
+    });
+
+    expect(
+      screen.queryByRole("region", { name: /^What moved/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("states what the figures are, as of the vintage's day", () => {
