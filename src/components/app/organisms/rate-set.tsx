@@ -2,35 +2,29 @@
 
 import type { JSX } from "react";
 
-import { Check, Lock } from "lucide-react";
-import { useOptimistic } from "react";
+import { Download } from "lucide-react";
+import { useId, useOptimistic } from "react";
 
-import type { Deductions, Mapping, Sleeve, Vintages } from "@/data/cma";
+import type { Deductions, Mapping, Vintages } from "@/data/cma";
 import type { Curve } from "@/data/inflation";
 import type { Allocation, RateSet as Chosen, Rates } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 
-import { saveRates, saveRateSet } from "@/actions/plan";
+import { pullCma } from "@/actions/cma";
+import { saveDeductions, saveRateSet } from "@/actions/plan";
 import { Caution } from "@/components/app/atoms/caution";
-import { DeltaValue } from "@/components/app/atoms/delta-value";
 import { FieldRow } from "@/components/app/atoms/field-row";
-import { NamedFigure } from "@/components/app/atoms/named-figure";
 import { RadioChoice } from "@/components/app/atoms/radio-choice";
 import { RateField } from "@/components/app/molecules/figure-field";
 import { SectionCard } from "@/components/app/molecules/section-card";
-import { Badge } from "@/components/kit/badge";
+import { CmaWorksheet } from "@/components/app/organisms/cma-worksheet";
+import { CustomRates } from "@/components/app/organisms/custom-rates";
+import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { RadioGroup } from "@/components/kit/radio-group";
-import {
-  blendsOf,
-  derivedSet,
-  sleeves,
-  stocksMoved,
-  vintageMonth,
-} from "@/data/cma";
-import { planRate, realRate, stocksTotal } from "@/data/rates";
+import { stocksMoved, vintageMonth, vintageName } from "@/data/cma";
 import { useSender } from "@/hooks/use-sender";
-import { formatPercent } from "@/lib/money";
+import { formatPercent, formatPoints } from "@/lib/money";
 import { formatDay } from "@/lib/months";
 import { assumptions, subsectionLabel } from "@/lib/nav";
 
@@ -51,42 +45,40 @@ const runsOn: Record<Chosen, string> = {
   custom: "The plan runs on the custom rates",
 };
 
-// The rates the plan runs on and where they come from, at the head of
-// the assumptions screen. A line above the cards says which set is
-// live: the CMA-derived one, under a badge in the positive tone; or the
-// rates typed by hand, under a caution saying the derivation further down
-// is set aside and what that costs. Beneath it, side by side where the screen is wide
-// enough, the choice of set and the rates themselves.
+// The rates the plan runs on, at the head of the assumptions screen: one
+// card, titled by the set that is live, with the choice of set in its
+// header and BlackRock's workbook pulled from its corner. Under the
+// CMA-derived set the card is the worksheet that derives them; under the
+// rates typed by hand, the rates and the split as typed, worked out the
+// same way, and the derivation is set aside rather than shown dormant,
+// with a caution above the card saying so and what that costs. The
+// workbook can be pulled under either, so the CMA's rates can be given
+// something to derive from before they are chosen.
 //
 // The set is chosen as a radio is pressed, and saved as it is: the
 // choice shows at once while the store is asked, and the store's answer
 // draws the screen again from the set kept, under a toast, or puts the
 // choice back and says why under a toast, as when the CMA gives no
 // rates for want of a class. Historical returns are offered and refused
-// until they are built.
-//
-// The CMA-derived rates are shown as the CMA, the target allocation, the
-// curve and the deductions make them, read-only under a badge saying
-// they are edited at their sources, each with where it comes from
-// beneath it, then stocks' total, how far the latest vintage moved it
-// from the one before, bonds' total, and the vintage. Before the CMA
-// gives any, the figures are left blank. The rates typed by hand are
-// typed where they are shown, with no dialog, and saved as the focus
-// leaves each, alone, so the others are kept as the store has them. One
-// that reads as it did, typed back to it or only passed through, is not
-// sent: the field commits a rate as it shows it, to a hundredth of a
-// point, so a rate kept finer than that, as a curve's inflation is
-// carried in, would otherwise be written over by its own rounding. The
-// figure shows the rate typed at once, and the totals beneath follow
-// it, while the store is asked; the store's answer draws the screen
-// again from the rates kept, with a toast saying what they now are, or
-// puts the figure back and says why under a toast when a rate is
+// until they are built. The pull holds while it is on its way, and the
+// store's answer draws the screen again from the vintage kept, under a
+// toast, or says why under a toast when BlackRock or its workbook is
 // refused.
 //
-// Beneath either set, what it comes to over inflation: stocks, bonds and
-// the portfolio the split makes of them, the CMA's under the target
-// allocation and the rates typed under the split typed, following a rate
-// as it is typed.
+// The two deductions the CMA's returns are taken down by, the fee drag
+// and the dividend yield, are typed in the card under either set: at the
+// head of the worksheet under the CMA's, and beneath the rates typed
+// under those, set aside and saying so, so they can be made ready
+// before the CMA's are chosen rather than taken up as they stood. Each
+// is saved as the focus leaves it, alone, and one typed back to what it
+// was is not sent; what they come to follows it at once while the store
+// is asked, and the store's answer draws the screen again, under a
+// toast, or puts it back and says why.
+//
+// The header's meta line says what the figures come from: the vintage
+// and the day its data are as of, and how far it moved stocks' return
+// from the vintage before, once there is one; or that the rates are
+// typed.
 export function RateSet({
   allocation,
   cma,
@@ -97,14 +89,19 @@ export function RateSet({
   rateSet,
   targets,
 }: RateSetProps): JSX.Element {
-  const [shown, show] = useOptimistic(
-    rates,
-    (current: Rates, patch: Partial<Rates>) => ({ ...current, ...patch }),
-  );
   const [chosen, choose] = useOptimistic(rateSet);
+  const [shown, show] = useOptimistic(
+    deductions,
+    (current: Deductions, patch: Partial<Deductions>) => ({
+      ...current,
+      ...patch,
+    }),
+  );
   const { send } = useSender();
+  const { isSending: isPulling, send: sendPull } = useSender();
+  const asideId = useId();
 
-  function save(key: keyof Rates, value: number): void {
+  function save(key: keyof Deductions, value: number): void {
     if (formatPercent(value) === formatPercent(shown[key])) {
       return;
     }
@@ -112,13 +109,13 @@ export function RateSet({
     send(
       async () => {
         show(patch);
-        return saveRates(patch);
+        return saveDeductions(patch);
       },
       {
-        failure: "Rates not saved",
+        failure: "Deductions not saved",
         success: (saved) => ({
-          description: `Stocks ${formatPercent(stocksTotal(saved))} · bonds ${formatPercent(saved.bonds)} · inflation ${formatPercent(saved.inflation)}`,
-          title: "Rates saved",
+          description: `Fees ${formatPercent(saved.fees)} · dividend yield ${formatPercent(saved.dividends)}`,
+          title: "Deductions saved",
         }),
       },
     );
@@ -143,285 +140,136 @@ export function RateSet({
     );
   }
 
+  function pull(): void {
+    sendPull(pullCma, {
+      failure: "CMA not pulled",
+      success: (pulled) => ({
+        description: `${vintageName(pulled)}, data as of ${formatDay(pulled.asOf)}`,
+        title: "CMA pulled",
+      }),
+    });
+  }
+
+  const fields = (
+    <FieldRow layout="pair">
+      <RateField
+        hint="Fund OCFs plus platform charge, off both sleeves"
+        label="Fee drag"
+        min={0}
+        onValueCommitted={(value) => {
+          save("fees", value);
+        }}
+        value={shown.fees}
+      />
+      <RateField
+        hint="Split out of stocks' return and added back on top"
+        label="Dividend yield"
+        min={0}
+        onValueCommitted={(value) => {
+          save("dividends", value);
+        }}
+        value={shown.dividends}
+      />
+    </FieldRow>
+  );
+
   return (
     <>
-      {chosen === "cma" ? (
-        <p className="flex">
-          <Badge className="label" variant="positive">
-            <Check aria-hidden />
-            CMA-derived set is live
-          </Badge>
-        </p>
-      ) : (
-        <Caution title="Custom rates are live — the CMA derivation below is ignored">
+      {chosen === "custom" && (
+        <Caution title="Custom rates are live — the CMA derivation is set aside">
           Hand-typed rates do not move when you pull a new CMA or BoE curve, and
           nothing warns you when they go stale.
         </Caution>
       )}
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
-        <SectionCard label="Mode" title="Rate set">
-          <CardContent>
-            <RadioGroup
-              aria-label="Rate set"
-              className="gap-5"
-              onValueChange={pick}
-              value={chosen}
-            >
-              <RadioChoice label="From CMA" value="cma">
-                Rates derived from the capital market assumptions and your
-                target allocation
-              </RadioChoice>
-              <RadioChoice label="Custom" value="custom">
-                One rate per class, typed by hand, flat for life
-              </RadioChoice>
-              <RadioChoice isDisabled label="Historical" value="historical">
-                Returns replayed from history, not built yet
-              </RadioChoice>
-            </RadioGroup>
-          </CardContent>
-        </SectionCard>
+      <SectionCard
+        actions={
+          <Button
+            disabled={isPulling}
+            onClick={pull}
+            size="sm"
+            variant="outline"
+          >
+            <Download aria-hidden />
+            Pull CMA workbook
+          </Button>
+        }
+        caption={
+          chosen === "custom"
+            ? "Typed by hand, flat for life"
+            : sourceOf(cma, targets, mappings)
+        }
+        controls={
+          <RadioGroup
+            aria-label="Rate set"
+            className="grid gap-4 sm:grid-cols-3"
+            onValueChange={pick}
+            value={chosen}
+          >
+            <RadioChoice label="From CMA" value="cma">
+              Derived from the capital market assumptions and your target
+              allocation
+            </RadioChoice>
+            <RadioChoice label="Custom" value="custom">
+              One rate per class, typed by hand, flat for life
+            </RadioChoice>
+            <RadioChoice isDisabled label="Historical" value="historical">
+              Returns replayed from history, not built yet
+            </RadioChoice>
+          </RadioGroup>
+        }
+        label={subsectionLabel(assumptions, 1)}
+        title={chosen === "cma" ? "CMA-derived rates" : "Custom rates"}
+      >
         {chosen === "cma" ? (
-          <Derived
+          <CmaWorksheet
             cma={cma}
             curve={curve}
-            deductions={deductions}
+            deductions={shown}
+            fields={fields}
             mappings={mappings}
             targets={targets}
           />
         ) : (
-          <SectionCard
-            label={subsectionLabel(assumptions, 1)}
-            title="Custom rates"
-          >
-            <CardContent className="grid gap-6">
-              <FieldRow layout="pair">
-                <RateField
-                  hint="Typed by hand"
-                  label="Stocks growth"
-                  min={-1}
-                  onValueCommitted={(value) => {
-                    save("stocks", value);
-                  }}
-                  value={shown.stocks}
-                />
-                <RateField
-                  hint="Added to growth — always change the pair"
-                  label="Dividend yield"
-                  min={0}
-                  onValueCommitted={(value) => {
-                    save("dividends", value);
-                  }}
-                  value={shown.dividends}
-                />
-              </FieldRow>
-              <FieldRow layout="pair">
-                <RateField
-                  hint="Typed by hand"
-                  label="Bonds growth"
-                  min={-1}
-                  onValueCommitted={(value) => {
-                    save("bonds", value);
-                  }}
-                  value={shown.bonds}
-                />
-                <RateField
-                  hint="Typed by hand — the BoE derivation below is ignored"
-                  label="Inflation"
-                  onValueCommitted={(value) => {
-                    save("inflation", value);
-                  }}
-                  value={shown.inflation}
-                />
-              </FieldRow>
-              <dl className="flex flex-wrap gap-x-10 gap-y-6 border-t pt-6">
-                <NamedFigure name="Stocks total">
-                  {formatPercent(stocksTotal(shown))}
-                </NamedFigure>
-                <NamedFigure name="Bonds total">
-                  {formatPercent(shown.bonds)}
-                </NamedFigure>
-              </dl>
-              <RealReturns
-                bonds={shown.bonds}
-                inflation={shown.inflation}
-                portfolio={planRate(shown, allocation)}
-                stocks={stocksTotal(shown)}
-              />
+          <>
+            <CustomRates allocation={allocation} rates={rates} />
+            <CardContent>
+              <section
+                aria-labelledby={asideId}
+                className="grid gap-4 border-t pt-6"
+              >
+                <h3 className="label text-muted-foreground" id={asideId}>
+                  For the CMA&apos;s rates
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Set aside while the custom rates are live, and taken up as
+                  they stand when From CMA is chosen.
+                </p>
+                {fields}
+              </section>
             </CardContent>
-          </SectionCard>
+          </>
         )}
-      </div>
+      </SectionCard>
     </>
   );
 }
 
-// The rates the CMA gives, read-only, each with where it comes from,
-// and what they come to: stocks' total, the move the latest vintage
-// made in it, once there is a vintage before it to move from, bonds'
-// total, which is their growth, since they pay no yield on top, and the
-// vintage.
-function Derived({
-  cma,
-  curve,
-  deductions,
-  mappings,
-  targets,
-}: Omit<RateSetProps, "allocation" | "rates" | "rateSet">): JSX.Element {
-  const derived = derivedSet({ cma, curve, deductions, mappings, targets });
-  const rates = "short" in derived ? null : derived.rates;
-  const empty = emptySleeveOf(cma, targets, mappings);
-  const held = (sleeve: Sleeve): null | Rates =>
-    empty === sleeve ? null : rates;
-  const stocks = held("stocks");
-  const bonds = held("bonds")?.bonds ?? null;
-  const vintage = cma === null ? "—" : vintageMonth(cma.latest);
-  const before = cma?.previous ?? null;
-  const moved = cma === null ? null : stocksMoved(cma, targets, mappings);
-  return (
-    <SectionCard
-      actions={
-        <Badge className="label" variant="outline">
-          <Lock aria-hidden />
-          Derived — edit the sources below
-        </Badge>
-      }
-      label={subsectionLabel(assumptions, 1)}
-      title="CMA-derived rates"
-    >
-      <CardContent className="grid gap-6">
-        <FieldRow layout="pair">
-          <RateField
-            hint={stocksHint(cma, empty)}
-            isReadOnly
-            label="Stocks growth"
-            value={held("stocks")?.stocks ?? null}
-          />
-          <RateField
-            hint="Typed in the return source below"
-            isReadOnly
-            label="Dividend yield"
-            value={held("stocks")?.dividends ?? null}
-          />
-        </FieldRow>
-        <FieldRow layout="pair">
-          <RateField
-            hint={
-              empty === "bonds"
-                ? nothingIn("bonds")
-                : "Blended from the bond sleeve, less fees"
-            }
-            isReadOnly
-            label="Bonds growth"
-            value={held("bonds")?.bonds ?? null}
-          />
-          <RateField
-            hint={
-              curve === null
-                ? "From the BoE curve, once one is pulled"
-                : `From the BoE curve, ${formatDay(curve.asOf)}`
-            }
-            isReadOnly
-            label="Inflation"
-            value={rates?.inflation ?? null}
-          />
-        </FieldRow>
-        <dl className="flex flex-wrap gap-x-10 gap-y-6 border-t pt-6">
-          <NamedFigure name="Stocks total">
-            {stocksTotalOf(held("stocks"))}
-          </NamedFigure>
-          {before !== null && moved !== null && (
-            <div className="grid gap-1">
-              <dt className="label text-muted-foreground">
-                {`vs ${vintageMonth(before)}`}
-              </dt>
-              <dd className="pt-2">
-                <DeltaValue format="points" value={moved * 100} />
-              </dd>
-            </div>
-          )}
-          <NamedFigure name="Bonds total">
-            {bonds === null ? "—" : formatPercent(bonds)}
-          </NamedFigure>
-          <NamedFigure name="CMA vintage">{vintage}</NamedFigure>
-        </dl>
-        <RealReturns
-          bonds={bonds}
-          inflation={rates?.inflation ?? null}
-          portfolio={
-            "short" in derived
-              ? null
-              : planRate(derived.rates, derived.allocation)
-          }
-          stocks={stocks === null ? null : stocksTotal(stocks)}
-        />
-      </CardContent>
-    </SectionCard>
-  );
-}
-
-// The sleeve nothing in the target allocation blends into, if one is,
-// whose rates stand in at the other sleeve's and are shown as empty.
-function emptySleeveOf(
+// What the CMA-derived rates come from: the vintage and the day its data
+// are as of, and how far it moved stocks' return from the vintage
+// before, once there is one and both blend; or that none is pulled.
+function sourceOf(
   cma: null | Vintages,
   targets: null | Targets,
   mappings: readonly Mapping[],
-): null | Sleeve {
-  const blends = cma === null ? null : blendsOf(cma.latest, targets, mappings);
-  if (blends === null || "short" in blends) {
-    return null;
+): string {
+  if (cma === null) {
+    return "No CMA pulled yet";
   }
-  return sleeves.find((sleeve) => blends[sleeve].parts.length === 0) ?? null;
-}
-
-// What a field of a sleeve nothing blends into says in place of where
-// its rate comes from.
-function nothingIn(sleeve: Sleeve): string {
-  return `Nothing in the target allocation blends into ${sleeve}`;
-}
-
-// What stocks, bonds and the portfolio return in all come to over
-// inflation, in today's money, each a dash where there is no rate for
-// it. A line under them says the two compound, since subtracting is the
-// sum a reader checks them by and comes out a little high.
-function RealReturns({
-  inflation,
-  ...nominal
-}: Readonly<
-  Record<"bonds" | "inflation" | "portfolio" | "stocks", null | number>
->): JSX.Element {
-  const real = (rate: null | number): string =>
-    rate === null || inflation === null
-      ? "—"
-      : formatPercent(realRate(rate, inflation));
-  return (
-    <div className="grid gap-3">
-      <dl className="flex flex-wrap gap-x-10 gap-y-6">
-        <NamedFigure name="Real stocks">{real(nominal.stocks)}</NamedFigure>
-        <NamedFigure name="Real bonds">{real(nominal.bonds)}</NamedFigure>
-        <NamedFigure name="Real portfolio">
-          {real(nominal.portfolio)}
-        </NamedFigure>
-      </dl>
-      <p className="text-sm text-muted-foreground">
-        Over inflation, compounded rather than subtracted — what a balance grows
-        at in today&apos;s money.
-      </p>
-    </div>
-  );
-}
-
-// Where stocks' growth comes from: the vintage, once one is pulled, or
-// nowhere, for a target allocation with nothing in stocks.
-function stocksHint(cma: null | Vintages, empty: null | Sleeve): string {
-  if (empty === "stocks") {
-    return nothingIn("stocks");
+  const dated = `${vintageName(cma.latest)} CMA, data as of ${formatDay(cma.latest.asOf)}`;
+  const moved = stocksMoved(cma, targets, mappings);
+  if (cma.previous === null || moved === null) {
+    return dated;
   }
-  return cma === null
-    ? "From the CMA, once one is pulled"
-    : `From the ${vintageMonth(cma.latest)} CMA, less fees and yield`;
-}
-
-// Stocks' return in all, or a dash where there are no rates for them.
-function stocksTotalOf(rates: null | Rates): string {
-  return rates === null ? "—" : formatPercent(stocksTotal(rates));
+  const way = moved < 0 ? "down" : "up";
+  return `${dated} · stocks ${way} ${formatPoints(Math.abs(moved), 2)} on ${vintageMonth(cma.previous)}`;
 }

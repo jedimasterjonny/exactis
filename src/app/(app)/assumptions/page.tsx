@@ -5,12 +5,9 @@ import type { RateSet as Chosen } from "@/data/rates";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { ScreenTabs } from "@/components/app/atoms/screen-tabs";
-import { AssetAllocation } from "@/components/app/organisms/asset-allocation";
 import { InflationSource } from "@/components/app/organisms/inflation-source";
 import { RateSet } from "@/components/app/organisms/rate-set";
-import { ReturnSource } from "@/components/app/organisms/return-source";
 import { TargetAllocation } from "@/components/app/organisms/target-allocation";
-import { WeightedReturn } from "@/components/app/organisms/weighted-return";
 import { formatPercent } from "@/lib/money";
 import { assumptions, sectionLabel } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
@@ -23,13 +20,10 @@ const setNames: Record<Chosen, string> = {
 
 // The assumptions the plan runs on, in two tabs. The first holds the
 // rates: the set the plan runs on and the rates in it, the CMA-derived
-// ones or the ones typed by hand, then the return source the derived
-// ones are blended from, then under the derived rates the target split
-// and what the vintage expects of it, or under the rates typed how the
-// savings are split between stocks and bonds, typed, and beneath them
-// the inflation source, over
-// the curve last pulled from the Bank, which the derived rates take and
-// the rates typed by hand set aside. The second holds the target
+// ones worked out from their sources or the ones and the split typed by
+// hand, and beneath them the inflation source, over the curve last
+// pulled from the Bank, which the derived rates take and the rates typed
+// by hand set aside. The second holds the target
 // allocation last imported from Portfolio Performance, with the class
 // of the latest CMA each category is mapped onto. The header says what
 // the plan grows at and what its prices rise by, made from the rates
@@ -70,21 +64,6 @@ export default async function Assumptions(): Promise<JSX.Element> {
                     rateSet={rateSet}
                     targets={targets}
                   />
-                  <ReturnSource
-                    cma={cma}
-                    deductions={deductions}
-                    mappings={mappings}
-                    targets={targets}
-                  />
-                  {rateSet === "cma" ? (
-                    <WeightedReturn
-                      cma={cma}
-                      mappings={mappings}
-                      targets={targets}
-                    />
-                  ) : (
-                    <AssetAllocation allocation={allocation} rates={rates} />
-                  )}
                   <InflationSource curve={curve} />
                 </>
               ),

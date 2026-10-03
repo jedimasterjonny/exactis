@@ -76,3 +76,20 @@ export function stubViewport(width: number): void {
     vi.fn(() => ({ addEventListener: vi.fn(), removeEventListener: vi.fn() })),
   );
 }
+
+// A worksheet's rows by its name, each its name and then its figures, as
+// read across, and whatever box it sits in.
+export function worksheet(
+  name: string,
+  box: HTMLElement = document.body,
+): readonly (readonly (null | string)[])[] {
+  return within(within(box).getByRole("table", { name }))
+    .getAllByRole("row")
+    .slice(1)
+    .map((row) => [
+      within(row).getByRole("rowheader").textContent,
+      ...within(row)
+        .getAllByRole("cell")
+        .map((cell) => cell.textContent),
+    ]);
+}
