@@ -9,6 +9,7 @@ import {
   openingRates,
   planRate,
   realRate,
+  resultsOf,
   stocksTotal,
 } from "./rates";
 import { allocation, rates } from "./rates.fixture";
@@ -35,6 +36,31 @@ describe("openingRates", () => {
     expect(planRate(opening, allInStocks)).toBeCloseTo(0.05, 15);
     expect(planRate(opening, { stocks: 0 })).toBeCloseTo(0.05, 15);
     expect(planRate(opening, allocation)).toBeCloseTo(0.05, 15);
+  });
+});
+
+describe("resultsOf", () => {
+  // Four fifths at 5.95% growth with 2% on top and a fifth at 4.45%: the
+  // portfolio returns 7.25%, which is the plan rate, made of 5.65%
+  // growth and 1.60% yield, and over 2.95% of inflation each comes to
+  // what realRate makes of its return.
+  it("works out each class and the portfolio, which adds up down and across", () => {
+    const results = resultsOf(rates, allocation);
+
+    expect(results.nominal.stocks).toBeCloseTo(0.0795, 15);
+    expect(results.nominal.bonds).toBeCloseTo(0.0445, 15);
+    expect(results.nominal.portfolio).toBeCloseTo(
+      planRate(rates, allocation),
+      15,
+    );
+    expect(results.growth.stocks).toBeCloseTo(0.0595, 15);
+    expect(results.growth.bonds).toBeCloseTo(0.0445, 15);
+    expect(results.growth.portfolio).toBeCloseTo(0.0565, 15);
+    expect(results.yield.stocks).toBeCloseTo(0.02, 15);
+    expect(results.yield.bonds).toBe(0);
+    expect(results.yield.portfolio).toBeCloseTo(0.016, 15);
+    expect(results.real.portfolio).toBeCloseTo(realRate(0.0725, 0.0295), 15);
+    expect(results.real.bonds).toBeCloseTo(realRate(0.0445, 0.0295), 15);
   });
 });
 

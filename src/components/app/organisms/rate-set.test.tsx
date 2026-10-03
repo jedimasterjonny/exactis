@@ -9,46 +9,59 @@ import {
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Cma } from "@/data/cma";
-import type { RateSet as Chosen, Rates } from "@/data/rates";
+import type { Cma, Deductions } from "@/data/cma";
+import type { RateSet as Chosen } from "@/data/rates";
 import type { Answer } from "@/lib/answer";
 
-import { saveRates, saveRateSet } from "@/actions/plan";
+import { pullCma } from "@/actions/cma";
+import { saveDeductions, saveRateSet } from "@/actions/plan";
 import { Toaster } from "@/components/kit/toast";
 import { cma, mappings } from "@/data/cma.fixture";
 import { curve } from "@/data/inflation.fixture";
 import { allocation, rates } from "@/data/rates.fixture";
 import { targets, targetsUnder } from "@/data/targets.fixture";
 import { refused, saved } from "@/lib/answer";
-import { commit, field } from "@/test/dom";
+import { commit, field, worksheet } from "@/test/dom";
 import { heldBack } from "@/test/held-back";
 
 import { RateSet } from "./rate-set";
 
-vi.mock("@/actions/plan", () => ({ saveRates: vi.fn(), saveRateSet: vi.fn() }));
+vi.mock("@/actions/cma", () => ({ pullCma: vi.fn() }));
+vi.mock("@/actions/plan", () => ({
+  saveAllocation: vi.fn(),
+  saveDeductions: vi.fn(),
+  saveRates: vi.fn(),
+  saveRateSet: vi.fn(),
+}));
+
+// A vintage of the month given, each class returning what August's does
+// and the fraction given on top.
+function shifted(by: number, month: number): Cma {
+  return {
+    ...cma,
+    assets: cma.assets.map((asset) => ({ ...asset, rate: asset.rate + by })),
+    vintage: { month, year: 2026 },
+  };
+}
+
+// The CMA worksheet's name.
+const derived = "CMA-derived rates, worked out";
 
 // May's vintage, each class returning a tenth of a point more than
 // August's.
-const may: Cma = {
-  ...cma,
-  assets: cma.assets.map((asset) => ({ ...asset, rate: asset.rate + 0.001 })),
-  vintage: { month: 4, year: 2026 },
-};
+const may = shifted(0.001, 4);
 
-// The figures the card gives: stocks' and bonds' totals, then what
-// stocks, bonds and the portfolio come to over inflation.
-function figures(): readonly (null | string)[] {
-  return screen
-    .getAllByRole("definition")
-    .map((definition) => definition.textContent);
+// The card, as a region named by the title it has under the set given.
+function cardOf(title: string): HTMLElement {
+  return screen.getByRole("region", { name: title });
 }
 
 // The set given over the rates and the split the design shows typed by
 // hand, and the reference household's sources for the CMA's: August's
-// vintage with
-// May's before it, the first of September's curve, its target
-// allocation and mappings, and 0.20% of fees and a 2% yield. A save
-// reports through the toast manager, which needs its Toaster mounted.
+// vintage with May's before it, the first of September's curve, its
+// target allocation and mappings, and 0.20% of fees and a 2% yield. A
+// save reports through the toast manager, which needs its Toaster
+// mounted.
 function renderSet(
   rateSet: Chosen = "custom",
   sources: Partial<ComponentProps<typeof RateSet>> = {},
@@ -74,27 +87,30 @@ describe("RateSet", () => {
     renderSet();
 
     expect(screen.getByRole("note")).toHaveTextContent(
-      "Custom rates are live — the CMA derivation below is ignoredHand-typed rates do not move when you pull a new CMA or BoE curve, and nothing warns you when they go stale.",
+      "Custom rates are live — the CMA derivation is set asideHand-typed rates do not move when you pull a new CMA or BoE curve, and nothing warns you when they go stale.",
     );
   });
 
-  it("shows the rates typed by hand as chosen, offers the CMA's, and offers but refuses historical returns", () => {
+  it("heads the card as the screen's first, with the choice of set in its header, the custom rates chosen and historical returns refused", () => {
     renderSet();
 
-    const mode = screen.getByRole("region", { name: "Rate set" });
-    const custom = within(mode).getByRole("radio", { name: "Custom" });
-    const derived = within(mode).getByRole("radio", { name: "From CMA" });
-    const historical = within(mode).getByRole("radio", { name: "Historical" });
+    const card = cardOf("Custom rates");
+    const choice = within(card).getByRole("radiogroup", { name: "Rate set" });
+    const custom = within(choice).getByRole("radio", { name: "Custom" });
+    const derived = within(choice).getByRole("radio", { name: "From CMA" });
+    const historical = within(choice).getByRole("radio", {
+      name: "Historical",
+    });
 
-    expect(within(mode).getByText("Mode")).toHaveClass("label");
+    expect(within(card).getByText("Sect. V.i")).toHaveClass("label");
+    expect(card).toHaveTextContent("Typed by hand, flat for life");
     expect(custom).toBeChecked();
     expect(custom).toHaveAccessibleDescription(
       "One rate per class, typed by hand, flat for life",
     );
     expect(derived).not.toBeChecked();
-    expect(derived).not.toHaveAttribute("aria-disabled", "true");
     expect(derived).toHaveAccessibleDescription(
-      "Rates derived from the capital market assumptions and your target allocation",
+      "Derived from the capital market assumptions and your target allocation",
     );
     expect(historical).toHaveAttribute("aria-disabled", "true");
     expect(historical).toHaveAccessibleDescription(
@@ -102,149 +118,95 @@ describe("RateSet", () => {
     );
   });
 
-  // 5.95% and 2% make 7.95% in all, and four fifths of it and a fifth of
-  // bonds' 4.45% make 7.25%. Over 2.95% of inflation those are 4.86%,
-  // 1.46% and 4.18%, where subtracting would give 5.00%, 1.50% and 4.30%.
-  it("shows each rate as kept, what it rests on, stocks' and bonds' totals, and what each comes to over inflation", () => {
+  it("lays out the rates and the split typed by hand under the custom rates, with the derivation set aside", () => {
     renderSet();
 
-    const card = screen.getByRole("region", { name: "Custom rates" });
-
-    expect(within(card).getByText("Sect. V.i")).toHaveClass("label");
-    expect(field("Stocks growth", card)).toHaveValue("5.95%");
-    expect(field("Dividend yield", card)).toHaveValue("2.00%");
-    expect(field("Bonds growth", card)).toHaveValue("4.45%");
-    expect(field("Inflation", card)).toHaveValue("2.95%");
-    expect(field("Stocks growth", card)).toHaveAccessibleDescription(
-      "Typed by hand",
-    );
-    expect(field("Dividend yield", card)).toHaveAccessibleDescription(
-      "Added to growth — always change the pair",
-    );
-    expect(field("Inflation", card)).toHaveAccessibleDescription(
-      "Typed by hand — the BoE derivation below is ignored",
-    );
+    expect(field("Stocks growth", cardOf("Custom rates"))).toHaveValue("5.95%");
+    expect(field("Stocks share")).toHaveValue("80.00%");
     expect(
-      within(card)
-        .getAllByRole("term")
-        .map((term) => term.textContent),
-    ).toStrictEqual([
-      "Stocks total",
-      "Bonds total",
-      "Real stocks",
-      "Real bonds",
-      "Real portfolio",
-    ]);
+      screen.getByRole("table", { name: "Custom rates, worked out" }),
+    ).toBeInTheDocument();
     expect(
-      within(card)
-        .getAllByRole("definition")
-        .map((definition) => definition.textContent),
-    ).toStrictEqual(["7.95%", "4.45%", "4.86%", "1.46%", "4.18%"]);
+      screen.queryByRole("table", { name: "CMA-derived rates, worked out" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "For the CMA's rates" }),
+    ).toHaveTextContent(
+      "Set aside while the custom rates are live, and taken up as they stand when From CMA is chosen.",
+    );
   });
 
-  // 6.45% and 2% make 8.45% in all, 5.34% over inflation, and the
-  // portfolio 4.57%. The stored rates come back with the page rather than
-  // with the answer, so once the store has answered the card shows the
-  // rates it was given again.
-  it("saves a rate alone as the focus leaves it, showing it, stocks' total and the real returns at once", async () => {
-    const answer = heldBack<Answer<Rates>>();
-    vi.mocked(saveRates).mockReturnValue(answer.promise);
+  // The deductions are typed under the custom rates too, so they are
+  // ready before the CMA's are chosen.
+  it("types the deductions under the custom rates as well, set aside, and saves them", async () => {
+    vi.mocked(saveDeductions).mockResolvedValue(
+      saved({ dividends: 0.02, fees: 0.0025 }),
+    );
     renderSet();
+    const aside = screen.getByRole("region", { name: "For the CMA's rates" });
 
-    commit(field("Stocks growth"), "6.45");
+    expect(field("Dividend yield", aside)).toHaveValue("2.00%");
 
-    await waitFor(() => {
-      expect(figures()).toStrictEqual([
-        "8.45%",
-        "4.45%",
-        "5.34%",
-        "1.46%",
-        "4.57%",
-      ]);
-    });
-    expect(field("Stocks growth")).toHaveValue("6.45%");
-    expect(saveRates).toHaveBeenCalledExactlyOnceWith({ stocks: 0.0645 });
+    commit(field("Fee drag", aside), "0.25");
 
-    answer.answer(saved({ ...rates, stocks: 0.0645 }));
-
+    expect(saveDeductions).toHaveBeenCalledExactlyOnceWith({ fees: 0.0025 });
     await waitFor(() => {
       expect(
-        screen.getByRole("dialog", { name: "Rates saved" }),
-      ).toHaveAccessibleDescription(
-        "Stocks 8.45% · bonds 4.45% · inflation 2.95%",
-      );
-    });
-    await waitFor(() => {
-      expect(figures()).toStrictEqual([
-        "7.95%",
-        "4.45%",
-        "4.86%",
-        "1.46%",
-        "4.18%",
-      ]);
+        screen.getByRole("dialog", { name: "Deductions saved" }),
+      ).toBeInTheDocument();
     });
   });
 
-  it.each([
-    ["Stocks growth", "6", { stocks: 0.06 }],
-    ["Dividend yield", "2.5", { dividends: 0.025 }],
-    ["Bonds growth", "4", { bonds: 0.04 }],
-    ["Inflation", "2.5", { inflation: 0.025 }],
-  ] as const)(
-    "sends what is typed into %s alone, under its own name",
-    async (name, typed, patch) => {
-      vi.mocked(saveRates).mockResolvedValue(saved({ ...rates, ...patch }));
-      renderSet();
+  // May priced every class a tenth of a point higher, so August moved
+  // stocks down by 0.10 of a point.
+  it("lays out the worksheet under the CMA's rates, saying which vintage it reads and how far it moved stocks", () => {
+    renderSet("cma");
 
-      commit(field(name), typed);
+    const card = cardOf("CMA-derived rates");
 
-      expect(saveRates).toHaveBeenCalledExactlyOnceWith(patch);
-      await waitFor(() => {
-        expect(
-          screen.getByRole("dialog", { name: "Rates saved" }),
-        ).toBeInTheDocument();
-      });
-    },
-  );
-
-  it("sends nothing for a rate typed back to what it was", () => {
-    renderSet();
-
-    commit(field("Bonds growth"), "4.45");
-
-    expect(field("Bonds growth")).toHaveValue("4.45%");
-    expect(saveRates).not.toHaveBeenCalled();
-  });
-
-  // Inflation carried in off a curve at 3.0459% shows as 3.05%, and the
-  // field commits 3.05% as the focus leaves it, typed or not.
-  it("sends nothing for a rate the focus only passed through, however finely it is kept", () => {
-    renderSet("custom", { rates: { ...rates, inflation: 0.030459 } });
-
-    fireEvent.focus(field("Inflation"));
-    fireEvent.blur(field("Inflation"));
-
-    expect(field("Inflation")).toHaveValue("3.05%");
-    expect(saveRates).not.toHaveBeenCalled();
-  });
-
-  it("puts the rate back and says why when the store refuses it", async () => {
-    vi.mocked(saveRates).mockResolvedValue(
-      refused("A dividend yield is nothing or more"),
+    expect(card).toHaveTextContent(
+      "August 2026 CMA, data as of 30 Jun 2026 · stocks down 0.10pp on May 2026",
     );
-    renderSet();
+    expect(
+      within(card).getByRole("table", {
+        name: "CMA-derived rates, worked out",
+      }),
+    ).toBeInTheDocument();
+    expect(field("Fee drag", card)).toHaveValue("0.20%");
+    expect(
+      screen.queryByRole("textbox", { name: "Stocks share" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
 
-    commit(field("Inflation"), "3.1");
+  it("says a vintage moved stocks up when it prices them higher than the one before", () => {
+    renderSet("cma", { cma: { latest: cma, previous: shifted(-0.001, 4) } });
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole("dialog", { name: "Rates not saved" }),
-      ).toHaveAccessibleDescription("A dividend yield is nothing or more");
-    });
-    expect(saveRates).toHaveBeenCalledExactlyOnceWith({ inflation: 0.031 });
-    await waitFor(() => {
-      expect(field("Inflation")).toHaveValue("2.95%");
-    });
+    expect(cardOf("CMA-derived rates")).toHaveTextContent(
+      "· stocks up 0.10pp on May 2026",
+    );
+  });
+
+  it("gives no move before a vintage before the latest is pulled", () => {
+    renderSet("cma", { cma: { latest: cma, previous: null } });
+
+    expect(
+      screen.getByText("August 2026 CMA, data as of 30 Jun 2026"),
+    ).toBeInTheDocument();
+  });
+
+  it("gives no move while nothing blends into stocks", () => {
+    renderSet("cma", { targets: targetsUnder("Bonds") });
+
+    expect(
+      screen.getByText("August 2026 CMA, data as of 30 Jun 2026"),
+    ).toBeInTheDocument();
+  });
+
+  it("says no CMA is pulled before one is", () => {
+    renderSet("cma", { cma: null });
+
+    expect(cardOf("CMA-derived rates")).toHaveTextContent("No CMA pulled yet");
   });
 
   // The store's set comes back with the page rather than the answer, so
@@ -259,13 +221,8 @@ describe("RateSet", () => {
     await waitFor(() => {
       expect(screen.getByRole("radio", { name: "From CMA" })).toBeChecked();
     });
-    expect(
-      screen.getByRole("region", { name: "CMA-derived rates" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("CMA-derived set is live")).toHaveAttribute(
-      "data-variant",
-      "positive",
-    );
+    expect(cardOf("CMA-derived rates")).toBeInTheDocument();
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
     expect(saveRateSet).toHaveBeenCalledExactlyOnceWith("cma");
 
     answer.answer(saved("cma"));
@@ -316,174 +273,144 @@ describe("RateSet", () => {
     });
   });
 
-  // August's blends less 0.20% of fees and the 2% yield: stocks 5.84%
-  // growth and 2.00% yield, 7.84% in all, bonds 4.25%, and the curve's
-  // 2.95%. May priced every class a tenth of a point higher, so August
-  // moved stocks down by 0.10 of a point. Over inflation stocks come to
-  // 4.75%, bonds 1.26%, and the target allocation's four fifths in stocks
-  // 4.05%, not the split typed.
-  it("shows the CMA's rates read-only, each with where it comes from, stocks' total, the move from the vintage before, bonds' total, the vintage, and what each comes to over inflation", () => {
+  it("types the deductions at the head of the worksheet under the CMA's rates, each with what it is", () => {
     renderSet("cma");
 
-    const card = screen.getByRole("region", { name: "CMA-derived rates" });
-
-    expect(within(card).getByText("Sect. V.i")).toHaveClass("label");
-    expect(
-      within(card).getByText("Derived — edit the sources below"),
-    ).toHaveClass("label");
-    expect(field("Stocks growth", card)).toHaveValue("5.84%");
-    expect(field("Dividend yield", card)).toHaveValue("2.00%");
-    expect(field("Bonds growth", card)).toHaveValue("4.25%");
-    expect(field("Inflation", card)).toHaveValue("2.95%");
-    for (const name of [
-      "Stocks growth",
-      "Dividend yield",
-      "Bonds growth",
-      "Inflation",
-    ]) {
-      expect(field(name, card)).toHaveAttribute("readonly");
-    }
-    expect(field("Stocks growth", card)).toHaveAccessibleDescription(
-      "From the Aug 2026 CMA, less fees and yield",
+    expect(field("Fee drag")).toHaveValue("0.20%");
+    expect(field("Fee drag")).toHaveAccessibleDescription(
+      "Fund OCFs plus platform charge, off both sleeves",
     );
-    expect(field("Dividend yield", card)).toHaveAccessibleDescription(
-      "Typed in the return source below",
+    expect(field("Dividend yield")).toHaveValue("2.00%");
+    expect(field("Dividend yield")).toHaveAccessibleDescription(
+      "Split out of stocks' return and added back on top",
     );
-    expect(field("Bonds growth", card)).toHaveAccessibleDescription(
-      "Blended from the bond sleeve, less fees",
-    );
-    expect(field("Inflation", card)).toHaveAccessibleDescription(
-      "From the BoE curve, 1 Sep 2026",
-    );
-    expect(
-      within(card)
-        .getAllByRole("term")
-        .map((term) => term.textContent),
-    ).toStrictEqual([
-      "Stocks total",
-      "vs May 2026",
-      "Bonds total",
-      "CMA vintage",
-      "Real stocks",
-      "Real bonds",
-      "Real portfolio",
-    ]);
-    expect(
-      within(card)
-        .getAllByRole("definition")
-        .map((definition) => definition.textContent),
-    ).toStrictEqual([
-      "7.84%",
-      "−0.10pp",
-      "4.25%",
-      "Aug 2026",
-      "4.75%",
-      "1.26%",
-      "4.05%",
-    ]);
-    expect(
-      screen.queryByRole("region", { name: "Custom rates" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 
-  it("gives no move before a vintage before the latest is pulled", () => {
-    renderSet("cma", { cma: { latest: cma, previous: null } });
+  // Fees of 0.25% take stocks to 7.79% and bonds to 4.20% at once, and
+  // the stored deductions come back with the page rather than the
+  // answer.
+  it("saves a deduction alone as the focus leaves it, the worksheet following at once", async () => {
+    const answer = heldBack<Answer<Deductions>>();
+    vi.mocked(saveDeductions).mockReturnValue(answer.promise);
+    renderSet("cma");
 
-    expect(
-      within(screen.getByRole("region", { name: "CMA-derived rates" }))
-        .getAllByRole("term")
-        .map((term) => term.textContent),
-    ).toStrictEqual([
-      "Stocks total",
-      "Bonds total",
-      "CMA vintage",
-      "Real stocks",
-      "Real bonds",
-      "Real portfolio",
-    ]);
+    commit(field("Fee drag"), "0.25");
+
+    await waitFor(() => {
+      expect(worksheet(derived)[4]).toStrictEqual([
+        "Return",
+        "7.79%",
+        "4.20%",
+        "7.08%",
+      ]);
+    });
+    expect(saveDeductions).toHaveBeenCalledExactlyOnceWith({ fees: 0.0025 });
+
+    answer.answer(saved({ dividends: 0.02, fees: 0.0025 }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Deductions saved" }),
+      ).toHaveAccessibleDescription("Fees 0.25% · dividend yield 2.00%");
+    });
+    await waitFor(() => {
+      expect(worksheet(derived)[4]?.[1]).toBe("7.84%");
+    });
   });
 
-  // The store refuses the set chosen in either case, so the card is
-  // only drawn so while it is asked.
-  it("leaves the CMA's rates blank while the CMA gives none", () => {
-    renderSet("cma", { mappings: mappings.slice(1) });
+  // A yield of 2.5% moves half a point of stocks' return from growth to
+  // yield, and their return stays at 7.84%.
+  it("sends the dividend yield under its own name, moving return from growth to yield, and nothing for one typed back to what it was", async () => {
+    const answer = heldBack<Answer<Deductions>>();
+    vi.mocked(saveDeductions).mockReturnValue(answer.promise);
+    renderSet("cma");
 
-    const card = screen.getByRole("region", { name: "CMA-derived rates" });
+    commit(field("Fee drag"), "0.2");
 
-    expect(field("Stocks growth", card)).toHaveValue("");
-    expect(
-      within(card)
-        .getAllByRole("definition")
-        .map((definition) => definition.textContent),
-    ).toStrictEqual(["—", "—", "Aug 2026", "—", "—", "—"]);
+    expect(saveDeductions).not.toHaveBeenCalled();
+
+    commit(field("Dividend yield"), "2.5");
+
+    expect(saveDeductions).toHaveBeenCalledExactlyOnceWith({
+      dividends: 0.025,
+    });
+    await waitFor(() => {
+      expect(worksheet(derived).slice(4, 7)).toStrictEqual([
+        ["Return", "7.84%", "4.25%", "7.13%"],
+        ["Growth", "5.34%", "4.25%", "5.13%"],
+        ["Dividend yield", "2.50%", "—", "2.00%"],
+      ]);
+    });
+
+    answer.answer(saved({ dividends: 0.025, fees: 0.002 }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Deductions saved" }),
+      ).toBeInTheDocument();
+    });
   });
 
-  // All in equities, bonds stand in at stocks' return and weigh
-  // nothing, so their growth, total and real return are left blank, the
-  // first saying why, and the portfolio comes to stocks' 4.75% alone.
-  it("leaves blank the rate of a sleeve nothing in the target allocation blends into", () => {
-    renderSet("cma", { targets: targetsUnder("Equity") });
-
-    const card = screen.getByRole("region", { name: "CMA-derived rates" });
-
-    expect(field("Stocks growth", card)).toHaveValue("5.84%");
-    expect(field("Bonds growth", card)).toHaveValue("");
-    expect(field("Bonds growth", card)).toHaveAccessibleDescription(
-      "Nothing in the target allocation blends into bonds",
+  it("puts a deduction back and says why when the store refuses it", async () => {
+    vi.mocked(saveDeductions).mockResolvedValue(
+      refused("A rate loses no more than everything"),
     );
-    expect(
-      within(card)
-        .getAllByRole("definition")
-        .map((definition) => definition.textContent),
-    ).toStrictEqual([
-      "7.84%",
-      "−0.10pp",
-      "—",
-      "Aug 2026",
-      "4.75%",
-      "—",
-      "4.75%",
-    ]);
+    renderSet("cma");
+
+    commit(field("Fee drag"), "150");
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Deductions not saved" }),
+      ).toHaveAccessibleDescription("A rate loses no more than everything");
+    });
+    await waitFor(() => {
+      expect(field("Fee drag")).toHaveValue("0.20%");
+    });
   });
 
-  // All in bonds, stocks have no growth, yield, total or real return of
-  // their own, and no move from the vintage before, and the portfolio
-  // comes to bonds' 4.25%, 1.26% real, alone.
-  it("leaves stocks' rates, total and move blank when nothing blends into stocks", () => {
-    renderSet("cma", { targets: targetsUnder("Bonds") });
+  // The pull is offered under the custom rates too, so a vintage can be
+  // pulled before the CMA's rates are chosen.
+  it("pulls BlackRock's workbook under either set, holding while it is on its way, and says what it pulled", async () => {
+    const answer = heldBack<Answer<Cma>>();
+    vi.mocked(pullCma).mockReturnValue(answer.promise);
+    renderSet();
+    const pull = within(cardOf("Custom rates")).getByRole("button", {
+      name: "Pull CMA workbook",
+    });
 
-    const card = screen.getByRole("region", { name: "CMA-derived rates" });
+    fireEvent.click(pull);
 
-    expect(field("Stocks growth", card)).toHaveValue("");
-    expect(field("Stocks growth", card)).toHaveAccessibleDescription(
-      "Nothing in the target allocation blends into stocks",
-    );
-    expect(field("Dividend yield", card)).toHaveValue("");
-    expect(field("Bonds growth", card)).not.toHaveValue("");
-    expect(
-      within(card)
-        .getAllByRole("definition")
-        .map((definition) => definition.textContent),
-    ).toStrictEqual(["—", "4.25%", "Aug 2026", "—", "1.26%", "1.26%"]);
+    await waitFor(() => {
+      expect(pull).toBeDisabled();
+    });
+
+    answer.answer(saved(cma));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "CMA pulled" }),
+      ).toHaveAccessibleDescription("August 2026, data as of 30 Jun 2026");
+    });
+    await waitFor(() => {
+      expect(pull).toBeEnabled();
+    });
   });
 
-  it("leaves the vintage and the curve's day out before either is pulled", () => {
-    renderSet("cma", { cma: null, curve: null });
-
-    const card = screen.getByRole("region", { name: "CMA-derived rates" });
-
-    expect(field("Inflation", card)).toHaveValue("");
-    expect(field("Stocks growth", card)).toHaveAccessibleDescription(
-      "From the CMA, once one is pulled",
+  it("says why when the pull is refused", async () => {
+    vi.mocked(pullCma).mockResolvedValue(
+      refused("BlackRock did not send its capital market assumptions"),
     );
-    expect(field("Inflation", card)).toHaveAccessibleDescription(
-      "From the BoE curve, once one is pulled",
-    );
-    expect(
-      within(card)
-        .getAllByRole("definition")
-        .map((definition) => definition.textContent),
-    ).toStrictEqual(["—", "—", "—", "—", "—", "—"]);
+    renderSet("cma");
+
+    fireEvent.click(screen.getByRole("button", { name: "Pull CMA workbook" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "CMA not pulled" }),
+      ).toHaveAccessibleDescription(
+        "BlackRock did not send its capital market assumptions",
+      );
+    });
   });
 });
