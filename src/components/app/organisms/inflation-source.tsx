@@ -8,6 +8,7 @@ import { useId } from "react";
 import type { Curve } from "@/data/inflation";
 
 import { pullCurve } from "@/actions/inflation";
+import { CurveChart } from "@/components/app/atoms/curve-chart";
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { Ledger } from "@/components/app/atoms/ledger";
 import { SectionCard } from "@/components/app/molecules/section-card";
@@ -101,9 +102,16 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
 }
 
 // The curve at each maturity it is read at, on a sunken panel headed as
-// a region of its own, the horizon's point in the foreground and the
-// rest muted, and the source beneath.
-function ByMaturity({ curve }: { readonly curve: Curve }): JSX.Element {
+// a region of its own: drawn, with the inflation derived from it across
+// it, then listed, the horizon's point in the foreground and the rest
+// muted, and the source beneath.
+function ByMaturity({
+  curve,
+  derived,
+}: {
+  readonly curve: Curve;
+  readonly derived: number;
+}): JSX.Element {
   const id = useId();
   return (
     <section
@@ -113,6 +121,7 @@ function ByMaturity({ curve }: { readonly curve: Curve }): JSX.Element {
       <h3 className="label text-muted-foreground" id={id}>
         Curve, by maturity
       </h3>
+      <CurveChart curve={curve} derived={derived} />
       <dl className="grid gap-3">
         {maturities.map((years) => {
           const tone = years === horizon ? undefined : "text-muted-foreground";
@@ -159,7 +168,7 @@ function Derivation({ curve }: { readonly curve: Curve }): JSX.Element {
         total={formatPercent(inflation.rate)}
         totalName="Derived inflation"
       />
-      <ByMaturity curve={curve} />
+      <ByMaturity curve={curve} derived={inflation.rate} />
     </div>
   );
 }
