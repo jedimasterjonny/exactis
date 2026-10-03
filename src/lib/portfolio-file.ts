@@ -187,8 +187,6 @@ function targetsOf(classes: readonly Class[]): readonly Target[] {
     throw new Refusal(`The ${taxonomy} taxonomy holds no classes`);
   }
   return top.flatMap((each) =>
-    [...categoriesOf(each, [], 1)].sort(
-      (one, other) => other.share - one.share,
-    ),
+    categoriesOf(each, [], 1).toSorted((one, other) => other.share - one.share),
   );
 }
