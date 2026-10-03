@@ -295,6 +295,45 @@ describe("readCma", () => {
     );
   });
 
+  // A row read in another currency is refused listed twice, as a
+  // sterling class is, rather than one of the two taken: the dollar cash
+  // a hedge is carried from, a return hedged to dollars, and the class
+  // carried from each currency with the anchor it is carried over.
+  it.each([
+    { currency: "USD", name: "US cash" },
+    { currency: "USD", name: "Global aggregate bonds (hedged)" },
+    { currency: "USD", name: "US small cap equities" },
+    { currency: "USD", name: "US large cap equities" },
+    { currency: "JPY", name: "Japan large cap equities" },
+    { currency: "JPY", name: "US large cap equities" },
+  ])(
+    "refuses a sheet listing $name in $currency twice",
+    ({ currency, name }) => {
+      const sheet = startingPointOf([
+        ...priced,
+        [currency, "Equities", name, 0.05],
+      ]);
+
+      expect(() => readCma(cmaFile(sheet))).toThrow(
+        new Refusal(
+          `The Starting point sheet lists ${name} in ${currency} twice`,
+        ),
+      );
+    },
+  );
+
+  // A hedged return for a class sterling does not price, and a row of
+  // euros, are never read, so either listed twice refuses nothing.
+  it("takes a sheet listing twice a row it never reads", () => {
+    const sheet = startingPointOf([
+      ...priced,
+      ["USD", "Fixed income", "Global ex-US treasuries (hedged)", 0.05],
+      ["EUR", "Equities", "Europe large cap equities", 0.05],
+    ]);
+
+    expect(readCma(cmaFile(sheet))).toStrictEqual(readCma(cmaFile()));
+  });
+
   it("refuses a sheet with no line dating its vintage", () => {
     expect(() =>
       readCma(cmaFile(startingPointOf(priced, "Capital Market Assumptions"))),

@@ -151,16 +151,10 @@ function carriedOf(
   sterling: readonly Asset[],
   listed: readonly Listed[],
 ): readonly Asset[] {
-  const rateOf = (currency: string, name: string): number | undefined => {
-    const rate = listed.find(
-      (row) => row.currency === currency && row.name === name,
-    )?.rate;
-    return typeof rate === "number" ? rate : undefined;
-  };
   const base = sterling.find(({ name }) => name === anchor)?.rate;
   return carried.flatMap(([currency, name]) => {
-    const rate = rateOf(currency, name);
-    const over = rateOf(currency, anchor);
+    const rate = rateIn(listed, currency, name);
+    const over = rateIn(listed, currency, anchor);
     return base === undefined ||
       rate === undefined ||
       over === undefined ||
@@ -252,6 +246,26 @@ function monthOf(name: string, year: string): Month {
   return { month, year: Number(year) };
 }
 
+// The return a currency's block gives the class named, or nothing for a
+// class it lists without a number or not at all. One it lists twice is
+// refused, as a sterling class is, rather than either taken: only a row
+// read here can be refused, so a class listed twice that nothing reads
+// stops no pull.
+function rateIn(
+  listed: readonly Listed[],
+  currency: string,
+  name: string,
+): number | undefined {
+  const rows = listed.filter(
+    (row) => row.currency === currency && row.name === name,
+  );
+  if (rows.length > 1) {
+    throw new Refusal(`The ${sheet} sheet lists ${name} in ${currency} twice`);
+  }
+  const rate = rows[0]?.rate;
+  return typeof rate === "number" ? rate : undefined;
+}
+
 // A cell's text with the spaces around it let go, as BlackRock leaves
 // one after some names, or none for a cell holding a number or nothing.
 function textAt(row: Row, column: number): string {
@@ -265,17 +279,10 @@ function withHedged(
   sterling: readonly Asset[],
   listed: readonly Listed[],
 ): readonly Asset[] {
-  const dollars = new Map(
-    listed.flatMap(({ currency, name, rate }) =>
-      currency === "USD" && typeof rate === "number"
-        ? [[name, rate] as const]
-        : [],
-    ),
-  );
   const fromCash = sterling.find(({ name }) => name === sterlingCash)?.rate;
-  const toCash = dollars.get(dollarCash);
+  const toCash = rateIn(listed, "USD", dollarCash);
   return sterling.flatMap((asset) => {
-    const rate = dollars.get(asset.name + hedged);
+    const rate = rateIn(listed, "USD", asset.name + hedged);
     return rate === undefined || fromCash === undefined || toCash === undefined
       ? [asset]
       : [
