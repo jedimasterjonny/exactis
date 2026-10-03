@@ -182,10 +182,7 @@ export function TargetTable({
                   {category.name}
                   {flags.map(({ isMuted, text }) => (
                     <Badge
-                      className={cn(
-                        "label",
-                        isMuted && "text-muted-foreground",
-                      )}
+                      className={cn(isMuted && "text-muted-foreground")}
                       key={text}
                       variant={isMuted ? "outline" : "caution"}
                     >

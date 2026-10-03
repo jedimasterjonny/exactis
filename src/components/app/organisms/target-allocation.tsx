@@ -100,7 +100,7 @@ export function TargetAllocation({
       actions={
         <>
           {targets !== null && (
-            <Badge className="label" variant="secondary">
+            <Badge variant="secondary">
               <FolderSync aria-hidden />
               {`Imported ${formatDay(targets.importedOn)}`}
             </Badge>

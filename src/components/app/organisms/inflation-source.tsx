@@ -63,7 +63,7 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
     <SectionCard
       actions={
         <>
-          <Badge className="label" variant="secondary">
+          <Badge variant="secondary">
             <Landmark aria-hidden />
             BoE implied curve
           </Badge>
