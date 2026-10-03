@@ -119,7 +119,7 @@ describe("AssetTable", () => {
 
     expect(within(golfRow).getAllByRole("cell", { name: "—" })).toHaveLength(2);
     expect(
-      within(golfRow).getByRole("cell", { name: "£18,000grows at -15.00%" }),
+      within(golfRow).getByRole("cell", { name: "£18,000grows at −15.00%" }),
     ).toBeInTheDocument();
     expect(within(golfRow).getByRole("cell", { name: "£18,000" })).toHaveClass(
       "font-medium",
@@ -286,7 +286,7 @@ describe("AssetTable", () => {
     }
     expect(
       screen.getByRole("cell", {
-        name: "Golf £18,000 Car · £18,000 value · grows at -15.00%",
+        name: "Golf £18,000 Car · £18,000 value · grows at −15.00%",
       }),
     ).toBeInTheDocument();
     expect(

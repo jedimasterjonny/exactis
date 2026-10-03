@@ -65,6 +65,10 @@ describe("formatPercent", () => {
     expect(formatPercent(0.12345)).toBe("12.35%");
   });
 
+  it("signs a fall with a real minus", () => {
+    expect(formatPercent(-0.021)).toBe("−2.10%");
+  });
+
   it("writes a fall that rounds to nothing unsigned", () => {
     expect(formatPercent(-0.00004)).toBe("0.00%");
     expect(formatPercent(-0)).toBe("0.00%");
