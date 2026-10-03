@@ -6,7 +6,14 @@ import { cn } from "cn";
 import { ChartPie, Download, Sheet } from "lucide-react";
 import { useId, useOptimistic } from "react";
 
-import type { Blend, Deductions, Mapping, Vintages } from "@/data/cma";
+import type {
+  Blend,
+  Cma,
+  Deductions,
+  Mapping,
+  Sleeve,
+  Vintages,
+} from "@/data/cma";
 import type { Targets } from "@/data/targets";
 
 import { pullCma } from "@/actions/cma";
@@ -71,8 +78,9 @@ const sleeves = {
 // adjustment where a class in the sleeve is hedged to sterling, the
 // fees, and for stocks the yield split out, each closing on the growth
 // the rates take. Every step is one the growth is worked out from, so
-// the steps add up to it. Beside them, on a sunken panel, every category's share of
-// the whole. Before a vintage is pulled, or a target allocation imported
+// the steps add up to it. Beneath them, on a sunken panel, every
+// category's share of the whole, under the sleeve it blends into.
+// Before a vintage is pulled, or a target allocation imported
 // on its tab, there is nothing to blend, and the card says so; while the
 // vintage makes no blend, it says what is missing in the caution tone.
 // The footer states what the figures are.
@@ -226,7 +234,7 @@ function Blended({
   }
   const rates = cmaRates(blends, deductions, 0);
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,18rem)]">
+    <div className="grid gap-8 lg:grid-cols-2">
       <Sleeve
         blend={blends.stocks}
         deductions={deductions}
@@ -241,7 +249,7 @@ function Blended({
         sleeve="bonds"
         total={rates.bonds}
       />
-      <Weights targets={targets} />
+      <Weights cma={vintages.latest} mappings={mappings} targets={targets} />
     </div>
   );
 }
@@ -327,29 +335,75 @@ function Sleeve({
 }
 
 // Every category's share of the whole, on a sunken panel headed as a
-// region of its own, a share of nothing muted, and where the shares
-// come from beneath.
-function Weights({ targets }: { readonly targets: Targets }): JSX.Element {
+// region of its own beneath both ledgers, split by the sleeve it blends
+// into, the one its class in the latest vintage is priced in: a share of
+// nothing muted, and where the shares come from beneath. A sleeve to a
+// column where the screen is wide enough, and where it is wider still,
+// equities take two of three columns and run down both, since that is
+// where a portfolio's categories are, so the panel is as tall as half of
+// them; one with more bond categories than equity would want it the
+// other way about. The card is drawn only when every category asking
+// for a share has a class, so one without asks for nothing and is left
+// out of both.
+function Weights({
+  cma,
+  mappings,
+  targets,
+}: {
+  readonly cma: Cma;
+  readonly mappings: readonly Mapping[];
+  readonly targets: Targets;
+}): JSX.Element {
   const id = useId();
+  const priced = new Map(cma.assets.map(({ name, sleeve }) => [name, sleeve]));
+  const sleeveOf = (category: string): Sleeve | undefined =>
+    priced.get(
+      mappings.find((mapping) => mapping.category === category)?.asset ?? "",
+    );
   return (
     <section
       aria-labelledby={id}
-      className="grid gap-4 self-start rounded-lg bg-muted p-5"
+      className="grid gap-4 rounded-lg bg-muted p-5 lg:col-span-2"
     >
       <h3 className="label text-muted-foreground" id={id}>
         Target weights
       </h3>
-      <dl className="grid gap-3">
-        {targets.categories.map(({ id: category, name, share }) => {
-          const tone = share === 0 ? "text-muted-foreground" : undefined;
-          return (
-            <div className="flex justify-between gap-4" key={category}>
-              <dt className={tone}>{name}</dt>
-              <dd className={cn("figure", tone)}>{formatPercent(share)}</dd>
-            </div>
-          );
-        })}
-      </dl>
+      <div className="grid gap-6 lg:grid-cols-2 lg:gap-8 xl:grid-cols-3">
+        {(["stocks", "bonds"] as const).map((sleeve) => (
+          <div
+            aria-labelledby={`${id}-${sleeve}`}
+            className={cn(
+              "grid content-start gap-3",
+              sleeve === "stocks" && "xl:col-span-2",
+            )}
+            key={sleeve}
+            role="group"
+          >
+            <h4 className="label text-muted-foreground" id={`${id}-${sleeve}`}>
+              {sleeves[sleeve].heading}
+            </h4>
+            <dl className={cn(sleeve === "stocks" && "xl:columns-2 xl:gap-8")}>
+              {targets.categories
+                .filter(({ id: category }) => sleeveOf(category) === sleeve)
+                .map(({ id: category, name, share }) => {
+                  const tone =
+                    share === 0 ? "text-muted-foreground" : undefined;
+                  return (
+                    <div
+                      className="flex break-inside-avoid justify-between gap-4 pb-3"
+                      key={category}
+                    >
+                      <dt className={tone}>{name}</dt>
+                      <dd className={cn("figure", tone)}>
+                        {formatPercent(share)}
+                      </dd>
+                    </div>
+                  );
+                })}
+            </dl>
+          </div>
+        ))}
+      </div>
       <p className="text-sm text-muted-foreground">
         From the Target allocation tab — portfolio targets, not current
         holdings.
