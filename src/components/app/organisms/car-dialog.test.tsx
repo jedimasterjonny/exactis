@@ -24,7 +24,6 @@ import {
 import { plan } from "@/data/income.fixture";
 import { saved as accepted, refused } from "@/lib/answer";
 import { commit, field, openDialog } from "@/test/dom";
-import { heldBack } from "@/test/held-back";
 
 import { CarDialog } from "./car-dialog";
 
@@ -112,7 +111,8 @@ describe("CarDialog", () => {
     );
 
     // The store's answer is held back, so the save can be seen in flight.
-    const { answer, promise } = heldBack<Answer<Account>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<Account>>();
     vi.mocked(saveCar).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 

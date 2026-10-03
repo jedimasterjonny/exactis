@@ -22,7 +22,6 @@ import { allocation, rates } from "@/data/rates.fixture";
 import { targets, targetsUnder } from "@/data/targets.fixture";
 import { refused, saved } from "@/lib/answer";
 import { commit, field, worksheet } from "@/test/dom";
-import { heldBack } from "@/test/held-back";
 
 import { RateSet } from "./rate-set";
 
@@ -213,7 +212,7 @@ describe("RateSet", () => {
   // The store's set comes back with the page rather than the answer, so
   // once the store has answered the card shows the set it was given.
   it("chooses the CMA's rates as the radio is pressed, showing them at once, and says so under a toast", async () => {
-    const answer = heldBack<Answer<Chosen>>();
+    const answer = Promise.withResolvers<Answer<Chosen>>();
     vi.mocked(saveRateSet).mockReturnValue(answer.promise);
     renderSet();
 
@@ -226,7 +225,7 @@ describe("RateSet", () => {
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
     expect(saveRateSet).toHaveBeenCalledExactlyOnceWith("cma");
 
-    answer.answer(saved("cma"));
+    answer.resolve(saved("cma"));
 
     await waitFor(() => {
       expect(
@@ -291,7 +290,7 @@ describe("RateSet", () => {
   // the stored deductions come back with the page rather than the
   // answer.
   it("saves a deduction alone as the focus leaves it, the worksheet following at once", async () => {
-    const answer = heldBack<Answer<Deductions>>();
+    const answer = Promise.withResolvers<Answer<Deductions>>();
     vi.mocked(saveDeductions).mockReturnValue(answer.promise);
     renderSet("cma");
 
@@ -307,7 +306,7 @@ describe("RateSet", () => {
     });
     expect(saveDeductions).toHaveBeenCalledExactlyOnceWith({ fees: 0.0025 });
 
-    answer.answer(saved({ dividends: 0.02, fees: 0.0025 }));
+    answer.resolve(saved({ dividends: 0.02, fees: 0.0025 }));
 
     await waitFor(() => {
       expect(
@@ -322,7 +321,7 @@ describe("RateSet", () => {
   // A yield of 2.5% moves half a point of stocks' return from growth to
   // yield, and their return stays at 7.84%.
   it("sends the dividend yield under its own name, moving return from growth to yield, and nothing for one typed back to what it was", async () => {
-    const answer = heldBack<Answer<Deductions>>();
+    const answer = Promise.withResolvers<Answer<Deductions>>();
     vi.mocked(saveDeductions).mockReturnValue(answer.promise);
     renderSet("cma");
 
@@ -343,7 +342,7 @@ describe("RateSet", () => {
       ]);
     });
 
-    answer.answer(saved({ dividends: 0.025, fees: 0.002 }));
+    answer.resolve(saved({ dividends: 0.025, fees: 0.002 }));
 
     await waitFor(() => {
       expect(
@@ -393,7 +392,7 @@ describe("RateSet", () => {
   // Confirming sends nothing to change, so the store keeps both and
   // dates them today; the press holds while it is asked.
   it("confirms the deductions still right, holding while the store is asked, and says so under a toast", async () => {
-    const answer = heldBack<Answer<Deductions>>();
+    const answer = Promise.withResolvers<Answer<Deductions>>();
     vi.mocked(saveDeductions).mockReturnValue(answer.promise);
     renderSet("cma");
     const confirm = screen.getByRole("button", { name: "Still right" });
@@ -405,7 +404,9 @@ describe("RateSet", () => {
       expect(confirm).toBeDisabled();
     });
 
-    answer.answer(saved({ dividends: 0.02, fees: 0.002, setOn: "2026-10-03" }));
+    answer.resolve(
+      saved({ dividends: 0.02, fees: 0.002, setOn: "2026-10-03" }),
+    );
 
     await waitFor(() => {
       expect(
@@ -420,7 +421,7 @@ describe("RateSet", () => {
   // The pull is offered under the custom rates too, so a vintage can be
   // pulled before the CMA's rates are chosen.
   it("pulls BlackRock's workbook under either set, holding while it is on its way, and says what it pulled", async () => {
-    const answer = heldBack<Answer<Cma>>();
+    const answer = Promise.withResolvers<Answer<Cma>>();
     vi.mocked(pullCma).mockReturnValue(answer.promise);
     renderSet();
     const pull = within(cardOf("Custom rates")).getByRole("button", {
@@ -433,7 +434,7 @@ describe("RateSet", () => {
       expect(pull).toBeDisabled();
     });
 
-    answer.answer(saved(cma));
+    answer.resolve(saved(cma));
 
     await waitFor(() => {
       expect(

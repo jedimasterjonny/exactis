@@ -18,7 +18,6 @@ import { incomeLines, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { refused, saved } from "@/lib/answer";
 import { bySlot, commit } from "@/test/dom";
-import { heldBack } from "@/test/held-back";
 
 import { MilestoneList } from "./milestone-list";
 
@@ -182,7 +181,8 @@ describe("MilestoneList", () => {
     expect(year).toHaveAccessibleDescription("Age 50");
 
     // The store's answer is held back, so the save can be seen in flight.
-    const { answer, promise } = heldBack<Answer<Milestone>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<Milestone>>();
     vi.mocked(saveMilestone).mockReturnValue(promise);
     fireEvent.click(within(form).getByRole("button", { name: "Save" }));
 

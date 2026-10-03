@@ -16,7 +16,6 @@ import { Toaster } from "@/components/kit/toast";
 import { cma, mappings } from "@/data/cma.fixture";
 import { targets } from "@/data/targets.fixture";
 import { refused, saved } from "@/lib/answer";
-import { heldBack } from "@/test/held-back";
 
 import { TargetTable } from "./target-table";
 
@@ -171,7 +170,7 @@ describe("TargetTable", () => {
   // bonds to stocks, at 8.156%, and leaves bonds without UK cash's
   // 3.574%.
   it("moves a category to the other sleeve's group as a class of that sleeve is chosen", async () => {
-    const answer = heldBack<Answer<readonly Mapping[]>>();
+    const answer = Promise.withResolvers<Answer<readonly Mapping[]>>();
     vi.mocked(mapCategory).mockReturnValue(answer.promise);
     renderTable();
 
@@ -195,7 +194,7 @@ describe("TargetTable", () => {
       "18.00%",
     ]);
 
-    answer.answer(saved(mappings));
+    answer.resolve(saved(mappings));
 
     await waitFor(() => {
       expect(
@@ -296,7 +295,7 @@ describe("TargetTable", () => {
   // answer, so once the store has answered the row shows the class it
   // was given again.
   it("maps a category onto the class chosen, showing it and its return at once, and says so under a toast", async () => {
-    const answer = heldBack<Answer<readonly Mapping[]>>();
+    const answer = Promise.withResolvers<Answer<readonly Mapping[]>>();
     vi.mocked(mapCategory).mockReturnValue(answer.promise);
     renderTable();
 
@@ -313,7 +312,7 @@ describe("TargetTable", () => {
       category: ukEquity?.id,
     });
 
-    answer.answer(saved(mappings));
+    answer.resolve(saved(mappings));
 
     await waitFor(() => {
       expect(
@@ -326,7 +325,7 @@ describe("TargetTable", () => {
   });
 
   it("maps a category onto no class, flagging one that asks for a share", async () => {
-    const answer = heldBack<Answer<readonly Mapping[]>>();
+    const answer = Promise.withResolvers<Answer<readonly Mapping[]>>();
     vi.mocked(mapCategory).mockReturnValue(answer.promise);
     renderTable();
 
@@ -342,7 +341,7 @@ describe("TargetTable", () => {
       category: ukEquity?.id,
     });
 
-    answer.answer(saved(mappings));
+    answer.resolve(saved(mappings));
 
     await waitFor(() => {
       expect(
