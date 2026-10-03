@@ -209,10 +209,10 @@ describe("the schedule actions", () => {
         household: {
           next: 6,
           schedule: {
-            income: [
-              ...kept.schedule.income.slice(0, 3),
+            income: kept.schedule.income.with(
+              3,
               lineOf({ ...values, lastYear: null }, 4),
-            ],
+            ),
           },
         },
       });
@@ -368,13 +368,7 @@ describe("the schedule actions", () => {
       expect(await readLatest(db)).toMatchObject({
         household: {
           next: 6,
-          schedule: {
-            expenses: [
-              ...kept.schedule.expenses.slice(0, 3),
-              written,
-              kept.schedule.expenses[4],
-            ],
-          },
+          schedule: { expenses: kept.schedule.expenses.with(3, written) },
         },
       });
     });
