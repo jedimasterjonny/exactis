@@ -1,9 +1,12 @@
 // Money is en-GB currency, never abbreviated but on a chart's axis and
 // never carrying pence in a balance. The sign is a real minus, U+2212,
-// never the hyphen Intl writes.
+// never the hyphen Intl writes, and only on what is below nothing once
+// rounded: by default Intl signs minus nothing, and a few pence going
+// out, as "-£0".
 const gbp = new Intl.NumberFormat("en-GB", {
   currency: "GBP",
   maximumFractionDigits: 0,
+  signDisplay: "negative",
   style: "currency",
 });
 
@@ -31,29 +34,34 @@ export function formatGbp(value: number): string {
 }
 
 // The figure with its sign turned, and nothing left as nothing rather
-// than as minus nothing, which Intl writes with its minus: a balance of
-// nothing owed would read "−£0", and a rate of nothing lost "-0.00%".
+// than as minus nothing, which a money field formatting with Intl's own
+// sign writes with its minus: a car or house owing nothing would open
+// its dialog with "-£0" owed.
 export function negated(figure: number): number {
   return figure === 0 ? 0 : -figure;
 }
 
 // A rate is held as a fraction and shown as a percentage to two places,
-// so 0 reads 0.00% and 0.021 reads 2.10%. The options are one statement
+// so 0 reads 0.00% and 0.021 reads 2.10%, and a fall too small to show
+// reads 0.00% rather than -0.00%. The options are one statement
 // the ledger formats with and the rate field hands Base UI to format and
 // parse with, so what a row shows and what a field takes agree.
 export const percentFormat: Intl.NumberFormatOptions = {
   maximumFractionDigits: 2,
   minimumFractionDigits: 2,
+  signDisplay: "negative",
   style: "percent",
 };
 
 const percent = new Intl.NumberFormat("en-GB", percentFormat);
 
 // A rate read off a market curve is quoted a place finer than a rate
-// the plan is set at, so 0.03365 reads 3.365%.
+// the plan is set at, so 0.03365 reads 3.365%, and a fall too small to
+// show reads 0.000%.
 const curveRate = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 3,
   minimumFractionDigits: 3,
+  signDisplay: "negative",
   style: "percent",
 });
 
