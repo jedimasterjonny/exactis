@@ -209,6 +209,17 @@ jobs:
       # bun.lock rather than node_modules, and a lockfile that would not
       # install is still worth auditing.
       #
+      # So a run answers for what its change introduces, and no more. The
+      # base's lockfile is audited as well, and an advisory it already has
+      # is a warning here rather than a failure. One published against a
+      # package already on main is news about main, not about whichever
+      # pull request runs next: on 3 October a single braces advisory
+      # turned main and every open pull request red at once, none of them
+      # having touched braces. It stays on every run as a warning until it
+      # is fixed or accepted below. With no base lockfile to compare - a
+      # new branch, a base that predates bun.lock - the tree is audited
+      # whole.
+      #
       # Every severity fails it. An advisory that cannot be fixed is
       # accepted with --ignore, the advisory named here and the reason
       # beside it, the same shape as an eslint-disable and its -- reason.
@@ -231,8 +242,36 @@ jobs:
       # own paths - and none is reached from anything that serves a
       # request. A pattern nobody hostile writes overflows nothing, so the
       # advisory is accepted until braces ships a fix.
+      #
+      # bun audit --json lists an ignored advisory regardless, so the
+      # accepted ones are skipped by hand before the warning rather than
+      # by the flag.
       - if: ${{ !cancelled() }}
-        run: bun audit --ignore GHSA-67mh-4wv8-2f99 --ignore GHSA-vfj7-8cjw-p6xm
+        env:
+          BASE_SHA:
+            ${{ github.event_name == 'pull_request' &&
+            github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -uo pipefail
+
+          accepted=(GHSA-67mh-4wv8-2f99 GHSA-vfj7-8cjw-p6xm)
+          ignore=()
+          for id in "${accepted[@]}"; do ignore+=(--ignore "$id"); done
+
+          if git cat-file -e "$BASE_SHA:bun.lock" 2>/dev/null; then
+            base="$(mktemp -d)"
+            git show "$BASE_SHA:package.json" > "$base/package.json"
+            git show "$BASE_SHA:bun.lock" > "$base/bun.lock"
+            for id in $( (cd "$base" && bun audit --json) | jq -r '.[][] | .url | split("/") | last' | sort -u); do
+              case " ${accepted[*]} " in *" $id "*) continue ;; esac
+              echo "::warning::$id is already on ${BASE_SHA:0:7}, so it does not fail this run. Fix it, or accept it in ci.yml with its reason."
+              ignore+=(--ignore "$id")
+            done
+          else
+            echo "No base lockfile to compare with; auditing this tree whole."
+          fi
+
+          bun audit "${ignore[@]}"
 
       # The commit-msg hook is bypassable with --no-verify. This is not, and
       # it runs for a push as well as a pull request. Most of this history
