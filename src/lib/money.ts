@@ -70,7 +70,7 @@ export function formatCurveRate(value: number): string {
 }
 
 export function formatPercent(value: number): string {
-  return percent.format(value);
+  return percent.format(value).replace(/^-/, "−");
 }
 
 // A difference between two rates, in percentage points and written pp,
