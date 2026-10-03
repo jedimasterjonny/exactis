@@ -20,6 +20,14 @@ const ukDay = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
 });
 
+// How many whole days one ISO date falls after another: nothing for the
+// same day, and fewer than nothing for a day before it. Both are read as
+// the start of their day in UTC, so the count is of days rather than of
+// the hours between two clocks.
+export function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
+}
+
 // The day an ISO date names, its month cut short: "1 Sep 2026". Read in
 // UTC, as a month's name is, since an ISO date is read as the start of
 // its day there, and put together here rather than by Intl, whose
