@@ -223,9 +223,7 @@ describe("readCma", () => {
     [2, "Asset"],
   ])("refuses a sheet with no column headed %s", (column, text) => {
     const sheet = startingPointOf().map((row, index) =>
-      index === 1 || index === 2
-        ? row.map((cell, at) => (at === column ? undefined : cell))
-        : row,
+      index === 1 || index === 2 ? row.with(column, undefined) : row,
     );
 
     expect(() => readCma(cmaFile(sheet))).toThrow(
@@ -237,7 +235,7 @@ describe("readCma", () => {
   // not taken in its place.
   it("refuses a block of expected returns with no 20-year column", () => {
     const sheet = startingPointOf().map((row, index) =>
-      index === 2 ? row.map((cell, at) => (at === 6 ? "25 year" : cell)) : row,
+      index === 2 ? row.with(6, "25 year") : row,
     );
 
     expect(() => readCma(cmaFile(sheet))).toThrow(
