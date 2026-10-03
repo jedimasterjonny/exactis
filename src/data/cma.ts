@@ -170,12 +170,9 @@ export function blendsOf(
       short: `${listed.format(missing.map(({ name }) => name))} ${missing.length === 1 ? "is" : "are"} mapped onto a class the ${vintageName(cma)} CMA does not price`,
     };
   }
-  const [bonds, stocks] = sleeves.map((sleeve) =>
-    blendOf(
-      priced.filter(({ asset }) => asset.sleeve === sleeve),
-      named,
-    ),
-  );
+  const bySleeve = Object.groupBy(priced, ({ asset }) => asset.sleeve);
+  const bonds = blendOf(bySleeve.bonds ?? [], named);
+  const stocks = blendOf(bySleeve.stocks ?? [], named);
   const standIn = stocks ?? bonds;
   if (standIn === undefined) {
     return { short: "Nothing in the target allocation asks for a share" };
