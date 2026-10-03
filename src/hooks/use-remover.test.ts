@@ -7,7 +7,6 @@ import type { Answer } from "@/lib/answer";
 
 import { toast } from "@/components/kit/toast";
 import { refused, saved } from "@/lib/answer";
-import { heldBack } from "@/test/held-back";
 
 import { useRemover } from "./use-remover";
 
@@ -63,7 +62,8 @@ describe("useRemover", () => {
     // The store's answer is held back, so the deletion can be seen in
     // flight, and given before the test ends, since a transition left
     // waiting holds every later one with it.
-    const { answer, promise } = heldBack<Answer<undefined>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<undefined>>();
     store.mockReturnValue(promise);
     const { result } = renderHook(() =>
       useRemover<Doomed>({
@@ -109,7 +109,8 @@ describe("useRemover", () => {
     const store = vi.fn<Store>();
     // The store's answer is held back, so the deletion can be seen in
     // flight.
-    const { answer, promise } = heldBack<Answer<undefined>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<undefined>>();
     store.mockReturnValue(promise);
     const { result } = renderHook(() =>
       useRemover<Doomed>({

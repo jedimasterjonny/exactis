@@ -22,7 +22,6 @@ import {
 } from "@/lib/portfolio-file.fixture";
 import { getHousehold, getSourcesDaysAgo } from "@/store/household";
 import { worksheet } from "@/test/dom";
-import { heldBack } from "@/test/held-back";
 
 import Assumptions from "./page";
 
@@ -163,7 +162,7 @@ describe("Assumptions", () => {
   // held when the tab is opened again, and a second cannot be started
   // over it.
   it("keeps an import held while the rates are open", async () => {
-    const answer = heldBack<Answer<Targets>>();
+    const answer = Promise.withResolvers<Answer<Targets>>();
     vi.mocked(importTargets).mockReturnValue(answer.promise);
     render(await Assumptions(), { wrapper: Toaster });
 
@@ -190,7 +189,7 @@ describe("Assumptions", () => {
 
     expect(button).toBeDisabled();
 
-    answer.answer(saved(targets));
+    answer.resolve(saved(targets));
 
     await waitFor(() => {
       expect(button).toBeEnabled();

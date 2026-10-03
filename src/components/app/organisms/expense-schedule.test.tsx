@@ -18,7 +18,6 @@ import { plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { saved as accepted } from "@/lib/answer";
 import { commit, openEditor, openEntry } from "@/test/dom";
-import { heldBack } from "@/test/held-back";
 
 import { ExpenseSchedule } from "./expense-schedule";
 
@@ -152,7 +151,8 @@ describe("ExpenseSchedule", () => {
     ).toBeInTheDocument();
 
     // The store's answer is held back, so the save can be seen in flight.
-    const { answer, promise } = heldBack<Answer<ExpenseLine>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<ExpenseLine>>();
     vi.mocked(saveExpenseLine).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 

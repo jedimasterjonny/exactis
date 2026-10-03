@@ -7,7 +7,6 @@ import type { Answer } from "@/lib/answer";
 
 import { toast } from "@/components/kit/toast";
 import { refused, saved } from "@/lib/answer";
-import { heldBack } from "@/test/held-back";
 
 import { useSender } from "./use-sender";
 
@@ -24,7 +23,8 @@ describe("useSender", () => {
     const call = vi.fn<Call>();
     // The store's answer is held back, so the call can be seen in
     // flight.
-    const { answer, promise } = heldBack<Answer<string>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<string>>();
     call.mockReturnValue(promise);
     const onAccepted = vi.fn<(value: string) => void>();
     const { result } = renderHook(() => useSender());

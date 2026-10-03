@@ -20,7 +20,6 @@ import { owners } from "@/data/owners.fixture";
 import { lineGrowths } from "@/data/schedule";
 import { saved as accepted, refused } from "@/lib/answer";
 import { commit, openEditor, openEntry } from "@/test/dom";
-import { heldBack } from "@/test/held-back";
 
 import { IncomeSchedule } from "./income-schedule";
 
@@ -93,7 +92,8 @@ describe("IncomeSchedule", () => {
   // and closes on the answer; the row goes when the page re-reads.
   it("asks before deleting a line, and deletes it on confirm", async () => {
     renderSchedule();
-    const { answer, promise } = heldBack<Answer<undefined>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<undefined>>();
     vi.mocked(removeIncomeLine).mockReturnValue(promise);
 
     fireEvent.click(screen.getByRole("button", { name: "Delete Salary" }));
@@ -187,7 +187,8 @@ describe("IncomeSchedule", () => {
     renderSchedule();
     // The store's answer is held back, so the save can be seen in flight,
     // and given at the end, so no save is left on its way.
-    const { answer, promise } = heldBack<Answer<IncomeLine>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<IncomeLine>>();
     vi.mocked(saveIncomeLine).mockReturnValue(promise);
     const dialog = openEditor("Salary");
 
@@ -630,7 +631,8 @@ describe("IncomeSchedule", () => {
     ).toBeInTheDocument();
 
     // The store's answer is held back, so the save can be seen in flight.
-    const { answer, promise } = heldBack<Answer<IncomeLine>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<IncomeLine>>();
     vi.mocked(saveIncomeLine).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 

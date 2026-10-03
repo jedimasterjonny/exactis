@@ -15,7 +15,6 @@ import { Toaster } from "@/components/kit/toast";
 import { curve } from "@/data/inflation.fixture";
 import { refused, saved } from "@/lib/answer";
 import { formatDay } from "@/lib/months";
-import { heldBack } from "@/test/held-back";
 
 import { InflationSource } from "./inflation-source";
 
@@ -121,7 +120,7 @@ describe("InflationSource", () => {
       asOf: "2026-09-24",
       implied: { 5: 0.03777, 10: 0.0346, 20: 0.03459, 30: 0.03492 },
     };
-    const answer = heldBack<Answer<Curve>>();
+    const answer = Promise.withResolvers<Answer<Curve>>();
     vi.mocked(pullCurve).mockReturnValue(answer.promise);
     renderSource();
 
@@ -133,7 +132,7 @@ describe("InflationSource", () => {
       expect(button).toBeDisabled();
     });
 
-    answer.answer(saved(pulled));
+    answer.resolve(saved(pulled));
 
     await waitFor(() => {
       expect(

@@ -20,7 +20,6 @@ import { incomeLines } from "@/data/income.fixture";
 import { owners, sam } from "@/data/owners.fixture";
 import { refused, saved } from "@/lib/answer";
 import { commit, field, openDialog } from "@/test/dom";
-import { heldBack } from "@/test/held-back";
 
 import { AccountDialog } from "./account-dialog";
 
@@ -110,7 +109,8 @@ describe("AccountDialog", () => {
     ).toBeInTheDocument();
 
     // The store's answer is held back, so the save can be seen in flight.
-    const { answer, promise } = heldBack<Answer<Account>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<Account>>();
     vi.mocked(saveAccount).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
@@ -399,7 +399,8 @@ describe("AccountDialog", () => {
     });
     // The store's answer is held back, so the save can be seen in flight,
     // and given at the end, so no save is left on its way.
-    const { answer, promise } = heldBack<Answer<Account>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<Account>>();
     vi.mocked(saveAccount).mockReturnValue(promise);
     const dialog = openDialog();
 
