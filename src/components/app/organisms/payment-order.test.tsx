@@ -60,7 +60,7 @@ describe("PaymentOrder", () => {
   it("draws a pension always funded in red on the line, and says so", () => {
     render(
       <PaymentOrder
-        accounts={[{ ...pension, isAlwaysFunded: true }, isa, cash]}
+        accounts={held.with(0, { ...pension, isAlwaysFunded: true })}
         label="Sect. II.iii"
         onMove={vi.fn<Move>()}
       />,
