@@ -369,6 +369,53 @@ describe("RateSet", () => {
     });
   });
 
+  it("says when the deductions were last set", () => {
+    renderSet("cma", {
+      deductions: { dividends: 0.02, fees: 0.002, setOn: "2026-09-03" },
+    });
+
+    expect(cardOf("CMA-derived rates")).toHaveTextContent(
+      "Fees and yield last set or confirmed 3 Sep 2026",
+    );
+  });
+
+  it("says the deductions are not dated while no day is kept, under either set", () => {
+    renderSet();
+
+    expect(
+      screen.getByRole("region", { name: "For the CMA's rates" }),
+    ).toHaveTextContent(
+      "Fees and yield are not dated: they were set before the day was kept",
+    );
+  });
+
+  // Confirming sends nothing to change, so the store keeps both and
+  // dates them today; the press holds while it is asked.
+  it("confirms the deductions still right, holding while the store is asked, and says so under a toast", async () => {
+    const answer = heldBack<Answer<Deductions>>();
+    vi.mocked(saveDeductions).mockReturnValue(answer.promise);
+    renderSet("cma");
+    const confirm = screen.getByRole("button", { name: "Still right" });
+
+    fireEvent.click(confirm);
+
+    expect(saveDeductions).toHaveBeenCalledExactlyOnceWith({});
+    await waitFor(() => {
+      expect(confirm).toBeDisabled();
+    });
+
+    answer.answer(saved({ dividends: 0.02, fees: 0.002, setOn: "2026-10-03" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Deductions confirmed" }),
+      ).toHaveAccessibleDescription("Fees 0.20% · dividend yield 2.00%");
+    });
+    await waitFor(() => {
+      expect(confirm).toBeEnabled();
+    });
+  });
+
   // The pull is offered under the custom rates too, so a vintage can be
   // pulled before the CMA's rates are chosen.
   it("pulls BlackRock's workbook under either set, holding while it is on its way, and says what it pulled", async () => {
