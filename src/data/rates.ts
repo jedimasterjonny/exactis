@@ -57,6 +57,14 @@ export function planRate(rates: Rates, allocation: Allocation): number {
   );
 }
 
+// What a rate comes to once prices have risen by the inflation given: a
+// pound grown at it, read at the prices it started at. Today's money
+// divides every sum by how far prices have risen, so the two compound
+// rather than subtract, and this is what a balance grows at there.
+export function realRate(rate: number, inflation: number): number {
+  return (1 + rate) / (1 + inflation) - 1;
+}
+
 // What stocks return in all: their growth and the yield on top of it,
 // added, since every account the plan holds them in reinvests it.
 export function stocksTotal(rates: Rates): number {

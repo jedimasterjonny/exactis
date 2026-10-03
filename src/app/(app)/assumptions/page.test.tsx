@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Household } from "@/data/household";
@@ -84,6 +90,11 @@ describe("Assumptions", () => {
     expect(screen.getByRole("textbox", { name: "Stocks share" })).toHaveValue(
       "80.00%",
     );
+    expect(
+      within(screen.getByRole("region", { name: "Custom rates" }))
+        .getAllByRole("definition")
+        .at(-1),
+    ).toHaveTextContent("4.18%");
     expect(
       screen.getByRole("region", { name: "Curve, by maturity" }),
     ).toBeInTheDocument();
