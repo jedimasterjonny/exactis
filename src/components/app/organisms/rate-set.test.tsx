@@ -17,7 +17,7 @@ import { saveRates, saveRateSet } from "@/actions/plan";
 import { Toaster } from "@/components/kit/toast";
 import { cma, mappings } from "@/data/cma.fixture";
 import { curve } from "@/data/inflation.fixture";
-import { rates } from "@/data/rates.fixture";
+import { allocation, rates } from "@/data/rates.fixture";
 import { targets, targetsUnder } from "@/data/targets.fixture";
 import { refused, saved } from "@/lib/answer";
 import { commit, field } from "@/test/dom";
@@ -35,8 +35,17 @@ const may: Cma = {
   vintage: { month: 4, year: 2026 },
 };
 
-// The set given over the rates the design shows typed by hand, and the
-// reference household's sources for the CMA's: August's vintage with
+// The figures the card gives: stocks' and bonds' totals, then what
+// stocks, bonds and the portfolio come to over inflation.
+function figures(): readonly (null | string)[] {
+  return screen
+    .getAllByRole("definition")
+    .map((definition) => definition.textContent);
+}
+
+// The set given over the rates and the split the design shows typed by
+// hand, and the reference household's sources for the CMA's: August's
+// vintage with
 // May's before it, the first of September's curve, its target
 // allocation and mappings, and 0.20% of fees and a 2% yield. A save
 // reports through the toast manager, which needs its Toaster mounted.
@@ -46,6 +55,7 @@ function renderSet(
 ): void {
   render(
     <RateSet
+      allocation={allocation}
       cma={{ latest: cma, previous: may }}
       curve={curve}
       deductions={{ dividends: 0.02, fees: 0.002 }}
@@ -57,11 +67,6 @@ function renderSet(
     />,
     { wrapper: Toaster },
   );
-}
-
-// The figure the card gives for stocks' total, the one it defines.
-function stocksTotal(): null | string {
-  return screen.getByRole("definition").textContent;
 }
 
 describe("RateSet", () => {
@@ -97,8 +102,10 @@ describe("RateSet", () => {
     );
   });
 
-  // 5.95% and 2% make 7.95% in all.
-  it("shows each rate as kept, what it rests on, and stocks' total", () => {
+  // 5.95% and 2% make 7.95% in all, and four fifths of it and a fifth of
+  // bonds' 4.45% make 7.25%. Over 2.95% of inflation those are 4.86%,
+  // 1.46% and 4.18%, where subtracting would give 5.00%, 1.50% and 4.30%.
+  it("shows each rate as kept, what it rests on, stocks' and bonds' totals, and what each comes to over inflation", () => {
     renderSet();
 
     const card = screen.getByRole("region", { name: "Custom rates" });
@@ -117,14 +124,29 @@ describe("RateSet", () => {
     expect(field("Inflation", card)).toHaveAccessibleDescription(
       "Typed by hand — the BoE derivation below is ignored",
     );
-    expect(within(card).getByRole("term")).toHaveTextContent("Stocks total");
-    expect(stocksTotal()).toBe("7.95%");
+    expect(
+      within(card)
+        .getAllByRole("term")
+        .map((term) => term.textContent),
+    ).toStrictEqual([
+      "Stocks total",
+      "Bonds total",
+      "Real stocks",
+      "Real bonds",
+      "Real portfolio",
+    ]);
+    expect(
+      within(card)
+        .getAllByRole("definition")
+        .map((definition) => definition.textContent),
+    ).toStrictEqual(["7.95%", "4.45%", "4.86%", "1.46%", "4.18%"]);
   });
 
-  // 6.45% and 2% make 8.45% in all, and the stored rates come back
-  // with the page rather than with the answer, so once the store has
-  // answered the card shows the rates it was given again.
-  it("saves a rate alone as the focus leaves it, showing it and stocks' total at once", async () => {
+  // 6.45% and 2% make 8.45% in all, 5.34% over inflation, and the
+  // portfolio 4.57%. The stored rates come back with the page rather than
+  // with the answer, so once the store has answered the card shows the
+  // rates it was given again.
+  it("saves a rate alone as the focus leaves it, showing it, stocks' total and the real returns at once", async () => {
     const answer = heldBack<Answer<Rates>>();
     vi.mocked(saveRates).mockReturnValue(answer.promise);
     renderSet();
@@ -132,7 +154,13 @@ describe("RateSet", () => {
     commit(field("Stocks growth"), "6.45");
 
     await waitFor(() => {
-      expect(stocksTotal()).toBe("8.45%");
+      expect(figures()).toStrictEqual([
+        "8.45%",
+        "4.45%",
+        "5.34%",
+        "1.46%",
+        "4.57%",
+      ]);
     });
     expect(field("Stocks growth")).toHaveValue("6.45%");
     expect(saveRates).toHaveBeenCalledExactlyOnceWith({ stocks: 0.0645 });
@@ -147,7 +175,13 @@ describe("RateSet", () => {
       );
     });
     await waitFor(() => {
-      expect(stocksTotal()).toBe("7.95%");
+      expect(figures()).toStrictEqual([
+        "7.95%",
+        "4.45%",
+        "4.86%",
+        "1.46%",
+        "4.18%",
+      ]);
     });
   });
 
@@ -285,8 +319,10 @@ describe("RateSet", () => {
   // August's blends less 0.20% of fees and the 2% yield: stocks 5.84%
   // growth and 2.00% yield, 7.84% in all, bonds 4.25%, and the curve's
   // 2.95%. May priced every class a tenth of a point higher, so August
-  // moved stocks down by 0.10 of a point.
-  it("shows the CMA's rates read-only, each with where it comes from, stocks' total, the move from the vintage before and the vintage", () => {
+  // moved stocks down by 0.10 of a point. Over inflation stocks come to
+  // 4.75%, bonds 1.26%, and the target allocation's four fifths in stocks
+  // 4.05%, not the split typed.
+  it("shows the CMA's rates read-only, each with where it comes from, stocks' total, the move from the vintage before, bonds' total, the vintage, and what each comes to over inflation", () => {
     renderSet("cma");
 
     const card = screen.getByRole("region", { name: "CMA-derived rates" });
@@ -323,12 +359,28 @@ describe("RateSet", () => {
       within(card)
         .getAllByRole("term")
         .map((term) => term.textContent),
-    ).toStrictEqual(["Stocks total", "vs May 2026", "CMA vintage"]);
+    ).toStrictEqual([
+      "Stocks total",
+      "vs May 2026",
+      "Bonds total",
+      "CMA vintage",
+      "Real stocks",
+      "Real bonds",
+      "Real portfolio",
+    ]);
     expect(
       within(card)
         .getAllByRole("definition")
         .map((definition) => definition.textContent),
-    ).toStrictEqual(["7.84%", "−0.10pp", "Aug 2026"]);
+    ).toStrictEqual([
+      "7.84%",
+      "−0.10pp",
+      "4.25%",
+      "Aug 2026",
+      "4.75%",
+      "1.26%",
+      "4.05%",
+    ]);
     expect(
       screen.queryByRole("region", { name: "Custom rates" }),
     ).not.toBeInTheDocument();
@@ -342,7 +394,14 @@ describe("RateSet", () => {
       within(screen.getByRole("region", { name: "CMA-derived rates" }))
         .getAllByRole("term")
         .map((term) => term.textContent),
-    ).toStrictEqual(["Stocks total", "CMA vintage"]);
+    ).toStrictEqual([
+      "Stocks total",
+      "Bonds total",
+      "CMA vintage",
+      "Real stocks",
+      "Real bonds",
+      "Real portfolio",
+    ]);
   });
 
   // The store refuses the set chosen in either case, so the card is
@@ -357,11 +416,12 @@ describe("RateSet", () => {
       within(card)
         .getAllByRole("definition")
         .map((definition) => definition.textContent),
-    ).toStrictEqual(["—", "Aug 2026"]);
+    ).toStrictEqual(["—", "—", "Aug 2026", "—", "—", "—"]);
   });
 
   // All in equities, bonds stand in at stocks' return and weigh
-  // nothing, so their growth is left blank and says why.
+  // nothing, so their growth, total and real return are left blank, the
+  // first saying why, and the portfolio comes to stocks' 4.75% alone.
   it("leaves blank the rate of a sleeve nothing in the target allocation blends into", () => {
     renderSet("cma", { targets: targetsUnder("Equity") });
 
@@ -372,10 +432,24 @@ describe("RateSet", () => {
     expect(field("Bonds growth", card)).toHaveAccessibleDescription(
       "Nothing in the target allocation blends into bonds",
     );
+    expect(
+      within(card)
+        .getAllByRole("definition")
+        .map((definition) => definition.textContent),
+    ).toStrictEqual([
+      "7.84%",
+      "−0.10pp",
+      "—",
+      "Aug 2026",
+      "4.75%",
+      "—",
+      "4.75%",
+    ]);
   });
 
-  // All in bonds, stocks have no growth, yield or total of their own,
-  // and no move from the vintage before.
+  // All in bonds, stocks have no growth, yield, total or real return of
+  // their own, and no move from the vintage before, and the portfolio
+  // comes to bonds' 4.25%, 1.26% real, alone.
   it("leaves stocks' rates, total and move blank when nothing blends into stocks", () => {
     renderSet("cma", { targets: targetsUnder("Bonds") });
 
@@ -391,7 +465,7 @@ describe("RateSet", () => {
       within(card)
         .getAllByRole("definition")
         .map((definition) => definition.textContent),
-    ).toStrictEqual(["—", "Aug 2026"]);
+    ).toStrictEqual(["—", "4.25%", "Aug 2026", "—", "1.26%", "1.26%"]);
   });
 
   it("leaves the vintage and the curve's day out before either is pulled", () => {
@@ -410,6 +484,6 @@ describe("RateSet", () => {
       within(card)
         .getAllByRole("definition")
         .map((definition) => definition.textContent),
-    ).toStrictEqual(["—", "—"]);
+    ).toStrictEqual(["—", "—", "—", "—", "—", "—"]);
   });
 });

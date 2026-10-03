@@ -61,6 +61,7 @@ export default async function Assumptions(): Promise<JSX.Element> {
               children: (
                 <>
                   <RateSet
+                    allocation={allocation}
                     cma={cma}
                     curve={curve}
                     deductions={deductions}

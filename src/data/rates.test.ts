@@ -4,7 +4,13 @@ import { describe, expect, it } from "vitest";
 import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
 
-import { allInStocks, openingRates, planRate, stocksTotal } from "./rates";
+import {
+  allInStocks,
+  openingRates,
+  planRate,
+  realRate,
+  stocksTotal,
+} from "./rates";
 import { allocation, rates } from "./rates.fixture";
 
 describe("openingRates", () => {
@@ -29,6 +35,17 @@ describe("openingRates", () => {
     expect(planRate(opening, allInStocks)).toBeCloseTo(0.05, 15);
     expect(planRate(opening, { stocks: 0 })).toBeCloseTo(0.05, 15);
     expect(planRate(opening, allocation)).toBeCloseTo(0.05, 15);
+  });
+});
+
+describe("realRate", () => {
+  // 7.95% over 2.95% is 1.0795 / 1.0295, not the 5% subtracting gives.
+  it("divides the inflation out rather than subtracting it", () => {
+    expect(realRate(0.0795, 0.0295)).toBeCloseTo(0.05 / 1.0295, 15);
+  });
+
+  it("is nothing for a rate that only keeps up with prices", () => {
+    expect(realRate(0.0295, 0.0295)).toBe(0);
   });
 });
 
