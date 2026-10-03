@@ -5,10 +5,12 @@ import type { RateSet as Chosen } from "@/data/rates";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { ScreenTabs } from "@/components/app/atoms/screen-tabs";
+import { SourceDates } from "@/components/app/atoms/source-dates";
 import { InflationSource } from "@/components/app/organisms/inflation-source";
 import { RateSet } from "@/components/app/organisms/rate-set";
 import { TargetAllocation } from "@/components/app/organisms/target-allocation";
 import { formatPercent } from "@/lib/money";
+import { today } from "@/lib/months";
 import { assumptions, sectionLabel } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
 
@@ -18,7 +20,8 @@ const setNames: Record<Chosen, string> = {
   custom: "custom rates",
 };
 
-// The assumptions the plan runs on, in two tabs. The first holds the
+// The assumptions the plan runs on, under a strip saying how old each
+// source they rest on is, in two tabs. The first holds the
 // rates: the set the plan runs on and the rates in it, the CMA-derived
 // ones worked out from their sources or the ones and the split typed by
 // hand, and beneath them the inflation source, over the curve last
@@ -49,6 +52,13 @@ export default async function Assumptions(): Promise<JSX.Element> {
         {`Plan rate ${formatPercent(plan.rate)} · inflation ${formatPercent(plan.inflation)} · ${setNames[rateSet]}`}
       </ScreenHeader>
       <ScreenBody>
+        <SourceDates
+          cma={cma}
+          curve={curve}
+          deductions={deductions}
+          targets={targets}
+          today={today()}
+        />
         <ScreenTabs
           tabs={[
             {
