@@ -174,9 +174,9 @@ function carriedOf(
 // The first column holding the text given, or a refusal saying the
 // sheet has none.
 function columnOf(row: Row, text: string): number {
-  const found = [...row].find(
-    ([, cell]) => typeof cell === "string" && cell.trim() === text,
-  );
+  const found = row
+    .entries()
+    .find(([, cell]) => typeof cell === "string" && cell.trim() === text);
   if (found === undefined) {
     throw new Refusal(`The ${sheet} sheet has no column headed ${text}`);
   }
@@ -192,11 +192,13 @@ function columnOf(row: Row, text: string): number {
 function columnsOf(header: Row, labels: Row): Columns {
   const returns = columnOf(labels, "Expected returns");
   const next =
-    [...labels].find(
-      ([column, cell]) => column > returns && typeof cell === "string",
-    )?.[0] ?? Infinity;
+    labels
+      .entries()
+      .find(
+        ([column, cell]) => column > returns && typeof cell === "string",
+      )?.[0] ?? Infinity;
   const block = new Map(
-    [...header].filter(([column]) => column >= returns && column < next),
+    header.entries().filter(([column]) => column >= returns && column < next),
   );
   return {
     asset: columnOf(header, "Asset"),

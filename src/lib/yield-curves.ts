@@ -89,7 +89,7 @@ export function readCurve(file: Uint8Array): Curve {
 // A day's rates by maturity: each rate under a maturity in the header.
 function ratesOf(row: Row, header: Row): ReadonlyMap<number, number> {
   return new Map(
-    [...header].flatMap(([column, years]) => {
+    header.entries().flatMap(([column, years]) => {
       const rate = row.get(column);
       return typeof years === "number" && typeof rate === "number"
         ? [[years, rate] as const]
