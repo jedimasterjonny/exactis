@@ -206,8 +206,8 @@ function Blended({
 // What the bonds' blend rests on: the category weighing most in it and
 // how much, or nothing for a sleeve nothing blends into.
 function largestOf({ parts }: Blend): string {
-  return [...parts]
-    .sort((one, other) => other.weight - one.weight)
+  return parts
+    .toSorted((one, other) => other.weight - one.weight)
     .slice(0, 1)
     .map(
       ({ category, weight }) =>

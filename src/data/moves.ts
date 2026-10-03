@@ -60,7 +60,7 @@ const steps: readonly {
 }[] = [
   {
     read: ({ cma }) =>
-      [...(cma?.latest.assets ?? [])].sort((one, other) =>
+      (cma?.latest.assets ?? []).toSorted((one, other) =>
         one.name.localeCompare(other.name),
       ),
     source: "cma",
@@ -73,11 +73,11 @@ const steps: readonly {
   },
   {
     read: ({ mappings, targets }) => ({
-      classes: [...mappings]
-        .sort((one, other) => one.category.localeCompare(other.category))
+      classes: mappings
+        .toSorted((one, other) => one.category.localeCompare(other.category))
         .map(({ asset, category }) => [category, asset]),
-      shares: [...(targets?.categories ?? [])]
-        .sort((one, other) => one.id.localeCompare(other.id))
+      shares: (targets?.categories ?? [])
+        .toSorted((one, other) => one.id.localeCompare(other.id))
         .map(({ id, share }) => [id, share]),
     }),
     source: "targets",
