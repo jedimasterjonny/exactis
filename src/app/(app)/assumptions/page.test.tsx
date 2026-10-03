@@ -109,8 +109,10 @@ describe("Assumptions", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Target allocation" }));
 
+    // A row a category, one for the group of them none of which is
+    // blended before a CMA is pulled, and the header.
     expect(screen.getAllByRole("row")).toHaveLength(
-      targets.categories.length + 1,
+      targets.categories.length + 1 + 1,
     );
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
