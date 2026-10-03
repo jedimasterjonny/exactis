@@ -237,19 +237,35 @@ describe("saveDeductions", () => {
     expect(await readLatest(db)).toBeNull();
   });
 
-  it("writes the deductions sent over the household's, keeping the rest, and draws the page again", async () => {
+  it("writes the deductions sent over the household's, keeping the rest, dated today, and draws the page again", async () => {
     expect(await saveDeductions({ fees: 0.0025 })).toStrictEqual(
-      saved({ dividends: 0.02, fees: 0.0025 }),
+      saved({ dividends: 0.02, fees: 0.0025, setOn: "2026-09-15" }),
     );
     expect(await readLatest(db)).toStrictEqual({
-      household: { ...blank, deductions: { dividends: 0.02, fees: 0.0025 } },
+      household: {
+        ...blank,
+        deductions: { dividends: 0.02, fees: 0.0025, setOn: "2026-09-15" },
+      },
       version: 1,
     });
     expect(refresh).toHaveBeenCalledOnce();
 
     expect(await saveDeductions({ dividends: 0.019 })).toStrictEqual(
-      saved({ dividends: 0.019, fees: 0.0025 }),
+      saved({ dividends: 0.019, fees: 0.0025, setOn: "2026-09-15" }),
     );
+  });
+
+  // Kept on the first of the month and confirmed on the fifteenth.
+  it("confirms the deductions still right, keeping both and dating them today, when sent neither", async () => {
+    await keepAfter(db, 0, {
+      ...reference,
+      deductions: { dividends: 0.019, fees: 0.0025, setOn: "2026-09-01" },
+    });
+
+    expect(await saveDeductions({})).toStrictEqual(
+      saved({ dividends: 0.019, fees: 0.0025, setOn: "2026-09-15" }),
+    );
+    expect(await readLatest(db)).toMatchObject({ version: 2 });
   });
 
   it("refuses a deduction that is not a number", async () => {
@@ -276,7 +292,7 @@ describe("saveDeductions", () => {
     await keepAfter(db, 0, reference);
 
     expect(await saveDeductions({ fees: 1.5 })).toStrictEqual(
-      saved({ dividends: 0.02, fees: 1.5 }),
+      saved({ dividends: 0.02, fees: 1.5, setOn: "2026-09-15" }),
     );
 
     await keepAfter(db, 2, { ...reference, rateSet: "cma" });

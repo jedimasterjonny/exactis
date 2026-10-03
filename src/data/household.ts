@@ -330,11 +330,13 @@ const mappings = z
   );
 
 // What comes off the CMA's returns: a dividend yield of nothing or
-// more, as a typed one is, and fees of nothing or more, since a fee is
-// charged and never paid.
+// more, as a typed one is, fees of nothing or more, since a fee is
+// charged and never paid, and the day they were last set, if one is
+// kept.
 const deductions = z.object({
   dividends: z.number().min(0, "A dividend yield is nothing or more"),
   fees: z.number().min(0, "A fee is nothing or more"),
+  setOn: z.iso.date().exactOptional(),
 }) satisfies z.ZodType<Deductions>;
 
 // The rates as typed: each class growing at a rate no lower than losing

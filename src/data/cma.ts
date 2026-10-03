@@ -52,10 +52,14 @@ export interface Cma {
 // fraction a year: the yield split out of stocks' return, which the plan
 // adds back on top of their growth, and the fees charged on every fund,
 // which BlackRock's index returns are gross of and the plan charges
-// nowhere else.
+// nowhere else. Neither moves when a source is pulled, so they keep the
+// day they were last typed or confirmed still right, as an ISO date, to
+// say how long they have stood; none for the ones a household opens
+// with, or kept before the day was.
 export interface Deductions {
   readonly dividends: number;
   readonly fees: number;
+  readonly setOn?: string;
 }
 
 // What the CMA gives the plan to run on: the rates, and the split of the
