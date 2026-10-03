@@ -35,6 +35,42 @@ const cash: Target = {
 // UK equity, which the reference maps onto UK large cap equities.
 const ukEquity = targets.categories[2];
 
+// Each group of rows as read down: its row, its name, what its return
+// is, the return and its share,
+// then each category in it, its name, class, return and target, the
+// class read as its select shows it, or as its cell reads before there
+// is one.
+function groups(): readonly (readonly (string | undefined)[])[][] {
+  return screen
+    .getAllByRole("rowgroup")
+    .slice(1)
+    .map((group) => {
+      const [head, ...rows] = within(group).getAllByRole("row");
+      const [, detail, rate, share] = within(head ?? group).getAllByRole(
+        "cell",
+      );
+      return [
+        [
+          within(head ?? group).getByRole("rowheader").textContent,
+          detail?.textContent,
+          rate?.textContent,
+          share?.textContent,
+        ],
+        ...rows.map((row) => {
+          const [, name, mapped, cellRate, target] =
+            within(row).getAllByRole("cell");
+          return [
+            name?.textContent,
+            within(mapped ?? row).queryByRole<HTMLSelectElement>("combobox")
+              ?.value ?? mapped?.textContent,
+            cellRate?.textContent,
+            target?.textContent,
+          ];
+        }),
+      ];
+    });
+}
+
 // The table over the categories, vintage and mappings given, the
 // reference's by default. A mapping reports through the toast manager,
 // which needs its Toaster mounted.
@@ -66,7 +102,7 @@ function rowOf(name: string): readonly HTMLElement[] {
 
 // The class select of the category named, in its column.
 function selectOf(name: string): HTMLSelectElement {
-  return within(rowOf(name)[3] ?? document.body).getByRole<HTMLSelectElement>(
+  return within(rowOf(name)[2] ?? document.body).getByRole<HTMLSelectElement>(
     "combobox",
     { name: `CMA class for ${name}` },
   );
@@ -78,83 +114,133 @@ describe("TargetTable", () => {
 
     expect(
       screen.getAllByRole("columnheader").map((head) => head.textContent),
-    ).toStrictEqual([
-      "Category",
-      "PP class",
-      "CMA class",
-      "20y return",
-      "Target",
+    ).toStrictEqual(["Category", "CMA class", "20y return", "Target"]);
+  });
+
+  // The folded cell leads each row, then the four columns. Stocks are
+  // four fifths of the whole, blending to 8.044% by their targets, and
+  // bonds a fifth, to 4.451% with their hedged class at its hedged
+  // return; FTSE North America has no class, so it is not blended, and
+  // its group has no return.
+  it("lays the categories out by the sleeve their class blends into, each group opening on its share and blended return", () => {
+    renderTable();
+
+    expect(groups()).toStrictEqual([
+      [
+        ["Stocks", "Blended by target, hedging included", "8.044%", "80.00%"],
+        [
+          "FTSE Global All Cap ex-UK",
+          "Global ex-UK large cap equities",
+          "7.722%",
+          "48.00%",
+        ],
+        [
+          "Global emerging markets",
+          "Emerging large cap equities",
+          "9.256%",
+          "12.00%",
+        ],
+        ["UK equity", "UK large cap equities", "8.156%", "12.00%"],
+        ["Global small cap", "Global small cap equities", "7.991%", "8.00%"],
+        ["FTSE 100", "UK large cap equities", "8.156%", "0.00%"],
+      ],
+      [
+        ["Bonds", "Blended by target, hedging included", "4.451%", "20.00%"],
+        [
+          "Global bonds, hedged",
+          "Global aggregate bonds (GBP hedged)",
+          "4.542%",
+          "14.00%",
+        ],
+        [
+          "UK index-linked gilts, 5y+Nothing implements it",
+          "UK index-linked gilts (5+ year)",
+          "4.570%",
+          "4.00%",
+        ],
+        ["Short-dated gilts", "UK cash", "3.574%", "2.00%"],
+      ],
+      [
+        ["Not blended", "No class the vintage prices", "—", "0.00%"],
+        ["FTSE North AmericaNo CMA class", "", "—", "0.00%"],
+      ],
     ]);
   });
 
-  // The folded cell leads each row, then the five columns, the class
-  // read as its select shows it.
-  it("lays each category out in the order given, with the classes above it, its CMA class and that class's return, and its target", () => {
+  // Short-dated gilts onto UK large cap equities takes their 2% from
+  // bonds to stocks, at 8.156%, and leaves bonds without UK cash's
+  // 3.574%.
+  it("moves a category to the other sleeve's group as a class of that sleeve is chosen", async () => {
+    const answer = heldBack<Answer<readonly Mapping[]>>();
+    vi.mocked(mapCategory).mockReturnValue(answer.promise);
     renderTable();
 
-    const rows = screen.getAllByRole("row").slice(1);
+    fireEvent.change(selectOf("Short-dated gilts"), {
+      target: { value: "UK large cap equities" },
+    });
 
-    expect(
-      rows.map((row) => {
-        const [, name, classes, mapped, rate, target] =
-          within(row).getAllByRole("cell");
-        return [
-          name?.textContent,
-          classes?.textContent,
-          within(mapped ?? document.body).getByRole<HTMLSelectElement>(
-            "combobox",
-          ).value,
-          rate?.textContent,
-          target?.textContent,
-        ];
-      }),
-    ).toStrictEqual([
-      [
-        "FTSE Global All Cap ex-UK",
-        "Equity · Developed",
-        "Global ex-UK large cap equities",
-        "7.722%",
-        "48.00%",
-      ],
-      [
-        "Global emerging markets",
-        "Equity",
-        "Emerging large cap equities",
-        "9.256%",
-        "12.00%",
-      ],
-      ["UK equity", "Equity · UK", "UK large cap equities", "8.156%", "12.00%"],
-      [
-        "Global small cap",
-        "Equity",
-        "Global small cap equities",
-        "7.991%",
-        "8.00%",
-      ],
-      [
-        "FTSE North AmericaNo CMA class",
-        "Equity · Developed",
-        "",
-        "—",
-        "0.00%",
-      ],
-      ["FTSE 100", "Equity · UK", "UK large cap equities", "8.156%", "0.00%"],
-      [
-        "Global bonds, hedged",
-        "Bonds",
-        "Global aggregate bonds (GBP hedged)",
-        "4.542%",
-        "14.00%",
-      ],
-      [
-        "UK index-linked gilts, 5y+Nothing implements it",
-        "Bonds",
-        "UK index-linked gilts (5+ year)",
-        "4.570%",
-        "4.00%",
-      ],
-      ["Short-dated gilts", "Bonds", "UK cash", "3.574%", "2.00%"],
+    await waitFor(() => {
+      expect(groups()[0]?.[0]).toStrictEqual([
+        "Stocks",
+        "Blended by target, hedging included",
+        "8.047%",
+        "82.00%",
+      ]);
+    });
+    expect(groups()[0]?.at(-1)?.[0]).toBe("Short-dated gilts");
+    expect(groups()[1]?.[0]).toStrictEqual([
+      "Bonds",
+      "Blended by target, hedging included",
+      "4.548%",
+      "18.00%",
     ]);
+
+    answer.answer(saved(mappings));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "CMA class saved" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("leaves out a group with nothing in it, and gives a group asking for nothing no return", () => {
+    renderTable({ latest: null });
+
+    expect(groups().map(([head]) => head)).toStrictEqual([
+      ["Not blended", "No CMA pulled yet", "—", "100.00%"],
+    ]);
+  });
+
+  // Short-dated gilts ask for 2% with no class, so the rates tab cannot
+  // blend, and neither sleeve gives a return here either.
+  it("gives the sleeves no return while a category asking for a share has no class, and says why", () => {
+    renderTable({
+      mapped: mappings.filter(({ asset }) => asset !== "UK cash"),
+    });
+
+    const why =
+      "Not blended until every category asking for a share has a class";
+
+    expect(groups().map(([head]) => head)).toStrictEqual([
+      ["Stocks", why, "—", "80.00%"],
+      ["Bonds", why, "—", "18.00%"],
+      ["Not blended", "No class the vintage prices", "—", "2.00%"],
+    ]);
+  });
+
+  it("folds a group's row as it folds a category's, its return beneath its name and share", () => {
+    renderTable();
+
+    const [folded, head] = within(
+      screen.getAllByRole("rowgroup")[1] ?? document.body,
+    ).getAllByRole("cell");
+
+    expect(folded).toHaveClass("unfolded:hidden");
+    expect(folded).toHaveTextContent(
+      "Stocks80.00%8.044% · Blended by target, hedging included",
+    );
+    expect(head).toHaveClass("folded:hidden");
   });
 
   // A class carried into sterling from another currency says which, and
@@ -221,7 +307,7 @@ describe("TargetTable", () => {
     await waitFor(() => {
       expect(selectOf("UK equity")).toHaveValue("Global small cap equities");
     });
-    expect(rowOf("UK equity")[4]).toHaveTextContent("7.991%");
+    expect(rowOf("UK equity")[3]).toHaveTextContent("7.991%");
     expect(mapCategory).toHaveBeenCalledExactlyOnceWith({
       asset: "Global small cap equities",
       category: ukEquity?.id,
@@ -249,7 +335,7 @@ describe("TargetTable", () => {
     await waitFor(() => {
       expect(selectOf("UK equity")).toHaveValue("");
     });
-    expect(rowOf("UK equity")[4]).toHaveTextContent("—");
+    expect(rowOf("UK equity")[3]).toHaveTextContent("—");
     expect(rowOf("UK equity")[1]).toHaveTextContent("UK equityNo CMA class");
     expect(mapCategory).toHaveBeenCalledExactlyOnceWith({
       asset: null,
@@ -324,7 +410,7 @@ describe("TargetTable", () => {
       ],
     });
 
-    const [, name, , , rate] = rowOf("UK equity");
+    const [, name, , rate] = rowOf("UK equity");
     const [stale] = within(selectOf("UK equity")).getAllByRole("group");
 
     expect(selectOf("UK equity")).toHaveValue("Canada large cap equities");
@@ -342,7 +428,7 @@ describe("TargetTable", () => {
   it("dashes the class and its return before a CMA is pulled", () => {
     renderTable({ latest: null });
 
-    const [, name, , mapped, rate] = rowOf("UK equity");
+    const [, name, mapped, rate] = rowOf("UK equity");
 
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(mapped).toHaveTextContent(/^—$/);
@@ -369,8 +455,8 @@ describe("TargetTable", () => {
   it("mutes a target of nothing, and flags one that asks for nothing for its class alone", () => {
     renderTable({ categories: [...targets.categories, cash] });
 
-    const [foldedZero, , , , , zero] = rowOf("FTSE 100");
-    const [foldedHeld, , , , , held] = rowOf("UK equity");
+    const [foldedZero, , , , zero] = rowOf("FTSE 100");
+    const [foldedHeld, , , , held] = rowOf("UK equity");
 
     expect(zero).toHaveClass("text-muted-foreground");
     expect(held).not.toHaveClass("text-muted-foreground");
@@ -384,14 +470,13 @@ describe("TargetTable", () => {
     expect(rowOf("Cash")[1]).not.toHaveTextContent("Nothing implements it");
   });
 
-  it("dashes the classes of a category beneath none", () => {
+  it("folds a category with nothing to map it onto into its name, its target and dashes", () => {
     renderTable({ categories: [cash], latest: null });
 
-    const [folded, , classes, , , target] = rowOf("Cash");
+    const [folded, , , , target] = rowOf("Cash");
 
-    expect(classes).toHaveTextContent(/^—$/);
     expect(target).toHaveTextContent("0.00%");
-    expect(folded).toHaveTextContent(/^Cash0\.00%———$/);
+    expect(folded).toHaveTextContent(/^Cash0\.00%——$/);
   });
 
   // The folded cell is drawn only while the table is narrow, and the
@@ -402,9 +487,7 @@ describe("TargetTable", () => {
     const [folded, ...columns] = rowOf("FTSE Global All Cap ex-UK");
 
     expect(folded).toHaveClass("unfolded:hidden");
-    expect(folded).toHaveTextContent(
-      "FTSE Global All Cap ex-UK48.00%Equity · Developed",
-    );
+    expect(folded).toHaveTextContent(/^FTSE Global All Cap ex-UK48\.00%/);
     expect(
       within(folded ?? document.body).getByRole("combobox", {
         name: "CMA class for FTSE Global All Cap ex-UK",

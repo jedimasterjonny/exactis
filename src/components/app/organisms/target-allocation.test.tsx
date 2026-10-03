@@ -78,8 +78,10 @@ describe("TargetAllocation", () => {
   it("lays out the categories imported, each with its CMA class", () => {
     renderCard();
 
+    // A row a category, one a group of them, stocks, bonds and those
+    // not blended, and the header.
     expect(screen.getAllByRole("row")).toHaveLength(
-      targets.categories.length + 1,
+      targets.categories.length + 3 + 1,
     );
     expect(
       screen.getAllByRole("combobox", { name: "CMA class for UK equity" })[0],

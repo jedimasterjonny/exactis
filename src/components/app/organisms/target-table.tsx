@@ -7,7 +7,7 @@ import { TriangleAlert } from "lucide-react";
 import { useOptimistic } from "react";
 
 import type { OptionGroup } from "@/components/app/atoms/cell-select";
-import type { Asset, Cma, Mapping } from "@/data/cma";
+import type { Asset, Cma, Mapping, Sleeve } from "@/data/cma";
 import type { Target } from "@/data/targets";
 
 import { mapCategory } from "@/actions/targets";
@@ -53,14 +53,33 @@ const unimplemented = "Nothing implements it";
 // blend into, as BlackRock heads them.
 const headings = { bonds: "Fixed income", stocks: "Equities" } as const;
 
-// The categories of a target allocation, a row apiece in the order
-// given: each one's name, the Portfolio Performance classes it sits
-// beneath, read from the top down, the class of the latest CMA it is
-// mapped onto and that class's 20-year return, and its target, a share
-// of the whole to the hundredth of a point. A category beneath no class
-// but the root has a dash for its classes. A target of nothing is
-// muted, folded or not, since the row is there to be wound down rather
-// than bought.
+// What the table heads each group of its rows: the sleeve the
+// categories in it blend into, or, for those that blend into neither,
+// that they are not blended.
+const groupNames: Record<"none" | Sleeve, string> = {
+  bonds: "Bonds",
+  none: "Not blended",
+  stocks: "Stocks",
+};
+
+// The categories of a target allocation, a row apiece, grouped by the
+// sleeve each blends into, stocks then bonds, with those that blend
+// into neither last, and in the order given within a group: each one's
+// name, the class of the latest CMA it is mapped onto and that class's
+// 20-year return, and its target, a share of the whole to the hundredth
+// of a point. A target of nothing is muted, folded or not, since the row
+// is there to be wound down rather than bought. Each group opens on a
+// row of its own naming it, with the share of the whole it holds and the
+// return its categories blend to by their targets, a weighted mean of
+// the column it heads, so a class hedged to sterling counts at its hedged
+// return, and the row says the hedging is included: it is the rates
+// tab's blended return with its hedging added. A sleeve's return is
+// shown only while every category asking for a share has a class the
+// vintage prices, as the rates tab blends only then, and the row says
+// why it is dashed otherwise; the group that is not blended has none,
+// and says why, and one with nothing in it is left out. A category's
+// group follows its class, so one mapped onto a class of the other
+// sleeve moves to that sleeve's group as it is chosen.
 //
 // The class is chosen in the row, from the classes the latest vintage
 // prices under their sleeves' headings, or none, and saved as it is
@@ -83,8 +102,9 @@ const headings = { bonds: "Fixed income", stocks: "Equities" } as const;
 // wound down. While the
 // table is too narrow to read across, as on a phone, each row folds into
 // one cell: the name and the target on its first line, then the
-// classes, the flags and the class with its return beneath, and the
-// header goes with the other columns. Nothing opens from a row.
+// flags and the class with its return beneath, and the header goes with
+// the other columns; a group's row folds the same way, its return
+// beneath its name and share. Nothing opens from a row.
 export function TargetTable({
   categories,
   cma,
@@ -120,110 +140,197 @@ export function TargetTable({
       <TableHeader className="folded:hidden">
         <TableRow>
           <TableHead>Category</TableHead>
-          <TableHead>PP class</TableHead>
           <TableHead>CMA class</TableHead>
           <TableHead className="text-right">20y return</TableHead>
           <TableHead className="text-right">Target</TableHead>
         </TableRow>
       </TableHeader>
-      <TableBody>
-        {categories.map((category) => {
-          const classes = classesOf(category);
-          const target = formatPercent(category.share);
-          const mapped = mappedOf(category, cma, shown);
-          const isAsked = category.share > 0;
-          const flags = [
-            ...(cma === null ? [] : unblended(cma, mapped)).map((text) => ({
-              isMuted: !isAsked,
-              text,
-            })),
-            ...(isAsked && !category.isImplemented
-              ? [{ isMuted: false, text: unimplemented }]
-              : []),
-          ];
-          const rate =
-            mapped.kind === "priced" ? formatCurveRate(mapped.asset.rate) : "—";
-          const choice =
-            cma === null ? (
-              "—"
-            ) : (
-              <CellSelect
-                groups={groupsOf(cma, mapped)}
-                label={`CMA class for ${category.name}`}
-                none="No class"
-                onValueChange={(asset) => {
-                  map(category, asset);
-                }}
-                value={valueOf(mapped)}
-              />
-            );
-          return (
-            <TableRow key={category.id}>
-              <FoldedCell
-                figure={target}
-                isFigureMuted={category.share === 0}
-                name={category.name}
-              >
-                <span>{classes}</span>
-                {flags.map(({ isMuted, text }) => (
-                  <span className={cn(!isMuted && "text-caution")} key={text}>
-                    {text}
-                  </span>
-                ))}
-                <span className="flex items-center gap-3 pt-1">
-                  {choice}
-                  <span className="w-14 shrink-0 text-right figure">
-                    {rate}
-                  </span>
-                </span>
+      {groupsIn(categories, cma, shown).map(
+        ({ detail, members, name, rate, share }) => (
+          <TableBody key={name}>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <FoldedCell figure={formatPercent(share)} name={name}>
+                <span>{rate === "—" ? detail : `${rate} · ${detail}`}</span>
               </FoldedCell>
-              <TableCell className="folded:hidden">
-                <span className="flex flex-wrap items-center gap-3">
-                  {category.name}
-                  {flags.map(({ isMuted, text }) => (
-                    <Badge
-                      className={cn(isMuted && "text-muted-foreground")}
-                      key={text}
-                      variant={isMuted ? "outline" : "caution"}
-                    >
-                      <TriangleAlert aria-hidden />
-                      {text}
-                    </Badge>
-                  ))}
-                </span>
-              </TableCell>
-              <TableCell className="text-muted-foreground folded:hidden">
-                {classes}
-              </TableCell>
-              <TableCell className="folded:hidden">{choice}</TableCell>
-              <TableCell
-                className={cn(
-                  "text-right figure folded:hidden",
-                  mapped.kind !== "priced" && "text-muted-foreground",
-                )}
+              <TableHead
+                className="label text-muted-foreground folded:hidden"
+                scope="rowgroup"
               >
+                {name}
+              </TableHead>
+              <TableCell className="text-muted-foreground folded:hidden">
+                {detail}
+              </TableCell>
+              <TableCell className="text-right figure font-medium folded:hidden">
                 {rate}
               </TableCell>
-              <TableCell
-                className={cn(
-                  "text-right figure folded:hidden",
-                  category.share === 0 && "text-muted-foreground",
-                )}
-              >
-                {target}
+              <TableCell className="text-right figure font-medium folded:hidden">
+                {formatPercent(share)}
               </TableCell>
             </TableRow>
-          );
-        })}
-      </TableBody>
+            {members.map((category) => {
+              const target = formatPercent(category.share);
+              const mapped = mappedOf(category, cma, shown);
+              const isAsked = category.share > 0;
+              const flags = [
+                ...(cma === null ? [] : unblended(cma, mapped)).map((text) => ({
+                  isMuted: !isAsked,
+                  text,
+                })),
+                ...(isAsked && !category.isImplemented
+                  ? [{ isMuted: false, text: unimplemented }]
+                  : []),
+              ];
+              const rate =
+                mapped.kind === "priced"
+                  ? formatCurveRate(mapped.asset.rate)
+                  : "—";
+              const choice =
+                cma === null ? (
+                  "—"
+                ) : (
+                  <CellSelect
+                    groups={groupsOf(cma, mapped)}
+                    label={`CMA class for ${category.name}`}
+                    none="No class"
+                    onValueChange={(asset) => {
+                      map(category, asset);
+                    }}
+                    value={valueOf(mapped)}
+                  />
+                );
+              return (
+                <TableRow key={category.id}>
+                  <FoldedCell
+                    figure={target}
+                    isFigureMuted={category.share === 0}
+                    name={category.name}
+                  >
+                    {flags.map(({ isMuted, text }) => (
+                      <span
+                        className={cn(!isMuted && "text-caution")}
+                        key={text}
+                      >
+                        {text}
+                      </span>
+                    ))}
+                    <span className="flex items-center gap-3 pt-1">
+                      {choice}
+                      <span className="w-14 shrink-0 text-right figure">
+                        {rate}
+                      </span>
+                    </span>
+                  </FoldedCell>
+                  <TableCell className="folded:hidden">
+                    <span className="flex flex-wrap items-center gap-3">
+                      {category.name}
+                      {flags.map(({ isMuted, text }) => (
+                        <Badge
+                          className={cn(isMuted && "text-muted-foreground")}
+                          key={text}
+                          variant={isMuted ? "outline" : "caution"}
+                        >
+                          <TriangleAlert aria-hidden />
+                          {text}
+                        </Badge>
+                      ))}
+                    </span>
+                  </TableCell>
+                  <TableCell className="folded:hidden">{choice}</TableCell>
+                  <TableCell
+                    className={cn(
+                      "text-right figure folded:hidden",
+                      mapped.kind !== "priced" && "text-muted-foreground",
+                    )}
+                  >
+                    {rate}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "text-right figure folded:hidden",
+                      category.share === 0 && "text-muted-foreground",
+                    )}
+                  >
+                    {target}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        ),
+      )}
     </Table>
   );
 }
 
-// The classes a category sits beneath, from the top down, or a dash for
-// one beneath none.
-function classesOf({ classes }: Target): string {
-  return classes.length === 0 ? "—" : classes.join(" · ");
+// What a group's row says of its return: that a sleeve's is blended by
+// the targets with its hedging included, or why it is not blended yet;
+// and for the group not blended, why its categories are not.
+function detailOf(
+  group: "none" | Sleeve,
+  cma: Cma | null,
+  isBlended: boolean,
+): string {
+  if (group === "none") {
+    return cma === null ? "No CMA pulled yet" : "No class the vintage prices";
+  }
+  return isBlended
+    ? "Blended by target, hedging included"
+    : "Not blended until every category asking for a share has a class";
+}
+
+// The categories in the groups the table lays them out in, each with
+// its name, the share of the whole its categories hold, the return they
+// blend to by their targets, or a dash where they blend to none, and
+// what that return is or why there is none. A sleeve blends only while
+// every category asking for a share has a class the vintage prices, as
+// the rates are derived only then, and one asking for nothing blends to
+// no return. A group with nothing in it is left out.
+function groupsIn(
+  categories: readonly Target[],
+  cma: Cma | null,
+  mappings: readonly Mapping[],
+): readonly {
+  readonly detail: string;
+  readonly members: readonly Target[];
+  readonly name: string;
+  readonly rate: string;
+  readonly share: number;
+}[] {
+  const priced = categories.map((category) => {
+    const mapped = mappedOf(category, cma, mappings);
+    return { asset: mapped.kind === "priced" ? mapped.asset : null, category };
+  });
+  const isBlended = priced.every(
+    ({ asset, category }) => asset !== null || category.share === 0,
+  );
+  return (["stocks", "bonds", "none"] as const).flatMap((group) => {
+    const members = priced.filter(
+      ({ asset }) => (asset?.sleeve ?? "none") === group,
+    );
+    const share = members.reduce(
+      (sum, { category }) => sum + category.share,
+      0,
+    );
+    const earned = members.reduce(
+      (sum, { asset, category }) => sum + category.share * (asset?.rate ?? 0),
+      0,
+    );
+    return members.length === 0
+      ? []
+      : [
+          {
+            detail: detailOf(group, cma, isBlended),
+            members: members.map(({ category }) => category),
+            name: groupNames[group],
+            rate:
+              group === "none" || !isBlended || share === 0
+                ? "—"
+                : formatCurveRate(earned / share),
+            share,
+          },
+        ];
+  });
 }
 
 // The classes a category can be mapped onto, under their sleeves'
