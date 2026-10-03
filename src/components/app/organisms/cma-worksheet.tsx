@@ -16,20 +16,25 @@ import type {
   Vintages,
 } from "@/data/cma";
 import type { Curve } from "@/data/inflation";
+import type { Before, Moves, Source } from "@/data/moves";
 import type { Across } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 
 import { Caution } from "@/components/app/atoms/caution";
 import { EmptyState } from "@/components/app/atoms/empty-state";
+import { Note } from "@/components/app/atoms/note";
 import { Worksheet } from "@/components/app/atoms/worksheet";
 import { CardContent, CardFooter } from "@/components/kit/card";
 import { blendsOf, cmaRates } from "@/data/cma";
 import { inflationOf } from "@/data/inflation";
+import { movesBetween } from "@/data/moves";
 import { resultsOf } from "@/data/rates";
+import { listed } from "@/lib/feeders";
 import { formatCurveRate, formatPercent, formatPoints } from "@/lib/money";
 import { formatDay } from "@/lib/months";
 
 interface CmaWorksheetProps {
+  readonly before: Before | null;
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
@@ -44,6 +49,18 @@ const headings: Record<Sleeve, string> = { bonds: "Bonds", stocks: "Stocks" };
 
 // The worksheet's columns: each sleeve, then the portfolio they make.
 const columns = [headings.stocks, headings.bonds, "Portfolio"] as const;
+
+// What each source is named as, and what a change of it was, in the
+// rows of what moved the rates.
+const sourceRows: Record<Source, { detail: string; label: string }> = {
+  cma: { detail: "A vintage pulled since", label: "BlackRock CMA" },
+  curve: { detail: "A curve pulled since", label: "BoE curve" },
+  deductions: { detail: "Typed again since", label: "Fees and yield" },
+  targets: {
+    detail: "Imported or mapped again since",
+    label: "Target allocation",
+  },
+};
 
 // The body of the rates card while the CMA-derived rates are live: the
 // latest vintage of BlackRock's capital market assumptions worked out
@@ -68,11 +85,23 @@ const columns = [headings.stocks, headings.bonds, "Portfolio"] as const;
 // row is the sleeves' in the shares the target allocation holds of them.
 // A sleeve nothing blends into is dashed. Under the worksheet, every
 // category's share of the whole, under the sleeve it blends into.
+// Beneath the worksheet, what has moved the rates since the household
+// as it stood a while ago, given as its sources then: the plan rate, the
+// inflation and the real return then, a row for each source that has
+// changed since, with how far it moved each, and the three as they are
+// now, so the rows add up down the columns. A source that changed and
+// moved nothing still has its row, and where nothing has changed the
+// section says so. It follows the deductions as they are typed, as the
+// worksheet does. Where the sources then derive no rates, or a source
+// taken on the way leaves none, there is nothing to compare, and the
+// section is left out.
+//
 // Before a vintage is pulled, or a target allocation imported on its
 // tab, there is nothing to work out, and the body says so; while the
 // vintage makes no blend, it says what is missing in the caution tone.
 // The footer states what the figures are.
 export function CmaWorksheet({
+  before,
   cma,
   curve,
   deductions,
@@ -80,6 +109,16 @@ export function CmaWorksheet({
   mappings,
   targets,
 }: CmaWorksheetProps): JSX.Element {
+  const moves =
+    before === null
+      ? null
+      : movesBetween(before.sources, {
+          cma,
+          curve,
+          deductions,
+          mappings,
+          targets,
+        });
   return (
     <>
       <CardContent className="grid gap-8">
@@ -106,6 +145,9 @@ export function CmaWorksheet({
             mappings={mappings}
             targets={targets}
           />
+        )}
+        {moves !== null && before !== null && (
+          <Moved moves={moves} since={before.savedOn} />
         )}
       </CardContent>
       <CardFooter className="text-sm text-muted-foreground">
@@ -172,6 +214,59 @@ function largestOf({ parts }: Blend): string {
         `; ${category.name} is ${formatPercent(weight)} of bonds`,
     )
     .join("");
+}
+
+// What moved the rates since the day given, as a worksheet that adds up
+// down its columns, or a note that nothing has.
+function Moved({
+  moves,
+  since,
+}: {
+  readonly moves: Moves;
+  readonly since: string;
+}): JSX.Element {
+  const id = useId();
+  const day = formatDay(since);
+  const points = ({ inflation, planRate, real }: Moves["now"]): string[] =>
+    [planRate, inflation, real].map((figure) => formatPoints(figure, 2));
+  const percents = ({ inflation, planRate, real }: Moves["now"]): string[] =>
+    [planRate, inflation, real].map((figure) => formatPercent(figure));
+  return (
+    <section aria-labelledby={id} className="grid gap-4">
+      <h3 className="label text-muted-foreground" id={id}>
+        {`What moved since ${day}`}
+      </h3>
+      {moves.steps.length === 0 ? (
+        <Note>{`Nothing has moved the rates since ${day}.`}</Note>
+      ) : (
+        <Worksheet
+          columns={["Plan rate", "Inflation", "Real return"]}
+          label="What moved the rates, worked out"
+          rows={[
+            {
+              detail: `As the household stood on ${day}`,
+              figures: percents(moves.before),
+              label: "Then",
+            },
+            ...moves.steps.map(({ by, sources }) => ({
+              detail:
+                sources.length > 1
+                  ? "Taken together, since the first alone derives no rates"
+                  : sources.map((one) => sourceRows[one].detail).join(""),
+              figures: points(by),
+              label: listed.format(sources.map((one) => sourceRows[one].label)),
+            })),
+            {
+              detail: "What the sources come to today",
+              figures: percents(moves.now),
+              isResult: true,
+              label: "Now",
+            },
+          ]}
+        />
+      )}
+    </section>
+  );
 }
 
 // The worksheet's rows, from the target weights to the real return.

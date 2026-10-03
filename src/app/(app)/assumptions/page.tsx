@@ -12,7 +12,7 @@ import { TargetAllocation } from "@/components/app/organisms/target-allocation";
 import { formatPercent } from "@/lib/money";
 import { today } from "@/lib/months";
 import { assumptions, sectionLabel } from "@/lib/nav";
-import { getHousehold } from "@/store/household";
+import { getHousehold, getSourcesDaysAgo } from "@/store/household";
 
 // What the header calls each set of rates.
 const setNames: Record<Chosen, string> = {
@@ -21,7 +21,11 @@ const setNames: Record<Chosen, string> = {
 };
 
 // The assumptions the plan runs on, under a strip saying how old each
-// source they rest on is, in two tabs. The first holds the
+// source they rest on is, in two tabs, the CMA's rates set beside the
+// household's sources as they stood thirty days before, to say what has
+// moved them since. The two are read together, and the sources then are
+// handed on only while the CMA's rates are live, which is the only time
+// the card reads them. The first holds the
 // rates: the set the plan runs on and the rates in it, the CMA-derived
 // ones worked out from their sources or the ones and the split typed by
 // hand, and beneath them the inflation source, over the curve last
@@ -35,17 +39,20 @@ const setNames: Record<Chosen, string> = {
 // store, which reads the session first, so it renders behind the
 // loading screen beside it.
 export default async function Assumptions(): Promise<JSX.Element> {
-  const {
-    allocation,
-    cma,
-    curve,
-    deductions,
-    mappings,
-    plan,
-    rates,
-    rateSet,
-    targets,
-  } = await getHousehold();
+  const [
+    {
+      allocation,
+      cma,
+      curve,
+      deductions,
+      mappings,
+      plan,
+      rates,
+      rateSet,
+      targets,
+    },
+    before,
+  ] = await Promise.all([getHousehold(), getSourcesDaysAgo(30)]);
   return (
     <>
       <ScreenHeader label={sectionLabel(assumptions)} title={assumptions.title}>
@@ -66,6 +73,7 @@ export default async function Assumptions(): Promise<JSX.Element> {
                 <>
                   <RateSet
                     allocation={allocation}
+                    before={rateSet === "cma" ? before : null}
                     cma={cma}
                     curve={curve}
                     deductions={deductions}

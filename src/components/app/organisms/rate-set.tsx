@@ -7,6 +7,7 @@ import { useId, useOptimistic } from "react";
 
 import type { Deductions, Mapping, Vintages } from "@/data/cma";
 import type { Curve } from "@/data/inflation";
+import type { Before } from "@/data/moves";
 import type { Allocation, RateSet as Chosen, Rates } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 
@@ -30,6 +31,7 @@ import { assumptions, subsectionLabel } from "@/lib/nav";
 
 interface RateSetProps {
   readonly allocation: Allocation;
+  readonly before: Before | null;
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
@@ -84,6 +86,7 @@ const runsOn: Record<Chosen, string> = {
 // typed.
 export function RateSet({
   allocation,
+  before,
   cma,
   curve,
   deductions,
@@ -250,6 +253,7 @@ export function RateSet({
       >
         {chosen === "cma" ? (
           <CmaWorksheet
+            before={before}
             cma={cma}
             curve={curve}
             deductions={shown}
