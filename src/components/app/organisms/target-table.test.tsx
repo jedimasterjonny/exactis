@@ -476,7 +476,7 @@ describe("TargetTable", () => {
     const [folded, , , , target] = rowOf("Cash");
 
     expect(target).toHaveTextContent("0.00%");
-    expect(folded).toHaveTextContent(/^Cash0\.00%——$/);
+    expect(folded).toHaveTextContent(/^Cash0\.00%—20y return —$/);
   });
 
   // The folded cell is drawn only while the table is narrow, and the
@@ -493,7 +493,7 @@ describe("TargetTable", () => {
         name: "CMA class for FTSE Global All Cap ex-UK",
       }),
     ).toHaveValue("Global ex-UK large cap equities");
-    expect(folded).toHaveTextContent(/7\.722%$/);
+    expect(folded).toHaveTextContent(/20y return 7\.722%$/);
     expect(
       within(folded ?? document.body).queryByRole("button"),
     ).not.toBeInTheDocument();
