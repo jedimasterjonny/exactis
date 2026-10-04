@@ -162,29 +162,27 @@ describe("OwnerList", () => {
   });
 
   // The fixture's pension and ISA are the first owner's, so the store
-  // would refuse to delete them: the row says what they hold and holds
-  // the bin, saying what has to happen first, while an owner holding
-  // nothing can still go.
+  // would refuse to delete them: the row says what they hold and draws a
+  // lock in place of the bin, saying what has to happen first, while an
+  // owner holding nothing can still go.
   it("says what an owner holds and holds the bin while they hold anything", () => {
     renderList([me, sam], accounts);
-
-    const held = screen.getByRole("button", { name: "Delete Me" });
 
     expect(
       within(screen.getByRole("cell", { name: /^Me/ })).getByText(
         "Holds Workplace pension and Stocks & shares ISA",
       ),
     ).toHaveClass("whitespace-normal", "text-muted-foreground");
-    expect(held).toBeDisabled();
-    expect(held).toHaveAttribute(
-      "title",
-      "Give Workplace pension and Stocks & shares ISA to another owner first",
-    );
+    expect(
+      screen.queryByRole("button", { name: "Delete Me" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "Give Workplace pension and Stocks & shares ISA to another owner first",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit Me" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Delete Sam" })).toBeEnabled();
-    expect(
-      screen.getByRole("button", { name: "Delete Sam" }),
-    ).not.toHaveAttribute("title");
     expect(screen.getByRole("cell", { name: "Sam" })).toBeInTheDocument();
   });
 });
