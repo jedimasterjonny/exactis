@@ -1,11 +1,9 @@
-import type { Account, Growth } from "@/data/accounts";
-import type { IncomeLine } from "@/data/income";
+import type { Account } from "@/data/accounts";
 import type { Secured } from "@/data/secured";
 
 import { capOf } from "@/data/accounts";
-import { cadenceAbbreviations, fixedMonthly, monthly } from "@/lib/cadence";
-import { fedOf } from "@/lib/feeders";
-import { formatGbp, formatPercent } from "@/lib/money";
+import { cadenceAbbreviations, fixedMonthly } from "@/lib/cadence";
+import { formatGbp } from "@/lib/money";
 
 // What the accounts hold between them, a debt's balance taking away, as
 // every total of balances on the accounts screen adds them.
@@ -43,37 +41,9 @@ export function formatContribution(account: Account): string {
   }
 }
 
-// A growth is the account's own rate, or the plan's, set once on the
-// assumptions screen.
-export function formatGrowth(growth: Growth): string {
-  switch (growth.kind) {
-    case "fixed":
-      return formatPercent(growth.rate);
-    case "plan":
-      return "Plan rate";
-  }
-}
-
 // A month's worth of money as the ledger writes it, "£1,390 / mo".
 export function formatMonthly(amount: number): string {
   return `${formatGbp(amount)} / ${cadenceAbbreviations.month}`;
-}
-
-// What the accounts are paid a month between them that the month
-// decides in advance, as the account table totals it beneath its rows
-// and the screen's tile states it over them: each one's own fixed sum,
-// and what the salaries running then sacrifice into it with the
-// employer's NI saved. The spare money's take is left out, since it is
-// decided month by month from what is left.
-export function paidMonthlyOf(
-  accounts: readonly Account[],
-  lines: readonly IncomeLine[],
-): number {
-  return sumOf(
-    accounts,
-    (account) =>
-      fixedMonthly(account) + monthly(fedOf(account.id, lines), "year"),
-  );
 }
 
 // A figure summed down a list, for a total beneath the rows or a tile
