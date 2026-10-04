@@ -59,8 +59,8 @@ describe("Plan", () => {
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
     ).toStrictEqual([
       "Milestones",
-      "Income by year",
-      "Expenses by year",
+      "What comes in",
+      "What goes out",
       "Year by year",
     ]);
     expect(screen.getByText("Age 68–89")).toBeInTheDocument();

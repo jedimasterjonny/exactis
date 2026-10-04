@@ -48,10 +48,10 @@ describe("ExpenseSchedule", () => {
 
     expect(screen.getByText("Sect. III.iii")).toHaveClass("label");
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "Expenses by year",
+      "What goes out",
     );
     expect(
-      screen.getByRole("region", { name: "Expenses by year" }),
+      screen.getByRole("region", { name: "What goes out" }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(expenseLines.length);
     // A line paying no loan carries no badge: its name says what it is.
