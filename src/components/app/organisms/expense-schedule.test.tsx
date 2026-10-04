@@ -117,10 +117,9 @@ describe("ExpenseSchedule", () => {
       target: { value: " Nursery " },
     });
     commit(within(dialog).getByRole("textbox", { name: "Amount" }), "1,150");
-    fireEvent.change(
-      within(dialog).getByRole("combobox", { name: "Grows with" }),
-      { target: { value: "inflation-plus-2" } },
-    );
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Growth" }), {
+      target: { value: "inflation-plus-2" },
+    });
     commit(within(dialog).getByRole("textbox", { name: "First year" }), "2027");
     commit(within(dialog).getByRole("textbox", { name: "Last year" }), "2035");
 
@@ -305,10 +304,10 @@ describe("ExpenseSchedule", () => {
       "data-variant",
       "secondary",
     );
-    expect(screen.getByText("Loan · Nominal, fixed")).toBeInTheDocument();
+    expect(screen.getByText("Loan · Fixed in pounds")).toBeInTheDocument();
     // The retirement living's folded lines name its growth alone, as its
     // column does, with no badge before it.
-    expect(screen.getAllByText("Inflation")).toHaveLength(2);
+    expect(screen.getAllByText("Rises with inflation")).toHaveLength(2);
     expect(
       screen.getAllByRole("img", {
         name: "Edited with its asset on the accounts screen",

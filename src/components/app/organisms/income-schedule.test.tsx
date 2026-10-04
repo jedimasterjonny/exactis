@@ -618,7 +618,7 @@ describe("IncomeSchedule", () => {
     ).toHaveLength(incomeKinds.length);
     expect(
       within(
-        within(dialog).getByRole("combobox", { name: "Grows with" }),
+        within(dialog).getByRole("combobox", { name: "Growth" }),
       ).getAllByRole("option"),
     ).toHaveLength(lineGrowths.length);
 
@@ -651,10 +651,9 @@ describe("IncomeSchedule", () => {
       within(dialog).getByRole("combobox", { name: "Cadence" }),
       { target: { value: "month" } },
     );
-    fireEvent.change(
-      within(dialog).getByRole("combobox", { name: "Grows with" }),
-      { target: { value: "inflation-plus-2" } },
-    );
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Growth" }), {
+      target: { value: "inflation-plus-2" },
+    });
     commit(within(dialog).getByRole("textbox", { name: "First year" }), "2030");
 
     expect(
@@ -794,7 +793,7 @@ describe("IncomeSchedule", () => {
       within(dialog).getByRole("combobox", { name: "Cadence" }),
     ).toHaveValue("year");
     expect(
-      within(dialog).getByRole("combobox", { name: "Grows with" }),
+      within(dialog).getByRole("combobox", { name: "Growth" }),
     ).toHaveValue("inflation");
     expect(
       within(dialog).getByRole("textbox", { name: "First year" }),

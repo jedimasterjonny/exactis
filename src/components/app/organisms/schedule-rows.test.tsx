@@ -68,8 +68,8 @@ describe("ScheduleRows", () => {
     expect(screen.getByText("£147,000")).toHaveClass("figure");
     expect(screen.getByText("£147,000")).toHaveTextContent("£147,000 / yr");
     expect(screen.getByText("£2,000")).toHaveTextContent("£2,000 / mo");
-    expect(screen.getByText("Inflation +1%")).toBeInTheDocument();
-    expect(screen.getByText("Nominal, fixed")).toBeInTheDocument();
+    expect(screen.getByText("Rises 1% over inflation")).toBeInTheDocument();
+    expect(screen.getByText("Fixed in pounds")).toBeInTheDocument();
     expect(screen.getByText("2026 – 2048")).toHaveClass("figure");
     expect(screen.getByText("Age 36–58")).toHaveClass("label");
     expect(screen.getByText("2058 – end")).toBeInTheDocument();
@@ -361,7 +361,7 @@ describe("ScheduleRows", () => {
     }
     expect(within(item).getByText("£147,000 / yr")).toHaveClass("figure");
     expect(
-      within(item).getByText("employment · Inflation +1%"),
+      within(item).getByText("employment · Rises 1% over inflation"),
     ).toBeInTheDocument();
     expect(within(item).getByText("2026 – 2048 · Age 36–58")).toBeVisible();
     // The bar is positioned and would lie over the button that covers
