@@ -709,6 +709,28 @@ describe("soundKept", () => {
     ).toThrow("Invalid ISO date");
   });
 
+  // A household kept before the day was has no account dated, which is
+  // read as undated rather than refused.
+  it("keeps the day an account's balance was set, and refuses one on no day", () => {
+    const dated = kept.accounts.map((account, index) =>
+      index === 0 ? { ...account, setOn: "2026-08-31" } : account,
+    );
+
+    expect(
+      soundKept({ ...kept, accounts: dated }).household.accounts,
+    ).toStrictEqual(dated);
+    expect(soundKept(kept).household.accounts).toStrictEqual(kept.accounts);
+    expect(() =>
+      soundKept({
+        ...kept,
+        accounts: dated.map((account) => ({
+          ...account,
+          setOn: "31 Aug 2026",
+        })),
+      }),
+    ).toThrow("Invalid ISO date");
+  });
+
   it("refuses a record whose id is not below the one the next is given", () => {
     expect(() => soundKept({ ...kept, next: 5 })).toThrow(
       "A record's id is below the one the next record is given",

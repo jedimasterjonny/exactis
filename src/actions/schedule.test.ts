@@ -154,8 +154,9 @@ describe("the schedule actions", () => {
     });
 
     // The pension is added as the account a new pension is, named as
-    // typed less the space around it and given the next id, and the line
-    // feeds it by that id, both in the one version. A salary already
+    // typed less the space around it, given the next id and its balance
+    // dated the day the tests run on, and the line feeds it by that id,
+    // both in the one version. A salary already
     // listed opens one the same way.
     it("opens the pension a salary opens, and feeds it by the id it is given", async () => {
       const opening = {
@@ -171,6 +172,7 @@ describe("the schedule actions", () => {
         kind: "tax-deferred",
         name: "Aviva",
         owner: 1,
+        setOn: "2026-09-15",
       });
 
       expect(await saveIncomeLine(null, opening)).toStrictEqual(
