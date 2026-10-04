@@ -69,11 +69,6 @@ export type Cadence = (typeof cadences)[number];
 
 export type Funding = (typeof fundings)[number];
 
-// Growth is the plan rate, set once on the assumptions screen and applied
-// to every wrapper, or a fixed rate the account carries itself.
-export type Growth =
-  { readonly kind: "fixed"; readonly rate: number } | { readonly kind: "plan" };
-
 // A salary's share of its base sacrificed into the account, by the
 // line's id, as the account's dialog holds it beside the account.
 export interface Share {
@@ -94,6 +89,11 @@ type Contribution =
       readonly kind: "fixed";
     }
   | { readonly cap: null | number; readonly kind: "spare" };
+
+// Growth is the plan rate, set once on the assumptions screen and applied
+// to every wrapper, or a fixed rate the account carries itself.
+type Growth =
+  { readonly kind: "fixed"; readonly rate: number } | { readonly kind: "plan" };
 
 // The choices as lists, so the store's columns take the same words the
 // types do and cannot drift from them.

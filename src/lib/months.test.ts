@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   daysBetween,
   formatDay,
+  formatMonth,
   isOnOrBefore,
   monthName,
   monthsBetween,
@@ -35,6 +36,13 @@ describe("formatDay", () => {
     expect(formatDay("2026-11-04")).toBe("4 Nov 2026");
     expect(formatDay("2027-01-01")).toBe("1 Jan 2027");
     expect(formatDay("2026-09-24")).toBe("24 Sep 2026");
+  });
+});
+
+describe("formatMonth", () => {
+  it("names a month in full, with its year", () => {
+    expect(formatMonth({ month: 8, year: 2026 })).toBe("September 2026");
+    expect(formatMonth({ month: 0, year: 2027 })).toBe("January 2027");
   });
 });
 

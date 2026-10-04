@@ -5,46 +5,44 @@ import type { JSX } from "react";
 import { CarFront, HousePlus, Plus } from "lucide-react";
 import { useOptimistic, useState } from "react";
 
-import type { Account } from "@/data/accounts";
+import type { Account, AccountKind } from "@/data/accounts";
+import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Owner } from "@/data/owners";
-import type { Month } from "@/data/schedule";
+import type { Plan } from "@/data/plan";
 import type { Secured } from "@/data/secured";
 import type { PlanMonth } from "@/lib/loans";
 
 import { placeAccountsInOrder, removeAccount } from "@/actions/accounts";
 import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
-import { Note } from "@/components/app/atoms/note";
-import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { SectionCard } from "@/components/app/molecules/section-card";
-import { StatTile } from "@/components/app/molecules/stat-tile";
 import { AccountDialog } from "@/components/app/organisms/account-dialog";
-import { AccountTable } from "@/components/app/organisms/account-table";
-import { AssetTable } from "@/components/app/organisms/asset-table";
+import { BalanceSheet } from "@/components/app/organisms/balance-sheet";
 import { CarDialog } from "@/components/app/organisms/car-dialog";
 import { HouseDialog } from "@/components/app/organisms/house-dialog";
 import { OwnerList } from "@/components/app/organisms/owner-list";
 import { PaymentOrder } from "@/components/app/organisms/payment-order";
 import { Button } from "@/components/kit/button";
+import { CardContent } from "@/components/kit/card";
 import { isAsset } from "@/data/accounts";
 import { useRemover } from "@/hooks/use-remover";
 import { useSender } from "@/hooks/use-sender";
-import { counted } from "@/lib/count";
 import { feedersOf, listed } from "@/lib/feeders";
-import { balanceOf, equityOf, paidMonthlyOf, sumOf } from "@/lib/ledger";
 import { runsIn } from "@/lib/lines";
-import { formatGbp } from "@/lib/money";
+import { formatPercent } from "@/lib/money";
 import { accountsAndAssets, subsectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
   readonly accounts: readonly Account[];
-  readonly at: Month;
+  readonly expenses: readonly ExpenseLine[];
   readonly lines: readonly IncomeLine[];
   readonly owners: readonly Owner[];
+  readonly plan: Plan;
 }
 
-// What the account dialog is open on: a new account, or one to edit.
-type AccountOpening = "new" | Account;
+// What the account dialog is open on: a new account of the kind it
+// opens as, or one to edit.
+type AccountOpening = Account | AccountKind;
 
 // What the car or house dialog is open on: a new one, or an asset to
 // edit with the loan secured on it. One type for both, since a house
@@ -55,39 +53,40 @@ type AssetOpening = "new" | Secured;
 // in the body beneath the header, which is the page's, since the header
 // reads the month and nothing the ledger holds.
 // The rows are the store's, handed down by the page, and a save goes to
-// the store and comes back with the page re-read, so the tables reflect
+// the store and comes back with the page re-read, so the sheet reflects
 // it without the ledger holding rows of its own. The one thing the
 // ledger holds is the order while a move is on its way to the store,
-// since a row dragged into place has to stay there rather than spring
+// since a row moved into place has to stay there rather than spring
 // back until the page re-reads; the optimistic order is the page's again
-// once it does. The accounts and the assets are two sections of the
-// screen rather than two tabs, so both are read at once and a save
-// lands in view wherever it lands. A dialog is open for as long as it
-// is mounted, so what it is open on doubles as its open state: each
-// section's buttons open the dialogs it lists on a new one, and a row's
-// pencil opens the account as it is, unless it is a house or a car,
-// which shares its row with the loan secured on it and opens with it, so
-// an edit writes both. A row's bin asks through the confirm dialog
-// before the account goes, and so does the Delete in the dialog a row
-// opens, which is where a row folded to fit a phone is deleted from,
-// saying what goes with it, since an asset takes its loan and the
-// loan's payments, and what stops,
-// since a salary feeding a pension stops when the pension goes; the
-// income lines are handed down for that, for the treatment such a
-// pension is held to, so both can name the salaries, and for the
-// accounts' table to write what the salaries feed each pension: the
-// table is handed the lines running in the month the plan starts in,
-// which the page hands down, so a salary that has ended or is yet to
-// start lands nothing on the row, while the dialog and the confirm
-// take every line, since the link stands whether or not it runs. The
-// owners close the screen, a section of their own beneath the order,
-// and are handed to the savings' table, to say whose each wrapper is,
-// and to the account dialog, to choose it.
+// once it does. Everything the household owns and owes is one balance
+// sheet, so it is read at once and a save lands in view wherever it
+// lands. A dialog is open for as long as it is mounted, so what it is
+// open on doubles as its open state: the sheet's buttons open the
+// dialogs on a new account, house, car or debt, and a row opens the
+// account as it is, unless it is a house or a car, or the loan secured
+// on one, which shares its entry with the other and opens with it, so
+// an edit writes both. The Delete in the dialog a row opens asks
+// through the confirm dialog before the account goes, saying what goes
+// with it, since an asset takes its loan and the loan's payments, and
+// what stops, since a salary feeding a pension stops when the pension
+// goes; the income lines are handed down for that, for the treatment
+// such a pension is held to, so both can name the salaries, and for the
+// sheet to write what the salaries feed each pension: the sheet is
+// handed the lines running in the month the plan starts in, so a salary
+// that has ended or is yet to start lands nothing on the row, while the
+// dialog and the confirm take every line, since the link stands whether
+// or not it runs. The expense lines are handed down for the sheet to say
+// when each loan's payments clear it, and the plan for the month it
+// starts in and the rate the savings grow at. The owners close the
+// screen, a section of their own beneath the order, and are handed to
+// the sheet, to say whose each wrapper is, and to the account dialog,
+// to choose it.
 export function AccountLedger({
   accounts,
-  at,
+  expenses,
   lines,
   owners,
+  plan,
 }: AccountLedgerProps): JSX.Element {
   const [account, setAccount] = useState<AccountOpening | null>(null);
   const [house, setHouse] = useState<AssetOpening | null>(null);
@@ -99,14 +98,14 @@ export function AccountLedger({
   });
   const { send } = useSender();
   const [order, placeOptimistically] = useOptimistic(accounts);
-  // Each asset with the loan it shares a row with, and the accounts paid
-  // out of the month: every one but an asset, a paired loan among them.
-  // The savings section lists them less the paired loans, which are read
-  // on their assets' rows instead, and less the debts left, which are
-  // secured on nothing with a row and have a section of their own, drawn
-  // only when there is one. The savings are the order of payment too,
-  // in the order they are paid, since a debt is paid before any of them
-  // wherever it is listed and has no place in the order to set.
+  // Each asset with the loan it shares an entry with, and the accounts
+  // paid out of the month: every one but an asset, a paired loan among
+  // them. The savings are them less the paired loans, which are read
+  // beside their assets instead, and less the debts left, which are
+  // secured on nothing with an entry and are listed as other debts. The
+  // savings are the order of payment too, in the order they are paid,
+  // since a debt is paid before any of them wherever it is listed and
+  // has no place in the order to set.
   const assets = order
     .filter(isAsset)
     .map((asset) => securedFor(asset, order) ?? { asset, loan: null });
@@ -117,32 +116,17 @@ export function AccountLedger({
   const held = paid.filter((account) => !paired.has(account.id));
   const savings = held.filter((account) => account.kind !== "debt");
   const debts = held.filter((account) => account.kind === "debt");
-  const running = lines.filter((line) => runsIn(line, at));
+  const running = lines.filter((line) =>
+    runsIn(line, { month: plan.month, year: plan.from }),
+  );
 
-  // The figures the screen opens on, read off the rows the sections
-  // list: what every balance comes to, a debt's taking away, which is
-  // the net worth the plan starts from; the savings among them; the
-  // equity the assets hold once their loans are paid, of what they are
-  // worth; and what the month pays in, every fixed sum and sacrifice
-  // the salaries running then make, the spare money's take being the
-  // month's to decide. A phone keeps the net worth and the savings, in
-  // one row, and leaves the equity and what is paid in to a wider
-  // screen, the sections beneath saying both.
-  const worth = balanceOf(order);
-  const saved = balanceOf(savings);
-  const owned = sumOf(assets, ({ asset }) => asset.balance);
-  const equity = sumOf(assets, equityOf);
-  const paidIn = paidMonthlyOf(order, running);
-
-  // Where the order and the owners sit among the sections: the order
-  // after the debts when there are any, and the owners after the order
-  // when it is drawn, which it is not for fewer than two savings.
-  const orderPlace = debts.length > 0 ? 4 : 3;
-  const ownersPlace = savings.length < 2 ? orderPlace : orderPlace + 1;
+  // Where the owners sit among the sections: after the order when it is
+  // drawn, which it is not for fewer than two savings.
+  const ownersPlace = savings.length < 2 ? 2 : 3;
 
   // The month the plan starts in as the loan maths counts from it, for
   // the two dialogs that let a loan's end be picked as a date.
-  const plan: PlanMonth = { from: at.year, month: at.month };
+  const starts: PlanMonth = { from: plan.from, month: plan.month };
 
   // Closes whichever dialog is open, there being only ever one, on a
   // dismiss, a save or a Delete alike.
@@ -152,9 +136,8 @@ export function AccountLedger({
     setCar(null);
   }
 
-  // A dialog's Delete asks as a row's bin does, about the account the
-  // dialog is open on, or for a house or a car its own account, which
-  // takes the loan with it. Whichever dialog it was closes first, so the
+  // A dialog's Delete asks about the account the dialog is open on, or
+  // for a house or a car its own account, which takes the loan with it. Whichever dialog it was closes first, so the
   // question stands alone and a cancel lands back on the screen rather
   // than on the draft of what was nearly deleted.
   function drop(account: Account): void {
@@ -162,8 +145,8 @@ export function AccountLedger({
     ask(account);
   }
 
-  // A row's pencil opens its account as it is, unless the account is a
-  // house or a car, which opens with the loan secured on it.
+  // A row opens its account as it is, unless the account is a house or
+  // a car, which opens with the loan secured on it.
   function edit(account: Account): void {
     const found = securedFor(account, order);
     if (found === null) {
@@ -201,63 +184,18 @@ export function AccountLedger({
 
   return (
     <>
-      <TileGrid>
-        <StatTile
-          caption="The balances the plan starts from"
-          label="Starting net worth"
-          tone="inverse"
-          value={formatGbp(worth)}
-        />
-        <StatTile
-          caption={counted(savings.length, "account")}
-          label="Savings"
-          value={formatGbp(saved)}
-        />
-        <StatTile
-          caption={`${formatGbp(owned)} owned · ${formatGbp(owned - equity)} owed`}
-          isHiddenOnPhone
-          label="Equity"
-          value={formatGbp(equity)}
-        />
-        <StatTile
-          caption="Sacrifice and fixed payments"
-          isHiddenOnPhone
-          label="Paid in"
-          unit="/ mo"
-          value={formatGbp(paidIn)}
-        />
-      </TileGrid>
-      <SectionCard
-        actions={
-          <Button
-            onClick={() => {
-              setAccount("new");
-            }}
-            size="sm"
-          >
-            <Plus aria-hidden />
-            Add account
-          </Button>
-        }
-        className="pb-0"
-        label={subsectionLabel(accountsAndAssets, 1)}
-        title="Savings and investments"
-      >
-        <AccountTable
-          accounts={savings}
-          lines={running}
-          onDelete={ask}
-          onEdit={edit}
-          owners={owners}
-        />
-      </SectionCard>
-      <Note>
-        Allocation is set once at plan level and applied pro rata to every
-        account.
-      </Note>
       <SectionCard
         actions={
           <>
+            <Button
+              onClick={() => {
+                setAccount("tax-deferred");
+              }}
+              size="sm"
+            >
+              <Plus aria-hidden />
+              Add account
+            </Button>
             <Button
               onClick={() => {
                 setHouse("new");
@@ -280,24 +218,28 @@ export function AccountLedger({
             </Button>
           </>
         }
-        className="pb-0"
-        label={subsectionLabel(accountsAndAssets, 2)}
-        title="Property and vehicles"
+        caption={`Savings grow at the plan rate, ${formatPercent(plan.rate)}, unless they say otherwise, under one allocation applied pro rata to every account.`}
+        label={subsectionLabel(accountsAndAssets, 1)}
+        title="Balance sheet"
       >
-        <AssetTable assets={assets} onDelete={ask} onEdit={edit} />
+        <CardContent>
+          <BalanceSheet
+            assets={assets}
+            debts={debts}
+            expenses={expenses}
+            lines={running}
+            onAddDebt={() => {
+              setAccount("debt");
+            }}
+            onEdit={edit}
+            owners={owners}
+            savings={savings}
+          />
+        </CardContent>
       </SectionCard>
-      {debts.length > 0 && (
-        <SectionCard
-          className="pb-0"
-          label={subsectionLabel(accountsAndAssets, 3)}
-          title="Other debts"
-        >
-          <AccountTable accounts={debts} onDelete={ask} onEdit={edit} />
-        </SectionCard>
-      )}
       <PaymentOrder
         accounts={savings}
-        label={subsectionLabel(accountsAndAssets, orderPlace)}
+        label={subsectionLabel(accountsAndAssets, 2)}
         onMove={move}
       />
       <OwnerList
@@ -307,7 +249,9 @@ export function AccountLedger({
       />
       {account !== null && (
         <AccountDialog
-          account={account === "new" ? null : account}
+          {...(typeof account === "string"
+            ? { account: null, kind: account }
+            : { account })}
           lines={lines}
           onDelete={drop}
           onDismiss={close}
@@ -326,7 +270,7 @@ export function AccountLedger({
           onDelete={drop}
           onDismiss={close}
           onSaved={close}
-          plan={plan}
+          plan={starts}
         />
       )}
       {car !== null && (
@@ -335,7 +279,7 @@ export function AccountLedger({
           onDelete={drop}
           onDismiss={close}
           onSaved={close}
-          plan={plan}
+          plan={starts}
         />
       )}
     </>

@@ -10,7 +10,6 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { Month } from "@/data/schedule";
 import type { Answer } from "@/lib/answer";
 
 import {
@@ -21,14 +20,14 @@ import {
   saveHouse,
 } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
-import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { golfPcp as finance, golf } from "@/data/cars.fixture";
+import { expenseLines } from "@/data/expenses.fixture";
 import { house, houseLoan as loan } from "@/data/houses.fixture";
-import { incomeLines } from "@/data/income.fixture";
+import { incomeLines, plan } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 import { saved as accepted, refused } from "@/lib/answer";
-import { bySlot, commit, openEditor, openEntry } from "@/test/dom";
+import { commit, openEntry } from "@/test/dom";
 
 import { AccountLedger } from "./account-ledger";
 
@@ -44,37 +43,47 @@ vi.mock("@/actions/owners", () => ({
   saveOwner: vi.fn(),
 }));
 
-// The month the fixture's plan is read in, September 2026, in which the
-// salary runs.
-const at: Month = { month: 8, year: 2026 };
-
-const held = accounts.filter((account) => !isAsset(account));
-const assets = accounts.filter(isAsset);
 const [pension, isa, cash, home, mortgage] = accounts;
 
-// The ledger on the fixture's accounts and owners in the month the plan
-// starts in, with whatever a test gives in their place. Save reports
-// through the toast manager, which needs its Toaster mounted.
+// Asks to delete an account from the Delete in the dialog its row
+// opens, which is where the sheet deletes from.
+function askToDelete(name: string): void {
+  fireEvent.click(
+    within(openRow(name)).getByRole("button", { name: "Delete" }),
+  );
+}
+
+// Opens an entry of the sheet from its row, a button named by the
+// account, and hands back the dialog it opens, named by the account the
+// dialog is open on.
+function openRow(name: string, opens = name): HTMLElement {
+  fireEvent.click(screen.getByRole("button", { name }));
+  return screen.getByRole("dialog", { name: opens });
+}
+
+// The ledger on the fixture's accounts and owners, over the plan the
+// income fixture carries, which starts in September 2026, with whatever
+// a test gives in their place. Save reports through the toast manager,
+// which needs its Toaster mounted.
 function renderLedger(
   props: Partial<ComponentProps<typeof AccountLedger>> = {},
 ): void {
   render(
     <AccountLedger
       accounts={accounts}
-      at={at}
+      expenses={[]}
       lines={[]}
       owners={owners}
+      plan={plan}
       {...props}
     />,
     { wrapper: Toaster },
   );
 }
 
-// The rows a section lists: its body's, less the header above them and
-// the totals beneath them when it has any.
-function rowsOf(panel: HTMLElement): HTMLElement[] {
-  const [, body] = within(panel).getAllByRole("rowgroup");
-  return body === undefined ? [] : within(body).getAllByRole("row");
+// The rows a group of the sheet lists, by the group's name.
+function rowsOf(name: string): HTMLElement[] {
+  return within(screen.getByRole("group", { name })).getAllByRole("listitem");
 }
 
 // The store's answer to a save: the account as it now has it. The ledger
@@ -87,52 +96,47 @@ function saved(account: Account): void {
   vi.mocked(saveAccount).mockResolvedValue(accepted(account));
 }
 
+// The balance sheet's section.
+function sheet(): HTMLElement {
+  return screen.getByRole("region", { name: "Balance sheet" });
+}
+
 describe("AccountLedger", () => {
-  // Every section is read at once, each a region named by its title and
-  // opened with its own buttons, and each followed by its notes. The
-  // fixture's mortgage is secured on nothing, so it is listed with the
-  // other debts rather than with the savings, and the order the accounts
-  // are paid in is a section of its own beneath them all.
-  it("lays the savings, the assets and the other debts out as sections, each with its notes, and the order beneath", () => {
+  // Everything owned and owed is one balance sheet, a region named by
+  // its title and opened with its own buttons, the rate the savings grow
+  // at in its caption. The fixture's mortgage is secured on nothing, so
+  // it is listed with the other debts rather than with the savings, and
+  // the order the accounts are paid in is a section of its own beneath,
+  // then the owners.
+  it("lays everything owned and owed out as one balance sheet, with the order and the owners beneath", () => {
     renderLedger();
 
-    const savingsSection = screen.getByRole("region", {
-      name: "Savings and investments",
-    });
-    const assetsSection = screen.getByRole("region", {
-      name: "Property and vehicles",
-    });
-    const debtsSection = screen.getByRole("region", { name: "Other debts" });
-
-    expect(within(savingsSection).getByText("Sect. II.i")).toHaveClass("label");
-    expect(within(assetsSection).getByText("Sect. II.ii")).toHaveClass("label");
-    expect(within(debtsSection).getByText("Sect. II.iii")).toHaveClass("label");
-    expect(rowsOf(savingsSection)).toHaveLength(held.length - 1);
-    expect(rowsOf(assetsSection)).toHaveLength(assets.length);
-    expect(rowsOf(debtsSection)).toHaveLength(1);
+    expect(within(sheet()).getByText("Sect. II.i")).toHaveClass("label");
     expect(
-      within(debtsSection).getByRole("row", { name: /Mortgage/ }),
+      within(sheet()).getByText(
+        "Savings grow at the plan rate, 5.00%, unless they say otherwise, under one allocation applied pro rata to every account.",
+      ),
     ).toBeInTheDocument();
     expect(
-      within(debtsSection).queryByRole("button", { name: /^Add / }),
-    ).not.toBeInTheDocument();
+      within(sheet())
+        .getAllByRole("button", { name: /^Add / })
+        .map((button) => button.textContent),
+    ).toStrictEqual(["Add account", "Add house", "Add car", "Add debt"]);
+    expect(rowsOf("Pensions · tax-deferred")).toHaveLength(1);
+    expect(rowsOf("ISAs · tax-free")).toHaveLength(1);
+    expect(rowsOf("Cash")).toHaveLength(1);
+    expect(rowsOf("Property & vehicles")).toHaveLength(1);
+    expect(rowsOf("Other debts")).toHaveLength(1);
+    expect(
+      within(screen.getByRole("group", { name: "Other debts" })).getByRole(
+        "button",
+        { name: "Mortgage" },
+      ),
+    ).toBeInTheDocument();
+    expect(within(sheet()).getByText("£950,771")).toHaveClass("figure");
     expect(
       screen.queryByRole("button", { name: /^Move / }),
     ).not.toBeInTheDocument();
-    expect(
-      within(savingsSection).getByRole("button", { name: "Add account" }),
-    ).toBeInTheDocument();
-    expect(
-      within(assetsSection).getByRole("button", { name: "Add house" }),
-    ).toBeInTheDocument();
-    expect(
-      within(assetsSection).getByRole("button", { name: "Add car" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getAllByRole("paragraph").map((note) => note.textContent),
-    ).toStrictEqual([
-      "Allocation is set once at plan level and applied pro rata to every account.",
-    ]);
     expect(
       within(screen.getByRole("region", { name: "Order of payment" }))
         .getAllByRole("listitem")
@@ -145,11 +149,11 @@ describe("AccountLedger", () => {
     expect(
       within(
         screen.getByRole("region", { name: "Order of payment" }),
-      ).getByText("Sect. II.iv"),
+      ).getByText("Sect. II.ii"),
     ).toHaveClass("label");
     expect(
       within(screen.getByRole("region", { name: "Owners" })).getByText(
-        "Sect. II.v",
+        "Sect. II.iii",
       ),
     ).toHaveClass("label");
   });
@@ -164,52 +168,55 @@ describe("AccountLedger", () => {
     expect(
       screen.queryByRole("region", { name: "Order of payment" }),
     ).not.toBeInTheDocument();
-    expect(within(owners).getByText("Sect. II.iii")).toHaveClass("label");
+    expect(within(owners).getByText("Sect. II.ii")).toHaveClass("label");
     expect(within(owners).getByRole("row", { name: /Me/ })).toBeInTheDocument();
   });
 
-  // The fixture's balances come to £950,771, its mortgage taking away,
-  // £717,325 of it in its three savings; its home, owned outright, is
-  // all equity; and it pays in £6,143 a month between the pension's
-  // £27,195 and the ISA's £20,000 a year and the mortgage's £2,210 a
-  // month. The tiles are the first four cards on the screen, the net
-  // worth the one that matters most.
-  it("opens on the starting net worth, the savings, the equity and what is paid in a month", () => {
-    renderLedger();
+  // The sheet says when the mortgage's payments clear it from the line
+  // paying it, which it is handed the expense lines for.
+  it("hands the sheet the expense lines, to say when a loan clears", () => {
+    renderLedger({
+      accounts: [house, loan],
+      expenses: [
+        {
+          ...expenseLines[0],
+          kind: "debt",
+          lastMonth: 6,
+          lastYear: 2047,
+          pays: loan.id,
+        },
+      ],
+    });
 
-    const [worth, savings, equity, paidIn] = screen.getAllByText(
-      bySlot("card"),
+    expect(rowsOf("Property & vehicles")[0]).toHaveTextContent(
+      "at 5.15% · £2,210 / mo · to Jul 2047",
     );
-
-    expect(worth).toHaveAttribute("data-tone", "inverse");
-    expect(worth).toHaveTextContent(
-      "Starting net worth£950,771The balances the plan starts from",
-    );
-    expect(savings).toHaveTextContent("Savings£717,3253 accounts");
-    expect(equity).toHaveTextContent("Equity£416,386£416,386 owned · £0 owed");
-    expect(paidIn).toHaveTextContent(
-      "Paid in£6,143/ moSacrifice and fixed payments",
-    );
-    // A phone keeps the net worth and the savings, in one row.
-    expect(worth).not.toHaveClass("max-sm:hidden");
-    expect(savings).not.toHaveClass("max-sm:hidden");
-    expect(equity).toHaveClass("max-sm:hidden");
-    expect(paidIn).toHaveClass("max-sm:hidden");
   });
 
-  // A salary running in the plan's month pays in what it sacrifices, and
-  // a loan on a house owes against it, so the equity is what is left.
-  it("counts the sacrifice in what is paid in, and the loan against the equity", () => {
-    const [salary] = incomeLines;
-    renderLedger({ accounts: [pension, house, loan], lines: [salary] });
+  // Add debt opens the account dialog on a new debt, which belongs to
+  // nobody, as Add account opens it on a new pension belonging to the
+  // first owner.
+  it("opens a new debt from the other debts, and a new pension from Add account", () => {
+    renderLedger();
 
-    const [worth, , equity, paidIn] = screen.getAllByText(bySlot("card"));
+    let dialog = openEntry("Add debt");
 
-    expect(worth).toHaveTextContent("£646,326");
-    expect(equity).toHaveTextContent(
-      "Equity£233,446£416,386 owned · £182,940 owed",
+    expect(
+      within(dialog).getByRole("combobox", { name: "Treatment" }),
+    ).toHaveValue("debt");
+    expect(
+      within(dialog).queryByRole("combobox", { name: "Owner" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    dialog = openEntry("Add account");
+
+    expect(
+      within(dialog).getByRole("combobox", { name: "Treatment" }),
+    ).toHaveValue("tax-deferred");
+    expect(within(dialog).getByRole("combobox", { name: "Owner" })).toHaveValue(
+      "1",
     );
-    expect(paidIn).toHaveTextContent("£5,626");
   });
 
   it("adds a named account and reports it", async () => {
@@ -349,24 +356,18 @@ describe("AccountLedger", () => {
       rate: 0,
       shares: [],
     });
-    expect(
-      rowsOf(screen.getByRole("region", { name: "Property and vehicles" })),
-    ).toHaveLength(assets.length);
+    expect(rowsOf("Property & vehicles")).toHaveLength(1);
   });
 
-  // The house dialog opens from the property section; what it saves is
+  // The house dialog opens from the sheet; what it saves is
   // its business, and the ledger's is to close it once it has.
-  it("adds a house from the property section and closes on the save", async () => {
+  it("adds a house from the sheet and closes on the save", async () => {
     renderLedger();
     vi.mocked(saveHouse).mockResolvedValue(
       accepted({ ...home, id: 6, name: "Flat" }),
     );
 
-    fireEvent.click(
-      within(
-        screen.getByRole("region", { name: "Property and vehicles" }),
-      ).getByRole("button", { name: "Add house" }),
-    );
+    fireEvent.click(within(sheet()).getByRole("button", { name: "Add house" }));
 
     const dialog = screen.getByRole("dialog", { name: "Untitled house" });
 
@@ -387,17 +388,13 @@ describe("AccountLedger", () => {
     expect(saveHouse).toHaveBeenCalledOnce();
   });
 
-  // The car dialog opens from the property section too, and the ledger's
+  // The car dialog opens from the sheet too, and the ledger's
   // part is the same: to close it once it has saved.
-  it("adds a car from the property section and closes on the save", async () => {
+  it("adds a car from the sheet and closes on the save", async () => {
     renderLedger();
     vi.mocked(saveCar).mockResolvedValue(accepted(golf));
 
-    fireEvent.click(
-      within(
-        screen.getByRole("region", { name: "Property and vehicles" }),
-      ).getByRole("button", { name: "Add car" }),
-    );
+    fireEvent.click(within(sheet()).getByRole("button", { name: "Add car" }));
 
     const dialog = screen.getByRole("dialog", { name: "Untitled car" });
 
@@ -443,16 +440,14 @@ describe("AccountLedger", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
-    expect(
-      rowsOf(screen.getByRole("region", { name: "Savings and investments" })),
-    ).toHaveLength(held.length - 1);
+    expect(rowsOf("Cash")).toHaveLength(1);
   });
 
   it("opens a real asset as it is, keeps its rate across the growth choice and writes the edit back", async () => {
     renderLedger();
     saved({ ...home, balance: 420000 });
 
-    const dialog = openEditor("Home");
+    const dialog = openRow("Home");
 
     expect(within(dialog).getByText("Edit account")).toHaveClass("text-brand");
     expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue(
@@ -528,7 +523,7 @@ describe("AccountLedger", () => {
       contribution: { amount: 30000, cadence: "year", kind: "fixed" },
     });
 
-    const dialog = openEditor("Workplace pension");
+    const dialog = openRow("Workplace pension");
 
     expect(
       within(dialog).getByRole("combobox", { name: "Contribution" }),
@@ -578,7 +573,7 @@ describe("AccountLedger", () => {
     renderLedger();
     saved({ ...isa, contribution: { cap: 4000, kind: "spare" } });
 
-    const dialog = openEditor("Stocks & shares ISA");
+    const dialog = openRow("Stocks & shares ISA");
 
     fireEvent.change(
       within(dialog).getByRole("combobox", { name: "Contribution" }),
@@ -639,7 +634,7 @@ describe("AccountLedger", () => {
       ],
     });
 
-    let dialog = openEditor("Current account");
+    let dialog = openRow("Current account");
 
     expect(
       within(dialog).getByRole("combobox", { name: "Contribution" }),
@@ -659,7 +654,7 @@ describe("AccountLedger", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
-    dialog = openEditor("Stocks & shares ISA");
+    dialog = openRow("Stocks & shares ISA");
 
     fireEvent.change(
       within(dialog).getByRole("combobox", { name: "Contribution" }),
@@ -693,7 +688,7 @@ describe("AccountLedger", () => {
     });
     saved(isa);
 
-    const dialog = openEditor("Stocks & shares ISA");
+    const dialog = openRow("Stocks & shares ISA");
     const treatment = within(dialog).getByRole("combobox", {
       name: "Treatment",
     });
@@ -887,43 +882,37 @@ describe("AccountLedger", () => {
     },
   );
 
-  // A house and the loan against it share a row, which opens both in the
-  // house dialog; the loan leaves the accounts' section for it, and is no
-  // more in the order than any other debt, so the one saving left is no
-  // order and the owners take its numeral.
-  it("puts a house and the loan against it on one row, which opens both in the house dialog", () => {
+  // A house and the loan against it are one entry, drawn level with
+  // each other and both opening the house dialog; the loan leaves the
+  // savings for it, and is no more in the order than any other debt, so
+  // the one saving left is no order and the owners take its numeral.
+  it("puts a house and the loan against it in one entry, which opens both in the house dialog", () => {
     renderLedger({ accounts: [pension, house, loan] });
 
-    const savingsSection = screen.getByRole("region", {
-      name: "Savings and investments",
-    });
-    const assetsSection = screen.getByRole("region", {
-      name: "Property and vehicles",
-    });
-
-    expect(rowsOf(savingsSection)).toHaveLength(1);
+    expect(rowsOf("Pensions · tax-deferred")).toHaveLength(1);
+    expect(rowsOf("Property & vehicles")).toHaveLength(1);
+    expect(rowsOf("Property & vehicles")[0]).toHaveTextContent(
+      "Mortgage−£182,940at 5.15%",
+    );
     expect(
-      within(savingsSection).queryByText("Mortgage"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("region", { name: "Other debts" }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(assetsSection).getByRole("row", { name: /Home/ }),
-    ).toHaveTextContent("Mortgage at 5.15%");
-    expect(
-      screen.queryByRole("button", { name: "Edit Mortgage" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("group", { name: "Other debts" }),
+    ).toHaveTextContent("None");
     expect(
       screen.queryByRole("region", { name: "Order of payment" }),
     ).not.toBeInTheDocument();
     expect(
       within(screen.getByRole("region", { name: "Owners" })).getByText(
-        "Sect. II.iii",
+        "Sect. II.ii",
       ),
     ).toHaveClass("label");
 
-    const dialog = openEditor("Home");
+    fireEvent.click(
+      within(openRow("Mortgage", "Home")).getByRole("button", {
+        name: "Cancel",
+      }),
+    );
+
+    const dialog = openRow("Home");
 
     expect(within(dialog).getByText("Edit house")).toHaveClass("text-brand");
     expect(
@@ -938,16 +927,18 @@ describe("AccountLedger", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  // A car and the finance on it share a row too, which opens both in the
-  // car dialog.
-  it("puts a car and the finance on it on one row, which opens both in the car dialog", () => {
+  // A car and the finance on it are one entry too, which opens both in
+  // the car dialog.
+  it("puts a car and the finance on it in one entry, which opens both in the car dialog", () => {
     renderLedger({ accounts: [pension, golf, finance] });
 
-    expect(
-      screen.queryByRole("button", { name: "Edit Golf PCP" }),
-    ).not.toBeInTheDocument();
+    fireEvent.click(
+      within(openRow("Golf PCP", "Golf")).getByRole("button", {
+        name: "Cancel",
+      }),
+    );
 
-    const dialog = openEditor("Golf");
+    const dialog = openRow("Golf");
 
     expect(within(dialog).getByText("Edit car")).toHaveClass("text-brand");
     expect(
@@ -968,7 +959,7 @@ describe("AccountLedger", () => {
   it("opens a house with no loan against it as owned outright", () => {
     renderLedger({ accounts: [house] });
 
-    const dialog = openEditor("Home");
+    const dialog = openRow("Home");
 
     expect(within(dialog).getByText("Edit house")).toHaveClass("text-brand");
     expect(
@@ -987,28 +978,27 @@ describe("AccountLedger", () => {
       ],
     });
 
-    let dialog = openEditor("Mortgage");
+    let dialog = openRow("Mortgage");
 
     expect(within(dialog).getByText("Edit account")).toHaveClass("text-brand");
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
-    dialog = openEditor("Golf PCP");
+    dialog = openRow("Golf PCP");
 
     expect(within(dialog).getByText("Edit account")).toHaveClass("text-brand");
   });
 
-  // A row's bin asks first, holds the confirm while the store answers,
-  // and closes on the answer; the row goes when the page re-reads.
+  // A row's dialog asks first, holds the confirm while the store
+  // answers, and closes on the answer; the row goes when the page
+  // re-reads.
   it("asks before deleting an account, and deletes it on confirm", async () => {
     renderLedger();
     const { promise, resolve: answer } =
       Promise.withResolvers<Answer<undefined>>();
     vi.mocked(removeAccount).mockReturnValue(promise);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Delete Current account" }),
-    );
+    askToDelete("Current account");
 
     const dialog = screen.getByRole("alertdialog", {
       name: "Delete Current account?",
@@ -1037,9 +1027,7 @@ describe("AccountLedger", () => {
     renderLedger();
     vi.mocked(removeAccount).mockResolvedValue(refused("Still secured"));
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Delete Current account" }),
-    );
+    askToDelete("Current account");
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => {
@@ -1060,9 +1048,7 @@ describe("AccountLedger", () => {
   it("drops the question on cancel and deletes nothing", () => {
     renderLedger();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Delete Stocks & shares ISA" }),
-    );
+    askToDelete("Stocks & shares ISA");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
@@ -1076,7 +1062,7 @@ describe("AccountLedger", () => {
     renderLedger();
     vi.mocked(removeAccount).mockResolvedValue(accepted(undefined));
 
-    const editor = openEditor("Stocks & shares ISA");
+    const editor = openRow("Stocks & shares ISA");
     fireEvent.click(within(editor).getByRole("button", { name: "Delete" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -1096,7 +1082,7 @@ describe("AccountLedger", () => {
     renderLedger({ accounts: [pension, house, loan] });
 
     fireEvent.click(
-      within(openEditor("Home")).getByRole("button", { name: "Delete" }),
+      within(openRow("Home")).getByRole("button", { name: "Delete" }),
     );
 
     const question = screen.getByRole("alertdialog", { name: "Delete Home?" });
@@ -1116,7 +1102,7 @@ describe("AccountLedger", () => {
     renderLedger({ accounts: [golf, finance] });
 
     fireEvent.click(
-      within(openEditor("Golf")).getByRole("button", { name: "Delete" }),
+      within(openRow("Golf")).getByRole("button", { name: "Delete" }),
     );
 
     expect(
@@ -1127,55 +1113,28 @@ describe("AccountLedger", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("says a house takes its mortgage and the payments", () => {
-    renderLedger({ accounts: [pension, house, loan] });
-
-    fireEvent.click(screen.getByRole("button", { name: "Delete Home" }));
-
-    expect(
-      screen.getByRole("alertdialog", { name: "Delete Home?" }),
-    ).toHaveAccessibleDescription(
-      "Its mortgage, Mortgage, and the payments go with it.",
-    );
-  });
-
-  it("says a car takes its finance and the payments", () => {
-    renderLedger({ accounts: [golf, finance] });
-
-    fireEvent.click(screen.getByRole("button", { name: "Delete Golf" }));
-
-    expect(
-      screen.getByRole("alertdialog", { name: "Delete Golf?" }),
-    ).toHaveAccessibleDescription(
-      "Its finance, Golf PCP, and the payments go with it.",
-    );
-  });
-
-  // A pension a salary feeds opens with its treatment held and the
-  // reason beneath it; an account nothing feeds opens free, as does a
-  // new one.
-  // The accounts' table is handed the lines, so a fed pension's row
-  // says what lands in it; the assets' is not, since nothing feeds an
-  // asset.
+  // The sheet is handed the lines, so a fed pension's row says what
+  // lands in it.
   it("writes what the salary sacrifices into the pension on its row", () => {
     const [salary] = incomeLines;
     renderLedger({ lines: [salary] });
 
-    expect(
-      screen.getByText("+ £1,150 / mo sacrificed from Salary"),
-    ).toHaveClass("text-muted-foreground");
+    expect(rowsOf("Pensions · tax-deferred")[0]).toHaveTextContent(
+      "£2,266 / mo paid + £1,150 / mo sacrificed from Salary",
+    );
   });
 
-  // The salary ends with 2048, so in 2049 it lands nothing on the row,
-  // though the link stands: the dialog still holds the treatment and
-  // the share, since the store holds the link whether or not it runs.
+  // The salary ends with 2048, so a plan starting in 2049 lands nothing
+  // of it on the row, though the link stands: the dialog still holds
+  // the treatment and the share, since the store holds the link whether
+  // or not it runs.
   it("counts a salary on the row only while it runs, and holds the link either way", () => {
     const [salary] = incomeLines;
-    renderLedger({ at: { month: 0, year: 2049 }, lines: [salary] });
+    renderLedger({ lines: [salary], plan: { ...plan, from: 2049, month: 0 } });
 
     expect(screen.queryByText(/sacrificed from/)).not.toBeInTheDocument();
 
-    const dialog = openEditor("Workplace pension");
+    const dialog = openRow("Workplace pension");
 
     expect(
       within(dialog).getByRole("combobox", { name: "Treatment" }),
@@ -1189,10 +1148,9 @@ describe("AccountLedger", () => {
     const [salary] = incomeLines;
     renderLedger({ accounts: [pension, isa], lines: [salary] });
 
-    let treatment = within(openEditor("Workplace pension")).getByRole(
-      "combobox",
-      { name: "Treatment" },
-    );
+    let treatment = within(openRow("Workplace pension")).getByRole("combobox", {
+      name: "Treatment",
+    });
 
     expect(treatment).toBeDisabled();
     expect(treatment).toHaveAccessibleDescription(
@@ -1200,10 +1158,9 @@ describe("AccountLedger", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    treatment = within(openEditor("Stocks & shares ISA")).getByRole(
-      "combobox",
-      { name: "Treatment" },
-    );
+    treatment = within(openRow("Stocks & shares ISA")).getByRole("combobox", {
+      name: "Treatment",
+    });
 
     expect(treatment).toBeEnabled();
 
@@ -1227,9 +1184,7 @@ describe("AccountLedger", () => {
       lines: [salary, { ...stepUp, feeds: pension.id, sacrifice: 0.05 }],
     });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Delete Workplace pension" }),
-    );
+    askToDelete("Workplace pension");
 
     expect(
       screen.getByRole("alertdialog", { name: "Delete Workplace pension?" }),
@@ -1238,9 +1193,7 @@ describe("AccountLedger", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Delete Stocks & shares ISA" }),
-    );
+    askToDelete("Stocks & shares ISA");
 
     expect(
       screen.getByRole("alertdialog", { name: "Delete Stocks & shares ISA?" }),
@@ -1250,7 +1203,7 @@ describe("AccountLedger", () => {
   it("says a house with no loan goes alone", () => {
     renderLedger({ accounts: [house] });
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete Home" }));
+    askToDelete("Home");
 
     expect(
       screen.getByRole("alertdialog", { name: "Delete Home?" }),

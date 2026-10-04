@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ExpenseLine } from "@/data/expenses";
+
 import { accounts } from "@/data/accounts.fixture";
+import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
@@ -20,14 +23,17 @@ vi.mock("@/actions/owners", () => ({
   saveOwner: vi.fn(),
 }));
 
-// The page over the fixture's household, as the store reads it.
-async function renderAccounts(): Promise<void> {
+// The page over the fixture's household, as the store reads it, with
+// the expense lines a test gives.
+async function renderAccounts({
+  expenses = [],
+}: { readonly expenses?: readonly ExpenseLine[] } = {}): Promise<void> {
   vi.mocked(getHousehold).mockResolvedValue({
     ...soundKept(blank).household,
     accounts: [...accounts],
     owners,
     plan,
-    schedule: { expenses: [], income: [...incomeLines] },
+    schedule: { expenses, income: [...incomeLines] },
   });
   render(await Accounts());
 }
@@ -42,8 +48,11 @@ describe("Accounts", () => {
     expect(screen.getByText("Sect. II · Accounts & assets")).toHaveClass(
       "label",
     );
+    // The fixture's balances come to £950,771, its mortgage taking away.
     expect(
-      screen.getByText("Starting balances for the plan · September 2026"),
+      screen.getByText(
+        "Starting net worth £950,771 · balances as of September 2026",
+      ),
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole("banner"))
@@ -55,19 +64,28 @@ describe("Accounts", () => {
 
   // The fixture's salary feeds the workplace pension, which the ledger
   // says before the pension goes, and lands £13,800 a year in it in the
-  // month the plan is read in, which the row says as £1,150 a month.
-  it("hands the store's accounts, income lines and owners to the ledger, in the plan's month", async () => {
-    await renderAccounts();
+  // month the plan is read in, which the row says as £1,150 a month;
+  // the plan's rate is what the savings grow at, and the expense line
+  // paying the mortgage says when it clears.
+  it("hands the store's accounts, lines, owners and plan to the ledger", async () => {
+    await renderAccounts({
+      expenses: [
+        {
+          ...expenseLines[0],
+          kind: "debt",
+          lastMonth: 6,
+          lastYear: 2047,
+          pays: 5,
+        },
+      ],
+    });
 
     expect(
-      screen.getByText("+ £1,150 / mo sacrificed from Salary"),
+      screen.getByText(/\+ £1,150 \/ mo sacrificed from Salary$/),
     ).toBeInTheDocument();
-
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Accounts & assets",
-    );
+    expect(screen.getByText(/to Jul 2047$/)).toBeInTheDocument();
     expect(
-      screen.getByText("Starting balances for the plan · September 2026"),
+      screen.getByText(/^Savings grow at the plan rate, 5\.00%/),
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole("region", { name: "Owners" })).getByRole("row", {
@@ -75,8 +93,11 @@ describe("Accounts", () => {
       }),
     ).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "Workplace pension" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Delete Workplace pension" }),
+      within(
+        screen.getByRole("dialog", { name: "Workplace pension" }),
+      ).getByRole("button", { name: "Delete" }),
     );
 
     expect(
