@@ -94,7 +94,7 @@ describe("MilestoneList", () => {
     expect(within(section).getAllByText("Age 65")).toHaveLength(2);
     expect(
       within(section).getByText(
-        /retirement moves with the age set on the dashboard\.$/,
+        /retirement moves with the age set on the Dashboard\.$/,
       ),
     ).toBeInTheDocument();
     // Hidden from the tree, so no query is better than the slot.
@@ -137,7 +137,7 @@ describe("MilestoneList", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("img", {
-        name: "Set by the retirement age on the dashboard",
+        name: "Set by the retirement age on the Dashboard",
       }),
     ).toHaveLength(2);
     expect(
