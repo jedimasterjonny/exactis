@@ -22,6 +22,7 @@ import { SectionCard } from "@/components/app/molecules/section-card";
 import { TextField } from "@/components/app/molecules/text-field";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
+import { asPaid } from "@/data/income";
 import { isTiedTo, markersOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
@@ -72,7 +73,9 @@ const retirementLock = "Set by the retirement age on the dashboard";
 // card comes before the schedules because the lines are laid out by the
 // milestones rather than the other way round. Each row says which lines
 // start and end at it, from either schedule, so what moves with a
-// milestone is read where the milestone is. There is always one row,
+// milestone is read where the milestone is, and retirement names the
+// salaries and profits it stops as ending there, whatever their own
+// ends say, since that is where they are paid to. There is always one row,
 // retirement's, so there is no empty state.
 // A milestone is a name and a year, too little to open a dialog for, so
 // it is added and edited where it is listed: the card's button opens a
@@ -96,6 +99,10 @@ export function MilestoneList({
   schedule,
 }: MilestoneListProps): JSX.Element {
   const lines = [...schedule.income, ...schedule.expenses];
+  const paid = [
+    ...schedule.income.map((line) => asPaid(line, plan)),
+    ...schedule.expenses,
+  ];
   const { amend, dialogOf, dismiss, entry, isSaving, open, save } = useEditor({
     describe: (milestone) => `${milestone.name} · ${String(milestone.year)}`,
     noun: "Milestone",
@@ -182,7 +189,7 @@ export function MilestoneList({
               ) : (
                 <MilestoneRow
                   key={marker.id}
-                  lines={lines}
+                  lines={paid}
                   marker={marker}
                   milestone={milestone}
                   onDelete={ask}

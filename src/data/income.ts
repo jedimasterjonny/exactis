@@ -1,5 +1,8 @@
 import type { AccountValues } from "@/data/accounts";
+import type { Plan } from "@/data/plan";
 import type { LineValues } from "@/data/schedule";
+
+import { retirementYear } from "@/data/plan";
 
 export type IncomeKind = (typeof incomeKinds)[number];
 
@@ -70,6 +73,31 @@ export const incomeKinds = [
 // sacrifice. The employee's own saving is the flow's to find, since a
 // sacrifice comes off the salary before its tax is charged.
 const employerNi = 0.15;
+
+// A line as it is paid: one earned by working that runs into the year
+// the plan's owner retires in is paid to the year before and no further,
+// whatever its own end says, since the engine pays no salary or profit
+// from retirement on. One that starts before then reads as a line ending
+// at retirement; one that starts there or later is never paid, and reads
+// as running no years rather than as ending somewhere it never reached.
+// Any other line is handed back as it is, which is how a caller tells
+// the two apart.
+export function asPaid<TLine extends IncomeLineValues>(
+  line: TLine,
+  plan: Plan,
+): TLine {
+  const retirement = retirementYear(plan);
+  if (
+    !isEarned(line) ||
+    (line.lastYear !== null && line.lastYear < retirement)
+  ) {
+    return line;
+  }
+  const stopped = { lastMonth: null, lastYear: retirement - 1 };
+  return line.firstYear < retirement
+    ? { ...line, ...stopped, endsAfter: 0, endsAt: "retirement" }
+    : { ...line, ...stopped };
+}
 
 // What lands in the pension a line feeds, at the line's cadence: the
 // sacrifice, and the employer's NI saved on it, passed on in full.

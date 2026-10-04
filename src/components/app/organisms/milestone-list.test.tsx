@@ -146,6 +146,18 @@ describe("MilestoneList", () => {
     expect(screen.getAllByText(/^(Ends|Starts) /)).toHaveLength(4);
   });
 
+  // A salary running with the plan is paid to the year before
+  // retirement whatever its end says, so retirement names it as ending
+  // there, though it is tied to nothing.
+  it("names a salary its pay stops at retirement as ending there", () => {
+    renderList(milestones, {
+      expenses: [],
+      income: [{ ...salary, lastYear: null }],
+    });
+
+    expect(screen.getAllByText("Ends Salary")).toHaveLength(2);
+  });
+
   it("lists retirement alone for a household listing no milestone", () => {
     renderList([], { expenses: [], income: [] });
 
