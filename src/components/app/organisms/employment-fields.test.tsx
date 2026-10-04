@@ -87,6 +87,24 @@ describe("EmploymentFields", () => {
   });
 
   // A share is at most the whole of the base, so 150 commits as 100.
+  // £120,000, £16,500 and £7,500 a year come to £144,000.
+  it("says what the base and its parts come to a year", () => {
+    renderFields(salary);
+
+    expect(screen.getByText("£144,000 a year")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
+  });
+
+  // The same parts left on a monthly salary are paid twelve times over,
+  // which the total says before the line is saved.
+  it("counts the parts of a monthly salary twelve times over", () => {
+    renderFields(salary, { ...salary, cadence: "month" });
+
+    expect(screen.getByText("£1,728,000 a year")).toBeInTheDocument();
+  });
+
   it("holds the share to the base it comes out of", () => {
     const { onAmend } = renderFields(salary);
 

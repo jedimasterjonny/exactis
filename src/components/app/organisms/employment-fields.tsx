@@ -9,7 +9,9 @@ import { FieldRow } from "@/components/app/atoms/field-row";
 import { MoneyField, RateField } from "@/components/app/molecules/figure-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
-import { isFeeding } from "@/data/income";
+import { isFeeding, totalOf } from "@/data/income";
+import { yearly } from "@/lib/cadence";
+import { formatGbp } from "@/lib/money";
 import { ownerFor, ownerOptions } from "@/lib/owners";
 
 interface EmploymentFieldsProps {
@@ -27,7 +29,11 @@ const opened = "new";
 
 // The fields only an employment line takes, sitting in the slot the line
 // fields leave for whatever a schedule adds: its bonus and RSUs on a row
-// of their own, and beneath them the pension it feeds, chosen from the
+// of their own, with what the base and both come to a year beside them,
+// read off the draft as it is typed and said aloud as it changes, since
+// the parts are paid at the salary's cadence and a bonus typed as a
+// year's and left on a monthly salary is paid twelve times over, and
+// beneath them the pension it feeds, chosen from the
 // pensions among the accounts the page hands down, or none, or a new
 // one the save opens, with the share of the base it sacrifices beside
 // it while there is a pension to take it. A new pension asks its name,
@@ -102,6 +108,15 @@ export function EmploymentFields({
             onAmend({ rsu });
           }}
         />
+        <div className="grid content-start gap-2">
+          <span className="label text-muted-foreground">In all</span>
+          <span aria-live="polite" className="figure font-medium">
+            {`${formatGbp(yearly(totalOf(draft), draft.cadence))} a year`}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            Base, bonus and RSUs together
+          </span>
+        </div>
       </FieldRow>
       <FieldRow layout="pair">
         <SelectField
