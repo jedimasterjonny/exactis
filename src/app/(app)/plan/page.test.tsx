@@ -70,8 +70,9 @@ describe("Plan", () => {
     expect(
       screen.getAllByText(/10\.00% of the base into Workplace pension$/),
     ).toHaveLength(2);
-    // The two schedules' notes.
-    expect(screen.getAllByRole("paragraph")).toHaveLength(2);
+    // The schedules keep their rules in their captions, with no note
+    // between the cards.
+    expect(screen.queryByRole("paragraph")).not.toBeInTheDocument();
     // The year book opens on the plan's first year, its month laid out
     // beneath the strip.
     expect(

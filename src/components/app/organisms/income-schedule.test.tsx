@@ -54,7 +54,7 @@ function saved(line: IncomeLine): void {
 }
 
 describe("IncomeSchedule", () => {
-  it("opens with the card, its rows and its note", () => {
+  it("opens with the card, its caption and its rows", () => {
     renderSchedule();
 
     expect(screen.getByText("Sect. III.ii")).toHaveClass("label");
@@ -82,9 +82,13 @@ describe("IncomeSchedule", () => {
         .at(-1),
     ).toHaveClass("text-muted-foreground");
     expect(screen.queryByText(/£168,000 base/)).not.toBeInTheDocument();
-    expect(screen.getByRole("paragraph")).toHaveTextContent(
-      "Lines overlap freely",
+    // The card's rule is its caption, with no note beside the card.
+    expect(
+      screen.getByText(/^Pay, pensions and anything else coming in/),
+    ).toHaveTextContent(
+      "Pay stops at retirement, whatever its line says. A rise is a second line from the year it starts, not an edit to the first.",
     );
+    expect(screen.queryByRole("paragraph")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 

@@ -14,7 +14,6 @@ import type { Entry } from "@/hooks/use-editor";
 
 import { removeIncomeLine, saveIncomeLine } from "@/actions/schedule";
 import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
-import { Note } from "@/components/app/atoms/note";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { EmploymentFields } from "@/components/app/organisms/employment-fields";
@@ -63,7 +62,9 @@ const kinds = optionsOf(kindLabels, [
 ]);
 
 // The plan screen's income schedule and its dialog, which enters a new
-// line from the card's button or edits one from its row. The rows are the
+// line from the card's button or edits one from its row. The caption
+// says what the card holds and the rules a reader needs to write a line
+// right: pay stops at retirement, and a rise is a line of its own. The rows are the
 // store's, handed down by the page, and a save goes to the store and
 // comes back with the page re-read, so the card reflects it without the
 // schedule holding rows of its own. The entry doubles as the dialog's
@@ -163,6 +164,7 @@ export function IncomeSchedule({
             Add income line
           </Button>
         }
+        caption="Pay, pensions and anything else coming in, each over the years it is paid. Pay stops at retirement, whatever its line says. A rise is a second line from the year it starts, not an edit to the first."
         label={subsectionLabel(planScreen, 2)}
         title="Income by year"
       >
@@ -179,10 +181,6 @@ export function IncomeSchedule({
           />
         </CardContent>
       </SectionCard>
-      <Note>
-        Lines overlap freely: a step-up is a second line starting mid-way, not
-        an edit to the first.
-      </Note>
       {doomed !== null && (
         <ConfirmDialog {...questionOf(doomed)}>
           It cannot be brought back.
