@@ -66,7 +66,7 @@ describe("ExpenseSchedule", () => {
     }
     expect(screen.getByText("£3,500")).toHaveTextContent("£3,500 / mo");
     expect(screen.getByText("£60,000")).toHaveTextContent("£60,000 / yr");
-    expect(screen.getByText("2048 – end")).toBeInTheDocument();
+    expect(screen.getByText("2048 on")).toBeInTheDocument();
     expect(screen.getByRole("paragraph")).toHaveTextContent(
       "An open-ended line runs to the end of the plan",
     );
@@ -261,7 +261,7 @@ describe("ExpenseSchedule", () => {
     });
     expect(
       screen.getByRole("dialog", { name: "Expense line updated" }),
-    ).toHaveAccessibleDescription("Retirement living · 2048–end of plan");
+    ).toHaveAccessibleDescription("Retirement living · 2048 on");
     expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(4, {
       amount: 65000,
       cadence: "year",
