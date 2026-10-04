@@ -19,7 +19,7 @@ import { yearsOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { counted } from "@/lib/count";
-import { endOf, growthLabels } from "@/lib/lines";
+import { growthLabels, spanOf } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 import { laneColumns } from "@/lib/span";
 
@@ -274,7 +274,7 @@ function describe(
       afterOf(nameOf(line.endsAt, milestones), line.endsAfter),
     ),
     total: formatGbp(summary.total),
-    years: `${String(line.firstYear)} – ${endOf(line) ?? "end"}`,
+    years: spanOf(line),
   };
 }
 
