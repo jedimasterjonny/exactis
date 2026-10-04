@@ -20,12 +20,14 @@ import { endOf, growthLabels } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 
 // What a schedule says of a line that the rows cannot read off it: the
-// badge its kind takes, what it pays at its cadence, and any detail to
-// write beside the badge.
+// badge its kind takes, what it pays at its cadence, any detail to write
+// beside the badge, and the line as it is paid where that stops short of
+// where it says it ends, which the row draws in its place.
 export interface Summary {
   readonly badge: { readonly label: string; readonly variant: Tone };
   readonly detail?: string;
   readonly lock?: string;
+  readonly paid?: LineValues;
   readonly total: number;
 }
 
@@ -81,7 +83,11 @@ const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
 // Retirement", its years staying the figures they fall on, since a name
 // in their place would not fit their column; and a line whose milestone
 // has moved past its other end says it runs no years in place of its
-// ages. A schedule holding nothing draws its empty state instead of a
+// ages. A line its schedule says is paid short of its own end, as a
+// salary is past retirement, is drawn as it is paid, its bar, years and
+// ties all, since a row promising years the plan never pays reads as
+// income the plan does not have; the pencil still opens the line as it
+// is. A schedule holding nothing draws its empty state instead of a
 // list of nothing. While the list is too narrow to read across, as on a
 // phone, each row folds into lines, as a ledger's does: the name and
 // what the line pays on the first, then its kind and how it grows, then
@@ -119,20 +125,21 @@ export function ScheduleRows<TLine extends Line>({
     <ul className="@container divide-y">
       {lines.map((line) => {
         const summary = summarise(line);
-        const row = describe(line, { milestones, plan }, summary);
+        const paid = summary.paid ?? line;
+        const row = describe(paid, { milestones, plan }, summary);
         const lock =
           summary.lock !== undefined ? (
             <RowLock reason={summary.lock} />
           ) : undefined;
         const bar = (
           <SpanBar
-            endsAt={line.endsAt}
-            firstYear={line.firstYear}
-            lastMonth={line.lastMonth}
-            lastYear={line.lastYear}
+            endsAt={paid.endsAt}
+            firstYear={paid.firstYear}
+            lastMonth={paid.lastMonth}
+            lastYear={paid.lastYear}
             plan={plan}
             side={side}
-            startsAt={line.startsAt}
+            startsAt={paid.startsAt}
           />
         );
         return (

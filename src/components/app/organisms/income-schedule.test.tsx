@@ -14,12 +14,12 @@ import { removeIncomeLine, saveIncomeLine } from "@/actions/schedule";
 import { Toaster } from "@/components/kit/toast";
 import { accounts, sipp } from "@/data/accounts.fixture";
 import { incomeKinds } from "@/data/income";
-import { incomeLines, plan } from "@/data/income.fixture";
+import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import { lineGrowths } from "@/data/schedule";
 import { saved as accepted, refused } from "@/lib/answer";
-import { commit, openEditor, openEntry } from "@/test/dom";
+import { bySlot, commit, openEditor, openEntry } from "@/test/dom";
 
 import { IncomeSchedule } from "./income-schedule";
 
@@ -500,8 +500,9 @@ describe("IncomeSchedule", () => {
 
   // Born in 1990 and retiring at 30, the owner retired in 2020, before
   // the plan starts, and a salary ending then would end before it
-  // started.
-  it("opens a new line running with the plan once its owner has retired", () => {
+  // started; it runs with the plan instead, and the dialog says that it
+  // is never paid.
+  it("opens a new line running with the plan once its owner has retired, and says it is never paid", () => {
     render(
       <IncomeSchedule
         accounts={accounts}
@@ -518,8 +519,52 @@ describe("IncomeSchedule", () => {
       "open",
     );
     expect(
-      within(dialog).getByText("Runs to 2079, the last year of the plan."),
+      within(dialog).getByText(
+        "Never paid, since pay stops at Retirement in 2020.",
+      ),
     ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByText("Runs to 2079, the last year of the plan."),
+    ).not.toBeInTheDocument();
+  });
+
+  // Retiring at 59, the owner retires in 2049, so a salary running with
+  // the plan is paid to 2048: its row draws it to there, tied to
+  // retirement, and its dialog says where its pay stops and draws its
+  // bar that far.
+  it("draws a salary to retirement, where its pay stops, whatever its end says", () => {
+    render(
+      <IncomeSchedule
+        accounts={accounts}
+        lines={[{ ...salary, lastYear: null }]}
+        milestones={milestones}
+        owners={owners}
+        plan={retiring}
+      />,
+    );
+
+    expect(screen.getByText("2026 – 2048")).toHaveClass("figure");
+    expect(screen.getAllByText("Until Retirement")).toHaveLength(2);
+    expect(
+      screen.getAllByText(bySlot("span-bar-fill"), { suggest: false })[0],
+    ).toHaveStyle({ width: `${String((23 / 53) * 100)}%` });
+
+    const dialog = openEditor("Salary");
+
+    expect(within(dialog).getByRole("combobox", { name: "Ends" })).toHaveValue(
+      "open",
+    );
+    expect(
+      within(dialog).getByText(
+        "Paid to 2048, since pay stops at Retirement whatever the end says.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByText("Runs to 2079, the last year of the plan."),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByText(bySlot("span-bar-fill"), { suggest: false }),
+    ).toHaveStyle({ width: `${String((23 / 53) * 100)}%` });
   });
 
   it("adds a named line ending in a year and reports it", async () => {

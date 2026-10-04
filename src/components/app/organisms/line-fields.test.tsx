@@ -8,7 +8,7 @@ import { markersOf } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { lineGrowths } from "@/data/schedule";
 import { optionsOf } from "@/lib/options";
-import { commit } from "@/test/dom";
+import { bySlot, commit } from "@/test/dom";
 
 import { LineFields } from "./line-fields";
 
@@ -50,10 +50,12 @@ const tied: Line = {
 };
 
 // The fields as a dialog would mount them, opened on a line and shown
-// the draft that mirrors them, with spies where the schedule listens.
+// the draft that mirrors them, and what the schedule says of where it
+// is paid to, with spies where the schedule listens.
 function renderFields(
   initial: Line,
   draft: Line = initial,
+  paid?: { readonly line: LineValues; readonly says: string },
 ): {
   readonly onAmend: ReturnType<
     typeof vi.fn<(patch: Partial<LineValues>) => void>
@@ -72,6 +74,7 @@ function renderFields(
       namePlaceholder="Salary…"
       onAmend={onAmend}
       onKindChange={onKindChange}
+      paid={paid}
       plan={plan}
       side="income"
     >
@@ -229,6 +232,32 @@ describe("LineFields", () => {
       [{ endsAt: "retirement", lastMonth: null, lastYear: 2079 }],
       [{ startsAt: null }],
     ]);
+  });
+
+  // The schedule says the line is paid to 2048, eighteen of the plan's
+  // fifty-three years from its first in 2030, so the bar stops there and
+  // the end says why in place of where an open end runs to.
+  it("says where the schedule stops paying a line short of its end, and draws its bar that far", () => {
+    renderFields(salary, salary, {
+      line: { ...salary, endsAt: "retirement", lastYear: 2048 },
+      says: "Paid to 2048.",
+    });
+
+    expect(screen.getByText("Paid to 2048.")).toHaveClass(
+      "text-muted-foreground",
+    );
+    expect(
+      screen.queryByText("Runs to 2079, the last year of the plan."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(bySlot("span-bar-fill"), { suggest: false }),
+    ).toHaveStyle({
+      left: `${String((4 / 53) * 100)}%`,
+      width: `${String((19 / 53) * 100)}%`,
+    });
+    expect(
+      screen.getByText(bySlot("span-bar-tie"), { suggest: false }),
+    ).toBeInTheDocument();
   });
 
   it("says the year a tied end falls in where its field would be, and asks the years after its milestone the last ends", () => {

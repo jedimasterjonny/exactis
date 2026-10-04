@@ -95,6 +95,40 @@ describe("ScheduleRows", () => {
     expect(screen.getByText("Age 36–58")).toBeInTheDocument();
   });
 
+  // The schedule says the salary is paid to 2045, as it would of one
+  // its owner retires from in 2046, so the row draws it to there, tied
+  // to retirement, while its pencil still opens the line as it is.
+  it("draws a line as its schedule says it is paid, and opens it as it is", () => {
+    const onEdit = vi.fn<(line: IncomeLine) => void>();
+    const open = { ...salary, lastYear: null };
+    render(
+      <ScheduleRows
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        lines={[open]}
+        milestones={markersOf([], retiring)}
+        onEdit={onEdit}
+        plan={plan}
+        side="income"
+        summarise={(line) => ({
+          ...summarise(line),
+          paid: { ...line, endsAt: "retirement", lastYear: 2045 },
+        })}
+      />,
+    );
+
+    expect(screen.getByText("2026 – 2045")).toHaveClass("figure");
+    expect(screen.getByText("Age 36–55")).toBeInTheDocument();
+    expect(screen.getAllByText("Until Retirement")).toHaveLength(2);
+    expect(
+      screen.getAllByText(bySlot("span-bar-tie"), { suggest: false }),
+    ).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Salary" }));
+
+    expect(onEdit).toHaveBeenCalledWith(open);
+  });
+
   it("draws each side's bars in its own colour", () => {
     const { rerender } = render(
       <ScheduleRows

@@ -23,7 +23,7 @@ import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { isPension } from "@/data/accounts";
-import { isOpeningSound, totalOf } from "@/data/income";
+import { asPaid, isOpeningSound, totalOf } from "@/data/income";
 import { markersOf } from "@/data/milestones";
 import { retirementYear } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
@@ -176,7 +176,7 @@ export function IncomeSchedule({
             onEdit={edit}
             plan={plan}
             side="income"
-            summarise={(line) => summarise(line, pensions)}
+            summarise={(line) => summarise(line, { pensions, plan })}
           />
         </CardContent>
       </SectionCard>
@@ -213,6 +213,7 @@ export function IncomeSchedule({
             onKindChange={(kind) => {
               categorise(entry, kind);
             }}
+            paid={paidOf(entry.draft, plan)}
             plan={plan}
             side="income"
           >
@@ -284,15 +285,45 @@ function hasParts(line: IncomeLine): boolean {
   return line.bonus > 0 || line.rsu > 0 || line.sacrifice > 0;
 }
 
+// What the dialog says of a line stopped short of its end at
+// retirement, as a salary or a profit is, and the line as it is paid,
+// for the bar beneath; that it is never paid, for one starting once its
+// owner has retired; and nothing for a line paid as it says.
+function paidOf(
+  draft: Draft,
+  plan: Plan,
+): undefined | { readonly line: Draft; readonly says: string } {
+  const paid = asPaid(draft, plan);
+  const retirement = retirementYear(plan);
+  if (paid === draft) {
+    return undefined;
+  }
+  return {
+    line: paid,
+    says:
+      draft.firstYear < retirement
+        ? `Paid to ${String(retirement - 1)}, since pay stops at Retirement whatever the end says.`
+        : `Never paid, since pay stops at Retirement in ${String(retirement)}.`,
+  };
+}
+
 // What the rows say of an income line: its kind's badge, plain since
 // every kind of income is money coming in; what it pays, the parts
-// summed and before any sacrifice; and, for a line paid in parts beyond
-// its base or giving up a share of it, the parts written out beside the
-// badge, so the split is seen without opening the line.
-function summarise(line: IncomeLine, pensions: readonly Account[]): Summary {
+// summed and before any sacrifice; for a line paid in parts beyond its
+// base or giving up a share of it, the parts written out beside the
+// badge, so the split is seen without opening the line; and the line as
+// it is paid, which for a salary or a profit stops at retirement.
+function summarise(
+  line: IncomeLine,
+  {
+    pensions,
+    plan,
+  }: { readonly pensions: readonly Account[]; readonly plan: Plan },
+): Summary {
   return {
     badge: { label: kindLabels[line.kind], variant: "secondary" },
     ...(hasParts(line) && { detail: formatParts(line, pensions) }),
+    paid: asPaid(line, plan),
     total: totalOf(line),
   };
 }
