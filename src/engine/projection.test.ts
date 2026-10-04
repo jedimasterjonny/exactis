@@ -12,7 +12,13 @@ import { drawFor, lumpSumAllowance } from "@/lib/tax";
 
 import type { ProjectionPoint } from "./projection";
 
-import { balanceIn, balanceOf, holdsAnything, project } from "./projection";
+import {
+  balanceIn,
+  balanceOf,
+  holdsAnything,
+  monthsOn,
+  project,
+} from "./projection";
 
 const [pension, isa, cash, home, mortgage] = accounts;
 // The fixture's salary fixed in nominal terms, so it pays what it states
@@ -1163,6 +1169,117 @@ describe("project", () => {
     );
 
     expect(entering2033?.balances[3]).toBe(54380);
+  });
+});
+
+describe("monthsOn", () => {
+  // The plan above, a year long, since a month end reads its months
+  // whatever the plan's length.
+  const year = { ...plan, years: 1 };
+
+  // Each account's figures by its id, as the months leave them.
+  function byId(
+    reached: ReturnType<typeof monthsOn>,
+  ): Map<number, { readonly balance: number; readonly paid: number }> {
+    return new Map(
+      reached.map(({ account, balance, paid }) => [
+        account.id,
+        { balance, paid },
+      ]),
+    );
+  }
+
+  it("leaves every account where it stands, paid nothing, over no months", () => {
+    expect(monthsOn(accounts, funded, { months: 0, plan: year })).toStrictEqual(
+      accounts.map((account) => ({
+        account,
+        balance: account.balance,
+        paid: 0,
+      })),
+    );
+  });
+
+  // January's month as the projection carries it: the pension's
+  // £2,266.25 lands with the basic rate claimed back on it, £2,832.81,
+  // and the ISA's £1,666.67, each then growing a month at 1.05^(1/12);
+  // the home grows a month at its own 2.1%, the current account holds
+  // still, and the mortgage is charged a twelfth of its 5.15% and paid
+  // down by its £2,210.
+  it("carries each account a month as the projection does, with what the month pays it", () => {
+    const month = byId(monthsOn(accounts, funded, { months: 1, plan: year }));
+    const grown = (balance: number, paid: number, rate: number): number =>
+      (balance + paid) * (1 + rate) ** (1 / 12);
+
+    expect(month.get(pension.id)?.paid).toBeCloseTo(2832.8125);
+    expect(month.get(pension.id)?.balance).toBeCloseTo(
+      grown(412880, 2832.8125, 0.05),
+    );
+    expect(month.get(isa.id)?.balance).toBeCloseTo(
+      grown(286145, 20000 / 12, 0.05),
+    );
+    expect(month.get(cash.id)).toStrictEqual({ balance: 18300, paid: 0 });
+    expect(month.get(home.id)).toStrictEqual({
+      balance: grown(416386, 0, 0.021),
+      paid: 0,
+    });
+    expect(month.get(mortgage.id)?.paid).toBe(2210);
+    expect(month.get(mortgage.id)?.balance).toBeCloseTo(
+      -182940 * (1 + 0.0515 / 12) + 2210,
+    );
+  });
+
+  // £150 owed at 5.15% is charged 64p for the month and cleared by the
+  // £290 payment, so the month pays off what was owed and its interest,
+  // and what the payment would have paid past nothing is no debt paid.
+  it("pays a debt off no further than it owes in the month it clears", () => {
+    const [cleared] = monthsOn(
+      [
+        {
+          ...mortgage,
+          balance: -150,
+          contribution: { amount: 290, cadence: "month", kind: "fixed" },
+        },
+      ],
+      funded,
+      { months: 1, plan: year },
+    );
+
+    expect(cleared?.balance).toBe(0);
+    expect(cleared?.paid).toBeCloseTo(150 * (1 + 0.0515 / 12));
+  });
+
+  // A month spending £1,000 with nothing coming in keeps a pension always
+  // funded paid only as far as the £1,200 of cash reaches once the
+  // spending is met, as the projection keeps it: £200, landing as £250
+  // with the basic rate claimed back on it, where with no reserve read
+  // it would be kept paid its whole £2,266.25.
+  it("keeps a pension always funded paid only as far as the cash reaches, as the projection does", () => {
+    const [kept] = monthsOn(
+      [{ ...pension, isAlwaysFunded: true }, pocket],
+      short,
+      { months: 1, plan: year },
+    );
+
+    expect(kept?.paid).toBeCloseTo(250);
+  });
+
+  // A salary starting in 2027 feeds the pension nothing in December and
+  // its sacrifice in January, so two months from December pay the
+  // pension more than twice what December alone does.
+  it("reads the months on into the next year", () => {
+    const starting = {
+      expenses: [],
+      income: [
+        ...funded.income,
+        { ...salary, feeds: pension.id, firstYear: 2027, sacrifice: 0.1 },
+      ],
+    };
+    const december = { ...year, month: 11 };
+    const [one] = monthsOn(accounts, starting, { months: 1, plan: december });
+    const [two] = monthsOn(accounts, starting, { months: 2, plan: december });
+
+    expect(one?.paid).toBeCloseTo(2832.8125);
+    expect(two?.paid).toBeGreaterThan(2 * 2832.8125 + 1000);
   });
 });
 

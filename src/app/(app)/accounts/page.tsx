@@ -4,10 +4,10 @@ import { BalanceDates } from "@/components/app/atoms/balance-dates";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { AccountLedger } from "@/components/app/organisms/account-ledger";
-import { BalancesMonth } from "@/components/app/organisms/balances-month";
+import { MonthEnd } from "@/components/app/organisms/month-end";
 import { balanceOf } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
-import { formatMonth, today } from "@/lib/months";
+import { formatMonth, thisMonth, today } from "@/lib/months";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
 
@@ -25,24 +25,34 @@ import { getHousehold } from "@/store/household";
 // the page's, as the plan screen's is, since it reads that month and
 // what the balances come to and nothing else: it says the starting net
 // worth and the month, as the assumptions screen's says the plan rate,
-// and holds the button that moves the month, over the body the ledger
-// lays its sections out in, which opens on how fresh the balances are,
-// as the assumptions screen's opens on how fresh its sources are, the
-// day read once on the server.
+// and holds the month end, which moves the month on and checks the
+// balances against it, closing onto the month it is unless another is
+// picked, over the body the ledger lays its sections out in, which
+// opens on how fresh the balances are, as the assumptions screen's
+// opens on how fresh its sources are. The day and the month are read
+// once on the server.
 export default async function Accounts(): Promise<JSX.Element> {
   const { accounts, owners, plan, schedule } = await getHousehold();
-  const at = { month: plan.month, year: plan.from };
+  const day = today();
   return (
     <>
       <ScreenHeader
-        actions={<BalancesMonth at={at} />}
+        actions={
+          <MonthEnd
+            accounts={accounts}
+            month={thisMonth()}
+            plan={plan}
+            schedule={schedule}
+            today={day}
+          />
+        }
         label={sectionLabel(accountsAndAssets)}
         title={accountsAndAssets.title}
       >
-        {`Starting net worth ${formatGbp(balanceOf(accounts))} · balances as of ${formatMonth(at)}`}
+        {`Starting net worth ${formatGbp(balanceOf(accounts))} · balances as of ${formatMonth({ month: plan.month, year: plan.from })}`}
       </ScreenHeader>
       <ScreenBody>
-        <BalanceDates accounts={accounts} today={today()} />
+        <BalanceDates accounts={accounts} today={day} />
         <AccountLedger
           accounts={accounts}
           expenses={schedule.expenses}
