@@ -28,7 +28,7 @@ describe("AppNav", () => {
 
     const dashboard = screen.getByRole("link", { name: /^Dashboard/ });
     const accounts = screen.getByRole("link", { name: /^Accounts/ });
-    const plan = screen.getByRole("link", { name: /^Plan/ });
+    const plan = screen.getByRole("link", { name: /^Income & expenses/ });
     const progress = screen.getByRole("link", { name: /^Progress/ });
     const assumptions = screen.getByRole("link", { name: /^Assumptions/ });
 
