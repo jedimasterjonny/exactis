@@ -4,12 +4,14 @@ import { isOnOrBefore, monthName } from "@/lib/months";
 
 // What each growth choice is called, on the rows and in the dialog that
 // offers them: the amount rises with inflation, a point or two over it,
-// or not at all.
+// or not at all, in words that say what happens to the figure rather
+// than naming the basis it is held on, since a line "nominal, fixed"
+// read under a figure that shrinks in today's money year on year.
 export const growthLabels: Record<LineGrowth, string> = {
-  inflation: "Inflation",
-  "inflation-plus-1": "Inflation +1%",
-  "inflation-plus-2": "Inflation +2%",
-  nominal: "Nominal, fixed",
+  inflation: "Rises with inflation",
+  "inflation-plus-1": "Rises 1% over inflation",
+  "inflation-plus-2": "Rises 2% over inflation",
+  nominal: "Fixed in pounds",
 };
 
 // Where a line ends, for the rows and the toast: its last year, with

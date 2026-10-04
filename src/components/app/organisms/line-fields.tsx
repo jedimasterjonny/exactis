@@ -166,7 +166,7 @@ export function LineFields<TKind extends string>({
         />
         <SelectField
           defaultValue={initial.growth}
-          label="Grows with"
+          label="Growth"
           onValueChange={(growth) => {
             onAmend({ growth });
           }}
