@@ -296,6 +296,9 @@ describe("ExpenseSchedule", () => {
     expect(
       screen.queryByRole("button", { name: "Mortgage payment" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link", { name: "Mortgage payment" }).at(-1),
+    ).toHaveAttribute("href", "/accounts");
     // The badge and the lock are drawn in the row's columns and on its
     // folded lines, the badge only for the loan's line.
     expect(screen.getByText("Loan")).toHaveAttribute(

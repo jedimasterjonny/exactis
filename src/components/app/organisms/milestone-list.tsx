@@ -31,7 +31,7 @@ import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { counted } from "@/lib/count";
 import { listed } from "@/lib/feeders";
-import { plan as planScreen, subsectionLabel } from "@/lib/nav";
+import { dashboard, plan as planScreen, subsectionLabel } from "@/lib/nav";
 import { laneColumns } from "@/lib/span";
 
 interface MilestoneFormProps {
@@ -61,8 +61,8 @@ interface MilestoneRowProps {
   readonly plan: Plan;
 }
 
-// Why retirement's row opens nothing: it is set on another screen, and
-// moves when it is.
+// Why retirement's row is held here: it is set on another screen, and
+// moves when it is, so the row links there.
 const retirementLock = "Set by the retirement age on the dashboard";
 
 // The plan screen's first card: the years the plan turns on, retirement
@@ -93,8 +93,8 @@ const retirementLock = "Set by the retirement age on the dashboard";
 // milestone is deleted from: it asks through the confirm dialog before
 // the milestone goes, and the question says what becomes of the lines
 // tied to it, which keep the years it gives them now. Retirement draws
-// a lock in place of the chevron and opens nothing, since it is set on
-// the dashboard, as the caption says.
+// a lock in place of the chevron, since it is set on the dashboard, as
+// the caption says, and its name links there.
 // The span is ruled in decades above the rows, in the pins' column, and
 // every pin's track carries a faint rule at each milestone, as every
 // line's bar beneath does, so the three cards read as lanes on the one
@@ -362,8 +362,8 @@ function MilestoneForm({
 // its folded lines, only one of which is shown at any width, and saying
 // beside its name which lines end and start at it. A saved milestone
 // opens from anywhere on it, either way, with a chevron at its end;
-// retirement draws its lock in the chevron's place instead, and opens
-// nothing.
+// retirement draws its lock in the chevron's place instead, and links to
+// the dashboard, where it is set.
 function MilestoneRow({
   lines,
   marker,
@@ -376,12 +376,7 @@ function MilestoneRow({
   const detail = tiesAt(marker, lines);
   const lock =
     milestone === undefined ? <RowLock reason={retirementLock} /> : undefined;
-  const open =
-    milestone === undefined
-      ? undefined
-      : (): void => {
-          onEdit(milestone);
-        };
+
   const bar = <PinBar marks={marks} plan={plan} year={marker.year} />;
   return (
     <li
@@ -393,9 +388,14 @@ function MilestoneRow({
       <div className="unfolded:hidden">
         <FoldedLines
           figure={String(marker.year)}
-          lock={lock}
           name={marker.name}
-          onOpen={open}
+          {...(milestone === undefined
+            ? { href: dashboard.href, lock }
+            : {
+                onOpen: (): void => {
+                  onEdit(milestone);
+                },
+              })}
         >
           {detail !== undefined && <span>{detail}</span>}
           <div className="pointer-events-none my-1">{bar}</div>
@@ -404,10 +404,16 @@ function MilestoneRow({
       </div>
       <div className="grid min-w-0 gap-2 folded:hidden">
         <div className="flex flex-wrap items-baseline gap-2">
-          {open === undefined ? (
-            <span className="font-medium">{marker.name}</span>
+          {milestone === undefined ? (
+            <RowOpener href={dashboard.href}>{marker.name}</RowOpener>
           ) : (
-            <RowOpener onOpen={open}>{marker.name}</RowOpener>
+            <RowOpener
+              onOpen={() => {
+                onEdit(milestone);
+              }}
+            >
+              {marker.name}
+            </RowOpener>
           )}
           {detail !== undefined && (
             <span className="text-xs text-muted-foreground">{detail}</span>

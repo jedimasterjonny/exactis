@@ -127,7 +127,7 @@ describe("MilestoneList", () => {
   // A milestone the household lists opens from its name, in its columns
   // and on its folded lines, with a chevron at the row's end. Retirement
   // is set on the dashboard, so its row draws a lock in the chevron's
-  // place, in both, and opens nothing.
+  // place, in both, and links there.
   it("opens each listed milestone from its name, and gives retirement a lock in its chevron's place", () => {
     renderList();
 
@@ -143,6 +143,10 @@ describe("MilestoneList", () => {
     expect(
       screen.queryByRole("button", { name: "Retirement" }),
     ).not.toBeInTheDocument();
+    // Its name links to the dashboard, where it is set.
+    for (const link of screen.getAllByRole("link", { name: "Retirement" })) {
+      expect(link).toHaveAttribute("href", "/");
+    }
   });
 
   // Each says it twice, in its columns and on its folded lines, and the
@@ -177,7 +181,7 @@ describe("MilestoneList", () => {
     renderList([], { expenses: [], income: [] });
 
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
-    expect(screen.getAllByText("Retirement")).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "Retirement" })).toHaveLength(2);
   });
 
   it("adds a named milestone from a row opened at the foot of the list, and reports it", async () => {
@@ -267,7 +271,7 @@ describe("MilestoneList", () => {
     ).toHaveAccessibleDescription("Downsize · 2057");
   });
 
-  it("opens a row from its name, one row at a time", () => {
+  it("opens a row from its name on its folded lines or in its columns, one row at a time", () => {
     renderList();
 
     pressRow("Kids leave home");
@@ -276,7 +280,12 @@ describe("MilestoneList", () => {
       within(screen.getByRole("form")).getByRole("textbox", { name: "Name" }),
     ).toHaveValue("Kids leave home");
 
-    pressRow("Downsize");
+    // The downsize from its name in its columns, the second of its two.
+    for (const opener of screen
+      .getAllByRole("button", { name: "Downsize" })
+      .slice(-1)) {
+      fireEvent.click(opener);
+    }
 
     expect(screen.getAllByRole("form")).toHaveLength(1);
     expect(

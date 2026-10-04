@@ -24,7 +24,11 @@ import { markersOf } from "@/data/milestones";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { isSound, spanOf } from "@/lib/lines";
-import { plan as planScreen, subsectionLabel } from "@/lib/nav";
+import {
+  accountsAndAssets,
+  plan as planScreen,
+  subsectionLabel,
+} from "@/lib/nav";
 
 // What the dialog holds while it is open: the line's values, which are
 // flat already, with no last year for a line that runs to the end of the
@@ -174,7 +178,8 @@ function blank(plan: Plan): Draft {
 // What the rows say of an expense line: what it pays, which is its
 // amount, since an expense is paid in no parts. A line that is a loan's
 // payments says so on its badge, its bar drawn in the debt's red, and
-// is locked, since the dialog of the
+// is locked, its name linking to the accounts screen, since the dialog
+// of the
 // asset the loan is on writes it from the loan and would write over an
 // edit made here; any other line has no badge, its name saying what it
 // is for.
@@ -184,7 +189,10 @@ function summarise(line: ExpenseLine): Summary {
     : {
         badge: { label: "Loan", variant: "secondary" },
         isLoan: true,
-        lock: "Edited with its asset on the accounts screen",
+        lock: {
+          at: accountsAndAssets.href,
+          reason: "Edited with its asset on the accounts screen",
+        },
         total: line.amount,
       };
 }
