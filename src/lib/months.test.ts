@@ -86,6 +86,23 @@ describe("thisMonth", () => {
 
     expect(thisMonth()).toStrictEqual({ month: 8, year: 2026 });
   });
+
+  // Half past eleven in UTC on the last of September is half past
+  // midnight on the first of October in British Summer Time, the day the
+  // household is dated on; and half past eleven on New Year's Eve in
+  // Greenwich Mean Time is still the old year.
+  it("reads the month in the UK's time, as the day is, whatever zone the clock keeps", () => {
+    vi.useFakeTimers({
+      now: new Date("2026-09-30T23:30:00Z"),
+      toFake: ["Date"],
+    });
+
+    expect(thisMonth()).toStrictEqual({ month: 9, year: 2026 });
+
+    vi.setSystemTime(new Date("2026-12-31T23:30:00Z"));
+
+    expect(thisMonth()).toStrictEqual({ month: 11, year: 2026 });
+  });
 });
 
 describe("today", () => {
