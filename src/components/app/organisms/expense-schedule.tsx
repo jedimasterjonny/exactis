@@ -188,7 +188,7 @@ function summarise(line: ExpenseLine): Summary {
         isLoan: true,
         lock: {
           at: accountsAndAssets.href,
-          reason: "Edited with its asset on the accounts screen",
+          reason: `Set with its asset on ${accountsAndAssets.label}`,
         },
         total: line.amount,
       };

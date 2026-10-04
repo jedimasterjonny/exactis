@@ -63,7 +63,7 @@ interface MilestoneRowProps {
 
 // Why retirement's row is held here: it is set on another screen, and
 // moves when it is, so the row links there.
-const retirementLock = "Set by the retirement age on the dashboard";
+const retirementLock = `Set by the retirement age on the ${dashboard.label}`;
 
 // The plan screen's first card: the years the plan turns on, retirement
 // among them, in the order they come. Each is a row laid out as a
@@ -185,7 +185,7 @@ export function MilestoneList({
             Add milestone
           </Button>
         }
-        caption="The years the plan turns on. A line tied to one moves with it, and retirement moves with the age set on the dashboard."
+        caption="The years the plan turns on. A line tied to one moves with it, and retirement moves with the age set on the Dashboard."
         label={subsectionLabel(planScreen, 1)}
         title="Milestones"
       >

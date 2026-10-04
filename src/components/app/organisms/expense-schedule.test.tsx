@@ -314,7 +314,7 @@ describe("ExpenseSchedule", () => {
     expect(screen.getAllByText("Rises with inflation")).toHaveLength(2);
     expect(
       screen.getAllByRole("img", {
-        name: "Edited with its asset on the accounts screen",
+        name: "Set with its asset on Accounts & assets",
       }),
     ).toHaveLength(2);
   });
