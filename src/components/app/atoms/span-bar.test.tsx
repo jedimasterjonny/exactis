@@ -41,11 +41,14 @@ describe("SpanBar", () => {
       left: "0%",
       width: "50%",
     });
-    expect(screen.getByText(bySlot("span-bar-fill"))).toHaveClass("bg-chart-2");
+    expect(screen.getByText(bySlot("span-bar-fill"))).toHaveClass(
+      "bg-chart-2",
+      "dark:bg-chart-1",
+    );
   });
 
-  it("runs an open-ended line to the plan's end, in the expense colour on that side", () => {
-    render(
+  it("runs an open-ended line to the plan's end, in ink on the expense side and red for a loan's payments", () => {
+    const { rerender } = render(
       <SpanBar
         endsAt={null}
         firstYear={2056}
@@ -61,6 +64,23 @@ describe("SpanBar", () => {
       left: "75%",
       width: "25%",
     });
+    expect(screen.getByText(bySlot("span-bar-fill"))).toHaveClass(
+      "bg-foreground/50",
+    );
+
+    rerender(
+      <SpanBar
+        endsAt={null}
+        firstYear={2056}
+        isLoan
+        lastMonth={null}
+        lastYear={null}
+        plan={plan}
+        side="expense"
+        startsAt={null}
+      />,
+    );
+
     expect(screen.getByText(bySlot("span-bar-fill"))).toHaveClass("bg-chart-5");
   });
 
