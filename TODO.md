@@ -38,11 +38,11 @@ another owner's pension. The plan holds one year of birth, so every pension is
 drawn from the one pension age, as though all the owners were born in the same
 year, and one lump sum allowance is shared by all of them. It holds one
 retirement age too, so every salary and every self-employed line stops in the
-same year, whoever earns it, and the plan screen still draws each such line to
-its own last year where the engine stops it at retirement. A draw on one owner's
-pension is taxed on top of every other owner's earnings, and each owner's
-pensions are relieved on everyone's earnings, as though each owner earned them
-all.
+same year, whoever earns it, and one starting later is never paid at all, which
+the plan screen draws as it is paid rather than as it says. A draw on one
+owner's pension is taxed on top of every other owner's earnings, and each
+owner's pensions are relieved on everyone's earnings, as though each owner
+earned them all.
 
 Decide whose each income line is, and the year each owner was born and retires,
 so tax, the pension age, the lump sum allowance, the earnings relief is held to

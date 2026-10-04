@@ -30,6 +30,8 @@ interface LineFieldsProps<TKind extends string> {
   readonly namePlaceholder: string;
   readonly onAmend: (patch: Partial<LineValues>) => void;
   readonly onKindChange: (kind: TKind) => void;
+  readonly paid?:
+    undefined | { readonly line: LineValues; readonly says: string };
   readonly plan: Plan;
   readonly side: Side;
 }
@@ -75,6 +77,7 @@ export function LineFields<TKind extends string>({
   namePlaceholder,
   onAmend,
   onKindChange,
+  paid,
   plan,
   side,
 }: LineFieldsProps<TKind>): JSX.Element {
@@ -85,6 +88,7 @@ export function LineFields<TKind extends string>({
   }));
   const from = milestones.find(({ id }) => id === draft.startsAt);
   const until = milestones.find(({ id }) => id === draft.endsAt);
+  const drawn = paid?.line ?? draft;
 
   function startAt(starting: string): void {
     const marker = milestones.find(({ id }) => choiceOf(id) === starting);
@@ -200,11 +204,13 @@ export function LineFields<TKind extends string>({
               value={draft.endsAfter}
             />
           )}
-          {until === undefined && draft.lastYear === null && (
-            <Beneath>
-              {`Runs to ${String(end)}, the last year of the plan.`}
-            </Beneath>
-          )}
+          {until === undefined &&
+            draft.lastYear === null &&
+            paid === undefined && (
+              <Beneath>
+                {`Runs to ${String(end)}, the last year of the plan.`}
+              </Beneath>
+            )}
           {until === undefined && draft.lastYear !== null && (
             <YearField
               hint={ageHint(draft.lastYear, plan)}
@@ -215,6 +221,7 @@ export function LineFields<TKind extends string>({
               value={draft.lastYear}
             />
           )}
+          {paid !== undefined && <Beneath>{paid.says}</Beneath>}
         </div>
       </FieldRow>
       <div className="grid gap-2">
@@ -222,13 +229,13 @@ export function LineFields<TKind extends string>({
           {`Plan · ${String(plan.from)}–${String(end)}`}
         </span>
         <SpanBar
-          endsAt={draft.endsAt}
-          firstYear={draft.firstYear}
-          lastMonth={draft.lastMonth}
-          lastYear={draft.lastYear}
+          endsAt={drawn.endsAt}
+          firstYear={drawn.firstYear}
+          lastMonth={drawn.lastMonth}
+          lastYear={drawn.lastYear}
           plan={plan}
           side={side}
-          startsAt={draft.startsAt}
+          startsAt={drawn.startsAt}
         />
       </div>
     </div>
