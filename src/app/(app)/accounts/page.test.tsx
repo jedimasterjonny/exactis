@@ -54,6 +54,11 @@ describe("Accounts", () => {
         "Starting net worth £950,771 · balances as of September 2026",
       ),
     ).toBeInTheDocument();
+    // The fixture's balances were kept before their days were, so no
+    // group of them is dated.
+    expect(
+      screen.getAllByRole("definition").map((value) => value.textContent),
+    ).toStrictEqual(["Not dated", "Not dated", "Not dated"]);
     expect(
       within(screen.getByRole("banner"))
         .getAllByRole("button")
