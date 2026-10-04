@@ -12,7 +12,12 @@ import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
-import { removeIncomeLine, saveExpenseLine, saveIncomeLine } from "./schedule";
+import {
+  removeExpenseLine,
+  removeIncomeLine,
+  saveExpenseLine,
+  saveIncomeLine,
+} from "./schedule";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -294,6 +299,56 @@ describe("the schedule actions", () => {
         refused("No income line has the id"),
       );
       expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+  });
+
+  describe("removeExpenseLine", () => {
+    it("deletes nothing without a session", async () => {
+      vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+      await expect(removeExpenseLine(2)).rejects.toThrow("redirected");
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+
+    it("deletes the line with the id and draws the page again", async () => {
+      await removeExpenseLine(2);
+
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          schedule: {
+            expenses: kept.schedule.expenses.filter(({ id }) => id !== 2),
+          },
+        },
+        version: 2,
+      });
+      expect(refresh).toHaveBeenCalledOnce();
+    });
+
+    it("refuses an id the schedule could not have sent, and one no line has", async () => {
+      await expect(removeExpenseLine(0)).rejects.toThrow(z.ZodError);
+      await expect(removeExpenseLine(99)).resolves.toStrictEqual(
+        refused("No expense line has the id"),
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+
+    // The mortgage's payments line, as the house dialog links it, goes
+    // with the house rather than from the plan screen.
+    it("refuses a line paying a loan", async () => {
+      await keepAfter(db, 1, {
+        ...kept,
+        schedule: {
+          ...kept.schedule,
+          expenses: kept.schedule.expenses.map((line) =>
+            line.id === 3 ? { ...line, pays: 5 } : line,
+          ),
+        },
+      });
+
+      await expect(removeExpenseLine(3)).resolves.toStrictEqual(
+        refused("A loan's payments go with the asset it is on"),
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 2 });
     });
   });
 

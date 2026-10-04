@@ -12,8 +12,10 @@ import type {
 } from "@/data/expenses";
 import type { Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
+import type { Entry } from "@/hooks/use-editor";
 
-import { saveExpenseLine } from "@/actions/schedule";
+import { removeExpenseLine, saveExpenseLine } from "@/actions/schedule";
+import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { Note } from "@/components/app/atoms/note";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { SectionCard } from "@/components/app/molecules/section-card";
@@ -23,6 +25,7 @@ import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { markersOf } from "@/data/milestones";
 import { useEditor } from "@/hooks/use-editor";
+import { useRemover } from "@/hooks/use-remover";
 import { isSound, spanOf } from "@/lib/lines";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 import { optionsOf } from "@/lib/options";
@@ -64,9 +67,12 @@ const tones: Record<ExpenseKind, Summary["badge"]["variant"]> = {
 // the page, a save goes to the store and comes back with the page
 // re-read, the entry doubles as the dialog's open state, and the fields
 // are the ones every line's dialog takes, with nothing to add beneath
-// them, since an expense is paid in no parts. Its lines are laid out by
-// the milestones the page hands down, as the income schedule's are. The
-// card takes the next numeral off the screen's after the income card's.
+// them, since an expense is paid in no parts. The dialog of a saved line
+// offers a Delete that asks through the confirm dialog before the line
+// goes, as the income schedule's does, and holds while a save is on its
+// way. Its lines are laid out by the milestones the page hands down, as
+// the income schedule's are. The card takes the next numeral off the
+// screen's after the income card's.
 export function ExpenseSchedule({
   lines,
   milestones,
@@ -78,6 +84,25 @@ export function ExpenseSchedule({
     noun: "Expense line",
     save: saveExpenseLine,
   });
+  const { ask, doomed, questionOf } = useRemover<ExpenseLine>({
+    describe: (line) => line.name,
+    noun: "Expense line",
+    remove: removeExpenseLine,
+  });
+
+  // The Delete a saved line's dialog offers, which closes the dialog
+  // first, so the question stands alone and a cancel lands back on the
+  // screen. A new line has nothing yet to delete, and matches no line
+  // the schedule lists.
+  function deleteFrom(current: Entry<Draft>): (() => void) | undefined {
+    const line = lines.find(({ id }) => id === current.id);
+    return line === undefined
+      ? undefined
+      : (): void => {
+          dismiss();
+          ask(line);
+        };
+  }
 
   // A row's pencil opens its line as it is, with its id so a save writes
   // back to it.
@@ -120,11 +145,17 @@ export function ExpenseSchedule({
         An open-ended line runs to the end of the plan: retirement living starts
         where household spending stops, as a line of its own.
       </Note>
+      {doomed !== null && (
+        <ConfirmDialog {...questionOf(doomed)}>
+          It cannot be brought back.
+        </ConfirmDialog>
+      )}
       {entry !== null && (
         <EditDialog
           {...dialogOf(entry)}
           canSave={isSound(entry.draft)}
           isWide
+          onDelete={deleteFrom(entry)}
           onDismiss={dismiss}
           title={entry.draft.name.trim() || "Untitled line"}
         >
