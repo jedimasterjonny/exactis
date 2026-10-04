@@ -18,13 +18,14 @@ import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { PinBar } from "@/components/app/atoms/pin-bar";
 import { RowLock } from "@/components/app/atoms/row-lock";
 import { RowOpener } from "@/components/app/atoms/row-opener";
+import { SpanRuler } from "@/components/app/atoms/span-ruler";
 import { YearField } from "@/components/app/molecules/figure-field";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { TextField } from "@/components/app/molecules/text-field";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { asPaid } from "@/data/income";
-import { isTiedTo, markersOf } from "@/data/milestones";
+import { isTiedTo, markersOf, yearsOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
@@ -54,6 +55,7 @@ interface MilestoneListProps {
 interface MilestoneRowProps {
   readonly lines: readonly LineValues[];
   readonly marker: Marker;
+  readonly marks: readonly number[];
   readonly milestone: Milestone | undefined;
   readonly onEdit: (milestone: Milestone) => void;
   readonly plan: Plan;
@@ -93,15 +95,20 @@ const retirementLock = "Set by the retirement age on the dashboard";
 // tied to it, which keep the years it gives them now. Retirement draws
 // a lock in place of the chevron and opens nothing, since it is set on
 // the dashboard, as the caption says.
-// While the list is too narrow to read across, as on a phone, each row
-// folds into lines, as a schedule's does: the name and the year on the
-// first, then the lines tied to it, then the pin, then the age.
+// The span is ruled in decades above the rows, in the pins' column, and
+// every pin's track carries a faint rule at each milestone, as every
+// line's bar beneath does, so the three cards read as lanes on the one
+// span. While the list is too narrow to read across, as on a phone, each
+// row folds into lines, as a schedule's does: the name and the year on
+// the first, then the lines tied to it, then the pin, then the age, and
+// the ruler runs the row's width as the pins do.
 export function MilestoneList({
   milestones,
   plan,
   schedule,
 }: MilestoneListProps): JSX.Element {
   const lines = [...schedule.income, ...schedule.expenses];
+  const markers = markersOf(milestones, plan);
   const paid = [
     ...schedule.income.map((line) => asPaid(line, plan)),
     ...schedule.expenses,
@@ -182,9 +189,12 @@ export function MilestoneList({
         label={subsectionLabel(planScreen, 1)}
         title="Milestones"
       >
-        <CardContent>
+        <CardContent className="@container grid gap-1">
+          <div className={cn("grid gap-4 folded:grid-cols-1", laneColumns)}>
+            <SpanRuler plan={plan} />
+          </div>
           <ul className="@container divide-y">
-            {markersOf(milestones, plan).map((marker) => {
+            {markers.map((marker) => {
               const milestone = milestones.find(({ id }) => id === marker.id);
               return entry !== null && isOpenOn(entry, milestone) ? (
                 formFor(entry, marker.id)
@@ -193,6 +203,7 @@ export function MilestoneList({
                   key={marker.id}
                   lines={paid}
                   marker={marker}
+                  marks={yearsOf(markers)}
                   milestone={milestone}
                   onEdit={edit}
                   plan={plan}
@@ -356,6 +367,7 @@ function MilestoneForm({
 function MilestoneRow({
   lines,
   marker,
+  marks,
   milestone,
   onEdit,
   plan,
@@ -370,7 +382,7 @@ function MilestoneRow({
       : (): void => {
           onEdit(milestone);
         };
-  const bar = <PinBar plan={plan} year={marker.year} />;
+  const bar = <PinBar marks={marks} plan={plan} year={marker.year} />;
   return (
     <li
       className={cn(

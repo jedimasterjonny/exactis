@@ -13,6 +13,7 @@ interface SpanBarProps {
   readonly firstYear: number;
   readonly lastMonth: null | number;
   readonly lastYear: null | number;
+  readonly marks?: readonly number[];
   readonly plan: Plan;
   readonly side: Side;
   readonly startsAt: null | Tie;
@@ -36,7 +37,10 @@ const sliver = 1.2;
 // meets it rather than stopping a year short of it. An end tied to a
 // milestone carries a dot in oxide, the milestones' colour, where it
 // meets the milestone's pin on the span above. A year outside the span
-// is held to its edge rather than drawn past it.
+// is held to its edge rather than drawn past it. The years given to mark,
+// the milestones', are ruled across the track in faint oxide, over the
+// fill, so every bar on the screen carries the same rules and a line's
+// end is read against the milestones without looking up to their pins.
 // Decorative, since the years are written beside it: the bar is hidden
 // from the accessibility tree.
 export function SpanBar({
@@ -44,6 +48,7 @@ export function SpanBar({
   firstYear,
   lastMonth,
   lastYear,
+  marks = [],
   plan,
   side,
   startsAt,
@@ -67,6 +72,14 @@ export function SpanBar({
           width: `${String(Math.max(right - left, sliver))}%`,
         }}
       />
+      {marks.map((year) => (
+        <span
+          className="absolute inset-y-0 w-px bg-brand/40"
+          data-slot="span-bar-mark"
+          key={year}
+          style={{ left: `${String(placed(year, plan))}%` }}
+        />
+      ))}
       {startsAt !== null && <TieDot at={left} />}
       {endsAt !== null && <TieDot at={right} />}
     </div>

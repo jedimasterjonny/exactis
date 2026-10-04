@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { incomeLines, retiring } from "@/data/income.fixture";
 
-import { isTiedTo, markersOf, timed, untied } from "./milestones";
+import { isTiedTo, markersOf, timed, untied, yearsOf } from "./milestones";
 import { milestones } from "./milestones.fixture";
 
 const [kidsLeave, downsize] = milestones;
@@ -112,5 +112,20 @@ describe("untied", () => {
       lastYear: 2061,
     });
     expect(untied(salary, downsize)).toStrictEqual(salary);
+  });
+});
+
+describe("yearsOf", () => {
+  // Retiring at 61, the owner retires in 2053; a sabbatical that year
+  // shares its rule.
+  it("gives each milestone's year once, in the order they come", () => {
+    expect(
+      yearsOf(
+        markersOf(
+          [...milestones, { id: 3, name: "Sabbatical", year: 2053 }],
+          retiring,
+        ),
+      ),
+    ).toStrictEqual([2040, 2053, 2059]);
   });
 });
