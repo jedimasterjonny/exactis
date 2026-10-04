@@ -7,6 +7,7 @@ import { totalOf } from "@/data/income";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { markersOf } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
+import { laneColumns } from "@/lib/span";
 import { bySlot } from "@/test/dom";
 
 import type { Summary } from "./schedule-rows";
@@ -73,6 +74,11 @@ describe("ScheduleRows", () => {
     expect(screen.getByText("Age 36–58")).toHaveClass("label");
     expect(screen.getByText("2058 – end")).toBeInTheDocument();
     expect(screen.getByText("Age 68–89")).toBeInTheDocument();
+    // Laid out in the milestones' columns, so each bar is as wide as
+    // every other on the screen.
+    for (const row of screen.getAllByRole("listitem")) {
+      expect(row).toHaveClass(laneColumns);
+    }
   });
 
   // A line that ends part way through its last year names the month,

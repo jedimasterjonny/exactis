@@ -2,6 +2,7 @@
 
 import type { JSX, SubmitEvent } from "react";
 
+import { cn } from "cn";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 
@@ -30,6 +31,7 @@ import { useRemover } from "@/hooks/use-remover";
 import { counted } from "@/lib/count";
 import { listed } from "@/lib/feeders";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
+import { laneColumns } from "@/lib/span";
 
 interface MilestoneFormProps {
   readonly canSave: boolean;
@@ -68,8 +70,9 @@ const retirementLock = "Set by the retirement age on the dashboard";
 // line's bar would be, and its year over the age reached in it where the
 // line's years would be, so a milestone reads as a line with no length
 // on the same span as the lines beneath it. The columns are the
-// schedules' own, the figure's left empty, so the span is as wide here
-// as there and a pin sits over the years a bar beneath it reaches. The
+// schedules' own, the one template, the figure's left empty, so the
+// span is as wide here as there and a pin sits over the years a bar
+// beneath it reaches. The
 // card comes before the schedules because the lines are laid out by the
 // milestones rather than the other way round. Each row says which lines
 // start and end at it, from either schedule, so what moves with a
@@ -366,7 +369,12 @@ function MilestoneRow({
     milestone === undefined ? <RowLock reason={retirementLock} /> : undefined;
   const bar = <PinBar plan={plan} year={marker.year} />;
   return (
-    <li className="relative grid grid-cols-[minmax(0,1fr)_9rem_11rem_auto] items-center gap-4 py-3 first:pt-0 last:pb-0 folded:grid-cols-1">
+    <li
+      className={cn(
+        "relative grid items-center gap-4 py-3 first:pt-0 last:pb-0 folded:grid-cols-1",
+        laneColumns,
+      )}
+    >
       <div className="unfolded:hidden">
         <FoldedLines
           figure={String(marker.year)}
