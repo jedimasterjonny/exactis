@@ -25,6 +25,7 @@ import { isWithinAllowance } from "@/lib/tax";
 
 interface AccountDialogProps {
   readonly account: Account | null;
+  readonly kind?: AccountKind;
   readonly lines: readonly IncomeLine[];
   readonly onDelete?: ((account: Account) => void) | undefined;
   readonly onDismiss: () => void;
@@ -59,7 +60,8 @@ const blank: Draft = {
 // The dialog an account is entered or edited in, which takes the account
 // as the record it is and lets the store write it. It is open for as
 // long as it is mounted, so the ledger renders it while it holds an
-// account to open on, or a new one, and the entry mounts from that; the
+// account to open on, or a new one of the kind it is given, a pension
+// unless told otherwise, and the entry mounts from that; the
 // entry doubles as the open state, as the progress editor's point does,
 // so nothing is left to show once a save has dropped it. The fields are
 // uncontrolled and mount fresh with the entry's opening values, and the
@@ -89,6 +91,7 @@ const blank: Draft = {
 // delete and is offered none.
 export function AccountDialog({
   account,
+  kind = blank.kind,
   lines,
   onDelete,
   onDismiss,
@@ -96,7 +99,7 @@ export function AccountDialog({
   owners,
 }: AccountDialogProps): JSX.Element | null {
   const feeders = account === null ? [] : feeding(account.id, lines);
-  const opening = openingOf(account, feeders, owners);
+  const opening = openingOf(account ?? kind, feeders, owners);
   const { amend, dialogOf, entry } = useMountedEditor({
     describe: (saved) => saved.name,
     noun: "Account",
@@ -246,24 +249,30 @@ function kindLockOf(feeders: readonly IncomeLine[]): string | undefined {
 
 // The entry the dialog mounts open on: the account as it is, under its
 // id so a save writes back to it, with the share each salary feeding
-// it sacrifices, or a blank draft under none for a new one, which the
-// store gives an id of its own, a pension belonging to the first owner.
+// it sacrifices, or a blank draft of the kind given under none for a
+// new one, which the store gives an id of its own, a pension or an ISA
+// belonging to the first owner and anything else to nobody.
 function openingOf(
-  account: Account | null,
+  account: Account | AccountKind,
   feeders: readonly IncomeLine[],
   owners: readonly Owner[],
 ): Entry<Draft> {
-  const draft =
-    account === null
-      ? { ...blank, owner: ownerFor(null, owners) }
-      : {
-          ...toValues(account),
-          shares: feeders.map((line) => ({
-            line: line.id,
-            sacrifice: line.sacrifice,
-          })),
-        };
-  return { draft, id: account?.id ?? null, initial: draft };
+  if (typeof account === "string") {
+    const draft = {
+      ...blank,
+      kind: account,
+      owner: isOwned({ kind: account }) ? ownerFor(null, owners) : null,
+    };
+    return { draft, id: null, initial: draft };
+  }
+  const draft = {
+    ...toValues(account),
+    shares: feeders.map((line) => ({
+      line: line.id,
+      sacrifice: line.sacrifice,
+    })),
+  };
+  return { draft, id: account.id, initial: draft };
 }
 
 // The owner the draft is left with by a treatment: none for a kind

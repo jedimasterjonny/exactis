@@ -8,12 +8,7 @@ import {
   TableHead as TableHeadBase,
 } from "@/components/ui/table";
 
-export {
-  TableBody,
-  TableFooter,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+export { TableBody, TableHeader, TableRow } from "@/components/ui/table";
 
 // Every table in the product is the container its rows fold by, so a
 // row too wide for the table's width can fold its columns into one

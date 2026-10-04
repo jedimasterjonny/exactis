@@ -48,6 +48,11 @@ export function formatDay(date: string): string {
   return `${String(day.getUTCDate())} ${monthName(day.getUTCMonth(), "short")} ${String(day.getUTCFullYear())}`;
 }
 
+// A month as a page names it, in full with its year: "September 2026".
+export function formatMonth({ month, year }: Month): string {
+  return `${monthName(month, "long")} ${String(year)}`;
+}
+
 // Whether a month falls in or before another: an earlier year, or the
 // same year and no later month. A line runs to its last month, a loan's
 // payments to the month they clear it in, and a balance is held as of
