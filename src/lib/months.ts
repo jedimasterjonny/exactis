@@ -74,11 +74,14 @@ export function monthsBetween(from: Month, to: Month): number {
   return (to.year - from.year) * 12 + to.month - from.month;
 }
 
-// The month it is, read from the clock, January being nought as the
-// date gives it.
+// The month it is, read from the clock in the UK's time as the day is,
+// January being nought: read in the clock's own, a server keeping UTC
+// would take the hour after midnight on the first of a month in summer
+// for the month before, while the day the household is dated on had
+// moved on.
 export function thisMonth(): Month {
-  const now = new Date();
-  return { month: now.getMonth(), year: now.getFullYear() };
+  const day = dayOf(new Date());
+  return { month: Number(day.slice(5, 7)) - 1, year: Number(day.slice(0, 4)) };
 }
 
 // The day it is, read from the clock, as dayOf names it.
