@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 
 import { RowAction } from "@/components/app/atoms/row-action";
+import { RowLock } from "@/components/app/atoms/row-lock";
 
 interface RowActionsProps<TRow> {
   readonly deleteLock?: string | undefined;
@@ -22,10 +23,13 @@ interface RowActionsProps<TRow> {
 // action does is said before the dialog asks about it. The row goes back
 // to the caller untouched, since the handler it came from is the one
 // that knows what a row is; only its name is this component's business.
-// A bin given a reason is held: drawn where it always is, so a column
-// of pairs stays a column, but disabled, with the reason as its title,
-// for a row the store would refuse to delete and whose caller can say
-// why before it is asked.
+// A bin given a reason is held: a lock is drawn where it would be, so a
+// column of pairs stays a column, named with the reason, for a row the
+// store would refuse to delete and whose caller can say why before it is
+// asked. A disabled bin with the reason as its title said it to nobody,
+// since a disabled button takes neither the pointer nor the focus; the
+// lock is the one the plan's locked rows draw, which a screen reader
+// reads the reason off.
 export function RowActions<TRow>({
   deleteLock,
   name,
@@ -48,15 +52,18 @@ export function RowActions<TRow>({
           }}
         />
       )}
-      {onDelete !== undefined && (
+      {onDelete !== undefined && deleteLock !== undefined && (
+        <span className="inline-flex size-7 items-center justify-center">
+          <RowLock reason={deleteLock} />
+        </span>
+      )}
+      {onDelete !== undefined && deleteLock === undefined && (
         <RowAction
-          disabled={deleteLock !== undefined}
           icon={Trash2}
           name={`Delete ${name}`}
           onClick={() => {
             onDelete(row);
           }}
-          title={deleteLock}
           tone="destructive"
         />
       )}

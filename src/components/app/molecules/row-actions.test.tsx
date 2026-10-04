@@ -69,28 +69,26 @@ describe("RowActions", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // A bin given a reason stays where it is, so the column of pairs holds,
-  // but is disabled and says why, and a press reports nothing.
-  it("holds the bin when given a reason, and says it", () => {
-    const onDelete = vi.fn<(deleted: typeof row) => void>();
+  // A bin given a reason is held: a lock named with the reason stands
+  // where it would be, so the column of pairs holds, and there is no bin
+  // to press.
+  it("holds the bin when given a reason, drawing a lock that says it", () => {
     render(
       <RowActions
         deleteLock="Pay it off first"
         name={row.name}
-        onDelete={onDelete}
+        onDelete={vi.fn<(deleted: typeof row) => void>()}
         onEdit={vi.fn<(edited: typeof row) => void>()}
         row={row}
       />,
     );
 
-    const bin = screen.getByRole("button", { name: "Delete Mortgage" });
-
-    expect(bin).toBeDisabled();
-    expect(bin).toHaveAttribute("title", "Pay it off first");
+    expect(
+      screen.getByRole("img", { name: "Pay it off first" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Delete Mortgage" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit Mortgage" })).toBeEnabled();
-
-    fireEvent.click(bin);
-
-    expect(onDelete).not.toHaveBeenCalled();
   });
 });
