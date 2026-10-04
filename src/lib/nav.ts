@@ -38,7 +38,7 @@ export const accountsAndAssets: Screen = {
 export const plan: Screen = {
   href: "/plan",
   icon: ListTree,
-  label: "Plan",
+  label: "Income & expenses",
   title: "Income & expenses",
 };
 
