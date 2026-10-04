@@ -67,13 +67,12 @@ function renderFields(
   render(
     <LineFields
       amountLabel="Base salary"
+      category={{ initial: initial.kind, kinds, onChange: onKindChange }}
       draft={draft}
       initial={initial}
-      kinds={kinds}
       milestones={markers}
       namePlaceholder="Salary…"
       onAmend={onAmend}
-      onKindChange={onKindChange}
       paid={paid}
       plan={plan}
       side="income"
@@ -258,6 +257,28 @@ describe("LineFields", () => {
     expect(
       screen.getByText(bySlot("span-bar-tie"), { suggest: false }),
     ).toBeInTheDocument();
+  });
+
+  // A schedule that sorts its lines into no category, as the expenses
+  // do, gives the fields none, and the name stands alone on its row.
+  it("offers no category for a schedule that has none", () => {
+    render(
+      <LineFields
+        amountLabel="Amount"
+        draft={salary}
+        initial={salary}
+        milestones={markers}
+        namePlaceholder="Childcare…"
+        onAmend={vi.fn<(patch: Partial<LineValues>) => void>()}
+        plan={plan}
+        side="expense"
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Salary");
+    expect(
+      screen.queryByRole("combobox", { name: "Category" }),
+    ).not.toBeInTheDocument();
   });
 
   it("says the year a tied end falls in where its field would be, and asks the years after its milestone the last ends", () => {

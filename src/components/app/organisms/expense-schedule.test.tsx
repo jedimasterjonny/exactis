@@ -12,7 +12,6 @@ import type { Answer } from "@/lib/answer";
 
 import { removeExpenseLine, saveExpenseLine } from "@/actions/schedule";
 import { Toaster } from "@/components/kit/toast";
-import { expenseKinds } from "@/data/expenses";
 import { expenseLines } from "@/data/expenses.fixture";
 import { plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
@@ -44,7 +43,7 @@ function saved(line: ExpenseLine): void {
 }
 
 describe("ExpenseSchedule", () => {
-  it("opens with the card, its rows in their kinds' tones and its note", () => {
+  it("opens with the card, its rows and its note", () => {
     renderSchedule();
 
     expect(screen.getByText("Sect. III.iii")).toHaveClass("label");
@@ -55,18 +54,16 @@ describe("ExpenseSchedule", () => {
       screen.getByRole("region", { name: "Expenses by year" }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(expenseLines.length);
-    expect(screen.getAllByText("Core")).toHaveLength(2);
-    expect(screen.getAllByText("Time-bound")).toHaveLength(2);
+    // A line paying no loan carries no badge: its name says what it is.
+    expect(
+      screen.queryByText(/^(Core|Time-bound|Debt|Other)$/),
+    ).not.toBeInTheDocument();
     // A row is drawn in its columns and again in its folded lines, only
     // one of which is on screen at any width, and opens from its name in
     // either.
     for (const name of screen.getAllByRole("button", { name: "Childcare" })) {
       expect(name).toHaveClass("font-medium");
     }
-    expect(screen.getByText("Debt")).toHaveAttribute(
-      "data-variant",
-      "destructive",
-    );
     expect(screen.getByText("£3,500")).toHaveTextContent("£3,500 / mo");
     expect(screen.getByText("£60,000")).toHaveTextContent("£60,000 / yr");
     expect(screen.getByText("2048 – end")).toBeInTheDocument();
@@ -76,23 +73,8 @@ describe("ExpenseSchedule", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("marks a time-bound cost for its end and draws the empty state for none", () => {
-    const { rerender } = render(
-      <ExpenseSchedule
-        lines={[expenseLines[1]]}
-        milestones={milestones}
-        plan={plan}
-      />,
-    );
-
-    expect(screen.getByText("Time-bound")).toHaveAttribute(
-      "data-variant",
-      "caution",
-    );
-
-    rerender(
-      <ExpenseSchedule lines={[]} milestones={milestones} plan={plan} />,
-    );
+  it("draws the empty state for none", () => {
+    render(<ExpenseSchedule lines={[]} milestones={milestones} plan={plan} />);
 
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
     expect(screen.getByText("No expenses yet")).toBeInTheDocument();
@@ -111,13 +93,8 @@ describe("ExpenseSchedule", () => {
     ).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(
-      within(dialog).getByRole("combobox", { name: "Category" }),
-    ).toHaveValue("time-bound");
-    expect(
-      within(
-        within(dialog).getByRole("combobox", { name: "Category" }),
-      ).getAllByRole("option"),
-    ).toHaveLength(expenseKinds.length);
+      within(dialog).queryByRole("combobox", { name: "Category" }),
+    ).not.toBeInTheDocument();
     expect(within(dialog).getByRole("textbox", { name: "Amount" })).toHaveValue(
       "£0",
     );
@@ -164,7 +141,6 @@ describe("ExpenseSchedule", () => {
       endsAt: null,
       firstYear: 2027,
       growth: "inflation-plus-2",
-      kind: "time-bound",
       lastMonth: null,
       lastYear: 2035,
       name: "Nursery",
@@ -181,7 +157,6 @@ describe("ExpenseSchedule", () => {
         firstYear: 2027,
         growth: "inflation-plus-2",
         id: 6,
-        kind: "time-bound",
         lastMonth: null,
         lastYear: 2035,
         name: "Nursery",
@@ -258,18 +233,15 @@ describe("ExpenseSchedule", () => {
     );
   });
 
-  it("opens an open-ended line as it is, recategorises it and writes the edit back", async () => {
+  it("opens an open-ended line as it is and writes the edit back", async () => {
     renderSchedule();
-    saved({ ...retirement, amount: 65000, kind: "other" });
+    saved({ ...retirement, amount: 65000 });
 
     const dialog = openRow("Retirement living");
 
     expect(within(dialog).getByText("Edit expense line")).toHaveClass(
       "text-brand",
     );
-    expect(
-      within(dialog).getByRole("combobox", { name: "Category" }),
-    ).toHaveValue("core");
     expect(within(dialog).getByRole("textbox", { name: "Amount" })).toHaveValue(
       "£60,000",
     );
@@ -280,10 +252,6 @@ describe("ExpenseSchedule", () => {
       "open",
     );
 
-    fireEvent.change(
-      within(dialog).getByRole("combobox", { name: "Category" }),
-      { target: { value: "other" } },
-    );
     commit(within(dialog).getByRole("textbox", { name: "Amount" }), "65,000");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
@@ -302,7 +270,6 @@ describe("ExpenseSchedule", () => {
       endsAt: null,
       firstYear: 2048,
       growth: "inflation",
-      kind: "other",
       lastMonth: null,
       lastYear: null,
       name: "Retirement living",
@@ -311,8 +278,8 @@ describe("ExpenseSchedule", () => {
   });
 
   // A line that is a loan's payments is written by the dialog of the
-  // asset the loan is on, so it is locked here, with the reason where
-  // its pencil would be.
+  // asset the loan is on, so it says it is a loan's and is locked here,
+  // with the reason where its chevron would be.
   it("locks a line that is a loan's payments", () => {
     render(
       <ExpenseSchedule
@@ -329,7 +296,16 @@ describe("ExpenseSchedule", () => {
     expect(
       screen.queryByRole("button", { name: "Mortgage payment" }),
     ).not.toBeInTheDocument();
-    // The lock is drawn in the row's columns and on its folded lines.
+    // The badge and the lock are drawn in the row's columns and on its
+    // folded lines, the badge only for the loan's line.
+    expect(screen.getByText("Loan")).toHaveAttribute(
+      "data-variant",
+      "secondary",
+    );
+    expect(screen.getByText("Loan · Nominal, fixed")).toBeInTheDocument();
+    // The retirement living's folded lines name its growth alone, as its
+    // column does, with no badge before it.
+    expect(screen.getAllByText("Inflation")).toHaveLength(2);
     expect(
       screen.getAllByRole("img", {
         name: "Edited with its asset on the accounts screen",
@@ -358,7 +334,6 @@ describe("ExpenseSchedule", () => {
       firstYear: 2026,
       growth: "inflation",
       id: 6,
-      kind: "time-bound",
       lastMonth: null,
       lastYear: 2051,
       name: "Household",
@@ -395,7 +370,6 @@ describe("ExpenseSchedule", () => {
       endsAt: "retirement",
       firstYear: 2026,
       growth: "inflation",
-      kind: "time-bound",
       lastMonth: null,
       lastYear: 2051,
       name: "Household",

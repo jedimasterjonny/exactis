@@ -224,7 +224,6 @@ function expenseFrom(
     firstYear,
     growth: "nominal",
     id,
-    kind: "core",
     lastMonth:
       lastYear !== null && random() < 0.5 ? Math.floor(random() * 12) : null,
     lastYear,

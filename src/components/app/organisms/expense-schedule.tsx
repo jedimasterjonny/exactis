@@ -5,13 +5,10 @@ import type { JSX } from "react";
 import { Plus } from "lucide-react";
 
 import type { Summary } from "@/components/app/organisms/schedule-rows";
-import type {
-  ExpenseKind,
-  ExpenseLine,
-  ExpenseLineValues,
-} from "@/data/expenses";
+import type { ExpenseLine } from "@/data/expenses";
 import type { Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
+import type { LineValues } from "@/data/schedule";
 import type { Entry } from "@/hooks/use-editor";
 
 import { removeExpenseLine, saveExpenseLine } from "@/actions/schedule";
@@ -28,12 +25,11 @@ import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { isSound, spanOf } from "@/lib/lines";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
-import { optionsOf } from "@/lib/options";
 
 // What the dialog holds while it is open: the line's values, which are
 // flat already, with no last year for a line that runs to the end of the
 // plan.
-type Draft = ExpenseLineValues;
+type Draft = LineValues;
 
 interface ExpenseScheduleProps {
   readonly lines: readonly ExpenseLine[];
@@ -41,32 +37,12 @@ interface ExpenseScheduleProps {
   readonly plan: Plan;
 }
 
-// What each kind is called, on the badge and in the dialog's choice.
-const kindLabels: Record<ExpenseKind, string> = {
-  core: "Core",
-  debt: "Debt",
-  other: "Other",
-  "time-bound": "Time-bound",
-};
-
-// The kinds in the order the reference's dialog offers them.
-const kinds = optionsOf(kindLabels, ["core", "time-bound", "debt", "other"]);
-
-// The badge each kind takes, as the reference tones them: a time-bound
-// cost is marked for the end it has, a debt takes the loss tone its
-// balance takes everywhere else, and the rest are plain.
-const tones: Record<ExpenseKind, Summary["badge"]["variant"]> = {
-  core: "secondary",
-  debt: "destructive",
-  other: "secondary",
-  "time-bound": "caution",
-};
-
 // The plan screen's expense schedule and its dialog, beneath the income
 // schedule and built as it is: the rows are the store's, handed down by
 // the page, a save goes to the store and comes back with the page
 // re-read, the entry doubles as the dialog's open state, and the fields
-// are the ones every line's dialog takes, with nothing to add beneath
+// are the ones every line's dialog takes, with no category, since what
+// the money is for is the line's name to say, and nothing to add beneath
 // them, since an expense is paid in no parts. The dialog of a saved line
 // offers a Delete that asks through the confirm dialog before the line
 // goes, as the income schedule's does, and holds while a save is on its
@@ -163,14 +139,10 @@ export function ExpenseSchedule({
             amountLabel="Amount"
             draft={entry.draft}
             initial={entry.initial}
-            kinds={kinds}
             milestones={markers}
             namePlaceholder="Childcare, mortgage, care…"
             onAmend={(patch) => {
               amend(entry, patch);
-            }}
-            onKindChange={(kind) => {
-              amend(entry, { kind });
             }}
             plan={plan}
             side="expense"
@@ -181,9 +153,9 @@ export function ExpenseSchedule({
   );
 }
 
-// A new line: a time-bound cost of nothing a month, running ten years
-// from the plan's first, growing with inflation and tied to no
-// milestone, as the reference's new expense line opens.
+// A new line: a cost of nothing a month, running ten years from the
+// plan's first, growing with inflation and tied to no milestone, as the
+// reference's new expense line opens.
 function blank(plan: Plan): Draft {
   return {
     amount: 0,
@@ -192,7 +164,6 @@ function blank(plan: Plan): Draft {
     endsAt: null,
     firstYear: plan.from,
     growth: "inflation",
-    kind: "time-bound",
     lastMonth: null,
     lastYear: plan.from + 10,
     name: "",
@@ -200,17 +171,18 @@ function blank(plan: Plan): Draft {
   };
 }
 
-// What the rows say of an expense line: its kind's badge in the kind's
-// tone, and what it pays, which is its amount, since an expense is paid
-// in no parts. A line that is a loan's payments is locked, since the
-// dialog of the asset the loan is on writes it from the loan and would
-// write over an edit made here.
+// What the rows say of an expense line: what it pays, which is its
+// amount, since an expense is paid in no parts. A line that is a loan's
+// payments says so on its badge, and is locked, since the dialog of the
+// asset the loan is on writes it from the loan and would write over an
+// edit made here; any other line has no badge, its name saying what it
+// is for.
 function summarise(line: ExpenseLine): Summary {
-  return {
-    badge: { label: kindLabels[line.kind], variant: tones[line.kind] },
-    ...(line.pays !== undefined && {
-      lock: "Edited with its asset on the accounts screen",
-    }),
-    total: line.amount,
-  };
+  return line.pays === undefined
+    ? { total: line.amount }
+    : {
+        badge: { label: "Loan", variant: "secondary" },
+        lock: "Edited with its asset on the accounts screen",
+        total: line.amount,
+      };
 }

@@ -1,5 +1,5 @@
 import type { Account, AccountKind, AccountValues } from "@/data/accounts";
-import type { ExpenseLineValues } from "@/data/expenses";
+import type { LineValues } from "@/data/schedule";
 
 // An asset and the loan secured on it, as the store holds them: two
 // accounts the loan links, or the asset alone when it is owned
@@ -36,7 +36,7 @@ interface Asset {
 // model writes them together, so they travel as one.
 interface Borrowing {
   readonly account: AccountValues;
-  readonly line: ExpenseLineValues;
+  readonly line: LineValues;
 }
 
 // The loan as its asset's model hands it to be written: its name, what
@@ -117,7 +117,6 @@ export function securedRecords(
         endsAt: null,
         firstYear: plan.from,
         growth: "nominal",
-        kind: "debt",
         lastMonth: null,
         lastYear: null,
         name: loan.name,
