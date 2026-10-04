@@ -92,8 +92,7 @@ describe("CashFlowCard", () => {
       "Expenses−£3,350",
       "MortgageA fixed sum−£2,180",
       "Workplace pensionA fixed sum, paid in as £1,470 with basic-rate relief−£1,176",
-      "Stocks & shares ISASpare money, to £20,000 / yr£0",
-      "Current accountSpare money, uncapped£0",
+      "Paid nothing this monthStocks & shares ISA and Current account£0",
       "Left overWhat no saving takes is left in the month, which the plan takes as spent.£0",
     ]);
     expect(screen.getByText("£12,000")).toHaveClass("figure");
@@ -112,8 +111,8 @@ describe("CashFlowCard", () => {
   // £190.50 of income tax and £57.15 of NI, is £6,145.98 short of the
   // mortgage payment and the retirement living, so the pension is paid
   // nothing of its fixed sum, so it says nothing of relief, the ISA and
-  // the account take nothing, and the month is short by that £6,145.98
-  // alone, which the savings cover. The mortgage
+  // the account take nothing, which the ledger says on one line, and the
+  // month is short by that £6,145.98 alone, which the savings cover. The mortgage
   // has no row by then: its £2,180 a month cleared the £176,520 in
   // November 2034, so the ledger stops charging it rather than writing it
   // at nothing for the rest of the plan.
@@ -149,9 +148,7 @@ describe("CashFlowCard", () => {
       "Income tax−£191",
       "National Insurance−£57",
       "Expenses−£7,898",
-      "Workplace pensionA fixed sum£0",
-      "Stocks & shares ISASpare money, to £20,000 / yr£0",
-      "Current accountSpare money, uncapped£0",
+      "Paid nothing this monthWorkplace pension, Stocks & shares ISA and Current account£0",
       "ShortWhat the month is short by is drawn from the savings, cash first.£6,146",
     ]);
   });
@@ -212,6 +209,26 @@ describe("CashFlowCard", () => {
     ).toBeInTheDocument();
   });
 
+  // The salary alone, taxed whole, leaves £7,342.20 a month: the ISA
+  // takes a twelfth of its £20,000 allowance, £1,666.67, and the current
+  // account, uncapped, the £5,675.53 left.
+  it("lists what each saving takes of the spare money, and the most it takes", () => {
+    render(
+      <CashFlowCard
+        accounts={[spareIsa, spareCash]}
+        milestones={[]}
+        plan={plan}
+        schedule={{ expenses: [], income: [salary] }}
+      />,
+    );
+
+    expect(rows().slice(-3)).toStrictEqual([
+      "Stocks & shares ISASpare money, to £20,000 / yr−£1,667",
+      "Current accountSpare money, uncapped−£5,676",
+      "Left overWhat no saving takes is left in the month, which the plan takes as spent.£0",
+    ]);
+  });
+
   // A fraction of a pound going out would otherwise read as a signed
   // nothing, and so would nothing at all: £5 a year is 42p a month.
   it("writes what rounds to nothing as nothing, unsigned", () => {
@@ -232,7 +249,7 @@ describe("CashFlowCard", () => {
       "Income tax£0",
       "National Insurance£0",
       "Expenses£0",
-      "Stocks & shares ISASpare money, to £20,000 / yr£0",
+      "Paid nothing this monthStocks & shares ISA£0",
       "Left overWhat no saving takes is left in the month, which the plan takes as spent.£0",
     ]);
     expect(screen.getAllByText("£0").at(-1)).not.toHaveClass(

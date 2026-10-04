@@ -71,7 +71,9 @@ interface RowProps {
 // National Insurance on what is left of it, then the expenses and every
 // account paid go out, each account under its name with how it is
 // paid, and a pension with what lands once the basic rate is claimed
-// back on it, and what is left closes the list. A month that does not
+// back on it, the accounts the month pays nothing named together on one
+// line rather than a column of nothings burying the ones it pays, and
+// what is left closes the list. A month that does not
 // cover its outgoings closes on what it is short by instead, in the
 // words the accounts screen's payment order uses, since the projection
 // draws that from the savings; only a year the savings run out in,
@@ -104,6 +106,7 @@ export function CashFlowCard({
   const marked = markersOf(milestones, plan)
     .filter((marker) => marker.year === year)
     .map(({ name }) => name);
+  const unpaid = [...flow.fixed, ...flow.spare].filter((paid) => !isPaid(paid));
   return (
     <SectionCard
       caption={[
@@ -137,7 +140,7 @@ export function CashFlowCard({
           <Row amount={-flow.incomeTax} label="Income tax" />
           <Row amount={-flow.insurance} label="National Insurance" />
           <Expenses amount={flow.expenses} spent={flow.spent} />
-          {flow.fixed.map((paid) => (
+          {flow.fixed.filter(isPaid).map((paid) => (
             <Row
               amount={-paid.amount}
               detail={relieved("A fixed sum", paid, flow.relief)}
@@ -145,7 +148,7 @@ export function CashFlowCard({
               label={paid.account.name}
             />
           ))}
-          {flow.spare.map((take) => (
+          {flow.spare.filter(isPaid).map((take) => (
             <Row
               amount={-take.amount}
               detail={relieved(describeTake(take), take, flow.relief)}
@@ -153,6 +156,13 @@ export function CashFlowCard({
               label={take.account.name}
             />
           ))}
+          {unpaid.length > 0 && (
+            <Row
+              amount={0}
+              detail={listed.format(unpaid.map(({ account }) => account.name))}
+              label="Paid nothing this month"
+            />
+          )}
           <Closing left={flow.left} uncovered={uncovered} />
         </ul>
       </CardContent>
@@ -283,6 +293,12 @@ function Figure({
       {formatGbp(isZero(amount) ? 0 : amount)}
     </span>
   );
+}
+
+// Whether a payment is one the month makes, rather than one that rounds
+// to nothing.
+function isPaid({ amount }: Paid): boolean {
+  return !isZero(amount);
 }
 
 // A figure that rounds to nothing is written as nothing, without the
