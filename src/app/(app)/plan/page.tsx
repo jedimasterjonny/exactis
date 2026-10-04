@@ -17,9 +17,10 @@ import { getHousehold } from "@/store/household";
 // same span as the lines rather than on a tab of their own, so this
 // screen is one column with no tab strip: the milestones first, since
 // the lines are laid out by them, then the income lines, the expense
-// lines beneath them, and beneath both what a month of a year leaves
-// once the accounts are paid, which the card reads from the two
-// schedules and the accounts together for whichever year it is set to.
+// lines beneath them, and beneath both the plan year by year, in
+// stretches of years alike, each a month of what comes in, goes out, is
+// put by and is drawn once the accounts are paid, which the card reads
+// from the two schedules and the accounts together.
 // The page reads all of it from the store, which reads the session
 // first, so it renders behind the loading screen beside it, and lays the
 // milestones and the lines over the plan the projection runs on. The
