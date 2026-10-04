@@ -20,15 +20,14 @@ import { AccountDialog } from "@/components/app/organisms/account-dialog";
 import { BalanceSheet } from "@/components/app/organisms/balance-sheet";
 import { CarDialog } from "@/components/app/organisms/car-dialog";
 import { HouseDialog } from "@/components/app/organisms/house-dialog";
+import { MoneyFlow } from "@/components/app/organisms/money-flow";
 import { OwnerList } from "@/components/app/organisms/owner-list";
-import { PaymentOrder } from "@/components/app/organisms/payment-order";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { isAsset } from "@/data/accounts";
 import { useRemover } from "@/hooks/use-remover";
 import { useSender } from "@/hooks/use-sender";
 import { feedersOf, listed } from "@/lib/feeders";
-import { runsIn } from "@/lib/lines";
 import { formatPercent } from "@/lib/money";
 import { accountsAndAssets, subsectionLabel } from "@/lib/nav";
 
@@ -69,18 +68,18 @@ type AssetOpening = "new" | Secured;
 // through the confirm dialog before the account goes, saying what goes
 // with it, since an asset takes its loan and the loan's payments, and
 // what stops, since a salary feeding a pension stops when the pension
-// goes; the income lines are handed down for that, for the treatment
-// such a pension is held to, so both can name the salaries, and for the
-// sheet to write what the salaries feed each pension: the sheet is
-// handed the lines running in the month the plan starts in, so a salary
-// that has ended or is yet to start lands nothing on the row, while the
-// dialog and the confirm take every line, since the link stands whether
-// or not it runs. The expense lines are handed down for the sheet to say
-// when each loan's payments clear it, and the plan for the month it
-// starts in and the rate the savings grow at. The owners close the
-// screen, a section of their own beneath the order, and are handed to
-// the sheet, to say whose each wrapper is, and to the account dialog,
-// to choose it.
+// goes; the income lines are handed down for that and for the treatment
+// such a pension is held to, so both can name the salaries. Beneath the
+// sheet, the month's money is drawn down the savings in the order they
+// are paid, which is where the order is set; the flow is handed every
+// account in the order the ledger holds, so a move shows in it at once,
+// both schedules, which it works the month out from, and the plan, for
+// the month it starts in. The expense lines are handed to the sheet as
+// well, to say when each loan's payments clear it, and the plan for the
+// rate the savings grow at. The owners close the screen, a section of
+// their own beneath the flow, and are handed to the sheet and the flow,
+// to say whose each wrapper is, and to the account dialog, to choose
+// it.
 export function AccountLedger({
   accounts,
   expenses,
@@ -116,13 +115,10 @@ export function AccountLedger({
   const held = paid.filter((account) => !paired.has(account.id));
   const savings = held.filter((account) => account.kind !== "debt");
   const debts = held.filter((account) => account.kind === "debt");
-  const running = lines.filter((line) =>
-    runsIn(line, { month: plan.month, year: plan.from }),
-  );
 
-  // Where the owners sit among the sections: after the order when it is
-  // drawn, which it is not for fewer than two savings.
-  const ownersPlace = savings.length < 2 ? 2 : 3;
+  // Where the owners sit among the sections: after the money's flow when
+  // it is drawn, which it is not for no savings.
+  const ownersPlace = savings.length === 0 ? 2 : 3;
 
   // The month the plan starts in as the loan maths counts from it, for
   // the two dialogs that let a loan's end be picked as a date.
@@ -227,7 +223,6 @@ export function AccountLedger({
             assets={assets}
             debts={debts}
             expenses={expenses}
-            lines={running}
             onAddDebt={() => {
               setAccount("debt");
             }}
@@ -237,10 +232,14 @@ export function AccountLedger({
           />
         </CardContent>
       </SectionCard>
-      <PaymentOrder
-        accounts={savings}
+      <MoneyFlow
+        accounts={order}
         label={subsectionLabel(accountsAndAssets, 2)}
         onMove={move}
+        owners={owners}
+        plan={plan}
+        savings={savings}
+        schedule={{ expenses, income: lines }}
       />
       <OwnerList
         accounts={order}

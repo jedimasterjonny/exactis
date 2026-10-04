@@ -6,7 +6,6 @@ import { useId } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
-import type { IncomeLine } from "@/data/income";
 import type { Owner } from "@/data/owners";
 import type { Secured } from "@/data/secured";
 
@@ -16,15 +15,8 @@ import { Ledger } from "@/components/app/atoms/ledger";
 import { ShareBar } from "@/components/app/atoms/share-bar";
 import { Button } from "@/components/kit/button";
 import { kindLabels } from "@/data/accounts";
-import { fixedMonthly, monthly } from "@/lib/cadence";
-import { fedOf, feedersOf, listed } from "@/lib/feeders";
-import {
-  balanceOf,
-  equityOf,
-  formatContribution,
-  formatMonthly,
-  sumOf,
-} from "@/lib/ledger";
+import { fixedMonthly } from "@/lib/cadence";
+import { balanceOf, equityOf, formatMonthly, sumOf } from "@/lib/ledger";
 import { formatGbp, formatPercent, negated } from "@/lib/money";
 import { monthName } from "@/lib/months";
 
@@ -32,7 +24,6 @@ interface BalanceSheetProps {
   readonly assets: readonly Secured[];
   readonly debts: readonly Account[];
   readonly expenses: readonly ExpenseLine[];
-  readonly lines: readonly IncomeLine[];
   readonly onAddDebt: () => void;
   readonly onEdit: (account: Account) => void;
   readonly owners: readonly Owner[];
@@ -81,7 +72,6 @@ export function BalanceSheet({
   assets,
   debts,
   expenses,
-  lines,
   onAddDebt,
   onEdit,
   owners,
@@ -133,7 +123,7 @@ export function BalanceSheet({
                           isOrdered ? savings.indexOf(account) + 1 : undefined
                         }
                       >
-                        {linesOf(account, owners, lines)}
+                        {aboutOf(account, owners)}
                       </Row>
                     ))}
                   </Group>
@@ -337,24 +327,6 @@ function Heading({
   );
 }
 
-// What a saving's row says beneath its name: what it is and what it is
-// paid, or nothing at all for a saving with neither to say, so the row
-// draws no lines rather than an empty box beneath its name.
-function linesOf(
-  account: Account,
-  owners: readonly Owner[],
-  lines: readonly IncomeLine[],
-): JSX.Element | undefined {
-  const about = aboutOf(account, owners);
-  const paid = paidOf(account, lines);
-  return about === undefined && paid === undefined ? undefined : (
-    <>
-      {about}
-      {paid}
-    </>
-  );
-}
-
 // What a loan or a debt is charged, paid and, when a line pays it, the
 // month that line's payments clear it in, which the household works out
 // from the loan whenever it is read; and the balloon a PCP leaves.
@@ -391,26 +363,6 @@ function Page({ children }: { readonly children: string }): JSX.Element {
   return (
     <p className="font-heading text-sm font-medium folded:hidden">{children}</p>
   );
-}
-
-// What is paid into a saving a month, as a line of its own: its own
-// sum, and with it what the salaries sacrifice into a pension, naming
-// them, with the employer's NI saved; or no line for one paid nothing.
-function paidOf(
-  account: Account,
-  lines: readonly IncomeLine[],
-): JSX.Element | undefined {
-  const fed = monthly(fedOf(account.id, lines), "year");
-  const own =
-    account.contribution?.kind === "fixed"
-      ? `${formatContribution(account)} paid`
-      : account.contribution && formatContribution(account);
-  const sacrificed =
-    fed === 0
-      ? undefined
-      : `${formatMonthly(fed)} sacrificed from ${listed.format(feedersOf(account.id, lines))}`;
-  const said = [own, sacrificed].filter((part) => part !== undefined);
-  return said.length === 0 ? undefined : <span>{said.join(" + ")}</span>;
 }
 
 // A row of the sheet: the account's name and balance, opening the
