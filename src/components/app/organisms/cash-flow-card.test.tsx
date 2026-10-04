@@ -94,7 +94,7 @@ describe("CashFlowCard", () => {
       "Workplace pensionA fixed sum, paid in as £1,543 with basic-rate relief−£1,235",
       "Stocks & shares ISASpare money, to £20,000 / yr£0",
       "Current accountSpare money, uncapped£0",
-      "Left over£0",
+      "Left overWhat no saving takes is left in the month, which the plan takes as spent.£0",
     ]);
     expect(screen.getByText("£12,250")).toHaveClass("figure");
     expect(screen.getByText("Income")).not.toHaveClass("font-medium");
@@ -113,7 +113,7 @@ describe("CashFlowCard", () => {
   // mortgage payment and the retirement living, so the pension is paid
   // nothing of its fixed sum, so it says nothing of relief, the ISA and
   // the account take nothing, and the month is short by that £6,448.65
-  // alone. The mortgage
+  // alone, which the savings cover. The mortgage
   // has no row by then: its £2,210 a month cleared the £182,940 in
   // March 2035, so the ledger stops charging it rather than writing it
   // at nothing for the rest of the plan.
@@ -152,20 +152,24 @@ describe("CashFlowCard", () => {
       "Workplace pensionA fixed sum£0",
       "Stocks & shares ISASpare money, to £20,000 / yr£0",
       "Current accountSpare money, uncapped£0",
-      "Left over−£6,449",
+      "ShortWhat the month is short by is drawn from the savings, cash first.£6,449",
     ]);
   });
 
   // The salary alone until 2048, feeding no pension listed and so
   // taxed whole, which leaves £7,474.70 a month, and the retirement
-  // living alone from 2049, with no account to pay.
-  it("weights what is left and tones a shortfall as a loss", () => {
-    render(
+  // living alone from 2049, with no account to pay: a month £5,000 short
+  // that nothing covers with no account at all, so the year leaves
+  // £55,000 uncovered, its £60,000 less what April settles of the
+  // salary's last tax year, and that the ISA's £286,145 covers whole.
+  it("weights what is left, and tones a shortfall as a loss only when the savings run out", () => {
+    const flows = { expenses: [retirement], income: [salary] };
+    const { unmount } = render(
       <CashFlowCard
         accounts={[]}
         milestones={milestones}
         plan={plan}
-        schedule={{ expenses: [retirement], income: [salary] }}
+        schedule={flows}
       />,
     );
 
@@ -177,9 +181,35 @@ describe("CashFlowCard", () => {
 
     fireEvent.change(slider("Year"), { target: { value: "2049" } });
 
-    const [, short] = screen.getAllByText("−£5,000");
+    expect(screen.getByText("Short")).toHaveClass("font-medium");
+    expect(screen.getByText("£5,000")).toHaveClass(
+      "figure",
+      "font-medium",
+      "text-destructive",
+    );
+    expect(
+      screen.getByText(
+        "The savings run out this year, leaving £55,000 of it uncovered.",
+      ),
+    ).toHaveClass("text-muted-foreground");
 
-    expect(short).toHaveClass("figure", "font-medium", "text-destructive");
+    unmount();
+    render(
+      <CashFlowCard
+        accounts={[isa]}
+        milestones={milestones}
+        plan={plan}
+        schedule={flows}
+      />,
+    );
+    fireEvent.change(slider("Year"), { target: { value: "2049" } });
+
+    expect(screen.getByText("£5,000")).not.toHaveClass("text-destructive");
+    expect(
+      screen.getByText(
+        "What the month is short by is drawn from the savings, cash first.",
+      ),
+    ).toBeInTheDocument();
   });
 
   // A fraction of a pound going out would otherwise read as a signed
@@ -203,7 +233,7 @@ describe("CashFlowCard", () => {
       "National Insurance£0",
       "Expenses£0",
       "Stocks & shares ISASpare money, to £20,000 / yr£0",
-      "Left over£0",
+      "Left overWhat no saving takes is left in the month, which the plan takes as spent.£0",
     ]);
     expect(screen.getAllByText("£0").at(-1)).not.toHaveClass(
       "text-destructive",
@@ -260,7 +290,9 @@ describe("CashFlowCard", () => {
   // third by January 2036, the 112th month from September 2026, 31.8%
   // in all. The household's £3,500, rising with them, reads as £3,500
   // in today's money as it does in 2026, where £1,000 a month fixed in
-  // nominal terms reads as £759.
+  // nominal terms reads as £759, and less each month after; with no
+  // account to draw on, the year's twelve such months, £50,985, go
+  // uncovered.
   it("reads a later year's month in today's money", () => {
     render(
       <CashFlowCard
@@ -295,7 +327,9 @@ describe("CashFlowCard", () => {
       "Household£3,500 / mo · 2026–2047−£3,500",
       "Subscription£1,000 / mo · 2026–end of plan−£759",
     ]);
-    expect(rows().at(-1)).toBe("Left over−£4,259");
+    expect(rows().at(-1)).toBe(
+      "ShortThe savings run out this year, leaving £50,985 of it uncovered.£4,259",
+    );
   });
 
   it("says when no expense line runs in the year", () => {

@@ -22,6 +22,7 @@ import { CardContent } from "@/components/kit/card";
 import { markersOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { cashFlow, inTodaysMoney } from "@/engine/cash-flow";
+import { project } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { listed } from "@/lib/feeders";
 import { spanOf } from "@/lib/lines";
@@ -38,12 +39,14 @@ interface CashFlowCardProps {
 
 interface FigureProps {
   readonly amount: number;
+  readonly isLoss?: boolean;
   readonly isTotal?: boolean;
 }
 
 interface RowProps {
   readonly amount: number;
   readonly detail?: string;
+  readonly isLoss?: boolean;
   readonly isTotal?: boolean;
   readonly label: string;
 }
@@ -68,8 +71,13 @@ interface RowProps {
 // National Insurance on what is left of it, then the expenses and every
 // account paid go out, each account under its name with how it is
 // paid, and a pension with what lands once the basic rate is claimed
-// back on it, and what is left closes the list, in the loss tone when the
-// month does not cover its outgoings. The
+// back on it, and what is left closes the list. A month that does not
+// cover its outgoings closes on what it is short by instead, in the
+// words the accounts screen's payment order uses, since the projection
+// draws that from the savings; only a year the savings run out in,
+// which the projection says it leaves uncovered, is in the loss tone
+// and says so, since a shortfall the savings meet is the plan working
+// rather than failing. The
 // expenses figure opens into the lines behind it, each under its name
 // with what it is paid at and the years it runs, since a sum over a
 // schedule that starts and ends line by line is a question as often as
@@ -88,6 +96,11 @@ export function CashFlowCard({
   const month = year === plan.from ? plan.month : 0;
   const reading = { at: { month, year }, plan };
   const flow = inTodaysMoney(cashFlow(accounts, schedule, reading), reading);
+  // The year's point carries what the projection left uncovered in it,
+  // and every year of the plan has one.
+  const uncovered = project(accounts, schedule, plan)
+    .filter((point) => point.year === year)
+    .reduce((sum, point) => sum + point.uncovered, 0);
   const marked = markersOf(milestones, plan)
     .filter((marker) => marker.year === year)
     .map(({ name }) => name);
@@ -140,10 +153,47 @@ export function CashFlowCard({
               label={take.account.name}
             />
           ))}
-          <Row amount={flow.left} isTotal label="Left over" />
+          <Closing left={flow.left} uncovered={uncovered} />
         </ul>
       </CardContent>
     </SectionCard>
+  );
+}
+
+// What closes the ledger: what is left over, and what becomes of it, or
+// what the month is short by and where that comes from, in the loss tone
+// and saying what is left uncovered when the savings run out in the
+// year. A fraction of a pound short is read as nothing left over, as
+// the figure shown is.
+function Closing({
+  left,
+  uncovered,
+}: {
+  readonly left: number;
+  readonly uncovered: number;
+}): JSX.Element {
+  if (isZero(left) || left > 0) {
+    return (
+      <Row
+        amount={left}
+        detail="What no saving takes is left in the month, which the plan takes as spent."
+        isTotal
+        label="Left over"
+      />
+    );
+  }
+  return (
+    <Row
+      amount={-left}
+      detail={
+        uncovered > 0
+          ? `The savings run out this year, leaving ${formatGbp(uncovered)} of it uncovered.`
+          : "What the month is short by is drawn from the savings, cash first."
+      }
+      isLoss={uncovered > 0}
+      isTotal
+      label="Short"
+    />
   );
 }
 
@@ -216,15 +266,18 @@ function Expenses({
 
 // A figure of the ledger, in mono, with a real minus on what goes out
 // and none on nothing. The total is weighted, and in the loss tone when
-// it is a shortfall, which is read off the figure shown: a fraction of
-// a pound short is written as nothing and is not toned as a loss.
-function Figure({ amount, isTotal = false }: FigureProps): JSX.Element {
+// its row says it is one.
+function Figure({
+  amount,
+  isLoss = false,
+  isTotal = false,
+}: FigureProps): JSX.Element {
   return (
     <span
       className={cn(
         "figure",
         isTotal && "font-medium",
-        isTotal && !isZero(amount) && amount < 0 && "text-destructive",
+        isLoss && "text-destructive",
       )}
     >
       {formatGbp(isZero(amount) ? 0 : amount)}
@@ -264,6 +317,7 @@ function relieved(
 function Row({
   amount,
   detail,
+  isLoss = false,
   isTotal = false,
   label,
 }: RowProps): JSX.Element {
@@ -275,7 +329,7 @@ function Row({
           <span className="text-xs text-muted-foreground">{detail}</span>
         )}
       </span>
-      <Figure amount={amount} isTotal={isTotal} />
+      <Figure amount={amount} isLoss={isLoss} isTotal={isTotal} />
     </li>
   );
 }
