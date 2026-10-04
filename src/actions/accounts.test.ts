@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
 import type { Kept } from "@/data/household";
+import type { Month } from "@/data/schedule";
 
 import { golfPcp, golfValues, golf as owned } from "@/data/cars.fixture";
 import { kept, today } from "@/data/household.fixture";
@@ -16,10 +17,10 @@ import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
 import {
+  closeBalances,
   placeAccountsInOrder,
   removeAccount,
   saveAccount,
-  saveBalancesMonth,
   saveCar,
   saveHouse,
 } from "./accounts";
@@ -805,20 +806,26 @@ describe("the account actions", () => {
     });
   });
 
-  describe("saveBalancesMonth", () => {
+  describe("closeBalances", () => {
+    // The month alone, as a month end checking no balance sends it.
+    async function moveTo(asOf: Month): ReturnType<typeof closeBalances> {
+      return closeBalances({ asOf, balances: [] });
+    }
+
     it("moves nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(saveBalancesMonth({ month: 2, year: 2026 })).rejects.toThrow(
+      await expect(moveTo({ month: 2, year: 2026 })).rejects.toThrow(
         "redirected",
       );
       expect(await versions()).toBe(1);
     });
 
     // The household's balances are as of September 2026; moved to
-    // March, every balance stays as it was, now March's.
-    it("moves the month the balances are as of, and no balance with it", async () => {
-      expect(await saveBalancesMonth({ month: 2, year: 2026 })).toStrictEqual(
+    // March with none checked, every balance stays as it was, now
+    // March's, with the day it had.
+    it("moves the month the balances are as of, and no balance unchecked with it", async () => {
+      expect(await moveTo({ month: 2, year: 2026 })).toStrictEqual(
         saved({ month: 2, year: 2026 }),
       );
       expect(await latest()).toStrictEqual({
@@ -826,6 +833,38 @@ describe("the account actions", () => {
         asOf: { month: 2, year: 2026 },
       });
       expect(refresh).toHaveBeenCalledOnce();
+    });
+
+    // The ISA's statement says £290,000 and the mortgage's £181,500, and
+    // the current account is confirmed as it stood: all three are dated
+    // today, with the month, in one version, and the rest are left.
+    it("writes each balance checked, dated today, with the month, in one version", async () => {
+      expect(
+        await closeBalances({
+          asOf: { month: 8, year: 2026 },
+          balances: [
+            { balance: 290000, id: 2 },
+            { balance: -181500, id: 5 },
+            { balance: 18300, id: 3 },
+          ],
+        }),
+      ).toStrictEqual(saved({ month: 8, year: 2026 }));
+      expect(await latest()).toStrictEqual({
+        ...kept,
+        accounts: kept.accounts.map((account) => {
+          switch (account.id) {
+            case 2:
+              return { ...account, balance: 290000, setOn: "2026-09-15" };
+            case 3:
+              return { ...account, setOn: "2026-09-15" };
+            case 5:
+              return { ...account, balance: -181500, setOn: "2026-09-15" };
+            default:
+              return account;
+          }
+        }),
+      });
+      expect(await versions()).toBe(2);
     });
 
     // It is 15 September 2026: September has begun, October has not, and
@@ -845,23 +884,47 @@ describe("the account actions", () => {
           "The balances are as of a month after the plan's owner was born",
         ],
       ] as const) {
-        expect(await saveBalancesMonth(month)).toStrictEqual(refused(refusal));
+        expect(await moveTo(month)).toStrictEqual(refused(refusal));
       }
       expect(await versions()).toBe(1);
 
-      await saveBalancesMonth({ month: 0, year: 1990 });
-      await saveBalancesMonth({ month: 8, year: 2026 });
+      await moveTo({ month: 0, year: 1990 });
+      await moveTo({ month: 8, year: 2026 });
 
       expect(await versions()).toBe(3);
     });
 
-    it("refuses what the dialog could not have sent", async () => {
-      await expect(
-        saveBalancesMonth({ month: 12, year: 2026 }),
-      ).rejects.toThrow(z.ZodError);
-      await expect(saveBalancesMonth({ month: 2, year: 0 })).rejects.toThrow(
-        z.ZodError,
-      );
+    it("refuses a balance on no account, or one the household's rules refuse, and writes nothing", async () => {
+      expect(
+        await closeBalances({
+          asOf: { month: 8, year: 2026 },
+          balances: [{ balance: 1000, id: 99 }],
+        }),
+      ).toStrictEqual(refused("No account has the id"));
+      expect(
+        await closeBalances({
+          asOf: { month: 8, year: 2026 },
+          balances: [{ balance: -1000, id: 2 }],
+        }),
+      ).toStrictEqual(refused("A balance below nothing is a debt's"));
+      expect(await versions()).toBe(1);
+    });
+
+    it("refuses what the worksheet could not have sent", async () => {
+      for (const draft of [
+        { asOf: { month: 12, year: 2026 }, balances: [] },
+        { asOf: { month: 2, year: 0 }, balances: [] },
+        { asOf: { month: 8, year: 2026 }, balances: [{ balance: 1.5, id: 2 }] },
+        {
+          asOf: { month: 8, year: 2026 },
+          balances: [
+            { balance: 1, id: 2 },
+            { balance: 2, id: 2 },
+          ],
+        },
+      ]) {
+        await expect(closeBalances(draft)).rejects.toThrow(z.ZodError);
+      }
       expect(await versions()).toBe(1);
     });
   });

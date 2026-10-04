@@ -82,6 +82,24 @@ describe("DialogFrame", () => {
     expect(screen.getByRole("dialog")).toHaveClass("sm:max-w-lg");
   });
 
+  it("takes a caller's class over its own width", () => {
+    render(
+      <DialogFrame
+        className="sm:max-w-3xl"
+        eyebrow="Month end"
+        footer={null}
+        isWide
+        onDismiss={vi.fn<() => void>()}
+        title="Balances for October 2026"
+      >
+        <p>The balances</p>
+      </DialogFrame>,
+    );
+
+    expect(screen.getByRole("dialog")).toHaveClass("sm:max-w-3xl");
+    expect(screen.getByRole("dialog")).not.toHaveClass("sm:max-w-lg");
+  });
+
   // A field focused unasked on a touch screen opens the keyboard over
   // the form, so there the frame takes the focus itself; a mouse or a
   // keyboard lands in the first field, ready to type. jsdom has no

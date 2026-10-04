@@ -68,6 +68,15 @@ export function MoneyField(
   return <FigureField {...props} {...presets.money} />;
 }
 
+// A money input with no field of its own, for a caller that lays its
+// label and its hint out around more than the input, as a worksheet's
+// row does around the input and the press that checks it.
+export function MoneyInput(
+  props: Figure & Pick<Forwarded, "onValueCommitted">,
+): JSX.Element {
+  return <FigureInput {...props} {...presets.money} />;
+}
+
 // A rate input. An error is the caller's, for a rate it could not work
 // out, and a rate worked out elsewhere is shown read-only.
 export function RateField(

@@ -15,6 +15,7 @@ import Accounts from "./page";
 
 vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
 vi.mock("@/actions/accounts", () => ({
+  closeBalances: vi.fn(),
   removeAccount: vi.fn(),
   saveAccount: vi.fn(),
 }));
@@ -39,7 +40,7 @@ async function renderAccounts({
 }
 
 describe("Accounts", () => {
-  it("opens with the header, the month its balances are as of, and the one action to move it", async () => {
+  it("opens with the header, the month its balances are as of, and the month end that moves it", async () => {
     await renderAccounts();
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -63,7 +64,7 @@ describe("Accounts", () => {
       within(screen.getByRole("banner"))
         .getAllByRole("button")
         .map((button) => button.textContent),
-    ).toStrictEqual(["Balances month"]);
+    ).toStrictEqual(["Update balances"]);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
