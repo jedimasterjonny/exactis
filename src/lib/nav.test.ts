@@ -20,7 +20,7 @@ describe("sectionLabel", () => {
     expect(sectionLabel(accountsAndAssets)).toBe(
       "Sect. II · Accounts & assets",
     );
-    expect(sectionLabel(plan)).toBe("Sect. III · Plan");
+    expect(sectionLabel(plan)).toBe("Sect. III · Income & expenses");
     expect(sectionLabel(progress)).toBe("Sect. IV · Progress");
     expect(sectionNumeral(progress)).toBe("IV");
     expect(sectionLabel(assumptions)).toBe("Sect. V · Assumptions");
