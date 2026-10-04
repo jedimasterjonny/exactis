@@ -5,11 +5,7 @@ import * as z from "zod";
 
 import type { Kept } from "@/data/household";
 
-import {
-  golf as car,
-  golfPcp as finance,
-  golfValues,
-} from "@/data/cars.fixture";
+import { golfPcp, golfValues, golf as owned } from "@/data/cars.fixture";
 import { kept, today } from "@/data/household.fixture";
 import { homeValues } from "@/data/houses.fixture";
 import { incomeLines } from "@/data/income.fixture";
@@ -40,7 +36,8 @@ const { db } = memory;
 const [salary] = incomeLines;
 
 // An ISA as the dialog sends it, with the shares no ISA has, belonging
-// to the first owner, and as the household holds it once written.
+// to the first owner, and as the household holds it once written, its
+// balance dated the day the tests run on.
 const values = {
   balance: 4000,
   balloon: 0,
@@ -64,6 +61,7 @@ const lifetime = {
   kind: "tax-free",
   name: "Lifetime ISA",
   owner: 1,
+  setOn: "2026-09-15",
 } as const;
 
 // A debt as the dialog sends it: £5,000 owed at 22%, paying nothing yet.
@@ -91,13 +89,15 @@ const outright = {
 // The records the house is held as, given the ids a new one takes: the
 // house, the loan owing £341,810 secured on it, and the line of its
 // payments, kept open-ended, since the household works out when they end
-// from the loan whenever it is read.
+// from the loan whenever it is read, the house and the loan dated the
+// day the tests run on.
 const home = {
   balance: 416386,
   growth: { kind: "fixed", rate: 0.021 },
   id: 6,
   kind: "house",
   name: "Home",
+  setOn: "2026-09-15",
 } as const;
 
 const mortgage = {
@@ -108,6 +108,7 @@ const mortgage = {
   kind: "debt",
   name: "Home mortgage",
   secures: 6,
+  setOn: "2026-09-15",
 } as const;
 
 const payments = {
@@ -128,9 +129,13 @@ const payments = {
 
 // A Golf as the dialog would send it: worth £18,000 losing 15% a year,
 // £14,000 owed at 7.9% on a PCP paying £290 a month towards a £6,000
-// balloon; and the records it is held as, its payments open-ended as
-// the house's are.
+// balloon; and the records it is held as, dated as the house's are,
+// its payments open-ended as the house's are.
 const golf = { ...golfValues, name: " Golf " };
+
+const car = { ...owned, setOn: "2026-09-15" };
+
+const finance = { ...golfPcp, setOn: "2026-09-15" };
 
 const carPayments = {
   amount: 290,
@@ -214,6 +219,52 @@ describe("the account actions", () => {
         ],
         next: 6,
       });
+    });
+
+    // The ISA was last set at the end of August. A save that leaves its
+    // balance keeps that day, one that sets it dates it today, and the
+    // current account, never dated, stays undated while its balance is
+    // left as it was.
+    it("dates a balance the day it is set, and keeps the day a save leaves it", async () => {
+      await keepAfter(db, 1, {
+        ...kept,
+        accounts: kept.accounts.map((account) =>
+          account.id === 2 ? { ...account, setOn: "2026-08-31" } : account,
+        ),
+      });
+      const isa = {
+        ...values,
+        balance: 286145,
+        cadence: "year",
+        contribution: 20000,
+        growth: "plan",
+        name: "ISA",
+      } as const;
+      const cash = {
+        ...values,
+        balance: 18300,
+        contribution: 0,
+        kind: "cash",
+        name: "Cash",
+        owner: null,
+        rate: 0,
+      } as const;
+
+      expect(await saveAccount(2, isa)).toMatchObject(
+        saved({ name: "ISA", setOn: "2026-08-31" }),
+      );
+      expect(await saveAccount(3, cash)).toStrictEqual(
+        saved({
+          balance: 18300,
+          growth: { kind: "fixed", rate: 0 },
+          id: 3,
+          kind: "cash",
+          name: "Cash",
+        }),
+      );
+      expect(await saveAccount(2, { ...isa, balance: 290000 })).toMatchObject(
+        saved({ balance: 290000, setOn: "2026-09-15" }),
+      );
     });
 
     it("refuses to make a pension a salary feeds anything else, and writes nothing", async () => {
@@ -405,6 +456,7 @@ describe("the account actions", () => {
           id: 6,
           kind: "cash",
           name: "Lifetime ISA",
+          setOn: "2026-09-15",
         }),
       );
     });

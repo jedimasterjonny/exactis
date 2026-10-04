@@ -15,6 +15,7 @@ import { timed } from "@/data/milestones";
 import { lineValues, named, pounds, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { endsAfterItStarts } from "@/lib/lines";
+import { today } from "@/lib/months";
 import { removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
@@ -120,9 +121,10 @@ export async function saveExpenseLine(
 // value the form could not have sent fails loudly. The pension a line
 // feeds by id is held by the household to be one it lists. A pension
 // the line opens is added as the account it is, given the household's
-// next id, and the line feeds it by that id, so the pension appears
-// among the accounts with no more asked of the form, and the two land
-// together or not at all.
+// next id, its balance dated today as every new account's is, and the
+// line feeds it by that id, so the pension appears among the accounts
+// with no more asked of the form, and the two land together or not at
+// all.
 export async function saveIncomeLine(
   id: null | number,
   draft: IncomeLineDraft,
@@ -133,7 +135,9 @@ export async function saveIncomeLine(
   return amend((held) => {
     const { kept } = held;
     const pension =
-      opens === null ? null : toAccount(toPension(opens), kept.next);
+      opens === null
+        ? null
+        : { ...toAccount(toPension(opens), kept.next), setOn: today() };
     const {
       next,
       records,
