@@ -11,7 +11,7 @@ import { incomeLines } from "@/data/income.fixture";
 
 import type { CashFlow, Schedule } from "./cash-flow";
 
-import { cashFlow, inTodaysMoney } from "./cash-flow";
+import { cashFlow, inTodaysMoney, totalsOf } from "./cash-flow";
 
 // The fixture's lines, each fixed in nominal terms, so it pays what it
 // states in every month whatever prices do and every figure below is
@@ -1667,5 +1667,57 @@ describe("inTodaysMoney", () => {
     ]) {
       expect(is).toBeCloseTo((was ?? Number.NaN) / 1.03, 9);
     }
+  });
+});
+
+describe("totalsOf", () => {
+  // In January 2026 the salary's £12,000 comes in. £1,200 of it is
+  // sacrificed into the pension, £3,710.25 of income tax and £383.55 of
+  // NI go on the rest, the household's £3,350 goes out and the mortgage
+  // takes its £2,180 whole, being owed, and the pension the £1,176.20
+  // left of its fixed sum: £9,623.80 out for good and £2,376.20 put by,
+  // which is all £12,000, with nothing drawn.
+  it("sums a month into what came in, went out, was put by and was drawn", () => {
+    const flow = cashFlow(
+      [pension, spareIsa, spareCash, mortgage],
+      { expenses: [household], income: [salary] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+    const totals = totalsOf(flow);
+
+    expect(totals.income).toBe(12000);
+    expect(totals.out).toBeCloseTo(9623.8, 2);
+    expect(totals.saved).toBeCloseTo(2376.2, 2);
+    expect(totals.drawn).toBe(0);
+  });
+
+  // A month that takes nothing, as one with no account, counts what is
+  // left as gone, since the plan takes it as spent, and one short draws
+  // what it is short by: the retirement living's £4,833.33 with nothing
+  // in.
+  it("counts what no saving takes as out, and what the month is short by as drawn", () => {
+    const left = totalsOf(
+      cashFlow(
+        [],
+        { expenses: [], income: [plain] },
+        { at: { month: 0, year: 2026 }, plan },
+      ),
+    );
+    const short = totalsOf(
+      cashFlow(
+        [],
+        { expenses: [retirement], income: [] },
+        { at: { month: 0, year: 2053 }, plan },
+      ),
+    );
+
+    expect(left.out).toBe(left.income);
+    expect(left.saved).toBe(0);
+    expect(short).toStrictEqual({
+      drawn: 58000 / 12,
+      income: 0,
+      out: 58000 / 12,
+      saved: 0,
+    });
   });
 });

@@ -100,6 +100,20 @@ export interface Take extends Paid {
   readonly cap: null | number;
 }
 
+// A month's money in four sums, as the plan screen's year book reads it:
+// what came in; what went out for good, which is the income tax and the
+// NI, the expenses, a debt's own fixed sum, and whatever no saving took,
+// since the plan takes that as spent; what was put by, a salary's
+// sacrifice, a saving's fixed sum and its take of the spare money; and
+// what the month was short by, which the projection draws from the
+// savings. What came in and was drawn is what went out and was put by.
+export interface Totals {
+  readonly drawn: number;
+  readonly income: number;
+  readonly out: number;
+  readonly saved: number;
+}
+
 // What the payments out of the month are held to as they are made:
 // what is left of each allowance, in what lands, and what is left of
 // each owner's relief, in what lands with it, which opens at what the
@@ -491,6 +505,29 @@ export function inTodaysMoney(
 
 // The account a link names, or none, since a link may name an account
 // the plan does not list and is sound when it does.
+// A month's money in the four sums the year book lays out: see Totals.
+// A debt's fixed sum is told from a saving's by the account it pays. The
+// relief a pension claims lands on top of what the month paid it, and
+// is no money the month had, so it is in none of them.
+export function totalsOf(flow: CashFlow): Totals {
+  const debts = flow.fixed.filter(({ account }) => account.kind === "debt");
+  const savings = flow.fixed.filter(({ account }) => account.kind !== "debt");
+  return {
+    drawn: Math.max(0, -flow.left),
+    income: flow.income,
+    out:
+      flow.incomeTax +
+      flow.insurance +
+      flow.expenses +
+      total(debts) +
+      Math.max(0, flow.left),
+    saved:
+      flow.fed.reduce((sum, entry) => sum + entry.sacrificed, 0) +
+      total(savings) +
+      total(flow.spare),
+  };
+}
+
 function accountAt(
   accounts: readonly Account[],
   id: null | number | undefined,

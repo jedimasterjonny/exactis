@@ -10,7 +10,7 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
-import { slider } from "@/test/dom";
+import { bySlot } from "@/test/dom";
 
 import { CashFlowCard } from "./cash-flow-card";
 
@@ -30,7 +30,8 @@ const salary = flat(incomeLines[0]);
 // £3,356.20: the mortgage is paid its £2,180 whole and first, being
 // owed, the pension the £1,176.20 left of its £2,376, which lands as
 // £1,470.25 with the basic rate claimed back on it, and the ISA and the
-// current account nothing.
+// current account nothing. So £9,623.80 goes out for good and
+// £2,376.20 is put by.
 const spareIsa: Account = {
   ...isa,
   contribution: { cap: null, kind: "spare" },
@@ -48,17 +49,36 @@ const schedule: Schedule = {
   income: kept.schedule.income.map(flat),
 };
 
+const spent =
+  "What no saving takes is left in the month, which the plan takes as spent.";
+
+const drawn =
+  "What the month is short by is drawn from the savings, cash first.";
+
+// A year chosen along the strip.
+function choose(at: number): void {
+  fireEvent.change(year(), { target: { value: String(at) } });
+}
+
 // A line as it is, fixed in nominal terms.
 function flat<TLine extends LineValues>(line: TLine): TLine {
   return { ...line, growth: "nominal" };
 }
 
-function rows(): string[] {
+// The chosen year's month, a line of its ledger apiece.
+function ledger(): string[] {
   return screen.getAllByRole("listitem").map((row) => row.textContent);
 }
 
+// The strip's slider, whose value is the year chosen.
+function year(): HTMLElement {
+  return screen.getByRole("slider", { hidden: true, name: "Year" });
+}
+
 describe("CashFlowCard", () => {
-  it("opens on the plan's first year and lays the month out as a ledger", () => {
+  // The month now puts £1,200 by as the salary's sacrifice and £1,176.20
+  // as the pension's fixed sum, £2,376.20 in all.
+  it("opens on the plan's first year, its figure beside the strip and its month as a ledger", () => {
     render(
       <CashFlowCard
         accounts={held}
@@ -69,22 +89,24 @@ describe("CashFlowCard", () => {
     );
 
     expect(screen.getByText("Sect. III.iv")).toHaveClass("label");
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "Cash flow each month",
-    );
     expect(
-      screen.getByRole("region", { name: "Cash flow each month" }),
+      screen.getByRole("heading", { level: 2, name: "Year by year" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Year by year" }),
+    ).toBeInTheDocument();
+    expect(year()).toHaveValue("2026");
+    expect(year()).toHaveAttribute(
+      "aria-valuetext",
+      "2026, age 34: £2,376 a month put by",
+    );
+    expect(screen.getByText("£2,376 / mo")).toHaveClass("figure");
+    expect(screen.getByText("put by")).toHaveClass("text-muted-foreground");
+    expect(screen.getByText("Age 34")).toHaveClass("label");
     expect(
       screen.getByText("September 2026, age 34, in today's money"),
-    ).toBeInTheDocument();
-    expect(slider("Year")).toHaveValue("2026");
-    expect(slider("Year")).toHaveAttribute("min", "2026");
-    expect(slider("Year")).toHaveAttribute("max", "2083");
-    expect(slider("Year")).toHaveAccessibleDescription(
-      "2026 to 2083, the years of the plan",
-    );
-    expect(rows()).toStrictEqual([
+    ).toHaveAttribute("aria-live", "polite");
+    expect(ledger()).toStrictEqual([
       "Income£12,000",
       "Workplace pensionSalary sacrifice from Salary, paid in as £1,380 with the NI saved−£1,200",
       "Income tax−£3,710",
@@ -93,30 +115,18 @@ describe("CashFlowCard", () => {
       "MortgageA fixed sum−£2,180",
       "Workplace pensionA fixed sum, paid in as £1,470 with basic-rate relief−£1,176",
       "Paid nothing this monthStocks & shares ISA and Current account£0",
-      "Left overWhat no saving takes is left in the month, which the plan takes as spent.£0",
+      `Left over${spent}£0`,
     ]);
-    expect(screen.getByText("£12,000")).toHaveClass("figure");
     expect(screen.getByText("Income")).not.toHaveClass("font-medium");
     expect(screen.getByText(/^Salary sacrifice from Salary/)).toHaveClass(
       "text-muted-foreground",
     );
-    expect(screen.getByText("A fixed sum")).toHaveClass(
-      "text-muted-foreground",
-    );
   });
 
-  // A year on, the childcare has started and the pension is paid
-  // £1,380 less, £36.20, the mortgage still paid whole; by 2053 the salaries have ended, so nothing is
-  // sacrificed, and the consulting's £2,000 a month, £1,752.35 after
-  // £190.50 of income tax and £57.15 of NI, is £6,145.98 short of the
-  // mortgage payment and the retirement living, so the pension is paid
-  // nothing of its fixed sum, so it says nothing of relief, the ISA and
-  // the account take nothing, which the ledger says on one line, and the
-  // month is short by that £6,145.98 alone, which the savings cover. The mortgage
-  // has no row by then: its £2,180 a month cleared the £176,520 in
-  // November 2034, so the ledger stops charging it rather than writing it
-  // at nothing for the rest of the plan.
-  it("moves the year along the plan with the slider and reads that year's month", () => {
+  // The plan runs from 2026 to 2083, a column a year, ruled at the
+  // children leaving home in 2040 and the downsize in 2059, retirement
+  // falling past its end.
+  it("draws every year of the plan as a column of the strip, ruled at its milestones", () => {
     render(
       <CashFlowCard
         accounts={held}
@@ -126,57 +136,148 @@ describe("CashFlowCard", () => {
       />,
     );
 
-    fireEvent.keyDown(slider("Year"), { key: "ArrowRight" });
-
     expect(
-      screen.getByText("January 2027, age 35, in today's money"),
+      screen.getAllByText(bySlot("year-strip-year"), { suggest: false }),
+    ).toHaveLength(58);
+    expect(
+      screen.getAllByText(bySlot("year-strip-mark"), { suggest: false }),
+    ).toHaveLength(2);
+    expect(
+      screen.getByText(bySlot("span-ruler"), { suggest: false }),
     ).toBeInTheDocument();
-    expect(slider("Year")).toHaveValue("2027");
-    expect(rows()[4]).toBe("Expenses−£4,590");
-    expect(rows()[5]).toBe("MortgageA fixed sum−£2,180");
-    expect(rows()[6]).toBe(
-      "Workplace pensionA fixed sum, paid in as £106 with basic-rate relief−£85",
+  });
+
+  // The consulting's £2,000 a month in 2053 is £1,752.35 after £190.50
+  // of income tax and £57.15 of NI, which is £6,145.98 short of the
+  // mortgage payment and the retirement living, so the pension is paid
+  // nothing of its fixed sum, and nor are the ISA and the account their
+  // spare money, which the ledger says on one line, and the month is
+  // short by that £6,145.98, which the savings cover. A year on reads the
+  // same, since every line is fixed in pounds and prices are level.
+  it("reads the year chosen along the strip, and steps it a year either way", () => {
+    render(
+      <CashFlowCard
+        accounts={held}
+        milestones={milestones}
+        plan={plan}
+        schedule={schedule}
+      />,
     );
 
-    fireEvent.change(slider("Year"), { target: { value: "2053" } });
+    expect(screen.getByRole("button", { name: "Year before" })).toBeDisabled();
+
+    choose(2053);
 
     expect(
       screen.getByText("January 2053, age 61, in today's money"),
     ).toBeInTheDocument();
-    expect(rows()).toStrictEqual([
+    expect(screen.getByText("£6,146 / mo")).toBeInTheDocument();
+    expect(screen.getByText("drawn from the savings")).toBeInTheDocument();
+    expect(ledger()).toStrictEqual([
       "Income£2,000",
       "Income tax−£191",
       "National Insurance−£57",
       "Expenses−£7,898",
       "Paid nothing this monthWorkplace pension, Stocks & shares ISA and Current account£0",
-      "ShortWhat the month is short by is drawn from the savings, cash first.£6,146",
+      `Short${drawn}£6,146`,
     ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Year after" }));
+
+    expect(year()).toHaveValue("2054");
+    expect(
+      screen.getByText("January 2054, age 62, in today's money"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Year before" }));
+    fireEvent.keyDown(year(), { key: "End" });
+
+    expect(
+      screen.getByText("January 2083, age 91, in today's money"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Year after" })).toBeDisabled();
   });
 
-  // The salary alone until 2052, feeding no pension listed and so
-  // taxed whole, which leaves £7,342.20 a month, and the retirement
-  // living alone from 2053, with no account to pay: a month £4,833.33 short
-  // that nothing covers with no account at all, so the year leaves
-  // £53,167 uncovered, its £58,000 less what April settles of the
-  // salary's last tax year, and that the ISA's £271,930 covers whole.
+  // Retiring at 61, the owner retires in 2053, the children leave home in
+  // 2040 and the downsize is in 2059; a chip jumps to its milestone's
+  // year and is pressed while the year is its own.
+  it("jumps to a milestone's year from its chip, pressed while the year is its own", () => {
+    render(
+      <CashFlowCard
+        accounts={held}
+        milestones={[...milestones, { id: 3, name: "Sabbatical", year: 2053 }]}
+        plan={retiring}
+        schedule={schedule}
+      />,
+    );
+
+    const chips = within(screen.getByRole("group", { name: "Milestones" }));
+
+    expect(
+      chips.getAllByRole("button").map((chip) => chip.textContent),
+    ).toStrictEqual([
+      "Kids leave home 2040",
+      "Retirement 2053",
+      "Sabbatical 2053",
+      "Downsize 2059",
+    ]);
+    expect(
+      chips.queryByRole("button", { pressed: true }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(chips.getByRole("button", { name: /^Retirement/ }));
+
+    expect(year()).toHaveValue("2053");
+    expect(
+      screen.getByText(
+        "January 2053, age 61, in today's money · Retirement and Sabbatical",
+      ),
+    ).toBeInTheDocument();
+    expect(chips.getByRole("button", { name: /^Retirement/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  // A household listing no milestone, retiring past the plan's end, has
+  // no chip to jump to.
+  it("draws no chips for a plan with no milestone in its years", () => {
+    render(
+      <CashFlowCard
+        accounts={[]}
+        milestones={[]}
+        plan={plan}
+        schedule={{ expenses: [], income: [] }}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("group", { name: "Milestones" }),
+    ).not.toBeInTheDocument();
+  });
+
+  // The salary alone until 2052, feeding no pension listed and so taxed
+  // whole, which leaves £7,342.20 a month, and the retirement living
+  // alone from 2053: a month £4,833.33 short that nothing covers with no
+  // account at all, so the year leaves £53,167 uncovered, its £58,000
+  // less what April settles of the salary's last tax year, and that the
+  // ISA's £271,930 covers whole.
   it("weights what is left, and tones a shortfall as a loss only when the savings run out", () => {
     const flows = { expenses: [retirement], income: [salary] };
     const { unmount } = render(
       <CashFlowCard
         accounts={[]}
-        milestones={milestones}
+        milestones={[]}
         plan={plan}
         schedule={flows}
       />,
     );
 
-    const left = screen.getByText("£7,342");
-
     expect(screen.getByText("Left over")).toHaveClass("font-medium");
-    expect(left).toHaveClass("figure", "font-medium");
-    expect(left).not.toHaveClass("text-destructive");
+    expect(screen.getByText("£7,342")).toHaveClass("figure", "font-medium");
+    expect(screen.getByText("£7,342")).not.toHaveClass("text-destructive");
 
-    fireEvent.change(slider("Year"), { target: { value: "2053" } });
+    choose(2053);
 
     expect(screen.getByText("Short")).toHaveClass("font-medium");
     expect(screen.getByText("£4,833")).toHaveClass(
@@ -184,6 +285,7 @@ describe("CashFlowCard", () => {
       "font-medium",
       "text-destructive",
     );
+    expect(screen.getByText("£4,833 / mo")).toHaveClass("text-destructive");
     expect(
       screen.getByText(
         "The savings run out this year, leaving £53,167 of it uncovered.",
@@ -194,19 +296,15 @@ describe("CashFlowCard", () => {
     render(
       <CashFlowCard
         accounts={[isa]}
-        milestones={milestones}
+        milestones={[]}
         plan={plan}
         schedule={flows}
       />,
     );
-    fireEvent.change(slider("Year"), { target: { value: "2053" } });
+    choose(2053);
 
-    expect(screen.getByText("£4,833")).not.toHaveClass("text-destructive");
-    expect(
-      screen.getByText(
-        "What the month is short by is drawn from the savings, cash first.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("£4,833 / mo")).not.toHaveClass("text-destructive");
+    expect(screen.getByText(drawn)).toBeInTheDocument();
   });
 
   // The salary alone, taxed whole, leaves £7,342.20 a month: the ISA
@@ -222,10 +320,10 @@ describe("CashFlowCard", () => {
       />,
     );
 
-    expect(rows().slice(-3)).toStrictEqual([
+    expect(ledger().slice(-3)).toStrictEqual([
       "Stocks & shares ISASpare money, to £20,000 / yr−£1,667",
       "Current accountSpare money, uncapped−£5,676",
-      "Left overWhat no saving takes is left in the month, which the plan takes as spent.£0",
+      `Left over${spent}£0`,
     ]);
   });
 
@@ -235,7 +333,7 @@ describe("CashFlowCard", () => {
     render(
       <CashFlowCard
         accounts={[spareIsa]}
-        milestones={milestones}
+        milestones={[]}
         plan={plan}
         schedule={{
           expenses: [{ ...household, amount: 5, cadence: "year" }],
@@ -244,17 +342,16 @@ describe("CashFlowCard", () => {
       />,
     );
 
-    expect(rows()).toStrictEqual([
+    expect(ledger()).toStrictEqual([
       "Income£0",
       "Income tax£0",
       "National Insurance£0",
       "Expenses£0",
       "Paid nothing this monthStocks & shares ISA£0",
-      "Left overWhat no saving takes is left in the month, which the plan takes as spent.£0",
+      `Left over${spent}£0`,
     ]);
-    expect(screen.getAllByText("£0").at(-1)).not.toHaveClass(
-      "text-destructive",
-    );
+    expect(screen.getByText("£0 / mo")).toBeInTheDocument();
+    expect(screen.getByText("put by")).toBeInTheDocument();
   });
 
   // The expenses figure opens into the lines behind it, listed only while
@@ -271,38 +368,31 @@ describe("CashFlowCard", () => {
       />,
     );
 
-    const expenses = screen.getByRole("button", { name: /^Expenses/ });
-
-    expect(expenses).toHaveAttribute("aria-expanded", "false");
-    expect(
-      screen.queryByRole("region", { name: /^Expenses/ }),
-    ).not.toBeInTheDocument();
-    expect(rows()[3]).toBe("Expenses−£3,350");
-
-    fireEvent.click(expenses);
-
+    const expenses = (): HTMLElement =>
+      screen.getByRole("button", { name: /^Expenses/ });
     const lines = (): string[] =>
       within(screen.getByRole("region", { name: /^Expenses/ }))
         .getAllByRole("listitem")
         .map((row) => row.textContent);
 
-    expect(expenses).toHaveAttribute("aria-expanded", "true");
+    expect(expenses()).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("region", { name: /^Expenses/ }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(expenses());
+
+    expect(expenses()).toHaveAttribute("aria-expanded", "true");
     expect(lines()).toStrictEqual([
       "Household£3,350 / mo · Fixed in pounds · 2026–2051−£3,350",
     ]);
 
-    fireEvent.change(slider("Year"), { target: { value: "2053" } });
+    choose(2053);
 
     expect(lines()).toStrictEqual([
       "Mortgage payment£3,065 / mo · Fixed in pounds · 2040–2064−£3,065",
       "Retirement living£58,000 / yr · Fixed in pounds · 2052 on−£4,833",
     ]);
-
-    fireEvent.click(expenses);
-
-    expect(
-      screen.queryByRole("region", { name: /^Expenses/ }),
-    ).not.toBeInTheDocument();
   });
 
   // At 3% a year, prices have risen 1.03 to the power of nine and a
@@ -316,7 +406,7 @@ describe("CashFlowCard", () => {
     render(
       <CashFlowCard
         accounts={[]}
-        milestones={milestones}
+        milestones={[]}
         plan={{ ...plan, inflation: 0.03 }}
         schedule={{
           expenses: [
@@ -335,7 +425,7 @@ describe("CashFlowCard", () => {
       />,
     );
 
-    fireEvent.change(slider("Year"), { target: { value: "2040" } });
+    choose(2036);
     fireEvent.click(screen.getByRole("button", { name: /^Expenses/ }));
 
     expect(
@@ -346,7 +436,7 @@ describe("CashFlowCard", () => {
       "Household£3,350 / mo · Rises with inflation · 2026–2051−£3,350",
       "Subscription£1,000 / mo · Fixed in pounds · 2026 on−£759",
     ]);
-    expect(rows().at(-1)).toBe(
+    expect(ledger().at(-1)).toBe(
       "ShortThe savings run out this year, leaving £49,185 of it uncovered.£4,109",
     );
   });
@@ -355,60 +445,20 @@ describe("CashFlowCard", () => {
     render(
       <CashFlowCard
         accounts={[]}
-        milestones={milestones}
+        milestones={[]}
         plan={plan}
         schedule={{ expenses: [household], income: [] }}
       />,
     );
 
-    fireEvent.change(slider("Year"), { target: { value: "2052" } });
+    choose(2052);
     fireEvent.click(screen.getByRole("button", { name: /^Expenses/ }));
 
-    expect(rows()[3]).toBe("Expenses£0No expense line runs this month.");
+    expect(ledger()[3]).toBe("Expenses£0No expense line runs this month.");
     expect(
       within(screen.getByRole("region", { name: /^Expenses/ })).getByRole(
         "paragraph",
       ),
     ).toHaveClass("text-muted-foreground");
-  });
-
-  // Retiring at 61, the owner retires in 2053, and the children leave
-  // home in 2040: the caption names each milestone in the year the card
-  // is set to, and two in one year together.
-  it("names the milestones that fall in the year the card is set to", () => {
-    render(
-      <CashFlowCard
-        accounts={held}
-        milestones={[...milestones, { id: 3, name: "Sabbatical", year: 2053 }]}
-        plan={retiring}
-        schedule={schedule}
-      />,
-    );
-
-    expect(
-      screen.getByText("September 2026, age 34, in today's money"),
-    ).toBeInTheDocument();
-
-    fireEvent.keyDown(slider("Year"), { key: "End" });
-    for (let year = 2083; year > 2053; year -= 1) {
-      fireEvent.keyDown(slider("Year"), { key: "ArrowLeft" });
-    }
-
-    expect(
-      screen.getByText(
-        "January 2053, age 61, in today's money · Retirement and Sabbatical",
-      ),
-    ).toBeInTheDocument();
-
-    fireEvent.keyDown(slider("Year"), { key: "Home" });
-    for (let year = 2026; year < 2040; year += 1) {
-      fireEvent.keyDown(slider("Year"), { key: "ArrowRight" });
-    }
-
-    expect(
-      screen.getByText(
-        "January 2040, age 48, in today's money · Kids leave home",
-      ),
-    ).toBeInTheDocument();
   });
 });

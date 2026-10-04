@@ -3,15 +3,21 @@
 import type { JSX } from "react";
 
 import { cn } from "cn";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
+import type { StripYear } from "@/components/app/atoms/year-strip";
 import type { Account } from "@/data/accounts";
-import type { Milestone } from "@/data/milestones";
+import type { Marker, Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Fed, Paid, Schedule, Spent, Take } from "@/engine/cash-flow";
+import type { ProjectionPoint } from "@/engine/projection";
 
+import { MilestoneChips } from "@/components/app/atoms/milestone-chips";
+import { RowAction } from "@/components/app/atoms/row-action";
+import { SpanRuler } from "@/components/app/atoms/span-ruler";
+import { YearStrip } from "@/components/app/atoms/year-strip";
 import { SectionCard } from "@/components/app/molecules/section-card";
-import { SliderField } from "@/components/app/molecules/slider-field";
 import {
   Accordion,
   AccordionContent,
@@ -19,9 +25,9 @@ import {
   AccordionTrigger,
 } from "@/components/kit/accordion";
 import { CardContent } from "@/components/kit/card";
-import { markersOf } from "@/data/milestones";
+import { markersOf, yearsOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
-import { cashFlow, inTodaysMoney } from "@/engine/cash-flow";
+import { cashFlow, inTodaysMoney, totalsOf } from "@/engine/cash-flow";
 import { project } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { listed } from "@/lib/feeders";
@@ -29,6 +35,18 @@ import { growthLabels, spanOf } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 import { monthName } from "@/lib/months";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
+import { laneColumns } from "@/lib/span";
+
+// What every year of the book reads the plan by: the accounts and the
+// schedule the engine runs on, the plan, its milestones within its span,
+// and the projection's years, for what each leaves uncovered.
+interface Book {
+  readonly accounts: readonly Account[];
+  readonly markers: readonly Marker[];
+  readonly plan: Plan;
+  readonly points: readonly ProjectionPoint[];
+  readonly schedule: Schedule;
+}
 
 interface CashFlowCardProps {
   readonly accounts: readonly Account[];
@@ -43,6 +61,12 @@ interface FigureProps {
   readonly isTotal?: boolean;
 }
 
+interface LedgerProps {
+  readonly book: Book;
+  readonly onYear: (year: number) => void;
+  readonly year: number;
+}
+
 interface RowProps {
   readonly amount: number;
   readonly detail?: string;
@@ -52,41 +76,26 @@ interface RowProps {
 }
 
 // The plan screen's fourth card, beneath the two schedules it is read
-// from: a month of a year's money, as the engine works it out, laid out
-// as a ledger. The year is the card's own, opening on the plan's first
-// and moved along the plan's span by the slider under the title, since
-// lines start and end and overlap, so a month a decade on can leave
-// something else. The month shown is the first the plan runs in that
-// year, the month the plan starts in for its first year and January
-// after, and the title names it, since a line may end part way through
-// a year and a later month of it would leave something else again. It
-// names the milestones falling in the year too, retirement among them,
-// since a line tied to one starts or stops in its year, which makes a
-// month then one worth reading. The
-// card runs the engine itself, which is pure and cheap, rather than
-// asking the page for every year. The income comes
-// in, as it is earned, then what a salary sacrifices into its pension
-// comes off it, under the pension's name with the salary it is fed
-// from and what lands with the NI saved, then the income tax and the
-// National Insurance on what is left of it, then the expenses and every
-// account paid go out, each account under its name with how it is
-// paid, and a pension with what lands once the basic rate is claimed
-// back on it, the accounts the month pays nothing named together on one
-// line rather than a column of nothings burying the ones it pays, and
-// what is left closes the list. A month that does not
-// cover its outgoings closes on what it is short by instead, in the
-// words the accounts screen's payment order uses, since the projection
-// draws that from the savings; only a year the savings run out in,
-// which the projection says it leaves uncovered, is in the loss tone
-// and says so, since a shortfall the savings meet is the plan working
-// rather than failing. The
-// expenses figure opens into the lines behind it, each under its name
-// with what it is paid at and the years it runs, since a sum over a
-// schedule that starts and ends line by line is a question as often as
-// an answer. Every figure is read in today's money, as the engine gives
-// it for the month once prices have risen by then, so a line rising
-// with inflation reads at what it states whichever year is shown. The
-// card takes the next numeral off the screen's after the expense card's.
+// from: the plan year by year, as one strip on the span the lines above
+// are laid on, ruled in decades as their span is. Each year is a column
+// of what a month of it puts by, rising from a rule, or draws from the
+// savings, hanging beneath it, as the engine works them out in today's
+// money, so the plan's shape is seen at once: the years saving, the year
+// the savings start paying the month, and how the sums move between,
+// gently as payments fixed in pounds shrink and in a step as a line
+// starts or stops. A year the projection runs out of savings in draws in
+// the loss tone, since only then is a draw a failure rather than the
+// plan spending what it saved. The strip is the slider that chooses a
+// year, opening on the plan's first, and the chosen year's figure and
+// age stand beside it in the lanes' columns, with the milestones as
+// chips beneath that jump to their years, since on a phone a year is a
+// few pixels wide. Beneath them all is the chosen year's month, line by
+// line, which steps a year at a time either way. The card runs the
+// engine itself, which is pure and cheap, a month a year and the
+// projection once. While the strip is too narrow to read across, as on a
+// phone, it runs the card's width, with the year's figure beneath it.
+// The card takes the next numeral off the screen's after the expense
+// card's.
 export function CashFlowCard({
   accounts,
   milestones,
@@ -95,76 +104,79 @@ export function CashFlowCard({
 }: CashFlowCardProps): JSX.Element {
   const [year, setYear] = useState(plan.from);
   const end = endYear(plan);
-  const month = year === plan.from ? plan.month : 0;
-  const reading = { at: { month, year }, plan };
-  const flow = inTodaysMoney(cashFlow(accounts, schedule, reading), reading);
-  // The year's point carries what the projection left uncovered in it,
-  // and every year of the plan has one.
-  const uncovered = project(accounts, schedule, plan)
-    .filter((point) => point.year === year)
-    .reduce((sum, point) => sum + point.uncovered, 0);
-  const marked = markersOf(milestones, plan)
-    .filter((marker) => marker.year === year)
-    .map(({ name }) => name);
-  const unpaid = [...flow.fixed, ...flow.spare].filter((paid) => !isPaid(paid));
+  const markers = markersOf(milestones, plan).filter(
+    (marker) => marker.year >= plan.from && marker.year <= end,
+  );
+  const book: Book = {
+    accounts,
+    markers,
+    plan,
+    points: project(accounts, schedule, plan),
+    schedule,
+  };
+  const chosen = yearOf(year, book);
+  const net = netOf(chosen);
   return (
     <SectionCard
-      caption={[
-        `${monthName(month, "long")} ${String(year)}, age ${String(ageIn(year, plan))}, in today's money`,
-        ...(marked.length === 0 ? [] : [listed.format(marked)]),
-      ].join(" · ")}
-      controls={
-        <SliderField
-          hint={`${String(plan.from)} to ${String(end)}, the years of the plan`}
-          label="Year"
-          max={end}
-          min={plan.from}
-          onValueChange={setYear}
-          value={year}
-        />
-      }
+      caption="What a month of each year puts by, rising from the rule, or draws from the savings, hanging beneath it, in today's money, on the span the lines above are laid on. Drag along it, choose a milestone or step a year at a time to read the month line by line."
       label={subsectionLabel(planScreen, 4)}
-      title="Cash flow each month"
+      title="Year by year"
     >
-      <CardContent>
-        <ul className="divide-y">
-          <Row amount={flow.income} label="Income" />
-          {flow.fed.map((fed) => (
-            <Row
-              amount={-fed.sacrificed}
-              detail={describeFed(fed)}
-              key={`fed-${String(fed.line.id)}`}
-              label={fed.account.name}
+      <CardContent className="@container grid gap-4">
+        <div
+          className={cn("grid gap-x-4 gap-y-1 folded:grid-cols-1", laneColumns)}
+        >
+          <SpanRuler plan={plan} />
+          <span className="col-start-1">
+            <YearStrip
+              label="Year"
+              marks={yearsOf(markers)}
+              onValueChange={setYear}
+              plan={plan}
+              value={year}
+              valueText={(at) => {
+                const { name, sum } = netOf(yearOf(at, book));
+                return `${String(at)}, age ${String(ageIn(at, plan))}: ${formatGbp(sum)} a month ${name}`;
+              }}
+              years={Array.from({ length: end - plan.from + 1 }, (_, offset) =>
+                yearOf(plan.from + offset, book),
+              )}
             />
-          ))}
-          <Row amount={-flow.incomeTax} label="Income tax" />
-          <Row amount={-flow.insurance} label="National Insurance" />
-          <Expenses amount={flow.expenses} spent={flow.spent} />
-          {flow.fixed.filter(isPaid).map((paid) => (
-            <Row
-              amount={-paid.amount}
-              detail={relieved("A fixed sum", paid, flow.relief)}
-              key={paid.account.id}
-              label={paid.account.name}
-            />
-          ))}
-          {flow.spare.filter(isPaid).map((take) => (
-            <Row
-              amount={-take.amount}
-              detail={relieved(describeTake(take), take, flow.relief)}
-              key={take.account.id}
-              label={take.account.name}
-            />
-          ))}
-          {unpaid.length > 0 && (
-            <Row
-              amount={0}
-              detail={listed.format(unpaid.map(({ account }) => account.name))}
-              label="Paid nothing this month"
-            />
-          )}
-          <Closing left={flow.left} uncovered={uncovered} />
-        </ul>
+          </span>
+          <span className="flex items-baseline justify-between gap-3 self-center unfolded:contents">
+            <span className="grid gap-0.5 self-center unfolded:text-right">
+              <span
+                className={cn(
+                  "figure font-medium",
+                  chosen.isShort && !isZero(chosen.drawn) && "text-destructive",
+                )}
+              >
+                {`${formatGbp(net.sum)} / mo`}
+              </span>
+              <span className="text-xs text-muted-foreground">{net.name}</span>
+            </span>
+            <span className="grid gap-0.5 self-center text-right">
+              <span className="figure">{year}</span>
+              <span className="label text-muted-foreground/60">
+                {`Age ${String(ageIn(year, plan))}`}
+              </span>
+            </span>
+          </span>
+        </div>
+        {markers.length > 0 && (
+          <MilestoneChips
+            markers={markers}
+            onSelect={(tie) => {
+              for (const marker of markers) {
+                if (marker.id === tie) {
+                  setYear(marker.year);
+                }
+              }
+            }}
+            selected={markers.find((marker) => marker.year === year)?.id}
+          />
+        )}
+        <MonthLedger book={book} onYear={setYear} year={year} />
       </CardContent>
     </SectionCard>
   );
@@ -309,6 +321,118 @@ function isZero(amount: number): boolean {
   return Math.round(amount) === 0;
 }
 
+// A year's month laid out as a ledger, line by line: the month and the
+// age, and the milestones falling in its year, then the income coming
+// in, then what a salary sacrifices into its pension, under the
+// pension's name with the salary it is fed from and what lands with the
+// NI saved, then the income tax and the National Insurance on what is
+// left of it, then the expenses, opening into the lines behind them, and
+// every account paid, each under its name with how it is paid and a
+// pension with what lands once the basic rate is claimed back on it, the
+// accounts the month pays nothing named together on one line rather
+// than a column of nothings burying the ones it pays, and what is left
+// or short closing the list. The month is the first the
+// plan runs in the year, the month the plan starts in for its first year
+// and January after, and the year steps either way across the plan, as
+// the strip does. Every figure is in today's money. The month is said
+// aloud as it steps.
+function MonthLedger({ book, onYear, year }: LedgerProps): JSX.Element {
+  const { accounts, markers, plan, points, schedule } = book;
+  const month = year === plan.from ? plan.month : 0;
+  const reading = { at: { month, year }, plan };
+  const flow = inTodaysMoney(cashFlow(accounts, schedule, reading), reading);
+  const marked = markers
+    .filter((marker) => marker.year === year)
+    .map(({ name }) => name);
+  const unpaid = [...flow.fixed, ...flow.spare].filter((paid) => !isPaid(paid));
+  return (
+    <div className="grid gap-3 rounded-md bg-muted/50 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <span aria-live="polite" className="text-sm text-muted-foreground">
+          {[
+            `${monthName(month, "long")} ${String(year)}, age ${String(ageIn(year, plan))}, in today's money`,
+            ...(marked.length === 0 ? [] : [listed.format(marked)]),
+          ].join(" · ")}
+        </span>
+        <span className="flex shrink-0 gap-1">
+          <RowAction
+            disabled={year === plan.from}
+            icon={ChevronLeft}
+            name="Year before"
+            onClick={() => {
+              onYear(year - 1);
+            }}
+          />
+          <RowAction
+            disabled={year === endYear(plan)}
+            icon={ChevronRight}
+            name="Year after"
+            onClick={() => {
+              onYear(year + 1);
+            }}
+          />
+        </span>
+      </div>
+      <ul className="divide-y">
+        <Row amount={flow.income} label="Income" />
+        {flow.fed.map((fed) => (
+          <Row
+            amount={-fed.sacrificed}
+            detail={describeFed(fed)}
+            key={`fed-${String(fed.line.id)}`}
+            label={fed.account.name}
+          />
+        ))}
+        <Row amount={-flow.incomeTax} label="Income tax" />
+        <Row amount={-flow.insurance} label="National Insurance" />
+        <Expenses amount={flow.expenses} spent={flow.spent} />
+        {flow.fixed.filter(isPaid).map((paid) => (
+          <Row
+            amount={-paid.amount}
+            detail={relieved("A fixed sum", paid, flow.relief)}
+            key={paid.account.id}
+            label={paid.account.name}
+          />
+        ))}
+        {flow.spare.filter(isPaid).map((take) => (
+          <Row
+            amount={-take.amount}
+            detail={relieved(describeTake(take), take, flow.relief)}
+            key={take.account.id}
+            label={take.account.name}
+          />
+        ))}
+        {unpaid.length > 0 && (
+          <Row
+            amount={0}
+            detail={listed.format(unpaid.map(({ account }) => account.name))}
+            label="Paid nothing this month"
+          />
+        )}
+        <Closing
+          left={flow.left}
+          uncovered={points
+            .filter((point) => point.year === year)
+            .reduce((sum, point) => sum + point.uncovered, 0)}
+        />
+      </ul>
+    </div>
+  );
+}
+
+// What a year's month comes to, as one figure: what it draws from the
+// savings when it draws anything, which a month short does, and
+// otherwise what it puts by. A draw of less than a pound is none, as the
+// ledger writes it.
+function netOf({ drawn, saved }: StripYear): {
+  readonly name: string;
+  readonly sum: number;
+} {
+  return isZero(drawn)
+    ? { name: "put by", sum: saved }
+    : { name: "drawn from the savings", sum: drawn };
+}
+
 // How an account is paid, and for a pension what lands in it once the
 // basic rate is claimed back on what the month paid, "A fixed sum, paid
 // in as £1,000 with basic-rate relief", which is more than comes off
@@ -350,4 +474,24 @@ function Row({
       <Figure amount={amount} isLoss={isLoss} isTotal={isTotal} />
     </li>
   );
+}
+
+// A year as the strip draws it, from a month of it, the first the plan
+// runs in the year, in today's money, and whether the projection runs
+// out of savings in it.
+function yearOf(
+  year: number,
+  { accounts, plan, points, schedule }: Book,
+): StripYear {
+  const month = year === plan.from ? plan.month : 0;
+  const reading = { at: { month, year }, plan };
+  const { drawn, saved } = totalsOf(
+    inTodaysMoney(cashFlow(accounts, schedule, reading), reading),
+  );
+  return {
+    drawn,
+    isShort: points.some((point) => point.year === year && point.uncovered > 0),
+    saved,
+    year,
+  };
 }
