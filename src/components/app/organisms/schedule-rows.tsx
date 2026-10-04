@@ -14,6 +14,7 @@ import { RowLock } from "@/components/app/atoms/row-lock";
 import { RowOpener } from "@/components/app/atoms/row-opener";
 import { SpanBar } from "@/components/app/atoms/span-bar";
 import { Badge } from "@/components/kit/badge";
+import { yearsOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { counted } from "@/lib/count";
@@ -71,7 +72,8 @@ const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
 // placing the line on the plan's span; what the line pays at its cadence
 // over what it grows with; the years it runs over the ages reached, to
 // the month when it ends part way through a year and an open-ended line
-// running to the end; and a chevron saying the row opens. The row opens
+// running to the end, the milestones ruled across every bar; and a
+// chevron saying the row opens. The row opens
 // from anywhere on it, its name the button that reports the line, whose
 // id says where a save writes back, as an account's row does on the
 // accounts screen, and the dialog it opens is where it is deleted from.
@@ -141,6 +143,7 @@ export function ScheduleRows<TLine extends Line>({
             firstYear={paid.firstYear}
             lastMonth={paid.lastMonth}
             lastYear={paid.lastYear}
+            marks={yearsOf(milestones)}
             plan={plan}
             side={side}
             startsAt={paid.startsAt}

@@ -32,6 +32,24 @@ describe("PinBar", () => {
     expect(screen.getByText(bySlot("pin-bar-pin"))).toHaveClass("bg-brand");
   });
 
+  it("rules the other milestones' years across the track, and none unless given", () => {
+    const { rerender } = render(
+      <PinBar marks={[2036, 2046]} plan={plan} year={2036} />,
+    );
+
+    expect(
+      screen
+        .getAllByText(bySlot("pin-bar-mark"), { suggest: false })
+        .map((mark) => mark.style.left),
+    ).toStrictEqual(["25%", "50%"]);
+
+    rerender(<PinBar plan={plan} year={2036} />);
+
+    expect(
+      screen.queryByText(bySlot("pin-bar-mark"), { suggest: false }),
+    ).not.toBeInTheDocument();
+  });
+
   it("holds a year outside the span to its edge", () => {
     const { rerender } = render(<PinBar plan={plan} year={2000} />);
 
