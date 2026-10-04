@@ -3,7 +3,7 @@
 import type { JSX, SubmitEvent } from "react";
 
 import { cn } from "cn";
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import type { Marker, Milestone, MilestoneValues } from "@/data/milestones";
@@ -17,8 +17,8 @@ import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { PinBar } from "@/components/app/atoms/pin-bar";
 import { RowLock } from "@/components/app/atoms/row-lock";
+import { RowOpener } from "@/components/app/atoms/row-opener";
 import { YearField } from "@/components/app/molecules/figure-field";
-import { RowActions } from "@/components/app/molecules/row-actions";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { TextField } from "@/components/app/molecules/text-field";
 import { Button } from "@/components/kit/button";
@@ -55,13 +55,12 @@ interface MilestoneRowProps {
   readonly lines: readonly LineValues[];
   readonly marker: Marker;
   readonly milestone: Milestone | undefined;
-  readonly onDelete: (milestone: Milestone) => void;
   readonly onEdit: (milestone: Milestone) => void;
   readonly plan: Plan;
 }
 
-// Why retirement's row has no pencil or bin: it is set on another
-// screen, and moves when it is.
+// Why retirement's row opens nothing: it is set on another screen, and
+// moves when it is.
 const retirementLock = "Set by the retirement age on the dashboard";
 
 // The plan screen's first card: the years the plan turns on, retirement
@@ -82,17 +81,18 @@ const retirementLock = "Set by the retirement age on the dashboard";
 // retirement's, so there is no empty state.
 // A milestone is a name and a year, too little to open a dialog for, so
 // it is added and edited where it is listed: the card's button opens a
-// new one at the foot of the list, and a row's pencil turns the row into
-// its two fields, as does a tap anywhere on a folded row, which has no
-// room for a pencil. Save or Enter keeps it, Cancel or Escape leaves it
-// as it was, and one row is edited at a time, so opening another drops
-// the first. The entry is the editor every dialog is driven by, since
-// only where the fields are drawn differs. A row's bin asks through the
-// confirm dialog before the milestone goes, and the row being edited
-// offers a Delete that asks the same, which is where a folded row is
-// deleted from, and the question says what becomes of the lines tied to
-// it, which keep the years it gives them now. Retirement draws a lock in
-// place of both, since it is set on the dashboard, as the caption says.
+// new one at the foot of the list, and a press anywhere on a row turns
+// it into its two fields, its name the button and a chevron at its end
+// saying so, as a schedule's row opens its dialog. Save or Enter keeps
+// it, Cancel or Escape leaves it as it was, and one row is edited at a
+// time, so opening another drops the first. The entry is the editor
+// every dialog is driven by, since only where the fields are drawn
+// differs. The row being edited offers a Delete, which is where a
+// milestone is deleted from: it asks through the confirm dialog before
+// the milestone goes, and the question says what becomes of the lines
+// tied to it, which keep the years it gives them now. Retirement draws
+// a lock in place of the chevron and opens nothing, since it is set on
+// the dashboard, as the caption says.
 // While the list is too narrow to read across, as on a phone, each row
 // folds into lines, as a schedule's does: the name and the year on the
 // first, then the lines tied to it, then the pin, then the age.
@@ -125,9 +125,8 @@ export function MilestoneList({
   // row it edits, keyed as the row is, or at the foot of the list for a
   // new one. A row's key is the same while it is drawn and while it is
   // edited, but not the same kind of thing, so each opening mounts the
-  // fields fresh. The Delete it offers for a saved milestone asks as the
-  // row's bin does, once the form has closed, so the question stands
-  // alone.
+  // fields fresh. The Delete it offers for a saved milestone asks once
+  // the form has closed, so the question stands alone.
   function formFor(
     current: Entry<MilestoneValues>,
     key: "new" | Marker["id"],
@@ -195,7 +194,6 @@ export function MilestoneList({
                   lines={paid}
                   marker={marker}
                   milestone={milestone}
-                  onDelete={ask}
                   onEdit={edit}
                   plan={plan}
                 />
@@ -352,14 +350,13 @@ function MilestoneForm({
 // A milestone's row as it is listed, drawn in its columns and again in
 // its folded lines, only one of which is shown at any width, and saying
 // beside its name which lines end and start at it. A saved milestone
-// ends with its pencil and bin, and opens from anywhere on its folded
-// lines; retirement draws its lock in both places instead, and opens
+// opens from anywhere on it, either way, with a chevron at its end;
+// retirement draws its lock in the chevron's place instead, and opens
 // nothing.
 function MilestoneRow({
   lines,
   marker,
   milestone,
-  onDelete,
   onEdit,
   plan,
 }: MilestoneRowProps): JSX.Element {
@@ -367,6 +364,12 @@ function MilestoneRow({
   const detail = tiesAt(marker, lines);
   const lock =
     milestone === undefined ? <RowLock reason={retirementLock} /> : undefined;
+  const open =
+    milestone === undefined
+      ? undefined
+      : (): void => {
+          onEdit(milestone);
+        };
   const bar = <PinBar plan={plan} year={marker.year} />;
   return (
     <li
@@ -380,13 +383,7 @@ function MilestoneRow({
           figure={String(marker.year)}
           lock={lock}
           name={marker.name}
-          onOpen={
-            milestone === undefined
-              ? undefined
-              : (): void => {
-                  onEdit(milestone);
-                }
-          }
+          onOpen={open}
         >
           {detail !== undefined && <span>{detail}</span>}
           <div className="pointer-events-none my-1">{bar}</div>
@@ -395,31 +392,26 @@ function MilestoneRow({
       </div>
       <div className="grid min-w-0 gap-2 folded:hidden">
         <div className="flex flex-wrap items-baseline gap-2">
-          <span className="font-medium">{marker.name}</span>
+          {open === undefined ? (
+            <span className="font-medium">{marker.name}</span>
+          ) : (
+            <RowOpener onOpen={open}>{marker.name}</RowOpener>
+          )}
           {detail !== undefined && (
             <span className="text-xs text-muted-foreground">{detail}</span>
           )}
         </div>
-        {bar}
+        <div className="pointer-events-none">{bar}</div>
       </div>
       <div className="col-start-3 grid gap-0.5 text-right folded:hidden">
         <span className="figure">{marker.year}</span>
         <span className="label text-muted-foreground/60">{age}</span>
       </div>
-      <div className="folded:hidden">
-        {milestone === undefined ? (
-          <span className="inline-flex size-7 items-center justify-center">
-            {lock}
-          </span>
-        ) : (
-          <RowActions
-            name={milestone.name}
-            onDelete={onDelete}
-            onEdit={onEdit}
-            row={milestone}
-          />
+      <span className="inline-flex size-7 items-center justify-center folded:hidden">
+        {lock ?? (
+          <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
         )}
-      </div>
+      </span>
     </li>
   );
 }

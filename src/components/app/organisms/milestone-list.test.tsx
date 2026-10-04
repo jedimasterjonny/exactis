@@ -18,7 +18,7 @@ import { incomeLines, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { refused, saved } from "@/lib/answer";
 import { laneColumns } from "@/lib/span";
-import { bySlot, commit } from "@/test/dom";
+import { bySlot, commit, pressRow } from "@/test/dom";
 
 import { MilestoneList } from "./milestone-list";
 
@@ -112,19 +112,16 @@ describe("MilestoneList", () => {
     }
   });
 
-  // Retirement is set on the dashboard, so its row draws a lock in its
-  // actions column and on its folded lines, where a milestone the
-  // household lists has a pencil and a bin, and opens from its folded
-  // name.
-  it("gives each listed milestone a pencil and a bin, and retirement a lock in their place", () => {
+  // A milestone the household lists opens from its name, in its columns
+  // and on its folded lines, with a chevron at the row's end. Retirement
+  // is set on the dashboard, so its row draws a lock in the chevron's
+  // place, in both, and opens nothing.
+  it("opens each listed milestone from its name, and gives retirement a lock in its chevron's place", () => {
     renderList();
 
-    expect(screen.getAllByRole("button", { name: /^Edit / })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Downsize" })).toHaveLength(2);
     expect(
-      screen.getByRole("button", { name: "Delete Downsize" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Edit Retirement" }),
+      screen.queryByRole("button", { name: /^(Edit|Delete) / }),
     ).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("img", {
@@ -229,7 +226,7 @@ describe("MilestoneList", () => {
       saved({ ...downsize, year: 2057 }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Downsize" }));
+    pressRow("Downsize");
 
     const form = screen.getByRole("form", { name: "Edit milestone" });
     const year = within(form).getByRole("textbox", { name: "Year" });
@@ -258,37 +255,37 @@ describe("MilestoneList", () => {
     ).toHaveAccessibleDescription("Downsize · 2057");
   });
 
-  it("opens a folded row from its name, one row at a time", () => {
+  it("opens a row from its name, one row at a time", () => {
     renderList();
 
-    fireEvent.click(screen.getByRole("button", { name: "Kids leave home" }));
+    pressRow("Kids leave home");
 
     expect(
       within(screen.getByRole("form")).getByRole("textbox", { name: "Name" }),
     ).toHaveValue("Kids leave home");
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Downsize" }));
+    pressRow("Downsize");
 
     expect(screen.getAllByRole("form")).toHaveLength(1);
     expect(
       within(screen.getByRole("form")).getByRole("textbox", { name: "Name" }),
     ).toHaveValue("Downsize");
     expect(
-      screen.getByRole("button", { name: "Edit Kids leave home" }),
-    ).toBeInTheDocument();
+      screen.getAllByRole("button", { name: "Kids leave home" }),
+    ).toHaveLength(2);
   });
 
   it("drops the row's draft on Cancel or Escape and saves nothing", () => {
     renderList();
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Downsize" }));
+    pressRow("Downsize");
     fireEvent.change(screen.getByRole("textbox", { name: "Name" }), {
       target: { value: "Move" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByRole("form")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Downsize")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Downsize" })).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Add milestone" }));
     fireEvent.keyDown(document.body, { key: "Enter" });
@@ -307,7 +304,7 @@ describe("MilestoneList", () => {
       refused("No milestone has the id"),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Downsize" }));
+    pressRow("Downsize");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -318,12 +315,13 @@ describe("MilestoneList", () => {
     expect(screen.getByRole("form")).toBeVisible();
   });
 
-  it("asks before deleting a milestone from its bin, and deletes it on confirm", async () => {
+  it("asks before deleting a milestone from its open row, and deletes it on confirm", async () => {
     renderList();
     vi.mocked(removeMilestone).mockResolvedValue(saved(undefined));
 
+    pressRow("Kids leave home");
     fireEvent.click(
-      screen.getByRole("button", { name: "Delete Kids leave home" }),
+      within(screen.getByRole("form")).getByRole("button", { name: "Delete" }),
     );
 
     const dialog = screen.getByRole("alertdialog", {
@@ -345,12 +343,12 @@ describe("MilestoneList", () => {
     ).toHaveAccessibleDescription("Kids leave home");
   });
 
-  // A folded row has no bin, so the row it opens into offers the Delete,
-  // which closes the row and asks as the bin does.
+  // The row a milestone opens into offers the Delete, which closes the
+  // row before it asks.
   it("asks from the open row's Delete, with the row closed", () => {
     renderList();
 
-    fireEvent.click(screen.getByRole("button", { name: "Downsize" }));
+    pressRow("Downsize");
     fireEvent.click(
       within(screen.getByRole("form")).getByRole("button", { name: "Delete" }),
     );
@@ -372,8 +370,9 @@ describe("MilestoneList", () => {
       income: [],
     });
 
+    pressRow("Kids leave home");
     fireEvent.click(
-      screen.getByRole("button", { name: "Delete Kids leave home" }),
+      within(screen.getByRole("form")).getByRole("button", { name: "Delete" }),
     );
 
     expect(
