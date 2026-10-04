@@ -23,11 +23,12 @@ import { formatGbp } from "@/lib/money";
 import { laneColumns } from "@/lib/span";
 
 // What a schedule says of a line that the rows cannot read off it: the
-// badge its kind takes, what it pays at its cadence, any detail to write
+// badge its kind takes, if it has one, what it pays at its cadence, any
+// detail to write
 // beside the badge, and the line as it is paid where that stops short of
 // where it says it ends, which the row draws in its place.
 export interface Summary {
-  readonly badge: { readonly label: string; readonly variant: Tone };
+  readonly badge?: { readonly label: string; readonly variant: Tone };
   readonly detail?: string;
   readonly lock?: string;
   readonly paid?: LineValues;
@@ -67,7 +68,7 @@ type Tone = "caution" | "destructive" | "secondary";
 // The icon each schedule's empty state takes.
 const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
 
-// A schedule's rows, one per line: the name and the kind's badge, with the
+// A schedule's rows, one per line: the name and any badge, with the
 // line's detail beside them when its schedule gives one, over a bar
 // placing the line on the plan's span; what the line pays at its cadence
 // over what it grows with; the years it runs over the ages reached, to
@@ -164,7 +165,11 @@ export function ScheduleRows<TLine extends Line>({
                 name={line.name}
                 onOpen={open}
               >
-                <span>{`${summary.badge.label} · ${row.growth}`}</span>
+                <span>
+                  {[summary.badge?.label, row.growth]
+                    .filter((part) => part !== undefined)
+                    .join(" · ")}
+                </span>
                 {summary.detail !== undefined && <span>{summary.detail}</span>}
                 {row.ties !== null && <Ties>{row.ties}</Ties>}
                 <div className="pointer-events-none my-1">{bar}</div>
@@ -178,9 +183,14 @@ export function ScheduleRows<TLine extends Line>({
                 ) : (
                   <RowOpener onOpen={open}>{line.name}</RowOpener>
                 )}
-                <Badge className="self-center" variant={summary.badge.variant}>
-                  {summary.badge.label}
-                </Badge>
+                {summary.badge !== undefined && (
+                  <Badge
+                    className="self-center"
+                    variant={summary.badge.variant}
+                  >
+                    {summary.badge.label}
+                  </Badge>
+                )}
                 {summary.detail !== undefined && (
                   <span className="text-xs text-muted-foreground">
                     {summary.detail}

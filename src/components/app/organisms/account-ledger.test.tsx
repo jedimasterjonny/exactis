@@ -191,13 +191,7 @@ describe("AccountLedger", () => {
     renderLedger({
       accounts: [house, loan],
       expenses: [
-        {
-          ...expenseLines[0],
-          kind: "debt",
-          lastMonth: 6,
-          lastYear: 2047,
-          pays: loan.id,
-        },
+        { ...expenseLines[0], lastMonth: 6, lastYear: 2047, pays: loan.id },
       ],
     });
 

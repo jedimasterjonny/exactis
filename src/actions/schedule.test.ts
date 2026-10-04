@@ -35,7 +35,6 @@ const expense = {
   endsAt: null,
   firstYear: 2027,
   growth: "inflation-plus-2",
-  kind: "time-bound",
   lastMonth: null,
   lastYear: 2035,
   name: " Nursery ",

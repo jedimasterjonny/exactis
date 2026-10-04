@@ -148,8 +148,8 @@ describe("BalanceSheet", () => {
       ],
       debts: [],
       expenses: [
-        { ...household, kind: "debt", lastMonth: 6, lastYear: 2047, pays: 5 },
-        { ...household, id: 9, kind: "debt", lastMonth: null, pays: 7 },
+        { ...household, lastMonth: 6, lastYear: 2047, pays: 5 },
+        { ...household, id: 9, lastMonth: null, pays: 7 },
       ],
     });
 
@@ -209,7 +209,7 @@ describe("BalanceSheet", () => {
           name: "Family loan",
         },
       ],
-      expenses: [{ ...household, kind: "debt", lastYear: null, pays: 5 }],
+      expenses: [{ ...household, lastYear: null, pays: 5 }],
     });
 
     expect(rowsOf("Other debts")).toStrictEqual([
