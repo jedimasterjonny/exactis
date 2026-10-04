@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   daysBetween,
+  formatDated,
   formatDay,
   formatMonth,
   isOnOrBefore,
@@ -36,6 +37,18 @@ describe("formatDay", () => {
     expect(formatDay("2026-11-04")).toBe("4 Nov 2026");
     expect(formatDay("2027-01-01")).toBe("1 Jan 2027");
     expect(formatDay("2026-09-24")).toBe("24 Sep 2026");
+  });
+});
+
+describe("formatDated", () => {
+  it("writes a day and how old it is on another, in days, and today as today", () => {
+    expect(formatDated("2026-09-01", "2026-09-04")).toBe(
+      "1 Sep 2026 · 3 days old",
+    );
+    expect(formatDated("2026-09-03", "2026-09-04")).toBe(
+      "3 Sep 2026 · 1 day old",
+    );
+    expect(formatDated("2026-09-04", "2026-09-04")).toBe("4 Sep 2026 · today");
   });
 });
 

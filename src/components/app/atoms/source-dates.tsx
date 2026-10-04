@@ -5,8 +5,7 @@ import type { Curve } from "@/data/inflation";
 import type { Targets } from "@/data/targets";
 
 import { vintageMonth } from "@/data/cma";
-import { counted } from "@/lib/count";
-import { daysBetween, formatDay } from "@/lib/months";
+import { formatDated } from "@/lib/months";
 
 interface SourceDatesProps {
   readonly cma: null | Vintages;
@@ -32,8 +31,7 @@ export function SourceDates({
   targets,
   today,
 }: SourceDatesProps): JSX.Element {
-  const dated = (day: string): string =>
-    `${formatDay(day)} · ${ageOf(daysBetween(day, today))}`;
+  const dated = (day: string): string => formatDated(day, today);
   const sources = [
     {
       name: "BlackRock CMA",
@@ -71,12 +69,4 @@ export function SourceDates({
       ))}
     </dl>
   );
-}
-
-// How old a source brought in so many days ago is, in words.
-function ageOf(days: number): string {
-  if (days === 0) {
-    return "today";
-  }
-  return `${counted(days, "day")} old`;
 }
