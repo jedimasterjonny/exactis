@@ -25,7 +25,7 @@ import { cashFlow, inTodaysMoney } from "@/engine/cash-flow";
 import { project } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { listed } from "@/lib/feeders";
-import { spanOf } from "@/lib/lines";
+import { growthLabels, spanOf } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 import { monthName } from "@/lib/months";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
@@ -214,10 +214,12 @@ function describeFed({ amount, line }: Fed): string {
   return `Salary sacrifice from ${line.name}, paid in as ${formatGbp(amount)} with the NI saved`;
 }
 
-// What a line is paid at and the years it runs, "£3,500 / mo ·
-// 2026–2047", beneath its name in the breakdown.
+// What a line is paid at, how that grows and the years it runs, "£2,245
+// / mo · Fixed in pounds · 2026–Jul 2047", beneath its name in the
+// breakdown, so a line fixed in pounds is read as the reason its figure
+// in today's money is the smaller.
 function describeSpent({ line }: Spent): string {
-  return `${formatGbp(line.amount)} / ${cadenceAbbreviations[line.cadence]} · ${spanOf(line)}`;
+  return `${formatGbp(line.amount)} / ${cadenceAbbreviations[line.cadence]} · ${growthLabels[line.growth]} · ${spanOf(line)}`;
 }
 
 // An account paid the spare money says the most it takes a year, so a
