@@ -107,7 +107,7 @@ export function ExpenseSchedule({
         }
         caption="Spending and loan payments, each over the years it is paid. A line with no last year runs to the end of the plan, and spending that changes at a milestone is two lines, one ending there and one starting. A loan's payments are set with its asset on Accounts & assets."
         label={subsectionLabel(planScreen, 3)}
-        title="Expenses by year"
+        title="What goes out"
       >
         <CardContent>
           <ScheduleRows

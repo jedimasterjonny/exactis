@@ -59,10 +59,10 @@ describe("IncomeSchedule", () => {
 
     expect(screen.getByText("Sect. III.ii")).toHaveClass("label");
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "Income by year",
+      "What comes in",
     );
     expect(
-      screen.getByRole("region", { name: "Income by year" }),
+      screen.getByRole("region", { name: "What comes in" }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(incomeLines.length);
     // A row opens from its name, in its columns and on its folded lines,
