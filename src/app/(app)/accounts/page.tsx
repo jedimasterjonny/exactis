@@ -1,12 +1,13 @@
 import type { JSX } from "react";
 
+import { BalanceDates } from "@/components/app/atoms/balance-dates";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { AccountLedger } from "@/components/app/organisms/account-ledger";
 import { BalancesMonth } from "@/components/app/organisms/balances-month";
 import { balanceOf } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
-import { formatMonth } from "@/lib/months";
+import { formatMonth, today } from "@/lib/months";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
 
@@ -25,7 +26,9 @@ import { getHousehold } from "@/store/household";
 // what the balances come to and nothing else: it says the starting net
 // worth and the month, as the assumptions screen's says the plan rate,
 // and holds the button that moves the month, over the body the ledger
-// lays its sections out in.
+// lays its sections out in, which opens on how fresh the balances are,
+// as the assumptions screen's opens on how fresh its sources are, the
+// day read once on the server.
 export default async function Accounts(): Promise<JSX.Element> {
   const { accounts, owners, plan, schedule } = await getHousehold();
   const at = { month: plan.month, year: plan.from };
@@ -39,6 +42,7 @@ export default async function Accounts(): Promise<JSX.Element> {
         {`Starting net worth ${formatGbp(balanceOf(accounts))} · balances as of ${formatMonth(at)}`}
       </ScreenHeader>
       <ScreenBody>
+        <BalanceDates accounts={accounts} today={today()} />
         <AccountLedger
           accounts={accounts}
           expenses={schedule.expenses}

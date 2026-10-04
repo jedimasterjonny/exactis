@@ -98,6 +98,22 @@ type Contribution =
 type Growth =
   { readonly kind: "fixed"; readonly rate: number } | { readonly kind: "plan" };
 
+// The groups the balances are dated and checked in, each by its name and
+// which accounts it holds: the savings, what the property and vehicles
+// are worth, and every loan and debt, a loan on an asset among them.
+export const balanceGroups = [
+  {
+    holds: (account: Account): boolean =>
+      !isAsset(account) && account.kind !== "debt",
+    name: "Savings",
+  },
+  { holds: isAsset, name: "Property & vehicles" },
+  {
+    holds: (account: Account): boolean => account.kind === "debt",
+    name: "Loans & debts",
+  },
+] as const;
+
 // The choices as lists, so the store's columns take the same words the
 // types do and cannot drift from them.
 export const accountKinds = [

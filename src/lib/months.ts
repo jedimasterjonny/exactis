@@ -1,5 +1,7 @@
 import type { Month } from "@/data/schedule";
 
+import { counted } from "@/lib/count";
+
 // The forms a month's name is written in: in full, or cut to three
 // letters.
 type MonthForm = "long" | "short";
@@ -36,6 +38,15 @@ export function dayOf(moment: Date): string {
 // the hours between two clocks.
 export function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
+}
+
+// The day an ISO date names and how old it is on the day given, as a
+// strip of dates writes each: "1 Sep 2026 · 3 days old", or "· today"
+// for the day itself.
+export function formatDated(date: string, today: string): string {
+  const days = daysBetween(date, today);
+  const age = days === 0 ? "today" : `${counted(days, "day")} old`;
+  return `${formatDay(date)} · ${age}`;
 }
 
 // The day an ISO date names, its month cut short: "1 Sep 2026". Read in
