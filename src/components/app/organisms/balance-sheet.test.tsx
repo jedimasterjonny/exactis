@@ -190,7 +190,7 @@ describe("BalanceSheet", () => {
     expect(
       screen.getByRole("heading", { name: /^Secured on them/ }),
     ).toHaveClass("folded:hidden");
-    const [, bar] = screen.getAllByText(bySlot("equity-bar-fill"), {
+    const [, bar] = screen.getAllByText(bySlot("share-bar-fill"), {
       suggest: false,
     });
     expect(bar).toHaveStyle({ width: `${String((4000 / 18000) * 100)}%` });

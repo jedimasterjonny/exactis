@@ -11,9 +11,9 @@ import type { Owner } from "@/data/owners";
 import type { Secured } from "@/data/secured";
 
 import { EmptyState } from "@/components/app/atoms/empty-state";
-import { EquityBar } from "@/components/app/atoms/equity-bar";
 import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { Ledger } from "@/components/app/atoms/ledger";
+import { ShareBar } from "@/components/app/atoms/share-bar";
 import { Button } from "@/components/kit/button";
 import { kindLabels } from "@/data/accounts";
 import { fixedMonthly, monthly } from "@/lib/cadence";
@@ -274,7 +274,7 @@ function AssetLines({
       <span>{`${kindLabels[asset.kind]} · ${growthOf(asset)}`}</span>
       {pair.loan !== null && (
         <>
-          <EquityBar className="my-1 h-1.5 w-full" share={share} />
+          <ShareBar className="my-1 h-1.5 w-full" share={share} />
           <span>{`${formatGbp(equity)} equity, ${part} of its value`}</span>
         </>
       )}
