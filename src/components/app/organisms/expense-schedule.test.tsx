@@ -17,7 +17,7 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { saved as accepted } from "@/lib/answer";
-import { commit, openEditor, openEntry } from "@/test/dom";
+import { commit, openEntry, openRow } from "@/test/dom";
 
 import { ExpenseSchedule } from "./expense-schedule";
 
@@ -55,14 +55,12 @@ describe("ExpenseSchedule", () => {
       screen.getByRole("region", { name: "Expenses by year" }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(expenseLines.length);
-    expect(screen.getAllByRole("button", { name: /^Edit / })).toHaveLength(
-      expenseLines.length,
-    );
     expect(screen.getAllByText("Core")).toHaveLength(2);
     expect(screen.getAllByText("Time-bound")).toHaveLength(2);
     // A row is drawn in its columns and again in its folded lines, only
-    // one of which is on screen at any width.
-    for (const name of screen.getAllByText("Childcare")) {
+    // one of which is on screen at any width, and opens from its name in
+    // either.
+    for (const name of screen.getAllByRole("button", { name: "Childcare" })) {
       expect(name).toHaveClass("font-medium");
     }
     expect(screen.getByText("Debt")).toHaveAttribute(
@@ -219,7 +217,7 @@ describe("ExpenseSchedule", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     fireEvent.click(
-      within(openEditor("Childcare")).getByRole("button", { name: "Delete" }),
+      within(openRow("Childcare")).getByRole("button", { name: "Delete" }),
     );
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -264,7 +262,7 @@ describe("ExpenseSchedule", () => {
     renderSchedule();
     saved({ ...retirement, amount: 65000, kind: "other" });
 
-    const dialog = openEditor("Retirement living");
+    const dialog = openRow("Retirement living");
 
     expect(within(dialog).getByText("Edit expense line")).toHaveClass(
       "text-brand",
@@ -326,10 +324,10 @@ describe("ExpenseSchedule", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: "Edit Retirement living" }),
-    ).toBeEnabled();
+      screen.getAllByRole("button", { name: "Retirement living" }),
+    ).toHaveLength(2);
     expect(
-      screen.queryByRole("button", { name: "Edit Mortgage payment" }),
+      screen.queryByRole("button", { name: "Mortgage payment" }),
     ).not.toBeInTheDocument();
     // The lock is drawn in the row's columns and on its folded lines.
     expect(

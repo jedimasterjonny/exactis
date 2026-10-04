@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
 
 import { cn } from "cn";
-import { Banknote, Flag, Receipt } from "lucide-react";
+import { Banknote, ChevronRight, Flag, Receipt } from "lucide-react";
 
 import type { Marker } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
@@ -11,8 +11,8 @@ import type { LineValues, Side, Tie } from "@/data/schedule";
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { RowLock } from "@/components/app/atoms/row-lock";
+import { RowOpener } from "@/components/app/atoms/row-opener";
 import { SpanBar } from "@/components/app/atoms/span-bar";
-import { RowActions } from "@/components/app/molecules/row-actions";
 import { Badge } from "@/components/kit/badge";
 import { ageIn, endYear } from "@/data/plan";
 import { cadenceAbbreviations } from "@/lib/cadence";
@@ -55,7 +55,6 @@ interface ScheduleRowsProps<TLine extends Line> {
   readonly emptyTitle: string;
   readonly lines: readonly TLine[];
   readonly milestones: readonly Marker[];
-  readonly onDelete?: (line: TLine) => void;
   readonly onEdit: (line: TLine) => void;
   readonly plan: Plan;
   readonly side: Side;
@@ -72,12 +71,13 @@ const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
 // placing the line on the plan's span; what the line pays at its cadence
 // over what it grows with; the years it runs over the ages reached, to
 // the month when it ends part way through a year and an open-ended line
-// running to the end; and a pencil that reports the row's line, whose
-// id says where a save writes back, and when given a delete handler a
-// bin beside it, in the one actions
-// column, which reports the line the schedule asks about before it
-// goes. A locked line draws its lock in place of both, since it is
-// neither edited nor deleted here. The schedule reads its own lines, so
+// running to the end; and a chevron saying the row opens. The row opens
+// from anywhere on it, its name the button that reports the line, whose
+// id says where a save writes back, as an account's row does on the
+// accounts screen, and the dialog it opens is where it is deleted from.
+// A locked line draws its lock in the chevron's place and opens
+// nothing, since it is neither edited nor deleted here. The schedule
+// reads its own lines, so
 // what the rows cannot read off one, the badge, the figure and the
 // detail, comes from it. The figures are right-aligned mono, as in every
 // ledger. A line tied to a milestone at either end says which beside
@@ -88,26 +88,22 @@ const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
 // ages. A line its schedule says is paid short of its own end, as a
 // salary is past retirement, is drawn as it is paid, its bar, years and
 // ties all, since a row promising years the plan never pays reads as
-// income the plan does not have; the pencil still opens the line as it
+// income the plan does not have; the row still opens the line as it
 // is. A schedule holding nothing draws its empty state instead of a
 // list of nothing. While the list is too narrow to read across, as on a
 // phone, each row folds into lines, as a ledger's does: the name and
 // what the line pays on the first, then its kind and how it grows, then
 // its detail when it has one, then its milestones when it is tied to
-// any, then the bar across the row, then the years and the ages. The list is the container it folds by, at the
-// width the ledgers fold at. A row opens from anywhere on it, the bar
-// letting a tap through to the row beneath it,
-// and its actions fold away with the columns, the dialog it opens being
-// where it is deleted from; a locked row opens nothing and draws its
-// lock where the chevron would be, the same lock as its column, which
-// folds away with the rest. Each row is described once and both its
-// copies draw the description, so the two say the same thing.
+// any, then the bar across the row, then the years and the ages. The
+// list is the container it folds by, at the width the ledgers fold at.
+// Either way the bar lets a press through to the row beneath it. Each
+// row is described once and both its copies draw the description, so
+// the two say the same thing.
 export function ScheduleRows<TLine extends Line>({
   emptyDescription,
   emptyTitle,
   lines,
   milestones,
-  onDelete,
   onEdit,
   plan,
   side,
@@ -133,6 +129,12 @@ export function ScheduleRows<TLine extends Line>({
           summary.lock !== undefined ? (
             <RowLock reason={summary.lock} />
           ) : undefined;
+        const open =
+          lock === undefined
+            ? (): void => {
+                onEdit(line);
+              }
+            : undefined;
         const bar = (
           <SpanBar
             endsAt={paid.endsAt}
@@ -157,13 +159,7 @@ export function ScheduleRows<TLine extends Line>({
                 figure={`${row.total} / ${row.cadence}`}
                 lock={lock}
                 name={line.name}
-                onOpen={
-                  lock !== undefined
-                    ? undefined
-                    : (): void => {
-                        onEdit(line);
-                      }
-                }
+                onOpen={open}
               >
                 <span>{`${summary.badge.label} · ${row.growth}`}</span>
                 {summary.detail !== undefined && <span>{summary.detail}</span>}
@@ -174,7 +170,11 @@ export function ScheduleRows<TLine extends Line>({
             </div>
             <div className="grid min-w-0 gap-2 folded:hidden">
               <div className="flex flex-wrap items-baseline gap-2">
-                <span className="font-medium">{line.name}</span>
+                {open === undefined ? (
+                  <span className="font-medium">{line.name}</span>
+                ) : (
+                  <RowOpener onOpen={open}>{line.name}</RowOpener>
+                )}
                 <Badge className="self-center" variant={summary.badge.variant}>
                   {summary.badge.label}
                 </Badge>
@@ -189,7 +189,7 @@ export function ScheduleRows<TLine extends Line>({
                   </span>
                 )}
               </div>
-              {bar}
+              <div className="pointer-events-none">{bar}</div>
             </div>
             <div className="grid gap-0.5 text-right folded:hidden">
               <span className="figure font-medium">
@@ -206,20 +206,14 @@ export function ScheduleRows<TLine extends Line>({
               <span className="figure">{row.years}</span>
               <span className="label text-muted-foreground/60">{row.ages}</span>
             </div>
-            <div className="folded:hidden">
-              {lock === undefined ? (
-                <RowActions
-                  name={line.name}
-                  onDelete={onDelete}
-                  onEdit={onEdit}
-                  row={line}
+            <span className="inline-flex size-7 items-center justify-center folded:hidden">
+              {lock ?? (
+                <ChevronRight
+                  aria-hidden
+                  className="size-4 text-muted-foreground"
                 />
-              ) : (
-                <span className="inline-flex size-7 items-center justify-center">
-                  {lock}
-                </span>
               )}
-            </div>
+            </span>
           </li>
         );
       })}
