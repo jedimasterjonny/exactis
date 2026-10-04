@@ -9,7 +9,6 @@ import { accounts } from "@/data/accounts.fixture";
 import { golf, golfPcp } from "@/data/cars.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { house, houseLoan } from "@/data/houses.fixture";
-import { incomeLines } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 import { bySlot } from "@/test/dom";
 
@@ -17,7 +16,6 @@ import { BalanceSheet } from "./balance-sheet";
 
 const [pension, isa, cash, home, mortgage] = accounts;
 const [household] = expenseLines;
-const [salary] = incomeLines;
 
 // The sheet over the fixture's savings, its home owned outright and its
 // mortgage, which is secured on nothing, with whatever a test gives in
@@ -30,7 +28,6 @@ function renderSheet(
       assets={[{ asset: home, loan: null }]}
       debts={[mortgage]}
       expenses={[]}
-      lines={[]}
       onAddDebt={vi.fn<() => void>()}
       onEdit={vi.fn<(account: Account) => void>()}
       owners={owners}
@@ -66,10 +63,10 @@ describe("BalanceSheet", () => {
       "Other debts−£182,940",
     ]);
     expect(rowsOf("Pensions · tax-deferred")).toStrictEqual([
-      "1Workplace pension£412,880Me£2,266 / mo paid",
+      "1Workplace pension£412,880Me",
     ]);
     expect(rowsOf("ISAs · tax-free")).toStrictEqual([
-      "3Stocks & shares ISA£286,145Me£1,667 / mo paid",
+      "3Stocks & shares ISA£286,145Me",
     ]);
     expect(rowsOf("Cash")).toStrictEqual([
       "2Current account£18,300holds its value",
@@ -93,7 +90,7 @@ describe("BalanceSheet", () => {
     renderSheet({ savings: [isa] });
 
     expect(rowsOf("ISAs · tax-free")).toStrictEqual([
-      "Stocks & shares ISA£286,145Me£1,667 / mo paid",
+      "Stocks & shares ISA£286,145Me",
     ]);
     expect(
       screen.queryByRole("group", { name: "Pensions · tax-deferred" }),
@@ -103,27 +100,24 @@ describe("BalanceSheet", () => {
     ).not.toBeInTheDocument();
   });
 
-  // The salary running in the plan's month sacrifices £13,800 a year
-  // into the pension with the NI saved, on top of its own sum; a saving
-  // paid the spare money says the most it takes; one paid nothing and
-  // owned by nobody at the plan rate says nothing beneath its name.
-  it("says whose a saving is, what it is paid and how it grows where that is its own", () => {
+  // A saving owned by nobody at the plan rate says nothing beneath its
+  // name, and what it is paid is the money's flow's to say.
+  it("says whose a saving is, how it grows where that is its own, and when it is always funded", () => {
     renderSheet({
-      lines: [salary],
       owners: [],
       savings: [
         { ...pension, isAlwaysFunded: true },
-        { ...isa, contribution: { cap: null, kind: "spare" } },
+        isa,
         { ...cash, growth: { kind: "fixed", rate: 0.04 } },
         { ...cash, growth: { kind: "plan" }, id: 9, name: "Premium bonds" },
       ],
     });
 
     expect(rowsOf("Pensions · tax-deferred")).toStrictEqual([
-      "1Workplace pension£412,880always funded£2,266 / mo paid + £1,150 / mo sacrificed from Salary",
+      "1Workplace pension£412,880always funded",
     ]);
     expect(rowsOf("ISAs · tax-free")).toStrictEqual([
-      "2Stocks & shares ISA£286,145Spare, to £20,000 / yr",
+      "2Stocks & shares ISA£286,145",
     ]);
     expect(rowsOf("Cash")).toStrictEqual([
       "3Current account£18,300grows 4.00% a year",
@@ -139,26 +133,6 @@ describe("BalanceSheet", () => {
       // eslint-disable-next-line testing-library/no-node-access -- the lines beneath a name are a layout box with no role or text of their own to query by
       bonds?.querySelector(".mt-1"),
     ).toBeNull();
-  });
-
-  it("writes a pension fed by a salary and paid nothing of its own as the sacrifice alone", () => {
-    renderSheet({
-      lines: [salary],
-      savings: [
-        {
-          balance: pension.balance,
-          growth: pension.growth,
-          id: pension.id,
-          kind: pension.kind,
-          name: pension.name,
-          owner: pension.owner,
-        },
-      ],
-    });
-
-    expect(rowsOf("Pensions · tax-deferred")).toStrictEqual([
-      "Workplace pension£412,880Me£1,150 / mo sacrificed from Salary",
-    ]);
   });
 
   // The mortgage is level with the house it is secured on, and the

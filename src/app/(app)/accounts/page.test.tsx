@@ -64,7 +64,7 @@ describe("Accounts", () => {
 
   // The fixture's salary feeds the workplace pension, which the ledger
   // says before the pension goes, and lands £13,800 a year in it in the
-  // month the plan is read in, which the row says as £1,150 a month;
+  // month the plan is read in, which the flow says as £1,150 a month;
   // the plan's rate is what the savings grow at, and the expense line
   // paying the mortgage says when it clears.
   it("hands the store's accounts, lines, owners and plan to the ledger", async () => {
@@ -81,7 +81,7 @@ describe("Accounts", () => {
     });
 
     expect(
-      screen.getByText(/\+ £1,150 \/ mo sacrificed from Salary$/),
+      screen.getByText(/£1,150 salary sacrifice from Salary/),
     ).toBeInTheDocument();
     expect(screen.getByText(/to Jul 2047$/)).toBeInTheDocument();
     expect(
