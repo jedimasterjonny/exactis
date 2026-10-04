@@ -214,9 +214,9 @@ describe("AccountLedger", () => {
 
     let dialog = openEntry("Add debt");
 
-    expect(
-      within(dialog).getByRole("combobox", { name: "Treatment" }),
-    ).toHaveValue("debt");
+    expect(within(dialog).getByRole("combobox", { name: "Type" })).toHaveValue(
+      "debt",
+    );
     expect(
       within(dialog).queryByRole("combobox", { name: "Owner" }),
     ).not.toBeInTheDocument();
@@ -224,9 +224,9 @@ describe("AccountLedger", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     dialog = openEntry("Add account");
 
-    expect(
-      within(dialog).getByRole("combobox", { name: "Treatment" }),
-    ).toHaveValue("tax-deferred");
+    expect(within(dialog).getByRole("combobox", { name: "Type" })).toHaveValue(
+      "tax-deferred",
+    );
     expect(within(dialog).getByRole("combobox", { name: "Owner" })).toHaveValue(
       "1",
     );
@@ -249,10 +249,9 @@ describe("AccountLedger", () => {
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: " Lifetime ISA " },
     });
-    fireEvent.change(
-      within(dialog).getByRole("combobox", { name: "Treatment" }),
-      { target: { value: "tax-free" } },
-    );
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Type" }), {
+      target: { value: "tax-free" },
+    });
     commit(within(dialog).getByRole("textbox", { name: "Balance" }), "4,000");
     expect(
       within(dialog).getByRole("combobox", { name: "Contribution" }),
@@ -331,10 +330,9 @@ describe("AccountLedger", () => {
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: "Car" },
     });
-    fireEvent.change(
-      within(dialog).getByRole("combobox", { name: "Treatment" }),
-      { target: { value: "real-asset" } },
-    );
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Type" }), {
+      target: { value: "real-asset" },
+    });
 
     expect(
       within(dialog).queryByRole("combobox", { name: "Contribution" }),
@@ -466,9 +464,9 @@ describe("AccountLedger", () => {
     expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue(
       "Home",
     );
-    expect(
-      within(dialog).getByRole("combobox", { name: "Treatment" }),
-    ).toHaveValue("real-asset");
+    expect(within(dialog).getByRole("combobox", { name: "Type" })).toHaveValue(
+      "real-asset",
+    );
     expect(
       within(dialog).getByRole("textbox", { name: "Balance" }),
     ).toHaveValue("£416,386");
@@ -702,9 +700,7 @@ describe("AccountLedger", () => {
     saved(isa);
 
     const dialog = openRow("Stocks & shares ISA");
-    const treatment = within(dialog).getByRole("combobox", {
-      name: "Treatment",
-    });
+    const treatment = within(dialog).getByRole("combobox", { name: "Type" });
 
     expect(
       within(dialog).getByRole("textbox", { name: "Cap, a year" }),
@@ -992,7 +988,9 @@ describe("AccountLedger", () => {
       name: "Delete Current account?",
     });
 
-    expect(dialog).toHaveAccessibleDescription("It cannot be brought back.");
+    expect(dialog).toHaveAccessibleDescription(
+      "Its £18,300 leaves the balance sheet, and it cannot be brought back.",
+    );
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
 
@@ -1127,7 +1125,7 @@ describe("AccountLedger", () => {
     const dialog = openRow("Workplace pension");
 
     expect(
-      within(dialog).getByRole("combobox", { name: "Treatment" }),
+      within(dialog).getByRole("combobox", { name: "Type" }),
     ).toBeDisabled();
     expect(
       within(dialog).getByRole("textbox", { name: "Sacrificed from Salary" }),
@@ -1139,7 +1137,7 @@ describe("AccountLedger", () => {
     renderLedger({ accounts: [pension, isa], lines: [salary] });
 
     let treatment = within(openRow("Workplace pension")).getByRole("combobox", {
-      name: "Treatment",
+      name: "Type",
     });
 
     expect(treatment).toBeDisabled();
@@ -1149,7 +1147,7 @@ describe("AccountLedger", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     treatment = within(openRow("Stocks & shares ISA")).getByRole("combobox", {
-      name: "Treatment",
+      name: "Type",
     });
 
     expect(treatment).toBeEnabled();
@@ -1159,7 +1157,7 @@ describe("AccountLedger", () => {
 
     expect(
       within(screen.getByRole("dialog")).getByRole("combobox", {
-        name: "Treatment",
+        name: "Type",
       }),
     ).toBeEnabled();
   });
@@ -1179,7 +1177,7 @@ describe("AccountLedger", () => {
     expect(
       screen.getByRole("alertdialog", { name: "Delete Workplace pension?" }),
     ).toHaveAccessibleDescription(
-      "Salary and Salary step-up stop sacrificing into it and are earned whole, at the share lost with it.",
+      "Salary and Salary step-up stop sacrificing into it, and pay those shares as salary instead.",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
@@ -1187,7 +1185,9 @@ describe("AccountLedger", () => {
 
     expect(
       screen.getByRole("alertdialog", { name: "Delete Stocks & shares ISA?" }),
-    ).toHaveAccessibleDescription("It cannot be brought back.");
+    ).toHaveAccessibleDescription(
+      "Its £286,145 leaves the balance sheet, and it cannot be brought back.",
+    );
   });
 
   it("says a house with no loan goes alone", () => {
@@ -1197,6 +1197,8 @@ describe("AccountLedger", () => {
 
     expect(
       screen.getByRole("alertdialog", { name: "Delete Home?" }),
-    ).toHaveAccessibleDescription("It cannot be brought back.");
+    ).toHaveAccessibleDescription(
+      "Its £416,386 leaves the balance sheet, and it cannot be brought back.",
+    );
   });
 });

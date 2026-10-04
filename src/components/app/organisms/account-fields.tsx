@@ -37,13 +37,6 @@ const fundings = [
   { label: "Spare money", value: "spare" },
 ] as const;
 
-// The same choices for a pension a salary feeds, where a fixed sum of
-// nothing is the usual case rather than an unfilled field, and says so.
-const fundingsOnTop = [
-  { label: "A fixed sum, or nothing", value: "fixed" },
-  { label: "Spare money", value: "spare" },
-] as const;
-
 const growths = [
   { label: "Plan rate", value: "plan" },
   { label: "Fixed rate", value: "fixed" },
@@ -64,7 +57,7 @@ const shortfallHints = {
   month: "Paid only what the month has left",
 } as const;
 
-// The treatments the dialog offers, in the order the reference's offers
+// The types the dialog offers, in the order the reference's offers
 // them: a house and a car are left out, since each is written from a
 // dialog of its own.
 const kinds = optionsOf(kindLabels, [
@@ -99,7 +92,10 @@ const kinds = optionsOf(kindLabels, [
 // as it was. A fed pension's own contribution is paid on top of the
 // sacrifice, and the choice and the sum say so, since a fixed sum of
 // nothing beside what a salary lands would otherwise read as nothing
-// paid in at all. The balance says a debt's is negative only while the
+// paid in at all; the amount says a sum of nothing is none, which for a
+// fed pension is the usual case, rather than the choice, whose longer
+// words were cut off in the narrow cell it has beside the owner. The
+// balance says a debt's is negative only while the
 // treatment is a debt, where it is the one thing to know about the
 // figure; beneath a pension's it was a line about something else.
 export function AccountFields({
@@ -122,13 +118,13 @@ export function AccountFields({
           onValueChange={(name) => {
             onAmend({ name });
           }}
-          placeholder="Lifetime ISA, car, loan…"
+          placeholder="Lifetime ISA, savings account, loan…"
         />
         <SelectField
           defaultValue={initial.kind}
           hint={kindLock}
           isDisabled={kindLock !== undefined}
-          label="Treatment"
+          label="Type"
           onValueChange={(kind) => {
             onKindChange(kind);
           }}
@@ -172,7 +168,7 @@ export function AccountFields({
             onValueChange={(funding) => {
               onFundingChange(funding);
             }}
-            options={isFed ? fundingsOnTop : fundings}
+            options={fundings}
           />
         )}
         {isPension(draft) && (
@@ -255,7 +251,8 @@ export function AccountFields({
 // pension the most it can be a year and still land within the
 // allowance, which the save holds to: a pension's four fifths of it,
 // the rest being the relief. A fed pension's sum is on top of what the
-// salaries sacrifice, which the allowance holds too, month by month.
+// salaries sacrifice, which the allowance holds too, month by month,
+// and nothing is as usual for one as for any other.
 function amountHint(kind: AccountKind, isFed: boolean): string {
   const most = mostFixedOf(kind);
   if (most === null) {
@@ -265,7 +262,9 @@ function amountHint(kind: AccountKind, isFed: boolean): string {
     most === allowanceOf(kind)
       ? `At most ${formatGbp(most)} a year, the allowance`
       : `At most ${formatGbp(most)} a year, the allowance with relief`;
-  return isFed ? `${limit}, less the sacrifice` : `${limit}; nothing for none`;
+  return isFed
+    ? `${limit}, less the sacrifice; nothing for none`
+    : `${limit}; nothing for none`;
 }
 
 // What the cap field says a cap of nothing means: the kind's allowance,

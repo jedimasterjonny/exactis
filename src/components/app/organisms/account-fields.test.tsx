@@ -63,7 +63,7 @@ describe("AccountFields", () => {
     const { onAmend, onFundingChange, onKindChange } = renderFields(isa);
 
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("ISA");
-    expect(screen.getByRole("combobox", { name: "Treatment" })).toHaveValue(
+    expect(screen.getByRole("combobox", { name: "Type" })).toHaveValue(
       "tax-free",
     );
     expect(screen.getByRole("textbox", { name: "Balance" })).toHaveValue(
@@ -94,7 +94,7 @@ describe("AccountFields", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Growth" }), {
       target: { value: "fixed" },
     });
-    fireEvent.change(screen.getByRole("combobox", { name: "Treatment" }), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
       target: { value: "cash" },
     });
     fireEvent.change(screen.getByRole("combobox", { name: "Contribution" }), {
@@ -249,7 +249,7 @@ describe("AccountFields", () => {
     const pension: AccountValues = { ...isa, kind: "tax-deferred" };
     renderFields(pension, pension, { kindLock: "Fed by Salary" });
 
-    const treatment = screen.getByRole("combobox", { name: "Treatment" });
+    const treatment = screen.getByRole("combobox", { name: "Type" });
 
     expect(treatment).toBeDisabled();
     expect(treatment).toHaveValue("tax-deferred");
@@ -275,11 +275,11 @@ describe("AccountFields", () => {
       within(choice)
         .getAllByRole("option")
         .map((option) => option.textContent),
-    ).toStrictEqual(["A fixed sum, or nothing", "Spare money"]);
+    ).toStrictEqual(["A fixed sum", "Spare money"]);
     expect(
       screen.getByRole("textbox", { name: "Amount" }),
     ).toHaveAccessibleDescription(
-      "At most £48,000 a year, the allowance with relief, less the sacrifice",
+      "At most £48,000 a year, the allowance with relief, less the sacrifice; nothing for none",
     );
   });
 
