@@ -3,15 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import { accounts } from "@/data/accounts.fixture";
 
-import {
-  balanceOf,
-  equityOf,
-  formatContribution,
-  formatMonthly,
-  sumOf,
-} from "./ledger";
+import { balanceOf, equityOf, formatMonthly, sumOf } from "./ledger";
 
-const [pension, isa, cash, home, mortgage] = accounts;
+const [, , , home, mortgage] = accounts;
 
 // The fixture's five accounts, the mortgage's balance taking away, hold
 // £950,771 between them.
@@ -36,44 +30,6 @@ describe("sumOf", () => {
   it("sums a figure down a list, and a list of nothing to nothing", () => {
     expect(sumOf(accounts, ({ id }) => id)).toBe(1 + 2 + 3 + 4 + 5);
     expect(sumOf([], () => 1)).toBe(0);
-  });
-});
-
-describe("formatContribution", () => {
-  // A year's sum is written as a twelfth of it, to the pound.
-  it("writes a fixed sum a month whatever its cadence, and a flat dash for none", () => {
-    expect(formatContribution(pension)).toBe("£2,266 / mo");
-    expect(formatContribution(mortgage)).toBe("£2,210 / mo");
-    expect(formatContribution(cash)).toBe("—");
-  });
-
-  // A cap of nothing is the account's own allowance, which cash has
-  // none of, and a cap above the allowance is held to it.
-  it("writes the most the spare money takes a year, its allowance when uncapped or capped above it", () => {
-    expect(
-      formatContribution({
-        ...pension,
-        contribution: { cap: null, kind: "spare" },
-      }),
-    ).toBe("Spare, to £60,000 / yr");
-    expect(
-      formatContribution({
-        ...isa,
-        contribution: { cap: 4000, kind: "spare" },
-      }),
-    ).toBe("Spare, to £4,000 / yr");
-    expect(
-      formatContribution({
-        ...isa,
-        contribution: { cap: 50000, kind: "spare" },
-      }),
-    ).toBe("Spare, to £20,000 / yr");
-    expect(
-      formatContribution({
-        ...cash,
-        contribution: { cap: null, kind: "spare" },
-      }),
-    ).toBe("Spare, uncapped");
   });
 });
 

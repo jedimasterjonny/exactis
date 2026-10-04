@@ -53,6 +53,11 @@ function askToDelete(name: string): void {
   );
 }
 
+// The section the month's money is drawn down the savings in.
+function flow(): HTMLElement {
+  return screen.getByRole("region", { name: "Where the month's money goes" });
+}
+
 // Opens an entry of the sheet from its row, a button named by the
 // account, and hands back the dialog it opens, named by the account the
 // dialog is open on.
@@ -106,9 +111,9 @@ describe("AccountLedger", () => {
   // its title and opened with its own buttons, the rate the savings grow
   // at in its caption. The fixture's mortgage is secured on nothing, so
   // it is listed with the other debts rather than with the savings, and
-  // the order the accounts are paid in is a section of its own beneath,
-  // then the owners.
-  it("lays everything owned and owed out as one balance sheet, with the order and the owners beneath", () => {
+  // the month's money is drawn down the savings in the order they are
+  // paid in a section of its own beneath, then the owners.
+  it("lays everything owned and owed out as one balance sheet, with the money's flow and the owners beneath", () => {
     renderLedger();
 
     expect(within(sheet()).getByText("Sect. II.i")).toHaveClass("label");
@@ -137,20 +142,12 @@ describe("AccountLedger", () => {
     expect(
       screen.queryByRole("button", { name: /^Move / }),
     ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByRole("region", { name: "Order of payment" }))
-        .getAllByRole("listitem")
-        .map((item) => item.textContent),
-    ).toStrictEqual([
-      "1Workplace pension",
-      "2Stocks & shares ISA",
-      "3Current account",
+    expect(names()).toStrictEqual([
+      "Workplace pension",
+      "Stocks & shares ISA",
+      "Current account",
     ]);
-    expect(
-      within(
-        screen.getByRole("region", { name: "Order of payment" }),
-      ).getByText("Sect. II.ii"),
-    ).toHaveClass("label");
+    expect(within(flow()).getByText("Sect. II.ii")).toHaveClass("label");
     expect(
       within(screen.getByRole("region", { name: "Owners" })).getByText(
         "Sect. II.iii",
@@ -158,18 +155,34 @@ describe("AccountLedger", () => {
     ).toHaveClass("label");
   });
 
-  // An order of fewer than two accounts is no order and draws nothing,
-  // so the owners take its place rather than leaving a numeral out.
-  it("puts the owners where the order would be when there is no order", () => {
-    renderLedger({ accounts: [isa] });
-
-    const owners = screen.getByRole("region", { name: "Owners" });
+  // No savings is no money to draw down them, so the owners take the
+  // flow's place rather than leaving a numeral out; one saving is drawn,
+  // with no order to set.
+  it("puts the owners where the flow would be when there are no savings", () => {
+    renderLedger({ accounts: [home] });
 
     expect(
-      screen.queryByRole("region", { name: "Order of payment" }),
+      screen.queryByRole("region", { name: "Where the month's money goes" }),
     ).not.toBeInTheDocument();
-    expect(within(owners).getByText("Sect. II.ii")).toHaveClass("label");
-    expect(within(owners).getByRole("row", { name: /Me/ })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Owners" })).getByText(
+        "Sect. II.ii",
+      ),
+    ).toHaveClass("label");
+  });
+
+  it("draws the flow for one saving, with no order to set", () => {
+    renderLedger({ accounts: [isa] });
+
+    expect(names()).toStrictEqual(["Stocks & shares ISA"]);
+    expect(
+      within(flow()).queryByRole("button", { name: "Reorder" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Owners" })).getByText(
+        "Sect. II.iii",
+      ),
+    ).toHaveClass("label");
   });
 
   // The sheet says when the mortgage's payments clear it from the line
@@ -750,20 +763,18 @@ describe("AccountLedger", () => {
     });
   });
 
-  // The names down the reorder dialog, the savings alone since a debt is
-  // paid before any of them, as the rows now stand: each row's grip is
-  // named for its account.
+  // The names down the money's flow, the savings alone since a debt is
+  // paid before any of them, as the steps now stand.
   function names(): string[] {
-    return screen
-      .getAllByRole("button", { name: /^Move / })
-      .map((grip) => grip.getAttribute("aria-label")?.slice(5) ?? "");
+    return within(flow())
+      .getAllByRole("listitem")
+      .map((step) => /^\d+(\D+?)£/.exec(step.textContent)?.[1] ?? "");
   }
 
-  // Moving the ISA onto the pension puts it before the pension, since it
-  // was below; the whole order goes to the store, the home and the
-  // mortgage where they were, though the dialog lists neither, and the
-  // rows show it before the store answers.
-  it("moves a row onto another from the keyboard, shows the order at once and sends it whole to the store", async () => {
+  // Moving the ISA up puts it before the pension; the whole order goes
+  // to the store, the home and the mortgage where they were, though the
+  // flow lists neither, and the steps show it before the store answers.
+  it("moves a saving up from its arrow, shows the order at once and sends it whole to the store", async () => {
     renderLedger();
     fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
     const { promise, resolve: answer } =
@@ -776,9 +787,8 @@ describe("AccountLedger", () => {
       "Current account",
     ]);
 
-    fireEvent.keyDown(
-      screen.getByRole("button", { name: "Move Stocks & shares ISA" }),
-      { key: "ArrowUp" },
+    fireEvent.click(
+      screen.getByRole("button", { name: "Move Stocks & shares ISA up" }),
     );
 
     await waitFor(() => {
@@ -803,25 +813,20 @@ describe("AccountLedger", () => {
     });
   });
 
-  // Dropping the pension on the current account puts it after, since it
-  // was above; the assets keep their places in the whole.
-  it("moves a row dropped on another after it when it came from above", async () => {
+  // Moving the ISA down puts it after the current account, since it was
+  // above; the assets keep their places in the whole.
+  it("moves a saving down after the one beneath it", async () => {
     renderLedger();
     vi.mocked(placeAccountsInOrder).mockResolvedValue(accepted(undefined));
     fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
 
-    const cashRow = screen.getByRole("row", { name: /Current account/ });
-
-    fireEvent.dragStart(
-      screen.getByRole("button", { name: "Move Workplace pension" }),
-      { dataTransfer: { setData: vi.fn() } },
+    fireEvent.click(
+      screen.getByRole("button", { name: "Move Stocks & shares ISA down" }),
     );
-    fireEvent.dragOver(cashRow);
-    fireEvent.drop(cashRow);
 
     await waitFor(() => {
       expect(placeAccountsInOrder).toHaveBeenCalledExactlyOnceWith([
-        2, 3, 1, 4, 5,
+        1, 3, 2, 4, 5,
       ]);
     });
   });
@@ -854,14 +859,9 @@ describe("AccountLedger", () => {
       answer();
       fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
 
-      const cashRow = screen.getByRole("row", { name: /Current account/ });
-
-      fireEvent.dragStart(
-        screen.getByRole("button", { name: "Move Workplace pension" }),
-        { dataTransfer: { setData: vi.fn() } },
+      fireEvent.click(
+        screen.getByRole("button", { name: "Move Workplace pension down" }),
       );
-      fireEvent.dragOver(cashRow);
-      fireEvent.drop(cashRow);
 
       expect(
         await screen.findByRole("dialog", { name: "Order not saved" }),
@@ -869,14 +869,10 @@ describe("AccountLedger", () => {
       // The toast lands inside the transition, and the page's order comes
       // back once it ends.
       await waitFor(() => {
-        expect(
-          screen
-            .getAllByRole("button", { name: /^Move / })
-            .map((button) => button.getAttribute("aria-label")),
-        ).toStrictEqual([
-          "Move Workplace pension",
-          "Move Stocks & shares ISA",
-          "Move Current account",
+        expect(names()).toStrictEqual([
+          "Workplace pension",
+          "Stocks & shares ISA",
+          "Current account",
         ]);
       });
     },
@@ -884,8 +880,7 @@ describe("AccountLedger", () => {
 
   // A house and the loan against it are one entry, drawn level with
   // each other and both opening the house dialog; the loan leaves the
-  // savings for it, and is no more in the order than any other debt, so
-  // the one saving left is no order and the owners take its numeral.
+  // savings for it, and is no more in the order than any other debt.
   it("puts a house and the loan against it in one entry, which opens both in the house dialog", () => {
     renderLedger({ accounts: [pension, house, loan] });
 
@@ -897,14 +892,7 @@ describe("AccountLedger", () => {
     expect(
       screen.getByRole("group", { name: "Other debts" }),
     ).toHaveTextContent("None");
-    expect(
-      screen.queryByRole("region", { name: "Order of payment" }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByRole("region", { name: "Owners" })).getByText(
-        "Sect. II.ii",
-      ),
-    ).toHaveClass("label");
+    expect(names()).toStrictEqual(["Workplace pension"]);
 
     fireEvent.click(
       within(openRow("Mortgage", "Home")).getByRole("button", {
@@ -1113,26 +1101,28 @@ describe("AccountLedger", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  // The sheet is handed the lines, so a fed pension's row says what
+  // The flow is handed the lines, so a fed pension's step says what
   // lands in it.
-  it("writes what the salary sacrifices into the pension on its row", () => {
+  it("draws what the salary sacrifices into the pension in the flow", () => {
     const [salary] = incomeLines;
     renderLedger({ lines: [salary] });
 
-    expect(rowsOf("Pensions · tax-deferred")[0]).toHaveTextContent(
-      "£2,266 / mo paid + £1,150 / mo sacrificed from Salary",
+    expect(within(flow()).getAllByRole("listitem")[0]).toHaveTextContent(
+      "£1,150 salary sacrifice from Salary",
     );
   });
 
   // The salary ends with 2048, so a plan starting in 2049 lands nothing
-  // of it on the row, though the link stands: the dialog still holds
+  // of it in the flow, though the link stands: the dialog still holds
   // the treatment and the share, since the store holds the link whether
   // or not it runs.
   it("counts a salary on the row only while it runs, and holds the link either way", () => {
     const [salary] = incomeLines;
     renderLedger({ lines: [salary], plan: { ...plan, from: 2049, month: 0 } });
 
-    expect(screen.queryByText(/sacrificed from/)).not.toBeInTheDocument();
+    expect(
+      within(flow()).queryByText(/salary sacrifice/),
+    ).not.toBeInTheDocument();
 
     const dialog = openRow("Workplace pension");
 
