@@ -121,4 +121,25 @@ describe("FoldedLines", () => {
     // eslint-disable-next-line testing-library/no-node-access -- the chevron is hidden from the accessibility tree, so its absence is read off the nodes
     expect(item.querySelector("svg")).not.toBeInTheDocument();
   });
+
+  // A row held here and set on another screen links there from its
+  // name, covering the row, with its lock where the chevron would be.
+  it("links a held row's name to the screen it is set on", () => {
+    renderInItem(
+      <FoldedLines
+        figure="2047"
+        href="/"
+        lock={<span aria-label="Set on the dashboard" role="img" />}
+        name="Retirement"
+      />,
+    );
+
+    const link = screen.getByRole("link", { name: "Retirement" });
+
+    expect(link).toHaveAttribute("href", "/");
+    expect(link).toHaveClass("after:absolute", "after:inset-0");
+    expect(
+      screen.getByRole("img", { name: "Set on the dashboard" }),
+    ).toBeInTheDocument();
+  });
 });

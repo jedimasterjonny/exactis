@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { Route } from "next";
 import type { JSX } from "react";
 
 import { cn } from "cn";
@@ -25,14 +26,15 @@ import { laneColumns } from "@/lib/span";
 // What a schedule says of a line that the rows cannot read off it: the
 // badge its kind takes, if it has one, what it pays at its cadence, any
 // detail to write beside the badge, whether it is a loan's payments,
-// which its bar is drawn in red for, and the line as it is paid where
+// which its bar is drawn in red for, why it is held here and the screen
+// it is set on, for a line edited elsewhere, and the line as it is paid where
 // that stops short of where it says it ends, which the row draws in its
 // place.
 export interface Summary {
   readonly badge?: { readonly label: string; readonly variant: Tone };
   readonly detail?: string;
   readonly isLoan?: boolean;
-  readonly lock?: string;
+  readonly lock?: { readonly at: Route; readonly reason: string };
   readonly paid?: LineValues;
   readonly total: number;
 }
@@ -80,8 +82,9 @@ const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
 // from anywhere on it, its name the button that reports the line, whose
 // id says where a save writes back, as an account's row does on the
 // accounts screen, and the dialog it opens is where it is deleted from.
-// A locked line draws its lock in the chevron's place and opens
-// nothing, since it is neither edited nor deleted here. The schedule
+// A locked line draws its lock in the chevron's place, since it is
+// neither edited nor deleted here, and its name links to the screen it
+// is set on, so a press on it goes where it can be changed. The schedule
 // reads its own lines, so
 // what the rows cannot read off one, the badge, the figure and the
 // detail, comes from it. The figures are right-aligned mono, as in every
@@ -130,16 +133,10 @@ export function ScheduleRows<TLine extends Line>({
         const summary = summarise(line);
         const paid = summary.paid ?? line;
         const row = describe(paid, { milestones, plan }, summary);
-        const lock =
-          summary.lock !== undefined ? (
-            <RowLock reason={summary.lock} />
-          ) : undefined;
-        const open =
-          lock === undefined
-            ? (): void => {
-                onEdit(line);
-              }
-            : undefined;
+        const held = summary.lock;
+        const open = (): void => {
+          onEdit(line);
+        };
         const bar = (
           <SpanBar
             endsAt={paid.endsAt}
@@ -164,9 +161,10 @@ export function ScheduleRows<TLine extends Line>({
             <div className="unfolded:hidden">
               <FoldedLines
                 figure={`${row.total} / ${row.cadence}`}
-                lock={lock}
                 name={line.name}
-                onOpen={open}
+                {...(held === undefined
+                  ? { onOpen: open }
+                  : { href: held.at, lock: <RowLock reason={held.reason} /> })}
               >
                 <span>
                   {[summary.badge?.label, row.growth]
@@ -181,10 +179,10 @@ export function ScheduleRows<TLine extends Line>({
             </div>
             <div className="grid min-w-0 gap-2 folded:hidden">
               <div className="flex flex-wrap items-baseline gap-2">
-                {open === undefined ? (
-                  <span className="font-medium">{line.name}</span>
-                ) : (
+                {held === undefined ? (
                   <RowOpener onOpen={open}>{line.name}</RowOpener>
+                ) : (
+                  <RowOpener href={held.at}>{line.name}</RowOpener>
                 )}
                 {summary.badge !== undefined && (
                   <Badge
@@ -223,11 +221,13 @@ export function ScheduleRows<TLine extends Line>({
               <span className="label text-muted-foreground/60">{row.ages}</span>
             </div>
             <span className="inline-flex size-7 items-center justify-center folded:hidden">
-              {lock ?? (
+              {held === undefined ? (
                 <ChevronRight
                   aria-hidden
                   className="size-4 text-muted-foreground"
                 />
+              ) : (
+                <RowLock reason={held.reason} />
               )}
             </span>
           </li>

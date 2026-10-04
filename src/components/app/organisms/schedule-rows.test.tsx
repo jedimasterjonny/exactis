@@ -299,14 +299,17 @@ describe("ScheduleRows", () => {
         side="income"
         summarise={(line) => ({
           ...summarise(line),
-          ...(line.kind === "pension" && { lock: "Set by the state" }),
+          ...(line.kind === "pension" && {
+            lock: { at: "/accounts", reason: "Set by the state" },
+          }),
         })}
       />,
     );
 
     expect(screen.getAllByRole("button", { name: "Salary" })).toHaveLength(2);
     // The lock is drawn where the chevron would be, in the columns and on
-    // the folded lines alike, and neither opens anything.
+    // the folded lines alike, and the name links to the screen the line
+    // is set on rather than opening it here.
     const locks = screen.getAllByRole("img", { name: "Set by the state" });
 
     expect(locks).toHaveLength(2);
@@ -316,6 +319,10 @@ describe("ScheduleRows", () => {
     expect(
       screen.queryByRole("button", { name: "State pension" }),
     ).not.toBeInTheDocument();
+    for (const link of screen.getAllByRole("link", { name: "State pension" })) {
+      expect(link).toHaveAttribute("href", "/accounts");
+    }
+    expect(onEdit).not.toHaveBeenCalled();
   });
 
   // Narrow, each row is its folded lines: the name and what it pays,
@@ -385,7 +392,10 @@ describe("ScheduleRows", () => {
         onEdit={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
         side="income"
-        summarise={(line) => ({ ...summarise(line), lock: "Set by the state" })}
+        summarise={(line) => ({
+          ...summarise(line),
+          lock: { at: "/accounts", reason: "Set by the state" },
+        })}
       />,
     );
 
