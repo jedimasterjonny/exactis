@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ExpenseLine } from "@/data/expenses";
 import type { Answer } from "@/lib/answer";
 
-import { saveExpenseLine } from "@/actions/schedule";
+import { removeExpenseLine, saveExpenseLine } from "@/actions/schedule";
 import { Toaster } from "@/components/kit/toast";
 import { expenseKinds } from "@/data/expenses";
 import { expenseLines } from "@/data/expenses.fixture";
@@ -21,7 +21,10 @@ import { commit, openEditor, openEntry } from "@/test/dom";
 
 import { ExpenseSchedule } from "./expense-schedule";
 
-vi.mock("@/actions/schedule", () => ({ saveExpenseLine: vi.fn() }));
+vi.mock("@/actions/schedule", () => ({
+  removeExpenseLine: vi.fn(),
+  saveExpenseLine: vi.fn(),
+}));
 
 const [, , mortgagePayment, retirement] = expenseLines;
 
@@ -196,6 +199,46 @@ describe("ExpenseSchedule", () => {
     expect(
       screen.getByRole("dialog", { name: "Expense line added" }),
     ).toHaveAccessibleDescription("Nursery · 2027–2035");
+  });
+
+  // A saved line's dialog is where it is deleted from: the Delete closes
+  // the dialog and asks first, holds the confirm while the store answers,
+  // and closes on the answer; the row goes when the page re-reads. A new
+  // line has nothing yet to delete.
+  it("asks from a saved line's dialog before deleting it, the dialog closing first", async () => {
+    renderSchedule();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<undefined>>();
+    vi.mocked(removeExpenseLine).mockReturnValue(promise);
+
+    expect(
+      within(openEntry("Add expense line")).queryByRole("button", {
+        name: "Delete",
+      }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(
+      within(openEditor("Childcare")).getByRole("button", { name: "Delete" }),
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    const question = screen.getByRole("alertdialog", {
+      name: "Delete Childcare?",
+    });
+    fireEvent.click(within(question).getByRole("button", { name: "Delete" }));
+
+    expect(removeExpenseLine).toHaveBeenCalledExactlyOnceWith(2);
+    expect(
+      within(question).getByRole("button", { name: "Delete" }),
+    ).toBeDisabled();
+
+    answer(accepted(undefined));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
   });
 
   it("drops a cancelled draft", () => {
