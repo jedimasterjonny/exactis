@@ -11,6 +11,7 @@ import { monthName } from "@/lib/months";
 
 interface MonthFieldProps {
   readonly hint?: string | undefined;
+  readonly isDisabled?: boolean;
   readonly label: string;
   readonly onValueChange?: (month: number) => void;
   readonly value: null | number;
@@ -32,9 +33,11 @@ const months = Array.from({ length: 12 }, (_, month) => ({
 // the native select, which is what ties it to the label the field
 // draws, as the select field does; it is not that field because that
 // one is uncontrolled and always holds a choice, and this one is
-// controlled and can hold none.
+// controlled and can hold none. A month worked out elsewhere is shown
+// held, so it reads as an answer rather than a choice.
 export function MonthField({
   hint,
+  isDisabled = false,
   label,
   onValueChange,
   value,
@@ -51,7 +54,7 @@ export function MonthField({
           }
         }}
         render={
-          <NativeSelect className="w-full">
+          <NativeSelect className="w-full" disabled={isDisabled}>
             {value === null && (
               <NativeSelectOption disabled value="">
                 —

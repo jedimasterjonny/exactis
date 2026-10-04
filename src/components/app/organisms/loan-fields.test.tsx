@@ -21,8 +21,6 @@ const words: LoanWords = {
   end: "Ends",
   never: "Never, so to the end of the plan",
   noRate: "No rate fits",
-  term: "Years",
-  typed: "As typed",
 };
 
 const workedHint = "Worked out from the other two";
@@ -36,43 +34,56 @@ function renderFields(
   readonly onAmend: ReturnType<
     typeof vi.fn<(patch: Partial<LoanDraft>) => void>
   >;
+  readonly onWork: ReturnType<typeof vi.fn<(worked: LoanFigure) => void>>;
 } {
   const onAmend = vi.fn<(patch: Partial<LoanDraft>) => void>();
+  const onWork = vi.fn<(worked: LoanFigure) => void>();
   render(
     <LoanFields
       draft={loan}
       figure={figure}
       onAmend={onAmend}
+      onWork={onWork}
       plan={plan}
       words={words}
       worked={worked}
     />,
   );
-  return { onAmend };
+  return { onAmend, onWork };
 }
 
 describe("LoanFields", () => {
-  it("names the fields in the caller's words, shows the worked-out figure by value and reports each change", () => {
+  // The payment is worked out, so it is read-only and says so, and the
+  // rate and the end are typed; the end's year says the years it comes
+  // to. A month or a year picked reports the term whose last payment
+  // falls in it.
+  it("names the fields in the caller's words, shows the worked-out figure read-only and reports each change", () => {
     const { onAmend } = renderFields("payment", 290);
 
     expect(field("Owed")).toHaveValue("£14,000");
+    expect(screen.getByRole("combobox", { name: "Work out" })).toHaveValue(
+      "payment",
+    );
     expect(field("Rate")).toHaveValue("7.90%");
     expect(field("Rate")).toHaveAccessibleDescription(
       "A year, compounding monthly",
     );
+    expect(field("Rate")).not.toHaveAttribute("readonly");
     expect(field("Monthly payment")).toHaveValue("£290");
     expect(field("Monthly payment")).toHaveAccessibleDescription(workedHint);
-    expect(field("Years")).toHaveValue("3");
-    expect(field("Years")).toHaveAccessibleDescription("As typed");
+    expect(field("Monthly payment")).toHaveAttribute("readonly");
     expect(screen.getByRole("combobox", { name: "Ends" })).toHaveDisplayValue(
       "August",
     );
+    expect(screen.getByRole("combobox", { name: "Ends" })).toBeEnabled();
+    expect(
+      screen.getByRole("combobox", { name: "Ends" }),
+    ).toHaveAccessibleDescription("When the last payment falls");
     expect(field("Year")).toHaveValue("2029");
+    expect(field("Year")).toHaveAccessibleDescription("3 years left");
 
     commit(field("Owed"), "-10,000");
     commit(field("Rate"), "6.9");
-    commit(field("Monthly payment"), "250");
-    commit(field("Years"), "4");
     fireEvent.change(screen.getByRole("combobox", { name: "Ends" }), {
       target: { value: "1" },
     });
@@ -81,53 +92,61 @@ describe("LoanFields", () => {
     expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
       { balance: 0 },
       { rate: 0.069 },
-      { payment: 250 },
-      { term: 4 },
       { term: 2.5 },
       { term: 4 },
     ]);
   });
 
+  it("reports which figure is chosen to be worked out", () => {
+    const { onWork } = renderFields("payment", 290);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Work out" }), {
+      target: { value: "rate" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "Work out" }), {
+      target: { value: "term" },
+    });
+
+    expect(onWork.mock.calls).toStrictEqual([["rate"], ["term"]]);
+  });
+
   it("says in the caller's words when no rate fits", () => {
-    renderFields("rate", null);
+    const { onAmend } = renderFields("rate", null);
 
     expect(field("Rate")).toHaveValue("");
     expect(field("Rate")).toHaveAttribute("aria-invalid", "true");
+    expect(field("Rate")).toHaveAttribute("readonly");
     expect(screen.getByText("No rate fits")).toHaveClass("text-destructive");
     expect(field("Monthly payment")).toHaveAccessibleDescription("A month");
+
+    commit(field("Monthly payment"), "250");
+
+    expect(onAmend).toHaveBeenCalledExactlyOnceWith({ payment: 250 });
   });
 
-  // A loan that never clears has no month to end in, so a month or a
-  // year picked takes the other from the plan: December is four
-  // payments from September, and a year on is thirteen.
-  it("says in the caller's words when the payment never clears, and ends a term picked from the plan", () => {
-    const { onAmend } = renderFields("term", null);
+  // A loan that never clears has no month to end in, so the end says
+  // so and its year says no years.
+  it("says in the caller's words when the payment never clears", () => {
+    renderFields("term", null);
     const ends = screen.getByRole("combobox", { name: "Ends" });
 
-    expect(field("Years")).toHaveValue("");
-    expect(field("Years")).toHaveAccessibleDescription(
-      "Never, so to the end of the plan",
-    );
     expect(ends).toHaveDisplayValue("—");
+    expect(ends).toBeDisabled();
     expect(ends).toHaveAccessibleDescription("Never, at this payment");
     expect(field("Year")).toHaveValue("");
-
-    fireEvent.change(ends, { target: { value: "11" } });
-    commit(field("Year"), "2027");
-
-    const [december, yearOn] = onAmend.mock.calls.map(([patch]) => patch);
-
-    expect(onAmend).toHaveBeenCalledTimes(2);
-    expect(december?.term).toBeCloseTo(4 / 12, 10);
-    expect(yearOn?.term).toBeCloseTo(13 / 12, 10);
+    expect(field("Year")).toHaveAttribute("readonly");
+    expect(field("Year")).toHaveAccessibleDescription(
+      "Never, so to the end of the plan",
+    );
   });
 
-  it("says a worked-out term was, and that the month follows it", () => {
+  it("says a worked-out end was, and holds it", () => {
     renderFields("term", 3);
 
-    expect(field("Years")).toHaveAccessibleDescription(workedHint);
     expect(
       screen.getByRole("combobox", { name: "Ends" }),
-    ).toHaveAccessibleDescription("Worked out with the years left");
+    ).toHaveAccessibleDescription(workedHint);
+    expect(screen.getByRole("combobox", { name: "Ends" })).toBeDisabled();
+    expect(field("Year")).toHaveAccessibleDescription("3 years left");
   });
 });

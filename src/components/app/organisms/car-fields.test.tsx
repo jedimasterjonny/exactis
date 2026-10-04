@@ -41,6 +41,7 @@ function renderFields(
   readonly rerender: (figure: null | number, clears?: null | number) => void;
 } {
   const onAmend = vi.fn<(patch: Partial<CarDraft>) => void>();
+  const onWork = vi.fn<(worked: LoanFigure) => void>();
   const clears = shown.clears ?? 4.86;
   const view = render(
     <CarFields
@@ -49,6 +50,7 @@ function renderFields(
       figure={shown.figure}
       initial={draft}
       onAmend={onAmend}
+      onWork={onWork}
       plan={plan}
       worked={shown.worked}
     />,
@@ -63,6 +65,7 @@ function renderFields(
           figure={next}
           initial={draft}
           onAmend={onAmend}
+          onWork={onWork}
           plan={plan}
           worked={shown.worked}
         />,
@@ -88,13 +91,12 @@ describe("CarFields", () => {
     );
     expect(field("Monthly payment")).toHaveValue("£290");
     expect(field("Monthly payment")).toHaveAccessibleDescription(workedHint);
-    expect(field("Years left")).toHaveValue("3");
-    expect(field("Years left")).toHaveAccessibleDescription("On the agreement");
     expect(select("Agreement ends")).toHaveDisplayValue("August");
     expect(select("Agreement ends")).toHaveAccessibleDescription(
-      "One with the years left",
+      "When the last payment falls",
     );
     expect(field("Year")).toHaveValue("2029");
+    expect(field("Year")).toHaveAccessibleDescription("3 years left");
     expect(field("Balloon")).toHaveValue("£6,000");
     expect(field("Balloon")).toHaveAccessibleDescription(
       `${refinanced}, so the payments run 4.9 years in all`,
@@ -105,8 +107,6 @@ describe("CarFields", () => {
     commit(field("Depreciation"), "20");
     commit(field("Balance owed"), "10,000");
     commit(field("Rate"), "6.9");
-    commit(field("Monthly payment"), "250");
-    commit(field("Years left"), "4");
     fireEvent.change(select("Agreement ends"), { target: { value: "1" } });
     commit(field("Year"), "2030");
     commit(field("Balloon"), "4,000");
@@ -120,8 +120,6 @@ describe("CarFields", () => {
       { depreciation: 0.2 },
       { balance: 10000 },
       { rate: 0.069 },
-      { payment: 250 },
-      { term: 4 },
       { term: 2.5 },
       { term: 4 },
       { balloon: 4000 },
@@ -130,7 +128,7 @@ describe("CarFields", () => {
   });
 
   it("holds what is owed, paid and left as a balloon at nothing or above", () => {
-    const { onAmend } = renderFields(golf, { figure: 290, worked: "payment" });
+    const { onAmend } = renderFields(golf, { figure: 3, worked: "term" });
 
     commit(field("Balance owed"), "-10,000");
     commit(field("Monthly payment"), "-250");
@@ -163,44 +161,26 @@ describe("CarFields", () => {
 
   // A PCP's payment that never reaches the balloon never clears the whole
   // either, so the balloon says only that it is refinanced, and the end
-  // shows no month and no year. A month or a year picked with no end
-  // to take the other from takes it from the plan: December is four
-  // payments from September, and a year on is thirteen.
-  it("shows a worked-out term, and says when the payment never reaches the balloon", () => {
-    const { onAmend, rerender } = renderFields(golf, {
-      figure: 3,
-      worked: "term",
-    });
+  // shows no month and no year. The end is worked out, so it is held.
+  it("shows a worked-out end, and says when the payment never reaches the balloon", () => {
+    const { rerender } = renderFields(golf, { figure: 3, worked: "term" });
 
-    expect(field("Years left")).toHaveValue("3");
-    expect(field("Years left")).toHaveAccessibleDescription(workedHint);
     expect(select("Agreement ends")).toHaveDisplayValue("August");
-    expect(select("Agreement ends")).toHaveAccessibleDescription(
-      "Worked out with the years left",
-    );
+    expect(select("Agreement ends")).toBeDisabled();
+    expect(select("Agreement ends")).toHaveAccessibleDescription(workedHint);
     expect(field("Year")).toHaveValue("2029");
 
     rerender(null, null);
 
-    expect(field("Years left")).toHaveValue("");
-    expect(field("Years left")).toHaveAccessibleDescription(
-      "Never reaches the balloon at this payment, so the payments run to the end of the plan",
-    );
     expect(select("Agreement ends")).toHaveDisplayValue("—");
     expect(select("Agreement ends")).toHaveAccessibleDescription(
       "Never, at this payment",
     );
     expect(field("Year")).toHaveValue("");
+    expect(field("Year")).toHaveAccessibleDescription(
+      "Never reaches the balloon at this payment, so the payments run to the end of the plan",
+    );
     expect(field("Balloon")).toHaveAccessibleDescription(refinanced);
-
-    fireEvent.change(select("Agreement ends"), { target: { value: "11" } });
-    commit(field("Year"), "2027");
-
-    const [december, yearOn] = onAmend.mock.calls.map(([patch]) => patch);
-
-    expect(onAmend).toHaveBeenCalledTimes(2);
-    expect(december?.term).toBeCloseTo(4 / 12, 10);
-    expect(yearOn?.term).toBeCloseTo(13 / 12, 10);
   });
 
   it("shows a loan with no balloon, and says when the payment never clears it", () => {
@@ -212,26 +192,17 @@ describe("CarFields", () => {
     expect(
       screen.queryByRole("textbox", { name: "Balloon" }),
     ).not.toBeInTheDocument();
-    expect(field("Years left")).toHaveAccessibleDescription(workedHint);
     expect(select("Last payment")).toHaveDisplayValue("August");
+    expect(select("Last payment")).toHaveAccessibleDescription(workedHint);
     expect(
       screen.queryByRole("combobox", { name: "Agreement ends" }),
     ).not.toBeInTheDocument();
 
     rerender(null);
 
-    expect(field("Years left")).toHaveAccessibleDescription(
+    expect(field("Year")).toHaveAccessibleDescription(
       "Never clears at this payment, so the payments run to the end of the plan",
     );
-  });
-
-  it("says what a typed term on a loan is left of", () => {
-    renderFields(
-      { ...golf, agreement: "loan", balloon: 0, payment: 438 },
-      { figure: 438, worked: "payment" },
-    );
-
-    expect(field("Years left")).toHaveAccessibleDescription("To pay off");
   });
 
   it("shows no finance fields for a car owned outright", () => {
@@ -245,14 +216,13 @@ describe("CarFields", () => {
       "Balance owed",
       "Rate",
       "Monthly payment",
-      "Years left",
       "Year",
       "Balloon",
     ]) {
       expect(screen.queryByRole("textbox", { name })).not.toBeInTheDocument();
     }
-    expect(
-      screen.queryByRole("combobox", { name: "Agreement ends" }),
-    ).not.toBeInTheDocument();
+    for (const name of ["Agreement ends", "Work out"]) {
+      expect(screen.queryByRole("combobox", { name })).not.toBeInTheDocument();
+    }
   });
 });

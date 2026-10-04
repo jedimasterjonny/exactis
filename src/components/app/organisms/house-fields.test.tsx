@@ -28,21 +28,25 @@ function renderFields(
   readonly onAmend: ReturnType<
     typeof vi.fn<(patch: Partial<HouseDraft>) => void>
   >;
+  readonly onWork: ReturnType<typeof vi.fn<(worked: LoanFigure) => void>>;
   readonly rerender: (figure: null | number) => void;
 } {
   const onAmend = vi.fn<(patch: Partial<HouseDraft>) => void>();
+  const onWork = vi.fn<(worked: LoanFigure) => void>();
   const view = render(
     <HouseFields
       draft={draft}
       figure={figure}
       initial={draft}
       onAmend={onAmend}
+      onWork={onWork}
       plan={plan}
       worked={worked}
     />,
   );
   return {
     onAmend,
+    onWork,
     rerender: (next): void => {
       view.rerender(
         <HouseFields
@@ -50,6 +54,7 @@ function renderFields(
           figure={next}
           initial={draft}
           onAmend={onAmend}
+          onWork={onWork}
           plan={plan}
           worked={worked}
         />,
@@ -60,7 +65,7 @@ function renderFields(
 
 describe("HouseFields", () => {
   it("mounts every field on the draft, shows the worked-out payment by value and reports each change", () => {
-    const { onAmend } = renderFields(home, "payment", 2166);
+    const { onAmend, onWork } = renderFields(home, "payment", 2166);
 
     expect(field("Name")).toHaveValue("Home");
     expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue(
@@ -75,23 +80,20 @@ describe("HouseFields", () => {
     );
     expect(field("Monthly payment")).toHaveValue("£2,166");
     expect(field("Monthly payment")).toHaveAccessibleDescription(workedHint);
-    expect(field("Years to pay off")).toHaveValue("22");
-    expect(field("Years to pay off")).toHaveAccessibleDescription(
-      "Left to run",
-    );
+    expect(select("Work out")).toHaveValue("payment");
     expect(select("Last payment")).toHaveDisplayValue("August");
     expect(select("Last payment")).toHaveAccessibleDescription(
-      "One with the years left",
+      "When the last payment falls",
     );
     expect(field("Year")).toHaveValue("2048");
+    expect(field("Year")).toHaveAccessibleDescription("22 years left");
 
     fireEvent.change(field("Name"), { target: { value: "Flat" } });
     commit(field("Value"), "420,000");
     commit(field("Value growth"), "3");
     commit(field("Loan balance"), "300,000");
     commit(field("Rate"), "4.5");
-    commit(field("Monthly payment"), "2,000");
-    commit(field("Years to pay off"), "20");
+    fireEvent.change(select("Work out"), { target: { value: "rate" } });
     fireEvent.change(select("Last payment"), { target: { value: "1" } });
     commit(field("Year"), "2047");
     fireEvent.change(screen.getByRole("combobox", { name: "Status" }), {
@@ -104,12 +106,11 @@ describe("HouseFields", () => {
       { growth: 0.03 },
       { balance: 300000 },
       { rate: 0.045 },
-      { payment: 2000 },
-      { term: 20 },
       { term: 21.5 },
       { term: 21 },
       { status: "outright" },
     ]);
+    expect(onWork).toHaveBeenCalledExactlyOnceWith("rate");
   });
 
   it("holds what is owed and paid at nothing or above", () => {
@@ -143,41 +144,27 @@ describe("HouseFields", () => {
   });
 
   // 21.21 years from September 2026 is 255 payments, the last of them in
-  // November 2047; a loan that never clears has no month to end in. A
-  // month or a year picked with no end to take the other from takes it
-  // from the plan: December is four payments from September, and a year
-  // on is thirteen.
-  it("shows a worked-out term, and says when the payment never clears the loan", () => {
-    const { onAmend, rerender } = renderFields(home, "term", 21.21);
+  // November 2047; a loan that never clears has no month to end in. The
+  // end is worked out, so it is held.
+  it("shows a worked-out end, and says when the payment never clears the loan", () => {
+    const { rerender } = renderFields(home, "term", 21.21);
 
-    expect(field("Years to pay off")).toHaveValue("21.2");
-    expect(field("Years to pay off")).toHaveAccessibleDescription(workedHint);
     expect(select("Last payment")).toHaveDisplayValue("November");
-    expect(select("Last payment")).toHaveAccessibleDescription(
-      "Worked out with the years left",
-    );
+    expect(select("Last payment")).toBeDisabled();
+    expect(select("Last payment")).toHaveAccessibleDescription(workedHint);
     expect(field("Year")).toHaveValue("2047");
+    expect(field("Year")).toHaveAccessibleDescription("21.2 years left");
 
     rerender(null);
 
-    expect(field("Years to pay off")).toHaveValue("");
-    expect(field("Years to pay off")).toHaveAccessibleDescription(
-      "Never clears at this payment, so the payments run to the end of the plan",
-    );
     expect(select("Last payment")).toHaveDisplayValue("—");
     expect(select("Last payment")).toHaveAccessibleDescription(
       "Never, at this payment",
     );
     expect(field("Year")).toHaveValue("");
-
-    fireEvent.change(select("Last payment"), { target: { value: "11" } });
-    commit(field("Year"), "2027");
-
-    const [december, yearOn] = onAmend.mock.calls.map(([patch]) => patch);
-
-    expect(onAmend).toHaveBeenCalledTimes(2);
-    expect(december?.term).toBeCloseTo(4 / 12, 10);
-    expect(yearOn?.term).toBeCloseTo(13 / 12, 10);
+    expect(field("Year")).toHaveAccessibleDescription(
+      "Never clears at this payment, so the payments run to the end of the plan",
+    );
   });
 
   it("shows no loan fields for a house owned outright", () => {
@@ -194,7 +181,7 @@ describe("HouseFields", () => {
       screen.queryByRole("textbox", { name: "Monthly payment" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("textbox", { name: "Years to pay off" }),
+      screen.queryByRole("combobox", { name: "Work out" }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("combobox", { name: "Last payment" }),

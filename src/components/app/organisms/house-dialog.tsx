@@ -6,7 +6,7 @@ import type { Account } from "@/data/accounts";
 import type { HouseDraft, HouseValues } from "@/data/houses";
 import type { Secured } from "@/data/secured";
 import type { Entry } from "@/hooks/use-editor";
-import type { Stood, WorkedOut } from "@/lib/figures";
+import type { LoanFigure, WorkedOut } from "@/lib/figures";
 import type { PlanMonth } from "@/lib/loans";
 
 import { saveHouse } from "@/actions/accounts";
@@ -14,14 +14,19 @@ import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { HouseFields } from "@/components/app/organisms/house-fields";
 import { derive, houseOf, isSound } from "@/data/houses";
 import { useMountedEditor } from "@/hooks/use-editor";
-import { isSettled, settled, stood, thirdOf, typedOn } from "@/lib/figures";
+import { isSettled, kept, movesLoan, settled, workedOn } from "@/lib/figures";
 
 // What the dialog holds while it is open: the house as the fields hold
-// it, and the two of the mortgage's three figures that stand while the
-// third is worked out from them. The two travel with the draft so an
-// amendment moves both at once.
+// it, which of the mortgage's three figures is worked out from the
+// other two, which the fields offer as a choice, and whether that figure
+// is held as the draft has it, as it is from the moment it is chosen
+// until something it is worked out from is typed, so a choice alone
+// changes no figure: worked out afresh from a term that is a part of a
+// month, which the payments round up to a whole one, a rate or a
+// payment would move with nothing typed, and be saved so.
 interface Draft extends HouseDraft {
-  readonly typed: Stood;
+  readonly isHeld: boolean;
+  readonly worked: LoanFigure;
 }
 
 interface HouseDialogProps {
@@ -34,18 +39,19 @@ interface HouseDialogProps {
 
 // A new house: mortgaged, since that is the case with something to work
 // out, worth nothing and owing nothing yet, over a term of twenty-five
-// years at no rate, so the first two figures typed are taken as read and
-// the payment follows from them until the payment is typed instead.
+// years at no rate, working out the payment from the rate and the term
+// until another figure is chosen.
 const blank: Draft = {
   balance: 0,
   growth: 0,
+  isHeld: false,
   name: "",
   payment: 0,
   rate: 0,
   status: "mortgaged",
   term: 25,
-  typed: ["rate", "term"],
   value: 0,
+  worked: "payment",
 };
 
 // The dialog a house is entered or edited in, which takes the house as
@@ -62,11 +68,10 @@ const blank: Draft = {
 // hook holds the entry, the save and the toast, as it does for the
 // account dialog; what is the house's own is the figure worked out on
 // each amendment and the values the save sends, which are the draft
-// less the figure typed over. The caller is told when the house has
+// with the figure worked out in place of its own. The caller is told when the house has
 // been saved, so the screen can close the dialog and bring the assets
 // forward. Given a delete handler, the dialog of a house the store holds
-// offers a Delete, which reports the house's own account, as its row's
-// bin does, for the caller to ask about with the mortgage that goes with
+// offers a Delete, which reports the house's own account, for the caller to ask about with the mortgage that goes with
 // it, and holds while a save is on its way; a new house has nothing yet
 // to delete and is offered none.
 export function HouseDialog({
@@ -112,7 +117,17 @@ export function HouseDialog({
         figure={figure}
         initial={entry.initial}
         onAmend={(patch) => {
-          amend(entry, { ...patch, typed: stood(entry.draft.typed, patch) });
+          amend(entry, {
+            ...patch,
+            isHeld: entry.draft.isHeld && !movesLoan(patch),
+          });
+        }}
+        onWork={(next) => {
+          amend(entry, {
+            ...kept({ figure, worked }),
+            isHeld: true,
+            worked: next,
+          });
         }}
         plan={plan}
         worked={worked}
@@ -133,8 +148,9 @@ function openingOf(house: null | Secured): Entry<Draft> {
   }
   const draft: Draft = {
     ...houseOf(house),
+    isHeld: false,
     term: blank.term,
-    typed: typedOn(house.loan !== null),
+    worked: workedOn(house.loan !== null),
   };
   return { draft, id: house.asset.id, initial: draft };
 }
@@ -165,8 +181,11 @@ function valuesOf(draft: HouseDraft, out: WorkedOut): HouseValues {
 function workedOut(
   draft: Draft,
 ): WorkedOut & { readonly canSave: boolean; readonly values: HouseValues } {
-  const worked = thirdOf(...draft.typed);
-  const out = { figure: derive(draft, worked), worked };
+  const { worked } = draft;
+  const out = {
+    figure: draft.isHeld ? draft[worked] : derive(draft, worked),
+    worked,
+  };
   const values = valuesOf(draft, out);
   return {
     ...out,
