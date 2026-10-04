@@ -259,6 +259,27 @@ describe("LineFields", () => {
     ).toBeInTheDocument();
   });
 
+  // The name and the category first, then when the line runs and its bar,
+  // then what it pays, then what the schedule adds.
+  it("lays the fields out in the order they decide the line", () => {
+    renderFields(salary);
+
+    const order = [
+      screen.getByRole("combobox", { name: "Category" }),
+      screen.getByRole("combobox", { name: "Ends" }),
+      screen.getByText(bySlot("span-bar"), { suggest: false }),
+      screen.getByRole("textbox", { name: "Base salary" }),
+      screen.getByText("The parts"),
+    ];
+
+    for (const [place, field] of order.slice(1).entries()) {
+      expect(
+        order[place]?.compareDocumentPosition(field) ??
+          Node.DOCUMENT_POSITION_PRECEDING,
+      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    }
+  });
+
   // A schedule that sorts its lines into no category, as the expenses
   // do, gives the fields none, and the name stands alone on its row.
   it("offers no category for a schedule that has none", () => {
