@@ -72,8 +72,14 @@ describe("HouseFields", () => {
       "mortgaged",
     );
     expect(field("Value")).toHaveValue("£397,512");
+    expect(field("Value")).toHaveAccessibleDescription(
+      "What it would sell for in September 2026",
+    );
     expect(field("Value growth")).toHaveValue("2.10%");
     expect(field("Loan balance")).toHaveValue("£334,670");
+    expect(field("Loan balance")).toHaveAccessibleDescription(
+      "What is owed in September 2026",
+    );
     expect(field("Rate")).toHaveValue("4.85%");
     expect(field("Rate")).toHaveAccessibleDescription(
       "A year, compounding monthly",

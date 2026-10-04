@@ -28,7 +28,7 @@ import { isAsset } from "@/data/accounts";
 import { useRemover } from "@/hooks/use-remover";
 import { useSender } from "@/hooks/use-sender";
 import { feedersOf, listed } from "@/lib/feeders";
-import { formatPercent } from "@/lib/money";
+import { formatGbp, formatPercent } from "@/lib/money";
 import { accountsAndAssets, subsectionLabel } from "@/lib/nav";
 
 interface AccountLedgerProps {
@@ -285,12 +285,13 @@ export function AccountLedger({
   );
 }
 
-// What goes with an account when it is deleted, for the dialog to say:
-// a pension takes the sacrifice of every salary feeding it, which is
-// earned whole from then on, since the store stops the salaries before
-// the pension goes and the share typed against each is lost with it; a
-// house or a car takes the loan secured on it and that loan's payments,
-// and any other account, or an asset with no loan, goes alone.
+// What goes with an account when it is deleted, for the dialog to say
+// in plain words: a pension takes the sacrifice of every salary feeding
+// it, which is paid as salary from then on, since the store stops the
+// salaries before the pension goes and the share typed against each is
+// lost with it; a house or a car takes the loan secured on it and that
+// loan's payments; and any other account, or an asset with no loan,
+// goes alone, taking its balance off the sheet for good.
 function goesWith(
   account: Account,
   accounts: readonly Account[],
@@ -298,11 +299,11 @@ function goesWith(
 ): string {
   const feeders = feedersOf(account.id, lines);
   if (feeders.length > 0) {
-    return `${listed.format(feeders)} ${feeders.length === 1 ? "stops" : "stop"} sacrificing into it and ${feeders.length === 1 ? "is" : "are"} earned whole, at the share lost with it.`;
+    return `${listed.format(feeders)} ${feeders.length === 1 ? "stops" : "stop"} sacrificing into it, and ${feeders.length === 1 ? "pays that share" : "pay those shares"} as salary instead.`;
   }
   const loan = securedFor(account, accounts)?.loan ?? null;
   if (loan === null) {
-    return "It cannot be brought back.";
+    return `Its ${formatGbp(account.balance)} leaves the balance sheet, and it cannot be brought back.`;
   }
   const what = account.kind === "house" ? "mortgage" : "finance";
   return `Its ${what}, ${loan.name}, and the payments go with it.`;

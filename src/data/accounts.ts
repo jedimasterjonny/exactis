@@ -132,16 +132,17 @@ export const fundings = ["fixed", "spare"] as const;
 
 export const growthKinds = ["fixed", "plan"] as const;
 
-// What each kind is called, on the ledger's badge and in the dialog's
-// choice, so the two cannot drift from each other.
+// What each kind is called, beside an asset on the balance sheet and in
+// the dialog's choice, so the two cannot drift from each other: a
+// wrapper by what it is, with the treatment its tax takes.
 export const kindLabels: Record<AccountKind, string> = {
   car: "Car",
   cash: "Cash",
   debt: "Debt",
   house: "House",
   "real-asset": "Real asset",
-  "tax-deferred": "Tax-deferred",
-  "tax-free": "Tax-free",
+  "tax-deferred": "Pension (tax-deferred)",
+  "tax-free": "ISA (tax-free)",
 };
 
 // The most the kind may be paid a year, as the UK sets it: £20,000 into

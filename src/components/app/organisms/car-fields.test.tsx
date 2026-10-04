@@ -83,6 +83,9 @@ describe("CarFields", () => {
       "pcp",
     );
     expect(field("Value")).toHaveValue("£18,000");
+    expect(field("Value")).toHaveAccessibleDescription(
+      "What it would sell for in September 2026",
+    );
     expect(field("Depreciation")).toHaveValue("15.00%");
     expect(field("Balance owed")).toHaveValue("£14,000");
     expect(field("Rate")).toHaveValue("7.90%");
