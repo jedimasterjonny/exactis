@@ -17,20 +17,24 @@ import { counted } from "@/lib/count";
 import { growthLabels } from "@/lib/lines";
 import { optionsOf } from "@/lib/options";
 
-// A line as the fields read it: what every line holds, and the kind,
-// whose choices are the schedule's own.
-type Line<TKind extends string> = LineValues & { readonly kind: TKind };
+// The category a schedule's lines are sorted into, where the schedule
+// has one: the choices, which are the schedule's own, the one the line
+// opened with, and where a choice goes.
+interface Category<TKind extends string> {
+  readonly initial: TKind;
+  readonly kinds: readonly Option<TKind>[];
+  readonly onChange: (kind: TKind) => void;
+}
 
 interface LineFieldsProps<TKind extends string> {
   readonly amountLabel: string;
+  readonly category?: Category<TKind>;
   readonly children?: ReactNode;
-  readonly draft: Line<TKind>;
-  readonly initial: Line<TKind>;
-  readonly kinds: readonly Option<TKind>[];
+  readonly draft: LineValues;
+  readonly initial: LineValues;
   readonly milestones: readonly Marker[];
   readonly namePlaceholder: string;
   readonly onAmend: (patch: Partial<LineValues>) => void;
-  readonly onKindChange: (kind: TKind) => void;
   readonly paid?:
     undefined | { readonly line: LineValues; readonly says: string };
   readonly plan: Plan;
@@ -50,7 +54,8 @@ const growths = optionsOf(growthLabels, [
 ]);
 
 // The fields every line's dialog takes, in the shape of the reference's
-// new-line dialog: a name and a category on the first row, the amount,
+// new-line dialog: a name on the first row, with a category beside it
+// for a schedule that sorts its lines into one, the amount,
 // its cadence and what it grows with on the second, whatever the
 // schedule adds beneath, where the line starts and ends, and the line's
 // coverage of the plan's span, moving as the years are typed. The fields
@@ -70,14 +75,13 @@ const growths = optionsOf(growthLabels, [
 // is given a year ends in its first year.
 export function LineFields<TKind extends string>({
   amountLabel,
+  category,
   children,
   draft,
   initial,
-  kinds,
   milestones,
   namePlaceholder,
   onAmend,
-  onKindChange,
   paid,
   plan,
   side,
@@ -117,24 +121,32 @@ export function LineFields<TKind extends string>({
     });
   }
 
+  const name = (
+    <TextField
+      defaultValue={initial.name}
+      label="Name"
+      onValueChange={(typed) => {
+        onAmend({ name: typed });
+      }}
+      placeholder={namePlaceholder}
+    />
+  );
+
   return (
     <div className="grid gap-4">
-      <FieldRow layout="named">
-        <TextField
-          defaultValue={initial.name}
-          label="Name"
-          onValueChange={(name) => {
-            onAmend({ name });
-          }}
-          placeholder={namePlaceholder}
-        />
-        <SelectField
-          defaultValue={initial.kind}
-          label="Category"
-          onValueChange={onKindChange}
-          options={kinds}
-        />
-      </FieldRow>
+      {category === undefined ? (
+        name
+      ) : (
+        <FieldRow layout="named">
+          {name}
+          <SelectField
+            defaultValue={category.initial}
+            label="Category"
+            onValueChange={category.onChange}
+            options={category.kinds}
+          />
+        </FieldRow>
+      )}
       <FieldRow layout="triple">
         <MoneyField
           defaultValue={initial.amount}

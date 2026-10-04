@@ -75,15 +75,7 @@ describe("Accounts", () => {
   // paying the mortgage says when it clears.
   it("hands the store's accounts, lines, owners and plan to the ledger", async () => {
     await renderAccounts({
-      expenses: [
-        {
-          ...expenseLines[0],
-          kind: "debt",
-          lastMonth: 6,
-          lastYear: 2051,
-          pays: 5,
-        },
-      ],
+      expenses: [{ ...expenseLines[0], lastMonth: 2, lastYear: 2044, pays: 5 }],
     });
 
     expect(

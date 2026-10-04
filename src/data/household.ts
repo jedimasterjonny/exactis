@@ -29,7 +29,6 @@ import {
   toValues,
 } from "@/data/accounts";
 import { derivedSet, openingDeductions, sleeves } from "@/data/cma";
-import { expenseKinds } from "@/data/expenses";
 import { incomeKinds } from "@/data/income";
 import { timed } from "@/data/milestones";
 import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
@@ -185,11 +184,7 @@ const account = z
   ) satisfies z.ZodType<Account>;
 
 const expenseLine = z
-  .object({
-    ...line,
-    kind: z.enum(expenseKinds),
-    pays: recordId.exactOptional(),
-  })
+  .object({ ...line, pays: recordId.exactOptional() })
   .refine(isInOrder, "A line ends no earlier than it starts")
   .refine(endsAfterATie, "A line ends years after a milestone only")
   .refine(

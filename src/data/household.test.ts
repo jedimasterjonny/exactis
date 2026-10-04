@@ -582,6 +582,23 @@ describe("soundKept", () => {
     });
   });
 
+  // A version saved while an expense line carried a category reads with
+  // the category dropped, so a household kept before it went still opens
+  // and its next save leaves it out.
+  it("reads an expense line kept with the category it once carried, without it", () => {
+    const [household, ...expenses] = expenseLines;
+
+    expect(
+      soundKept({
+        ...kept,
+        schedule: {
+          ...kept.schedule,
+          expenses: [{ ...household, kind: "core" }, ...expenses],
+        },
+      }).kept,
+    ).toStrictEqual(kept);
+  });
+
   // A category the allocation no longer lists, and a class the vintage
   // no longer prices, keep the class they were given.
   it("keeps a mapping of a category no longer listed, and onto a class no longer priced", () => {

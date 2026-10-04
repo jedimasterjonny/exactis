@@ -2,14 +2,13 @@
 
 import * as z from "zod";
 
-import type { ExpenseLine, ExpenseLineValues } from "@/data/expenses";
+import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine, IncomeLineDraft } from "@/data/income";
 import type { LineValues } from "@/data/schedule";
 import type { Answer } from "@/lib/answer";
 import type { Held } from "@/store/household";
 
 import { toAccount } from "@/data/accounts";
-import { expenseKinds } from "@/data/expenses";
 import { incomeKinds, toPension } from "@/data/income";
 import { timed } from "@/data/milestones";
 import { lineValues, named, pounds, recordId, target } from "@/data/schemas";
@@ -21,15 +20,13 @@ import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
 // What a save of an expense line may carry: the values every line
-// holds, as the model holds them so the two cannot drift, and its kind.
+// holds, as the model holds them so the two cannot drift, and nothing
+// more.
 // That a line with fixed ends ends no earlier than it starts, and in a
 // month only of a year it ends in, is the household's to hold, as every
 // rule across the fields is; that a line tied to a milestone does, as
 // its ends fall on the day, is the save's.
-const expenseValues = z.object({
-  ...lineValues,
-  kind: z.enum(expenseKinds),
-}) satisfies z.ZodType<ExpenseLineValues>;
+const expenseValues = z.object(lineValues) satisfies z.ZodType<LineValues>;
 
 // An income line adds its kind and its parts, whole and never negative,
 // the pension it feeds and the share of its base it sacrifices, a
@@ -106,7 +103,7 @@ export async function removeIncomeLine(id: number): Promise<Answer<undefined>> {
 // dialogs link a line to its loan.
 export async function saveExpenseLine(
   id: null | number,
-  draft: ExpenseLineValues,
+  draft: LineValues,
 ): Promise<Answer<ExpenseLine>> {
   await requireSession();
   const at = target.parse(id);

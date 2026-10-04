@@ -201,16 +201,19 @@ export function IncomeSchedule({
             amountLabel={
               entry.draft.kind === "employment" ? "Base salary" : "Amount"
             }
+            category={{
+              initial: entry.initial.kind,
+              kinds,
+              onChange: (kind) => {
+                categorise(entry, kind);
+              },
+            }}
             draft={entry.draft}
             initial={entry.initial}
-            kinds={kinds}
             milestones={markers}
             namePlaceholder="Salary, consulting, state pension…"
             onAmend={(patch) => {
               amend(entry, patch);
-            }}
-            onKindChange={(kind) => {
-              categorise(entry, kind);
             }}
             paid={paidOf(entry.draft, plan)}
             plan={plan}
