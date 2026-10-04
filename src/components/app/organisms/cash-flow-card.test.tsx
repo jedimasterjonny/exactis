@@ -287,13 +287,15 @@ describe("CashFlowCard", () => {
         .map((row) => row.textContent);
 
     expect(expenses).toHaveAttribute("aria-expanded", "true");
-    expect(lines()).toStrictEqual(["Household£3,500 / mo · 2026–2047−£3,500"]);
+    expect(lines()).toStrictEqual([
+      "Household£3,500 / mo · Fixed in pounds · 2026–2047−£3,500",
+    ]);
 
     fireEvent.change(slider("Year"), { target: { value: "2049" } });
 
     expect(lines()).toStrictEqual([
-      "Mortgage payment£3,201 / mo · 2036–2060−£3,201",
-      "Retirement living£60,000 / yr · 2048–end of plan−£5,000",
+      "Mortgage payment£3,201 / mo · Fixed in pounds · 2036–2060−£3,201",
+      "Retirement living£60,000 / yr · Fixed in pounds · 2048–end of plan−£5,000",
     ]);
 
     fireEvent.click(expenses);
@@ -341,8 +343,8 @@ describe("CashFlowCard", () => {
         .getAllByRole("listitem")
         .map((row) => row.textContent),
     ).toStrictEqual([
-      "Household£3,500 / mo · 2026–2047−£3,500",
-      "Subscription£1,000 / mo · 2026–end of plan−£759",
+      "Household£3,500 / mo · Rises with inflation · 2026–2047−£3,500",
+      "Subscription£1,000 / mo · Fixed in pounds · 2026–end of plan−£759",
     ]);
     expect(rows().at(-1)).toBe(
       "ShortThe savings run out this year, leaving £50,985 of it uncovered.£4,259",
