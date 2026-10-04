@@ -18,6 +18,7 @@ vi.mock("@/actions/milestones", () => ({
   saveMilestone: vi.fn(),
 }));
 vi.mock("@/actions/schedule", () => ({
+  removeExpenseLine: vi.fn(),
   removeIncomeLine: vi.fn(),
   saveExpenseLine: vi.fn(),
   saveIncomeLine: vi.fn(),

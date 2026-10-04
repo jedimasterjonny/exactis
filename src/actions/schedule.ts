@@ -16,7 +16,7 @@ import { lineValues, named, pounds, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { endsAfterItStarts } from "@/lib/lines";
 import { today } from "@/lib/months";
-import { removed, written } from "@/lib/records";
+import { found, removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
@@ -56,6 +56,33 @@ const incomeValues = z
   .refine(
     (values) => values.feeds === null || values.opens === null,
   ) satisfies z.ZodType<IncomeLineDraft>;
+
+// Deletes the expense line with that id, checked as a save is. Nothing
+// hangs on a line, so it goes alone, but a line paying a loan is
+// refused: it is written by the dialog of the house or car the loan is
+// on, and goes when that does.
+export async function removeExpenseLine(
+  id: number,
+): Promise<Answer<undefined>> {
+  await requireSession();
+  const at = recordId.parse(id);
+  return amend(({ kept }) => {
+    const { expenses } = kept.schedule;
+    if (found(expenses, at, "expense line").pays !== undefined) {
+      throw new Refusal("A loan's payments go with the asset it is on");
+    }
+    return {
+      kept: {
+        ...kept,
+        schedule: {
+          ...kept.schedule,
+          expenses: removed(expenses, at, "expense line"),
+        },
+      },
+      result: undefined,
+    };
+  });
+}
 
 // Deletes the income line with that id. Nothing hangs on a line, so it
 // goes alone. Checked as a save is.
