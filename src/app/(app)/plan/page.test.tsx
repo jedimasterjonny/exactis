@@ -54,8 +54,14 @@ describe("Plan", () => {
     expect(screen.getByText("Sect. III · Income & expenses")).toHaveClass(
       "label",
     );
+    // The month now puts £1,200 by as the salary's sacrifice and
+    // £1,176.20 as the pension's fixed sum; from 2053, the consulting's
+    // £2,000 leaves the month £6,145.98 short, which the savings carry
+    // to the end of the plan.
     expect(
-      screen.getByText("3 milestones · 4 income lines · 5 expense lines"),
+      screen.getByText(
+        "£2,376 a month put by now · £6,146 a month drawn from 2053 · the savings last to 91",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
@@ -91,7 +97,7 @@ describe("Plan", () => {
   // The salary alone, with nothing going out and no account to pay,
   // leaves all of its £12,000 a month that the tax does not take,
   // £7,342.20.
-  it("counts a single line in the singular and none as none", async () => {
+  it("says what a plan with no account puts by", async () => {
     vi.mocked(getHousehold).mockResolvedValue({
       ...household,
       accounts: [],
@@ -102,10 +108,33 @@ describe("Plan", () => {
 
     render(await Plan());
 
+    // With no account to put by into, what the salary leaves is taken as
+    // spent, and the month is never short.
     expect(
-      screen.getByText("1 milestone · 1 income line · 0 expense lines"),
+      screen.getByText("£0 a month put by now · the savings last to 91"),
     ).toBeInTheDocument();
     expect(screen.getByText("No expenses yet")).toBeInTheDocument();
     expect(screen.getByText("£7,342")).toHaveClass("figure", "font-medium");
+  });
+
+  // The household's £3,350 a month with nothing coming in and no account
+  // to draw on: the month is short now, and nothing covers it from the
+  // plan's first year.
+  it("says when the month draws on the savings now and when they run out", async () => {
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      accounts: [],
+      milestones: [],
+      plan,
+      schedule: { expenses: [expenseLines[0]], income: [] },
+    });
+
+    render(await Plan());
+
+    expect(
+      screen.getByText(
+        "£3,350 a month drawn from the savings now · the savings run out at 34, in 2026",
+      ),
+    ).toBeInTheDocument();
   });
 });
