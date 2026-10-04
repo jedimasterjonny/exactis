@@ -53,13 +53,14 @@ const growths = optionsOf(growthLabels, [
   "nominal",
 ]);
 
-// The fields every line's dialog takes, in the shape of the reference's
-// new-line dialog: a name on the first row, with a category beside it
-// for a schedule that sorts its lines into one, the amount,
-// its cadence and what it grows with on the second, whatever the
-// schedule adds beneath, where the line starts and ends, and the line's
-// coverage of the plan's span, moving as the years are typed. The fields
-// report each change to the schedule, whose draft mirrors them. They
+// The fields every line's dialog takes, in the order they decide the
+// line: a name on the first row, with a category beside it for a
+// schedule that sorts its lines into one, since the category decides
+// which fields follow; where the line starts and ends, and the line's
+// coverage of the plan's span beneath them, moving as the years are
+// typed, so when a line runs is settled and seen before what it pays;
+// then the amount, its cadence and how it grows; and whatever the
+// schedule adds beneath, a salary's parts. The fields report each change to the schedule, whose draft mirrors them. They
 // mount with the line as it opened, save the two years and the years
 // after, which show the draft's, since a choice moves them as well as
 // the fields do. Each end is a choice before it is a year: a fixed
@@ -147,33 +148,6 @@ export function LineFields<TKind extends string>({
           />
         </FieldRow>
       )}
-      <FieldRow layout="triple">
-        <MoneyField
-          defaultValue={initial.amount}
-          hint="Today's money"
-          label={amountLabel}
-          onValueCommitted={(amount) => {
-            onAmend({ amount });
-          }}
-        />
-        <SelectField
-          defaultValue={initial.cadence}
-          label="Cadence"
-          onValueChange={(cadence) => {
-            onAmend({ cadence });
-          }}
-          options={cadenceOptions}
-        />
-        <SelectField
-          defaultValue={initial.growth}
-          label="Growth"
-          onValueChange={(growth) => {
-            onAmend({ growth });
-          }}
-          options={growths}
-        />
-      </FieldRow>
-      {children}
       <FieldRow layout="pair-top">
         <div className="grid gap-4">
           <SelectField
@@ -252,6 +226,33 @@ export function LineFields<TKind extends string>({
           startsAt={drawn.startsAt}
         />
       </div>
+      <FieldRow layout="triple">
+        <MoneyField
+          defaultValue={initial.amount}
+          hint="Today's money"
+          label={amountLabel}
+          onValueCommitted={(amount) => {
+            onAmend({ amount });
+          }}
+        />
+        <SelectField
+          defaultValue={initial.cadence}
+          label="Cadence"
+          onValueChange={(cadence) => {
+            onAmend({ cadence });
+          }}
+          options={cadenceOptions}
+        />
+        <SelectField
+          defaultValue={initial.growth}
+          label="Growth"
+          onValueChange={(growth) => {
+            onAmend({ growth });
+          }}
+          options={growths}
+        />
+      </FieldRow>
+      {children}
     </div>
   );
 }
