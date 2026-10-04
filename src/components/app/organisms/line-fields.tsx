@@ -42,7 +42,6 @@ interface LineFieldsProps<TKind extends string> {
 }
 
 const fixed = { label: "In a fixed year", value: "fixed" } as const;
-const open = { label: "With the plan", value: "open" } as const;
 
 // The growth choices in the order the reference's dialog offers them,
 // named as the rows name them.
@@ -66,7 +65,10 @@ const growths = optionsOf(growthLabels, [
 // the fields do. Each end is a choice before it is a year: a fixed
 // year, typed into the field beneath the choice, or a milestone, in
 // which case the line moves with it and the dialog says which year that
-// is, and the last may end with the plan instead, so it has none. A
+// is, and the last may run to the end of the plan instead, so it has
+// none. The choices are worded as a row names its ties, a line running
+// from one milestone until another, and the end of the plan names its
+// last year. A
 // milestone is the first year of what it marks, so a line starting at
 // one starts in its year, and one ending at one runs to the year before
 // it, or ends as many whole years after it as the field beneath the
@@ -88,10 +90,12 @@ export function LineFields<TKind extends string>({
   side,
 }: LineFieldsProps<TKind>): JSX.Element {
   const end = endYear(plan);
-  const tied = milestones.map((marker) => ({
-    label: `At ${marker.name} · ${String(marker.year)}`,
-    value: choiceOf(marker.id),
-  }));
+  const tied = (word: "From" | "Until"): Option<string>[] =>
+    milestones.map((marker) => ({
+      label: `${word} ${marker.name} · ${String(marker.year)}`,
+      value: choiceOf(marker.id),
+    }));
+  const open = { label: `To the end · ${String(end)}`, value: "open" };
   const from = milestones.find(({ id }) => id === draft.startsAt);
   const until = milestones.find(({ id }) => id === draft.endsAt);
   const drawn = paid?.line ?? draft;
@@ -156,7 +160,7 @@ export function LineFields<TKind extends string>({
             }
             label="Starts"
             onValueChange={startAt}
-            options={[fixed, ...tied]}
+            options={[fixed, ...tied("From")]}
           />
           {from === undefined ? (
             <YearField
@@ -178,7 +182,7 @@ export function LineFields<TKind extends string>({
             defaultValue={endingOf(initial)}
             label="Ends"
             onValueChange={endAt}
-            options={[fixed, ...tied, open]}
+            options={[fixed, ...tied("Until"), open]}
           />
           {until !== undefined && (
             <YearField
