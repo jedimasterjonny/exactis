@@ -24,12 +24,14 @@ import { laneColumns } from "@/lib/span";
 
 // What a schedule says of a line that the rows cannot read off it: the
 // badge its kind takes, if it has one, what it pays at its cadence, any
-// detail to write
-// beside the badge, and the line as it is paid where that stops short of
-// where it says it ends, which the row draws in its place.
+// detail to write beside the badge, whether it is a loan's payments,
+// which its bar is drawn in red for, and the line as it is paid where
+// that stops short of where it says it ends, which the row draws in its
+// place.
 export interface Summary {
   readonly badge?: { readonly label: string; readonly variant: Tone };
   readonly detail?: string;
+  readonly isLoan?: boolean;
   readonly lock?: string;
   readonly paid?: LineValues;
   readonly total: number;
@@ -142,6 +144,7 @@ export function ScheduleRows<TLine extends Line>({
           <SpanBar
             endsAt={paid.endsAt}
             firstYear={paid.firstYear}
+            isLoan={summary.isLoan === true}
             lastMonth={paid.lastMonth}
             lastYear={paid.lastYear}
             marks={yearsOf(milestones)}

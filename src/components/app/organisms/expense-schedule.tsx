@@ -173,7 +173,8 @@ function blank(plan: Plan): Draft {
 
 // What the rows say of an expense line: what it pays, which is its
 // amount, since an expense is paid in no parts. A line that is a loan's
-// payments says so on its badge, and is locked, since the dialog of the
+// payments says so on its badge, its bar drawn in the debt's red, and
+// is locked, since the dialog of the
 // asset the loan is on writes it from the loan and would write over an
 // edit made here; any other line has no badge, its name saying what it
 // is for.
@@ -182,6 +183,7 @@ function summarise(line: ExpenseLine): Summary {
     ? { total: line.amount }
     : {
         badge: { label: "Loan", variant: "secondary" },
+        isLoan: true,
         lock: "Edited with its asset on the accounts screen",
         total: line.amount,
       };

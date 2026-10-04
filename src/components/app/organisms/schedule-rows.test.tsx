@@ -174,6 +174,26 @@ describe("ScheduleRows", () => {
     for (const fill of screen.getAllByText(bySlot("span-bar-fill"), {
       suggest: false,
     })) {
+      expect(fill).toHaveClass("bg-foreground/50");
+    }
+
+    // A line its schedule says is a loan's payments is drawn in red.
+    rerender(
+      <ScheduleRows
+        emptyDescription="Add one."
+        emptyTitle="Nothing yet"
+        lines={[statePension]}
+        milestones={[]}
+        onEdit={vi.fn<(line: IncomeLine) => void>()}
+        plan={plan}
+        side="expense"
+        summarise={(line) => ({ ...summarise(line), isLoan: true })}
+      />,
+    );
+
+    for (const fill of screen.getAllByText(bySlot("span-bar-fill"), {
+      suggest: false,
+    })) {
       expect(fill).toHaveClass("bg-chart-5");
     }
   });

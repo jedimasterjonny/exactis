@@ -11,6 +11,7 @@ import { placed } from "@/lib/span";
 interface SpanBarProps {
   readonly endsAt: null | Tie;
   readonly firstYear: number;
+  readonly isLoan?: boolean;
   readonly lastMonth: null | number;
   readonly lastYear: null | number;
   readonly marks?: readonly number[];
@@ -19,11 +20,17 @@ interface SpanBarProps {
   readonly startsAt: null | Tie;
 }
 
-// The fill takes the series' colour the reference draws each schedule
-// in: bonds for income, debt for expenses.
+// The fill each side takes. Income is drawn in jade, the series colour
+// the reference draws it in, lightened in the dark, where the light
+// mode's jade was dimmer than the bars beside it. Spending is drawn in
+// ink rather than the loss red, since money going out as the plan means
+// it to is no loss, and red read every expense as one; a loan's
+// payments keep the red, the colour a debt is drawn in below nothing on
+// the dashboard. Oxide is the milestones' alone, so the rules and the
+// dots where a line meets one stand out against any fill.
 const fills: Record<Side, string> = {
-  expense: "bg-chart-5",
-  income: "bg-chart-2",
+  expense: "bg-foreground/50",
+  income: "bg-chart-2 dark:bg-chart-1",
 };
 
 // The least of the span a line is drawn over, as a share of the track, so
@@ -46,6 +53,7 @@ const sliver = 1.2;
 export function SpanBar({
   endsAt,
   firstYear,
+  isLoan = false,
   lastMonth,
   lastYear,
   marks = [],
@@ -65,7 +73,10 @@ export function SpanBar({
       data-slot="span-bar"
     >
       <span
-        className={cn("absolute inset-y-0 rounded-full", fills[side])}
+        className={cn(
+          "absolute inset-y-0 rounded-full",
+          isLoan ? "bg-chart-5" : fills[side],
+        )}
         data-slot="span-bar-fill"
         style={{
           left: `${String(left)}%`,
