@@ -61,7 +61,7 @@ describe("Plan", () => {
       "Milestones",
       "Income by year",
       "Expenses by year",
-      "Cash flow each month",
+      "Year by year",
     ]);
     expect(screen.getByText("Age 68–89")).toBeInTheDocument();
     expect(screen.getByText("Age 82–89")).toBeInTheDocument();
@@ -70,21 +70,19 @@ describe("Plan", () => {
     expect(
       screen.getAllByText(/10\.00% of the base into Workplace pension$/),
     ).toHaveLength(2);
-    // The two schedules' notes, and the hint under the cash flow's year.
-    expect(screen.getAllByRole("paragraph")).toHaveLength(3);
+    // The two schedules' notes.
+    expect(screen.getAllByRole("paragraph")).toHaveLength(2);
+    // The year book opens on the plan's first year, its month laid out
+    // beneath the strip.
     expect(
       screen.getByText("September 2026, age 36, in today's money"),
     ).toBeInTheDocument();
-    expect(
-      within(screen.getByRole("group", { name: "Year" })).getByRole("slider", {
-        hidden: true,
-      }),
-    ).toHaveValue("2026");
     expect(screen.getByText("Left over")).toBeInTheDocument();
-    expect(screen.getAllByText("£0").at(-1)).toHaveClass(
-      "figure",
-      "font-medium",
-    );
+    expect(
+      within(screen.getByRole("region", { name: "Year by year" }))
+        .getAllByText("£0")
+        .at(-1),
+    ).toHaveClass("figure", "font-medium");
   });
 
   // The salary alone, with nothing going out and no account to pay,

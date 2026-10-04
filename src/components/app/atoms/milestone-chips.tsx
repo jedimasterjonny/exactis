@@ -9,10 +9,10 @@ import type { Tie } from "@/data/schedule";
 interface MilestoneChipsProps {
   readonly markers: readonly Marker[];
   readonly onSelect: (tie: Tie) => void;
-  readonly selected: Tie;
+  readonly selected?: Tie | undefined;
 }
 
-// The milestones as a row of chips, one chosen at a time: each a button
+// The milestones as a row of chips, one chosen at a time, or none: each a button
 // naming its milestone after the flag the plan screen ties a line to one
 // with, pressed while it is the one chosen and then filled in oxide, the
 // palette's colour for milestones, as the chart draws the chosen
