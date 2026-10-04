@@ -195,9 +195,9 @@ describe("LineFields", () => {
         .map((option) => option.textContent),
     ).toStrictEqual([
       "In a fixed year",
-      "At Kids leave home · 2036",
-      "At Downsize · 2055",
-      "At Retirement · 2080",
+      "From Kids leave home · 2036",
+      "From Downsize · 2055",
+      "From Retirement · 2080",
     ]);
     expect(
       within(screen.getByRole("combobox", { name: "Ends" }))
@@ -205,10 +205,10 @@ describe("LineFields", () => {
         .map((option) => option.textContent),
     ).toStrictEqual([
       "In a fixed year",
-      "At Kids leave home · 2036",
-      "At Downsize · 2055",
-      "At Retirement · 2080",
-      "With the plan",
+      "Until Kids leave home · 2036",
+      "Until Downsize · 2055",
+      "Until Retirement · 2080",
+      "To the end · 2079",
     ]);
     expect(screen.getByRole("combobox", { name: "Starts" })).toHaveValue(
       "fixed",
