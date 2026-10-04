@@ -39,7 +39,7 @@ describe("endOf", () => {
 
 describe("spanOf", () => {
   it("writes the years a line runs, an open-ended one to the end of the plan", () => {
-    expect(spanOf(salary)).toBe("2030–end of plan");
+    expect(spanOf(salary)).toBe("2030 on");
     expect(spanOf({ ...salary, lastYear: 2040 })).toBe("2030–2040");
     expect(spanOf({ ...salary, lastMonth: 2, lastYear: 2040 })).toBe(
       "2030–Mar 2040",

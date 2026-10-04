@@ -70,9 +70,9 @@ describe("ScheduleRows", () => {
     expect(screen.getByText("£2,000")).toHaveTextContent("£2,000 / mo");
     expect(screen.getByText("Rises 1% over inflation")).toBeInTheDocument();
     expect(screen.getByText("Fixed in pounds")).toBeInTheDocument();
-    expect(screen.getByText("2026 – 2048")).toHaveClass("figure");
+    expect(screen.getByText("2026–2048")).toHaveClass("figure");
     expect(screen.getByText("Age 36–58")).toHaveClass("label");
-    expect(screen.getByText("2058 – end")).toBeInTheDocument();
+    expect(screen.getByText("2058 on")).toBeInTheDocument();
     expect(screen.getByText("Age 68–89")).toBeInTheDocument();
     // Laid out in the milestones' columns, so each bar is as wide as
     // every other on the screen.
@@ -97,7 +97,7 @@ describe("ScheduleRows", () => {
       />,
     );
 
-    expect(screen.getByText("2026 – Nov 2048")).toHaveClass("figure");
+    expect(screen.getByText("2026–Nov 2048")).toHaveClass("figure");
     expect(screen.getByText("Age 36–58")).toBeInTheDocument();
   });
 
@@ -123,7 +123,7 @@ describe("ScheduleRows", () => {
       />,
     );
 
-    expect(screen.getByText("2026 – 2045")).toHaveClass("figure");
+    expect(screen.getByText("2026–2045")).toHaveClass("figure");
     expect(screen.getByText("Age 36–55")).toBeInTheDocument();
     expect(screen.getAllByText("Until Retirement")).toHaveLength(2);
     expect(
@@ -363,7 +363,7 @@ describe("ScheduleRows", () => {
     expect(
       within(item).getByText("employment · Rises 1% over inflation"),
     ).toBeInTheDocument();
-    expect(within(item).getByText("2026 – 2048 · Age 36–58")).toBeVisible();
+    expect(within(item).getByText("2026–2048 · Age 36–58")).toBeVisible();
     // The bar is positioned and would lie over the button that covers
     // the row, so it lets a tap through to it. The folded lines' bar is
     // the row's first.
@@ -463,7 +463,7 @@ describe("ScheduleRows", () => {
     ).toHaveLength(2);
     expect(screen.getAllByText("From Downsize")).toHaveLength(2);
     expect(screen.getAllByText("From Retirement")).toHaveLength(2);
-    expect(screen.getByText("2026 – 2048")).toHaveClass("figure");
+    expect(screen.getByText("2026–2048")).toHaveClass("figure");
     expect(screen.getByText("Age 36–58")).toBeInTheDocument();
     expect(screen.getByText("Runs no years")).toHaveClass("label");
     // Every bar rules the three milestones across its track: five lines,

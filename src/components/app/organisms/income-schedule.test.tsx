@@ -548,7 +548,7 @@ describe("IncomeSchedule", () => {
       />,
     );
 
-    expect(screen.getByText("2026 – 2048")).toHaveClass("figure");
+    expect(screen.getByText("2026–2048")).toHaveClass("figure");
     expect(screen.getAllByText("Until Retirement")).toHaveLength(2);
     expect(
       screen.getAllByText(bySlot("span-bar-fill"), { suggest: false })[0],
@@ -954,7 +954,7 @@ describe("IncomeSchedule", () => {
     });
     expect(
       screen.getByRole("dialog", { name: "Income line updated" }),
-    ).toHaveAccessibleDescription("Salary · 2026–end of plan");
+    ).toHaveAccessibleDescription("Salary · 2026 on");
     expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(1, {
       amount: 120000,
       bonus: 15000,

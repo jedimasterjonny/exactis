@@ -14,10 +14,9 @@ export const growthLabels: Record<LineGrowth, string> = {
   nominal: "Fixed in pounds",
 };
 
-// Where a line ends, for the rows and the toast: its last year, with
-// the month before it when it ends part way through, "Nov 2047", and
-// nothing for a line that runs to the end of the plan, which the caller
-// names in its own words.
+// Where a line ends: its last year, with the month before it when it
+// ends part way through, "Nov 2047", and nothing for a line that runs to
+// the end of the plan.
 export function endOf(line: LineValues): null | string {
   if (line.lastYear === null) {
     return null;
@@ -57,7 +56,13 @@ export function runsIn(line: LineValues, at: Month): boolean {
   );
 }
 
-// The years a saved line runs, for the toast that reports it.
+// The years a line runs, one way wherever they are written, on its row,
+// in a month's ledger and in the toast that reports it: "2026–2046", to
+// the month when it ends part way through a year, "2026–Jul 2047", or
+// "2048 on" for a line running to the end of the plan.
 export function spanOf(line: LineValues): string {
-  return `${String(line.firstYear)}–${endOf(line) ?? "end of plan"}`;
+  const end = endOf(line);
+  return end === null
+    ? `${String(line.firstYear)} on`
+    : `${String(line.firstYear)}–${end}`;
 }

@@ -295,7 +295,7 @@ describe("CashFlowCard", () => {
 
     expect(lines()).toStrictEqual([
       "Mortgage payment£3,201 / mo · Fixed in pounds · 2036–2060−£3,201",
-      "Retirement living£60,000 / yr · Fixed in pounds · 2048–end of plan−£5,000",
+      "Retirement living£60,000 / yr · Fixed in pounds · 2048 on−£5,000",
     ]);
 
     fireEvent.click(expenses);
@@ -344,7 +344,7 @@ describe("CashFlowCard", () => {
         .map((row) => row.textContent),
     ).toStrictEqual([
       "Household£3,500 / mo · Rises with inflation · 2026–2047−£3,500",
-      "Subscription£1,000 / mo · Fixed in pounds · 2026–end of plan−£759",
+      "Subscription£1,000 / mo · Fixed in pounds · 2026 on−£759",
     ]);
     expect(rows().at(-1)).toBe(
       "ShortThe savings run out this year, leaving £50,985 of it uncovered.£4,259",
