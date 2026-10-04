@@ -124,8 +124,9 @@ const line = { ...lineValues, id: recordId };
 // a fixed sum within its allowance on its own, a rate no lower than
 // losing everything, a link to an asset only on the loan secured on
 // it, and the mark of an account always funded only on a pension. A
-// contribution, a balloon, an owner, a link and the mark are absent
-// rather than nothing, as the model has them.
+// contribution, a balloon, an owner, a link, the mark and the day its
+// balance was set are absent rather than nothing, as the model has
+// them.
 const account = z
   .object({
     balance: z.number().int(),
@@ -156,6 +157,7 @@ const account = z
     name: named,
     owner: recordId.exactOptional(),
     secures: recordId.exactOptional(),
+    setOn: z.iso.date().exactOptional(),
   })
   .refine(
     (account) => account.kind === "debt" || account.balance >= 0,

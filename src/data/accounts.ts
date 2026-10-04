@@ -14,7 +14,9 @@
 // carries none. A pension may be always funded, so what it is paid,
 // its own sum and what the salaries feeding it sacrifice, is kept up
 // out of the savings when the month cannot pay it; any other account,
-// and a pension that is not, carries no mark at all.
+// and a pension that is not, carries no mark at all. An account carries
+// the day its balance was last set, an ISO date, once a save has dated
+// it; one kept before the day was carries none.
 export interface Account {
   readonly balance: number;
   readonly balloon?: number;
@@ -26,6 +28,7 @@ export interface Account {
   readonly name: string;
   readonly owner?: number;
   readonly secures?: number;
+  readonly setOn?: string;
 }
 
 // The account as its dialog holds it: the values, and the share of its

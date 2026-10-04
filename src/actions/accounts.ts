@@ -33,7 +33,7 @@ import {
 import { isSound, statuses, toRecords } from "@/data/houses";
 import { month, named, pounds, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
-import { isOnOrBefore, thisMonth } from "@/lib/months";
+import { isOnOrBefore, thisMonth, today } from "@/lib/months";
 import { found, replaced, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
@@ -303,6 +303,20 @@ export async function saveHouse(
   );
 }
 
+// An account as written, dated with the day its balance was set: today
+// for a new one and for one whose balance the save changes, and the day
+// the account had for one whose balance it leaves as it was, so a save
+// of a name or a rate does not date a balance nobody looked at. An
+// account undated before stays undated until its balance is set.
+function dated(account: Account, listed: Account | undefined): Account {
+  if (listed?.balance !== account.balance) {
+    return { ...account, setOn: today() };
+  }
+  return listed.setOn === undefined
+    ? account
+    : { ...account, setOn: listed.setOn };
+}
+
 // The shares written over the salaries' own, each against the line it
 // names, which has to be one feeding the account: a share written
 // against a line feeding another, or none, would land elsewhere or
@@ -358,10 +372,13 @@ function securedIn(
   }
   // A loan the asset had keeps its id, and so does the line paying it;
   // what is added takes the next, the loan before its line.
-  const debt = {
-    ...toAccount(secured.account, loan?.id ?? next),
-    secures: entered.result.id,
-  };
+  const debt = dated(
+    {
+      ...toAccount(secured.account, loan?.id ?? next),
+      secures: entered.result.id,
+    },
+    loan,
+  );
   const afterDebt = loan === undefined ? next + 1 : next;
   const line = schedule.expenses.find(({ pays }) => pays === debt.id);
   const payments = {
@@ -390,7 +407,7 @@ function securedIn(
 // The account written into the household: added as the next when the
 // id is null, else written over the one with that id in its place,
 // keeping the asset a loan is secured on, since what an account
-// secures is not among the values a save sends.
+// secures is not among the values a save sends, and dated as below.
 function writtenIn(
   kept: Kept,
   at: null | number,
@@ -403,10 +420,14 @@ function writtenIn(
   } = written(
     kept.accounts,
     { at, next: kept.next, noun: "account" },
-    (id, listed) => ({
-      ...toAccount(values, id),
-      ...(listed?.secures !== undefined && { secures: listed.secures }),
-    }),
+    (id, listed) =>
+      dated(
+        {
+          ...toAccount(values, id),
+          ...(listed?.secures !== undefined && { secures: listed.secures }),
+        },
+        listed,
+      ),
   );
   return { kept: { ...kept, accounts: records, next }, result: account };
 }
