@@ -13,6 +13,7 @@ import {
 
 interface DialogFrameProps {
   readonly children: ReactNode;
+  readonly className?: string;
   readonly eyebrow: string;
   readonly footer: ReactNode;
   readonly isWide?: boolean;
@@ -28,7 +29,8 @@ interface DialogFrameProps {
 // opens only from state, so the only change it can report is a close:
 // Escape, a press outside or its cross, all of which dismiss, and a
 // caller's own button that closes it calls the same. A wide frame fits
-// a form of three columns.
+// a form of three columns, and a caller's class may size it otherwise,
+// as the month end's worksheet widens it to two columns of balances.
 // The frame is held to the height of the screen, less the margin it
 // keeps at the sides, and what the caller gives scrolls between the
 // title and the footer, which stay where they are: a form taller than a
@@ -46,6 +48,7 @@ interface DialogFrameProps {
 // the first field, ready to type.
 export function DialogFrame({
   children,
+  className,
   eyebrow,
   footer,
   isWide = false,
@@ -59,6 +62,7 @@ export function DialogFrame({
         className={cn(
           "max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto]",
           isWide && "sm:max-w-lg",
+          className,
         )}
         initialFocus={() => (isTouch() ? popupRef.current : true)}
         ref={popupRef}

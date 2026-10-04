@@ -18,6 +18,15 @@ import {
   upratingIn,
 } from "@/lib/tax";
 
+// Where a month or more of the plan leaves an account, as the
+// projection carries it: the account, the balance it is carried to,
+// and what the months pay into it, or off it for a debt.
+export interface MonthsOn {
+  readonly account: Account;
+  readonly balance: number;
+  readonly paid: number;
+}
+
 // A year of the projection: the balance the plan expects entering it,
 // whole pounds, and the age reached that year, since a plan is read by
 // age as much as by year. The first point is the balances as they are,
@@ -127,6 +136,47 @@ export function balanceOf(point: ProjectionPoint): number {
 // Whether a point holds or owes anything at all, in any account.
 export function holdsAnything(point: ProjectionPoint): boolean {
   return Object.values(point.balances).some((balance) => balance !== 0);
+}
+
+// Each account carried the months given on from the one the plan
+// starts in, in the order given, as the projection carries a month: what the
+// month's cash flow pays in lands at its start and the balance grows a
+// month at its rate, and a debt is charged a month's interest and paid
+// down by what the month pays off it, each month's flow read over every
+// account as they opened the plan, and over what the cash and the ISAs
+// hold as the month opens for a pension always funded, as the projection
+// reads it, through the one month step the projection takes. What it
+// is for is a month end: the balance the plan expected each account to
+// reach by then, to be checked against its statement, and what the
+// months were planned to pay into it, so the rest of the difference is
+// what moved it. A month the income does not cover pays nothing into
+// the savings, and is not drawn on here as the projection would draw on
+// it, since a month end checks the plan against the balances rather
+// than spending them; nor is a tax year settled. No months leave every
+// account where it stands, paid nothing.
+export function monthsOn(
+  accounts: readonly Account[],
+  schedule: Schedule,
+  { months, plan }: { readonly months: number; readonly plan: Plan },
+): readonly MonthsOn[] {
+  let reached = accounts.map((account) => ({
+    account,
+    balance: account.balance,
+    paid: 0,
+  }));
+  for (let offset = 0; offset < months; offset += 1) {
+    const month = plan.month + offset;
+    const flow = cashFlow(accounts, schedule, {
+      at: { month: month % 12, year: plan.from + Math.floor(month / 12) },
+      plan,
+      reserve: reserveOf(reached),
+    });
+    reached = reached.map((held) => {
+      const { balance, paid } = monthOf(held, flow, plan);
+      return { account: held.account, balance, paid: held.paid + paid };
+    });
+  }
+  return reached;
 }
 
 // The plan's years, the first holding the balances as they are and each
@@ -250,9 +300,7 @@ export function project(
         const flow = cashFlow(accounts, schedule, {
           at,
           plan,
-          reserve: held
-            .filter(({ account }) => takesSpare(account) && !isPension(account))
-            .reduce((sum, { balance }) => sum + balance, 0),
+          reserve: reserveOf(held),
           settlement,
         });
         const draw = drawnFrom(held, Math.max(0, -flow.left), {
@@ -274,21 +322,13 @@ export function project(
           taxable: taxYear.taxable + draw.taxable,
         };
         uncovered += draw.uncovered / risen;
-        held = draw.held.map(({ account, balance }) => ({
-          account,
-          balance: carried(
-            balance,
-            paidIn(account, flow),
-            rateOf(account, plan),
-          ),
+        held = draw.held.map((account) => ({
+          account: account.account,
+          balance: monthOf(account, flow, plan).balance,
         }));
-        owing = owing.map(({ account, balance }) => ({
-          account,
-          balance: paidDown(
-            balance,
-            paidOff(account, flow),
-            rateOf(account, plan),
-          ),
+        owing = owing.map((account) => ({
+          account: account.account,
+          balance: monthOf(account, flow, plan).balance,
         }));
       }
     }
@@ -397,6 +437,30 @@ function isBeforePensionAge(age: number, { month, year }: Month): boolean {
   return age < (hasRisen ? pensionAge.after : pensionAge.before);
 }
 
+// An account carried a month on the month's cash flow, as the projection
+// and a month end both carry one: a saving or an asset paid what the
+// flow pays it and grown, and a debt charged a month's interest and paid
+// down by what the flow pays off it; with what the month paid in or off,
+// which for a debt is no more than it owed with the month's interest,
+// since the last payment is rounded up to a whole one and what it pays
+// past nothing is no debt paid off.
+function monthOf(
+  { account, balance }: Held,
+  flow: CashFlow,
+  plan: Plan,
+): { readonly balance: number; readonly paid: number } {
+  const rate = rateOf(account, plan);
+  if (account.kind !== "debt") {
+    const paid = paidIn(account, flow);
+    return { balance: carried(balance, paid, rate), paid };
+  }
+  const off = paidOff(account, flow);
+  return {
+    balance: paidDown(balance, off, rate),
+    paid: Math.min(off, Math.max(0, -balance * (1 + rate / 12))),
+  };
+}
+
 // A month of a debt, as the loan maths reads one: interest at a
 // twelfth of the yearly rate on what is owed as the month opens, then
 // the month's payment off it. That is how the term a payment clears a
@@ -463,6 +527,14 @@ function rateOf(account: Account, plan: Plan): number {
     throw new Error(rules.beyondLoss);
   }
   return rate;
+}
+
+// What the cash and the ISAs hold as a month opens, which is as far as
+// the flow keeps a pension always funded paid out of the savings.
+function reserveOf(held: readonly Held[]): number {
+  return held
+    .filter(({ account }) => takesSpare(account) && !isPension(account))
+    .reduce((sum, { balance }) => sum + balance, 0);
 }
 
 // What a tax year is refunded once it closes, or owes as a negative:
