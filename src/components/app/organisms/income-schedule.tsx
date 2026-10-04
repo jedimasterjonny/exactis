@@ -166,7 +166,7 @@ export function IncomeSchedule({
         }
         caption="Pay, pensions and anything else coming in, each over the years it is paid. Pay stops at retirement, whatever its line says. A rise is a second line from the year it starts, not an edit to the first."
         label={subsectionLabel(planScreen, 2)}
-        title="Income by year"
+        title="What comes in"
       >
         <CardContent>
           <ScheduleRows
