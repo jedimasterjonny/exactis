@@ -13,7 +13,6 @@ import type { Entry } from "@/hooks/use-editor";
 
 import { removeExpenseLine, saveExpenseLine } from "@/actions/schedule";
 import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
-import { Note } from "@/components/app/atoms/note";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { LineFields } from "@/components/app/organisms/line-fields";
@@ -42,7 +41,8 @@ interface ExpenseScheduleProps {
 }
 
 // The plan screen's expense schedule and its dialog, beneath the income
-// schedule and built as it is: the rows are the store's, handed down by
+// schedule and built as it is, its caption saying what it holds and how
+// a line is written: the rows are the store's, handed down by
 // the page, a save goes to the store and comes back with the page
 // re-read, the entry doubles as the dialog's open state, and the fields
 // are the ones every line's dialog takes, with no category, since what
@@ -105,6 +105,7 @@ export function ExpenseSchedule({
             Add expense line
           </Button>
         }
+        caption="Spending and loan payments, each over the years it is paid. A line with no last year runs to the end of the plan, and spending that changes at a milestone is two lines, one ending there and one starting. A loan's payments are set with its asset on Accounts & assets."
         label={subsectionLabel(planScreen, 3)}
         title="Expenses by year"
       >
@@ -121,10 +122,6 @@ export function ExpenseSchedule({
           />
         </CardContent>
       </SectionCard>
-      <Note>
-        An open-ended line runs to the end of the plan: retirement living starts
-        where household spending stops, as a line of its own.
-      </Note>
       {doomed !== null && (
         <ConfirmDialog {...questionOf(doomed)}>
           It cannot be brought back.

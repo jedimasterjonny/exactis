@@ -43,7 +43,7 @@ function saved(line: ExpenseLine): void {
 }
 
 describe("ExpenseSchedule", () => {
-  it("opens with the card, its rows and its note", () => {
+  it("opens with the card, its caption and its rows", () => {
     renderSchedule();
 
     expect(screen.getByText("Sect. III.iii")).toHaveClass("label");
@@ -67,9 +67,13 @@ describe("ExpenseSchedule", () => {
     expect(screen.getByText("£3,500")).toHaveTextContent("£3,500 / mo");
     expect(screen.getByText("£60,000")).toHaveTextContent("£60,000 / yr");
     expect(screen.getByText("2048 on")).toBeInTheDocument();
-    expect(screen.getByRole("paragraph")).toHaveTextContent(
-      "An open-ended line runs to the end of the plan",
+    // The card's rule is its caption, with no note beside the card.
+    expect(
+      screen.getByText(/^Spending and loan payments, each over the years/),
+    ).toHaveTextContent(
+      "A loan's payments are set with its asset on Accounts & assets.",
     );
+    expect(screen.queryByRole("paragraph")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
