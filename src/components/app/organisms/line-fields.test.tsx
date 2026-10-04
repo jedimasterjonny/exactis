@@ -102,7 +102,7 @@ describe("LineFields", () => {
       "year",
     );
     expect(
-      screen.getAllByRole("option", { name: /Inflation|Nominal/ }),
+      screen.getAllByRole("option", { name: /^(Rises|Fixed) / }),
     ).toHaveLength(lineGrowths.length);
     expect(screen.getByRole("textbox", { name: "First year" })).toHaveValue(
       "2030",
@@ -131,7 +131,7 @@ describe("LineFields", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Cadence" }), {
       target: { value: "month" },
     });
-    fireEvent.change(screen.getByRole("combobox", { name: "Grows with" }), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Growth" }), {
       target: { value: "inflation-plus-2" },
     });
     commit(screen.getByRole("textbox", { name: "First year" }), "2031");
