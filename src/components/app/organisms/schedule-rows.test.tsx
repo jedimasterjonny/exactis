@@ -8,7 +8,7 @@ import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { markersOf } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { laneColumns } from "@/lib/span";
-import { bySlot } from "@/test/dom";
+import { bySlot, pressRow } from "@/test/dom";
 
 import type { Summary } from "./schedule-rows";
 
@@ -49,7 +49,7 @@ describe("ScheduleRows", () => {
     // Every row is drawn in its columns and again in its folded lines,
     // only one of which is on screen at any width, so the name and the
     // detail are found twice, the columns' copy after the lines'.
-    for (const name of screen.getAllByText("Salary")) {
+    for (const name of screen.getAllByRole("button", { name: "Salary" })) {
       expect(name).toHaveClass("font-medium");
     }
     expect(screen.getAllByText("employment")).toHaveLength(2);
@@ -103,7 +103,7 @@ describe("ScheduleRows", () => {
 
   // The schedule says the salary is paid to 2045, as it would of one
   // its owner retires from in 2046, so the row draws it to there, tied
-  // to retirement, while its pencil still opens the line as it is.
+  // to retirement, while the row still opens the line as it is.
   it("draws a line as its schedule says it is paid, and opens it as it is", () => {
     const onEdit = vi.fn<(line: IncomeLine) => void>();
     const open = { ...salary, lastYear: null };
@@ -130,7 +130,7 @@ describe("ScheduleRows", () => {
       screen.getAllByText(bySlot("span-bar-tie"), { suggest: false }),
     ).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Salary" }));
+    pressRow("Salary");
 
     expect(onEdit).toHaveBeenCalledWith(open);
   });
@@ -214,16 +214,19 @@ describe("ScheduleRows", () => {
     expect(screen.getByText("No expenses yet")).toBeInTheDocument();
   });
 
-  it("closes each row with a pencil and a bin when given both handlers", () => {
-    const onDelete = vi.fn<(line: IncomeLine) => void>();
+  // Laid out in columns, a row's name is the button that opens it, its
+  // press covering the row, as on its folded lines, and a chevron closes
+  // the row where a pencil and a bin once stood; the dialog it opens is
+  // where it is deleted from. The bar is positioned and would lie over
+  // the press, so it lets a click through to it.
+  it("opens a row in columns from its name, with a chevron at its end", () => {
     const onEdit = vi.fn<(line: IncomeLine) => void>();
     render(
       <ScheduleRows
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
-        lines={incomeLines}
+        lines={[salary]}
         milestones={[]}
-        onDelete={onDelete}
         onEdit={onEdit}
         plan={plan}
         side="income"
@@ -231,45 +234,38 @@ describe("ScheduleRows", () => {
       />,
     );
 
-    expect(screen.getAllByRole("button", { name: /^Edit / })).toHaveLength(
-      incomeLines.length,
-    );
-    expect(screen.getAllByRole("button", { name: /^Delete / })).toHaveLength(
-      incomeLines.length,
-    );
-    expect(screen.getByRole("button", { name: "Delete Salary" })).toHaveClass(
-      "hover:text-destructive",
-    );
+    const item = screen.getByRole("listitem");
+    // eslint-disable-next-line testing-library/no-node-access -- the row's boxes are layout boxes with no role of their own; the columns' name and bar are the second, the chevron's the last
+    const [, columns, , , end] = item.children;
+    const opens = within(item).getAllByRole("button", { name: "Salary" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Salary" }));
-    fireEvent.click(screen.getByRole("button", { name: "Delete Salary" }));
-
-    expect(onEdit).toHaveBeenCalledExactlyOnceWith(salary);
-    expect(onDelete).toHaveBeenCalledExactlyOnceWith(salary);
-  });
-
-  it("draws the pencil alone when given no delete handler", () => {
-    render(
-      <ScheduleRows
-        emptyDescription="Add one."
-        emptyTitle="Nothing yet"
-        lines={[salary]}
-        milestones={[]}
-        onEdit={vi.fn<(line: IncomeLine) => void>()}
-        plan={plan}
-        side="income"
-        summarise={summarise}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Edit Salary" })).toBeEnabled();
+    expect(opens).toHaveLength(2);
+    expect(columns).toContainElement(opens.at(-1) ?? null);
+    for (const open of opens) {
+      expect(open).toHaveClass("after:absolute", "after:inset-0");
+    }
     expect(
-      screen.queryByRole("button", { name: "Delete Salary" }),
+      screen.queryByRole("button", { name: /^(Edit|Delete) / }),
     ).not.toBeInTheDocument();
+    expect(end).toHaveClass("size-7", "folded:hidden");
+    // eslint-disable-next-line testing-library/no-node-access -- the chevron is an icon hidden from the tree, with no role or text of its own
+    expect(end?.querySelector("svg")).toHaveClass("lucide-chevron-right");
+    const bar = within(item)
+      .getAllByText(bySlot("span-bar"), { suggest: false })
+      .at(-1);
+
+    // eslint-disable-next-line testing-library/no-node-access -- the box the bar sits in is a layout box with no role of its own
+    expect(bar?.parentElement).toHaveClass("pointer-events-none");
+
+    for (const open of opens) {
+      fireEvent.click(open);
+    }
+
+    expect(onEdit.mock.calls).toStrictEqual([[salary], [salary]]);
   });
 
-  // A line the schedule locks draws a lock where its pencil and bin
-  // would be, saying why, and the others keep theirs.
+  // A line the schedule locks draws a lock where its chevron would be,
+  // saying why, and opens nothing; the others open as ever.
   it("locks a line the schedule says is locked, with the reason", () => {
     const onEdit = vi.fn<(line: IncomeLine) => void>();
     render(
@@ -278,7 +274,6 @@ describe("ScheduleRows", () => {
         emptyTitle="Nothing yet"
         lines={[salary, statePension]}
         milestones={[]}
-        onDelete={vi.fn<(line: IncomeLine) => void>()}
         onEdit={onEdit}
         plan={plan}
         side="income"
@@ -289,15 +284,9 @@ describe("ScheduleRows", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Edit Salary" })).toBeEnabled();
-    expect(
-      screen.queryByRole("button", { name: "Edit State pension" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Delete State pension" }),
-    ).not.toBeInTheDocument();
-    // The lock is drawn where the pencil and the bin would be, and where
-    // the chevron would be on the folded lines, which open nothing.
+    expect(screen.getAllByRole("button", { name: "Salary" })).toHaveLength(2);
+    // The lock is drawn where the chevron would be, in the columns and on
+    // the folded lines alike, and neither opens anything.
     const locks = screen.getAllByRole("img", { name: "Set by the state" });
 
     expect(locks).toHaveLength(2);
@@ -312,9 +301,9 @@ describe("ScheduleRows", () => {
   // Narrow, each row is its folded lines: the name and what it pays,
   // its kind and how it grows, its detail, the bar and its years. The
   // columns hide while they show, the row is one column, and it opens
-  // from anywhere on it; its actions fold away with the columns, the
-  // dialog it opens being where it is deleted from.
-  it("folds each row into lines while narrow, opened from its name, its actions folded away", () => {
+  // from anywhere on it, the dialog it opens being where it is deleted
+  // from.
+  it("folds each row into lines while narrow, opened from its name", () => {
     const onEdit = vi.fn<(line: IncomeLine) => void>();
     render(
       <ScheduleRows
@@ -322,7 +311,6 @@ describe("ScheduleRows", () => {
         emptyTitle="Nothing yet"
         lines={[salary]}
         milestones={[]}
-        onDelete={vi.fn<(line: IncomeLine) => void>()}
         onEdit={onEdit}
         plan={plan}
         side="income"
@@ -331,14 +319,15 @@ describe("ScheduleRows", () => {
     );
 
     const item = screen.getByRole("listitem");
-    const open = within(item).getByRole("button", { name: "Salary" });
     // eslint-disable-next-line testing-library/no-node-access -- the row's boxes are layout boxes with no role of their own; the folded lines' is the first
     const [folded, ...columns] = item.children;
 
     expect(screen.getByRole("list")).toHaveClass("@container");
     expect(item).toHaveClass("relative", "folded:grid-cols-1");
     expect(folded).toHaveClass("unfolded:hidden");
-    expect(folded).toContainElement(open);
+    expect(folded).toContainElement(
+      within(item).getAllByRole("button", { name: "Salary" }).at(0) ?? null,
+    );
     expect(columns).toHaveLength(4);
     for (const column of columns) {
       expect(column).toHaveClass("folded:hidden");
@@ -358,7 +347,7 @@ describe("ScheduleRows", () => {
     // eslint-disable-next-line testing-library/no-node-access -- the box the bar sits in is a layout box with no role of its own
     expect(foldedBar?.parentElement).toHaveClass("pointer-events-none");
 
-    fireEvent.click(open);
+    pressRow("Salary", item);
 
     expect(onEdit).toHaveBeenCalledExactlyOnceWith(salary);
   });
@@ -373,7 +362,6 @@ describe("ScheduleRows", () => {
         emptyTitle="Nothing yet"
         lines={[statePension]}
         milestones={[]}
-        onDelete={vi.fn<(line: IncomeLine) => void>()}
         onEdit={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
         side="income"
@@ -388,7 +376,7 @@ describe("ScheduleRows", () => {
     // eslint-disable-next-line testing-library/no-node-access -- the boxes the locks sit in are layout boxes with no role of their own
     expect(folded?.closest(".unfolded\\:hidden")).not.toBeNull();
     // eslint-disable-next-line testing-library/no-node-access -- the boxes the locks sit in are layout boxes with no role of their own
-    expect(column?.parentElement?.parentElement).toHaveClass("folded:hidden");
+    expect(column?.parentElement).toHaveClass("folded:hidden");
   });
 
   // Retirement at 59 falls in 2049 and the downsize in 2055. A salary

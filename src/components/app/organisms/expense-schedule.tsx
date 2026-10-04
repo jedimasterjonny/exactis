@@ -104,8 +104,8 @@ export function ExpenseSchedule({
         };
   }
 
-  // A row's pencil opens its line as it is, with its id so a save writes
-  // back to it.
+  // A row opens its line as it is, with its id so a save writes back to
+  // it.
   function edit(line: ExpenseLine): void {
     const { id, ...values } = line;
     open(values, id);

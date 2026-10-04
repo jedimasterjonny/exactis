@@ -19,7 +19,7 @@ import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import { lineGrowths } from "@/data/schedule";
 import { saved as accepted, refused } from "@/lib/answer";
-import { bySlot, commit, openEditor, openEntry } from "@/test/dom";
+import { bySlot, commit, openEntry, openRow } from "@/test/dom";
 
 import { IncomeSchedule } from "./income-schedule";
 
@@ -65,12 +65,12 @@ describe("IncomeSchedule", () => {
       screen.getByRole("region", { name: "Income by year" }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(incomeLines.length);
-    expect(screen.getAllByRole("button", { name: /^Edit / })).toHaveLength(
-      incomeLines.length,
-    );
-    expect(screen.getAllByRole("button", { name: /^Delete / })).toHaveLength(
-      incomeLines.length,
-    );
+    // A row opens from its name, in its columns and on its folded lines,
+    // and is deleted from the dialog it opens.
+    expect(screen.getAllByRole("button", { name: "Salary" })).toHaveLength(2);
+    expect(
+      screen.queryByRole("button", { name: /^(Edit|Delete) / }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("£147,000")).toHaveTextContent("£147,000 / yr");
     // A row is drawn in its columns and again in its folded lines, only
     // one of which is on screen at any width, the columns' copy last.
@@ -88,15 +88,18 @@ describe("IncomeSchedule", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  // A row's bin asks first, holds the confirm while the store answers,
-  // and closes on the answer; the row goes when the page re-reads.
+  // The Delete in a line's dialog asks first, holds the confirm while
+  // the store answers, and closes on the answer; the row goes when the
+  // page re-reads.
   it("asks before deleting a line, and deletes it on confirm", async () => {
     renderSchedule();
     const { promise, resolve: answer } =
       Promise.withResolvers<Answer<undefined>>();
     vi.mocked(removeIncomeLine).mockReturnValue(promise);
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete Salary" }));
+    fireEvent.click(
+      within(openRow("Salary")).getByRole("button", { name: "Delete" }),
+    );
 
     const dialog = screen.getByRole("alertdialog", { name: "Delete Salary?" });
 
@@ -125,7 +128,9 @@ describe("IncomeSchedule", () => {
       refused("No income line was written"),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete Salary" }));
+    fireEvent.click(
+      within(openRow("Salary")).getByRole("button", { name: "Delete" }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => {
@@ -142,7 +147,7 @@ describe("IncomeSchedule", () => {
     renderSchedule();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Delete State pension" }),
+      within(openRow("State pension")).getByRole("button", { name: "Delete" }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
@@ -150,9 +155,9 @@ describe("IncomeSchedule", () => {
     expect(removeIncomeLine).not.toHaveBeenCalled();
   });
 
-  // A row folded to fit a phone has no bin, so the dialog it opens is
-  // where it is deleted from: the Delete there closes the dialog and
-  // asks as the bin would. A new line has nothing yet to delete.
+  // The dialog a row opens is where it is deleted from: the Delete there
+  // closes the dialog before it asks. A new line has nothing yet to
+  // delete.
   it("asks from a saved line's dialog before deleting it, the dialog closing first", async () => {
     renderSchedule();
     vi.mocked(removeIncomeLine).mockResolvedValue(accepted(undefined));
@@ -165,7 +170,7 @@ describe("IncomeSchedule", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     fireEvent.click(
-      within(openEditor("Salary")).getByRole("button", { name: "Delete" }),
+      within(openRow("Salary")).getByRole("button", { name: "Delete" }),
     );
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -190,7 +195,7 @@ describe("IncomeSchedule", () => {
     const { promise, resolve: answer } =
       Promise.withResolvers<Answer<IncomeLine>>();
     vi.mocked(saveIncomeLine).mockReturnValue(promise);
-    const dialog = openEditor("Salary");
+    const dialog = openRow("Salary");
 
     expect(
       within(dialog).getByRole("button", { name: "Delete" }),
@@ -424,7 +429,7 @@ describe("IncomeSchedule", () => {
     renderSchedule();
     saved({ ...salary, feeds: sipp.id, sacrifice: 0.05 });
 
-    const dialog = openEditor("Salary");
+    const dialog = openRow("Salary");
     const choice = within(dialog).getByRole("combobox", { name: "Pension" });
     const share = (): HTMLElement =>
       within(dialog).getByRole("textbox", { name: "Salary sacrifice" });
@@ -549,7 +554,7 @@ describe("IncomeSchedule", () => {
       screen.getAllByText(bySlot("span-bar-fill"), { suggest: false })[0],
     ).toHaveStyle({ width: `${String((23 / 53) * 100)}%` });
 
-    const dialog = openEditor("Salary");
+    const dialog = openRow("Salary");
 
     expect(within(dialog).getByRole("combobox", { name: "Ends" })).toHaveValue(
       "open",
@@ -768,7 +773,7 @@ describe("IncomeSchedule", () => {
     renderSchedule();
     saved({ ...statePension, lastYear: 2070 });
 
-    const dialog = openEditor("State pension");
+    const dialog = openRow("State pension");
 
     expect(within(dialog).getByText("Edit income line")).toHaveClass(
       "text-brand",
@@ -847,7 +852,7 @@ describe("IncomeSchedule", () => {
     renderSchedule();
     saved({ ...salary, rsu: 20000 });
 
-    const dialog = openEditor("Salary");
+    const dialog = openRow("Salary");
 
     expect(
       within(dialog).getByRole("textbox", { name: "Base salary" }),
@@ -918,7 +923,7 @@ describe("IncomeSchedule", () => {
     renderSchedule();
     saved({ ...salary, lastYear: null });
 
-    const dialog = openEditor("Salary");
+    const dialog = openRow("Salary");
 
     expect(within(dialog).getByRole("combobox", { name: "Ends" })).toHaveValue(
       "fixed",

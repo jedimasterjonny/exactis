@@ -75,12 +75,12 @@ const kinds = optionsOf(kindLabels, [
 // accounts the page hands down; a salary may open a pension of its own
 // with the save, belonging to one of the owners the page hands down,
 // so the save holds while the one it opens is unnamed or has no owner,
-// as it holds while the line is unnamed. A row's bin asks through the confirm
-// dialog before the line goes, as the ledger's does; nothing hangs on a
-// line, so it goes alone. The dialog of a saved line offers a Delete
-// that asks the same question, which is where a row folded to fit a
-// phone is deleted from, and holds while a save is on its way, since a
-// deletion over a save in flight would race it. The lines are laid out
+// as it holds while the line is unnamed. The dialog of a saved line
+// offers a Delete, which is where a row is deleted from, as an account
+// is from its dialog: it asks through the confirm dialog before the line
+// goes, and nothing hangs on a line, so it goes alone. It holds while a
+// save is on its way, since a deletion over a save in flight would race
+// it. The lines are laid out
 // by the milestones the page hands down: each row names the ones its
 // line is tied to, and the dialog offers them for either end. The card
 // takes a numeral of its own off the screen's, since the reference
@@ -128,9 +128,9 @@ export function IncomeSchedule({
     });
   }
 
-  // The Delete a saved line's dialog offers, which asks as its row's bin
-  // does: the dialog closes first, so the question stands alone and a
-  // cancel lands back on the screen, as the ledger's does. A new line has
+  // The Delete a saved line's dialog offers: the dialog closes first, so
+  // the question stands alone and a cancel lands back on the screen, as
+  // the ledger's does. A new line has
   // nothing yet to delete, and matches no line the schedule lists.
   function deleteFrom(current: Entry<Draft>): (() => void) | undefined {
     const line = lines.find(({ id }) => id === current.id);
@@ -142,8 +142,8 @@ export function IncomeSchedule({
         };
   }
 
-  // A row's pencil opens its line as it is, with its id so a save writes
-  // back to it. A saved line feeds its pension by id, so it opens none.
+  // A row opens its line as it is, with its id so a save writes back to
+  // it. A saved line feeds its pension by id, so it opens none.
   function edit(line: IncomeLine): void {
     const { id, ...values } = line;
     open({ ...values, opens: null }, id);
@@ -172,7 +172,6 @@ export function IncomeSchedule({
             emptyTitle="No income yet"
             lines={lines}
             milestones={markers}
-            onDelete={ask}
             onEdit={edit}
             plan={plan}
             side="income"

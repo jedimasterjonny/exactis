@@ -48,6 +48,25 @@ export function openEntry(label: string): HTMLElement {
   return screen.getByRole("dialog");
 }
 
+// A row's record opened in its dialog from the row itself, the dialog
+// being named by the record's own name.
+export function openRow(name: string): HTMLElement {
+  pressRow(name);
+  return screen.getByRole("dialog", { name });
+}
+
+// A row pressed where it opens, on its name, on the screen or within a
+// box. A row is drawn in its columns and again on its folded lines, only
+// one of which is shown at any width, and jsdom shows both, so each has
+// a button named by the row; either opens it, and the first is pressed.
+export function pressRow(name: string, box: HTMLElement = document.body): void {
+  for (const opener of within(box)
+    .getAllByRole("button", { name })
+    .slice(0, 1)) {
+    fireEvent.click(opener);
+  }
+}
+
 // A select by its label: the native select a choice draws, which is a
 // combobox to the accessibility tree.
 export function select(name: string): HTMLElement {
