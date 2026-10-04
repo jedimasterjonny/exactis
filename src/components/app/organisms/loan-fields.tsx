@@ -16,6 +16,7 @@ import { MonthField } from "@/components/app/molecules/month-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { counted } from "@/lib/count";
 import { clearsIn, termTo } from "@/lib/loans";
+import { formatMonth } from "@/lib/months";
 
 // A loan as the fields read it: what is owed, and the three figures any
 // two of which fix the third. An asset's draft carries these among its
@@ -119,7 +120,7 @@ export function LoanFields({
     <>
       <FieldRow layout="pair">
         <MoneyField
-          hint="What is owed today"
+          hint={`What is owed in ${formatMonth({ month: plan.month, year: plan.from })}`}
           label={words.balance}
           min={0}
           onValueCommitted={(balance) => {

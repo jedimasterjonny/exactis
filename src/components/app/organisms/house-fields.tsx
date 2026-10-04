@@ -11,6 +11,7 @@ import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { LoanFields } from "@/components/app/organisms/loan-fields";
 import { statuses } from "@/data/houses";
+import { formatMonth } from "@/lib/months";
 import { optionsOf } from "@/lib/options";
 
 interface HouseFieldsProps {
@@ -81,7 +82,7 @@ export function HouseFields({
       <FieldRow layout="pair">
         <MoneyField
           defaultValue={initial.value}
-          hint="What it would sell for today"
+          hint={`What it would sell for in ${formatMonth({ month: plan.month, year: plan.from })}`}
           label="Value"
           onValueCommitted={(value) => {
             onAmend({ value });
