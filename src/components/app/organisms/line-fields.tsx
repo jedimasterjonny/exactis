@@ -10,6 +10,7 @@ import { SpanBar } from "@/components/app/atoms/span-bar";
 import { MoneyField, YearField } from "@/components/app/molecules/figure-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
+import { yearsOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { cadenceOptions } from "@/lib/cadence";
 import { counted } from "@/lib/count";
@@ -233,6 +234,7 @@ export function LineFields<TKind extends string>({
           firstYear={drawn.firstYear}
           lastMonth={drawn.lastMonth}
           lastYear={drawn.lastYear}
+          marks={yearsOf(milestones)}
           plan={plan}
           side={side}
           startsAt={drawn.startsAt}

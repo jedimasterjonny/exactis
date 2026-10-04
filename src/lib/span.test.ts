@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Plan } from "@/data/plan";
 
-import { placed } from "./span";
+import { decadesOf, placed } from "./span";
 
 // Forty years from 2026, so the span ends in 2066 and the shares are round.
 const plan: Plan = {
@@ -15,6 +15,14 @@ const plan: Plan = {
   retires: 90,
   years: 40,
 };
+
+describe("decadesOf", () => {
+  it("rules each decade the span reaches past its first year", () => {
+    expect(decadesOf(plan)).toStrictEqual([2030, 2040, 2050, 2060]);
+    expect(decadesOf({ ...plan, from: 2030, years: 9 })).toStrictEqual([]);
+    expect(decadesOf({ ...plan, from: 2030, years: 10 })).toStrictEqual([2040]);
+  });
+});
 
 describe("placed", () => {
   it("places a year by its share of the span, a fraction of one that far into it", () => {

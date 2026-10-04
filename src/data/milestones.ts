@@ -106,6 +106,13 @@ export function untied<TLine extends LineValues>(
   };
 }
 
+// The years the milestones fall in, each once, in the order they come,
+// for the rules every bar on the plan's span draws across its track: two
+// milestones in the one year rule it once.
+export function yearsOf(markers: readonly Marker[]): number[] {
+  return [...new Set(markers.map(({ year }) => year))];
+}
+
 // The year a tie falls in: retirement's, or the listed milestone's, or
 // none for a milestone the household does not list.
 function yearOf(

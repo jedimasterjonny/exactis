@@ -143,6 +143,47 @@ describe("SpanBar", () => {
     });
   });
 
+  // Milestones in 2036 and 2046 rule the track a quarter and half way
+  // along, over the fill, faint, whatever the line's own years.
+  it("rules the years given to mark across the track, and none unless given", () => {
+    const { rerender } = render(
+      <SpanBar
+        endsAt={null}
+        firstYear={2026}
+        lastMonth={null}
+        lastYear={null}
+        marks={[2036, 2046]}
+        plan={plan}
+        side="income"
+        startsAt={null}
+      />,
+    );
+
+    // Hidden from the tree, so no query is better than the slot.
+    const marks = screen.getAllByText(bySlot("span-bar-mark"), {
+      suggest: false,
+    });
+
+    expect(marks.map((mark) => mark.style.left)).toStrictEqual(["25%", "50%"]);
+    expect(marks[0]).toHaveClass("w-px", "bg-brand/40");
+
+    rerender(
+      <SpanBar
+        endsAt={null}
+        firstYear={2026}
+        lastMonth={null}
+        lastYear={null}
+        plan={plan}
+        side="income"
+        startsAt={null}
+      />,
+    );
+
+    expect(
+      screen.queryByText(bySlot("span-bar-mark"), { suggest: false }),
+    ).not.toBeInTheDocument();
+  });
+
   // A line tied at both ends to milestones in 2036 and 2046 runs from
   // the first to the year before the second, and each tied end carries
   // a dot where it meets the milestone's pin.

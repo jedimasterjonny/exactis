@@ -12,6 +12,18 @@ import { endYear } from "@/data/plan";
 // fell about three years apart from one row to the next.
 export const laneColumns = "grid-cols-[minmax(0,1fr)_9rem_11rem_1.75rem]";
 
+// The years a ruler over the plan's span marks: each decade the span
+// reaches past its first year, 2030 to 2070 for a plan from 2026 to 2079,
+// so the marks fall at round years, and at round ages for an owner born
+// in a round year, and stand far enough apart to read on a phone.
+export function decadesOf(plan: Plan): number[] {
+  const first = Math.floor(plan.from / 10) * 10 + 10;
+  return Array.from(
+    { length: Math.max(0, Math.floor((endYear(plan) - first) / 10) + 1) },
+    (_, index) => first + index * 10,
+  );
+}
+
 // A year's place along the plan's span, as a percentage from its start,
 // held within it, so a year outside the span is placed at its edge
 // rather than past it. A year is placed where it begins, and a fraction

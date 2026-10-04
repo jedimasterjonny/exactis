@@ -110,6 +110,18 @@ describe("MilestoneList", () => {
     for (const row of within(section).getAllByRole("listitem")) {
       expect(row).toHaveClass(laneColumns);
     }
+    // The span is ruled in decades above the rows, in the pins' column,
+    // and every pin's track carries a rule at each milestone: three
+    // milestones on each of the six tracks.
+    const ruler = within(section).getByText(bySlot("span-ruler"), {
+      suggest: false,
+    });
+
+    // eslint-disable-next-line testing-library/no-node-access -- the box the ruler sits in is a layout box with no role of its own
+    expect(ruler.parentElement).toHaveClass(laneColumns);
+    expect(
+      within(section).getAllByText(bySlot("pin-bar-mark"), { suggest: false }),
+    ).toHaveLength(18);
   });
 
   // A milestone the household lists opens from its name, in its columns

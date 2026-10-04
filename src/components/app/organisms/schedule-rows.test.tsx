@@ -436,6 +436,11 @@ describe("ScheduleRows", () => {
     expect(screen.getByText("2026 – 2048")).toHaveClass("figure");
     expect(screen.getByText("Age 36–58")).toBeInTheDocument();
     expect(screen.getByText("Runs no years")).toHaveClass("label");
+    // Every bar rules the three milestones across its track: five lines,
+    // each drawn twice.
+    expect(
+      screen.getAllByText(bySlot("span-bar-mark"), { suggest: false }),
+    ).toHaveLength(30);
     // Hidden from the tree, so no query is better than the slot. Six
     // tied ends, each drawn on the row's two bars.
     expect(
