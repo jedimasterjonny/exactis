@@ -18,6 +18,7 @@ interface HouseFieldsProps {
   readonly figure: null | number;
   readonly initial: HouseDraft;
   readonly onAmend: (patch: Partial<HouseDraft>) => void;
+  readonly onWork: (worked: LoanFigure) => void;
   readonly plan: PlanMonth;
   readonly worked: LoanFigure;
 }
@@ -39,8 +40,6 @@ const words: LoanWords = {
   never:
     "Never clears at this payment, so the payments run to the end of the plan",
   noRate: "No rate clears the balance over the term",
-  term: "Years to pay off",
-  typed: "Left to run",
 };
 
 // The fields the house dialog takes: the name and the status on the first
@@ -55,6 +54,7 @@ export function HouseFields({
   figure,
   initial,
   onAmend,
+  onWork,
   plan,
   worked,
 }: HouseFieldsProps): JSX.Element {
@@ -101,6 +101,7 @@ export function HouseFields({
           draft={draft}
           figure={figure}
           onAmend={onAmend}
+          onWork={onWork}
           plan={plan}
           words={words}
           worked={worked}

@@ -19,6 +19,7 @@ interface CarFieldsProps {
   readonly figure: null | number;
   readonly initial: CarDraft;
   readonly onAmend: (patch: Partial<CarDraft>) => void;
+  readonly onWork: (worked: LoanFigure) => void;
   readonly plan: PlanMonth;
   readonly worked: LoanFigure;
 }
@@ -32,8 +33,7 @@ const agreementLabels: Record<Agreement, string> = {
 
 const agreementOptions = optionsOf(agreementLabels, agreements);
 
-// The years the payments run in all, to a tenth as the term field shows
-// them.
+// The years the payments run in all, to a tenth.
 const years = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 });
 
 // The fields the car dialog takes: the name and the agreement on the
@@ -53,6 +53,7 @@ export function CarFields({
   figure,
   initial,
   onAmend,
+  onWork,
   plan,
   worked,
 }: CarFieldsProps): JSX.Element {
@@ -99,6 +100,7 @@ export function CarFields({
           draft={draft}
           figure={figure}
           onAmend={onAmend}
+          onWork={onWork}
           plan={plan}
           words={wordsOf(draft.agreement)}
           worked={worked}
@@ -145,7 +147,5 @@ function wordsOf(agreement: Agreement): LoanWords {
       ? "Never reaches the balloon at this payment, so the payments run to the end of the plan"
       : "Never clears at this payment, so the payments run to the end of the plan",
     noRate: "No rate reaches the balloon over the term",
-    term: "Years left",
-    typed: isPcp ? "On the agreement" : "To pay off",
   };
 }

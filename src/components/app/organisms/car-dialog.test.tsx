@@ -80,12 +80,17 @@ describe("CarDialog", () => {
     expect(field("Monthly payment", dialog)).toHaveAccessibleDescription(
       workedHint,
     );
-    expect(field("Years left", dialog)).toHaveValue("4");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+    ).toHaveValue("payment");
+    expect(field("Year", dialog)).toHaveValue("2030");
+    expect(field("Year", dialog)).toHaveAccessibleDescription("4 years left");
     expect(field("Balloon", dialog)).toHaveValue("£0");
   });
 
-  // £14,000 at 7.9% over three years towards a £6,000 balloon is £290 a
-  // month, to the pound, and carried on clears the whole in 4.9 years.
+  // £14,000 at 7.9% over three years, the agreement ending in August
+  // 2029, towards a £6,000 balloon is £290 a month, to the pound, and
+  // carried on clears the whole in 4.9 years.
   it("works the payment out from the balance, balloon, rate and term, and saves a new car with its PCP", async () => {
     const onSaved = vi.fn<() => void>();
     renderDialog({ onSaved });
@@ -97,7 +102,7 @@ describe("CarDialog", () => {
     commit(field("Balance owed", dialog), "14,000");
     commit(field("Balloon", dialog), "6,000");
     commit(field("Rate", dialog), "7.9");
-    commit(field("Years left", dialog), "3");
+    commit(field("Year", dialog), "2029");
 
     expect(
       within(dialog).getByRole("heading", { name: "Golf" }),
@@ -161,8 +166,13 @@ describe("CarDialog", () => {
     expect(field("Balance owed", dialog)).toHaveValue("£14,000");
     expect(field("Rate", dialog)).toHaveValue("7.90%");
     expect(field("Monthly payment", dialog)).toHaveValue("£290");
-    expect(field("Years left", dialog)).toHaveValue("3");
-    expect(field("Years left", dialog)).toHaveAccessibleDescription(workedHint);
+    expect(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+    ).toHaveValue("term");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Agreement ends" }),
+    ).toHaveAccessibleDescription(workedHint);
+    expect(field("Year", dialog)).toHaveAccessibleDescription("3 years left");
     expect(field("Balloon", dialog)).toHaveValue("£6,000");
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
 
@@ -201,7 +211,7 @@ describe("CarDialog", () => {
     expect(
       within(dialog).queryByRole("textbox", { name: "Balloon" }),
     ).not.toBeInTheDocument();
-    expect(field("Years left", dialog)).toHaveValue("3");
+    expect(field("Year", dialog)).toHaveAccessibleDescription("3 years left");
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
@@ -244,9 +254,13 @@ describe("CarDialog", () => {
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Golf" } });
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+      { target: { value: "rate" } },
+    );
     commit(field("Balance owed", dialog), "14,000");
     commit(field("Balloon", dialog), "6,000");
-    commit(field("Years left", dialog), "3");
+    commit(field("Year", dialog), "2029");
     commit(field("Monthly payment", dialog), "290");
 
     expect(field("Rate", dialog)).toHaveValue("7.92%");
@@ -277,18 +291,28 @@ describe("CarDialog", () => {
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Golf" } });
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+      { target: { value: "term" } },
+    );
     commit(field("Balance owed", dialog), "14,000");
     commit(field("Balloon", dialog), "6,000");
     commit(field("Rate", dialog), "7.9");
     commit(field("Monthly payment", dialog), "290");
 
-    expect(field("Years left", dialog)).toHaveValue("3");
-    expect(field("Years left", dialog)).toHaveAccessibleDescription(workedHint);
+    const ends = within(dialog).getByRole("combobox", {
+      name: "Agreement ends",
+    });
+
+    expect(ends).toHaveDisplayValue("August");
+    expect(field("Year", dialog)).toHaveValue("2029");
+    expect(field("Year", dialog)).toHaveAccessibleDescription("3 years left");
 
     commit(field("Monthly payment", dialog), "90");
 
-    expect(field("Years left", dialog)).toHaveValue("");
-    expect(field("Years left", dialog)).toHaveAccessibleDescription(
+    expect(ends).toHaveDisplayValue("—");
+    expect(ends).toHaveAccessibleDescription("Never, at this payment");
+    expect(field("Year", dialog)).toHaveAccessibleDescription(
       "Never reaches the balloon at this payment, so the payments run to the end of the plan",
     );
     expect(field("Balloon", dialog)).toHaveAccessibleDescription(
@@ -313,41 +337,38 @@ describe("CarDialog", () => {
     });
   });
 
-  // Whichever two of the three were typed last stand, and the third is
-  // worked out, so typing a figure that was worked out hands the working
-  // to the one left alone longest. The balloon is none of the three, so
-  // typing it hands nothing over.
-  it("keeps the two figures typed last and works out the third", () => {
+  // A choice alone changes no figure: the £290 a month worked out is kept
+  // as typed once the rate is chosen instead, and the rate holds at the
+  // 7.9% it was typed as, until a figure it is worked out from is typed:
+  // £300 a month then reaches the balloon at 9.71%.
+  it("changes no figure on a choice alone, until one is typed", () => {
     renderDialog();
     const dialog = openDialog();
-    const worked = (name: string): void => {
-      expect(field(name, dialog)).toHaveAccessibleDescription(workedHint);
-    };
 
     commit(field("Balance owed", dialog), "14,000");
     commit(field("Balloon", dialog), "6,000");
-    worked("Monthly payment");
-
-    commit(field("Monthly payment", dialog), "290");
-    worked("Years left");
-
     commit(field("Rate", dialog), "7.9");
-    worked("Years left");
+    commit(field("Year", dialog), "2029");
 
-    commit(field("Years left", dialog), "3");
-    worked("Monthly payment");
+    expect(field("Monthly payment", dialog)).toHaveValue("£290");
 
-    commit(field("Monthly payment", dialog), "290");
-    worked("Rate");
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+      { target: { value: "rate" } },
+    );
 
-    commit(field("Years left", dialog), "4");
-    worked("Rate");
+    expect(field("Monthly payment", dialog)).toHaveValue("£290");
+    expect(field("Monthly payment", dialog)).not.toHaveAttribute("readonly");
+    expect(field("Rate", dialog)).toHaveValue("7.90%");
+    expect(field("Rate", dialog)).toHaveAccessibleDescription(workedHint);
 
-    commit(field("Rate", dialog), "7.9");
-    worked("Monthly payment");
+    fireEvent.change(field("Name", dialog), { target: { value: "Golf" } });
 
-    commit(field("Rate", dialog), "7");
-    worked("Monthly payment");
+    expect(field("Rate", dialog)).toHaveValue("7.90%");
+
+    commit(field("Monthly payment", dialog), "300");
+
+    expect(field("Rate", dialog)).not.toHaveValue("7.90%");
   });
 
   // The balloon typed on a PCP goes with the agreement: a car made a

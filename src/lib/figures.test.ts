@@ -1,55 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { isSettled, settled, stood, thirdOf, typedOn } from "./figures";
-
-// A draft of the shape each dialog holds: the three figures, and a
-// field of its own that is none of them.
-interface Draft {
-  readonly balloon: number;
-  readonly payment: number;
-  readonly rate: number;
-  readonly term: number;
-}
-
-// The patch a dialog sends when a field that is none of the three is
-// typed.
-const balloon: Partial<Draft> = { balloon: 6000 };
-
-describe("stood", () => {
-  it("puts the figure a patch carries first and pushes the other out", () => {
-    expect(stood(["rate", "term"], { payment: 290 })).toStrictEqual([
-      "payment",
-      "rate",
-    ]);
-    expect(stood(["payment", "rate"], { term: 3 })).toStrictEqual([
-      "term",
-      "payment",
-    ]);
-  });
-
-  it("leaves the pair as it is when the patch carries the figure already first", () => {
-    expect(stood(["payment", "rate"], { payment: 300 })).toStrictEqual([
-      "payment",
-      "rate",
-    ]);
-  });
-
-  it("leaves the two that stand when the patch carries none of the three", () => {
-    expect(stood(["rate", "term"], balloon)).toStrictEqual(["rate", "term"]);
-  });
-});
-
-describe("thirdOf", () => {
-  it("names the figure the two given leave out, in either order", () => {
-    expect(thirdOf("payment", "rate")).toBe("term");
-    expect(thirdOf("rate", "payment")).toBe("term");
-    expect(thirdOf("payment", "term")).toBe("rate");
-    expect(thirdOf("term", "payment")).toBe("rate");
-    expect(thirdOf("rate", "term")).toBe("payment");
-    expect(thirdOf("term", "rate")).toBe("payment");
-  });
-});
+import { isSettled, kept, settled, workedOn } from "./figures";
 
 // A secured asset's values as a dialog builds them: the loan's three
 // saved figures, and a field of the asset's own that is none of them.
@@ -90,9 +42,22 @@ describe("isSettled", () => {
   });
 });
 
-describe("typedOn", () => {
-  it("stands the payment and the rate a loan keeps, else the rate and the term", () => {
-    expect(typedOn(true)).toStrictEqual(["payment", "rate"]);
-    expect(typedOn(false)).toStrictEqual(["rate", "term"]);
+describe("kept", () => {
+  it("patches the draft with the figure worked out, and nothing where none fit", () => {
+    expect(kept({ figure: 290, worked: "payment" })).toStrictEqual({
+      payment: 290,
+    });
+    expect(kept({ figure: 0.079, worked: "rate" })).toStrictEqual({
+      rate: 0.079,
+    });
+    expect(kept({ figure: 3, worked: "term" })).toStrictEqual({ term: 3 });
+    expect(kept({ figure: null, worked: "rate" })).toStrictEqual({});
+  });
+});
+
+describe("workedOn", () => {
+  it("works out the term of a loan the store keeps, else the payment", () => {
+    expect(workedOn(true)).toBe("term");
+    expect(workedOn(false)).toBe("payment");
   });
 });

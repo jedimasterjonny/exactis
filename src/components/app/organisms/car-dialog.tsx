@@ -6,7 +6,7 @@ import type { Account } from "@/data/accounts";
 import type { Agreement, CarDraft, CarValues } from "@/data/cars";
 import type { Secured } from "@/data/secured";
 import type { Entry } from "@/hooks/use-editor";
-import type { Stood, WorkedOut } from "@/lib/figures";
+import type { LoanFigure, WorkedOut } from "@/lib/figures";
 import type { PlanMonth } from "@/lib/loans";
 
 import { saveCar } from "@/actions/accounts";
@@ -14,7 +14,7 @@ import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { CarFields } from "@/components/app/organisms/car-fields";
 import { carOf, clearsAfter, derive, isSound } from "@/data/cars";
 import { useMountedEditor } from "@/hooks/use-editor";
-import { isSettled, settled, stood, thirdOf, typedOn } from "@/lib/figures";
+import { isSettled, kept, movesLoan, settled, workedOn } from "@/lib/figures";
 
 interface CarDialogProps {
   readonly car: null | Secured;
@@ -25,28 +25,32 @@ interface CarDialogProps {
 }
 
 // What the dialog holds while it is open: the car as the fields hold it,
-// and the two of the finance's three figures that stand while the third
-// is worked out from them. The two travel with the draft so an
-// amendment moves both at once.
+// which of the finance's three figures is worked out from the other two,
+// which the fields offer as a choice, and whether that figure is held as
+// the draft has it, as it is from the moment it is chosen until
+// something it is worked out from is typed, so a choice alone changes no
+// figure, as the house dialog holds it.
 interface Draft extends CarDraft {
-  readonly typed: Stood;
+  readonly isHeld: boolean;
+  readonly worked: LoanFigure;
 }
 
 // A new car: on a PCP, since that is the case with the most to work out,
 // worth nothing and owing nothing yet, over a term of four years at no
-// rate, so the first two figures typed are taken as read and the payment
-// follows from them until the payment is typed instead.
+// rate, working out the payment from the rate and the term until another
+// figure is chosen.
 const blank: Draft = {
   agreement: "pcp",
   balance: 0,
   balloon: 0,
   depreciation: 0,
+  isHeld: false,
   name: "",
   payment: 0,
   rate: 0,
   term: 4,
-  typed: ["rate", "term"],
   value: 0,
+  worked: "payment",
 };
 
 // The dialog a car is entered or edited in, which takes the car as the
@@ -62,11 +66,11 @@ const blank: Draft = {
 // the fields, which count the term's end from it. The editor hook holds
 // the entry, the save and the toast, as it does for the account dialog;
 // what is the car's own is the figure worked out on each amendment and
-// the values the save sends, which are the draft less the figure typed
-// over. The caller is told when the car has been saved, so the screen
+// the values the save sends, which are the draft with the figure worked
+// out in place of its own. The caller is told when the car has been saved, so the screen
 // can close the dialog and bring the assets forward. Given a delete
 // handler, the dialog of a car the store holds offers a Delete, which
-// reports the car's own account, as its row's bin does, for the caller
+// reports the car's own account for the caller
 // to ask about with the finance that goes with it, and holds while a
 // save is on its way; a new car has nothing yet to delete and is
 // offered none.
@@ -111,7 +115,17 @@ export function CarDialog({
         figure={figure}
         initial={entry.initial}
         onAmend={(patch) => {
-          amend(entry, { ...patch, typed: stood(entry.draft.typed, patch) });
+          amend(entry, {
+            ...patch,
+            isHeld: entry.draft.isHeld && !movesLoan(patch),
+          });
+        }}
+        onWork={(next) => {
+          amend(entry, {
+            ...kept({ figure, worked }),
+            isHeld: true,
+            worked: next,
+          });
         }}
         plan={plan}
         worked={worked}
@@ -145,8 +159,9 @@ function openingOf(car: null | Secured): Entry<Draft> {
   }
   const draft: Draft = {
     ...carOf(car),
+    isHeld: false,
     term: blank.term,
-    typed: typedOn(car.loan !== null),
+    worked: workedOn(car.loan !== null),
   };
   return { draft, id: car.asset.id, initial: draft };
 }
@@ -184,8 +199,11 @@ function workedOut(
   readonly clears: null | number;
   readonly values: CarValues;
 } {
-  const worked = thirdOf(...draft.typed);
-  const out = { figure: derive(draft, worked), worked };
+  const { worked } = draft;
+  const out = {
+    figure: draft.isHeld ? draft[worked] : derive(draft, worked),
+    worked,
+  };
   const values = valuesOf(draft, out);
   return {
     ...out,

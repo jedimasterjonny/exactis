@@ -79,10 +79,15 @@ describe("HouseDialog", () => {
     expect(field("Monthly payment", dialog)).toHaveAccessibleDescription(
       workedHint,
     );
-    expect(field("Years to pay off", dialog)).toHaveValue("25");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+    ).toHaveValue("payment");
+    expect(field("Year", dialog)).toHaveValue("2051");
+    expect(field("Year", dialog)).toHaveAccessibleDescription("25 years left");
   });
 
-  // £334,670 at 4.85% over 26 years is £1,889 a month, to the pound.
+  // £334,670 at 4.85% over 26 years, the last payment in August 2052, is
+  // £1,889 a month, to the pound.
   it("works the payment out from the balance, rate and term, and saves a new house with its mortgage", async () => {
     const onSaved = vi.fn<() => void>();
     renderDialog({ onSaved });
@@ -92,7 +97,7 @@ describe("HouseDialog", () => {
     commit(field("Value", dialog), "397,512");
     commit(field("Loan balance", dialog), "334,670");
     commit(field("Rate", dialog), "4.85");
-    commit(field("Years to pay off", dialog), "26");
+    commit(field("Year", dialog), "2052");
 
     expect(
       within(dialog).getByRole("heading", { name: "Home" }),
@@ -152,10 +157,13 @@ describe("HouseDialog", () => {
     expect(field("Loan balance", dialog)).toHaveValue("£176,520");
     expect(field("Rate", dialog)).toHaveValue("4.85%");
     expect(field("Monthly payment", dialog)).toHaveValue("£2,180");
-    expect(field("Years to pay off", dialog)).toHaveValue("8.2");
-    expect(field("Years to pay off", dialog)).toHaveAccessibleDescription(
-      workedHint,
-    );
+    expect(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+    ).toHaveValue("term");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Last payment" }),
+    ).toHaveAccessibleDescription(workedHint);
+    expect(field("Year", dialog)).toHaveAccessibleDescription("8.2 years left");
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
 
     commit(field("Value", dialog), "420,000");
@@ -179,10 +187,10 @@ describe("HouseDialog", () => {
   });
 
   // The 8.2 years worked out when the house opens, a shade over, are 99
-  // payments and run to November 2034; August 2035 picked instead is nine
-  // years, which stands as the term and shows in the years, and the
-  // rate is worked out in its place.
-  it("ends the mortgage in a picked month, which stands as the term", () => {
+  // payments and run to November 2034. With the rate chosen to be worked
+  // out instead, the end can be picked: August 2034 is eight years, which
+  // stands as the term, and the rate follows.
+  it("ends the mortgage in a picked month once the end is not worked out", () => {
     renderDialog({ house });
     const dialog = openDialog();
     const lastPayment = within(dialog).getByRole("combobox", {
@@ -190,18 +198,61 @@ describe("HouseDialog", () => {
     });
 
     expect(lastPayment).toHaveDisplayValue("November");
+    expect(lastPayment).toBeDisabled();
     expect(field("Year", dialog)).toHaveValue("2034");
 
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+      { target: { value: "rate" } },
+    );
     fireEvent.change(lastPayment, { target: { value: "7" } });
 
-    expect(field("Years to pay off", dialog)).toHaveValue("9");
-    expect(field("Years to pay off", dialog)).toHaveAccessibleDescription(
-      "Left to run",
-    );
+    expect(field("Year", dialog)).toHaveAccessibleDescription("8 years left");
     expect(lastPayment).toHaveDisplayValue("August");
-    expect(field("Year", dialog)).toHaveValue("2035");
+    expect(field("Year", dialog)).toHaveValue("2034");
     expect(field("Rate", dialog)).toHaveAccessibleDescription(workedHint);
     expect(field("Monthly payment", dialog)).toHaveValue("£2,180");
+  });
+
+  // The loan's £2,180 a month at 4.85% clears it in 8.19 years, a part of
+  // a month the payments round up to a whole one: worked out afresh over
+  // the whole months, the rate would come to 5.00% with nothing typed, so
+  // a choice alone holds it, and the save writes the loan as it was.
+  it("changes no figure on a choice alone, and saves the loan as it was", async () => {
+    const onSaved = vi.fn<() => void>();
+    saved(house.asset);
+    renderDialog({ house, onSaved });
+    const dialog = openDialog();
+
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+      { target: { value: "rate" } },
+    );
+
+    expect(field("Rate", dialog)).toHaveValue("4.85%");
+    expect(field("Monthly payment", dialog)).toHaveValue("£2,180");
+
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+      { target: { value: "payment" } },
+    );
+
+    expect(field("Monthly payment", dialog)).toHaveValue("£2,180");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
+      balance: 176520,
+      growth: 0.021,
+      name: "Home",
+      payment: 2180,
+      rate: 0.0485,
+      status: "mortgaged",
+      value: 397512,
+    });
   });
 
   it("opens a house owned outright with no loan fields", () => {
@@ -225,8 +276,12 @@ describe("HouseDialog", () => {
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Home" } });
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+      { target: { value: "rate" } },
+    );
     commit(field("Loan balance", dialog), "334,670");
-    commit(field("Years to pay off", dialog), "26");
+    commit(field("Year", dialog), "2052");
     commit(field("Monthly payment", dialog), "2,180");
 
     expect(field("Rate", dialog)).toHaveValue("5.46%");
@@ -256,19 +311,27 @@ describe("HouseDialog", () => {
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Home" } });
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+      { target: { value: "term" } },
+    );
     commit(field("Loan balance", dialog), "334,670");
     commit(field("Rate", dialog), "4.85");
     commit(field("Monthly payment", dialog), "2,180");
 
-    expect(field("Years to pay off", dialog)).toHaveValue("20.0");
-    expect(field("Years to pay off", dialog)).toHaveAccessibleDescription(
-      workedHint,
-    );
+    const lastPayment = within(dialog).getByRole("combobox", {
+      name: "Last payment",
+    });
+
+    expect(lastPayment).toHaveDisplayValue("September");
+    expect(field("Year", dialog)).toHaveValue("2046");
+    expect(field("Year", dialog)).toHaveAccessibleDescription("20 years left");
 
     commit(field("Monthly payment", dialog), "1,000");
 
-    expect(field("Years to pay off", dialog)).toHaveValue("");
-    expect(field("Years to pay off", dialog)).toHaveAccessibleDescription(
+    expect(lastPayment).toHaveDisplayValue("—");
+    expect(lastPayment).toHaveAccessibleDescription("Never, at this payment");
+    expect(field("Year", dialog)).toHaveAccessibleDescription(
       "Never clears at this payment, so the payments run to the end of the plan",
     );
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
@@ -289,39 +352,32 @@ describe("HouseDialog", () => {
     });
   });
 
-  // Whichever two of the three were typed last stand, and the third is
-  // worked out, so typing a figure that was worked out hands the working
-  // to the one left alone longest.
-  it("keeps the two figures typed last and works out the third", () => {
+  // The figure chosen is the one worked out, read-only, whichever of the
+  // others is typed after it, and the end is held while it is the one.
+  it("works out the figure chosen, and takes the other two as typed", () => {
     renderDialog();
     const dialog = openDialog();
-    const worked = (name: string): void => {
-      expect(field(name, dialog)).toHaveAccessibleDescription(workedHint);
-    };
+    const workOut = within(dialog).getByRole("combobox", { name: "Work out" });
+    const lastPayment = within(dialog).getByRole("combobox", {
+      name: "Last payment",
+    });
 
     commit(field("Loan balance", dialog), "334,670");
-    worked("Monthly payment");
-
-    commit(field("Monthly payment", dialog), "2,180");
-    worked("Years to pay off");
-
     commit(field("Rate", dialog), "4.85");
-    worked("Years to pay off");
 
-    commit(field("Years to pay off", dialog), "26");
-    worked("Monthly payment");
+    expect(field("Monthly payment", dialog)).toHaveAttribute("readonly");
+    expect(lastPayment).toBeEnabled();
 
-    commit(field("Monthly payment", dialog), "2,180");
-    worked("Rate");
+    fireEvent.change(workOut, { target: { value: "rate" } });
 
-    commit(field("Years to pay off", dialog), "20");
-    worked("Rate");
+    expect(field("Rate", dialog)).toHaveAttribute("readonly");
+    expect(field("Rate", dialog)).toHaveAccessibleDescription(workedHint);
+    expect(field("Monthly payment", dialog)).not.toHaveAttribute("readonly");
 
-    commit(field("Rate", dialog), "4.85");
-    worked("Monthly payment");
+    fireEvent.change(workOut, { target: { value: "term" } });
 
-    commit(field("Rate", dialog), "5");
-    worked("Monthly payment");
+    expect(lastPayment).toBeDisabled();
+    expect(field("Rate", dialog)).not.toHaveAttribute("readonly");
   });
 
   it("saves a house owned outright as the asset alone", async () => {

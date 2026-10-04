@@ -42,10 +42,6 @@ const presets = {
   // way, with the options the ledger formats with, and the number field
   // parses the other. A tenth of a point, a whole point with shift.
   rate: { format: percentFormat, largeStep: 0.01, step: 0.001 },
-  // A term is a count of years, to a tenth, since one worked out from a
-  // loan's figures seldom lands on a whole one and the tenth is worth
-  // showing.
-  term: { format: { maximumFractionDigits: 1 }, largeStep: 5, step: 1 },
   // A year is a whole number written without a separator, so 2026 never
   // reads 2,026, and a fraction typed is rounded to one, as an age is.
   year: {
@@ -61,9 +57,11 @@ const presets = {
 // A money input, under a hint that carries the derivation. The figure is
 // held inside the bounds it is given if any, which the number field
 // clamps a typed sum to when it commits: what is owed on a loan is never
-// less than nothing.
+// less than nothing. A sum worked out elsewhere is shown read-only.
 export function MoneyField(
-  props: PresetProps<"max" | "min"> & { readonly hint?: string | undefined },
+  props: PresetProps<"isReadOnly" | "max" | "min"> & {
+    readonly hint?: string | undefined;
+  },
 ): JSX.Element {
   return <FigureField {...props} {...presets.money} />;
 }
@@ -85,20 +83,16 @@ export function RateField(
   return <FigureField {...props} {...presets.rate} />;
 }
 
-// A term input: how long a loan has left to run.
-export function TermField(props: PresetProps<"hint">): JSX.Element {
-  return <FigureField {...props} {...presets.term} />;
-}
-
 // A year input, under a hint that carries the age reached, inside the
-// bounds it is given if any, so one before the plan cannot be typed.
+// bounds it is given if any, so one before the plan cannot be typed,
+// and read-only when it is worked out elsewhere.
 export function YearField(
-  props: PresetProps<"hint" | "max" | "min">,
+  props: PresetProps<"hint" | "isReadOnly" | "max" | "min">,
 ): JSX.Element {
   return <FigureField {...props} {...presets.year} />;
 }
 
-// What the four fields share: a figure input under a label, a hint and,
+// What the three fields share: a figure input under a label, a hint and,
 // if the caller gives one, an error. The figure is held as the caller
 // says, by default or by value.
 function FigureField({

@@ -4,19 +4,12 @@
 // leaves none.
 export type LoanFigure = "payment" | "rate" | "term";
 
-// The two figures typed last, the latest first, which stand while the
-// third is worked out from them.
-export type Stood = readonly [LoanFigure, LoanFigure];
-
 // The figure a dialog works out from the other two, and what it came
 // to, or null where no figure fits.
 export interface WorkedOut {
   readonly figure: null | number;
   readonly worked: LoanFigure;
 }
-
-// The three figures, so a patch can be asked which one it carries.
-const figures: readonly LoanFigure[] = ["payment", "rate", "term"];
 
 // Whether a secured asset's draft can be saved, as far as its loan's
 // figures go: an asset with no loan has none to hold it, and a rate
@@ -29,6 +22,42 @@ export function isSettled(
   { figure, worked }: WorkedOut,
 ): boolean {
   return !hasLoan || worked !== "rate" || figure !== null;
+}
+
+// The figure worked out as a patch of the draft, for a dialog to keep
+// as typed when another figure is chosen to be worked out instead, so
+// the field it was shown in keeps showing it; or none where no figure
+// fit, which leaves the draft's own.
+export function kept({
+  figure,
+  worked,
+}: WorkedOut): Partial<Record<LoanFigure, number>> {
+  if (figure === null) {
+    return {};
+  }
+  switch (worked) {
+    case "payment":
+      return { payment: figure };
+    case "rate":
+      return { rate: figure };
+    case "term":
+      return { term: figure };
+  }
+}
+
+// Whether a patch of a secured asset's draft moves what its loan's
+// figures are worked out from: what is owed, the balloon, any of the
+// three figures, or whether there is a loan at all and of what kind.
+export function movesLoan(patch: object): boolean {
+  return [
+    "agreement",
+    "balance",
+    "balloon",
+    "payment",
+    "rate",
+    "status",
+    "term",
+  ].some((key) => key in patch);
 }
 
 // A secured asset's values as its draft saves them: nothing owed, paid
@@ -56,38 +85,9 @@ export function settled<
     : { ...values, rate: figure };
 }
 
-// The two that stand once a patch lands: the figure it carries first,
-// and whichever of the two that stood is not it, so the one worked out
-// is always the one left alone longest. A patch carrying none of the
-// three leaves the two as they were.
-export function stood(
-  typed: Stood,
-  patch: Partial<Record<LoanFigure, number>>,
-): Stood {
-  const figure = figures.find((candidate) => candidate in patch);
-  if (figure === undefined) {
-    return typed;
-  }
-  const [first, second] = typed;
-  return [figure, first === figure ? second : first];
-}
-
-// The figure the two given leave out.
-export function thirdOf(one: LoanFigure, other: LoanFigure): LoanFigure {
-  switch (one) {
-    case "payment":
-      return other === "rate" ? "term" : "rate";
-    case "rate":
-      return other === "payment" ? "term" : "payment";
-    case "term":
-      return other === "payment" ? "rate" : "payment";
-  }
-}
-
-// The two figures that stand as a secured asset's dialog opens: the
-// payment and the rate the store keeps of a loan, the term being worked
-// out from them, or for an asset with none the rate and the term, so
-// the payment follows from the first two typed.
-export function typedOn(hasLoan: boolean): Stood {
-  return hasLoan ? ["payment", "rate"] : ["rate", "term"];
+// The figure a secured asset's dialog opens working out: the term, from
+// the payment and the rate the store keeps of a loan, or for an asset
+// with none the payment, which follows from the rate and the term.
+export function workedOn(hasLoan: boolean): LoanFigure {
+  return hasLoan ? "term" : "payment";
 }
