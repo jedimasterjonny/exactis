@@ -17,6 +17,7 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { refused, saved } from "@/lib/answer";
+import { laneColumns } from "@/lib/span";
 import { bySlot, commit } from "@/test/dom";
 
 import { MilestoneList } from "./milestone-list";
@@ -108,6 +109,11 @@ describe("MilestoneList", () => {
     ).toStrictEqual(
       [14, 14, 27, 27, 33, 33].map((years) => `${String((years / 57) * 100)}%`),
     );
+    // Laid out in the schedules' columns, retirement's lock row as wide
+    // in its span as a row with a pencil and a bin.
+    for (const row of within(section).getAllByRole("listitem")) {
+      expect(row).toHaveClass(laneColumns);
+    }
   });
 
   // Retirement is set on the dashboard, so its row draws a lock in its

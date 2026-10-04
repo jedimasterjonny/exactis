@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
 
+import { cn } from "cn";
 import { Banknote, Flag, Receipt } from "lucide-react";
 
 import type { Marker } from "@/data/milestones";
@@ -18,6 +19,7 @@ import { cadenceAbbreviations } from "@/lib/cadence";
 import { counted } from "@/lib/count";
 import { endOf, growthLabels } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
+import { laneColumns } from "@/lib/span";
 
 // What a schedule says of a line that the rows cannot read off it: the
 // badge its kind takes, what it pays at its cadence, any detail to write
@@ -144,7 +146,10 @@ export function ScheduleRows<TLine extends Line>({
         );
         return (
           <li
-            className="relative grid grid-cols-[minmax(0,1fr)_9rem_11rem_auto] items-center gap-4 py-3 first:pt-0 last:pb-0 folded:grid-cols-1"
+            className={cn(
+              "relative grid items-center gap-4 py-3 first:pt-0 last:pb-0 folded:grid-cols-1",
+              laneColumns,
+            )}
             key={line.id}
           >
             <div className="unfolded:hidden">
