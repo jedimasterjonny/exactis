@@ -53,6 +53,7 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
+        milestones={[]}
         plan={plan}
         schedule={spending(500)}
         spread={{ short: "No CMA is pulled" }}
@@ -78,6 +79,7 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[home]}
+        milestones={[]}
         plan={plan}
         schedule={spending(500)}
         spread={nothingStrays}
@@ -98,6 +100,7 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
+        milestones={[]}
         plan={plan}
         schedule={spending(500)}
         spread={nothingStrays}
@@ -123,6 +126,7 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
+        milestones={[]}
         plan={{ ...plan, rate: 0.05 }}
         schedule={spending(10000 / 12)}
         spread={{ inflation: 0.02, rate: 0.15 }}
@@ -144,6 +148,7 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[{ ...isa, balance: 1000000, kind: "tax-deferred" }]}
+        milestones={[]}
         plan={plan}
         schedule={spending(500)}
         spread={nothingStrays}
@@ -166,6 +171,7 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
+        milestones={[]}
         plan={plan}
         schedule={spending(1000)}
         spread={nothingStrays}

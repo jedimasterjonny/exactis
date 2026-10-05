@@ -9,7 +9,7 @@ import { normalsFrom } from "@/lib/random";
 
 import type { Future } from "./futures";
 
-import { futuresOf, pathOf, readingOf } from "./futures";
+import { futuresOf, pathOf, readingOf, yearIn, yearsIn } from "./futures";
 
 // A plan at 7% and 3% over the years these tests draw.
 const plan = { inflation: 0.03, rate: 0.07, years: 40 };
@@ -268,5 +268,62 @@ describe("readingOf", () => {
     expect(readingOf([{ fell: null, ranOut: null, savings: [] }]).middle).toBe(
       0,
     );
+  });
+});
+
+describe("yearsIn", () => {
+  const span = { from: 2026, years: 2 };
+
+  // Ten futures, the nth holding n thousand pounds entering 2026, twice
+  // that entering 2027 and three times entering 2028; the first falls
+  // short in 2027 and the second in 2028. So a year is lasting for every
+  // future not yet fallen short as it opens, and the poor, middle and
+  // good futures are the second, sixth and ninth in order.
+  it("lays a run on the plan's years, counting what lasts and falls short and reading the spread of the savings", () => {
+    const futures = Array.from({ length: 10 }, (_, nth): Future => ({
+      fell: [2027, 2028][nth] ?? null,
+      ranOut: null,
+      savings: [1000 * nth, 2000 * nth, 3000 * nth],
+    }));
+
+    expect(yearsIn(futures, span)).toStrictEqual([
+      {
+        fell: 0,
+        good: 8000,
+        lasting: 10,
+        middle: 5000,
+        poor: 1000,
+        year: 2026,
+      },
+      {
+        fell: 1,
+        good: 16000,
+        lasting: 10,
+        middle: 10000,
+        poor: 2000,
+        year: 2027,
+      },
+      {
+        fell: 1,
+        good: 24000,
+        lasting: 9,
+        middle: 15000,
+        poor: 3000,
+        year: 2028,
+      },
+    ]);
+  });
+
+  it("reads a run of none as holding nothing in every year, and a future with no point for a year as holding nothing in it", () => {
+    expect(
+      yearsIn([], span).map(({ middle, year }) => [year, middle]),
+    ).toStrictEqual([
+      [2026, 0],
+      [2027, 0],
+      [2028, 0],
+    ]);
+    expect(
+      yearIn([{ fell: null, ranOut: null, savings: [] }], span, 2027).middle,
+    ).toBe(0);
   });
 });
