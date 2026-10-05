@@ -12,12 +12,16 @@ import { monthName } from "@/lib/months";
 // nominal and geometric as BlackRock quotes it. One hedged to sterling,
 // which BlackRock prices hedged only in dollars, names the class it is
 // the hedged form of, and one BlackRock prices only in another
-// currency, carried into sterling, names that currency.
+// currency, carried into sterling, names that currency. Each carries
+// how far BlackRock expects it to stray, and none was kept by a vintage
+// pulled before that was read, or for a class BlackRock gives no
+// volatility.
 export interface Asset {
   readonly carriedFrom?: string;
   readonly hedges?: string;
   readonly name: string;
   readonly rate: number;
+  readonly risk?: Risk;
   readonly sleeve: Sleeve;
 }
 
@@ -41,10 +45,14 @@ export type Blends =
 // A vintage of BlackRock's capital market assumptions: the month it was
 // published in, the day its data are as of, as an ISO date, and the
 // asset classes it prices in sterling that a fund can hold, in the
-// order its workbook lists them.
+// order its workbook lists them; and how government bonds and equities
+// move together, their correlation, which every class's correlations
+// with the two are read against, none for a vintage pulled before it
+// was read or a workbook that does not say.
 export interface Cma {
   readonly asOf: string;
   readonly assets: readonly Asset[];
+  readonly correlation?: number;
   readonly vintage: Month;
 }
 
@@ -75,6 +83,16 @@ export interface DerivedSet {
 export interface Mapping {
   readonly asset: string;
   readonly category: string;
+}
+
+// How far an asset class strays in a year as BlackRock expects it to:
+// the standard deviation of its return a year, a fraction, and how it
+// moves with government bonds and with equities, its correlation with
+// each, the two every class BlackRock prices is correlated with.
+export interface Risk {
+  readonly bonds: number;
+  readonly stocks: number;
+  readonly volatility: number;
 }
 
 // Why the CMA gives the plan nothing: what is missing, in words naming

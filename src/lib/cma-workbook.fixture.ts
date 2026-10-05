@@ -73,7 +73,10 @@ export function cmaFile(sheet: Written = startingPointOf()): Uint8Array {
 // the header, a row a return, and the reference code closing the sheet.
 // Each block runs across 5, 10, 20 and 30 years, the expected returns'
 // first and the lower ends of their ranges after, so a 20-year column
-// read from the wrong block reads four points low. For tests.
+// read from the wrong block reads four points low. After them come each
+// row's volatility, under a label with a blank header cell beneath it as
+// BlackRock leaves it, and its correlations with government bonds and
+// equities, as strayingOf has it. For tests.
 export function startingPointOf(
   rows: readonly Priced[] = priced,
   line: string = dated,
@@ -92,6 +95,11 @@ export function startingPointOf(
       undefined,
       undefined,
       "Lower interquartile range (25th percentile)",
+      undefined,
+      undefined,
+      undefined,
+      "Volatility",
+      "Correlation",
     ],
     [
       "Currency",
@@ -106,6 +114,9 @@ export function startingPointOf(
       "10 year",
       "20 year",
       "30 year",
+      undefined,
+      "Government bonds",
+      "Equities",
     ],
     ...rows.map(([currency, kind, name, rate]) => [
       currency,
@@ -120,7 +131,34 @@ export function startingPointOf(
       0.03,
       typeof rate === "number" ? rate - 0.04 : 0.04,
       0.05,
+      ...strayingOf(kind, name),
     ]),
     ["BII0826-5810213-EXP0827"],
   ];
+}
+
+// How far the fixture has a row stray, as BlackRock would: cash by
+// nothing, with its correlations left blank; the equities every class is
+// correlated with by 19%, wholly with itself and a little against
+// government bonds; US large caps by 18.5%; a return hedged to dollars
+// by 3.5%, moving with
+// government bonds; and the rest by their class, equities by 16% and
+// fixed income by 6%, each mostly with its own kind. For tests.
+function strayingOf(
+  kind: string,
+  name: string,
+): readonly [volatility: number, bonds?: number, stocks?: number] {
+  if (name.trim().endsWith("cash")) {
+    return [0];
+  }
+  if (name === "Global ex-UK large cap equities") {
+    return [0.19, -0.05, 1];
+  }
+  if (name === "US large cap equities") {
+    return [0.185, -0.12, 0.85];
+  }
+  if (name.endsWith("(hedged)")) {
+    return [0.035, 0.9, 0];
+  }
+  return kind === "Equities" ? [0.16, -0.1, 0.8] : [0.06, 0.8, 0.1];
 }

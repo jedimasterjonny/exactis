@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import type { Cma, Risk } from "@/data/cma";
 import type { Priced } from "@/lib/cma-workbook.fixture";
 
 import { Refusal } from "@/lib/answer";
@@ -13,6 +14,12 @@ import {
 import { workbookOf } from "@/lib/workbook.fixture";
 
 import { readCma } from "./cma-workbook";
+
+// How far the class named strays in a vintage, or none for one it
+// prices without a volatility or does not price at all.
+function riskIn(cma: Cma, name: string): Risk | undefined {
+  return cma.assets.find((asset) => asset.name === name)?.risk;
+}
 
 // The workbook of the reference rows with those given in their place,
 // or left out where given nothing.
@@ -54,6 +61,7 @@ describe("readCma", () => {
     expect(cma.assets[1]).toStrictEqual({
       name: "UK large cap equities",
       rate: 0.08156,
+      risk: { bonds: -0.1, stocks: 0.8, volatility: 0.16 },
       sleeve: "stocks",
     });
   });
@@ -90,7 +98,12 @@ describe("readCma", () => {
     );
 
     expect(japan).toStrictEqual([
-      { name: "Japan large cap equities", rate: 0.075, sleeve: "stocks" },
+      {
+        name: "Japan large cap equities",
+        rate: 0.075,
+        risk: { bonds: -0.1, stocks: 0.8, volatility: 0.16 },
+        sleeve: "stocks",
+      },
     ]);
   });
 
@@ -142,6 +155,75 @@ describe("readCma", () => {
       sleeve: "bonds",
     });
     expect(hedged?.rate).toBeCloseTo(0.04542, 12);
+  });
+
+  // UK large caps stray by 16%, with equities and a little against
+  // government bonds; cash by nothing, its blank correlations read as
+  // none; and the equities every class is correlated with move 0.05
+  // against government bonds.
+  it("reads each class's volatility, its correlations with government bonds and equities, and how the two move together", () => {
+    const cma = readCma(cmaFile());
+
+    expect(riskIn(cma, "UK large cap equities")).toStrictEqual({
+      bonds: -0.1,
+      stocks: 0.8,
+      volatility: 0.16,
+    });
+    expect(riskIn(cma, "UK cash")).toStrictEqual({
+      bonds: 0,
+      stocks: 0,
+      volatility: 0,
+    });
+    expect(cma.correlation).toBeCloseTo(-0.05, 15);
+  });
+
+  // The hedged form strays as the dollar-hedged row does, its currency
+  // hedged away; Japan's large caps, carried in over US large caps, stray
+  // as sterling's US large caps do.
+  it("gives a hedged form the risk of the class hedged in dollars, and a class carried in that of US large caps in sterling", () => {
+    const cma = readCma(cmaFile());
+
+    expect(riskIn(cma, "Global aggregate bonds (GBP hedged)")).toStrictEqual({
+      bonds: 0.9,
+      stocks: 0,
+      volatility: 0.035,
+    });
+    expect(riskIn(cma, "Japan large cap equities")).toStrictEqual({
+      bonds: -0.12,
+      stocks: 0.85,
+      volatility: 0.185,
+    });
+  });
+
+  // A volatility written as text is none, and a sheet without the blocks
+  // gives no class a risk and says nothing of how the markets move
+  // together, rather than refusing the pull.
+  it("gives no risk to a class with no volatility, and none to any on a sheet without them", () => {
+    const blanked = startingPointOf().map((row) =>
+      row[2] === "UK large cap equities" ? row.with(12, "n/a") : row,
+    );
+    const bare = readCma(
+      cmaFile(startingPointOf().map((row) => row.slice(0, 12))),
+    );
+
+    expect(
+      riskIn(readCma(cmaFile(blanked)), "UK large cap equities"),
+    ).toBeUndefined();
+    expect(bare.assets.some(({ risk }) => risk !== undefined)).toBe(false);
+    expect(bare).not.toHaveProperty("correlation");
+  });
+
+  // Government bonds retitled, so its column is not found: the
+  // correlations with it are not read as nothing but as missing, and no
+  // class carries a risk.
+  it("gives no class a risk on a sheet missing either correlation's column", () => {
+    const retitled = startingPointOf().map((row) =>
+      row.map((cell) => (cell === "Government bonds" ? "Govt bonds" : cell)),
+    );
+    const cma = readCma(cmaFile(retitled));
+
+    expect(cma.assets.some(({ risk }) => risk !== undefined)).toBe(false);
+    expect(cma).not.toHaveProperty("correlation");
   });
 
   it.each(["UK cash ", "US cash"])(
