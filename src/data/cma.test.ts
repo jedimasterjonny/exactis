@@ -8,6 +8,7 @@ import {
   blendsOf,
   cmaRates,
   derivedSet,
+  riskOf,
   stocksMoved,
   vintageMonth,
   vintageName,
@@ -289,6 +290,132 @@ describe("derivedSet", () => {
     });
     expect(derivedSet({ ...sources, targets: null })).toStrictEqual({
       short: "No target allocation is imported to weight the CMA by",
+    });
+  });
+});
+
+describe("riskOf", () => {
+  // The blends' risk under the allocation given, or a failure naming
+  // why there is none.
+  function risked(
+    allocation: Targets,
+    vintage: Cma = cma,
+  ): ReturnType<typeof riskOf> {
+    return riskOf(vintage, blended(vintage, allocation));
+  }
+
+  // Half in UK equities at 16% and half in the equities every class is
+  // correlated with, at 19%, which UK equities move with by their own
+  // 0.8: 0.25 × 0.16² + 0.25 × 0.19² + 2 × 0.25 × 0.16 × 0.19 × 0.8 is
+  // 0.027585, 16.61% a year, under the 17.5% of the two apart. Nothing
+  // is in bonds, so they stray by nothing and move with nothing.
+  it("blends a sleeve's classes by their weights and how far they move together", () => {
+    expect(
+      risked(onlyIn("UK equity", "FTSE Global All Cap ex-UK")),
+    ).toStrictEqual({ bonds: 0, correlation: 0, stocks: Math.sqrt(0.027585) });
+  });
+
+  // FTSE 100 and UK equity are both mapped onto UK equities, which move
+  // wholly with themselves, so the two stray by UK equities' 16%.
+  it("blends a class two categories are mapped onto as one", () => {
+    expect(risked(onlyIn("FTSE 100", "UK equity"))).toMatchObject({
+      stocks: 0.16,
+    });
+  });
+
+  // UK equities' correlations of -0.1 and 0.8 work back, through the
+  // -0.05 between government bonds and equities, to -0.0602 of the one
+  // and 0.7970 of the other; hedged bonds' 0.9 and nothing to 0.9023
+  // and 0.0451. Met, -0.0602 × 0.9023 + 0.7970 × 0.0451 - 0.05 ×
+  // (-0.0602 × 0.0451 + 0.7970 × 0.9023), they move -0.0541 together.
+  it("correlates the sleeves by what their classes share of government bonds and equities", () => {
+    const risk = risked(onlyIn("UK equity", "Global bonds, hedged"));
+
+    expect(risk).toMatchObject({ bonds: 0.035, stocks: 0.16 });
+    expect("correlation" in risk && risk.correlation).toBeCloseTo(
+      -0.0541353,
+      6,
+    );
+  });
+
+  // Two classes each wholly with government bonds and wholly against
+  // equities, or the other way about, are read as a class and its
+  // opposite, which the -0.05 between the two pushes past wholly against
+  // each other: -1.90. Half each in one sleeve would stray by less than
+  // nothing, and one in each sleeve would move together more than wholly
+  // against each other.
+  it("holds a sleeve to straying by nothing at the least, and the sleeves to moving together no more than wholly", () => {
+    // The vintage with the classes named straying 10% a year, wholly
+    // with government bonds and against equities at one of them, and the
+    // other way about at the other.
+    const opposing = (towards: string, away: string): Cma => ({
+      ...cma,
+      assets: cma.assets.map((asset) => {
+        const bonds = { [away]: -1, [towards]: 1 }[asset.name];
+        return bonds === undefined
+          ? asset
+          : { ...asset, risk: { bonds, stocks: -bonds, volatility: 0.1 } };
+      }),
+    });
+
+    expect(
+      risked(
+        onlyIn("UK equity", "FTSE Global All Cap ex-UK"),
+        opposing("UK large cap equities", "Global ex-UK large cap equities"),
+      ),
+    ).toMatchObject({ correlation: 0, stocks: 0 });
+    expect(
+      risked(
+        onlyIn("UK equity", "Global bonds, hedged"),
+        opposing(
+          "UK large cap equities",
+          "Global aggregate bonds (GBP hedged)",
+        ),
+      ),
+    ).toStrictEqual({ bonds: 0.1, correlation: -1, stocks: 0.1 });
+  });
+
+  it("correlates a sleeve that strays by nothing with nothing", () => {
+    expect(risked(onlyIn("Global bonds, hedged"))).toStrictEqual({
+      bonds: 0.035,
+      correlation: 0,
+      stocks: 0,
+    });
+  });
+
+  it("gives none for a vintage pulled before its volatilities were read, while a class blended carries none, or while the vintage does not say how bonds and equities move together", () => {
+    const unread: Cma = {
+      asOf: cma.asOf,
+      assets: cma.assets.map(({ name, rate, sleeve }) => ({
+        name,
+        rate,
+        sleeve,
+      })),
+      vintage: cma.vintage,
+    };
+    const ukUnrisked: Cma = {
+      ...cma,
+      assets: cma.assets.map((asset) =>
+        asset.name === "UK large cap equities"
+          ? { name: asset.name, rate: asset.rate, sleeve: asset.sleeve }
+          : asset,
+      ),
+    };
+    const uncorrelated: Cma = {
+      asOf: cma.asOf,
+      assets: cma.assets,
+      vintage: cma.vintage,
+    };
+
+    expect(risked(onlyIn("FTSE 100", "UK equity"), unread)).toStrictEqual({
+      short: "The August 2026 CMA was pulled before its volatilities were read",
+    });
+    expect(risked(onlyIn("FTSE 100", "UK equity"), ukUnrisked)).toStrictEqual({
+      short: "The August 2026 CMA gives UK large cap equities no volatility",
+    });
+    expect(risked(onlyIn("UK equity"), uncorrelated)).toStrictEqual({
+      short:
+        "The August 2026 CMA does not say how bonds and equities move together",
     });
   });
 });
