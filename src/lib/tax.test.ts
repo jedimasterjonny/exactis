@@ -405,13 +405,55 @@ describe("upratingIn", () => {
   // At 3%, the figures hold through the 2030/31 tax year, to March 2031,
   // and rise 3% each April after, so January 2034 is three tax years on.
   it("holds the bands frozen to April 2031 and raises them with the plan's inflation each April after", () => {
-    const plan = { inflation: 0.03 };
+    const plan = { from: 2026, inflation: 0.03 };
 
     expect(upratingIn(plan, { month: 8, year: 2026 })).toBe(1);
     expect(upratingIn(plan, { month: 2, year: 2031 })).toBe(1);
     expect(upratingIn(plan, { month: 3, year: 2031 })).toBeCloseTo(1.03, 12);
     expect(upratingIn(plan, { month: 0, year: 2034 })).toBeCloseTo(
       1.03 ** 3,
+      12,
+    );
+  });
+
+  // Along a path from 2026 of 10% in 2030 and 20% in 2031, the figures
+  // still hold to March 2031, rise 10% that April and 20% more the April
+  // after, then at the plan's 3% past where the path runs.
+  it("raises the bands each April by what prices rose along the path in the year before", () => {
+    const plan = {
+      from: 2026,
+      inflation: 0.03,
+      path: { inflation: [0.5, 0.5, 0.5, 0.5, 0.1, 0.2], rate: [] },
+    };
+
+    expect(upratingIn(plan, { month: 2, year: 2031 })).toBe(1);
+    expect(upratingIn(plan, { month: 3, year: 2031 })).toBeCloseTo(1.1, 12);
+    expect(upratingIn(plan, { month: 3, year: 2032 })).toBeCloseTo(
+      1.1 * 1.2,
+      12,
+    );
+    expect(upratingIn(plan, { month: 3, year: 2033 })).toBeCloseTo(
+      1.1 * 1.2 * 1.03,
+      12,
+    );
+  });
+
+  // A plan starting in 2035 holds no prices for the five years from
+  // 2030, so the bands have risen 3% a year over them by April 2035, and
+  // the path's 50% on top by April 2036.
+  it("raises the bands at the plan's own inflation for the years before the plan", () => {
+    const plan = {
+      from: 2035,
+      inflation: 0.03,
+      path: { inflation: [0.5], rate: [] },
+    };
+
+    expect(upratingIn(plan, { month: 3, year: 2035 })).toBeCloseTo(
+      1.03 ** 5,
+      12,
+    );
+    expect(upratingIn(plan, { month: 3, year: 2036 })).toBeCloseTo(
+      1.03 ** 5 * 1.5,
       12,
     );
   });
