@@ -5,6 +5,7 @@ import { Check, Landmark, ScrollText } from "lucide-react";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { StatTile } from "@/components/app/molecules/stat-tile";
+import { ChanceTile } from "@/components/app/organisms/chance-tile";
 import { PlanAssumptions } from "@/components/app/organisms/plan-assumptions";
 import { ProjectionBoard } from "@/components/app/organisms/projection-board";
 import { Badge } from "@/components/kit/badge";
@@ -17,7 +18,9 @@ import { getHousehold } from "@/store/household";
 // which the assumptions in the header set, then the tiles, then the
 // projection. The board holds the milestone
 // tile, since the milestone it reads is chosen on it and the retirement
-// age set there; the badges and the rest
+// age set there; the chance of success is drawn over the plan's futures
+// as the screen of that name draws it, with the spread the store gives
+// the plan; the badges and the rest
 // of the tiles are the reference kit's invented plan, standing in until
 // the engine projects what they show, save the age the net worth is
 // read at, which is the plan's. It reads the store from its header
@@ -27,7 +30,7 @@ import { getHousehold } from "@/store/household";
 // of success, the two the plan is steered by, in one row, and leaves
 // the net worth and the legacy to a wider screen.
 export default async function Dashboard(): Promise<JSX.Element> {
-  const { accounts, milestones, plan, schedule } = await getHousehold();
+  const { accounts, milestones, plan, schedule, spread } = await getHousehold();
   const age = String(endAge(plan));
   return (
     <>
@@ -58,13 +61,11 @@ export default async function Dashboard(): Promise<JSX.Element> {
             label={`Net worth at ${age}`}
             value="£4,533,429"
           />
-          <StatTile
-            caption="5-run mean, SD 0.44pp"
-            delta={-0.96}
-            deltaFormat="points"
-            label="Chance of success"
-            unit="%"
-            value="96.90"
+          <ChanceTile
+            accounts={accounts}
+            plan={plan}
+            schedule={schedule}
+            spread={spread}
           />
           <StatTile
             caption="After IHT and estate costs"
