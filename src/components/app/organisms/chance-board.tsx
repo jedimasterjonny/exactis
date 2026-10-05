@@ -23,7 +23,7 @@ import { FuturesDrawn } from "@/components/app/organisms/futures-drawn";
 import { CardContent } from "@/components/kit/card";
 import { takesSpare } from "@/data/accounts";
 import { ageIn, endAge } from "@/data/plan";
-import { futureOf, readingOf } from "@/engine/futures";
+import { futureOf, readingOf, runLength } from "@/engine/futures";
 import { project } from "@/engine/projection";
 import { useFutures } from "@/hooks/use-futures";
 import { formatCount } from "@/lib/count";
@@ -37,11 +37,6 @@ interface ChanceBoardProps {
   readonly schedule: Schedule;
   readonly spread: Shortfall | Spread;
 }
-
-// How many futures a run draws: enough to pin the chance to within two
-// points either way, and few enough that the run is a matter of
-// seconds.
-const count = 1000;
 
 // The chance of success: the plan run over a thousand futures of the
 // markets, drawn as the screen opens, a slice at a time, with the header
@@ -138,7 +133,7 @@ function Futures({
   readonly spread: Spread;
 }): JSX.Element {
   const { futures, isDone } = useFutures(accounts, schedule, {
-    count,
+    count: runLength,
     plan,
     spread,
   });
@@ -150,7 +145,7 @@ function Futures({
   const projected = readingOf([asProjected]);
   const headline = isDone
     ? [
-        `${formatWholePercent(reading.chance)} of ${formatCount(count)} futures last to ${String(endAge(plan))}`,
+        `${formatWholePercent(reading.chance)} of ${formatCount(runLength)} futures last to ${String(endAge(plan))}`,
         ...(reading.tenthFell === null
           ? []
           : [
@@ -158,12 +153,12 @@ function Futures({
             ]),
         `the middle one leaves ${formatGbp(reading.middle)}`,
       ].join(" · ")
-    : `Drawing ${formatCount(futures.length)} of ${formatCount(count)} futures…`;
+    : `Drawing ${formatCount(futures.length)} of ${formatCount(runLength)} futures…`;
   return (
     <Screen headline={headline}>
       <AtItsRates future={asProjected} plan={plan} />
       <FuturesCount
-        count={count}
+        count={runLength}
         plan={plan}
         projected={projected.middle}
         reading={reading}
@@ -174,7 +169,7 @@ function Futures({
         plan={plan}
         projected={asProjected}
       />
-      <FuturesDrawn count={count} plan={plan} spread={spread} />
+      <FuturesDrawn count={runLength} plan={plan} spread={spread} />
     </Screen>
   );
 }
