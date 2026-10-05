@@ -104,6 +104,15 @@ export interface Shortfall {
 // The plan's two classes, which an asset class's return blends into.
 export type Sleeve = (typeof sleeves)[number];
 
+// How far the plan's two sleeves stray in a year as a vintage expects:
+// each sleeve's volatility, its classes' blended in the weights the
+// target allocation gives them, and how the two move together.
+export interface SleeveRisk {
+  readonly bonds: number;
+  readonly correlation: number;
+  readonly stocks: number;
+}
+
 // The vintages of the capital market assumptions the household keeps:
 // the latest pulled, and the one it replaced, or none before a second
 // vintage is pulled, kept so what a new vintage moves can be read.
@@ -119,6 +128,11 @@ interface Part {
   readonly asset: Asset;
   readonly category: Target;
   readonly weight: number;
+}
+
+// A part whose class carries how far it strays.
+interface Risked extends Part {
+  readonly asset: Asset & { readonly risk: Risk };
 }
 
 export const sleeves = ["bonds", "stocks"] as const;
@@ -254,6 +268,83 @@ export function derivedSet({
   };
 }
 
+// How far the two sleeves of a vintage's blends stray, and how they move
+// together. BlackRock correlates each class only with government bonds
+// and with equities, and those two with each other, so each class is
+// read as moving with the two in the measure those correlations make,
+// and two classes as moving together as far as what they share of the
+// two does; a class moves wholly with itself, so a class two
+// categories are mapped onto is blended as one. A sleeve's volatility
+// is then its classes' in their weights, each pair as far as they move
+// together, so classes that do not move wholly together stray less
+// blended than on their own, and the correlation between the sleeves is
+// what they share over what each strays, none where either strays by
+// nothing, as an empty sleeve does. Correlations BlackRock rounds can
+// disagree with each other past what any market could do, which would
+// read as a sleeve straying by less than nothing or two sleeves moving
+// together more than wholly, so a sleeve strays by nothing at the least
+// and the two move together no more than wholly either way. There is none for a vintage pulled
+// before volatilities were read, none of whose classes carries one,
+// where a class blended carries none, or where the vintage does not say
+// how bonds and equities move together, and what is missing is said:
+// for the first, that, rather than every class it prices by name.
+export function riskOf(
+  cma: Cma,
+  { bonds, stocks }: { readonly bonds: Blend; readonly stocks: Blend },
+): Shortfall | SleeveRisk {
+  if (cma.assets.every(({ risk }) => risk === undefined)) {
+    return {
+      short: `The ${vintageName(cma)} CMA was pulled before its volatilities were read`,
+    };
+  }
+  const parts = [...stocks.parts, ...bonds.parts];
+  const unrisked = parts.filter((part) => !isRisked(part));
+  if (unrisked.length > 0) {
+    const names = new Set(unrisked.map(({ asset }) => asset.name));
+    return {
+      short: `The ${vintageName(cma)} CMA gives ${listed.format(names)} no volatility`,
+    };
+  }
+  const { correlation } = cma;
+  if (correlation === undefined) {
+    return {
+      short: `The ${vintageName(cma)} CMA does not say how bonds and equities move together`,
+    };
+  }
+  const covariance = (from: readonly Risked[], to: readonly Risked[]): number =>
+    from
+      .flatMap((first) =>
+        to.map(
+          (second) =>
+            first.weight *
+            second.weight *
+            first.asset.risk.volatility *
+            second.asset.risk.volatility *
+            sharedBy(first, second, correlation),
+        ),
+      )
+      .reduce((sum, part) => sum + part, 0);
+  const inStocks = stocks.parts.filter(isRisked);
+  const inBonds = bonds.parts.filter(isRisked);
+  const strays = {
+    bonds: Math.sqrt(Math.max(0, covariance(inBonds, inBonds))),
+    stocks: Math.sqrt(Math.max(0, covariance(inStocks, inStocks))),
+  };
+  return {
+    ...strays,
+    correlation:
+      strays.bonds === 0 || strays.stocks === 0
+        ? 0
+        : Math.min(
+            1,
+            Math.max(
+              -1,
+              covariance(inStocks, inBonds) / (strays.bonds * strays.stocks),
+            ),
+          ),
+  };
+}
+
 // How far stocks' return in all moved from the previous vintage to the
 // latest, under the target allocation and the mappings as they are now,
 // so it is the move the new vintage made and nothing else; the fees and
@@ -320,4 +411,34 @@ function blendOf(
     ),
     share,
   };
+}
+
+// Whether a part's class carries how far it strays.
+function isRisked(part: Part): part is Risked {
+  return part.asset.risk !== undefined;
+}
+
+// How far two parts' classes move together: wholly for one class, and
+// for two, as far as what each shares of government bonds and equities
+// does, those two moving together by the correlation given. Each class
+// is read as so much of each of the two, worked back from its
+// correlations with them, and the measures of one class are met with
+// the other's.
+function sharedBy(first: Risked, second: Risked, correlation: number): number {
+  if (first.asset === second.asset) {
+    return 1;
+  }
+  const measuresOf = ({
+    asset: { risk },
+  }: Risked): { readonly bonds: number; readonly stocks: number } => ({
+    bonds: (risk.bonds - correlation * risk.stocks) / (1 - correlation ** 2),
+    stocks: (risk.stocks - correlation * risk.bonds) / (1 - correlation ** 2),
+  });
+  const one = measuresOf(first);
+  const other = measuresOf(second);
+  return (
+    one.bonds * other.bonds +
+    one.stocks * other.stocks +
+    correlation * (one.bonds * other.stocks + one.stocks * other.bonds)
+  );
 }
