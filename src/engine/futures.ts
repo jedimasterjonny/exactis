@@ -23,6 +23,22 @@ export interface Future {
   readonly savings: readonly number[];
 }
 
+// A year of a run of futures, as the chance of success lays the run on
+// the plan's years: how many futures are still lasting as it opens, how
+// many first fall short in it, by running out or drawing a pension
+// early, and what the futures' savings hold as it opens, the poor one a
+// tenth of them hold less than, the middle one and the good one a tenth
+// hold more than, counted the same from either end, a future run out
+// holding nothing.
+export interface FutureYear {
+  readonly fell: number;
+  readonly good: number;
+  readonly lasting: number;
+  readonly middle: number;
+  readonly poor: number;
+  readonly year: number;
+}
+
 // What a run of futures comes to, as the chance of success reads it:
 // how many were run; how many lasted, ran out of money, or were kept
 // going only by drawing a pension early, the three adding up to the
@@ -158,6 +174,39 @@ export function readingOf(futures: readonly Future[]): Reading {
     run,
     tenthFell: fellIn[Math.ceil(run / 10) - 1] ?? null,
   };
+}
+
+// A year of a run of futures, each future's savings read off the point
+// for the year. A year a future holds no point for, as a run of none
+// holds none, reads as holding nothing.
+export function yearIn(
+  futures: readonly Future[],
+  plan: Pick<Plan, "from">,
+  year: number,
+): FutureYear {
+  const held = sorted(
+    futures.map(({ savings }) => savings[year - plan.from] ?? 0),
+  );
+  const tenth = Math.floor(held.length / 10);
+  return {
+    fell: futures.filter(({ fell }) => fell === year).length,
+    good: held[held.length - 1 - tenth] ?? 0,
+    lasting: futures.filter(({ fell }) => fell === null || fell >= year).length,
+    middle: held[Math.floor(held.length / 2)] ?? 0,
+    poor: held[tenth] ?? 0,
+    year,
+  };
+}
+
+// A run of futures year by year over the plan's years, from the one it
+// starts in to the one it ends in.
+export function yearsIn(
+  futures: readonly Future[],
+  plan: Pick<Plan, "from" | "years">,
+): readonly FutureYear[] {
+  return Array.from({ length: plan.years + 1 }, (_, offset) =>
+    yearIn(futures, plan, plan.from + offset),
+  );
 }
 
 function sorted(values: readonly number[]): readonly number[] {

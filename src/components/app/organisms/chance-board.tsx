@@ -7,6 +7,7 @@ import { useMemo } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { Shortfall } from "@/data/cma";
+import type { Milestone } from "@/data/milestones";
 import type { Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { Future } from "@/engine/futures";
@@ -16,6 +17,7 @@ import { EmptyState } from "@/components/app/atoms/empty-state";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { SectionCard } from "@/components/app/molecules/section-card";
+import { FuturesByYear } from "@/components/app/organisms/futures-by-year";
 import { FuturesCount } from "@/components/app/organisms/futures-count";
 import { CardContent } from "@/components/kit/card";
 import { takesSpare } from "@/data/accounts";
@@ -29,6 +31,7 @@ import { chance, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 interface ChanceBoardProps {
   readonly accounts: readonly Account[];
+  readonly milestones: readonly Milestone[];
   readonly plan: Plan;
   readonly schedule: Schedule;
   readonly spread: Shortfall | Spread;
@@ -48,6 +51,7 @@ const count = 1000;
 // futures to grow, and the screen says which.
 export function ChanceBoard({
   accounts,
+  milestones,
   plan,
   schedule,
   spread,
@@ -73,6 +77,7 @@ export function ChanceBoard({
   return (
     <Futures
       accounts={accounts}
+      milestones={milestones}
       plan={plan}
       schedule={schedule}
       spread={spread}
@@ -120,9 +125,11 @@ function AtItsRates({
 // what it holds at the end beside the middle future, and a plan that
 // falls short even at its own rates is said to before the count, since
 // the chance then reads how often the markets would carry a plan that
-// does not work as it stands.
+// does not work as it stands. The run is laid on the plan's years
+// beneath the count.
 function Futures({
   accounts,
+  milestones,
   plan,
   schedule,
   spread,
@@ -159,6 +166,12 @@ function Futures({
         plan={plan}
         projected={projected.middle}
         reading={reading}
+      />
+      <FuturesByYear
+        futures={futures}
+        milestones={milestones}
+        plan={plan}
+        projected={asProjected}
       />
     </Screen>
   );
