@@ -102,7 +102,7 @@ describe("RateSet", () => {
       name: "Historical",
     });
 
-    expect(within(card).getByText("Sect. V.i")).toHaveClass("label");
+    expect(within(card).getByText("Sect. VI.i")).toHaveClass("label");
     expect(card).toHaveTextContent("Typed by hand, flat for life");
     expect(custom).toBeChecked();
     expect(custom).toHaveAccessibleDescription(

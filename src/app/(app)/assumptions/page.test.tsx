@@ -78,7 +78,7 @@ describe("Assumptions", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Plan assumptions",
     );
-    expect(screen.getByText("Sect. V · Assumptions")).toHaveClass("label");
+    expect(screen.getByText("Sect. VI · Assumptions")).toHaveClass("label");
     expect(
       screen.getByText("Plan rate 7.25% · inflation 2.95% · custom rates"),
     ).toBeInTheDocument();
@@ -235,7 +235,7 @@ describe("Assumptions", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("region", { name: "Inflation source" }),
-    ).toHaveTextContent("Sect. V.ii");
+    ).toHaveTextContent("Sect. VI.ii");
   });
 
   // The household thirty days ago, with the same sources, so nothing has

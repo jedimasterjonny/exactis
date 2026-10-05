@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 
 import { screenAt, sectionLabel } from "@/lib/nav";
 
-// The current screen's section label, "Sect. II · Accounts & assets", read
+// The current screen's section label, "Sect. III · Accounts & assets", read
 // off the pathname, for the phone's bar to carry beside the sidebar's
 // trigger while the sidebar and its numerals are off canvas. Nothing
 // renders where no built screen is. A client component, since the

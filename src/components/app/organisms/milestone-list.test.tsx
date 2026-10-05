@@ -70,7 +70,7 @@ describe("MilestoneList", () => {
 
     const section = screen.getByRole("region", { name: "Milestones" });
 
-    expect(within(section).getByText("Sect. III.i")).toHaveClass("label");
+    expect(within(section).getByText("Sect. IV.i")).toHaveClass("label");
     // A row is drawn in its folded lines and again in its columns, only
     // one of which is on screen at any width, so each name is found
     // twice, one row after another.

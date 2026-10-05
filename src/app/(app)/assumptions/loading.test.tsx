@@ -10,7 +10,7 @@ describe("Loading", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Plan assumptions",
     );
-    expect(screen.getByText("Sect. V · Assumptions")).toHaveClass("label");
+    expect(screen.getByText("Sect. VI · Assumptions")).toHaveClass("label");
     expect(screen.getByText("Reading the store…")).toBeInTheDocument();
   });
 });

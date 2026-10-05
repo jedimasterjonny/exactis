@@ -1,7 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { counted } from "./count";
+import { counted, formatCount } from "./count";
+
+describe("formatCount", () => {
+  it("sets a count's thousands apart", () => {
+    expect(formatCount(1000)).toBe("1,000");
+    expect(formatCount(575)).toBe("575");
+  });
+});
 
 describe("counted", () => {
   it("writes one of a noun in the singular", () => {

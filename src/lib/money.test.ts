@@ -7,6 +7,7 @@ import {
   formatGbp,
   formatPercent,
   formatPoints,
+  formatWholePercent,
   negated,
 } from "./money";
 
@@ -97,5 +98,18 @@ describe("negated", () => {
     // toBe compares as Object.is does, which tells minus nothing apart.
     expect(negated(0)).toBe(0);
     expect(formatGbp(negated(0))).toBe("£0");
+  });
+});
+
+describe("formatWholePercent", () => {
+  it("writes a share as a whole percentage", () => {
+    expect(formatWholePercent(0.881)).toBe("88%");
+    expect(formatWholePercent(1)).toBe("100%");
+    expect(formatWholePercent(0)).toBe("0%");
+  });
+
+  it("reads a share short of all as 99% at the most, and one more than none as 1% at the least", () => {
+    expect(formatWholePercent(0.996)).toBe("99%");
+    expect(formatWholePercent(0.004)).toBe("1%");
   });
 });

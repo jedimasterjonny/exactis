@@ -1,6 +1,7 @@
 import type { Account } from "@/data/accounts";
 import type { Path, Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
+import type { ProjectionPoint } from "@/engine/projection";
 
 import { takesSpare } from "@/data/accounts";
 import { balanceIn, project } from "@/engine/projection";
@@ -22,6 +23,29 @@ export interface Future {
   readonly savings: readonly number[];
 }
 
+// What a run of futures comes to, as the chance of success reads it:
+// how many were run; how many lasted, ran out of money, or were kept
+// going only by drawing a pension early, the three adding up to the
+// run; the share that lasted, which is the chance, and how far the run
+// alone may have it wrong, the half-width of the range 19 runs in 20
+// would put it in, never nothing; the year the first ran out and the year by which
+// half of those had, none where none did; the year by which a tenth of
+// the run had fallen short either way, none where fewer did; and what
+// the middle future's savings hold entering the plan's last year, half
+// holding less and half more, a future run out holding nothing.
+export interface Reading {
+  readonly chance: number;
+  readonly early: number;
+  readonly firstRanOut: null | number;
+  readonly halfRanOut: null | number;
+  readonly lasted: number;
+  readonly margin: number;
+  readonly middle: number;
+  readonly ranOut: number;
+  readonly run: number;
+  readonly tenthFell: null | number;
+}
+
 // The seed every run of the futures starts from, so every run of a plan
 // meets the same markets and a change in what they come to is the plan's.
 const seed = 2026;
@@ -30,6 +54,27 @@ const seed = 2026;
 // golden ratio's share of 2^32, which spreads the futures' seeds as far
 // from each other as any step can.
 const step = 0x9e3779b9;
+
+// A projection read as a future, over the accounts it was run over: the
+// year it first fell short, by running out or by drawing a pension
+// early, the year it first ran out, and what the savings hold entering
+// each year. What a future drawn is read as, and what the plan at its
+// own rates is read as beside them.
+export function futureOf(
+  points: readonly ProjectionPoint[],
+  accounts: readonly Account[],
+): Future {
+  const savings = accounts.filter(takesSpare);
+  return {
+    fell:
+      points.find(({ early, uncovered }) => early > 0 || uncovered > 0)?.year ??
+      null,
+    ranOut: points.find(({ uncovered }) => uncovered > 0)?.year ?? null,
+    savings: points.map((point) =>
+      savings.reduce((sum, { id }) => sum + balanceIn(point, id), 0),
+    ),
+  };
+}
 
 // The futures of a plan, drawn one at a time without end, each the plan
 // carried along its own path, drawn as pathOf draws one at the spread
@@ -42,19 +87,9 @@ export function* futuresOf(
   schedule: Schedule,
   { plan, spread }: { readonly plan: Plan; readonly spread: Spread },
 ): Generator<Future, never, undefined> {
-  const savings = accounts.filter(takesSpare);
   for (let future = 0; ; future += 1) {
     const path = pathOf(plan, spread, normalsFrom(seed + future * step));
-    const points = project(accounts, schedule, { ...plan, path });
-    yield {
-      fell:
-        points.find(({ early, uncovered }) => early > 0 || uncovered > 0)
-          ?.year ?? null,
-      ranOut: points.find(({ uncovered }) => uncovered > 0)?.year ?? null,
-      savings: points.map((point) =>
-        savings.reduce((sum, { id }) => sum + balanceIn(point, id), 0),
-      ),
-    };
+    yield futureOf(project(accounts, schedule, { ...plan, path }), accounts);
   }
 }
 
@@ -92,4 +127,48 @@ export function pathOf(
     inflation: years.map(({ inflation }) => inflation),
     rate: years.map(({ rate }) => rate),
   };
+}
+
+// What a run of futures comes to, read off the futures drawn, a run of
+// none reading as nothing at all, and a future holding no years as
+// holding nothing. The chance's range is Wilson's for a share of a
+// count, whose half-width is 1.96 over one and 1.96² over the count,
+// times the root of the share's variance over the count and 1.96² over
+// four counts squared: unlike the normal range it does not shrink to
+// nothing for a run that all lasted or none did, which a thousand
+// futures cannot say for certain.
+export function readingOf(futures: readonly Future[]): Reading {
+  const run = futures.length;
+  const lasted = futures.filter(({ fell }) => fell === null).length;
+  const ranOutIn = sorted(futures.flatMap(({ ranOut }) => ranOut ?? []));
+  const fellIn = sorted(futures.flatMap(({ fell }) => fell ?? []));
+  const chance = lasted / Math.max(run, 1);
+  return {
+    chance,
+    early: run - lasted - ranOutIn.length,
+    firstRanOut: ranOutIn[0] ?? null,
+    halfRanOut: ranOutIn[Math.floor((ranOutIn.length - 1) / 2)] ?? null,
+    lasted,
+    margin: run === 0 ? 0 : wilsonOf(chance, run),
+    middle:
+      sorted(futures.map(({ savings }) => savings.at(-1) ?? 0))[
+        Math.floor(run / 2)
+      ] ?? 0,
+    ranOut: ranOutIn.length,
+    run,
+    tenthFell: fellIn[Math.ceil(run / 10) - 1] ?? null,
+  };
+}
+
+function sorted(values: readonly number[]): readonly number[] {
+  return values.toSorted((first, second) => first - second);
+}
+
+// The half-width of Wilson's range for a share of a count, at 19 in 20.
+function wilsonOf(share: number, count: number): number {
+  const z = 1.96;
+  return (
+    (z / (1 + z ** 2 / count)) *
+    Math.sqrt((share * (1 - share)) / count + z ** 2 / (4 * count ** 2))
+  );
 }

@@ -32,7 +32,7 @@ describe("InflationSource", () => {
 
     const card = screen.getByRole("region", { name: "Inflation source" });
 
-    expect(within(card).getByText("Sect. V.ii")).toHaveClass("label");
+    expect(within(card).getByText("Sect. VI.ii")).toHaveClass("label");
     expect(within(card).getByText("BoE implied curve")).not.toHaveClass(
       "label",
     );

@@ -88,7 +88,7 @@ describe("CashFlowCard", () => {
       />,
     );
 
-    expect(screen.getByText("Sect. III.iv")).toHaveClass("label");
+    expect(screen.getByText("Sect. IV.iv")).toHaveClass("label");
     expect(
       screen.getByRole("heading", { level: 2, name: "Year by year" }),
     ).toBeInTheDocument();
