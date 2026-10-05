@@ -6,6 +6,18 @@ import { planRate } from "@/data/rates";
 import { termOf } from "@/lib/loans";
 import { monthsBetween } from "@/lib/months";
 
+// One future of the markets, a figure for each year the plan carries,
+// the first year's the one the plan starts in and each after it the
+// year on: what the plan rate comes to that year, and what prices rise
+// by in it, each a fraction as every rate is. A plan carried along a
+// path takes the year's figures in place of its own, everywhere a rate
+// or prices move with the markets; a year the path holds no figure for
+// takes the plan's own.
+export interface Path {
+  readonly inflation: readonly number[];
+  readonly rate: readonly number[];
+}
+
 // What the projection runs on: the rate every account on the plan rate
 // grows at, a nominal return as a fixed rate is, and the inflation the
 // plan takes, which the lines, stated in today's money, rise with, each
@@ -37,18 +49,6 @@ export interface Plan {
 export interface PlanAges {
   readonly ends: number;
   readonly retires: number;
-}
-
-// One future of the markets, a figure for each year the plan carries,
-// the first year's the one the plan starts in and each after it the
-// year on: what the plan rate comes to that year, and what prices rise
-// by in it, each a fraction as every rate is. A plan carried along a
-// path takes the year's figures in place of its own, everywhere a rate
-// or prices move with the markets; a year the path holds no figure for
-// takes the plan's own.
-interface Path {
-  readonly inflation: readonly number[];
-  readonly rate: readonly number[];
 }
 
 // The rest of the plan, until there is somewhere to set it: someone
