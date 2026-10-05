@@ -83,32 +83,34 @@ export function endYear(plan: Plan): number {
   return plan.from + plan.years;
 }
 
-// The rate a line's amount rises at a year, in the pounds of the day the
-// projection counts in: the plan's inflation for a line kept level in
-// today's money, a point or two over it for one that outpaces prices,
-// and nothing for one fixed in nominal terms, which so falls behind
-// them. A line paying a loan grows at nothing whatever it says, since a
+// What a line's amount rises at a year over prices, in the pounds of the
+// day the projection counts in: nothing over them for a line kept level
+// in today's money, a point or two for one that outpaces them, and none
+// at all for one fixed in nominal terms, which does not rise with them
+// and so falls behind. It is a margin rather than a rate because prices
+// are the plan's to say, and a margin reads the same over whatever they
+// do. A line paying a loan does not rise whatever it says, since a
 // loan's payment is the one sum for every month of its term, which is
 // how the loan maths reads it and how the line's end is worked out; a
 // payment rising with prices would clear the loan early and go on being
 // paid after it. The dialogs write such a line fixed, so this holds
 // one written any other way to the same.
-export function growthFrom(
-  line: { readonly growth: LineGrowth; readonly pays?: number },
-  plan: Plan,
-): number {
+export function marginOf(line: {
+  readonly growth: LineGrowth;
+  readonly pays?: number;
+}): null | number {
   if (line.pays !== undefined) {
-    return 0;
+    return null;
   }
   switch (line.growth) {
     case "inflation":
-      return plan.inflation;
-    case "inflation-plus-1":
-      return plan.inflation + 0.01;
-    case "inflation-plus-2":
-      return plan.inflation + 0.02;
-    case "nominal":
       return 0;
+    case "inflation-plus-1":
+      return 0.01;
+    case "inflation-plus-2":
+      return 0.02;
+    case "nominal":
+      return null;
   }
 }
 
