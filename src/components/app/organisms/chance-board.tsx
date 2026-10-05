@@ -19,6 +19,7 @@ import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { FuturesByYear } from "@/components/app/organisms/futures-by-year";
 import { FuturesCount } from "@/components/app/organisms/futures-count";
+import { FuturesDrawn } from "@/components/app/organisms/futures-drawn";
 import { CardContent } from "@/components/kit/card";
 import { takesSpare } from "@/data/accounts";
 import { ageIn, endAge } from "@/data/plan";
@@ -126,7 +127,7 @@ function AtItsRates({
 // falls short even at its own rates is said to before the count, since
 // the chance then reads how often the markets would carry a plan that
 // does not work as it stands. The run is laid on the plan's years
-// beneath the count.
+// beneath the count, and what it was drawn from beneath that.
 function Futures({
   accounts,
   milestones,
@@ -173,6 +174,7 @@ function Futures({
         plan={plan}
         projected={asProjected}
       />
+      <FuturesDrawn count={count} plan={plan} spread={spread} />
     </Screen>
   );
 }
