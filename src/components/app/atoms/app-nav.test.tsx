@@ -27,6 +27,7 @@ describe("AppNav", () => {
     );
 
     const dashboard = screen.getByRole("link", { name: /^Dashboard/ });
+    const chance = screen.getByRole("link", { name: /^Chance of success/ });
     const accounts = screen.getByRole("link", { name: /^Accounts/ });
     const plan = screen.getByRole("link", { name: /^Income & expenses/ });
     const progress = screen.getByRole("link", { name: /^Progress/ });
@@ -35,17 +36,20 @@ describe("AppNav", () => {
     expect(dashboard).toHaveAttribute("href", "/");
     expect(dashboard).not.toHaveAttribute("data-active");
     expect(within(dashboard).getByText("I")).toHaveClass("label");
+    expect(chance).toHaveAttribute("href", "/chance");
+    expect(chance).not.toHaveAttribute("data-active");
+    expect(within(chance).getByText("II")).toHaveClass("label");
     expect(accounts).toHaveAttribute("href", "/accounts");
     expect(accounts).not.toHaveAttribute("data-active");
-    expect(within(accounts).getByText("II")).toHaveClass("label");
+    expect(within(accounts).getByText("III")).toHaveClass("label");
     expect(plan).toHaveAttribute("href", "/plan");
     expect(plan).not.toHaveAttribute("data-active");
-    expect(within(plan).getByText("III")).toHaveClass("label");
+    expect(within(plan).getByText("IV")).toHaveClass("label");
     expect(progress).toHaveAttribute("href", "/progress");
     expect(progress).toHaveAttribute("data-active");
-    expect(within(progress).getByText("IV")).toHaveClass("label");
+    expect(within(progress).getByText("V")).toHaveClass("label");
     expect(assumptions).toHaveAttribute("href", "/assumptions");
     expect(assumptions).not.toHaveAttribute("data-active");
-    expect(within(assumptions).getByText("V")).toHaveClass("label");
+    expect(within(assumptions).getByText("VI")).toHaveClass("label");
   });
 });

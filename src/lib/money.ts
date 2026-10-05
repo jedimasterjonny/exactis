@@ -69,8 +69,24 @@ export function formatCurveRate(value: number): string {
   return curveRate.format(value).replace(/^-/, "−");
 }
 
+// A chance, a share of a count of futures, is shown as a whole
+// percentage, since a run of a thousand pins it no closer than a point
+// or two: 0.881 reads 88%. A share short of all reads as 99% at the
+// most, and one more than none as 1% at the least, so only all reads
+// as 100% and only none as 0%.
+const wholePercent = new Intl.NumberFormat("en-GB", {
+  maximumFractionDigits: 0,
+  style: "percent",
+});
+
 export function formatPercent(value: number): string {
   return percent.format(value).replace(/^-/, "−");
+}
+
+export function formatWholePercent(value: number): string {
+  return wholePercent.format(
+    value > 0 && value < 1 ? Math.min(Math.max(value, 0.01), 0.99) : value,
+  );
 }
 
 // A difference between two rates, in percentage points and written pp,

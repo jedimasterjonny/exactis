@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 import {
+  Dices,
   History,
   LayoutDashboard,
   ListTree,
@@ -26,6 +27,13 @@ export const dashboard: Screen = {
   icon: LayoutDashboard,
   label: "Dashboard",
   title: "Projected to age",
+};
+
+export const chance: Screen = {
+  href: "/chance",
+  icon: Dices,
+  label: "Chance of success",
+  title: "Chance of success",
 };
 
 export const accountsAndAssets: Screen = {
@@ -59,9 +67,12 @@ export const assumptions: Screen = {
 // The screens in navigation order. Section numerals derive from this order,
 // so inserting a screen renumbers every header after it and nothing else
 // has to change. Only built screens appear, since a typed route cannot
-// point at one that does not exist.
+// point at one that does not exist. The chance of success sits beside the
+// dashboard, the two readings of where the plan goes, ahead of the
+// screens it is read from.
 export const screens: readonly Screen[] = [
   dashboard,
+  chance,
   accountsAndAssets,
   plan,
   progress,
@@ -69,11 +80,11 @@ export const screens: readonly Screen[] = [
 ];
 
 // Section numerals are roman, decorative and consistent, never the only
-// way to identify a screen. There are five screens and no screen has
-// more than five cards, so the numerals are listed rather than worked
+// way to identify a screen. There are six screens and no screen has
+// more than six cards, so the numerals are listed rather than worked
 // out; a place past the list is written in figures, so it shows rather
 // than vanishing.
-const numerals = ["I", "II", "III", "IV", "V"] as const;
+const numerals = ["I", "II", "III", "IV", "V", "VI"] as const;
 
 // The screen at a pathname, or undefined where no built screen is.
 export function screenAt(pathname: string): Screen | undefined {

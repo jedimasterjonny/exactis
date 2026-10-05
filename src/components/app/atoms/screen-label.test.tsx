@@ -14,7 +14,7 @@ describe("ScreenLabel", () => {
     pathname.current = "/accounts";
     render(<ScreenLabel />);
 
-    expect(screen.getByText("Sect. II · Accounts & assets")).toHaveClass(
+    expect(screen.getByText("Sect. III · Accounts & assets")).toHaveClass(
       "label",
     );
   });
