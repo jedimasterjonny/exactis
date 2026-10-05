@@ -51,6 +51,16 @@ export interface PlanAges {
   readonly retires: number;
 }
 
+// How far a year strays from the plan's rates, as the futures are drawn:
+// the standard deviation of the logarithm of one plus the plan rate's
+// return in a year, and of one plus prices' rise. The rate's is the
+// portfolio's as a whole, stocks and bonds in the split the plan holds,
+// since every account on the plan rate is carried at the one rate.
+export interface Spread {
+  readonly inflation: number;
+  readonly rate: number;
+}
+
 // The rest of the plan, until there is somewhere to set it: someone
 // born in 1990.
 const born = 1990;
@@ -106,6 +116,19 @@ export function inflationIn(
   year: number,
 ): number {
   return plan.path?.inflation[year - plan.from] ?? plan.inflation;
+}
+
+// How far a year strays in logs, the standard deviation of the logarithm
+// of one plus its figure, which the futures are drawn in, from how far
+// it strays as its source states it, the standard deviation of the
+// figure itself, about the rate given for the middle year. For a figure
+// log-normal about that rate, one plus it strays by one plus the rate
+// times the root of w(w - 1), where w is e to the variance in logs, so
+// w is the root above one of w² - w - (stated / (1 + rate))². BlackRock
+// states its volatilities so, and the spread of UK CPI is so measured.
+export function loggedSpread(rate: number, stated: number): number {
+  const widening = (1 + Math.sqrt(1 + 4 * (stated / (1 + rate)) ** 2)) / 2;
+  return Math.sqrt(Math.log(widening));
 }
 
 // What a line's amount rises at a year over prices, in the pounds of the
@@ -240,4 +263,11 @@ export function risenWith(
     risen *= (1 + inflationIn(plan, year) + margin) ** ((to - from) / 12);
   }
   return risen;
+}
+
+// How far a year strays as its source would state it, from how far it
+// strays in logs about the rate given: what loggedSpread worked back.
+export function statedSpread(rate: number, logged: number): number {
+  const widening = Math.exp(logged ** 2);
+  return (1 + rate) * Math.sqrt(widening * (widening - 1));
 }

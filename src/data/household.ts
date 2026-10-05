@@ -7,6 +7,7 @@ import type {
   Deductions,
   DerivedSet,
   Mapping,
+  Shortfall,
   Vintages,
 } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
@@ -14,7 +15,7 @@ import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
-import type { Plan, PlanAges } from "@/data/plan";
+import type { Plan, PlanAges, Spread } from "@/data/plan";
 import type { Allocation, Rates, RateSet } from "@/data/rates";
 import type { Month, Tie } from "@/data/schedule";
 import type { Target, Targets } from "@/data/targets";
@@ -28,7 +29,7 @@ import {
   takesSpare,
   toValues,
 } from "@/data/accounts";
-import { derivedSet, openingDeductions, sleeves } from "@/data/cma";
+import { derivedSet, openingDeductions, sleeves, spreadOf } from "@/data/cma";
 import { incomeKinds } from "@/data/income";
 import { timed } from "@/data/milestones";
 import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
@@ -79,6 +80,7 @@ export interface Household {
     readonly expenses: readonly ExpenseLine[];
     readonly income: readonly IncomeLine[];
   };
+  readonly spread: Shortfall | Spread;
   readonly targets: null | Targets;
 }
 
@@ -434,6 +436,8 @@ const plan = z
 // rather than through a line, pays it down at the rate it is charged,
 // its own or the plan's, since the engine charges it to the month the
 // payments clear the debt in and one the interest swallows has none.
+// How far its rates stray is a spread of nothing or more, or why there
+// is none.
 export const household = z
   .object({
     accounts: z.array(account),
@@ -452,6 +456,13 @@ export const household = z
       expenses: z.array(expenseLine),
       income: z.array(incomeLine),
     }),
+    spread: z.union([
+      z.object({ short: z.string() }),
+      z.object({
+        inflation: z.number().nonnegative(),
+        rate: z.number().nonnegative(),
+      }),
+    ]),
     targets: targets.nullable(),
   })
   .refine(({ accounts }) => isListedOnce(accounts), rules.listedOnce)
@@ -742,6 +753,7 @@ function householdOf(kept: Kept): Household {
         timed(line, kept.milestones, plan),
       ),
     },
+    spread: spreadOf(kept, live),
     targets: kept.targets,
   };
 }
