@@ -9,7 +9,7 @@ import { normalsFrom } from "@/lib/random";
 
 import type { Future } from "./futures";
 
-import { futuresOf, pathOf } from "./futures";
+import { futuresOf, pathOf, readingOf } from "./futures";
 
 // A plan at 7% and 3% over the years these tests draw.
 const plan = { inflation: 0.03, rate: 0.07, years: 40 };
@@ -189,5 +189,84 @@ describe("futuresOf", () => {
     ).toBe(true);
     expect(lasted).toBeGreaterThan(0);
     expect(lasted).toBeLessThan(40);
+  });
+});
+
+describe("readingOf", () => {
+  // A future falling short in the year given, running out in the year
+  // given, and holding what is given entering the plan's last year.
+  function future(
+    fell: null | number,
+    ranOut: null | number,
+    end: number,
+  ): Future {
+    return { fell, ranOut, savings: [100000, end] };
+  }
+
+  // Ten futures: seven last; one runs out in 2060, one draws a pension
+  // early in 2040 and then runs out in 2070, and one only draws early,
+  // in 2045. The chance is 70%, give or take Wilson's 1.96 / (1 + 1.96²
+  // / 10) × √(0.7 × 0.3 / 10 + 1.96² / 400), 24.8 points; the first ran
+  // out in 2060, and so had
+  // the lower half of the two; a tenth, one, had fallen short by 2040;
+  // and the sixth of the ends in order, the middle one, is £500,000.
+  it("counts what lasted, ran out and drew early, and reads when the run turns and what the middle future holds", () => {
+    const futures = [
+      future(null, null, 500000),
+      future(null, null, 300000),
+      future(2060, 2060, 0),
+      future(2040, 2070, 0),
+      future(2045, null, 200000),
+      future(null, null, 400000),
+      future(null, null, 600000),
+      future(null, null, 700000),
+      future(null, null, 800000),
+      future(null, null, 900000),
+    ];
+
+    expect(readingOf(futures)).toStrictEqual({
+      chance: 0.7,
+      early: 1,
+      firstRanOut: 2060,
+      halfRanOut: 2060,
+      lasted: 7,
+      margin:
+        (1.96 / (1 + 1.96 ** 2 / 10)) *
+        Math.sqrt((0.7 * 0.3) / 10 + 1.96 ** 2 / 400),
+      middle: 500000,
+      ranOut: 2,
+      run: 10,
+      tenthFell: 2040,
+    });
+  });
+
+  // A thousand futures all lasting are not certain to: Wilson's range
+  // still runs 0.19 of a point below them.
+  it("gives a run that all lasted a range all the same", () => {
+    const lasting = Array.from({ length: 1000 }, (): Future => ({
+      fell: null,
+      ranOut: null,
+      savings: [1],
+    }));
+
+    expect(readingOf(lasting).margin).toBeCloseTo(0.0019134, 6);
+  });
+
+  it("reads a run of none as nothing at all, and a future holding no years as holding nothing", () => {
+    expect(readingOf([])).toStrictEqual({
+      chance: 0,
+      early: 0,
+      firstRanOut: null,
+      halfRanOut: null,
+      lasted: 0,
+      margin: 0,
+      middle: 0,
+      ranOut: 0,
+      run: 0,
+      tenthFell: null,
+    });
+    expect(readingOf([{ fell: null, ranOut: null, savings: [] }]).middle).toBe(
+      0,
+    );
   });
 });

@@ -116,7 +116,7 @@ describe("AccountLedger", () => {
   it("lays everything owned and owed out as one balance sheet, with the money's flow and the owners beneath", () => {
     renderLedger();
 
-    expect(within(sheet()).getByText("Sect. II.i")).toHaveClass("label");
+    expect(within(sheet()).getByText("Sect. III.i")).toHaveClass("label");
     expect(
       within(sheet()).getByText(
         "Savings grow at the plan rate, 5.00%, unless they say otherwise, under one allocation applied pro rata to every account.",
@@ -147,10 +147,10 @@ describe("AccountLedger", () => {
       "Stocks & shares ISA",
       "Current account",
     ]);
-    expect(within(flow()).getByText("Sect. II.ii")).toHaveClass("label");
+    expect(within(flow()).getByText("Sect. III.ii")).toHaveClass("label");
     expect(
       within(screen.getByRole("region", { name: "Owners" })).getByText(
-        "Sect. II.iii",
+        "Sect. III.iii",
       ),
     ).toHaveClass("label");
   });
@@ -166,7 +166,7 @@ describe("AccountLedger", () => {
     ).not.toBeInTheDocument();
     expect(
       within(screen.getByRole("region", { name: "Owners" })).getByText(
-        "Sect. II.ii",
+        "Sect. III.ii",
       ),
     ).toHaveClass("label");
   });
@@ -180,7 +180,7 @@ describe("AccountLedger", () => {
     ).not.toBeInTheDocument();
     expect(
       within(screen.getByRole("region", { name: "Owners" })).getByText(
-        "Sect. II.iii",
+        "Sect. III.iii",
       ),
     ).toHaveClass("label");
   });

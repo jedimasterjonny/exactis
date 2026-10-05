@@ -8,9 +8,9 @@ describe("Loading", () => {
     render(<Loading />);
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Income & expenses",
+      "Chance of success",
     );
-    expect(screen.getByText("Sect. IV · Income & expenses")).toHaveClass(
+    expect(screen.getByText("Sect. II · Chance of success")).toHaveClass(
       "label",
     );
     expect(screen.getByText("Reading the store…")).toBeInTheDocument();
