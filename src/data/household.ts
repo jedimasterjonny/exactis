@@ -243,15 +243,28 @@ const curve = z.object({
   }),
 }) satisfies z.ZodType<Curve>;
 
+// How closely one figure moves with another, from wholly against it to
+// wholly with it.
+const correlation = z.number().min(-1).max(1);
+
 // An asset class as a vintage priced it: its name, the class of the
 // plan it blends into, and a return no lower than losing everything,
 // the class it is the hedged form of, if it is one, and the currency it
-// was carried into sterling from, if it was.
+// was carried into sterling from, if it was; and how far it strays, a
+// volatility of nothing or more and its two correlations, kept by
+// vintages pulled since that was read and by no other.
 const asset = z.object({
   carriedFrom: named.exactOptional(),
   hedges: named.exactOptional(),
   name: named,
   rate: z.number().min(-1, rules.beyondLoss),
+  risk: z
+    .object({
+      bonds: correlation,
+      stocks: correlation,
+      volatility: z.number().min(0),
+    })
+    .exactOptional(),
   sleeve: z.enum(sleeves),
 }) satisfies z.ZodType<Asset>;
 
@@ -259,9 +272,16 @@ const asset = z.object({
 // of, and its asset classes, each priced once by its name, since a
 // category of the target allocation is mapped onto one by its name, and
 // a hedged class the hedged form of an unhedged one it prices, since the
-// adjustment hedging makes is read against it.
+// adjustment hedging makes is read against it; and how its government
+// bonds and equities move together, where it says, short of wholly,
+// since every class's correlations are read against the two as apart.
 const vintage = z
-  .object({ asOf: z.iso.date(), assets: z.array(asset), vintage: month })
+  .object({
+    asOf: z.iso.date(),
+    assets: z.array(asset),
+    correlation: z.number().gt(-1).lt(1).exactOptional(),
+    vintage: month,
+  })
   .refine(
     ({ assets }) =>
       new Set(assets.map(({ name }) => name)).size === assets.length,
