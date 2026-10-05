@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import type { Blend, Cma, Mapping } from "./cma";
+import type { Blend, Cma, DerivedSet, Mapping } from "./cma";
 import type { Targets } from "./targets";
 
 import {
@@ -9,6 +9,7 @@ import {
   cmaRates,
   derivedSet,
   riskOf,
+  spreadOf,
   stocksMoved,
   vintageMonth,
   vintageName,
@@ -416,6 +417,92 @@ describe("riskOf", () => {
     expect(risked(onlyIn("UK equity"), uncorrelated)).toStrictEqual({
       short:
         "The August 2026 CMA does not say how bonds and equities move together",
+    });
+  });
+});
+
+describe("spreadOf", () => {
+  const vintages = { latest: cma, previous: null };
+
+  // Stocks at 6% and a 2% yield, 8% in all, bonds at 4%, prices at 3%.
+  const rates = { bonds: 0.04, dividends: 0.02, inflation: 0.03, stocks: 0.06 };
+
+  // The split given, on the rates above.
+  function live(stocks: number): DerivedSet {
+    return { allocation: { stocks }, rates };
+  }
+
+  // Half in UK equities at 16% and half in hedged bonds at 3.5%, moving
+  // -0.0541 together: 0.25 × 0.16² + 0.25 × 0.035² + 2 × 0.25 × -0.0541
+  // × 0.16 × 0.035, a portfolio straying 8.10% a year about the 6% the
+  // split makes, which in logs is 7.60%. All in stocks, the stocks' 16%
+  // about 8% is 14.58% in logs, and prices' standing 2% about 3% is
+  // 1.94% in logs either way.
+  it("spreads the plan rate as far as the portfolio strays in the split it runs on, and prices by the standing figure, each in logs", () => {
+    const sources = {
+      cma: vintages,
+      mappings,
+      targets: onlyIn("UK equity", "Global bonds, hedged"),
+    };
+    const halved = spreadOf(sources, live(0.5));
+    const stocked = spreadOf(sources, live(1));
+
+    expect("rate" in halved && halved.rate).toBeCloseTo(0.0760476, 6);
+    expect("rate" in stocked && stocked.rate).toBeCloseTo(0.1458034, 6);
+    expect("inflation" in stocked && stocked.inflation).toBeCloseTo(
+      0.019412,
+      6,
+    );
+  });
+
+  it("spreads nothing before a vintage is pulled, while it makes no blend or gives no risk, or while the plan holds what the target allocation does not", () => {
+    const unread: Cma = {
+      asOf: cma.asOf,
+      assets: cma.assets.map(({ name, rate, sleeve }) => ({
+        name,
+        rate,
+        sleeve,
+      })),
+      vintage: cma.vintage,
+    };
+
+    expect(spreadOf({ cma: null, mappings, targets }, live(0.8))).toStrictEqual(
+      { short: "No CMA is pulled" },
+    );
+    expect(
+      spreadOf({ cma: vintages, mappings, targets: null }, live(0.8)),
+    ).toStrictEqual({
+      short: "No target allocation is imported to weight the CMA by",
+    });
+    expect(
+      spreadOf(
+        {
+          cma: { latest: unread, previous: null },
+          mappings,
+          targets: onlyIn("UK equity"),
+        },
+        live(1),
+      ),
+    ).toStrictEqual({
+      short: "The August 2026 CMA was pulled before its volatilities were read",
+    });
+    expect(
+      spreadOf(
+        { cma: vintages, mappings, targets: onlyIn("Global bonds, hedged") },
+        live(0.6),
+      ),
+    ).toStrictEqual({
+      short:
+        "The plan holds stocks the target allocation holds none of, so nothing says how far they stray",
+    });
+    expect(
+      spreadOf(
+        { cma: vintages, mappings, targets: onlyIn("UK equity") },
+        live(0.6),
+      ),
+    ).toStrictEqual({
+      short:
+        "The plan holds bonds the target allocation holds none of, so nothing says how far they stray",
     });
   });
 });

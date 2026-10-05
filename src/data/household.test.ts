@@ -2,13 +2,20 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { Cma, Deductions, Mapping, Risk, Vintages } from "@/data/cma";
+import type {
+  Cma,
+  Deductions,
+  Mapping,
+  Risk,
+  Shortfall,
+  Vintages,
+} from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
-import type { Plan } from "@/data/plan";
+import type { Plan, Spread } from "@/data/plan";
 import type { Allocation, Rates, RateSet } from "@/data/rates";
 import type { Month } from "@/data/schedule";
 import type { SecuredRecords } from "@/data/secured";
@@ -60,6 +67,7 @@ interface Inputs {
     readonly expenses: readonly ExpenseLine[];
     readonly income: readonly IncomeLine[];
   };
+  readonly spread: Shortfall | Spread;
   readonly targets: null | Targets;
 }
 
@@ -84,6 +92,7 @@ const sound: Inputs = {
   rates,
   rateSet: "custom",
   schedule: { expenses: expenseLines, income: incomeLines },
+  spread: { inflation: 0.02, rate: 0.14 },
   targets,
 };
 
@@ -547,6 +556,7 @@ describe("soundKept", () => {
         rates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
         rateSet: "custom",
         schedule: { expenses: [], income: [] },
+        spread: { short: "No CMA is pulled" },
         targets: null,
       },
       kept: nothingKeptIn(september),
