@@ -166,13 +166,14 @@ export function monthsOn(
   }));
   for (let offset = 0; offset < months; offset += 1) {
     const month = plan.month + offset;
+    const at = { month: month % 12, year: plan.from + Math.floor(month / 12) };
     const flow = cashFlow(accounts, schedule, {
-      at: { month: month % 12, year: plan.from + Math.floor(month / 12) },
+      at,
       plan,
       reserve: reserveOf(reached),
     });
     reached = reached.map((held) => {
-      const { balance, paid } = monthOf(held, flow, plan);
+      const { balance, paid } = monthOf(held, flow, { at, plan });
       return { account: held.account, balance, paid: held.paid + paid };
     });
   }
@@ -324,11 +325,11 @@ export function project(
         uncovered += draw.uncovered / risen;
         held = draw.held.map((account) => ({
           account: account.account,
-          balance: monthOf(account, flow, plan).balance,
+          balance: monthOf(account, flow, { at, plan }).balance,
         }));
         owing = owing.map((account) => ({
           account: account.account,
-          balance: monthOf(account, flow, plan).balance,
+          balance: monthOf(account, flow, { at, plan }).balance,
         }));
       }
     }
@@ -443,13 +444,14 @@ function isBeforePensionAge(age: number, { month, year }: Month): boolean {
 // down by what the flow pays off it; with what the month paid in or off,
 // which for a debt is no more than it owed with the month's interest,
 // since the last payment is rounded up to a whole one and what it pays
-// past nothing is no debt paid off.
+// past nothing is no debt paid off. The month is read for the year it
+// falls in, whose rate a plan carried along a path takes.
 function monthOf(
   { account, balance }: Held,
   flow: CashFlow,
-  plan: Plan,
+  { at, plan }: { readonly at: Month; readonly plan: Plan },
 ): { readonly balance: number; readonly paid: number } {
-  const rate = rateOf(account, plan);
+  const rate = rateOf(account, plan, at.year);
   if (account.kind !== "debt") {
     const paid = paidIn(account, flow);
     return { balance: carried(balance, paid, rate), paid };
@@ -511,18 +513,26 @@ function paidOff(account: Account, flow: CashFlow): number {
   );
 }
 
-// The rate a month is carried at, held to losing no more than
-// everything. At minus one the month's growth is the twelfth root of
-// nothing, so the balance is nothing from the first month on and stays
-// there, which is a rate that can be meant; below it the root is of a
-// negative, so every balance after it, and every figure the year went
-// short by, is not a number at all, no comparison against them holds
-// and the year the money runs out is never marked. The plan rate is
-// held to it as a fixed rate is, since the whole plan is carried on the
-// one and an account on the other, and the floor is the one the action
-// holds a saved rate to.
-function rateOf(account: Account, plan: Plan): number {
-  const rate = rateFrom(account, plan);
+// The rate a month of a year is carried at, held to losing no more than
+// everything. Along a path, a saving or an asset on the plan rate takes
+// the year's figure in place of the plan's, and nothing else does: an
+// account on a fixed rate keeps its own, and so does a debt on the plan
+// rate, since its payment and the term it clears in are worked out
+// against the plan's own rate, and charged at another it would be left
+// owing when the payments stop. At minus one the month's growth is the
+// twelfth root of nothing, so the balance is nothing from the first
+// month on and stays there, which is a rate that can be meant; below it
+// the root is of a negative, so every balance after it, and every
+// figure the year went short by, is not a number at all, no comparison
+// against them holds and the year the money runs out is never marked.
+// The plan rate is held to it as a fixed rate is, since the whole plan
+// is carried on the one and an account on the other, and the floor is
+// the one the action holds a saved rate to; so is a path's.
+function rateOf(account: Account, plan: Plan, year: number): number {
+  const rate =
+    account.kind !== "debt" && account.growth.kind === "plan"
+      ? (plan.path?.rate[year - plan.from] ?? plan.rate)
+      : rateFrom(account, plan);
   if (rate < -1) {
     throw new Error(rules.beyondLoss);
   }

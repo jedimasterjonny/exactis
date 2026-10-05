@@ -4,6 +4,7 @@ import type { Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 
 import { allowanceOf, isPension } from "@/data/accounts";
+import { inflationIn } from "@/data/plan";
 import { yearly } from "@/lib/cadence";
 
 // A draw on a pension: what leaves it, what is left of that once taxed,
@@ -240,9 +241,22 @@ export function relievableOn(earned: number): number {
 // How far the bands have risen by the tax year a month falls in, as a
 // multiple of the figures above: not at all while they are frozen, and
 // by the plan's inflation a whole year at a time, each April, from the
-// first tax year after the freeze.
-export function upratingIn(plan: Pick<Plan, "inflation">, at: Month): number {
-  return (1 + plan.inflation) ** Math.max(0, taxYearOf(at) - frozenThrough);
+// first tax year after the freeze. Along a path each April raises them
+// by what prices rose in the year before it, as the law raises them by
+// the year to the September before; a year before the plan, which the
+// path holds no prices for, at the plan's own inflation.
+export function upratingIn(
+  plan: Pick<Plan, "from" | "inflation" | "path">,
+  at: Month,
+): number {
+  if (plan.path === undefined) {
+    return (1 + plan.inflation) ** Math.max(0, taxYearOf(at) - frozenThrough);
+  }
+  let risen = 1;
+  for (let year = frozenThrough; year < taxYearOf(at); year += 1) {
+    risen *= 1 + inflationIn(plan, year);
+  }
+  return risen;
 }
 
 // What the bands charge on a share of them: each band's rate on the

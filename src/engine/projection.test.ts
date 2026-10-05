@@ -1170,6 +1170,74 @@ describe("project", () => {
 
     expect(entering2033?.balances[3]).toBe(54380);
   });
+
+  // £20,000 on the plan rate earns the path's 10% in 2026, loses 20% of
+  // that in 2027 and gains 30% in 2028, 22,000, 17,600 and 22,880, and
+  // the plan's own 5% in 2029, past where the path runs, 24,024.
+  it("carries a saving on the plan rate at each year's rate along a path, and at the plan's past it", () => {
+    const saving: Account = { ...flatIsa, growth: { kind: "plan" } };
+
+    expect(
+      project(
+        [saving],
+        { expenses: [], income: [] },
+        {
+          ...plan,
+          path: { inflation: [0, 0, 0], rate: [0.1, -0.2, 0.3] },
+          years: 4,
+        },
+      ).map((point) => balanceIn(point, saving.id)),
+    ).toStrictEqual([20000, 22000, 17600, 22880, 24024]);
+  });
+
+  // The mortgage on the plan rate and the home on its own are carried
+  // the same whatever the path says the plan rate comes to.
+  it("carries a debt and an account on a fixed rate as at the plan's rates, whatever the path", () => {
+    const carriedOn: readonly Account[] = [
+      { ...mortgage, growth: { kind: "plan" } },
+      home,
+      cash,
+    ];
+    const atItsRates = { ...plan, years: 3 };
+
+    expect(
+      project(carriedOn, funded, {
+        ...atItsRates,
+        path: { inflation: [0, 0, 0], rate: [0.9, -0.5, 0.4] },
+      }),
+    ).toStrictEqual(project(carriedOn, funded, atItsRates));
+  });
+
+  // £12,100 earning nothing reads £11,000 of today's money once prices
+  // have risen 10% along the path, and £10,000 once they have risen 10%
+  // again; past the path, at the plan's own inflation of nothing, it
+  // stays there.
+  it("reads each balance in today's money along the path's prices, and at the plan's inflation past it", () => {
+    expect(
+      project(
+        [{ ...cash, balance: 12100 }],
+        { expenses: [], income: [] },
+        { ...plan, path: { inflation: [0.1, 0.1], rate: [0, 0] }, years: 3 },
+      ).map((point) => balanceIn(point, cash.id)),
+    ).toStrictEqual([12100, 11000, 10000, 10000]);
+  });
+
+  // The fixture's household, every line rising as it says, carried along
+  // a path of its own 5% and 3% in every year as it is at its own rates.
+  it("carries a plan along a path of its own rates as at its rates", () => {
+    const atItsRates = { ...plan, inflation: 0.03, month: 8, years: 30 };
+    const lines = { expenses: expenseLines, income: incomeLines };
+
+    expect(
+      project(accounts, lines, {
+        ...atItsRates,
+        path: {
+          inflation: Array.from({ length: 30 }, () => 0.03),
+          rate: Array.from({ length: 30 }, () => 0.05),
+        },
+      }),
+    ).toStrictEqual(project(accounts, lines, atItsRates));
+  });
 });
 
 describe("monthsOn", () => {
