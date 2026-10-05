@@ -20,7 +20,7 @@ import {
 } from "@/data/income";
 import {
   debtTermOf,
-  growthFrom,
+  marginOf,
   pricesIn,
   retirementYear,
   risenBy,
@@ -674,15 +674,18 @@ function landWithRelief(account: Account, paid: number, purse: Purse): void {
 
 // What a sum a line states is paid a month in the month read, in that
 // month's pounds: a twelfth of a yearly one, risen from the money of
-// the month the plan starts in, which is what the line states it in, at
-// the rate its growth gives.
+// the month the plan starts in, which is what the line states it in,
+// with prices and by the margin its growth gives over them, or not at
+// all for a line that does not rise with them.
 function monthlyOf(
   line: LineValues,
   amount: number,
   { at, plan }: Reading,
 ): number {
+  const margin = marginOf(line);
   return (
-    monthly(amount, line.cadence) * risenBy(growthFrom(line, plan), plan, at)
+    monthly(amount, line.cadence) *
+    (margin === null ? 1 : risenBy(plan.inflation + margin, plan, at))
   );
 }
 
