@@ -58,6 +58,14 @@ export const rpiWedge = 0.0065;
 // answer most.
 const premium = 0.003;
 
+// How far prices stray in a year from the inflation the plan takes, as
+// the futures of the chance of success draw them: the standard deviation
+// of a year's rise. UK CPI's yearly rate has strayed by about 1.9 points
+// since 1997 (ONS series D7G7), and by about 1.0 before 2021's surge;
+// two points is held. None of the plan's sources says it, so it stands
+// here as the premium does, and it moves how wide the futures spread.
+export const inflationSpread = 0.02;
+
 // The month RPI is aligned with CPIH, February 2030, January being
 // nought as the date gives it, from which a linker's RPI carries no
 // wedge.

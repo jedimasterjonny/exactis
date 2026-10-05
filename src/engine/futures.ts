@@ -1,5 +1,5 @@
 import type { Account } from "@/data/accounts";
-import type { Path, Plan } from "@/data/plan";
+import type { Path, Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 
 import { takesSpare } from "@/data/accounts";
@@ -20,16 +20,6 @@ export interface Future {
   readonly fell: null | number;
   readonly ranOut: null | number;
   readonly savings: readonly number[];
-}
-
-// How far a year strays from the plan's rates, as the futures are drawn:
-// the standard deviation of the logarithm of one plus the plan rate's
-// return in a year, and of one plus prices' rise. The rate's is the
-// portfolio's as a whole, stocks and bonds in the split the plan holds,
-// since every account on the plan rate is carried at the one rate.
-export interface Spread {
-  readonly inflation: number;
-  readonly rate: number;
 }
 
 // The seed every run of the futures starts from, so every run of a plan

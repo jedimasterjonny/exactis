@@ -1,9 +1,12 @@
 import type { Curve } from "@/data/inflation";
+import type { Spread } from "@/data/plan";
 import type { Allocation, Rates } from "@/data/rates";
 import type { Month } from "@/data/schedule";
 import type { Target, Targets } from "@/data/targets";
 
-import { inflationOf } from "@/data/inflation";
+import { inflationOf, inflationSpread } from "@/data/inflation";
+import { loggedSpread } from "@/data/plan";
+import { planRate } from "@/data/rates";
 import { monthName } from "@/lib/months";
 
 // An asset class as BlackRock's capital market assumptions price it in
@@ -342,6 +345,65 @@ export function riskOf(
               covariance(inStocks, inBonds) / (strays.bonds * strays.stocks),
             ),
           ),
+  };
+}
+
+// How far the plan's rates stray in a year, as the futures of the chance
+// of success are drawn: its portfolio as far as the latest vintage's
+// sleeves stray, blended by the target allocation, held in the split
+// the plan runs on, and its prices by the standing figure for them, each
+// stated as BlackRock and the ONS state it and drawn in logs about the
+// rate it strays from, the plan rate the rates and the split make and
+// the rates' inflation. The vintage's risk is taken whichever rates are
+// live, those typed by hand among them, since how far the markets stray
+// is theirs whatever return is set for them. There is none before a
+// vintage is pulled, while it makes no blend, while it gives no risk, or
+// while the plan holds stocks or bonds the target allocation holds none
+// of, as a split typed by hand can, since nothing then says how far that
+// part of the savings strays; and what is missing is said.
+export function spreadOf(
+  {
+    cma,
+    mappings,
+    targets,
+  }: {
+    readonly cma: null | Vintages;
+    readonly mappings: readonly Mapping[];
+    readonly targets: null | Targets;
+  },
+  { allocation, rates }: DerivedSet,
+): Shortfall | Spread {
+  if (cma === null) {
+    return { short: "No CMA is pulled" };
+  }
+  const blends = blendsOf(cma.latest, targets, mappings);
+  if ("short" in blends) {
+    return blends;
+  }
+  const risk = riskOf(cma.latest, blends);
+  if ("short" in risk) {
+    return risk;
+  }
+  const { stocks: share } = allocation;
+  const unheld = [
+    ...(share > 0 && blends.stocks.parts.length === 0 ? ["stocks"] : []),
+    ...(share < 1 && blends.bonds.parts.length === 0 ? ["bonds"] : []),
+  ];
+  if (unheld.length > 0) {
+    return {
+      short: `The plan holds ${listed.format(unheld)} the target allocation holds none of, so nothing says how far they stray`,
+    };
+  }
+  const variance =
+    share ** 2 * risk.stocks ** 2 +
+    (1 - share) ** 2 * risk.bonds ** 2 +
+    2 * share * (1 - share) * risk.correlation * risk.stocks * risk.bonds;
+  return {
+    inflation: loggedSpread(rates.inflation, inflationSpread),
+    rate: loggedSpread(
+      planRate(rates, allocation),
+      Math.sqrt(Math.max(0, variance)),
+    ),
   };
 }
 
