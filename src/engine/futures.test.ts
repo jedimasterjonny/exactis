@@ -1,9 +1,15 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import type { Account } from "@/data/accounts";
+
+import { expenseLines } from "@/data/expenses.fixture";
+import { project } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
-import { pathOf } from "./futures";
+import type { Future } from "./futures";
+
+import { futuresOf, pathOf } from "./futures";
 
 // A plan at 7% and 3% over the years these tests draw.
 const plan = { inflation: 0.03, rate: 0.07, years: 40 };
@@ -74,5 +80,114 @@ describe("pathOf", () => {
 
     expect(Math.min(...path.rate)).toBeGreaterThan(-1);
     expect(Math.min(...path.inflation)).toBeGreaterThan(-1);
+  });
+});
+
+describe("futuresOf", () => {
+  // Born in 1990, so 36 when the plan opens in January 2026 and short of
+  // the pension age throughout; no inflation, so every figure is the
+  // pounds it states.
+  const planned = {
+    born: 1990,
+    from: 2026,
+    inflation: 0,
+    month: 0,
+    rate: 0,
+    retires: 90,
+    years: 5,
+  };
+
+  // £1,000 a month going out and nothing coming in.
+  const short = {
+    expenses: [
+      { ...expenseLines[0], amount: 1000, growth: "nominal" as const },
+    ],
+    income: [],
+  };
+
+  const isa: Account = {
+    balance: 30000,
+    growth: { kind: "plan" },
+    id: 1,
+    kind: "tax-free",
+    name: "ISA",
+    owner: 1,
+  };
+
+  const home: Account = {
+    balance: 400000,
+    growth: { kind: "fixed", rate: 0 },
+    id: 2,
+    kind: "house",
+    name: "Home",
+  };
+
+  const nothingStrays = { inflation: 0, rate: 0 };
+
+  function taken(
+    accounts: readonly Account[],
+    run: Parameters<typeof futuresOf>[2],
+    count: number,
+  ): readonly Future[] {
+    return futuresOf(accounts, short, run).take(count).toArray();
+  }
+
+  // £30,000 drawn £12,000 a year holds £18,000 entering 2027 and £6,000
+  // entering 2028, which runs out that year; the home is no saving.
+  it("runs every future as the plan at its rates where nothing strays", () => {
+    const futures = taken(
+      [isa, home],
+      { plan: planned, spread: nothingStrays },
+      3,
+    );
+
+    expect(futures).toStrictEqual(
+      Array.from({ length: 3 }, () => ({
+        fell: 2028,
+        ranOut: 2028,
+        savings: [30000, 18000, 6000, 0, 0, 0],
+      })),
+    );
+  });
+
+  it("tells a future kept going only by drawing a pension early from one that ran out", () => {
+    const pension: Account = { ...isa, balance: 1000000, kind: "tax-deferred" };
+
+    const [future] = taken(
+      [pension],
+      { plan: planned, spread: nothingStrays },
+      1,
+    );
+
+    expect(future).toMatchObject({ fell: 2026, ranOut: null });
+  });
+
+  it("draws each future from a stream of its own, the same on every run", () => {
+    const run = { plan: planned, spread: { inflation: 0.02, rate: 0.15 } };
+    const first = taken([isa], run, 3);
+
+    expect(taken([isa], run, 3)).toStrictEqual(first);
+    expect(taken([isa], run, 1)).toStrictEqual(first.slice(0, 1));
+    expect(new Set(first.map(({ savings }) => savings[2])).size).toBe(3);
+  });
+
+  // £100,000 at 5% drawn £12,000 a year lasts ten years at its rates with
+  // some £12,000 to spare, so some futures straying 15% a year last and
+  // some run out.
+  it("lasts in some futures and falls short in others where the plan only just lasts", () => {
+    const thin = { ...planned, rate: 0.05, years: 10 };
+    const saved = { ...isa, balance: 100000 };
+    const futures = taken(
+      [saved],
+      { plan: thin, spread: { inflation: 0.02, rate: 0.15 } },
+      40,
+    );
+    const lasted = futures.filter(({ fell }) => fell === null).length;
+
+    expect(
+      project([saved], short, thin).every(({ uncovered }) => uncovered === 0),
+    ).toBe(true);
+    expect(lasted).toBeGreaterThan(0);
+    expect(lasted).toBeLessThan(40);
   });
 });
