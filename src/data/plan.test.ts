@@ -12,11 +12,13 @@ import {
   debtTermOf,
   endAge,
   inflationIn,
+  loggedSpread,
   marginOf,
   planOf,
   pricesIn,
   risenBy,
   risenWith,
+  statedSpread,
 } from "./plan";
 
 // The rates a household opens with, 5% for stocks and bonds alike and
@@ -223,5 +225,21 @@ describe("risenWith", () => {
       1.11 ** (4 / 12) * 1.21 * 1.03 ** (8 / 12),
       12,
     );
+  });
+});
+
+describe("loggedSpread", () => {
+  // A year straying 16% about 8% strays 14.58% in logs, and nothing
+  // about anything strays by nothing.
+  it("reads how far a year strays as its source states it as how far it strays in logs", () => {
+    expect(loggedSpread(0.08, 0.16)).toBeCloseTo(0.1458034, 6);
+    expect(loggedSpread(0.05, 0)).toBe(0);
+  });
+});
+
+describe("statedSpread", () => {
+  it("works a spread in logs back to the spread its source would state", () => {
+    expect(statedSpread(0.08, loggedSpread(0.08, 0.16))).toBeCloseTo(0.16, 12);
+    expect(statedSpread(0.05, 0)).toBe(0);
   });
 });

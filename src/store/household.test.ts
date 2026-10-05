@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Answer } from "@/lib/answer";
 
+import { spreadOf } from "@/data/cma";
 import { cma } from "@/data/cma.fixture";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { inflationOf } from "@/data/inflation";
@@ -53,6 +54,7 @@ describe("the household store", () => {
       rates: openingRates,
       rateSet: "custom",
       schedule: { expenses: [], income: [] },
+      spread: { short: "No CMA is pulled" },
       targets: null,
     });
   });
@@ -83,6 +85,10 @@ describe("the household store", () => {
       rates: reference.rates,
       rateSet: reference.rateSet,
       schedule: reference.schedule,
+      spread: spreadOf(reference, {
+        allocation: reference.allocation,
+        rates: reference.rates,
+      }),
       targets: reference.targets,
     });
   });
