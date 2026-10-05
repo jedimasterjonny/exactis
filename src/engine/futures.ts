@@ -62,6 +62,12 @@ export interface Reading {
   readonly tenthFell: null | number;
 }
 
+// How many futures a run draws: enough to pin the chance to within two
+// points either way, and few enough that the run is a matter of
+// seconds. The screen and the dashboard's tile draw the same run, so
+// they say the same chance.
+export const runLength = 1000;
+
 // The seed every run of the futures starts from, so every run of a plan
 // meets the same markets and a change in what they come to is the plan's.
 const seed = 2026;

@@ -93,6 +93,16 @@ describe("Dashboard", () => {
     }
   });
 
+  // The household before anything is saved has no CMA, so the tile has
+  // no spread to draw the futures at, and says so.
+  it("hands the store's spread to the chance of success, which says when there is none", async () => {
+    render(await Dashboard());
+
+    expect(
+      screen.getByText("No spread to draw the futures from"),
+    ).toBeInTheDocument();
+  });
+
   // A phone keeps the two the plan is steered by, in one row, and
   // leaves the other two to a wider screen.
   it("keeps the milestone tile and the chance of success on a phone, and no other tile", async () => {
