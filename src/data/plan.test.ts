@@ -11,10 +11,12 @@ import {
   ageIn,
   debtTermOf,
   endAge,
+  inflationIn,
   marginOf,
   planOf,
   pricesIn,
   risenBy,
+  risenWith,
 } from "./plan";
 
 // The rates a household opens with, 5% for stocks and bonds alike and
@@ -120,6 +122,27 @@ describe("marginOf", () => {
   });
 });
 
+describe("inflationIn", () => {
+  // A path from 2026 holds 2026 and 2027; the plan's 2% is taken before
+  // it, past it, and for every year of a plan with none.
+  it("reads a year's inflation off the path where it holds one, and the plan's own otherwise", () => {
+    const plan = {
+      from: 2026,
+      inflation: 0.02,
+      path: { inflation: [0.1, 0.2], rate: [0, 0] },
+    };
+
+    expect(inflationIn(plan, 2026)).toBeCloseTo(0.1, 15);
+    expect(inflationIn(plan, 2027)).toBeCloseTo(0.2, 15);
+    expect(inflationIn(plan, 2025)).toBeCloseTo(0.02, 15);
+    expect(inflationIn(plan, 2028)).toBeCloseTo(0.02, 15);
+    expect(inflationIn({ from: 2026, inflation: 0.02 }, 2026)).toBeCloseTo(
+      0.02,
+      15,
+    );
+  });
+});
+
 describe("pricesIn", () => {
   // At 10% from September 2026, prices stand where they are that month,
   // today's money, and have risen by a tenth the September after.
@@ -128,6 +151,22 @@ describe("pricesIn", () => {
 
     expect(pricesIn(plan, { month: 8, year: 2026 })).toBe(1);
     expect(pricesIn(plan, { month: 8, year: 2027 })).toBeCloseTo(1.1, 12);
+  });
+
+  // Along a path of 10% in 2026 and 20% in 2027, by September 2027
+  // prices have risen four months of the one and eight of the other.
+  it("reads how far prices have risen along the plan's path", () => {
+    const plan = {
+      from: 2026,
+      inflation: 0.02,
+      month: 8,
+      path: { inflation: [0.1, 0.2], rate: [0, 0] },
+    };
+
+    expect(pricesIn(plan, { month: 8, year: 2027 })).toBeCloseTo(
+      1.1 ** (4 / 12) * 1.2 ** (8 / 12),
+      12,
+    );
   });
 });
 
@@ -142,6 +181,46 @@ describe("risenBy", () => {
     expect(risenBy(0.1, start, { month: 8, year: 2027 })).toBeCloseTo(1.1, 12);
     expect(risenBy(0.1, start, { month: 2, year: 2028 })).toBeCloseTo(
       1.1 ** 1.5,
+      12,
+    );
+  });
+});
+
+describe("risenWith", () => {
+  // At 2% and a point over it, a sum has risen 3% a year on.
+  it("compounds the plan's inflation and the margin together for a plan at its own rates", () => {
+    const plan = { from: 2026, inflation: 0.02, month: 8 };
+
+    expect(risenWith(0.01, plan, { month: 8, year: 2027 })).toBeCloseTo(
+      1.03,
+      12,
+    );
+  });
+
+  // From September 2026 along 10% in 2026 and 20% in 2027, with a point
+  // over each: nothing that month, four months at 11% by the new year,
+  // eight more at 21% by the September after, and the whole of 2027 and
+  // eight months of the plan's 2% and the point, past the path, by
+  // September 2028.
+  it("compounds each year's inflation along the plan's path, the margin over each, and the plan's own past it", () => {
+    const plan = {
+      from: 2026,
+      inflation: 0.02,
+      month: 8,
+      path: { inflation: [0.1, 0.2], rate: [0, 0] },
+    };
+
+    expect(risenWith(0.01, plan, { month: 8, year: 2026 })).toBe(1);
+    expect(risenWith(0.01, plan, { month: 0, year: 2027 })).toBeCloseTo(
+      1.11 ** (4 / 12),
+      12,
+    );
+    expect(risenWith(0.01, plan, { month: 8, year: 2027 })).toBeCloseTo(
+      1.11 ** (4 / 12) * 1.21 ** (8 / 12),
+      12,
+    );
+    expect(risenWith(0.01, plan, { month: 8, year: 2028 })).toBeCloseTo(
+      1.11 ** (4 / 12) * 1.21 * 1.03 ** (8 / 12),
       12,
     );
   });

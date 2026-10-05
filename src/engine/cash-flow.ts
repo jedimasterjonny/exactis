@@ -23,7 +23,7 @@ import {
   marginOf,
   pricesIn,
   retirementYear,
-  risenBy,
+  risenWith,
 } from "@/data/plan";
 import { rules } from "@/data/rules";
 import { fixedMonthly, monthly } from "@/lib/cadence";
@@ -685,7 +685,7 @@ function monthlyOf(
   const margin = marginOf(line);
   return (
     monthly(amount, line.cadence) *
-    (margin === null ? 1 : risenBy(plan.inflation + margin, plan, at))
+    (margin === null ? 1 : risenWith(margin, plan, at))
   );
 }
 

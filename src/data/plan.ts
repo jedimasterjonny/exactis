@@ -17,12 +17,14 @@ import { monthsBetween } from "@/lib/months";
 // they retire at, from which they earn nothing by working. It sits
 // beside the accounts and the lines rather than inside the engine,
 // since the flow and the projection each read it and the flow is what
-// the projection is built on.
+// the projection is built on. A plan run over one future of the markets
+// rather than at its own rates carries that future's path as well.
 export interface Plan {
   readonly born: number;
   readonly from: number;
   readonly inflation: number;
   readonly month: number;
+  readonly path?: Path;
   readonly rate: number;
   readonly retires: number;
   readonly years: number;
@@ -35,6 +37,18 @@ export interface Plan {
 export interface PlanAges {
   readonly ends: number;
   readonly retires: number;
+}
+
+// One future of the markets, a figure for each year the plan carries,
+// the first year's the one the plan starts in and each after it the
+// year on: what the plan rate comes to that year, and what prices rise
+// by in it, each a fraction as every rate is. A plan carried along a
+// path takes the year's figures in place of its own, everywhere a rate
+// or prices move with the markets; a year the path holds no figure for
+// takes the plan's own.
+interface Path {
+  readonly inflation: readonly number[];
+  readonly rate: readonly number[];
 }
 
 // The rest of the plan, until there is somewhere to set it: someone
@@ -81,6 +95,17 @@ export const oldestAge = 120;
 // span, the fields and the rows read it as the projection does.
 export function endYear(plan: Plan): number {
   return plan.from + plan.years;
+}
+
+// What prices rise by in a year: the path's figure for it, along one,
+// and the plan's own inflation for a year the path holds none for, a
+// year before the plan or past where the path runs, and for every year
+// of a plan carried at its own rates.
+export function inflationIn(
+  plan: Pick<Plan, "from" | "inflation" | "path">,
+  year: number,
+): number {
+  return plan.path?.inflation[year - plan.from] ?? plan.inflation;
 }
 
 // What a line's amount rises at a year over prices, in the pounds of the
@@ -142,15 +167,16 @@ export function planOf(
   };
 }
 
-// How far prices have risen by a month at the plan's inflation, from
-// the month the plan starts in, whose money is today's money: what a
-// pound of today's money costs in that month's pounds, and what a pound
-// of that month's is divided by to be read in today's money.
+// How far prices have risen by a month at the plan's inflation, or
+// along its path, from the month the plan starts in, whose money is
+// today's money: what a pound of today's money costs in that month's
+// pounds, and what a pound of that month's is divided by to be read in
+// today's money.
 export function pricesIn(
-  plan: Pick<Plan, "from" | "inflation" | "month">,
+  plan: Pick<Plan, "from" | "inflation" | "month" | "path">,
   at: Month,
 ): number {
-  return risenBy(plan.inflation, plan, at);
+  return risenWith(0, plan, at);
 }
 
 // The rate an account is carried at, its own fixed one or the plan's,
@@ -187,4 +213,31 @@ export function risenBy(
     (1 + rate) **
     (monthsBetween({ month: plan.month, year: plan.from }, at) / 12)
   );
+}
+
+// How many times over a sum rising with prices, and by the margin given
+// over them, has risen by a month, from the month the plan starts in:
+// at the plan's inflation and the margin together for a plan carried at
+// its own rates, as risenBy compounds any rate; and along a path, a
+// month at a time at each year's inflation and the margin, the part of
+// the first year the plan holds and of the year the month falls in at
+// their own, and each year between whole.
+export function risenWith(
+  margin: number,
+  plan: Pick<Plan, "from" | "inflation" | "month" | "path">,
+  at: Month,
+): number {
+  if (plan.path === undefined) {
+    return risenBy(plan.inflation + margin, plan, at);
+  }
+  // ponytail: walks the path on every call, which makes a run along one
+  // a fifth slower than one at the plan's rates; working out each year's
+  // start once a path took it to a twelfth, if the chance takes too long.
+  let risen = 1;
+  for (let year = plan.from; year <= at.year; year += 1) {
+    const from = year === plan.from ? plan.month : 0;
+    const to = year === at.year ? at.month : 12;
+    risen *= (1 + inflationIn(plan, year) + margin) ** ((to - from) / 12);
+  }
+  return risen;
 }
