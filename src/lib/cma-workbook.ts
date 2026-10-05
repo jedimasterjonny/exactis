@@ -1,4 +1,4 @@
-import type { Asset, Cma, Sleeve } from "@/data/cma";
+import type { Asset, Cma, Risk, Sleeve } from "@/data/cma";
 import type { Month } from "@/data/schedule";
 import type { Cell, Row } from "@/lib/workbook";
 
@@ -8,20 +8,27 @@ import { monthName } from "@/lib/months";
 import { readSheet } from "@/lib/workbook";
 
 // The columns a row's asset class, the asset's name and its return over
-// the horizon are in, its currency being in the first.
+// the horizon are in, its currency being in the first; and those its
+// volatility and its correlations with government bonds and equities
+// are in, where the sheet has them.
 interface Columns {
   readonly asset: number;
+  readonly bonds: number | undefined;
   readonly kind: number;
   readonly rate: number;
+  readonly stocks: number | undefined;
+  readonly volatility: number | undefined;
 }
 
 // A row of the sheet as read: its currency, BlackRock's class for it,
-// its name, and what its return cell holds.
+// its name, what its return cell holds, and how far it strays, or none
+// for a row with no volatility.
 interface Listed {
   readonly currency: string;
   readonly kind: string;
   readonly name: string;
   readonly rate: Cell | undefined;
+  readonly risk: Risk | undefined;
 }
 
 // The sheet the returns are read from, BlackRock's central case, the
@@ -98,6 +105,18 @@ const months: ReadonlyMap<string, number> = new Map(
 // sterling cash, as a hedge is rolled. Where either cash is missing no
 // hedged form is added, rather than the pull refused over it.
 //
+// Each class carries how far BlackRock expects it to stray, read from
+// the blocks beside the returns: its volatility and its correlations
+// with government bonds and with equities. A hedged form strays as the
+// dollar-hedged row does, its currency hedged away, and a class carried
+// in as sterling's US large caps do, its return being carried over
+// theirs. How government bonds and equities move together is read off
+// the class correlated wholly with equities, which is the equities the
+// rest are correlated with. A class with no volatility carries none,
+// and a sheet without the blocks, or without either correlation's
+// column, is read with none at all, rather than the pull refused over
+// them, since the returns stand without them.
+//
 // What the reader cannot read, or cannot find, is refused in words
 // naming it, since the screen says why a workbook was not pulled.
 export function readCma(file: Uint8Array): Cma {
@@ -120,9 +139,12 @@ export function readCma(file: Uint8Array): Cma {
   if (twice !== undefined) {
     throw new Refusal(`The ${sheet} sheet lists ${twice} in GBP twice`);
   }
+  const correlation = sterling.find(({ risk }) => risk?.stocks === 1)?.risk
+    ?.bonds;
   return {
     ...datesOf(rows.slice(0, at)),
     assets: [...withHedged(sterling, listed), ...carriedOf(sterling, listed)],
+    ...(correlation !== undefined && { correlation }),
   };
 }
 
@@ -140,7 +162,23 @@ function assetOf(row: Listed): readonly Asset[] {
       `The ${sheet} sheet gives ${row.name} no ${String(horizon)}-year return`,
     );
   }
-  return [{ name: row.name, rate: row.rate, sleeve }];
+  return [{ name: row.name, rate: row.rate, ...riskOf(row.risk), sleeve }];
+}
+
+// The header's cells in the block the label given starts in the row of
+// labels above it, from there to where the next label starts the next
+// block, or a refusal saying the sheet has no such block.
+function blockOf(header: Row, labels: Row, label: string): Row {
+  const start = columnOf(labels, label);
+  const next =
+    labels
+      .entries()
+      .find(
+        ([column, cell]) => column > start && typeof cell === "string",
+      )?.[0] ?? Infinity;
+  return new Map(
+    header.entries().filter(([column]) => column >= start && column < next),
+  );
 }
 
 // The classes carried into sterling over US large caps, each its own
@@ -151,7 +189,8 @@ function carriedOf(
   sterling: readonly Asset[],
   listed: readonly Listed[],
 ): readonly Asset[] {
-  const base = sterling.find(({ name }) => name === anchor)?.rate;
+  const found = sterling.find(({ name }) => name === anchor);
+  const base = found?.rate;
   return carried.flatMap(([currency, name]) => {
     const rate = rateIn(listed, currency, name);
     const over = rateIn(listed, currency, anchor);
@@ -165,6 +204,7 @@ function carriedOf(
             carriedFrom: currency,
             name,
             rate: base + rate - over,
+            ...riskOf(found?.risk),
             sleeve: "stocks" as const,
           },
         ];
@@ -174,36 +214,37 @@ function carriedOf(
 // The first column holding the text given, or a refusal saying the
 // sheet has none.
 function columnOf(row: Row, text: string): number {
-  const found = row
-    .entries()
-    .find(([, cell]) => typeof cell === "string" && cell.trim() === text);
+  const found = foundIn(row, text);
   if (found === undefined) {
     throw new Refusal(`The ${sheet} sheet has no column headed ${text}`);
   }
-  return found[0];
+  return found;
 }
 
 // Where a row's class, name and return are, by what the header names
 // them, the return's column the one named for the horizon within the
-// block of expected returns: from where the row of labels above the
-// header starts it to where the next label starts the next block. A
-// header naming none of them is refused, naming what it lacks, rather
-// than the horizon read out of a range's block.
+// block of expected returns. A header naming none of them is refused,
+// naming what it lacks, rather than the horizon read out of a range's
+// block. Where its volatility and its correlations are, if anywhere:
+// the volatility's column the one the row of labels names, its header
+// cell being blank, and each correlation's the one named for government
+// bonds or equities within the block of correlations; a sheet without
+// them is read all the same, its classes straying by nothing it says.
 function columnsOf(header: Row, labels: Row): Columns {
-  const returns = columnOf(labels, "Expected returns");
-  const next =
-    labels
-      .entries()
-      .find(
-        ([column, cell]) => column > returns && typeof cell === "string",
-      )?.[0] ?? Infinity;
-  const block = new Map(
-    header.entries().filter(([column]) => column >= returns && column < next),
-  );
+  const correlations =
+    foundIn(labels, "Correlation") === undefined
+      ? new Map<number, Cell>()
+      : blockOf(header, labels, "Correlation");
   return {
     asset: columnOf(header, "Asset"),
+    bonds: foundIn(correlations, "Government bonds"),
     kind: columnOf(header, "Asset class"),
-    rate: columnOf(block, `${String(horizon)} year`),
+    rate: columnOf(
+      blockOf(header, labels, "Expected returns"),
+      `${String(horizon)} year`,
+    ),
+    stocks: foundIn(correlations, "Equities"),
+    volatility: foundIn(labels, "Volatility"),
   };
 }
 
@@ -229,15 +270,48 @@ function datesOf(rows: readonly Row[]): Pick<Cma, "asOf" | "vintage"> {
   };
 }
 
-// A row's currency, class, name and return, or nothing for a row
-// missing any of the first three.
+// The first column holding the text given, or none.
+function foundIn(row: Row, text: string): number | undefined {
+  return row
+    .entries()
+    .find(([, cell]) => typeof cell === "string" && cell.trim() === text)?.[0];
+}
+
+// The row a currency's block gives the class named, or none for a class
+// it does not list. One it lists twice is refused, as a sterling class
+// is, rather than either taken: only a row read here can be refused, so
+// a class listed twice that nothing reads stops no pull.
+function listingIn(
+  listed: readonly Listed[],
+  currency: string,
+  name: string,
+): Listed | undefined {
+  const rows = listed.filter(
+    (row) => row.currency === currency && row.name === name,
+  );
+  if (rows.length > 1) {
+    throw new Refusal(`The ${sheet} sheet lists ${name} in ${currency} twice`);
+  }
+  return rows[0];
+}
+
+// A row's currency, class, name, return and how far it strays, or
+// nothing for a row missing any of the first three.
 function listingOf(row: Row, columns: Columns): readonly Listed[] {
   const currency = textAt(row, 0);
   const kind = textAt(row, columns.kind);
   const name = textAt(row, columns.asset);
   return currency === "" || kind === "" || name === ""
     ? []
-    : [{ currency, kind, name, rate: row.get(columns.rate) }];
+    : [
+        {
+          currency,
+          kind,
+          name,
+          rate: row.get(columns.rate),
+          risk: riskAt(row, columns),
+        },
+      ];
 }
 
 function monthOf(name: string, year: string): Month {
@@ -248,24 +322,49 @@ function monthOf(name: string, year: string): Month {
   return { month, year: Number(year) };
 }
 
+// What a cell holds where it holds a number, or none, as for a column
+// the sheet does not have.
+function numberAt(row: Row, column: number | undefined): number | undefined {
+  const cell = column === undefined ? undefined : row.get(column);
+  return typeof cell === "number" ? cell : undefined;
+}
+
 // The return a currency's block gives the class named, or nothing for a
-// class it lists without a number or not at all. One it lists twice is
-// refused, as a sterling class is, rather than either taken: only a row
-// read here can be refused, so a class listed twice that nothing reads
-// stops no pull.
+// class it lists without a number or not at all.
 function rateIn(
   listed: readonly Listed[],
   currency: string,
   name: string,
 ): number | undefined {
-  const rows = listed.filter(
-    (row) => row.currency === currency && row.name === name,
-  );
-  if (rows.length > 1) {
-    throw new Refusal(`The ${sheet} sheet lists ${name} in ${currency} twice`);
-  }
-  const rate = rows[0]?.rate;
+  const rate = listingIn(listed, currency, name)?.rate;
   return typeof rate === "number" ? rate : undefined;
+}
+
+// How far a row strays, as its volatility and its correlations say, or
+// none for a row whose volatility is not a number, or on a sheet missing
+// either correlation's column, since a correlation nobody gave is not
+// one of nothing. A correlation left blank in its column, as BlackRock
+// leaves cash's beside a volatility of nothing, is read as none.
+function riskAt(row: Row, columns: Columns): Risk | undefined {
+  const volatility = numberAt(row, columns.volatility);
+  if (
+    volatility === undefined ||
+    columns.bonds === undefined ||
+    columns.stocks === undefined
+  ) {
+    return undefined;
+  }
+  return {
+    bonds: numberAt(row, columns.bonds) ?? 0,
+    stocks: numberAt(row, columns.stocks) ?? 0,
+    volatility,
+  };
+}
+
+// A class's risk as an asset carries it: none at all rather than an
+// empty one, for a class with none.
+function riskOf(risk: Risk | undefined): { readonly risk?: Risk } {
+  return risk === undefined ? {} : { risk };
 }
 
 // A cell's text with the spaces around it let go, as BlackRock leaves
@@ -284,8 +383,11 @@ function withHedged(
   const fromCash = sterling.find(({ name }) => name === sterlingCash)?.rate;
   const toCash = rateIn(listed, "USD", dollarCash);
   return sterling.flatMap((asset) => {
-    const rate = rateIn(listed, "USD", asset.name + hedged);
-    return rate === undefined || fromCash === undefined || toCash === undefined
+    const row = listingIn(listed, "USD", asset.name + hedged);
+    const rate = row?.rate;
+    return typeof rate !== "number" ||
+      fromCash === undefined ||
+      toCash === undefined
       ? [asset]
       : [
           asset,
@@ -293,6 +395,7 @@ function withHedged(
             hedges: asset.name,
             name: `${asset.name} (GBP hedged)`,
             rate: rate + fromCash - toCash,
+            ...riskOf(row?.risk),
             sleeve: asset.sleeve,
           },
         ];

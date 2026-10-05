@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { Cma, Deductions, Mapping, Vintages } from "@/data/cma";
+import type { Cma, Deductions, Mapping, Risk, Vintages } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
@@ -635,6 +635,55 @@ describe("soundKept", () => {
         cma: { latest: { ...cma, asOf: "30 June 2026" }, previous: null },
       }),
     ).toThrow("Invalid ISO date");
+  });
+
+  // The August vintage as the reader gives it, with every class's risk
+  // and how government bonds and equities move together; one pulled
+  // before that was read, with neither, is kept as it is.
+  it("keeps how far each class strays, and refuses a volatility below nothing, a correlation past one, or bonds and equities moving wholly together", () => {
+    const stray = (risk: Risk): Vintages => ({
+      latest: {
+        ...cma,
+        assets: cma.assets.map((asset, index) =>
+          index === 0 ? { ...asset, risk } : asset,
+        ),
+      },
+      previous: null,
+    });
+    const unread: Cma = {
+      asOf: cma.asOf,
+      assets: [
+        { name: "UK large cap equities", rate: 0.08156, sleeve: "stocks" },
+      ],
+      vintage: cma.vintage,
+    };
+
+    expect(
+      soundKept({ ...kept, cma: { latest: cma, previous: null } }).household.cma
+        ?.latest,
+    ).toStrictEqual(cma);
+    expect(
+      soundKept({ ...kept, cma: { latest: unread, previous: null } }).household
+        .cma?.latest,
+    ).toStrictEqual(unread);
+    expect(() =>
+      soundKept({
+        ...kept,
+        cma: stray({ bonds: 0, stocks: 0, volatility: -0.1 }),
+      }),
+    ).toThrow("Too small");
+    expect(() =>
+      soundKept({
+        ...kept,
+        cma: stray({ bonds: 1.2, stocks: 0, volatility: 0.1 }),
+      }),
+    ).toThrow("Too big");
+    expect(() =>
+      soundKept({
+        ...kept,
+        cma: { latest: { ...cma, correlation: -1 }, previous: null },
+      }),
+    ).toThrow("Too small");
   });
 
   it("keeps the target allocation as it was imported, and refuses one on no day", () => {
