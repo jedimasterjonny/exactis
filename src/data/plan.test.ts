@@ -11,7 +11,7 @@ import {
   ageIn,
   debtTermOf,
   endAge,
-  growthFrom,
+  marginOf,
   planOf,
   pricesIn,
   risenBy,
@@ -104,34 +104,19 @@ describe("planOf", () => {
   });
 });
 
-describe("growthFrom", () => {
-  // At 3% a year, a line rises 3% with inflation, 4% or 5% a point or
-  // two over it, and not at all fixed in nominal terms.
-  it("reads each growth choice against the plan's inflation", () => {
-    const plan = {
-      ...planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }, opening),
-      inflation: 0.03,
-    };
-
-    expect(growthFrom({ growth: "inflation" }, plan)).toBeCloseTo(0.03, 15);
-    expect(growthFrom({ growth: "inflation-plus-1" }, plan)).toBeCloseTo(
-      0.04,
-      15,
-    );
-    expect(growthFrom({ growth: "inflation-plus-2" }, plan)).toBeCloseTo(
-      0.05,
-      15,
-    );
-    expect(growthFrom({ growth: "nominal" }, plan)).toBe(0);
+describe("marginOf", () => {
+  // A line rises nothing over prices with inflation, a point or two
+  // over them for the choices that say so, and does not rise with them
+  // at all fixed in nominal terms.
+  it("reads each growth choice as its margin over prices", () => {
+    expect(marginOf({ growth: "inflation" })).toBe(0);
+    expect(marginOf({ growth: "inflation-plus-1" })).toBeCloseTo(0.01, 15);
+    expect(marginOf({ growth: "inflation-plus-2" })).toBeCloseTo(0.02, 15);
+    expect(marginOf({ growth: "nominal" })).toBeNull();
   });
 
-  it("grows a line paying a loan at nothing, whatever it says", () => {
-    const plan = {
-      ...planOf({ ends: 89, retires: 59 }, { month: 8, year: 2026 }, opening),
-      inflation: 0.03,
-    };
-
-    expect(growthFrom({ growth: "inflation-plus-2", pays: 5 }, plan)).toBe(0);
+  it("does not rise a line paying a loan with prices, whatever it says", () => {
+    expect(marginOf({ growth: "inflation-plus-2", pays: 5 })).toBeNull();
   });
 });
 
