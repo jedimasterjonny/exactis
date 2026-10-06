@@ -25,7 +25,7 @@ interface ConfirmDialogProps {
 // as it is mounted, so a caller renders it while it holds something to
 // ask about and not otherwise. An alert dialog closes only from its
 // buttons, never from a press outside, so the only change it can report
-// is Cancel or Escape, both of which cancel. The confirm holds while
+// is Cancel or Escape, both of which cancel. The confirm spins while
 // the caller says the deletion is on its way to the store.
 export function ConfirmDialog({
   children,
@@ -44,7 +44,7 @@ export function ConfirmDialog({
         <AlertDialogFooter>
           <AlertDialogCancel size="sm">Cancel</AlertDialogCancel>
           <AlertDialogAction
-            disabled={isBusy}
+            isBusy={isBusy}
             onClick={onConfirm}
             size="sm"
             variant="destructive"

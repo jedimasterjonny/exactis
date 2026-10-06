@@ -35,7 +35,7 @@ interface InflationSourceProps {
 // gives and how it is derived, which the plan takes while it runs on the
 // CMA-derived rates, and which is there to check the inflation typed
 // against while it runs on the rates typed by hand. The header names the source and pulls the Bank's latest
-// curve; the pull holds while it is on its way, and the store's answer
+// curve; the pull spins while it is on its way, and the store's answer
 // draws the screen again from the curve kept, with a toast saying what
 // it derives, or says why under a toast when the Bank or its file is
 // refused. Beneath, the steps from the curve to the derived rate are
@@ -68,12 +68,7 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
             <Landmark aria-hidden />
             BoE implied curve
           </Badge>
-          <Button
-            disabled={isPulling}
-            onClick={pull}
-            size="sm"
-            variant="outline"
-          >
+          <Button isBusy={isPulling} onClick={pull} size="sm" variant="outline">
             <Download aria-hidden />
             Pull latest curve
           </Button>

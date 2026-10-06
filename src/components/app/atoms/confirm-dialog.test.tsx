@@ -46,7 +46,10 @@ describe("ConfirmDialog", () => {
       </ConfirmDialog>,
     );
 
-    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
   });
 });

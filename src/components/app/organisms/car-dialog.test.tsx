@@ -131,7 +131,9 @@ describe("CarDialog", () => {
       rate: 0.079,
       value: 18000,
     });
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(
+      within(dialog).getByRole("button", { name: "Save" }),
+    ).toHaveAttribute("aria-busy", "true");
     expect(onSaved).not.toHaveBeenCalled();
 
     answer(accepted(golf));

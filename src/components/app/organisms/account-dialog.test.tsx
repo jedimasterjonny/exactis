@@ -127,7 +127,9 @@ describe("AccountDialog", () => {
       rate: 0,
       shares: [],
     });
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(
+      within(dialog).getByRole("button", { name: "Save" }),
+    ).toHaveAttribute("aria-busy", "true");
     expect(onSaved).not.toHaveBeenCalled();
 
     answer(saved(stored));

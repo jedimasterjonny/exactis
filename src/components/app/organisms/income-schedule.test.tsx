@@ -114,7 +114,7 @@ describe("IncomeSchedule", () => {
     expect(removeIncomeLine).toHaveBeenCalledExactlyOnceWith(salary.id);
     expect(
       within(dialog).getByRole("button", { name: "Delete" }),
-    ).toBeDisabled();
+    ).toHaveAttribute("aria-busy", "true");
 
     answer(accepted(undefined));
 
@@ -707,7 +707,9 @@ describe("IncomeSchedule", () => {
       sacrifice: 0,
       startsAt: null,
     });
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(
+      within(dialog).getByRole("button", { name: "Save" }),
+    ).toHaveAttribute("aria-busy", "true");
     expect(screen.getByRole("dialog", { name: "Bonus scheme" })).toBeVisible();
 
     answer(

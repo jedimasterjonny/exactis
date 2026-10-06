@@ -262,8 +262,8 @@ function isOpenOn(
 // draft the form was drawn with would not yet have the year the blur
 // has just committed. Escape leaves the milestone as it was, wherever
 // the focus is, as it closes a dialog wherever the focus is in it. Save
-// holds while the name is empty and while a save is on its way, and the
-// Delete holds while a save is, as the dialog's do.
+// holds while the name is empty and spins while a save is on its way,
+// and the Delete holds while a save is, as the dialog's do.
 function MilestoneForm({
   canSave,
   entry,
@@ -351,7 +351,7 @@ function MilestoneForm({
         <Button onClick={onDismiss} size="sm" type="button" variant="outline">
           Cancel
         </Button>
-        <Button disabled={!canSave || isSaving} size="sm" type="submit">
+        <Button disabled={!canSave} isBusy={isSaving} size="sm" type="submit">
           Save
         </Button>
       </div>

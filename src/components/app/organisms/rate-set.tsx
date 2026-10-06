@@ -62,7 +62,7 @@ const runsOn: Record<Chosen, string> = {
 // draws the screen again from the set kept, under a toast, or puts the
 // choice back and says why under a toast, as when the CMA gives no
 // rates for want of a class. Historical returns are offered and refused
-// until they are built. The pull holds while it is on its way, and the
+// until they are built. The pull spins while it is on its way, and the
 // store's answer draws the screen again from the vintage kept, under a
 // toast, or says why under a toast when BlackRock or its workbook is
 // refused.
@@ -214,12 +214,7 @@ export function RateSet({
       )}
       <SectionCard
         actions={
-          <Button
-            disabled={isPulling}
-            onClick={pull}
-            size="sm"
-            variant="outline"
-          >
+          <Button isBusy={isPulling} onClick={pull} size="sm" variant="outline">
             <Download aria-hidden />
             Pull CMA workbook
           </Button>

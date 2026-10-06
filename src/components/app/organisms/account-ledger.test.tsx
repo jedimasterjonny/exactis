@@ -285,7 +285,9 @@ describe("AccountLedger", () => {
       rate: 0.03,
       shares: [],
     });
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(
+      within(dialog).getByRole("button", { name: "Save" }),
+    ).toHaveAttribute("aria-busy", "true");
     expect(screen.getByRole("dialog", { name: "Lifetime ISA" })).toBeVisible();
 
     answer(
@@ -991,7 +993,7 @@ describe("AccountLedger", () => {
     expect(removeAccount).toHaveBeenCalledExactlyOnceWith(cash.id);
     expect(
       within(dialog).getByRole("button", { name: "Delete" }),
-    ).toBeDisabled();
+    ).toHaveAttribute("aria-busy", "true");
 
     answer(accepted(undefined));
 

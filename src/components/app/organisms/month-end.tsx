@@ -281,7 +281,7 @@ function Worksheet({
             Cancel
           </Button>
           <Button
-            disabled={isSaving}
+            isBusy={isSaving}
             onClick={() => {
               onSave(rows);
             }}
