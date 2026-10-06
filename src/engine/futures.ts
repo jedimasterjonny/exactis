@@ -44,6 +44,11 @@ export interface FutureYear {
   readonly year: number;
 }
 
+// What a future comes to, as the chance of success grades a run: one
+// that lasted by what it leaves, one that fell short by when.
+export type Outcome =
+  "almost" | "barely" | "comfortable" | "early" | "middle" | "surplus";
+
 // What a run of futures comes to, as the chance of success reads it:
 // how many were run; how many lasted, ran out of money, or were kept
 // going only by drawing a pension early, the three adding up to the
@@ -67,11 +72,6 @@ export interface Reading {
   readonly tenthFell: null | number;
 }
 
-// What a future comes to, as the chance of success grades a run: one
-// that lasted by what it leaves, one that fell short by when.
-type Outcome =
-  "almost" | "barely" | "comfortable" | "early" | "middle" | "surplus";
-
 // How many futures a run draws: enough to pin the chance to within two
 // points either way, and few enough that the run is a matter of
 // seconds. The screen and the dashboard's tile draw the same run, so
@@ -92,7 +92,7 @@ const step = 0x9e3779b9;
 // middle of retirement and the year from which it almost made it, and
 // the pounds from which a future lasting is comfortable and over which
 // it leaves a large surplus.
-interface Grading {
+export interface Grading {
   readonly almost: number;
   readonly comfortable: number;
   readonly middle: number;

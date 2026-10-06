@@ -20,14 +20,20 @@ import { SectionCard } from "@/components/app/molecules/section-card";
 import { FuturesByYear } from "@/components/app/organisms/futures-by-year";
 import { FuturesCount } from "@/components/app/organisms/futures-count";
 import { FuturesDrawn } from "@/components/app/organisms/futures-drawn";
+import { FuturesOutcomes } from "@/components/app/organisms/futures-outcomes";
 import { CardContent } from "@/components/kit/card";
 import { takesSpare } from "@/data/accounts";
 import { ageIn, endAge } from "@/data/plan";
-import { futureOf, readingOf, runLength } from "@/engine/futures";
+import {
+  futureOf,
+  gradingOf,
+  outcomesOf,
+  readingOf,
+  runLength,
+} from "@/engine/futures";
 import { project } from "@/engine/projection";
 import { useFutures } from "@/hooks/use-futures";
 import { formatCount } from "@/lib/count";
-import { formatGbp, formatWholePercent } from "@/lib/money";
 import { chance, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 interface ChanceBoardProps {
@@ -40,8 +46,8 @@ interface ChanceBoardProps {
 
 // The chance of success: the plan run over a thousand futures of the
 // markets, drawn as the screen opens, a slice at a time, with the header
-// saying what they come to as the screen's siblings say what theirs do,
-// and the cards beneath. Every run draws the same futures, so there is
+// saying how far the run has come and the cards beneath, the first of
+// them saying what the futures come to. Every run draws the same futures, so there is
 // nothing to run again and no button to. There is nothing to draw while
 // the plan has no spread, the CMA giving it none, or no savings for the
 // futures to grow, and the screen says which.
@@ -114,15 +120,17 @@ function AtItsRates({
   return null;
 }
 
-// The plan's futures as they come in, under a header saying what they
-// come to: the chance, by when a tenth of them have fallen short, where
-// a tenth do, and what the middle one leaves; or, while they are coming
-// in, how many have. The plan at its own rates is read as a future, for
-// what it holds at the end beside the middle future, and a plan that
-// falls short even at its own rates is said to before the count, since
-// the chance then reads how often the markets would carry a plan that
-// does not work as it stands. The run is laid on the plan's years
-// beneath the count, and what it was drawn from beneath that.
+// The plan's futures as they come in, under a header saying how many
+// there are and over what ages, or, while they are coming in, how many
+// have; then what they come to, graded, and the count beneath it. The
+// plan at its own rates is read as a future, for what it holds at the
+// end beside the middle future and what it is worth as its owner
+// retires, which the futures that last are graded against. A plan that
+// falls short even at its own rates is said to before what the futures
+// come to, since the chance then reads how often the markets would
+// carry a plan that does not work as it stands. The run is laid on the
+// plan's years beneath the count, and what it was drawn from beneath
+// that.
 function Futures({
   accounts,
   milestones,
@@ -143,20 +151,23 @@ function Futures({
     [accounts, plan, schedule],
   );
   const projected = readingOf([asProjected]);
+  const grading = useMemo(
+    () => gradingOf(asProjected, plan),
+    [asProjected, plan],
+  );
   const headline = isDone
-    ? [
-        `${formatWholePercent(reading.chance)} of ${formatCount(runLength)} futures last to ${String(endAge(plan))}`,
-        ...(reading.tenthFell === null
-          ? []
-          : [
-              `a tenth fall short by ${String(ageIn(reading.tenthFell, plan))}`,
-            ]),
-        `the middle one leaves ${formatGbp(reading.middle)}`,
-      ].join(" · ")
+    ? `${formatCount(runLength)} futures, each the plan run again from ${String(ageIn(plan.from, plan))} to ${String(endAge(plan))}`
     : `Drawing ${formatCount(futures.length)} of ${formatCount(runLength)} futures…`;
   return (
     <Screen headline={headline}>
       <AtItsRates future={asProjected} plan={plan} />
+      <FuturesOutcomes
+        count={runLength}
+        grading={grading}
+        outcomes={outcomesOf(futures, grading)}
+        plan={plan}
+        reading={reading}
+      />
       <FuturesCount
         count={runLength}
         plan={plan}
@@ -174,7 +185,7 @@ function Futures({
   );
 }
 
-// The screen's header, saying what it comes to, over its body.
+// The screen's header, with the line beneath its title, over its body.
 function Screen({
   children,
   headline,
