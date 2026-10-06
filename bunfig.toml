@@ -5,6 +5,13 @@
 # intent already declared in renovate.json.
 exact = true
 
+# Resolve no version, transitive ones included, until it has been published for
+# three days: the hold Renovate applies to what package.json names, extended to
+# what a lock file refresh pulls in beneath it. A version already in bun.lock is
+# left where it is. An exact pin younger than this fails to resolve, so a
+# security fix published today needs `bun install --minimum-release-age=0`.
+minimumReleaseAge = 259200
+
 # pnpm-style non-hoisted node_modules: each package sees only what it declares,
 # so an import of a transitive dependency fails here rather than in production
 # after an unrelated upgrade removes it.
