@@ -61,9 +61,23 @@ export interface Spread {
   readonly rate: number;
 }
 
+// What a plan's prices are read off: the month it starts in, whose money
+// is today's money, its own inflation, and the path, where it carries
+// one.
+type Priced = Pick<Plan, "from" | "inflation" | "month" | "path">;
+
 // The rest of the plan, until there is somewhere to set it: someone
 // born in 1990.
 const born = 1990;
+
+// How far a sum has risen by the start of each year of a plan along a
+// path, by the margin it rises at and the year, each worked out once and
+// read off after. A run carries one plan through some six hundred
+// months, each reading a price for every line, so walking the path from
+// its start on every read was most of what a future cost. Held against
+// the plan itself, which carries the path and the month it starts from,
+// and let go with it.
+const yearStarts = new WeakMap<Priced, Map<number, Map<number, number>>>();
 
 // The age the plan's owner reaches in a year. The plan holds the year
 // they were born in and not the day, so it is the age reached that
@@ -195,10 +209,7 @@ export function planOf(
 // today's money: what a pound of today's money costs in that month's
 // pounds, and what a pound of that month's is divided by to be read in
 // today's money.
-export function pricesIn(
-  plan: Pick<Plan, "from" | "inflation" | "month" | "path">,
-  at: Month,
-): number {
+export function pricesIn(plan: Priced, at: Month): number {
   return risenWith(0, plan, at);
 }
 
@@ -245,24 +256,18 @@ export function risenBy(
 // month at a time at each year's inflation and the margin, the part of
 // the first year the plan holds and of the year the month falls in at
 // their own, and each year between whole.
-export function risenWith(
-  margin: number,
-  plan: Pick<Plan, "from" | "inflation" | "month" | "path">,
-  at: Month,
-): number {
+export function risenWith(margin: number, plan: Priced, at: Month): number {
   if (plan.path === undefined) {
     return risenBy(plan.inflation + margin, plan, at);
   }
-  // ponytail: walks the path on every call, which makes a run along one
-  // a fifth slower than one at the plan's rates; working out each year's
-  // start once a path took it to a twelfth, if the chance takes too long.
-  let risen = 1;
-  for (let year = plan.from; year <= at.year; year += 1) {
-    const from = year === plan.from ? plan.month : 0;
-    const to = year === at.year ? at.month : 12;
-    risen *= (1 + inflationIn(plan, year) + margin) ** ((to - from) / 12);
+  if (at.year < plan.from) {
+    return 1;
   }
-  return risen;
+  const from = at.year === plan.from ? plan.month : 0;
+  return (
+    risenByStartOf(margin, plan, at.year) *
+    (1 + inflationIn(plan, at.year) + margin) ** ((at.month - from) / 12)
+  );
 }
 
 // How far a year strays as its source would state it, from how far it
@@ -270,4 +275,37 @@ export function risenWith(
 export function statedSpread(rate: number, logged: number): number {
   const widening = Math.exp(logged ** 2);
   return (1 + rate) * Math.sqrt(widening * (widening - 1));
+}
+
+// How far a sum rising by the margin given has risen by the start of a
+// year of a plan along a path: nothing by the start of the plan, and by
+// each year after it the year before's start carried through that year,
+// from the plan's month in its first. The years are multiplied in the
+// order the walk took them, so a figure read here is the walk's to the
+// last bit.
+function risenByStartOf(margin: number, plan: Priced, year: number): number {
+  if (year === plan.from) {
+    return 1;
+  }
+  let byMargin = yearStarts.get(plan);
+  if (byMargin === undefined) {
+    byMargin = new Map();
+    yearStarts.set(plan, byMargin);
+  }
+  let starts = byMargin.get(margin);
+  if (starts === undefined) {
+    starts = new Map();
+    byMargin.set(margin, starts);
+  }
+  const known = starts.get(year);
+  if (known !== undefined) {
+    return known;
+  }
+  const before = year - 1;
+  const from = before === plan.from ? plan.month : 0;
+  const risen =
+    risenByStartOf(margin, plan, before) *
+    (1 + inflationIn(plan, before) + margin) ** ((12 - from) / 12);
+  starts.set(year, risen);
+  return risen;
 }
