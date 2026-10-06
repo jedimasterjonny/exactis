@@ -29,7 +29,6 @@ const reading: Reading = {
   middle: 1234567,
   ranOut: 26,
   run: 1000,
-  tenthFell: null,
 };
 
 function steps(): string[] {

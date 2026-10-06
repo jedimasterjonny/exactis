@@ -377,8 +377,8 @@ describe("readingOf", () => {
   // in 2045. The chance is 70%, give or take Wilson's 1.96 / (1 + 1.96²
   // / 10) × √(0.7 × 0.3 / 10 + 1.96² / 400), 24.8 points; the first ran
   // out in 2060, and so had
-  // the lower half of the two; a tenth, one, had fallen short by 2040;
-  // and the sixth of the ends in order, the middle one, is £500,000.
+  // the lower half of the two; and the sixth of the ends in order, the
+  // middle one, is £500,000.
   it("counts what lasted, ran out and drew early, and reads when the run turns and what the middle future holds", () => {
     const futures = [
       future(null, null, 500000),
@@ -405,7 +405,6 @@ describe("readingOf", () => {
       middle: 500000,
       ranOut: 2,
       run: 10,
-      tenthFell: 2040,
     });
   });
 
@@ -433,7 +432,6 @@ describe("readingOf", () => {
       middle: 0,
       ranOut: 0,
       run: 0,
-      tenthFell: null,
     });
     expect(
       readingOf([{ fell: null, ranOut: null, savings: [], worth: [] }]).middle,
