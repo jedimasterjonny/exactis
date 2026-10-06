@@ -12,15 +12,19 @@ import { normalsFrom } from "@/lib/random";
 // pension before the pension age, or null for a future that lasts; the
 // year it first ran out, or null for one that never did, so a future
 // kept going only by drawing a pension early is told from one that ran
-// out; and what the savings it draws on hold entering each year of the
-// plan, cash, the ISAs and the pensions, in today's money as the
-// projection's points are. A future that falls short by drawing early
+// out; what the savings it draws on hold entering each year of the
+// plan, cash, the ISAs and the pensions; and what the plan is worth
+// entering each year, every account it holds less every debt it owes, a
+// house or a car at its value less the loan on it, as the dashboard
+// counts net worth; both in today's money as the projection's points
+// are. A future that falls short by drawing early
 // has not lasted: the 55% the draw is charged keeps the plan going only
 // on paper, which is why the projection marks it.
 export interface Future {
   readonly fell: null | number;
   readonly ranOut: null | number;
   readonly savings: readonly number[];
+  readonly worth: readonly number[];
 }
 
 // A year of a run of futures, as the chance of success lays the run on
@@ -79,9 +83,10 @@ const step = 0x9e3779b9;
 
 // A projection read as a future, over the accounts it was run over: the
 // year it first fell short, by running out or by drawing a pension
-// early, the year it first ran out, and what the savings hold entering
-// each year. What a future drawn is read as, and what the plan at its
-// own rates is read as beside them.
+// early, the year it first ran out, what the savings hold entering each
+// year, and what every account comes to then, which is the plan's net
+// worth. What a future drawn is read as, and what the plan at its own
+// rates is read as beside them.
 export function futureOf(
   points: readonly ProjectionPoint[],
   accounts: readonly Account[],
@@ -94,6 +99,9 @@ export function futureOf(
     ranOut: points.find(({ uncovered }) => uncovered > 0)?.year ?? null,
     savings: points.map((point) =>
       savings.reduce((sum, { id }) => sum + balanceIn(point, id), 0),
+    ),
+    worth: points.map((point) =>
+      accounts.reduce((sum, { id }) => sum + balanceIn(point, id), 0),
     ),
   };
 }
