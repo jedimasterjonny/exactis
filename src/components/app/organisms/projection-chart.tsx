@@ -13,7 +13,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  getNiceTickValues,
   ReferenceDot,
   ReferenceLine,
   XAxis,
@@ -32,6 +31,7 @@ import { Card, CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
 import { isAsset } from "@/data/accounts";
 import { balanceIn, balanceOf, holdsAnything } from "@/engine/projection";
+import { axisOf } from "@/lib/axis";
 import { listed } from "@/lib/feeders";
 import { formatAxisGbp, formatGbp } from "@/lib/money";
 import { accountsAndAssets } from "@/lib/nav";
@@ -611,15 +611,9 @@ function ProjectionTooltip({
   );
 }
 
-// The pounds the axis spans and the ticks it marks. Above nothing they
-// are the ticks recharts would choose itself for the most the stack
-// ever holds, the last at or above it. Below nothing the axis reaches
-// only as deep as the stack ever goes, what is owed and any equity
-// below nothing, marked at the same step as far as it reaches one: recharts spaces its ticks evenly either side of
-// nothing, so £400,000 owed under £10m held took the axis down to
-// minus £3.5m and gave a quarter of the plot to nothing. The step is set
-// by the deeper of the two sides, so a plan of debts alone is marked
-// as one of savings alone would be.
+// The pounds the axis spans and the ticks it marks, from the most the
+// stack ever holds above nothing to the deepest it ever goes below it,
+// what is owed and any equity below nothing.
 function scaleOf(
   points: readonly ProjectionPoint[],
   series: readonly Series[],
@@ -629,27 +623,16 @@ function scaleOf(
     side: (value: number) => number,
   ): number =>
     series.reduce((sum, line) => sum + side(valueIn(point, line)), 0);
-  const top = Math.max(
-    0,
-    ...points.map((point) => sumOf(point, (value) => Math.max(0, value))),
+  return axisOf(
+    Math.min(
+      0,
+      ...points.map((point) => sumOf(point, (value) => Math.min(0, value))),
+    ),
+    Math.max(
+      0,
+      ...points.map((point) => sumOf(point, (value) => Math.max(0, value))),
+    ),
   );
-  const bottom = Math.min(
-    0,
-    ...points.map((point) => sumOf(point, (value) => Math.min(0, value))),
-  );
-  const nice = getNiceTickValues(
-    [0, Math.max(top, -bottom)],
-    5,
-    true,
-    "adaptive",
-  );
-  const step = Math.max(...nice) / (nice.length - 1);
-  const above = nice.filter((tick) => tick - step < top);
-  const below = Array.from(
-    { length: Math.floor(-bottom / step) },
-    (_, place) => -(place + 1) * step,
-  ).reverse();
-  return { domain: [bottom, Math.max(...above)], ticks: [...below, ...above] };
 }
 
 // Each account the chart draws, family by family in the order they
