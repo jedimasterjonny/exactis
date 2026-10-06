@@ -15,7 +15,6 @@ import {
   outcomesOf,
   pathOf,
   readingOf,
-  yearIn,
   yearsIn,
 } from "./futures";
 
@@ -443,48 +442,52 @@ describe("readingOf", () => {
 describe("yearsIn", () => {
   const span = { from: 2026, years: 2 };
 
-  // Ten futures, the nth holding n thousand pounds entering 2026, twice
-  // that entering 2027 and three times entering 2028; the first falls
-  // short in 2027 and the second in 2028. So a year is lasting for every
-  // future not yet fallen short as it opens, and the poor, middle and
-  // good futures are the second, sixth and ninth in order.
-  it("lays a run on the plan's years, counting what lasts and falls short and reading the spread of the savings", () => {
+  // Ten futures, the nth worth n thousand pounds entering 2026, twice
+  // that entering 2027 and three times entering 2028, whatever they
+  // save; the first runs out in 2027 and the second in 2028, and the
+  // third only draws a pension early in 2027. So the bottom tenth and
+  // quarter are the second and third in order, the middle the sixth,
+  // and the top quarter and tenth the eighth and ninth.
+  it("lays a run on the plan's years, reading the spread of its worth and counting what has run out", () => {
     const futures = Array.from({ length: 10 }, (_, nth): Future => ({
-      fell: [2027, 2028][nth] ?? null,
-      ranOut: null,
-      savings: [1000 * nth, 2000 * nth, 3000 * nth],
+      fell: [2027, 2028, 2027][nth] ?? null,
+      ranOut: [2027, 2028][nth] ?? null,
+      savings: [],
       worth: [1000 * nth, 2000 * nth, 3000 * nth],
     }));
 
     expect(yearsIn(futures, span)).toStrictEqual([
       {
-        fell: 0,
-        good: 8000,
-        lasting: 10,
+        bottomQuarter: 2000,
+        bottomTenth: 1000,
         middle: 5000,
-        poor: 1000,
+        outOfMoney: 0,
+        topQuarter: 7000,
+        topTenth: 8000,
         year: 2026,
       },
       {
-        fell: 1,
-        good: 16000,
-        lasting: 10,
+        bottomQuarter: 4000,
+        bottomTenth: 2000,
         middle: 10000,
-        poor: 2000,
+        outOfMoney: 1,
+        topQuarter: 14000,
+        topTenth: 16000,
         year: 2027,
       },
       {
-        fell: 1,
-        good: 24000,
-        lasting: 9,
+        bottomQuarter: 6000,
+        bottomTenth: 3000,
         middle: 15000,
-        poor: 3000,
+        outOfMoney: 2,
+        topQuarter: 21000,
+        topTenth: 24000,
         year: 2028,
       },
     ]);
   });
 
-  it("reads a run of none as holding nothing in every year, and a future with no point for a year as holding nothing in it", () => {
+  it("reads a run of none as worth nothing in every year, and a future with no point for a year as worth nothing in it", () => {
     expect(
       yearsIn([], span).map(({ middle, year }) => [year, middle]),
     ).toStrictEqual([
@@ -493,8 +496,9 @@ describe("yearsIn", () => {
       [2028, 0],
     ]);
     expect(
-      yearIn([{ fell: null, ranOut: null, savings: [], worth: [] }], span, 2027)
-        .middle,
-    ).toBe(0);
+      yearsIn([{ fell: null, ranOut: null, savings: [], worth: [] }], span).map(
+        ({ middle }) => middle,
+      ),
+    ).toStrictEqual([0, 0, 0]);
   });
 });
