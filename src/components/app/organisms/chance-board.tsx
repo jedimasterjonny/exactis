@@ -122,15 +122,15 @@ function AtItsRates({
 
 // The plan's futures as they come in, under a header saying how many
 // there are and over what ages, or, while they are coming in, how many
-// have; then what they come to, graded, and the count beneath it. The
-// plan at its own rates is read as a future, for what it holds at the
-// end beside the middle future and what it is worth as its owner
-// retires, which the futures that last are graded against. A plan that
+// have; then what they come to, graded, the run fanned over the plan's
+// years, and the count beneath them. The plan at its own rates is read
+// as a future, for what it is worth at the end beside the middle future
+// and as its owner retires, which the futures that last are graded
+// against. A plan that
 // falls short even at its own rates is said to before what the futures
 // come to, since the chance then reads how often the markets would
-// carry a plan that does not work as it stands. The run is fanned over
-// the plan's years beneath the count, and what it was drawn from
-// beneath that.
+// carry a plan that does not work as it stands. What the run was drawn
+// from closes the screen.
 function Futures({
   accounts,
   milestones,
@@ -168,13 +168,13 @@ function Futures({
         plan={plan}
         reading={reading}
       />
+      <FuturesFan futures={futures} milestones={milestones} plan={plan} />
       <FuturesCount
         count={runLength}
         plan={plan}
         projected={projected.middle}
         reading={reading}
       />
-      <FuturesFan futures={futures} milestones={milestones} plan={plan} />
       <FuturesDrawn count={runLength} plan={plan} spread={spread} />
     </Screen>
   );

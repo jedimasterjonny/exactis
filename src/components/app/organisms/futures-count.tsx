@@ -42,7 +42,7 @@ export function FuturesCount({
   return (
     <SectionCard
       caption="Of the futures run, the ones that cover every year to the plan's end, counted down from all of them."
-      label={subsectionLabel(chance, 1)}
+      label={subsectionLabel(chance, 2)}
       title="How many futures last"
     >
       <CardContent>

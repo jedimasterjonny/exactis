@@ -124,7 +124,7 @@ export function FuturesFan({
     <SectionCard
       caption="What the futures are worth as each year opens, in today's money: the middle future as a line, the middle half of them shaded about it and the middle four in five more faintly. Hover or step along it to read a year."
       className="min-w-0 overflow-visible"
-      label={subsectionLabel(chance, 2)}
+      label={subsectionLabel(chance, 1)}
       title="Year by year"
     >
       <CardContent className="grid grid-cols-1 gap-4">
