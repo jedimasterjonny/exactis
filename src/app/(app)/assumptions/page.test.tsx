@@ -187,12 +187,12 @@ describe("Assumptions", () => {
       name: "Reload from Portfolio Performance",
     });
 
-    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-busy", "true");
 
     answer.resolve(saved(targets));
 
     await waitFor(() => {
-      expect(button).toBeEnabled();
+      expect(button).not.toHaveAttribute("aria-busy");
     });
   });
 

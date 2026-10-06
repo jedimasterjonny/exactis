@@ -149,7 +149,9 @@ describe("ExpenseSchedule", () => {
       name: "Nursery",
       startsAt: null,
     });
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(
+      within(dialog).getByRole("button", { name: "Save" }),
+    ).toHaveAttribute("aria-busy", "true");
 
     answer(
       accepted({
@@ -208,7 +210,7 @@ describe("ExpenseSchedule", () => {
     expect(removeExpenseLine).toHaveBeenCalledExactlyOnceWith(2);
     expect(
       within(question).getByRole("button", { name: "Delete" }),
-    ).toBeDisabled();
+    ).toHaveAttribute("aria-busy", "true");
 
     answer(accepted(undefined));
 

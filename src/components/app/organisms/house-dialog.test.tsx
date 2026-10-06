@@ -122,7 +122,9 @@ describe("HouseDialog", () => {
       status: "mortgaged",
       value: 416386,
     });
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(
+      within(dialog).getByRole("button", { name: "Save" }),
+    ).toHaveAttribute("aria-busy", "true");
     expect(onSaved).not.toHaveBeenCalled();
 
     answer(accepted(home));

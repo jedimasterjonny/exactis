@@ -27,7 +27,7 @@ export function LoginForm(): JSX.Element {
       </Field>
       <Button
         className="justify-self-start"
-        disabled={isPending}
+        isBusy={isPending}
         size="sm"
         type="submit"
       >

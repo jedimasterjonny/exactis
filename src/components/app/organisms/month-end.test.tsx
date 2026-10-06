@@ -242,7 +242,10 @@ describe("MonthEnd", () => {
 
     fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));
 
-    expect(within(sheet).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(within(sheet).getByRole("button", { name: "Save" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
 
     answer(refused("The balances are as of a month that has begun"));
 

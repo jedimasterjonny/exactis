@@ -36,7 +36,7 @@ interface TargetAllocationProps {
 // it. The file is read here in the browser rather than sent, since it
 // holds every holding and transaction beside the taxonomy and only the
 // targets are wanted, so the store is sent the categories alone. The
-// import holds while the file is read and the store asked, and the
+// import spins while the file is read and the store asked, and the
 // store's answer draws the screen again from the targets kept, under a
 // toast. A file that cannot be read, or targets the store refuses, are
 // said why under a toast, and nothing is kept. The picker is emptied as soon
@@ -47,7 +47,7 @@ interface TargetAllocationProps {
 //
 // While a category the CMA cannot blend has a class its name suggests,
 // the header offers to map every such category by name, saying how many
-// it would map. The mapping holds while it is on its way, and the
+// it would map. The mapping spins while it is on its way, and the
 // store's answer draws the screen again from the mappings kept, under a
 // toast saying how many it mapped, or says why under a toast. A class
 // chosen by hand is never written over, and the table shows each class
@@ -107,7 +107,7 @@ export function TargetAllocation({
           )}
           {suggested > 0 && (
             <Button
-              disabled={isMapping}
+              isBusy={isMapping}
               onClick={mapNames}
               size="sm"
               variant="outline"
@@ -125,7 +125,7 @@ export function TargetAllocation({
             type="file"
           />
           <Button
-            disabled={isImporting}
+            isBusy={isImporting}
             onClick={() => {
               pickerRef.current?.click();
             }}
