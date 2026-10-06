@@ -98,18 +98,24 @@ export function futureOf(
   };
 }
 
-// The futures of a plan, drawn one at a time without end, each the plan
-// carried along its own path, drawn as pathOf draws one at the spread
-// given. Future by future the draws come from a stream of their own,
-// seeded by where the future falls in the run, so a run of a thousand
-// starts with the hundred a run of a hundred is, and the futures do not
+// The futures of a plan, drawn one at a time without end from the place
+// in the run given, its first unless another is, each the plan carried
+// along its own path, drawn as pathOf draws one at the spread given.
+// Future by future the draws come from a stream of their own, seeded by
+// where the future falls in the run, so a run of a thousand starts with
+// the hundred a run of a hundred is, a run drawn from its fiftieth is
+// the rest of the run drawn from its first, and the futures do not
 // depend on how many are taken or by whom.
 export function* futuresOf(
   accounts: readonly Account[],
   schedule: Schedule,
-  { plan, spread }: { readonly plan: Plan; readonly spread: Spread },
+  {
+    from = 0,
+    plan,
+    spread,
+  }: { readonly from?: number; readonly plan: Plan; readonly spread: Spread },
 ): Generator<Future, never, undefined> {
-  for (let future = 0; ; future += 1) {
+  for (let future = from; ; future += 1) {
     const path = pathOf(plan, spread, normalsFrom(seed + future * step));
     yield futureOf(project(accounts, schedule, { ...plan, path }), accounts);
   }

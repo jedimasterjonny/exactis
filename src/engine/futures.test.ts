@@ -171,6 +171,16 @@ describe("futuresOf", () => {
     expect(new Set(first.map(({ savings }) => savings[2])).size).toBe(3);
   });
 
+  it("draws from any place in the run the futures the run holds there", () => {
+    const run = { plan: planned, spread: { inflation: 0.02, rate: 0.15 } };
+
+    expect(
+      futuresOf([isa], short, { ...run, from: 2 })
+        .take(3)
+        .toArray(),
+    ).toStrictEqual(taken([isa], run, 5).slice(2));
+  });
+
   // £100,000 at 5% drawn £12,000 a year lasts ten years at its rates with
   // some £12,000 to spare, so some futures straying 15% a year last and
   // some run out.
