@@ -17,9 +17,9 @@ import { EmptyState } from "@/components/app/atoms/empty-state";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { SectionCard } from "@/components/app/molecules/section-card";
-import { FuturesByYear } from "@/components/app/organisms/futures-by-year";
 import { FuturesCount } from "@/components/app/organisms/futures-count";
 import { FuturesDrawn } from "@/components/app/organisms/futures-drawn";
+import { FuturesFan } from "@/components/app/organisms/futures-fan";
 import { FuturesOutcomes } from "@/components/app/organisms/futures-outcomes";
 import { CardContent } from "@/components/kit/card";
 import { takesSpare } from "@/data/accounts";
@@ -128,9 +128,9 @@ function AtItsRates({
 // retires, which the futures that last are graded against. A plan that
 // falls short even at its own rates is said to before what the futures
 // come to, since the chance then reads how often the markets would
-// carry a plan that does not work as it stands. The run is laid on the
-// plan's years beneath the count, and what it was drawn from beneath
-// that.
+// carry a plan that does not work as it stands. The run is fanned over
+// the plan's years beneath the count, and what it was drawn from
+// beneath that.
 function Futures({
   accounts,
   milestones,
@@ -174,12 +174,7 @@ function Futures({
         projected={projected.middle}
         reading={reading}
       />
-      <FuturesByYear
-        futures={futures}
-        milestones={milestones}
-        plan={plan}
-        projected={asProjected}
-      />
+      <FuturesFan futures={futures} milestones={milestones} plan={plan} />
       <FuturesDrawn count={runLength} plan={plan} spread={spread} />
     </Screen>
   );

@@ -29,18 +29,17 @@ export interface Future {
 }
 
 // A year of a run of futures, as the chance of success lays the run on
-// the plan's years: how many futures are still lasting as it opens, how
-// many first fall short in it, by running out or drawing a pension
-// early, and what the futures' savings hold as it opens, the poor one a
-// tenth of them hold less than, the middle one and the good one a tenth
-// hold more than, counted the same from either end, a future run out
-// holding nothing.
+// the plan's years: what the futures are worth as it opens, read at the
+// middle one and at a quarter and a tenth in from either end, counted
+// the same from either end, and how many have run out of money by the
+// time it closes, in it or before.
 export interface FutureYear {
-  readonly fell: number;
-  readonly good: number;
-  readonly lasting: number;
+  readonly bottomQuarter: number;
+  readonly bottomTenth: number;
   readonly middle: number;
-  readonly poor: number;
+  readonly outOfMoney: number;
+  readonly topQuarter: number;
+  readonly topTenth: number;
   readonly year: number;
 }
 
@@ -287,37 +286,30 @@ export function readingOf(futures: readonly Future[]): Reading {
   };
 }
 
-// A year of a run of futures, each future's savings read off the point
-// for the year. A year a future holds no point for, as a run of none
-// holds none, reads as holding nothing.
-export function yearIn(
-  futures: readonly Future[],
-  plan: Pick<Plan, "from">,
-  year: number,
-): FutureYear {
-  const held = sorted(
-    futures.map(({ savings }) => savings[year - plan.from] ?? 0),
-  );
-  const tenth = Math.floor(held.length / 10);
-  return {
-    fell: futures.filter(({ fell }) => fell === year).length,
-    good: held[held.length - 1 - tenth] ?? 0,
-    lasting: futures.filter(({ fell }) => fell === null || fell >= year).length,
-    middle: held[Math.floor(held.length / 2)] ?? 0,
-    poor: held[tenth] ?? 0,
-    year,
-  };
-}
-
 // A run of futures year by year over the plan's years, from the one it
-// starts in to the one it ends in.
+// starts in to the one it ends in. A year a future holds no point for,
+// as a run of none holds none, reads as worth nothing.
 export function yearsIn(
   futures: readonly Future[],
   plan: Pick<Plan, "from" | "years">,
 ): readonly FutureYear[] {
-  return Array.from({ length: plan.years + 1 }, (_, offset) =>
-    yearIn(futures, plan, plan.from + offset),
-  );
+  return Array.from({ length: plan.years + 1 }, (_, offset) => {
+    const year = plan.from + offset;
+    const held = sorted(futures.map(({ worth }) => worth[offset] ?? 0));
+    const quarter = Math.floor(held.length / 4);
+    const tenth = Math.floor(held.length / 10);
+    return {
+      bottomQuarter: held[quarter] ?? 0,
+      bottomTenth: held[tenth] ?? 0,
+      middle: held[Math.floor(held.length / 2)] ?? 0,
+      outOfMoney: futures.filter(
+        ({ ranOut }) => ranOut !== null && ranOut <= year,
+      ).length,
+      topQuarter: held[held.length - 1 - quarter] ?? 0,
+      topTenth: held[held.length - 1 - tenth] ?? 0,
+      year,
+    };
+  });
 }
 
 function sorted(values: readonly number[]): readonly number[] {
