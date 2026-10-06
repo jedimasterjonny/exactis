@@ -19,6 +19,7 @@ import { PinBar } from "@/components/app/atoms/pin-bar";
 import { RowLock } from "@/components/app/atoms/row-lock";
 import { RowOpener } from "@/components/app/atoms/row-opener";
 import { SpanRuler } from "@/components/app/atoms/span-ruler";
+import { YearAge } from "@/components/app/atoms/year-age";
 import { YearField } from "@/components/app/molecules/figure-field";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { TextField } from "@/components/app/molecules/text-field";
@@ -421,10 +422,11 @@ function MilestoneRow({
         </div>
         <div className="pointer-events-none">{bar}</div>
       </div>
-      <div className="col-start-3 grid gap-0.5 text-right folded:hidden">
-        <span className="figure">{marker.year}</span>
-        <span className="label text-muted-foreground/60">{age}</span>
-      </div>
+      <YearAge
+        age={age}
+        className="col-start-3 folded:hidden"
+        year={marker.year}
+      />
       <span className="inline-flex size-7 items-center justify-center folded:hidden">
         {lock ?? (
           <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
