@@ -51,7 +51,7 @@ describe("FuturesCount", () => {
       name: "Net worth against the plan as projected",
     });
 
-    expect(within(card).getByText("Sect. II.i")).toHaveClass("label");
+    expect(within(card).getByText("Sect. II.ii")).toHaveClass("label");
     expect(steps()).toStrictEqual([
       "Futures runEach the plan run again over its own 53 years of returns and inflation1,000",
       "Ran out of moneyA year no account could cover. The first at 69, half of them by 84−26",
