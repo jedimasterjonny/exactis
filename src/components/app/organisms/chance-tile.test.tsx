@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 
 import { expenseLines } from "@/data/expenses.fixture";
+import { FuturesWorker } from "@/test/futures-worker";
 
 import { ChanceTile } from "./chance-tile";
 
@@ -35,6 +36,11 @@ const schedule = {
 };
 
 describe("ChanceTile", () => {
+  // jsdom has no Worker, and the chance of success draws its futures on two.
+  beforeEach(() => {
+    vi.stubGlobal("Worker", FuturesWorker);
+  });
+
   // Nothing strays, so every future is the plan at its rates, which
   // lasts.
   it("draws the plan's futures and shows the share that last, with how many and to what age", async () => {
