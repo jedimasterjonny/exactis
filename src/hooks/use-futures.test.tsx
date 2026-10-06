@@ -1,11 +1,13 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { Activity } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { Slice } from "@/hooks/futures.worker";
 
 import { expenseLines } from "@/data/expenses.fixture";
 import { futuresOf } from "@/engine/futures";
+import { FuturesWorker } from "@/test/futures-worker";
 
 import { useFutures } from "./use-futures";
 
@@ -39,70 +41,119 @@ const plan = {
 
 const spread = { inflation: 0.02, rate: 0.15 };
 
+// How long a worker takes over a slice, in milliseconds: under the 200
+// the screen is handed what has come back at most every.
+const took = 150;
+
+// A worker that keeps the place in the run of each slice it is handed,
+// and takes a while over each.
+class Watched extends FuturesWorker {
+  public readonly handed: number[] = [];
+
+  protected override readonly took = took;
+
+  public override postMessage(slice: Slice): void {
+    this.handed.push(slice.from);
+    super.postMessage(slice);
+  }
+}
+
+// The workers the hook starts, in the order it starts them, on a clock
+// faked so a test says when each slice lands.
+function watchWorkers(): readonly Watched[] {
+  const started: Watched[] = [];
+  vi.stubGlobal(
+    "Worker",
+    vi.fn(function start() {
+      const worker = new Watched();
+      started.push(worker);
+      return worker;
+    }),
+  );
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+  return started;
+}
+
 describe("useFutures", () => {
-  // Each look at the clock moves it 5 ms on, so a future takes 5 ms and
-  // a slice draws one or two, stopping before one would end past it, and
-  // the screen is handed what has been drawn once 200 ms have passed,
-  // well before the run is done.
-  it("draws the plan's futures a slice at a time, handing them over as they come in, and says when it has drawn them all", () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    let clock = 0;
-    vi.spyOn(performance, "now").mockImplementation(() => (clock += 5));
-    const run = { count: 60, plan, spread };
+  // 24 futures are three slices, the last of four: the two workers are
+  // handed the first
+  // two, and the first back is handed the third while the other, with
+  // nothing left to hand it, is let go. The first two land together at
+  // 150 ms and are handed over together at 200, so the screen never
+  // shows the count between them; the third lands at 300 and finishes
+  // the run, which is handed over at once.
+  it("draws the plan's futures on two workers a slice at a time, handing over what has landed every 200 ms and the whole run once it is drawn", () => {
+    const started = watchWorkers();
+    const run = { count: 24, plan, spread };
     const { result } = renderHook(() => useFutures(accounts, schedule, run));
 
     expect(result.current).toStrictEqual({ futures: [], isDone: false });
+    expect(started.map(({ handed }) => handed)).toStrictEqual([[0], [10]]);
     act(() => {
-      vi.advanceTimersToNextTimer();
+      vi.advanceTimersByTime(took);
     });
-    expect(result.current.futures).toStrictEqual([]);
-    while (result.current.futures.length === 0) {
-      act(() => {
-        vi.advanceTimersToNextTimer();
-      });
-    }
-    expect(result.current.isDone).toBe(false);
-    expect(result.current.futures.length).toBeLessThan(60);
+    expect(started.map(({ handed }) => handed)).toStrictEqual([[0, 20], [10]]);
+    expect(result.current).toStrictEqual({ futures: [], isDone: false });
     act(() => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(200 - took);
     });
     expect(result.current).toStrictEqual({
-      futures: futuresOf(accounts, schedule, run).take(60).toArray(),
+      futures: futuresOf(accounts, schedule, run).take(20).toArray(),
+      isDone: false,
+    });
+    act(() => {
+      vi.advanceTimersByTime(took);
+    });
+
+    expect(result.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, run).take(24).toArray(),
       isDone: true,
     });
+    for (const worker of started) {
+      expect(worker.terminate).toHaveBeenCalled();
+    }
   });
 
-  it("drops what was drawn for a plan changed part way, and draws the new one's", async () => {
+  // The old plan's third slice is still on its way when the plan
+  // changes, and lands on a handler taken off.
+  it("drops what was drawn for a plan changed part way, hearing nothing more from its workers, and draws the new one's", () => {
+    const started = watchWorkers();
     const changed = { ...plan, rate: 0.08 };
     const { rerender, result } = renderHook(
       ({ drawnFor }) =>
-        useFutures(accounts, schedule, { count: 25, plan: drawnFor, spread }),
+        useFutures(accounts, schedule, { count: 30, plan: drawnFor, spread }),
       { initialProps: { drawnFor: plan } },
     );
-    await waitFor(() => {
-      expect(result.current.isDone).toBe(true);
+    act(() => {
+      vi.advanceTimersByTime(took);
     });
 
     rerender({ drawnFor: changed });
 
     expect(result.current).toStrictEqual({ futures: [], isDone: false });
-    await waitFor(() => {
-      expect(result.current.isDone).toBe(true);
+    expect(started).toHaveLength(4);
+    for (const worker of started.slice(0, 2)) {
+      expect(worker.terminate).toHaveBeenCalled();
+      expect(worker.onmessage).toBeNull();
+    }
+    act(() => {
+      vi.runAllTimers();
     });
-    expect(result.current.futures).toStrictEqual(
-      futuresOf(accounts, schedule, { plan: changed, spread })
-        .take(25)
+    expect(result.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, { plan: changed, spread })
+        .take(30)
         .toArray(),
-    );
+      isDone: true,
+    });
   });
 
   // Next hides a route navigated away from rather than taking it down,
   // which clears its effects and runs them again when it is shown; a run
   // done before it was hidden is still done, with nothing left to draw.
-  it("is still done when the screen is hidden and shown again, drawing nothing more", () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  it("is still done when the screen is hidden and shown again, starting no worker", () => {
+    const started = watchWorkers();
     const mode = { current: "visible" as "hidden" | "visible" };
-    const run = { count: 25, plan, spread };
+    const run = { count: 5, plan, spread };
     const { rerender, result } = renderHook(
       () => useFutures(accounts, schedule, run),
       {
@@ -120,21 +171,19 @@ describe("useFutures", () => {
     mode.current = "visible";
     rerender();
 
-    expect(vi.getTimerCount()).toBe(0);
-    expect(result.current.futures).toHaveLength(25);
+    expect(started).toHaveLength(1);
+    expect(result.current.futures).toHaveLength(5);
     expect(result.current.isDone).toBe(true);
   });
 
-  // Hidden part way, once two lots have been handed over, the run
-  // carries on from where it stood when shown again, so the next lot
-  // handed over holds more rather than starting over, and it ends on the
-  // same futures.
-  it("carries a run hidden part way on from where it stood when shown again", () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    let clock = 0;
-    vi.spyOn(performance, "now").mockImplementation(() => (clock += 5));
+  // Hidden once the first two of three slices are back, the third still
+  // on its way: shown again, the run carries on from the slices it has,
+  // handing the third out again rather than starting over, and it ends
+  // on the same futures.
+  it("carries a run hidden part way on from the slices it has when shown again", () => {
+    const started = watchWorkers();
     const mode = { current: "visible" as "hidden" | "visible" };
-    const run = { count: 60, plan, spread };
+    const run = { count: 30, plan, spread };
     const { rerender, result } = renderHook(
       () => useFutures(accounts, schedule, run),
       {
@@ -143,55 +192,51 @@ describe("useFutures", () => {
         ),
       },
     );
-    for (const handedOver of [0, 1]) {
-      const was = result.current.futures.length;
-      while (result.current.futures.length === was) {
-        act(() => {
-          vi.advanceTimersToNextTimer();
-        });
-      }
-      expect(result.current.futures.length).toBeGreaterThan(handedOver);
-    }
-    const before = result.current.futures.length;
+    act(() => {
+      vi.advanceTimersByTime(took);
+    });
 
     mode.current = "hidden";
     rerender();
     mode.current = "visible";
     rerender();
-    while (result.current.futures.length === before) {
-      act(() => {
-        vi.advanceTimersToNextTimer();
-      });
-    }
-
-    expect(result.current.futures.length).toBeGreaterThan(before);
     act(() => {
       vi.runAllTimers();
     });
-    expect(result.current.futures).toStrictEqual(
-      futuresOf(accounts, schedule, run).take(60).toArray(),
-    );
+
+    expect(started.map(({ handed }) => handed)).toStrictEqual([
+      [0, 20],
+      [10],
+      [20],
+    ]);
+    expect(result.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, run).take(30).toArray(),
+      isDone: true,
+    });
   });
 
-  it("stops the run when the screen is taken down", () => {
-    const stopped = vi.spyOn(globalThis, "clearTimeout");
+  it("stops the workers when the screen is taken down", () => {
+    const started = watchWorkers();
     const { unmount } = renderHook(() =>
-      useFutures(accounts, schedule, { count: 25, plan, spread }),
+      useFutures(accounts, schedule, { count: 20, plan, spread }),
     );
 
     unmount();
 
-    expect(stopped).toHaveBeenCalled();
+    expect(started).toHaveLength(2);
+    for (const worker of started) {
+      expect(worker.terminate).toHaveBeenCalled();
+      expect(worker.onmessage).toBeNull();
+    }
   });
 
-  it("is done at once with nothing to draw", async () => {
+  it("is done at once with nothing to draw, starting no worker", () => {
+    const started = watchWorkers();
     const { result } = renderHook(() =>
       useFutures(accounts, schedule, { count: 0, plan, spread }),
     );
 
     expect(result.current).toStrictEqual({ futures: [], isDone: true });
-    await waitFor(() => {
-      expect(result.current.futures).toStrictEqual([]);
-    });
+    expect(started).toHaveLength(0);
   });
 });

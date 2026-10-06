@@ -1,10 +1,11 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 import type { Schedule } from "@/engine/cash-flow";
 
 import { expenseLines } from "@/data/expenses.fixture";
+import { FuturesWorker } from "@/test/futures-worker";
 
 import { ChanceBoard } from "./chance-board";
 
@@ -49,6 +50,11 @@ function spending(amount: number): Schedule {
 }
 
 describe("ChanceBoard", () => {
+  // jsdom has no Worker, and the chance of success draws its futures on two.
+  beforeEach(() => {
+    vi.stubGlobal("Worker", FuturesWorker);
+  });
+
   it("says there is nothing to draw the futures at while the plan has no spread", () => {
     render(
       <ChanceBoard
