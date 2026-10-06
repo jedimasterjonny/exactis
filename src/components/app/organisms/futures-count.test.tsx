@@ -48,7 +48,7 @@ describe("FuturesCount", () => {
 
     const card = screen.getByRole("region", { name: "How many futures last" });
     const panel = within(card).getByRole("region", {
-      name: "Against the plan as projected",
+      name: "Net worth against the plan as projected",
     });
 
     expect(within(card).getByText("Sect. II.i")).toHaveClass("label");
