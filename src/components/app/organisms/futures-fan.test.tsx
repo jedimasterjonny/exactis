@@ -23,7 +23,6 @@ const plan = {
 const futures = Array.from({ length: 10 }, (_, nth): Future => ({
   fell: [2027, 2028][nth] ?? null,
   ranOut: [2027, 2028][nth] ?? null,
-  savings: [],
   worth: [1000 * nth, 2000 * nth, 3000 * nth],
 }));
 

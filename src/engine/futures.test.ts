@@ -153,7 +153,6 @@ describe("futuresOf", () => {
       Array.from({ length: 3 }, () => ({
         fell: 2028,
         ranOut: 2028,
-        savings: [30000, 18000, 6000, 0, 0, 0],
         worth: [430000, 418000, 406000, 400000, 400000, 400000],
       })),
     );
@@ -177,7 +176,7 @@ describe("futuresOf", () => {
 
     expect(taken([isa], run, 3)).toStrictEqual(first);
     expect(taken([isa], run, 1)).toStrictEqual(first.slice(0, 1));
-    expect(new Set(first.map(({ savings }) => savings[2])).size).toBe(3);
+    expect(new Set(first.map(({ worth }) => worth[2])).size).toBe(3);
   });
 
   it("draws from any place in the run the futures the run holds there", () => {
@@ -230,7 +229,6 @@ describe("gradingOf", () => {
   const projected: Future = {
     fell: null,
     ranOut: null,
-    savings: [],
     worth: [
       50000, 60000, 70000, 80000, 100000, 90000, 80000, 70000, 60000, 50000,
       40000,
@@ -315,11 +313,11 @@ describe("outcomesOf", () => {
   };
 
   function lasting(left: number): Future {
-    return { fell: null, ranOut: null, savings: [], worth: [0, left] };
+    return { fell: null, ranOut: null, worth: [0, left] };
   }
 
   function short(fell: number, ranOut: null | number = fell): Future {
-    return { fell, ranOut, savings: [], worth: [0, 0] };
+    return { fell, ranOut, worth: [0, 0] };
   }
 
   // More than £300,000 is a large surplus, £300,000 itself and down to
@@ -362,14 +360,13 @@ describe("outcomesOf", () => {
 
 describe("readingOf", () => {
   // A future falling short in the year given, running out in the year
-  // given, and worth what is given entering the plan's last year, which
-  // is read off its worth rather than the savings it holds.
+  // given, and worth what is given entering the plan's last year.
   function future(
     fell: null | number,
     ranOut: null | number,
     end: number,
   ): Future {
-    return { fell, ranOut, savings: [100000, 0], worth: [100000, end] };
+    return { fell, ranOut, worth: [100000, end] };
   }
 
   // Ten futures: seven last; one runs out in 2060, one draws a pension
@@ -414,7 +411,6 @@ describe("readingOf", () => {
     const lasting = Array.from({ length: 1000 }, (): Future => ({
       fell: null,
       ranOut: null,
-      savings: [1],
       worth: [1],
     }));
 
@@ -433,9 +429,7 @@ describe("readingOf", () => {
       ranOut: 0,
       run: 0,
     });
-    expect(
-      readingOf([{ fell: null, ranOut: null, savings: [], worth: [] }]).middle,
-    ).toBe(0);
+    expect(readingOf([{ fell: null, ranOut: null, worth: [] }]).middle).toBe(0);
   });
 });
 
@@ -452,7 +446,6 @@ describe("yearsIn", () => {
     const futures = Array.from({ length: 10 }, (_, nth): Future => ({
       fell: [2027, 2028, 2027][nth] ?? null,
       ranOut: [2027, 2028][nth] ?? null,
-      savings: [],
       worth: [1000 * nth, 2000 * nth, 3000 * nth],
     }));
 
@@ -496,7 +489,7 @@ describe("yearsIn", () => {
       [2028, 0],
     ]);
     expect(
-      yearsIn([{ fell: null, ranOut: null, savings: [], worth: [] }], span).map(
+      yearsIn([{ fell: null, ranOut: null, worth: [] }], span).map(
         ({ middle }) => middle,
       ),
     ).toStrictEqual([0, 0, 0]);
