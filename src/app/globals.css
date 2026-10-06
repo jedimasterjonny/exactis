@@ -91,7 +91,7 @@
   --chart-4: #cfcbbf;
   --chart-5: #c10007; /* debt follows loss red, no longer oxide */
   --radius: 0.5rem; /* controls on the lg step at 8px; the card takes xl, about 11px */
-  /* Ink sidebar, identical in both themes */
+  /* Ink sidebar, identical in both themes, so the dark scope leaves it be */
   --sidebar: #151716;
   --sidebar-foreground: #fafaf8;
   --sidebar-primary: #ac5348; /* oxide-400: active rail, 3.5:1 on ink */
@@ -132,14 +132,6 @@
   --chart-3: #d3a557;
   --chart-4: #8a867b;
   --chart-5: #ffa2a2;
-  --sidebar: #151716;
-  --sidebar-foreground: #fafaf8;
-  --sidebar-primary: #ac5348;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgb(255 255 255 / 6%);
-  --sidebar-accent-foreground: #fafaf8;
-  --sidebar-border: rgb(255 255 255 / 8%);
-  --sidebar-ring: #fafaf8;
   --brand: #d18a7f; /* oxide-300 */
   --brand-foreground: #151716;
   --positive: #8fcfaf;
