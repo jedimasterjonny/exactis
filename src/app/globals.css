@@ -65,6 +65,15 @@
 }
 
 :root {
+  /* The shades a token borrows from the other theme, named once: the
+     inverse tile takes the dark theme's on paper and the light theme's on
+     ink, and a shade written in both places could be changed in one */
+  --grey-300: #b8bdb8;
+  --grey-500: #6b716d;
+  --jade-300: #8fcfaf;
+  --jade-500: #1f6b4f;
+  --red-300: #ffa2a2;
+  --red-700: #c10007;
   /* Exactis greys: cool with a faint warm cast in the paper tints */
   --background: #fafaf8; /* grey-25 paper */
   --foreground: #232624; /* grey-800 ink */
@@ -77,10 +86,11 @@
   --secondary: #f4f5f3; /* grey-50 sunken */
   --secondary-foreground: #232624;
   --muted: #f4f5f3;
-  --muted-foreground: #6b716d; /* grey-500 */
+  --muted-foreground: var(--grey-500);
   --accent: #f4f5f3;
   --accent-foreground: #232624;
-  --destructive: #c10007; /* red-700: losses and destructive actions. 6.1:1 on paper */
+  /* Losses and destructive actions. 6.1:1 on paper */
+  --destructive: var(--red-700);
   --border: #e8eae6; /* grey-100 hairline */
   --input: #d6d9d4; /* grey-200 control border */
   --ring: #151716; /* grey-900 focus ink */
@@ -89,7 +99,7 @@
   --chart-2: #3f7e6f;
   --chart-3: #b08540;
   --chart-4: #cfcbbf;
-  --chart-5: #c10007; /* debt follows loss red, no longer oxide */
+  --chart-5: var(--red-700); /* debt follows loss red, no longer oxide */
   --radius: 0.5rem; /* controls on the lg step at 8px; the card takes xl, about 11px */
   /* Ink sidebar, identical in both themes, so the dark scope leaves it be */
   --sidebar: #151716;
@@ -103,7 +113,8 @@
   /* Exactis additions */
   --brand: #8c2f27; /* oxide-500: wordmark dot, active tab, milestone markers */
   --brand-foreground: #ffffff;
-  --positive: #1f6b4f; /* jade-500: gains, funded. 6.1:1 on paper, equal to loss */
+  /* Gains, funded. 6.1:1 on paper, equal to loss */
+  --positive: var(--jade-500);
   --caution: #8e6116; /* ochre-600: stale data, changed assumptions */
 }
 
@@ -119,10 +130,11 @@
   --secondary: #363a37; /* grey-700 */
   --secondary-foreground: #e8eae6;
   --muted: #363a37;
-  --muted-foreground: #b8bdb8; /* grey-300: grey-400 fails AA on the muted surface */
+  /* grey-400 fails AA on the muted surface */
+  --muted-foreground: var(--grey-300);
   --accent: #363a37;
   --accent-foreground: #e8eae6;
-  --destructive: #ffa2a2; /* red-300: red-400 fails AA on the muted surface */
+  --destructive: var(--red-300); /* red-400 fails AA on the muted surface */
   --border: rgb(255 255 255 / 8%);
   --input: rgb(255 255 255 / 14%);
   --ring: #fafaf8;
@@ -131,10 +143,10 @@
   --chart-2: #43897a;
   --chart-3: #d3a557;
   --chart-4: #8a867b;
-  --chart-5: #ffa2a2;
+  --chart-5: var(--red-300);
   --brand: #d18a7f; /* oxide-300 */
   --brand-foreground: #151716;
-  --positive: #8fcfaf;
+  --positive: var(--jade-300);
   --caution: #d3a557; /* ochre-300: ochre-100 is indistinguishable from foreground */
 }
 
@@ -145,15 +157,15 @@
 [data-tone="inverse"] {
   --card: var(--primary);
   --card-foreground: var(--primary-foreground);
-  --muted-foreground: #b8bdb8;
-  --positive: #8fcfaf;
-  --destructive: #ffa2a2;
+  --muted-foreground: var(--grey-300);
+  --positive: var(--jade-300);
+  --destructive: var(--red-300);
 }
 
 .dark [data-tone="inverse"] {
-  --muted-foreground: #6b716d;
-  --positive: #1f6b4f;
-  --destructive: #c10007;
+  --muted-foreground: var(--grey-500);
+  --positive: var(--jade-500);
+  --destructive: var(--red-700);
 }
 
 @layer base {
