@@ -16,6 +16,7 @@ import type { ProjectionPoint } from "@/engine/projection";
 import { MilestoneChips } from "@/components/app/atoms/milestone-chips";
 import { RowAction } from "@/components/app/atoms/row-action";
 import { SpanRuler } from "@/components/app/atoms/span-ruler";
+import { YearAge } from "@/components/app/atoms/year-age";
 import { YearStrip } from "@/components/app/atoms/year-strip";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import {
@@ -155,12 +156,11 @@ export function CashFlowCard({
               </span>
               <span className="text-xs text-muted-foreground">{net.name}</span>
             </span>
-            <span className="grid gap-0.5 self-center text-right">
-              <span className="figure">{year}</span>
-              <span className="label text-muted-foreground/60">
-                {`Age ${String(ageIn(year, plan))}`}
-              </span>
-            </span>
+            <YearAge
+              age={`Age ${String(ageIn(year, plan))}`}
+              className="self-center"
+              year={year}
+            />
           </span>
         </div>
         {markers.length > 0 && (
