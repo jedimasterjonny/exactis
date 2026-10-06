@@ -24,6 +24,7 @@ const futures = Array.from({ length: 10 }, (_, nth): Future => ({
   fell: [2027, 2028][nth] ?? null,
   ranOut: null,
   savings: [1000 * nth, 2000 * nth, 3000 * nth],
+  worth: [1000 * nth, 2000 * nth, 3000 * nth],
 }));
 
 // The plan at its own rates, holding £500, £600 and £700.
@@ -31,6 +32,7 @@ const projected: Future = {
   fell: null,
   ranOut: null,
   savings: [500, 600, 700],
+  worth: [500, 600, 700],
 };
 
 const milestones = [

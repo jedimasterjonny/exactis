@@ -133,7 +133,8 @@ describe("futuresOf", () => {
   }
 
   // £30,000 drawn £12,000 a year holds £18,000 entering 2027 and £6,000
-  // entering 2028, which runs out that year; the home is no saving.
+  // entering 2028, which runs out that year; the home is no saving, but
+  // it is worth £400,000 throughout.
   it("runs every future as the plan at its rates where nothing strays", () => {
     const futures = taken(
       [isa, home],
@@ -146,6 +147,7 @@ describe("futuresOf", () => {
         fell: 2028,
         ranOut: 2028,
         savings: [30000, 18000, 6000, 0, 0, 0],
+        worth: [430000, 418000, 406000, 400000, 400000, 400000],
       })),
     );
   });
@@ -210,7 +212,7 @@ describe("readingOf", () => {
     ranOut: null | number,
     end: number,
   ): Future {
-    return { fell, ranOut, savings: [100000, end] };
+    return { fell, ranOut, savings: [100000, end], worth: [100000, end] };
   }
 
   // Ten futures: seven last; one runs out in 2060, one draws a pension
@@ -257,6 +259,7 @@ describe("readingOf", () => {
       fell: null,
       ranOut: null,
       savings: [1],
+      worth: [1],
     }));
 
     expect(readingOf(lasting).margin).toBeCloseTo(0.0019134, 6);
@@ -275,9 +278,9 @@ describe("readingOf", () => {
       run: 0,
       tenthFell: null,
     });
-    expect(readingOf([{ fell: null, ranOut: null, savings: [] }]).middle).toBe(
-      0,
-    );
+    expect(
+      readingOf([{ fell: null, ranOut: null, savings: [], worth: [] }]).middle,
+    ).toBe(0);
   });
 });
 
@@ -294,6 +297,7 @@ describe("yearsIn", () => {
       fell: [2027, 2028][nth] ?? null,
       ranOut: null,
       savings: [1000 * nth, 2000 * nth, 3000 * nth],
+      worth: [1000 * nth, 2000 * nth, 3000 * nth],
     }));
 
     expect(yearsIn(futures, span)).toStrictEqual([
@@ -333,7 +337,8 @@ describe("yearsIn", () => {
       [2028, 0],
     ]);
     expect(
-      yearIn([{ fell: null, ranOut: null, savings: [] }], span, 2027).middle,
+      yearIn([{ fell: null, ranOut: null, savings: [], worth: [] }], span, 2027)
+        .middle,
     ).toBe(0);
   });
 });
