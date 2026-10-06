@@ -26,8 +26,9 @@ interface FuturesCountProps {
 // the chance. Each step says what it counts, the ran out when the first
 // did and by when half of them had, and the early draws what the chance
 // would be counted as lasting, so the judgement that they fail shows.
-// Beside it, what the middle future holds at the plan's end against what
-// the plan holds there at its own rates, as the dashboard projects it.
+// Beside it, what the middle future is worth at the plan's end against
+// what the plan is worth there at its own rates, as the dashboard
+// projects it.
 // Beneath, how far the run alone may have the chance wrong. While the
 // run is coming in the ledger counts the futures drawn so far, and
 // says so, and before the first are drawn it says that much.
@@ -103,10 +104,10 @@ export function FuturesCount({
   );
 }
 
-// What the middle future holds at the plan's end beside what the plan
-// holds there at its own rates, which the middle future grows at, so
-// the two sit close and what the one projection cannot show is the
-// spread either side.
+// What the middle future is worth at the plan's end beside what the
+// plan is worth there at its own rates, which the middle future grows
+// at, so the two sit close and what the one projection cannot show is
+// the spread either side.
 function AgainstProjection({
   age,
   middle,
@@ -123,7 +124,7 @@ function AgainstProjection({
       className="grid gap-4 self-start rounded-lg bg-muted p-5"
     >
       <h3 className="label text-muted-foreground" id={id}>
-        Against the plan as projected
+        Net worth against the plan as projected
       </h3>
       <dl className="grid gap-3">
         <div className="flex justify-between gap-4">

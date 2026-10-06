@@ -363,13 +363,14 @@ describe("outcomesOf", () => {
 
 describe("readingOf", () => {
   // A future falling short in the year given, running out in the year
-  // given, and holding what is given entering the plan's last year.
+  // given, and worth what is given entering the plan's last year, which
+  // is read off its worth rather than the savings it holds.
   function future(
     fell: null | number,
     ranOut: null | number,
     end: number,
   ): Future {
-    return { fell, ranOut, savings: [100000, end], worth: [100000, end] };
+    return { fell, ranOut, savings: [100000, 0], worth: [100000, end] };
   }
 
   // Ten futures: seven last; one runs out in 2060, one draws a pension

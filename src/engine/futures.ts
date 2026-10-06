@@ -55,9 +55,9 @@ export type Outcome =
 // run; the share that lasted, which is the chance, and how far the run
 // alone may have it wrong, the half-width of the range 19 runs in 20
 // would put it in, never nothing; the year the first ran out and the year by which
-// half of those had, none where none did; and what the middle future's
-// savings hold entering the plan's last year, half holding less and half
-// more, a future run out holding nothing.
+// half of those had, none where none did; and what the middle future is
+// worth entering the plan's last year, its net worth, half worth less and
+// half more.
 export interface Reading {
   readonly chance: number;
   readonly early: number;
@@ -279,7 +279,7 @@ export function readingOf(futures: readonly Future[]): Reading {
     lasted,
     margin: run === 0 ? 0 : wilsonOf(chance, run),
     middle:
-      sorted(futures.map(({ savings }) => savings.at(-1) ?? 0))[
+      sorted(futures.map(({ worth }) => worth.at(-1) ?? 0))[
         Math.floor(run / 2)
       ] ?? 0,
     ranOut: ranOutIn.length,
