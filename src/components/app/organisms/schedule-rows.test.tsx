@@ -314,7 +314,7 @@ describe("ScheduleRows", () => {
 
     expect(locks).toHaveLength(2);
     for (const lock of locks) {
-      expect(lock).toHaveClass("text-muted-foreground/60");
+      expect(lock).toHaveClass("text-muted-foreground");
     }
     expect(
       screen.queryByRole("button", { name: "State pension" }),
