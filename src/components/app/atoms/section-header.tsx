@@ -1,7 +1,9 @@
-import type { JSX, ReactNode } from "react";
+import type { JSX } from "react";
+
+import type { Slot } from "@/lib/slot";
 
 interface SectionHeaderProps {
-  readonly actions?: ReactNode;
+  readonly actions?: Slot;
   readonly children?: string | undefined;
   readonly id?: string;
   readonly label: string;
