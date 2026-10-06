@@ -14,6 +14,7 @@ import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { RowLock } from "@/components/app/atoms/row-lock";
 import { RowOpener } from "@/components/app/atoms/row-opener";
 import { SpanBar } from "@/components/app/atoms/span-bar";
+import { YearAge } from "@/components/app/atoms/year-age";
 import { Badge } from "@/components/kit/badge";
 import { yearsOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
@@ -216,10 +217,11 @@ export function ScheduleRows<TLine extends Line>({
                 {row.growth}
               </span>
             </div>
-            <div className="grid gap-0.5 text-right folded:hidden">
-              <span className="figure">{row.years}</span>
-              <span className="label text-muted-foreground/60">{row.ages}</span>
-            </div>
+            <YearAge
+              age={row.ages}
+              className="folded:hidden"
+              year={row.years}
+            />
             <span className="inline-flex size-7 items-center justify-center folded:hidden">
               {held === undefined ? (
                 <ChevronRight
