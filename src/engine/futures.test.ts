@@ -9,7 +9,15 @@ import { normalsFrom } from "@/lib/random";
 
 import type { Future } from "./futures";
 
-import { futuresOf, pathOf, readingOf, yearIn, yearsIn } from "./futures";
+import {
+  futuresOf,
+  gradingOf,
+  outcomesOf,
+  pathOf,
+  readingOf,
+  yearIn,
+  yearsIn,
+} from "./futures";
 
 // A plan at 7% and 3% over the years these tests draw.
 const plan = { inflation: 0.03, rate: 0.07, years: 40 };
@@ -201,6 +209,155 @@ describe("futuresOf", () => {
     ).toBe(true);
     expect(lasted).toBeGreaterThan(0);
     expect(lasted).toBeLessThan(40);
+  });
+});
+
+describe("gradingOf", () => {
+  // Born in 1970 and retiring at 60, in 2030, the fifth of the plan's
+  // years; the plan ends in 2036, so retirement runs six years, its two
+  // fifths to 2032.4 and its four to 2034.8.
+  const plan = {
+    born: 1970,
+    from: 2026,
+    inflation: 0,
+    month: 0,
+    rate: 0,
+    retires: 60,
+    years: 10,
+  };
+
+  // The plan at its own rates, worth £100,000 as its owner retires and
+  // less either side of it.
+  const projected: Future = {
+    fell: null,
+    ranOut: null,
+    savings: [],
+    worth: [
+      50000, 60000, 70000, 80000, 100000, 90000, 80000, 70000, 60000, 50000,
+      40000,
+    ],
+  };
+
+  // Over fifteen years of retirement the fifths land on whole years, six
+  // and twelve in, which fifths taken in fractions of a year would
+  // round a year late.
+  it("draws the lines at the plan's worth as its owner retires and at fifths of retirement", () => {
+    expect(gradingOf(projected, plan)).toStrictEqual({
+      almost: 2035,
+      comfortable: 50000,
+      middle: 2033,
+      surplus: 300000,
+    });
+    expect(gradingOf(projected, { ...plan, years: 19 })).toMatchObject({
+      almost: 2042,
+      middle: 2036,
+    });
+  });
+
+  // Retiring at 80 is past the plan's end, so its own ten years are
+  // divided, two fifths in by 2030 and four by 2034, and its worth read
+  // at its last year, £40,000. Retiring in 2010 is before its start, so
+  // retirement counts from 2026, with the same fifths, and its worth is
+  // read at its first year, £50,000.
+  it("divides the plan's own years where it ends before retiring, and counts a retirement begun from its start", () => {
+    expect(gradingOf(projected, { ...plan, retires: 80 })).toStrictEqual({
+      almost: 2034,
+      comfortable: 20000,
+      middle: 2030,
+      surplus: 120000,
+    });
+    expect(gradingOf(projected, { ...plan, born: 1950 })).toStrictEqual({
+      almost: 2034,
+      comfortable: 25000,
+      middle: 2030,
+      surplus: 150000,
+    });
+  });
+
+  // Owing £100,000 at retirement, the plan is graded against the £50,000
+  // it is worth today; worth nothing at retirement and owing today, it is
+  // graded against nothing rather than the debt, so the lines meet
+  // rather than cross.
+  it("grades against today's worth where the plan is worth nothing at retirement, and never against less than nothing", () => {
+    const owing = (today: number, retiring: number): Future => ({
+      ...projected,
+      worth: projected.worth.map((each, year) => {
+        if (year === 0) {
+          return today;
+        }
+        return year === 4 ? retiring : each;
+      }),
+    });
+
+    expect(gradingOf(owing(50000, -100000), plan)).toMatchObject({
+      comfortable: 25000,
+      surplus: 150000,
+    });
+    expect(gradingOf(owing(-10000, 0), plan)).toMatchObject({
+      comfortable: 0,
+      surplus: 0,
+    });
+  });
+
+  it("reads a plan holding no years as worth nothing", () => {
+    expect(gradingOf({ ...projected, worth: [] }, plan)).toMatchObject({
+      comfortable: 0,
+      surplus: 0,
+    });
+  });
+});
+
+describe("outcomesOf", () => {
+  const grading = {
+    almost: 2035,
+    comfortable: 50000,
+    middle: 2033,
+    surplus: 300000,
+  };
+
+  function lasting(left: number): Future {
+    return { fell: null, ranOut: null, savings: [], worth: [0, left] };
+  }
+
+  function short(fell: number, ranOut: null | number = fell): Future {
+    return { fell, ranOut, savings: [], worth: [0, 0] };
+  }
+
+  // More than £300,000 is a large surplus, £300,000 itself and down to
+  // £50,000 comfortable, and under that barely. 2035 and on almost made
+  // it, 2033 and 2034 the middle, and before that early. Drawing a
+  // pension early in 2035 is graded as falling short then.
+  it("grades what lasted by what it leaves and what fell short by when", () => {
+    expect(
+      outcomesOf(
+        [
+          lasting(300001),
+          lasting(300000),
+          lasting(50000),
+          lasting(49999),
+          short(2035),
+          short(2035, null),
+          short(2034),
+          short(2033),
+          short(2032),
+          short(2028),
+        ],
+        grading,
+      ),
+    ).toStrictEqual({
+      almost: 2,
+      barely: 1,
+      comfortable: 2,
+      early: 2,
+      middle: 2,
+      surplus: 1,
+    });
+  });
+
+  it("reads a future holding no years as holding nothing", () => {
+    expect(outcomesOf([{ ...lasting(0), worth: [] }], grading)).toMatchObject({
+      barely: 1,
+    });
   });
 });
 

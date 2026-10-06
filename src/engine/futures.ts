@@ -4,6 +4,7 @@ import type { Schedule } from "@/engine/cash-flow";
 import type { ProjectionPoint } from "@/engine/projection";
 
 import { takesSpare } from "@/data/accounts";
+import { endYear, retirementYear } from "@/data/plan";
 import { balanceIn, project } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
@@ -66,6 +67,11 @@ export interface Reading {
   readonly tenthFell: null | number;
 }
 
+// What a future comes to, as the chance of success grades a run: one
+// that lasted by what it leaves, one that fell short by when.
+type Outcome =
+  "almost" | "barely" | "comfortable" | "early" | "middle" | "surplus";
+
 // How many futures a run draws: enough to pin the chance to within two
 // points either way, and few enough that the run is a matter of
 // seconds. The screen and the dashboard's tile draw the same run, so
@@ -80,6 +86,18 @@ const seed = 2026;
 // golden ratio's share of 2^32, which spreads the futures' seeds as far
 // from each other as any step can.
 const step = 0x9e3779b9;
+
+// The lines a run of futures is graded on, as gradingOf draws them for
+// a plan: the year from which a future falling short has reached the
+// middle of retirement and the year from which it almost made it, and
+// the pounds from which a future lasting is comfortable and over which
+// it leaves a large surplus.
+interface Grading {
+  readonly almost: number;
+  readonly comfortable: number;
+  readonly middle: number;
+  readonly surplus: number;
+}
 
 // A projection read as a future, over the accounts it was run over: the
 // year it first fell short, by running out or by drawing a pension
@@ -127,6 +145,83 @@ export function* futuresOf(
     const path = pathOf(plan, spread, normalsFrom(seed + future * step));
     yield futureOf(project(accounts, schedule, { ...plan, path }), accounts);
   }
+}
+
+// The lines a plan's futures are graded on. A future that lasted is
+// graded by what the plan is worth at its end against what the plan at
+// its own rates is worth as its owner retires: more than three times
+// that a large surplus, half to three times comfortable, and less than
+// half barely made it. One yardstick for every future rather than each
+// future's own worth at retirement, so a future that leaves more is
+// never graded below one that leaves less, and each grade is a span of
+// pounds. A plan worth nothing at retirement, or less, gives no scale to
+// grade by, three times nothing calling a future that leaves a pound a
+// large surplus and three times a debt crossing the lines, so it is
+// graded against what it is worth today, and never against less than
+// nothing. A future that fell short is graded by how far into the
+// plan's retirement it got first: in the last fifth almost made it, in
+// the two fifths before that the middle, and before those early, with
+// every future falling short before retirement. Counted from the plan's
+// start instead, two fifths of a plan opening in its owner's thirties
+// would end in their fifties, before most retire, and early would hold
+// only the bridge to a pension. A retirement already begun counts from
+// the plan's start, where the futures are drawn from, and a plan ending
+// before its owner retires has no retirement to divide, so its own years
+// are divided instead. The fifths are worked out in whole years, so a
+// fifth that lands on a year starts there rather than a rounding step
+// after it. The worth at a retirement outside the plan's years is read
+// at the nearer end of them.
+export function gradingOf(projected: Future, plan: Plan): Grading {
+  const end = endYear(plan);
+  const retired = retirementYear(plan);
+  const opens = retired < end ? Math.max(retired, plan.from) : plan.from;
+  const span = Math.max(1, end - opens);
+  const at = Math.min(
+    Math.max(retired - plan.from, 0),
+    projected.worth.length - 1,
+  );
+  const atRetirement = projected.worth[at] ?? 0;
+  const worth =
+    atRetirement > 0 ? atRetirement : Math.max(0, projected.worth[0] ?? 0);
+  return {
+    almost: opens + Math.ceil((4 * span) / 5),
+    comfortable: worth / 2,
+    middle: opens + Math.ceil((2 * span) / 5),
+    surplus: 3 * worth,
+  };
+}
+
+// A run of futures graded on the lines given, counted. A future kept
+// going only by drawing a pension early is graded by when it first did,
+// as it is counted as falling short then.
+export function outcomesOf(
+  futures: readonly Future[],
+  grading: Grading,
+): Readonly<Record<Outcome, number>> {
+  function outcomeOf({ fell, worth }: Future): Outcome {
+    if (fell === null) {
+      const left = worth.at(-1) ?? 0;
+      if (left > grading.surplus) {
+        return "surplus";
+      }
+      return left >= grading.comfortable ? "comfortable" : "barely";
+    }
+    if (fell >= grading.almost) {
+      return "almost";
+    }
+    return fell >= grading.middle ? "middle" : "early";
+  }
+  const graded = futures.map(outcomeOf);
+  const count = (outcome: Outcome): number =>
+    graded.filter((each) => each === outcome).length;
+  return {
+    almost: count("almost"),
+    barely: count("barely"),
+    comfortable: count("comfortable"),
+    early: count("early"),
+    middle: count("middle"),
+    surplus: count("surplus"),
+  };
 }
 
 // One future of the markets for the plan, a return and an inflation for
