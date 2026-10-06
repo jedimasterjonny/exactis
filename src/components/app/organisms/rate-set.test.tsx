@@ -431,7 +431,7 @@ describe("RateSet", () => {
     fireEvent.click(pull);
 
     await waitFor(() => {
-      expect(pull).toBeDisabled();
+      expect(pull).toHaveAttribute("aria-busy", "true");
     });
 
     answer.resolve(saved(cma));
@@ -442,7 +442,7 @@ describe("RateSet", () => {
       ).toHaveAccessibleDescription("August 2026, data as of 30 Jun 2026");
     });
     await waitFor(() => {
-      expect(pull).toBeEnabled();
+      expect(pull).not.toHaveAttribute("aria-busy");
     });
   });
 

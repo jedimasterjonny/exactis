@@ -25,7 +25,9 @@ correctness.
 `kit/` is ours. A wrapper re-exports exactly the names the app uses, which is
 what keeps upstream churn in the rest from reaching a screen. Most are a single
 line. One becomes a real component when it has something to add: `badge` carries
-the `positive` and `caution` tones this app needs and base-nova does not ship.
+the `positive` and `caution` tones this app needs and base-nova does not ship,
+and `button` spins while its action runs, which `alert-dialog` passes on to its
+confirm.
 
 A customisation that has to survive an update belongs in the wrapper. Putting it
 in the vendored file works until the next refresh silently discards it.

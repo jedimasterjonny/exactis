@@ -155,7 +155,7 @@ describe("TargetAllocation", () => {
       );
     });
     expect(picker).toHaveValue("");
-    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-busy", "true");
 
     answer.resolve(saved({ ...targets, importedOn: "2026-09-15" }));
 
@@ -167,7 +167,7 @@ describe("TargetAllocation", () => {
       );
     });
     await waitFor(() => {
-      expect(button).toBeEnabled();
+      expect(button).not.toHaveAttribute("aria-busy");
     });
   });
 
@@ -227,7 +227,7 @@ describe("TargetAllocation", () => {
 
     expect(mapByName).toHaveBeenCalledOnce();
     await waitFor(() => {
-      expect(map).toBeDisabled();
+      expect(map).toHaveAttribute("aria-busy", "true");
     });
 
     answer.resolve(

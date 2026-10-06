@@ -129,7 +129,7 @@ describe("InflationSource", () => {
 
     expect(pullCurve).toHaveBeenCalledOnce();
     await waitFor(() => {
-      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute("aria-busy", "true");
     });
 
     answer.resolve(saved(pulled));
@@ -144,7 +144,7 @@ describe("InflationSource", () => {
     // The toast lands before the transition ends, so the pull frees a
     // beat after it.
     await waitFor(() => {
-      expect(button).toBeEnabled();
+      expect(button).not.toHaveAttribute("aria-busy");
     });
   });
 

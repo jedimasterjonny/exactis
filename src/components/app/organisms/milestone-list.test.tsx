@@ -221,7 +221,10 @@ describe("MilestoneList", () => {
       name: "Sabbatical",
       year: 2040,
     });
-    expect(within(form).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(within(form).getByRole("button", { name: "Save" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
 
     answer(saved({ id: 3, name: "Sabbatical", year: 2040 }));
 
