@@ -55,6 +55,12 @@
   --color-brand: var(--brand);
   --color-positive: var(--positive);
   --color-caution: var(--caution);
+  --color-outcome-surplus: var(--outcome-surplus);
+  --color-outcome-comfortable: var(--outcome-comfortable);
+  --color-outcome-barely: var(--outcome-barely);
+  --color-outcome-almost: var(--outcome-almost);
+  --color-outcome-middle: var(--outcome-middle);
+  --color-outcome-early: var(--outcome-early);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -116,6 +122,20 @@
   /* Gains, funded. 6.1:1 on paper, equal to loss */
   --positive: var(--jade-500);
   --caution: #8e6116; /* ochre-600: stale data, changed assumptions */
+  /* What the futures come to, two ordinal arms meeting where lasting
+     turns to falling short: jade from a large surplus down to barely made
+     it, red from almost made it down to falling short early, each deepest
+     at its extreme. Each arm passes the dataviz validator's ordinal checks
+     on the card; barely beside almost, where the arms meet, is ΔE 9.8
+     apart under deuteranopia and the nearest pair 15.1 apart to the full
+     eye. The light ends are under 3:1 on the card, so every share is also
+     written beside the meter */
+  --outcome-surplus: #0f4a37;
+  --outcome-comfortable: #2b7d5c;
+  --outcome-barely: #78bea3;
+  --outcome-almost: #e07c55;
+  --outcome-middle: #c23a2e;
+  --outcome-early: #7f1611;
 }
 
 .dark {
@@ -148,6 +168,14 @@
   --brand-foreground: #151716;
   --positive: var(--jade-300);
   --caution: #d3a557; /* ochre-300: ochre-100 is indistinguishable from foreground */
+  /* Lifted for ink with each arm's order kept; ΔE 10.5 where they meet
+     under deuteranopia, 15.7 for the nearest pair */
+  --outcome-surplus: #2b7357;
+  --outcome-comfortable: #5aae8d;
+  --outcome-barely: #b4e6cf;
+  --outcome-almost: #f8ad7c;
+  --outcome-middle: #e55c4a;
+  --outcome-early: #a8302a;
 }
 
 /* The inverse tile sits on the primary surface, ink in light and paper in
