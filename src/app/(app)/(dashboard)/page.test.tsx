@@ -10,6 +10,7 @@ import { blank } from "@/data/household.fixture";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { getHousehold } from "@/store/household";
+import { FuturesWorker } from "@/test/futures-worker";
 
 import Dashboard from "./page";
 
@@ -31,6 +32,8 @@ const household: Household = {
 describe("Dashboard", () => {
   beforeEach(() => {
     vi.mocked(getHousehold).mockResolvedValue(household);
+    // jsdom has no Worker, and the chance of success draws its futures on two.
+    vi.stubGlobal("Worker", FuturesWorker);
   });
 
   it("opens with the dashboard header, titled with the age the plan runs to", async () => {

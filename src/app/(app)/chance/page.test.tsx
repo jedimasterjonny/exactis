@@ -1,10 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { accounts } from "@/data/accounts.fixture";
 import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
 import { getHousehold } from "@/store/household";
+import { FuturesWorker } from "@/test/futures-worker";
 
 import Chance from "./page";
 
@@ -15,6 +16,11 @@ vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
 const { household } = soundKept(blank);
 
 describe("Chance", () => {
+  // jsdom has no Worker, and the chance of success draws its futures on two.
+  beforeEach(() => {
+    vi.stubGlobal("Worker", FuturesWorker);
+  });
+
   it("hands the store's spread to the board, which says why there is nothing to draw", async () => {
     vi.mocked(getHousehold).mockResolvedValue(household);
 
