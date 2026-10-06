@@ -55,10 +55,9 @@ export type Outcome =
 // run; the share that lasted, which is the chance, and how far the run
 // alone may have it wrong, the half-width of the range 19 runs in 20
 // would put it in, never nothing; the year the first ran out and the year by which
-// half of those had, none where none did; the year by which a tenth of
-// the run had fallen short either way, none where fewer did; and what
-// the middle future's savings hold entering the plan's last year, half
-// holding less and half more, a future run out holding nothing.
+// half of those had, none where none did; and what the middle future's
+// savings hold entering the plan's last year, half holding less and half
+// more, a future run out holding nothing.
 export interface Reading {
   readonly chance: number;
   readonly early: number;
@@ -69,7 +68,6 @@ export interface Reading {
   readonly middle: number;
   readonly ranOut: number;
   readonly run: number;
-  readonly tenthFell: null | number;
 }
 
 // How many futures a run draws: enough to pin the chance to within two
@@ -272,7 +270,6 @@ export function readingOf(futures: readonly Future[]): Reading {
   const run = futures.length;
   const lasted = futures.filter(({ fell }) => fell === null).length;
   const ranOutIn = sorted(futures.flatMap(({ ranOut }) => ranOut ?? []));
-  const fellIn = sorted(futures.flatMap(({ fell }) => fell ?? []));
   const chance = lasted / Math.max(run, 1);
   return {
     chance,
@@ -287,7 +284,6 @@ export function readingOf(futures: readonly Future[]): Reading {
       ] ?? 0,
     ranOut: ranOutIn.length,
     run,
-    tenthFell: fellIn[Math.ceil(run / 10) - 1] ?? null,
   };
 }
 
