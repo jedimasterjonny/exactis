@@ -2,15 +2,17 @@ import type { JSX, ReactNode } from "react";
 
 import { useId } from "react";
 
+import type { Slot } from "@/lib/slot";
+
 import { SectionHeader } from "@/components/app/atoms/section-header";
 import { Card, CardHeader } from "@/components/kit/card";
 
 interface SectionCardProps {
-  readonly actions?: ReactNode;
+  readonly actions?: Slot;
   readonly caption?: string;
   readonly children: ReactNode;
   readonly className?: string;
-  readonly controls?: ReactNode;
+  readonly controls?: Slot;
   readonly label: string;
   readonly title: string;
 }

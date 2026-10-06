@@ -142,7 +142,7 @@ export function MoneyFlow({
   return (
     <SectionCard
       actions={
-        savings.length > 1 && (
+        savings.length > 1 ? (
           <Button
             aria-pressed={isReordering}
             onClick={() => {
@@ -154,7 +154,7 @@ export function MoneyFlow({
             {isReordering ? <Check aria-hidden /> : <ArrowUpDown aria-hidden />}
             {isReordering ? "Done" : "Reorder"}
           </Button>
-        )
+        ) : undefined
       }
       caption="Debts are always paid first. Savings are then paid in this order, and drawn on in it one kind at a time."
       label={label}
