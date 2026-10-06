@@ -1,4 +1,6 @@
-import type { JSX, ReactNode } from "react";
+import type { JSX } from "react";
+
+import type { Slot } from "@/lib/slot";
 
 interface ScreenHeaderProps {
   readonly actions?: Slot;
@@ -6,11 +8,6 @@ interface ScreenHeaderProps {
   readonly label: string;
   readonly title: string;
 }
-
-// What a slot takes: anything React draws but what a condition that came
-// out false gives, so a slot filled as cond && <x /> is a type error rather
-// than an empty row under the title or an empty column beside it.
-type Slot = Exclude<ReactNode, boolean | null>;
 
 // The frame every screen opens with: a mono section label, the title in the
 // heading face, and a meta line beneath when the screen has one. Actions sit
