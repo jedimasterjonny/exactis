@@ -16,6 +16,11 @@
       "matchUpdateTypes": ["minor", "patch"]
     },
     {
+      "description": "A lock file refresh lands by itself once every check on it is green. The npm release wait reaches only what package.json names, so bunfig.toml's minimumReleaseAge holds every version the refresh resolves for the same three days. next and the Neon driver are pinned exactly, so a refresh cannot move either.",
+      "automerge": true,
+      "matchUpdateTypes": ["lockFileMaintenance"]
+    },
+    {
       "description": "Reviewed by hand at any update type. Nothing in CI renders a page that reads the store, or reaches the store through the Neon driver rather than PGlite, so a bump to either can pass every gate and still break at runtime.",
       "automerge": false,
       "matchPackageNames": [
