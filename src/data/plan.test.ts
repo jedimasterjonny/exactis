@@ -226,6 +226,42 @@ describe("risenWith", () => {
       12,
     );
   });
+
+  // The years along the path are worked out once a plan and margin, so
+  // a month read late in the plan first, and the plan read again at a
+  // second margin, must each read what a plan asked nothing before does.
+  it("reads the same along a path whatever was read of the plan before, at any margin", () => {
+    const path = { inflation: [0.1, 0.2, 0.3], rate: [0, 0, 0] };
+    const fresh = (): Parameters<typeof risenWith>[1] => ({
+      from: 2026,
+      inflation: 0.02,
+      month: 8,
+      path,
+    });
+    const plan = fresh();
+
+    const late = risenWith(0.01, plan, { month: 3, year: 2028 });
+    const early = risenWith(0.01, plan, { month: 3, year: 2027 });
+    const level = risenWith(0, plan, { month: 3, year: 2028 });
+
+    expect(late).toBe(risenWith(0.01, fresh(), { month: 3, year: 2028 }));
+    expect(early).toBe(risenWith(0.01, fresh(), { month: 3, year: 2027 }));
+    expect(level).toBe(risenWith(0, fresh(), { month: 3, year: 2028 }));
+    expect(level).toBeCloseTo(1.1 ** (4 / 12) * 1.2 * 1.3 ** (3 / 12), 12);
+  });
+
+  // A year before the plan has risen nothing along its path, as it has
+  // risen nothing at the plan's own rates before its first month.
+  it("reads a year before the plan along a path as nothing risen", () => {
+    const plan = {
+      from: 2026,
+      inflation: 0.02,
+      month: 8,
+      path: { inflation: [0.1], rate: [0] },
+    };
+
+    expect(risenWith(0.01, plan, { month: 11, year: 2025 })).toBe(1);
+  });
 });
 
 describe("loggedSpread", () => {
