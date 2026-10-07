@@ -35,7 +35,9 @@ describe("Progress", () => {
     expect(
       screen.getByText("6 month-ends from Mar 2026 to Aug 2026"),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner")).queryByRole("button"),
+    ).not.toBeInTheDocument();
   });
 
   // Six points from March to August 2026, net worth rising from
@@ -108,16 +110,27 @@ describe("Progress", () => {
     expect(
       screen.getByText("1 month-end from Mar 2026 to Mar 2026"),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "What the year came to" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Month by month" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("carries the points table with a row per point", async () => {
+  // The six points fall in 2026, which is open to them, newest first.
+  it("carries the points year by year, the latest year open to a row per point", async () => {
     await renderProgress();
 
-    // The one table not captioned, the year's legends being captioned.
-    const table = screen.getByRole("table", { name: "" });
-    const [, ...rows] = within(table).getAllByRole("row");
+    const years = screen.getByRole("region", { name: "Year by year" });
+    const [, ...rows] = within(within(years).getByRole("table")).getAllByRole(
+      "row",
+    );
 
+    expect(within(years).getByRole("button")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     expect(rows).toHaveLength(points.length);
   });
 
