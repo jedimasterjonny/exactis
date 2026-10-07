@@ -1021,6 +1021,52 @@ describe("cashFlow", () => {
     ).toStrictEqual([kept, sipp]);
   });
 
+  // Against £2,000 of household the £60,000 salary leaves £1,431.78 with
+  // its £600 sacrificed into a pension that is not always funded, which
+  // covers the spending and not the £2,376 the pension that is is
+  // kept paid after it. A month short of what it pays feeds nothing but
+  // a pension always funded, so the sacrifice goes, the salary is earned
+  // whole, and the month is short by what its £1,779.78 leaves of the
+  // £2,376, £596.22, rather than £944.22 with the other pension fed.
+  // With nothing in the cash and the ISAs the pension is paid only the
+  // £1,779.78 the month has, but the sacrifice still goes, rather than
+  // stay and leave the pension £1,431.78.
+  it("gives up an unmarked pension's sacrifice in a month an always funded pension's fixed sum leaves short", () => {
+    const kept: Account = { ...pension, isAlwaysFunded: true };
+    const unmarked: Account = {
+      balance: 0,
+      growth: { kind: "plan" },
+      id: 7,
+      kind: "tax-deferred",
+      name: "SIPP",
+      owner: 1,
+    };
+    const flowOf = (reserve?: number): CashFlow =>
+      cashFlow(
+        [kept, unmarked],
+        {
+          expenses: [{ ...household, amount: 2000 }],
+          income: [{ ...lean, feeds: unmarked.id }],
+        },
+        {
+          at: { month: 0, year: 2026 },
+          plan,
+          ...(reserve !== undefined && { reserve }),
+        },
+      );
+
+    expect(flowOf().fed).toStrictEqual([]);
+    expect(pennies(flowOf().fixed)).toStrictEqual([
+      { account: kept, amount: 2376 },
+    ]);
+    expect(flowOf().left).toBeCloseTo(-596.22, 2);
+    expect(flowOf(0).fed).toStrictEqual([]);
+    expect(pennies(flowOf(0).fixed)).toStrictEqual([
+      { account: kept, amount: 1779.78 },
+    ]);
+    expect(flowOf(0).left).toBe(0);
+  });
+
   // With nothing spent, the month's £2,453.30 pays the mortgage its
   // £2,180 first, then the pension always funded its £2,376 before
   // the ISA listed above it, which is paid nothing, and the month is

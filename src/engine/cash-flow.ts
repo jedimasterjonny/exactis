@@ -114,6 +114,24 @@ export interface Totals {
   readonly saved: number;
 }
 
+// A month fed one way, with or without the sacrifices into the pensions
+// that are not always funded: what the salaries feed, the tax on what is
+// left of them, what the month then has, the purse the payments out of
+// it are held to, and what each pension always funded is paid of its
+// fixed sum, which is the last thing to know before the month can say
+// whether it is short. Fed the other sacrifices too, the month is asked
+// for that sum whole rather than as far as the cash and the ISAs reach,
+// since whether it can afford them is whether it pays that pension in
+// full after them, and a month with nothing in either would otherwise
+// keep them by paying the pension less.
+interface Feeding {
+  readonly fed: readonly Fed[];
+  readonly funded: readonly Paid[];
+  readonly month: number;
+  readonly purse: Purse;
+  readonly taxed: Taxed;
+}
+
 // What the payments out of the month are held to as they are made:
 // what is left of each allowance, in what lands, and what is left of
 // each owner's relief, in what lands with it, which opens at what the
@@ -251,7 +269,7 @@ const nanopound = 1e-9;
 // sacrifice costs the month less than it puts in the pension. It is
 // given up only while what is left of the income after the tax on it
 // still covers the expenses, the debts' payments and what a pension
-// always funded is fed, a month short of them by less than a
+// always funded is fed and paid, a month short of them by less than a
 // nanopound covering them as a month left with that much is left with
 // nothing: what the sacrifices are dropped for and what the month
 // is left with are the one figure, so the two are read against the one
@@ -414,29 +432,35 @@ export function cashFlow(
   const others = feeding.filter(
     ({ account }) => account.isAlwaysFunded !== true,
   );
-  const isSacrificing =
-    others.length > 0 &&
-    leftWith([...(isKeeping ? kept : []), ...others]) >= -nanopound;
-  const fed = feeding.filter(({ account }) =>
-    account.isAlwaysFunded === true ? isKeeping : isSacrificing,
-  );
-  const taxed = taxOn(running, fed, reading);
-  const month = leftWith(fed, taxed);
-  const purse: Purse = {
-    relief: [],
-    reliefs: new Map(),
-    relievable: relievableOn(payOf(running.filter(isEarned), fed, reading)),
-    rooms: new Map(),
-  };
-  for (const entry of fed) {
-    landIn(purse.rooms, entry.account, entry.amount);
-  }
   const saving = own.filter((account) => account.kind !== "debt");
-  const { sums: funded } = fixedSums(
-    saving.filter((account) => account.isAlwaysFunded === true),
-    month - floor,
-    { purse, reading },
-  );
+  const feedingOthers = (isSacrificing: boolean): Feeding => {
+    const fed = feeding.filter(({ account }) =>
+      account.isAlwaysFunded === true ? isKeeping : isSacrificing,
+    );
+    const taxed = taxOn(running, fed, reading);
+    const month = leftWith(fed, taxed);
+    const purse: Purse = {
+      relief: [],
+      reliefs: new Map(),
+      relievable: relievableOn(payOf(running.filter(isEarned), fed, reading)),
+      rooms: new Map(),
+    };
+    for (const entry of fed) {
+      landIn(purse.rooms, entry.account, entry.amount);
+    }
+    const { sums: funded } = fixedSums(
+      saving.filter((account) => account.isAlwaysFunded === true),
+      isSacrificing ? Number.POSITIVE_INFINITY : month - floor,
+      { purse, reading },
+    );
+    return { fed, funded, month, purse, taxed };
+  };
+  const sacrificing = others.length > 0 ? feedingOthers(true) : undefined;
+  const { fed, funded, month, purse, taxed } =
+    sacrificing !== undefined &&
+    sacrificing.month - total(sacrificing.funded) >= -nanopound
+      ? sacrificing
+      : feedingOthers(false);
   const { left: rest, sums: saved } = fixedSums(
     saving.filter((account) => account.isAlwaysFunded !== true),
     month - total(funded),
