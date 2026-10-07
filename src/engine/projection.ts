@@ -3,7 +3,7 @@ import type { Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 import type { CashFlow, Paid, Schedule } from "@/engine/cash-flow";
 
-import { isPension, takesSpare } from "@/data/accounts";
+import { isPension } from "@/data/accounts";
 import { ageIn, pricesIn, rateFrom } from "@/data/plan";
 import { rules } from "@/data/rules";
 import { cashFlow } from "@/engine/cash-flow";
@@ -106,6 +106,12 @@ interface TaxYear {
   readonly taxable: number;
 }
 
+// The kinds a month's shortfall is drawn from, in the order it draws
+// them: cash, then the tax-free wrapper, then the tax-deferred one. The
+// two before the pension are the savings a pension always funded is
+// kept paid out of, as far as they reach.
+const drawOrder: readonly AccountKind[] = ["cash", "tax-free", "tax-deferred"];
+
 // The age the plan's owner may draw a pension at as income, the UK
 // normal minimum pension age: 55, until it rises to 57 on 6 April 2028,
 // taken here from the start of that April. Someone who is 55 or 56 when
@@ -159,32 +165,50 @@ export function isShort(point: ProjectionPoint): boolean {
 // reach by then, to be checked against its statement, and what the
 // months were planned to pay into it, so the rest of the difference is
 // what moved it. A month the income does not cover pays nothing into
-// the savings, and is not drawn on here as the projection would draw on
-// it, since a month end checks the plan against the balances rather
-// than spending them; nor is a tax year settled. No months leave every
+// the savings but a pension always funded, and is not drawn on here as
+// the projection would draw on it, since a month end checks the plan
+// against the balances rather than spending them; but what that pension
+// is kept paid comes out of the cash and the ISAs, as the projection
+// takes it, since paid in and taken from nowhere it would be money the
+// plan never had, and the spending the months fell short of, though not
+// drawn, is counted off what they have to keep it paid, as the
+// projection, having drawn it, counts it, so a month end closed after a
+// long gap stops keeping the pension paid when the projection would;
+// nor is a tax year settled. No months leave every
 // account where it stands, paid nothing.
 export function monthsOn(
   accounts: readonly Account[],
   schedule: Schedule,
   { months, plan }: { readonly months: number; readonly plan: Plan },
 ): readonly MonthsOn[] {
-  let reached = accounts.map((account) => ({
+  let reached: readonly MonthsOn[] = accounts.map((account) => ({
     account,
     balance: account.balance,
     paid: 0,
   }));
+  let unmet = 0;
   for (let offset = 0; offset < months; offset += 1) {
     const month = plan.month + offset;
     const at = { month: month % 12, year: plan.from + Math.floor(month / 12) };
     const flow = cashFlow(accounts, schedule, {
       at,
       plan,
-      reserve: reserveOf(reached),
+      reserve: Math.max(0, reserveOf(reached) - unmet),
     });
-    reached = reached.map((held) => {
-      const { balance, paid } = monthOf(held, flow, { at, plan });
-      return { account: held.account, balance, paid: held.paid + paid };
-    });
+    const spent =
+      flow.left < 0
+        ? Math.max(
+            0,
+            -cashFlow(accounts, schedule, { at, plan, reserve: 0 }).left,
+          )
+        : 0;
+    unmet += spent;
+    reached = keptOutOf(reached, Math.max(0, -flow.left) - spent).map(
+      (held) => {
+        const { balance, paid } = monthOf(held, flow, { at, plan });
+        return { account: held.account, balance, paid: held.paid + paid };
+      },
+    );
   }
   return reached;
 }
@@ -408,12 +432,11 @@ function drawnFrom(
   readonly taxable: number;
   readonly uncovered: number;
 } {
-  const kinds: readonly AccountKind[] = ["cash", "tax-free", "tax-deferred"];
   let drawn = held;
   let left = shortfall;
   let early = 0;
   let taxed = { allowance, below, isEarly, months: 1, uprating };
-  for (const kind of kinds) {
+  for (const kind of drawOrder) {
     drawn = drawn.map(({ account, balance }) => {
       if (account.kind !== kind || !isPension(account)) {
         const taken =
@@ -451,6 +474,42 @@ function drawnFrom(
 function isBeforePensionAge(age: number, { month, year }: Month): boolean {
   const hasRisen = isOnOrBefore(pensionAge.rises, { month, year });
   return age < (hasRisen ? pensionAge.after : pensionAge.before);
+}
+
+// Whether an account is among the savings a pension always funded is
+// kept paid out of: drawn on for a shortfall, and no pension, since one
+// pension sold to pay another is money going round in a circle.
+function isReserve(account: Account): boolean {
+  return drawOrder.includes(account.kind) && !isPension(account);
+}
+
+// What keeping the pensions always funded paid takes out of the savings
+// in a month the income does not cover it, as a month end reads one:
+// what the month is short of with those pensions paid, less what it is
+// short of with nothing kept paid out of the cash and the ISAs, taken
+// from them in the order a shortfall is drawn, the kinds as the draw
+// takes them and each kind's accounts in the order listed, and counted
+// as paid off each. They held at least that as the month opened, since
+// that is as far as the flow keeps such a pension paid; the spending the
+// month is short of stays where it is, since a month end checks the plan
+// against the balances rather than spending them.
+function keptOutOf(
+  reached: readonly MonthsOn[],
+  kept: number,
+): readonly MonthsOn[] {
+  let left = Math.max(0, kept);
+  let taken = reached;
+  for (const kind of drawOrder) {
+    taken = taken.map(({ account, balance, paid }) => {
+      const take =
+        account.kind === kind && isReserve(account)
+          ? Math.min(balance, left)
+          : 0;
+      left -= take;
+      return { account, balance: balance - take, paid: paid - take };
+    });
+  }
+  return taken;
 }
 
 // An account carried a month on the month's cash flow, as the projection
@@ -558,7 +617,7 @@ function rateOf(account: Account, plan: Plan, year: number): number {
 // the flow keeps a pension always funded paid out of the savings.
 function reserveOf(held: readonly Held[]): number {
   return held
-    .filter(({ account }) => takesSpare(account) && !isPension(account))
+    .filter(({ account }) => isReserve(account))
     .reduce((sum, { balance }) => sum + balance, 0);
 }
 
