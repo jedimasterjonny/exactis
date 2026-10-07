@@ -48,7 +48,7 @@ import {
 import { Refusal } from "@/lib/answer";
 import { fixedMonthly, monthly } from "@/lib/cadence";
 import { endsAfterItStarts } from "@/lib/lines";
-import { clearsIn, termOf } from "@/lib/loans";
+import { paidUntil, termOf } from "@/lib/loans";
 import { monthsBetween } from "@/lib/months";
 import { isWithinAllowance } from "@/lib/tax";
 
@@ -821,7 +821,12 @@ function liveOf(kept: Kept): DerivedSet {
 // the plan's first year to the month its payments clear what the loan
 // owes, counted from the plan's first month at the loan's rate, or to
 // the end of the plan when they never clear it, as the interest on an
-// interest-only mortgage swallows them. A balloon a PCP leaves is
+// interest-only mortgage swallows them, or through the month before the
+// plan's first when the loan owes nothing they are for, as one paid off
+// with its line left in place does, so it is paid in no month of the
+// plan rather than once into nothing; such a line starts in the year it
+// ends in, which is the year before the plan's from January, since a
+// line ending before it starts is refused wherever it is read. A balloon a PCP leaves is
 // refinanced on the same terms, so the payments run until the whole of
 // it clears. The span is the loan's rather than the line's own, so it
 // is worked out here, whenever the household is read, and moves with
@@ -843,12 +848,12 @@ function paidOver(
     monthly(line.amount, line.cadence),
     rateFrom(loan, plan),
   );
-  const end = term === null ? null : clearsIn(term, plan);
+  const end = term === null ? null : paidUntil(term, plan);
   return {
     ...line,
     endsAfter: 0,
     endsAt: null,
-    firstYear: plan.from,
+    firstYear: Math.min(plan.from, end?.year ?? plan.from),
     lastMonth: end?.month ?? null,
     lastYear: end?.year ?? null,
     startsAt: null,
