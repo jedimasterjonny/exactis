@@ -930,6 +930,29 @@ describe("a line paying a loan", () => {
     });
   });
 
+  // A mortgage already paid off, its line left in place, owes nothing
+  // the £2,210 is for, so the line runs through the month before the
+  // balances' month and no month of the plan: from September, through
+  // August 2026, and from January, through December 2025, starting in
+  // that year so that it still ends no earlier than it starts.
+  it("runs a cleared loan's payments in no month of the plan", () => {
+    const cleared = toHouseRecords(
+      { ...homeValues, balance: 0 },
+      { from: 2026 },
+    );
+
+    expect(paymentsOf(cleared)).toMatchObject({
+      firstYear: 2026,
+      lastMonth: 7,
+      lastYear: 2026,
+    });
+    expect(paymentsOf(cleared, { month: 0, year: 2026 })).toMatchObject({
+      firstYear: 2025,
+      lastMonth: 11,
+      lastYear: 2025,
+    });
+  });
+
   // The £290 carries on past the agreement's end, the balloon being
   // refinanced on the same terms, and clears the whole in 59 payments:
   // July 2031, not the August 2029 the agreement ends in. £438 a month on
