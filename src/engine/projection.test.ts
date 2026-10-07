@@ -389,6 +389,18 @@ describe("project", () => {
     ).not.toThrow();
   });
 
+  // A debt owes what it holds below nothing: the mortgage at £500 above
+  // it would plot as money held and be wiped off by its first payment.
+  // One owing nothing is carried at nothing.
+  it("refuses a debt above nothing", () => {
+    expect(() =>
+      project([{ ...mortgage, balance: 500 }], funded, { ...plan, years: 1 }),
+    ).toThrow("A debt's balance is nothing or less");
+    expect(() =>
+      project([{ ...mortgage, balance: 0 }], funded, { ...plan, years: 0 }),
+    ).not.toThrow();
+  });
+
   // A balance below nothing is a debt's, and no debt is held: the ISA
   // at minus £500 would be compounded deeper every month and never
   // drawn on, since a draw takes the lesser of what an account holds

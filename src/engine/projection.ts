@@ -250,7 +250,10 @@ export function monthsOn(
 // compounded deeper every month by the growth and never drawn on, the
 // draw taking the lesser of what the account holds and what the month
 // is short under a floor of nothing. The action refuses the same
-// balance where it is saved.
+// balance where it is saved, and a debt opening above nothing beside
+// it: carried as the debt it is, a balance above nothing would read as
+// money held on the first point and be wiped off by its first payment,
+// paid down no further than nothing.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -268,6 +271,9 @@ export function project(
   let owing: readonly Held[] = accounts
     .filter(({ kind }) => kind === "debt")
     .map((account) => ({ account, balance: account.balance }));
+  if (owing.some(({ balance }) => balance > 0)) {
+    throw new Error(rules.owes);
+  }
   let allowance = lumpSumAllowance;
   let taxYear: TaxYear = { months: 0, paid: 0, profit: 0, taxable: 0 };
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
