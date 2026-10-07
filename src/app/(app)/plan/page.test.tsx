@@ -137,4 +137,37 @@ describe("Plan", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  // The same £3,350 a month with a pension the only account to draw on:
+  // at 34 it is a pension before the pension age, so the month is
+  // carried by drawing it early at the 55% charge, and the plan falls
+  // short there rather than lasting on paper. The fixture's £391,640
+  // runs out after it, at 39 in 2031, which is said too; £10,000,000
+  // never does.
+  it("says when the savings are carried only by drawing a pension early, and when they then run out", async () => {
+    const [pension] = accounts;
+    const headlineWith = async (balance: number): Promise<null | string> => {
+      vi.mocked(getHousehold).mockResolvedValue({
+        ...household,
+        accounts: [{ ...pension, balance }],
+        milestones: [],
+        owners: [...owners],
+        plan,
+        schedule: { expenses: [expenseLines[0]], income: [] },
+      });
+      const { unmount } = render(await Plan());
+      const { textContent } = screen.getByText(
+        /a month drawn from the savings now/,
+      );
+      unmount();
+      return textContent;
+    };
+
+    expect(await headlineWith(391640)).toBe(
+      "£3,350 a month drawn from the savings now · the savings fall short at 34, in 2026, carried by an early pension draw, and run out at 39, in 2031",
+    );
+    expect(await headlineWith(10000000)).toBe(
+      "£3,350 a month drawn from the savings now · the savings fall short at 34, in 2026, carried by an early pension draw",
+    );
+  });
 });
