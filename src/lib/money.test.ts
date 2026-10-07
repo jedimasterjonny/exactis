@@ -7,6 +7,7 @@ import {
   formatGbp,
   formatPercent,
   formatPoints,
+  formatSignedGbp,
   formatWholePercent,
   negated,
 } from "./money";
@@ -98,6 +99,15 @@ describe("negated", () => {
     // toBe compares as Object.is does, which tells minus nothing apart.
     expect(negated(0)).toBe(0);
     expect(formatGbp(negated(0))).toBe("£0");
+  });
+});
+
+describe("formatSignedGbp", () => {
+  it("signs a move either way, with a real minus, and leaves one that rounds to nothing unsigned", () => {
+    expect(formatSignedGbp(137474)).toBe("+£137,474");
+    expect(formatSignedGbp(-11000.4)).toBe("−£11,000");
+    expect(formatSignedGbp(0.4)).toBe("£0");
+    expect(formatSignedGbp(-0.4)).toBe("£0");
   });
 });
 
