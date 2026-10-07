@@ -114,6 +114,12 @@ const thrown: readonly Thrown[] = [
     (given): Inputs => changed(given, 3, (cash) => ({ ...cash, balance: -1 })),
   ],
   [
+    "A debt's balance is nothing or less",
+    "A debt's balance is nothing or less",
+    (given): Inputs =>
+      changed(given, 5, (mortgage) => ({ ...mortgage, balance: 1 })),
+  ],
+  [
     "A rate loses no more than everything",
     "A rate loses no more than everything",
     (given): Inputs =>
