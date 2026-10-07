@@ -46,7 +46,12 @@ describe("CustomRates", () => {
     expect(field("Bonds growth")).toHaveValue("4.45%");
     expect(field("Inflation")).toHaveValue("2.95%");
     expect(field("Stocks share")).toHaveValue("80.00%");
-    expect(field("Stocks growth")).toHaveAccessibleDescription("Typed by hand");
+    expect(field("Stocks growth")).toHaveAccessibleDescription(
+      "Typed by hand — after fees, as none are taken off",
+    );
+    expect(field("Bonds growth")).toHaveAccessibleDescription(
+      "Typed by hand — after fees, as none are taken off",
+    );
     expect(field("Dividend yield")).toHaveAccessibleDescription(
       "Added to growth — always change the pair",
     );
