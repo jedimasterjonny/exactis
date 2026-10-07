@@ -1067,6 +1067,55 @@ describe("cashFlow", () => {
     expect(flowOf(0).left).toBe(0);
   });
 
+  // Two salaries feed one owner's pensions past the £5,000 a month of
+  // allowance between them: £4,600 from a £48,000 side job given up
+  // whole into a pension that is not always funded, and £575 from the
+  // £60,000 salary into one that is. Against £10,000 of household the
+  // month is short, so only the pension always funded is fed, and it is
+  // fed the whole of its sacrifice whichever salary is listed first, the
+  // side job's taking none of the room it does not give up.
+  it("feeds an always funded pension the room a sacrifice the month gives up leaves, whatever the order", () => {
+    const unmarked: Account = {
+      balance: 0,
+      growth: { kind: "plan" },
+      id: 7,
+      kind: "tax-deferred",
+      name: "SIPP",
+      owner: 1,
+    };
+    const kept: Account = {
+      ...unmarked,
+      id: pension.id,
+      isAlwaysFunded: true,
+      name: "Workplace pension",
+    };
+    const side: IncomeLine = {
+      ...plain,
+      amount: 48000,
+      feeds: unmarked.id,
+      id: 9,
+      name: "Side job",
+      sacrifice: 1,
+    };
+    const fedOf = (income: readonly IncomeLine[]): CashFlow["fed"] =>
+      cashFlow(
+        [kept, unmarked],
+        { expenses: [{ ...household, amount: 10000 }], income },
+        { at: { month: 0, year: 2026 }, plan },
+      ).fed;
+    const whole = [
+      {
+        account: kept,
+        amount: (6000 * 1.15) / 12,
+        line: lean,
+        sacrificed: 500,
+      },
+    ];
+
+    expect(fedOf([side, lean])).toStrictEqual(whole);
+    expect(fedOf([lean, side])).toStrictEqual(whole);
+  });
+
   // With nothing spent, the month's £2,453.30 pays the mortgage its
   // £2,210 first, then the pension always funded its £2,266.25 before
   // the ISA listed above it, which is paid nothing, and the month is
