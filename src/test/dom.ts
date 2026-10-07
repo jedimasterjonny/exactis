@@ -35,13 +35,6 @@ export function openDialog(): HTMLElement {
   return screen.getByRole("dialog");
 }
 
-// A row's line opened in its dialog from the row's pencil, the dialog
-// being named by the line's own name.
-export function openEditor(name: string): HTMLElement {
-  fireEvent.click(screen.getByRole("button", { name: `Edit ${name}` }));
-  return screen.getByRole("dialog", { name });
-}
-
 // A new record's dialog opened from the button that adds one.
 export function openEntry(label: string): HTMLElement {
   fireEvent.click(screen.getByRole("button", { name: label }));

@@ -1,15 +1,10 @@
-"use client";
-
 import type { JSX } from "react";
 
-import { useState } from "react";
+import { History } from "lucide-react";
 
-import type { ProgressPoint } from "@/data/points";
+import type { ProgressPoint } from "@/data/progress";
 
-import { FieldRow } from "@/components/app/atoms/field-row";
-import { EditDialog } from "@/components/app/molecules/edit-dialog";
-import { MoneyField } from "@/components/app/molecules/figure-field";
-import { RowActions } from "@/components/app/molecules/row-actions";
+import { EmptyState } from "@/components/app/atoms/empty-state";
 import { Card } from "@/components/kit/card";
 import {
   Table,
@@ -19,115 +14,65 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/kit/table";
-import { toast } from "@/components/kit/toast";
 import { formatGbp } from "@/lib/money";
+import { formatMonthShort } from "@/lib/months";
 
-type Balance = Exclude<keyof ProgressPoint, "date">;
+type Balance = Exclude<keyof ProgressPoint, "month">;
 
 interface ProgressPointsProps {
   readonly points: readonly ProgressPoint[];
 }
 
-// The four balances, in table order. One list drives the head, the body and
-// the editor's fields, so a column cannot be mono in the head and not the
-// body, or editable in the dialog and absent from the table.
+// The five balances, in table order. One list drives the head and the
+// body, so a column cannot be mono in the head and not the body.
 const balances: readonly (readonly [string, Balance])[] = [
   ["Tax-deferred", "deferred"],
   ["Tax-free", "free"],
   ["Total assets", "assets"],
   ["Asset loans", "loans"],
+  ["Unsecured debt", "unsecured"],
 ];
 
-// The progress table and its editor. Rows live in state and an edit writes
-// back into them, so the table reflects the edit until reload; a store
-// replaces the state when there is one. The point being edited is held as
-// it was, so the fields keep their defaults while the committed edits
-// accumulate beside it, and it doubles as the dialog's open state.
+// The progress table: a row a point, newest first, each balance as it
+// was read and a debt below nothing as an account's is. The points are
+// read off the store as they are kept, and a household keeping none yet
+// draws what would fill the table rather than a head over no rows.
 export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
-  const [rows, setRows] = useState(points);
-  const [editing, setEditing] = useState<null | ProgressPoint>(null);
-  const [edits, setEdits] = useState<Partial<Record<Balance, number>>>({});
-
-  function open(point: ProgressPoint): void {
-    setEditing(point);
-    setEdits({});
-  }
-
-  function dismiss(): void {
-    setEditing(null);
-  }
-
-  // The reference reports "plan recalculated" beside the date. Nothing here
-  // recalculates yet, so the toast says only what happened.
-  function save(point: ProgressPoint): void {
-    setRows(
-      rows.map((row) => (row.date === point.date ? { ...row, ...edits } : row)),
+  if (points.length === 0) {
+    return (
+      <EmptyState
+        description="A point is the balances as the Household Finances sheet sums them at the end of a month, loaded into the store."
+        icon={History}
+        title="No points yet"
+      />
     );
-    setEditing(null);
-    toast.add({
-      description: point.date,
-      title: "Point updated",
-      type: "success",
-    });
   }
-
   return (
-    <>
-      <Card className="py-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Point</TableHead>
-              {balances.map(([header]) => (
-                <TableHead className="text-right" key={header}>
-                  {header}
-                </TableHead>
-              ))}
-              <TableHead className="w-px">
-                <span className="sr-only">Edit</span>
+    <Card className="py-0">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Point</TableHead>
+            {balances.map(([header]) => (
+              <TableHead className="text-right" key={header}>
+                {header}
               </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((point) => (
-              <TableRow key={point.date}>
-                <TableCell>{point.date}</TableCell>
-                {balances.map(([header, key]) => (
-                  <TableCell className="text-right figure" key={header}>
-                    {formatGbp(point[key])}
-                  </TableCell>
-                ))}
-                <TableCell className="py-1">
-                  <RowActions name={point.date} onEdit={open} row={point} />
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {points.toReversed().map((point) => (
+            <TableRow key={formatMonthShort(point.month)}>
+              <TableCell>{formatMonthShort(point.month)}</TableCell>
+              {balances.map(([header, key]) => (
+                <TableCell className="text-right figure" key={header}>
+                  {formatGbp(point[key])}
                 </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
-      {editing !== null && (
-        <EditDialog
-          eyebrow="Edit point"
-          onDismiss={dismiss}
-          onSave={() => {
-            save(editing);
-          }}
-          title={editing.date}
-        >
-          <FieldRow layout="pair">
-            {balances.map(([label, key]) => (
-              <MoneyField
-                defaultValue={editing[key]}
-                key={key}
-                label={label}
-                onValueCommitted={(value) => {
-                  setEdits({ ...edits, [key]: value });
-                }}
-              />
-            ))}
-          </FieldRow>
-        </EditDialog>
-      )}
-    </>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
   );
 }
