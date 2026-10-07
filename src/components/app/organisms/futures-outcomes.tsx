@@ -1,11 +1,11 @@
 import type { JSX } from "react";
 
-import { cn } from "cn";
-
+import type { LegendEntry } from "@/components/app/atoms/legend-table";
 import type { Plan } from "@/data/plan";
 import type { Grading, Outcome, Reading } from "@/engine/futures";
 
-import { OutcomeMeter } from "@/components/app/atoms/outcome-meter";
+import { LegendTable } from "@/components/app/atoms/legend-table";
+import { SegmentBar } from "@/components/app/atoms/segment-bar";
 import { Card, CardContent } from "@/components/kit/card";
 import { ageIn, endAge } from "@/data/plan";
 import { formatCount } from "@/lib/count";
@@ -23,14 +23,6 @@ interface FuturesOutcomesProps {
   readonly outcomes: Readonly<Record<Outcome, number>>;
   readonly plan: Plan;
   readonly reading: Reading;
-}
-
-interface SharesProps {
-  readonly bounds: Readonly<Record<Outcome, string>>;
-  readonly caption: string;
-  readonly group: readonly Outcome[];
-  readonly outcomes: Readonly<Record<Outcome, number>>;
-  readonly run: number;
 }
 
 // How the futures that came to each lasting outcome lasted, as a
@@ -78,6 +70,13 @@ export function FuturesOutcomes({
         ? `at ${String(middle)}`
         : `between ${String(middle)} and ${String(almost - 1)}`,
   };
+  const shareOf = (outcome: Outcome): LegendEntry => ({
+    figure: formatWholePercent(outcomes[outcome] / reading.run),
+    key: outcome,
+    name: outcomeNames[outcome],
+    note: bounds[outcome],
+    tone: outcomeTones[outcome],
+  });
   const lasted = mostOf(lastingOutcomes, outcomes);
   const fell = mostOf(shortOutcomes, outcomes);
   const howMany = (part: number, whole: number): string =>
@@ -109,7 +108,16 @@ export function FuturesOutcomes({
               </p>
             </div>
             <div className="grid content-start gap-3">
-              <OutcomeMeter count={count} outcomes={outcomes} />
+              <SegmentBar
+                groups={[lastingOutcomes, shortOutcomes].map((group) =>
+                  group.map((outcome) => ({
+                    key: outcome,
+                    tone: outcomeTones[outcome],
+                    value: outcomes[outcome],
+                  })),
+                )}
+                total={count}
+              />
               <p className="flex justify-between gap-4 text-xs text-muted-foreground">
                 <span>
                   <span className="figure text-foreground">
@@ -132,19 +140,13 @@ export function FuturesOutcomes({
               </p>
             </div>
             <div className="grid content-start gap-4 lg:col-span-2 lg:grid-cols-2 xl:col-span-1 xl:grid-cols-1">
-              <Shares
-                bounds={bounds}
+              <LegendTable
                 caption={`Lasted · ${formatCount(reading.lasted)}`}
-                group={lastingOutcomes}
-                outcomes={outcomes}
-                run={reading.run}
+                entries={lastingOutcomes.map(shareOf)}
               />
-              <Shares
-                bounds={bounds}
+              <LegendTable
                 caption={`Fell short · ${formatCount(short)}`}
-                group={shortOutcomes}
-                outcomes={outcomes}
-                run={reading.run}
+                entries={shortOutcomes.map(shareOf)}
               />
             </div>
           </>
@@ -174,44 +176,5 @@ function mostOf<TOutcome extends Outcome>(
 ): TOutcome {
   return group.reduce((most, each) =>
     outcomes[each] > outcomes[most] ? each : most,
-  );
-}
-
-// A group of outcomes, each in its tone, by name, with what bounds it
-// and its share of the run.
-function Shares({
-  bounds,
-  caption,
-  group,
-  outcomes,
-  run,
-}: SharesProps): JSX.Element {
-  return (
-    <table className="w-full text-sm">
-      <caption className="pb-1.5 text-left label text-muted-foreground">
-        {caption}
-      </caption>
-      <tbody>
-        {group.map((outcome) => (
-          <tr className="border-t first:border-t-0" key={outcome}>
-            <td className="w-5 py-1.5">
-              <span
-                aria-hidden
-                className={cn("block size-3 rounded-sm", outcomeTones[outcome])}
-              />
-            </td>
-            <td className="py-1.5">
-              {outcomeNames[outcome]}{" "}
-              <span className="ml-1 figure text-xs text-muted-foreground">
-                {bounds[outcome]}
-              </span>
-            </td>
-            <td className="py-1.5 text-right figure">
-              {formatWholePercent(outcomes[outcome] / run)}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
   );
 }
