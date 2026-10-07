@@ -1344,6 +1344,47 @@ describe("monthsOn", () => {
     expect(kept?.paid).toBeCloseTo(250);
   });
 
+  // The same month with £20,000 in an ISA beside the £1,200 of cash
+  // keeps the pension paid its whole £2,266.25, and that comes out of
+  // them, the cash's £1,200 first and the ISA's £1,066.25 after it,
+  // counted as paid off each, while the £1,000 the spending is short of
+  // is not drawn, a month end checking the balances rather than
+  // spending them.
+  it("takes what keeps a pension always funded paid out of the cash and the ISAs, and nothing for the spending", () => {
+    const kept: Account = { ...pension, isAlwaysFunded: true };
+    const month = byId(
+      monthsOn([kept, flatIsa, pocket], short, { months: 1, plan: year }),
+    );
+
+    expect(month.get(pocket.id)).toStrictEqual({ balance: 0, paid: -1200 });
+    expect(month.get(flatIsa.id)?.balance).toBeCloseTo(18933.75, 10);
+    expect(month.get(flatIsa.id)?.paid).toBeCloseTo(-1066.25, 10);
+  });
+
+  // £10,000 of cash under £1,000 a month of spending and a £500 pension
+  // kept paid: the projection draws £1,500 a month and has £1,000 left
+  // as the seventh month opens, which the spending alone runs out, so
+  // the pension is kept paid six months. A month end over eighteen counts
+  // the spending it does not draw off what keeps the pension paid, so it
+  // too pays it six months, £3,000 out of the cash, landing as £3,360
+  // with the basic rate on the £300 a month nothing earned relieves.
+  it("stops keeping a pension always funded paid when the projection would, over a long gap", () => {
+    const kept: Account = {
+      ...pension,
+      contribution: { amount: 500, cadence: "month", kind: "fixed" },
+      isAlwaysFunded: true,
+    };
+    const months = byId(
+      monthsOn([kept, { ...pocket, balance: 10000 }], short, {
+        months: 18,
+        plan: year,
+      }),
+    );
+
+    expect(months.get(pocket.id)).toStrictEqual({ balance: 7000, paid: -3000 });
+    expect(months.get(pension.id)?.paid).toBeCloseTo(3360, 10);
+  });
+
   // A salary starting in 2027 feeds the pension nothing in December and
   // its sacrifice in January, so two months from December pay the
   // pension more than twice what December alone does.
