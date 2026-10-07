@@ -21,9 +21,10 @@ interface CustomRatesProps {
 }
 
 // The body of the rates card while the rates typed by hand are live: a
-// rate for each class and for inflation, and the share of the savings in
-// stocks, one split for the whole plan and flat for life, the rest in
-// bonds; then what they come to, worked out as the CMA's rates are, a
+// rate for each class, after fees, since none are taken off a rate typed
+// here as they are off the CMA's, and one for inflation, and the share
+// of the savings in stocks, one split for the whole plan and flat for
+// life, the rest in bonds; then what they come to, worked out as the CMA's rates are, a
 // column for stocks, bonds and the portfolio the split makes of them:
 // the weight, the return, which for the portfolio is the plan rate, the
 // growth and the yield it is made of, and the return over inflation.
@@ -100,7 +101,7 @@ export function CustomRates({
       <div className="grid gap-6">
         <FieldRow layout="pair">
           <RateField
-            hint="Typed by hand"
+            hint="Typed by hand — after fees, as none are taken off"
             label="Stocks growth"
             min={-1}
             onValueCommitted={(value) => {
@@ -120,7 +121,7 @@ export function CustomRates({
         </FieldRow>
         <FieldRow layout="pair">
           <RateField
-            hint="Typed by hand"
+            hint="Typed by hand — after fees, as none are taken off"
             label="Bonds growth"
             min={-1}
             onValueCommitted={(value) => {
