@@ -64,6 +64,11 @@ export function formatMonth({ month, year }: Month): string {
   return `${monthName(month, "long")} ${String(year)}`;
 }
 
+// A month as a table names it, its name cut short: "Sep 2026".
+export function formatMonthShort({ month, year }: Month): string {
+  return `${monthName(month, "short")} ${String(year)}`;
+}
+
 // Whether a month falls in or before another: an earlier year, or the
 // same year and no later month. A line runs to its last month, a loan's
 // payments to the month they clear it in, and a balance is held as of

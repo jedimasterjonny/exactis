@@ -16,3 +16,12 @@ export interface ProgressPoint {
   readonly month: Month;
   readonly unsecured: number;
 }
+
+// What a point's balances come to: the five summed, the debts taking
+// away. It leaves cash out, as the point does, where the accounts
+// screen's starting net worth counts it.
+export function netWorthOf(point: ProgressPoint): number {
+  return (
+    point.assets + point.deferred + point.free + point.loans + point.unsecured
+  );
+}
