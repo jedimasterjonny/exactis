@@ -3,7 +3,15 @@ import { describe, expect, it } from "vitest";
 
 import type { Owed } from "./loans";
 
-import { clearsIn, figureOf, paymentOf, rateOf, termOf, termTo } from "./loans";
+import {
+  clearsIn,
+  figureOf,
+  paidUntil,
+  paymentOf,
+  rateOf,
+  termOf,
+  termTo,
+} from "./loans";
 
 // What is owed, with no balloon unless one is given.
 function owed(balance: number, balloon = 0): Owed {
@@ -218,6 +226,26 @@ describe("clearsIn", () => {
     expect(clearsIn(10 + 1e-12, { from: 2026, month: 0 })).toStrictEqual({
       month: 11,
       year: 2035,
+    });
+  });
+});
+
+describe("paidUntil", () => {
+  // A term of a payment or more is paid through the month clearsIn
+  // counts to; a term of nothing, a loan owing nothing its payments are
+  // for, is paid through the month before the plan's first, in the year
+  // before it from January.
+  it("runs a loan's payments to its last, and not at all for one owing nothing", () => {
+    expect(paidUntil(9.5, { from: 2026, month: 0 })).toStrictEqual(
+      clearsIn(9.5, { from: 2026, month: 0 }),
+    );
+    expect(paidUntil(0, { from: 2026, month: 8 })).toStrictEqual({
+      month: 7,
+      year: 2026,
+    });
+    expect(paidUntil(0, { from: 2026, month: 0 })).toStrictEqual({
+      month: 11,
+      year: 2025,
     });
   });
 });

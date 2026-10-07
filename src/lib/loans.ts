@@ -34,8 +34,7 @@ interface Figures {
 // rather than time, since a term landing on a year end would otherwise
 // be read as the year after it.
 export function clearsIn(term: number, plan: PlanMonth): Month {
-  const last = plan.month + monthsIn(term) - 1;
-  return { month: last % 12, year: plan.from + Math.floor(last / 12) };
+  return lastOf(monthsIn(term), plan);
 }
 
 // The figure worked out from the other two, over what is owed: the
@@ -56,6 +55,16 @@ export function figureOf(
     case "term":
       return termOf(owed, payment, rate);
   }
+}
+
+// The month a loan the plan carries is paid through: the month its last
+// payment falls in, as clearsIn counts it, or the month before the
+// plan's first for a loan owing nothing its payments are for, a term of
+// nothing. A dialog reads a term of nothing as a single payment, as
+// clearsIn does, but a loan already paid down has no payment left to
+// make, and one charged to the plan's first month would land on nothing.
+export function paidUntil(term: number, plan: PlanMonth): Month {
+  return lastOf(term > 0 ? monthsIn(term) : 0, plan);
 }
 
 // What pays the balance down to the balloon over the term at the rate,
@@ -174,6 +183,13 @@ export function termTo(end: Month, plan: PlanMonth): number {
   const payments =
     monthsBetween({ month: plan.month, year: plan.from }, end) + 1;
   return Math.max(1, payments) / 12;
+}
+
+// The month the payments given end in, counted from the plan's month as
+// the first of them, or the month before it for none.
+function lastOf(payments: number, plan: PlanMonth): Month {
+  const last = plan.month + payments - 1;
+  return { month: (last + 12) % 12, year: plan.from + Math.floor(last / 12) };
 }
 
 // The months a term runs: whole and rounded up, since a part of a month

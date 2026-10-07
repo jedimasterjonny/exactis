@@ -1302,6 +1302,34 @@ describe("cashFlow", () => {
     expect(owed(held, { month: 2, year: 2028 }).left).toBeCloseTo(786.63, 2);
   });
 
+  // A card already cleared with its £250 still set, and a PCP down to
+  // the £6,000 balloon its payments leave, owe nothing the payments are
+  // for, so neither states a sum even in the plan's first month, where
+  // the one payment a term of nothing counts would land on nothing.
+  it("charges a debt owing no more than its balloon nothing", () => {
+    const cleared: Account = {
+      balance: 0,
+      contribution: { amount: 250, cadence: "month", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0.22 },
+      id: 6,
+      kind: "debt",
+      name: "Credit card",
+    };
+    const pcp: Account = {
+      balance: -6000,
+      balloon: 6000,
+      contribution: { amount: 290, cadence: "month", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0.079 },
+      id: 7,
+      kind: "debt",
+      name: "Car finance",
+    };
+
+    expect(owed([cleared, pcp], { month: 0, year: 2026 }).fixed).toStrictEqual(
+      [],
+    );
+  });
+
   // £1,200 at no rate paying £100 a month spreads flat over twelve
   // payments, so the last falls in December 2026 and January 2027 is
   // charged nothing: a term that is a whole number of months ends on
