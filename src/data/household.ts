@@ -16,6 +16,7 @@ import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan, PlanAges, Spread } from "@/data/plan";
+import type { ProgressPoint } from "@/data/progress";
 import type { Allocation, Rates, RateSet } from "@/data/rates";
 import type { Month, Tie } from "@/data/schedule";
 import type { Target, Targets } from "@/data/targets";
@@ -53,7 +54,8 @@ import { monthsBetween } from "@/lib/months";
 import { isWithinAllowance } from "@/lib/tax";
 
 // Everything the projection runs on, the owners the wrappers name and
-// the milestones the plan is laid out by, the inflation curve last
+// the milestones the plan is laid out by, the progress points the
+// balances were read at month by month, the inflation curve last
 // pulled from the Bank of England, or none before one is, the vintages
 // of BlackRock's capital market assumptions last pulled, or none before
 // one is, the rates typed by hand, what comes off the CMA's returns to
@@ -74,6 +76,7 @@ export interface Household {
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
+  readonly points: readonly ProgressPoint[];
   readonly rates: Rates;
   readonly rateSet: RateSet;
   readonly schedule: {
@@ -86,8 +89,9 @@ export interface Household {
 
 // The household as the store keeps it: the records, the month their
 // balances are as of, one for the whole household since they are
-// recorded together, the ages the plan is set to rather than the plan
-// they make, the curve as the Bank gave it rather than the inflation it
+// recorded together, the progress points, the ages the plan is set to
+// rather than the plan they make, the curve as the Bank gave it rather
+// than the inflation it
 // makes, the vintages as BlackRock priced them, the rates and the split
 // as typed rather than the rate they make, the deductions and the rate
 // set chosen rather than the rates they make, the target allocation as
@@ -108,6 +112,7 @@ export interface Kept {
   readonly milestones: readonly Milestone[];
   readonly next: number;
   readonly owners: readonly Owner[];
+  readonly points: readonly ProgressPoint[];
   readonly rates: Rates;
   readonly rateSet: RateSet;
   readonly schedule: Household["schedule"];
@@ -237,6 +242,32 @@ const owner = z.object({
   id: recordId,
   name: named,
 }) satisfies z.ZodType<Owner>;
+
+// A progress point as the model lays it: each sum whole pounds, the
+// three balances nothing or more and the two debts nothing or less, in
+// the words an account is held to the same.
+const point = z.object({
+  assets: z.number().int().nonnegative(rules.belowNothing),
+  deferred: z.number().int().nonnegative(rules.belowNothing),
+  free: z.number().int().nonnegative(rules.belowNothing),
+  loans: z.number().int().nonpositive(rules.owes),
+  month,
+  unsecured: z.number().int().nonpositive(rules.owes),
+}) satisfies z.ZodType<ProgressPoint>;
+
+// The progress points, oldest first and each in a month after the one
+// before it, so a month is recorded once and a screen reads them in
+// order without sorting them.
+const points = z.array(point).refine(
+  (listed) =>
+    listed.every((each, index) => {
+      const before = listed[index - 1];
+      return (
+        before === undefined || monthsBetween(before.month, each.month) > 0
+      );
+    }),
+  "A point is recorded once a month, oldest first",
+);
 
 // A curve as the Bank gave it: the day it stood on, and a rate at each
 // maturity the plan reads.
@@ -455,6 +486,7 @@ export const household = z
     milestones: z.array(milestone),
     owners: z.array(owner),
     plan,
+    points,
     rates,
     rateSet: z.enum(rateSets),
     schedule: z.object({
@@ -599,6 +631,7 @@ const kept = z
     milestones: z.array(milestone),
     next: recordId,
     owners: z.array(owner),
+    points,
     rates,
     rateSet: z.enum(rateSets),
     schedule: z.object({
@@ -645,11 +678,11 @@ export function holdWhileLive(
 }
 
 // The household before anything is saved: no records, balances as of
-// the month given, the ages the dashboard has shown, a plan to 89
-// retiring at 59, no curve or CMA pulled, the rates a household opens
-// with live and everything in stocks, the manual method's fees and yield
-// to deduct from a CMA's returns, no target allocation imported or
-// category mapped, and the first id.
+// the month given, no progress point, the ages the dashboard has shown,
+// a plan to 89 retiring at 59, no curve or CMA pulled, the rates a
+// household opens with live and everything in stocks, the manual
+// method's fees and yield to deduct from a CMA's returns, no target
+// allocation imported or category mapped, and the first id.
 export function nothingKeptIn(asOf: Month): Kept {
   return {
     accounts: [],
@@ -663,6 +696,7 @@ export function nothingKeptIn(asOf: Month): Kept {
     milestones: [],
     next: 1,
     owners: [],
+    points: [],
     rates: openingRates,
     rateSet: "custom",
     schedule: { expenses: [], income: [] },
@@ -748,6 +782,7 @@ function householdOf(kept: Kept): Household {
     milestones: kept.milestones,
     owners: kept.owners,
     plan,
+    points: kept.points,
     rates: kept.rates,
     rateSet: kept.rateSet,
     schedule: {

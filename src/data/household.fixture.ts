@@ -9,11 +9,13 @@ import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
+import { points } from "@/data/progress.fixture";
 import { allInStocks } from "@/data/rates";
 import { targets } from "@/data/targets.fixture";
 
 // The reference kit's invented plan as the store keeps it: the fixtures'
-// records, balances as of September 2026, a plan to 89 whose owner
+// records, balances as of September 2026 and the six months of progress
+// points before it, a plan to 89 whose owner
 // retires at 59, the curve its card reads, the August 2026 CMA with no
 // vintage before it, the rates it ran on before
 // there were rates to type, 5% for stocks and bonds alike and the
@@ -33,6 +35,7 @@ export const kept: Kept = {
   milestones,
   next: 6,
   owners,
+  points,
   rates: {
     bonds: 0.05,
     dividends: 0,

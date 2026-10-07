@@ -38,11 +38,12 @@ nvm install "$(cat .node-version)" && nvm alias default "$(cat .node-version)"
 ## The store
 
 The household, its owners, accounts, milestones, income and expense lines, the
-month its balances are as of, the ages the plan is set to, the rates and the
-split of the savings the plan runs on, the inflation curve last pulled from the
-Bank of England, the vintages of BlackRock's capital market assumptions last
-pulled and the target allocation last imported from Portfolio Performance, lives
-in Postgres as one document, a version of it a save, reached through
+month its balances are as of, the progress points its balances were read at
+month by month, the ages the plan is set to, the rates and the split of the
+savings the plan runs on, the inflation curve last pulled from the Bank of
+England, the vintages of BlackRock's capital market assumptions last pulled and
+the target allocation last imported from Portfolio Performance, lives in
+Postgres as one document, a version of it a save, reached through
 [Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The table is
 `src/db/schema.ts`, the migration generated from it is in `drizzle/`, and the
 two queries, reading the latest version and keeping the next, are in
