@@ -120,8 +120,9 @@ const line = { ...lineValues, id: recordId };
 
 // An account as the model lays it, with what the account save holds
 // it to and what the engine refuses of one account alone: a balance
-// below nothing only on a debt, the spare money only into an account
-// that takes it, an owner on an ISA or a pension and on nothing else,
+// below nothing only on a debt and above it never on one, the spare
+// money only into an account that takes it, an owner on an ISA or a
+// pension and on nothing else,
 // a fixed sum within its allowance on its own, a rate no lower than
 // losing everything, a link to an asset only on the loan secured on
 // it, and the mark of an account always funded only on a pension. A
@@ -163,6 +164,10 @@ const account = z
   .refine(
     (account) => account.kind === "debt" || account.balance >= 0,
     rules.belowNothing,
+  )
+  .refine(
+    (account) => account.kind !== "debt" || account.balance <= 0,
+    rules.owes,
   )
   .refine(
     (account) => account.contribution?.kind !== "spare" || takesSpare(account),
