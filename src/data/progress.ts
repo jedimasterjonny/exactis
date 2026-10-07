@@ -40,6 +40,17 @@ export const balances = [
 
 export type Balance = (typeof balances)[number];
 
+// A calendar year of the points: the year; the point its move is read
+// from, the last of the year before, or its own first where the points
+// begin in it; the points kept in it, oldest first; and the last of
+// them, which it is read to.
+export interface KeptYear {
+  readonly from: ProgressPoint;
+  readonly points: readonly ProgressPoint[];
+  readonly to: ProgressPoint;
+  readonly year: number;
+}
+
 // The latest year the points span: the point it is read from, a year
 // before the latest or the earliest within the year where the points
 // start later or that month was not kept; the latest point, which it is
@@ -91,6 +102,34 @@ export function movesOf(from: ProgressPoint, to: ProgressPoint): Move[] {
 // what added and minus one for what took away.
 export function sumOf(moves: readonly Move[], sign: -1 | 1): number {
   return moves.reduce((sum, { move }) => sum + Math.max(0, sign * move), 0);
+}
+
+// The points by the calendar year they fall in, oldest first, each read
+// from the last point of the year before so the years' moves add up to
+// the whole span's, a year with no December read from whatever month
+// ended it. A year after one that kept no point at all is read from its
+// own first point, as the first year is, so no row carries the move of
+// a year it does not name.
+export function yearsOf(points: readonly ProgressPoint[]): KeptYear[] {
+  const years: KeptYear[] = [];
+  for (const point of points) {
+    const last = years.at(-1);
+    if (last?.year === point.month.year) {
+      years[years.length - 1] = {
+        ...last,
+        points: [...last.points, point],
+        to: point,
+      };
+    } else {
+      years.push({
+        from: last?.year === point.month.year - 1 ? last.to : point,
+        points: [point],
+        to: point,
+        year: point.month.year,
+      });
+    }
+  }
+  return years;
 }
 
 // What net worth moved by over each year to the month given before the
