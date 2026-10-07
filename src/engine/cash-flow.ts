@@ -314,7 +314,10 @@ const nanopound = 1e-9;
 // every source and in the order the month pays them: what the salaries
 // feed each, then the fixed sums in the order the accounts are listed,
 // then the spare money's takes in the same order, each taking only
-// what the ones before it left. A wrapper naming no owner is refused
+// what the ones before it left. A sacrifice the month does not give up
+// takes none of it, so what a pension always funded is fed in a month
+// short of the rest does not hang on which salary is listed first. A
+// wrapper naming no owner is refused
 // with the rest, since the store holds every wrapper to one and an
 // allowance with nobody to hold it to is a figure the flow cannot
 // place; read as a number rather than as present, so an owner of null
@@ -380,26 +383,30 @@ export function cashFlow(
       (!isEarned(line) || at.year < retirementYear(reading.plan)),
   );
   const income = payOf(running, [], reading);
-  const offered: Rooms = new Map();
-  const feeding = running.flatMap((line) => {
-    const account = accountAt(accounts, line.feeds);
-    const wanted = monthlyOf(line, contributionOf(line), reading);
-    if (account === undefined || wanted === 0) {
-      return [];
-    }
-    const share = Math.min(1, roomIn(offered, account) / wanted);
-    landIn(offered, account, wanted * share);
-    return share === 0
-      ? []
-      : [
-          {
-            account,
-            amount: wanted * share,
-            line,
-            sacrificed: monthlyOf(line, sacrificeOf(line), reading) * share,
-          },
-        ];
-  });
+  const feedingInto = (
+    isFed: (account: Account) => boolean,
+  ): readonly Fed[] => {
+    const offered: Rooms = new Map();
+    return running.flatMap((line) => {
+      const account = accountAt(accounts, line.feeds);
+      const wanted = monthlyOf(line, contributionOf(line), reading);
+      if (account === undefined || !isFed(account) || wanted === 0) {
+        return [];
+      }
+      const share = Math.min(1, roomIn(offered, account) / wanted);
+      landIn(offered, account, wanted * share);
+      return share === 0
+        ? []
+        : [
+            {
+              account,
+              amount: wanted * share,
+              line,
+              sacrificed: monthlyOf(line, sacrificeOf(line), reading) * share,
+            },
+          ];
+    });
+  };
   const spent = schedule.expenses
     .filter((line) => runsIn(line, at))
     .map((line) => ({ amount: monthlyOf(line, line.amount, reading), line }));
@@ -427,16 +434,16 @@ export function cashFlow(
     Math.max(0, -leftWith([])),
     reading.reserve ?? Number.POSITIVE_INFINITY,
   );
-  const kept = feeding.filter(({ account }) => account.isAlwaysFunded === true);
+  const kept = feedingInto((account) => account.isAlwaysFunded === true);
   const isKeeping = kept.length > 0 && leftWith(kept) >= floor - nanopound;
+  const feeding = feedingInto(
+    (account) => isKeeping || account.isAlwaysFunded !== true,
+  );
   const others = feeding.filter(
     ({ account }) => account.isAlwaysFunded !== true,
   );
   const saving = own.filter((account) => account.kind !== "debt");
-  const feedingOthers = (isSacrificing: boolean): Feeding => {
-    const fed = feeding.filter(({ account }) =>
-      account.isAlwaysFunded === true ? isKeeping : isSacrificing,
-    );
+  const paidWith = (fed: readonly Fed[], least: number): Feeding => {
     const taxed = taxOn(running, fed, reading);
     const month = leftWith(fed, taxed);
     const purse: Purse = {
@@ -450,17 +457,19 @@ export function cashFlow(
     }
     const { sums: funded } = fixedSums(
       saving.filter((account) => account.isAlwaysFunded === true),
-      isSacrificing ? Number.POSITIVE_INFINITY : month - floor,
+      month - least,
       { purse, reading },
     );
     return { fed, funded, month, purse, taxed };
   };
-  const sacrificing = others.length > 0 ? feedingOthers(true) : undefined;
+  const sacrificing =
+    others.length > 0 ? paidWith(feeding, Number.NEGATIVE_INFINITY) : undefined;
+  const keeping = isKeeping ? kept : [];
   const { fed, funded, month, purse, taxed } =
     sacrificing !== undefined &&
     sacrificing.month - total(sacrificing.funded) >= -nanopound
       ? sacrificing
-      : feedingOthers(false);
+      : paidWith(keeping, floor);
   const { left: rest, sums: saved } = fixedSums(
     saving.filter((account) => account.isAlwaysFunded !== true),
     month - total(funded),
