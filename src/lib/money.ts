@@ -33,6 +33,20 @@ export function formatGbp(value: number): string {
   return gbp.format(value).replace(/^-/, "−");
 }
 
+// A move in pounds, signed whichever way it went, as a figure standing
+// for a change is written: "+£1,250", "−£300", and a move that rounds
+// to nothing as "£0", unsigned.
+const signedGbp = new Intl.NumberFormat("en-GB", {
+  currency: "GBP",
+  maximumFractionDigits: 0,
+  signDisplay: "exceptZero",
+  style: "currency",
+});
+
+export function formatSignedGbp(value: number): string {
+  return signedGbp.format(value).replace(/^-/, "−");
+}
+
 // The figure with its sign turned, and nothing left as nothing rather
 // than as minus nothing, which a money field formatting with Intl's own
 // sign writes with its minus: a car or house owing nothing would open
