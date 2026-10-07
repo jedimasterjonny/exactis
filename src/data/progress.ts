@@ -30,7 +30,7 @@ export function netWorthOf(point: ProgressPoint): number {
 
 // The balances a point carries, what is held before what is owed, in
 // the order every screen lists them.
-const balances = [
+export const balances = [
   "deferred",
   "free",
   "assets",
