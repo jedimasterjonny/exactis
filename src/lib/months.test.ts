@@ -6,6 +6,7 @@ import {
   formatDated,
   formatDay,
   formatMonth,
+  formatMonthShort,
   isOnOrBefore,
   monthName,
   monthsBetween,
@@ -56,6 +57,13 @@ describe("formatMonth", () => {
   it("names a month in full, with its year", () => {
     expect(formatMonth({ month: 8, year: 2026 })).toBe("September 2026");
     expect(formatMonth({ month: 0, year: 2027 })).toBe("January 2027");
+  });
+});
+
+describe("formatMonthShort", () => {
+  it("names a month cut short, with its year", () => {
+    expect(formatMonthShort({ month: 8, year: 2026 })).toBe("Sep 2026");
+    expect(formatMonthShort({ month: 0, year: 2017 })).toBe("Jan 2017");
   });
 });
 
