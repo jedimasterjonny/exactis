@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ProgressPoint } from "./progress";
 
-import { latestYearOf, movesOf, sumOf } from "./progress";
+import { latestYearOf, movesOf, sumOf, yearsOf } from "./progress";
 import { points } from "./progress.fixture";
 
 // The fixture's first point and its last, March and August 2026.
@@ -108,5 +108,49 @@ describe("movesOf", () => {
     ]);
     expect(sumOf(moves, 1)).toBe(35146);
     expect(sumOf(moves, -1)).toBe(540);
+  });
+});
+
+describe("yearsOf", () => {
+  // Twenty-one months from June 2019, worth their index, with June 2020
+  // not kept: 2019 is read from its own June, 2020 from the December
+  // before it, and 2021 has January and February alone.
+  it("groups the points by calendar year, each read from the last point of the year before", () => {
+    const kept = monthly(
+      Array.from({ length: 21 }, (_, index) => index),
+    ).filter((_point, index) => index !== 12);
+
+    expect(
+      yearsOf(kept).map(({ from, points: inYear, to, year }) => [
+        year,
+        from.assets,
+        to.assets,
+        inYear.length,
+      ]),
+    ).toStrictEqual([
+      [2019, 0, 6, 7],
+      [2020, 6, 18, 11],
+      [2021, 18, 20, 2],
+    ]);
+  });
+
+  // Every month from June 2019 to May 2022 but those of 2020: 2021 is
+  // read from its own January rather than across the year not kept.
+  it("reads a year after one that kept no point from its own first point", () => {
+    const kept = monthly(
+      Array.from({ length: 36 }, (_, index) => index),
+    ).filter(({ month }) => month.year !== 2020);
+
+    expect(
+      yearsOf(kept).map(({ from, year }) => [year, from.assets]),
+    ).toStrictEqual([
+      [2019, 0],
+      [2021, 19],
+      [2022, 30],
+    ]);
+  });
+
+  it("has no year before any point is kept", () => {
+    expect(yearsOf([])).toStrictEqual([]);
   });
 });
