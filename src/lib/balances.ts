@@ -22,6 +22,16 @@ export const balanceTones: Readonly<Record<Balance, string>> = {
   unsecured: "bg-brand",
 };
 
+// The same colours as a chart draws in them, by the palette's own
+// variables rather than through a class.
+export const balanceColors: Readonly<Record<Balance, string>> = {
+  assets: "var(--chart-3)",
+  deferred: "var(--chart-2)",
+  free: "var(--chart-1)",
+  loans: "var(--chart-5)",
+  unsecured: "var(--brand)",
+};
+
 // The moves on one side as the parts of a bar, each in its balance's
 // tone, the sign picking the side as it does for their sum.
 export function partsOf(

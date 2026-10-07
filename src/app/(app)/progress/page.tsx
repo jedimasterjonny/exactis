@@ -5,6 +5,7 @@ import type { ProgressPoint } from "@/data/progress";
 import { Note } from "@/components/app/atoms/note";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
+import { ProgressChart } from "@/components/app/organisms/progress-chart";
 import { ProgressPoints } from "@/components/app/organisms/progress-points";
 import { ProgressYear } from "@/components/app/organisms/progress-year";
 import { latestYearOf } from "@/data/progress";
@@ -15,10 +16,14 @@ import { getHousehold } from "@/store/household";
 
 // The progress points, read from the store behind the session, under a
 // header saying how many there are, over which months and how many of
-// those were not kept, and opening on what the latest year came to. A
-// household keeping no point yet draws the table's empty state and no
-// more, and one keeping a point alone has no year to read. The page
-// renders behind the loading screen beside it.
+// those were not kept, and opening on what the latest year came to over
+// the balances laid month by month. The chart is drawn whenever two
+// points are kept, whether or not a year can be read: a latest point
+// more than a year after the one before it has no year, but the months
+// before it still lay out. A household keeping no point yet draws the
+// table's empty state and no more, and one keeping a point alone has no
+// year to read and nothing to lay along a chart. The page renders
+// behind the loading screen beside it.
 export default async function Progress(): Promise<JSX.Element> {
   const { points } = await getHousehold();
   const year = latestYearOf(points);
@@ -29,6 +34,7 @@ export default async function Progress(): Promise<JSX.Element> {
       </ScreenHeader>
       <ScreenBody>
         {year !== undefined && <ProgressYear year={year} />}
+        {points.length > 1 && <ProgressChart points={points} />}
         <ProgressPoints points={points} />
         <Note>
           Net worth is a point&apos;s five balances summed; cash is left out, as

@@ -40,15 +40,18 @@ describe("Progress", () => {
 
   // Six points from March to August 2026, net worth rising from
   // £873,279 to £930,261.
-  it("opens on what the year came to, read from the earliest point within it", async () => {
+  it("opens on what the year came to, read from the earliest point within it, over the months laid along a chart", async () => {
     await renderProgress();
 
-    expect(
-      screen.getByRole("region", { name: "What the year came to" }),
-    ).toHaveTextContent("+£56,982");
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+    const year = screen.getByRole("region", { name: "What the year came to" });
+
+    expect(year).toHaveTextContent("+£56,982");
+    expect(within(year).getByRole("heading", { level: 2 })).toHaveTextContent(
       "Net worth rose £56,982 in the 5 months to August.",
     );
+    expect(
+      screen.getByRole("region", { name: "Month by month" }),
+    ).toBeInTheDocument();
   });
 
   // Fourteen months of points from January 2025 with July 2025 not
@@ -68,9 +71,34 @@ describe("Progress", () => {
     expect(
       screen.getByText("13 month-ends from Jan 2025 to Feb 2026 · 1 missing"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "Net worth rose £12,000 in the year to February.",
-    );
+    expect(
+      within(
+        screen.getByRole("region", { name: "What the year came to" }),
+      ).getByRole("heading", { level: 2 }),
+    ).toHaveTextContent("Net worth rose £12,000 in the year to February.");
+  });
+
+  // Every month of 2020 and then March 2022: the latest point has none
+  // within the year before it to read a year from, but the months still
+  // lay out along the chart.
+  it("lays the months along the chart where the latest point has no year to read", async () => {
+    const kept = Array.from({ length: 13 }, (_, index): ProgressPoint => ({
+      assets: 400000 + index * 1000,
+      deferred: 0,
+      free: 0,
+      loans: 0,
+      month:
+        index === 12 ? { month: 2, year: 2022 } : { month: index, year: 2020 },
+      unsecured: 0,
+    }));
+    await renderProgress(kept);
+
+    expect(
+      screen.queryByRole("region", { name: "What the year came to" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Month by month" }),
+    ).toBeInTheDocument();
   });
 
   // A point alone has nothing to move from.
