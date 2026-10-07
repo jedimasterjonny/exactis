@@ -4,7 +4,7 @@ import type { Schedule } from "@/engine/cash-flow";
 import type { ProjectionPoint } from "@/engine/projection";
 
 import { endYear, retirementYear } from "@/data/plan";
-import { balanceIn, project } from "@/engine/projection";
+import { balanceIn, isShort, project } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
 // One future the plan was run over, as the chance of success reads it:
@@ -103,9 +103,7 @@ export function futureOf(
   accounts: readonly Account[],
 ): Future {
   return {
-    fell:
-      points.find(({ early, uncovered }) => early > 0 || uncovered > 0)?.year ??
-      null,
+    fell: points.find(isShort)?.year ?? null,
     ranOut: points.find(({ uncovered }) => uncovered > 0)?.year ?? null,
     worth: points.map((point) =>
       accounts.reduce((sum, { id }) => sum + balanceIn(point, id), 0),

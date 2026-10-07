@@ -138,6 +138,15 @@ export function holdsAnything(point: ProjectionPoint): boolean {
   return Object.values(point.balances).some((balance) => balance !== 0);
 }
 
+// Whether a point's year falls short: some of it drawn from nowhere, or
+// covered only by drawing a pension before the pension age, at a charge
+// that keeps the plan going on paper alone. A plan falls short in the
+// first such year, which is where the chance of success counts a future
+// as falling short.
+export function isShort(point: ProjectionPoint): boolean {
+  return point.early > 0 || point.uncovered > 0;
+}
+
 // Each account carried the months given on from the one the plan
 // starts in, in the order given, as the projection carries a month: what the
 // month's cash flow pays in lands at its start and the balance grows a
