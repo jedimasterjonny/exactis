@@ -16,6 +16,7 @@ import {
   balanceIn,
   balanceOf,
   holdsAnything,
+  isShort,
   monthsOn,
   project,
 } from "./projection";
@@ -1384,6 +1385,14 @@ describe("balanceOf", () => {
         ),
       ),
     ).toBe(1500);
+  });
+});
+
+describe("isShort", () => {
+  it("says whether a point's year drew from nowhere or on a pension early", () => {
+    expect(isShort(point(2030, {}))).toBe(false);
+    expect(isShort(point(2030, {}, { uncovered: 1 }))).toBe(true);
+    expect(isShort(point(2030, {}, { early: 1 }))).toBe(true);
   });
 });
 
