@@ -1,0 +1,109 @@
+// @vitest-environment node
+import { describe, expect, it } from "vitest";
+
+import type { ProgressPoint } from "./progress";
+
+import { latestYearOf, movesOf, sumOf } from "./progress";
+import { points } from "./progress.fixture";
+
+// The fixture's first point and its last, March and August 2026.
+function ends(): { readonly from: ProgressPoint; readonly to: ProgressPoint } {
+  const [from] = points;
+  const to = points.at(-1);
+  if (from === undefined || to === undefined) {
+    throw new Error("The fixture keeps points.");
+  }
+  return { from, to };
+}
+
+// A point a month, from January 2017, its property worth what is given
+// and nothing else held or owed, so its net worth is that figure.
+function monthly(worths: readonly number[]): ProgressPoint[] {
+  return worths.map((assets, index) => ({
+    assets,
+    deferred: 0,
+    free: 0,
+    loans: 0,
+    month: { month: index % 12, year: 2017 + Math.floor(index / 12) },
+    unsecured: 0,
+  }));
+}
+
+describe("latestYearOf", () => {
+  // Six points from March to August 2026: the year is read from the
+  // earliest, five months back, and is held against no year before it.
+  it("reads from the earliest point within the year where the points start later", () => {
+    expect(latestYearOf(points)).toStrictEqual({
+      before: [],
+      from: points[0],
+      to: points[5],
+    });
+  });
+
+  // Thirty-eight months from January 2017 to February 2020, rising
+  // £1,000 a month to February 2018, £2,000 a month to February 2019 and
+  // £3,000 a month to February 2020.
+  it("reads from the point a year before, and the years before it to the same month, nearest first", () => {
+    const kept = monthly(
+      Array.from({ length: 38 }, (_, index) =>
+        Array.from(
+          { length: index },
+          (_unused, month) => Math.ceil(month / 12) * 1000,
+        ).reduce((sum, rise) => sum + rise, 100000),
+      ),
+    );
+
+    const year = latestYearOf(kept);
+
+    expect(year?.from.month).toStrictEqual({ month: 1, year: 2019 });
+    expect(year?.before).toStrictEqual([24000, 12000]);
+  });
+
+  // The same months with February 2017 not kept, the year from it to
+  // February 2018 has no start, and is passed over; with February 2018
+  // not kept, that year has no end and the year after it no start.
+  it("passes over a year either end of which was not kept", () => {
+    const kept = monthly(Array.from({ length: 38 }, (_, index) => index));
+
+    expect(
+      latestYearOf(kept.filter((_point, index) => index !== 1))?.before,
+    ).toStrictEqual([12]);
+    expect(
+      latestYearOf(kept.filter((_point, index) => index !== 13))?.before,
+    ).toStrictEqual([]);
+  });
+
+  // August 2025 not kept: the year is read from September 2025, eleven
+  // months back, and so is held against none.
+  it("holds a year that is not twelve months whole against none", () => {
+    const kept = monthly(Array.from({ length: 116 }, (_, index) => index));
+
+    expect(
+      latestYearOf(kept.filter((_point, index) => index !== 103)),
+    ).toMatchObject({ before: [], from: { month: { month: 8, year: 2025 } } });
+  });
+
+  it("reads no year off a point alone, or before any is kept", () => {
+    expect(latestYearOf(points.slice(0, 1))).toBeUndefined();
+    expect(latestYearOf([])).toBeUndefined();
+  });
+});
+
+describe("movesOf", () => {
+  // The fixture's March and August: the debts paid down add, the cards
+  // run up take away, and each side sums apart.
+  it("reads what each balance moved net worth by, and what each side came to", () => {
+    const { from, to } = ends();
+    const moves = movesOf(from, to);
+
+    expect(moves).toStrictEqual([
+      { key: "deferred", move: 28660 },
+      { key: "free", move: 20144 },
+      { key: "assets", move: 4966 },
+      { key: "loans", move: 3572 },
+      { key: "unsecured", move: -360 },
+    ]);
+    expect(sumOf(moves, 1)).toBe(57342);
+    expect(sumOf(moves, -1)).toBe(360);
+  });
+});

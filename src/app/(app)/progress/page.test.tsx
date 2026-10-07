@@ -24,16 +24,6 @@ async function renderProgress(
   render(await Progress());
 }
 
-// A tile by its label: the card that carries a tone, read as its label,
-// its figure and the line beneath run together.
-function tile(label: string): HTMLElement {
-  return screen.getByText(
-    (_content, element) =>
-      element?.hasAttribute("data-tone") === true &&
-      element.textContent.startsWith(label),
-  );
-}
-
 describe("Progress", () => {
   it("opens with the progress header and no action, since the points are loaded rather than typed", async () => {
     await renderProgress();
@@ -42,32 +32,29 @@ describe("Progress", () => {
       "Progress points",
     );
     expect(screen.getByText("Sect. V · Progress")).toHaveClass("label");
-    expect(screen.getByText("Newest first")).toBeInTheDocument();
+    expect(
+      screen.getByText("6 month-ends from Mar 2026 to Aug 2026"),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  // Six points from March to August 2026. August's balances come to
-  // £930,261, July's to £918,708, and March's, the earliest within the
-  // twelve months to August, to £873,279.
-  it("reads the four tiles off the points", async () => {
+  // Six points from March to August 2026, net worth rising from
+  // £873,279 to £930,261.
+  it("opens on what the year came to, read from the earliest point within it", async () => {
     await renderProgress();
 
-    expect(tile("Points recorded")).toHaveTextContent(
-      "Points recorded6Monthly since Mar 2026",
-    );
-    expect(tile("Latest point")).toHaveTextContent("Latest pointAug2026");
-    expect(tile("Tracked 12 months")).toHaveTextContent(
-      "Tracked 12 months+£56,982Net worth since Mar 2026",
-    );
-    expect(tile("Net worth today")).toHaveTextContent(
-      "Net worth today£930,261+£11,553vs Jul 2026",
+    expect(
+      screen.getByRole("region", { name: "What the year came to" }),
+    ).toHaveTextContent("+£56,982");
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Net worth rose £56,982 in the 5 months to August.",
     );
   });
 
-  // Fourteen months of points from January 2025, the assets rising
-  // £1,000 a month, read February 2026's move from February 2025's
-  // rather than from the first.
-  it("reads the move from the point a year before", async () => {
+  // Fourteen months of points from January 2025 with July 2025 not
+  // kept, the property rising £1,000 a month: the year to February 2026
+  // is read from February 2025, and the header counts the month missing.
+  it("reads the year from the point a year before, and counts the months not kept", async () => {
     const monthly = Array.from({ length: 14 }, (_, index): ProgressPoint => ({
       assets: 400000 + index * 1000,
       deferred: 0,
@@ -75,39 +62,42 @@ describe("Progress", () => {
       loans: 0,
       month: { month: index % 12, year: 2025 + Math.floor(index / 12) },
       unsecured: 0,
-    }));
+    })).filter((_point, index) => index !== 6);
     await renderProgress(monthly);
 
-    expect(tile("Tracked 12 months")).toHaveTextContent(
-      "Tracked 12 months+£12,000Net worth since Feb 2025",
+    expect(
+      screen.getByText("13 month-ends from Jan 2025 to Feb 2026 · 1 missing"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Net worth rose £12,000 in the year to February.",
     );
   });
 
-  // A point alone has nothing to move from, and no month before it.
-  it("reads no move off a point alone", async () => {
+  // A point alone has nothing to move from.
+  it("reads no year off a point alone", async () => {
     await renderProgress(points.slice(0, 1));
 
-    expect(tile("Tracked 12 months")).toHaveTextContent(
-      "Tracked 12 months£0Net worth since Mar 2026",
-    );
-    expect(tile("Net worth today")).toHaveTextContent(
-      /^Net worth today£873,279$/,
-    );
+    expect(
+      screen.getByText("1 month-end from Mar 2026 to Mar 2026"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
   });
 
   it("carries the points table with a row per point", async () => {
     await renderProgress();
 
-    const table = screen.getByRole("table");
+    // The one table not captioned, the year's legends being captioned.
+    const table = screen.getByRole("table", { name: "" });
     const [, ...rows] = within(table).getAllByRole("row");
 
     expect(rows).toHaveLength(points.length);
   });
 
-  it("draws no tiles and the table's empty state before any point is kept", async () => {
+  it("draws no year, no span and the table's empty state before any point is kept", async () => {
     await renderProgress([]);
 
-    expect(screen.queryByText("Points recorded")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(screen.queryByText(/month-end/)).not.toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.getByText("No points yet")).toBeInTheDocument();
   });
@@ -115,7 +105,7 @@ describe("Progress", () => {
   it("closes with the note on what net worth counts", async () => {
     await renderProgress();
 
-    expect(screen.getByRole("paragraph")).toHaveTextContent(
+    expect(screen.getAllByRole("paragraph").at(-1)).toHaveTextContent(
       "Net worth is a point's five balances summed; cash is left out, as the sheet leaves it out.",
     );
   });
