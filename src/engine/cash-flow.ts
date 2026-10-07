@@ -28,7 +28,7 @@ import {
 import { rules } from "@/data/rules";
 import { fixedMonthly, monthly } from "@/lib/cadence";
 import { runsIn } from "@/lib/lines";
-import { clearsIn } from "@/lib/loans";
+import { paidUntil } from "@/lib/loans";
 import { isOnOrBefore } from "@/lib/months";
 import {
   incomeTaxOn,
@@ -656,11 +656,13 @@ function fixedSums(
 // the balance it holds, which a debt holds as a negative, down to the
 // balloon a PCP leaves standing, and the term is what that sum a month
 // takes to pay it down at the rate the debt is charged, its own fixed
-// one or the plan's. The last payment falls in the month clearsIn
+// one or the plan's. The last payment falls in the month paidUntil
 // counts to from the month the plan starts in, and the sum is charged
 // whole through that month and not at all after it, which is the test
 // runsIn makes of a line's last year and month, made here of the month
-// the loan maths gives rather than of one anybody typed. A payment the
+// the loan maths gives rather than of one anybody typed. A debt owing
+// no more than its balloon takes no time to pay down, and its payments
+// do not run at all. A payment the
 // interest swallows clears nothing and has no last month; the action
 // refuses to save such a debt, so one here is a caller's mistake.
 function isPaying(
@@ -672,7 +674,7 @@ function isPaying(
   if (term === null) {
     throw new Error(rules.debtEnds);
   }
-  return isOnOrBefore(at, clearsIn(term, plan));
+  return isOnOrBefore(at, paidUntil(term, plan));
 }
 
 // What lands in an account, taken off what is left of its owner's
