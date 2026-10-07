@@ -16,6 +16,7 @@ import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan, Spread } from "@/data/plan";
+import type { ProgressPoint } from "@/data/progress";
 import type { Allocation, Rates, RateSet } from "@/data/rates";
 import type { Month } from "@/data/schedule";
 import type { SecuredRecords } from "@/data/secured";
@@ -35,6 +36,7 @@ import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
+import { points } from "@/data/progress.fixture";
 import { planRate } from "@/data/rates";
 import { allocation, rates } from "@/data/rates.fixture";
 import { targets, targetsUnder } from "@/data/targets.fixture";
@@ -61,6 +63,7 @@ interface Inputs {
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
+  readonly points: readonly ProgressPoint[];
   readonly rates: Rates;
   readonly rateSet: RateSet;
   readonly schedule: {
@@ -89,6 +92,7 @@ const sound: Inputs = {
   milestones,
   owners,
   plan: retiring,
+  points,
   rates,
   rateSet: "custom",
   schedule: { expenses: expenseLines, income: incomeLines },
@@ -477,6 +481,25 @@ const held: readonly Case[] = [
       },
     }),
   ],
+  [
+    "A balance below nothing is a debt's",
+    (given): Inputs => recorded(given, (point) => ({ ...point, assets: -1 })),
+  ],
+  [
+    "A debt's balance is nothing or less",
+    (given): Inputs => recorded(given, (point) => ({ ...point, loans: 1 })),
+  ],
+  [
+    "A point is recorded once a month, oldest first",
+    (given): Inputs => ({ ...given, points: given.points.toReversed() }),
+  ],
+  [
+    "A point is recorded once a month, oldest first",
+    (given): Inputs => ({
+      ...given,
+      points: [...given.points, ...given.points.slice(-1)],
+    }),
+  ],
 ];
 
 describe("household", () => {
@@ -559,6 +582,7 @@ describe("soundKept", () => {
           retires: 59,
           years: 53,
         },
+        points: [],
         rates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
         rateSet: "custom",
         schedule: { expenses: [], income: [] },
@@ -1060,6 +1084,19 @@ function priced(
   return {
     ...given,
     cma: { latest: { ...cma, assets: change(cma.assets) }, previous: null },
+  };
+}
+
+// The household with its first progress point changed.
+function recorded(
+  given: Inputs,
+  change: (point: ProgressPoint) => ProgressPoint,
+): Inputs {
+  return {
+    ...given,
+    points: given.points.map((point, index) =>
+      index === 0 ? change(point) : point,
+    ),
   };
 }
 
