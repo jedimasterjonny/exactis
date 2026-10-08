@@ -45,18 +45,20 @@ interface IndexedMonth {
 }
 
 // The index as the Land Registry publishes it for the house: the
-// region, as the id the Registry gives it names it in an address, and
-// the figure for the house's type, as the Registry names it among a
-// month's figures. Both stand here rather than in the store, as the
-// inflation premium does, since the household has one house and
-// nothing else reads them; a second house in another county, or of
-// another type, is the day they move onto the house. The figure is the
-// average price rather than the index, since the index is that price
-// over January 2015's, published to a tenth: the ratio of two months'
-// prices is the index's own, and to the pound, where the index's tenth
-// moved a house £400 or so at a step.
+// region, as the id the Registry gives it names it in an address, the
+// figure for the house's type, as the Registry names it among a
+// month's figures, and the two as a screen says them. All three stand
+// here rather than in the store, as the inflation premium does, since
+// the household has one house and nothing else reads them; a second
+// house in another county, or of another type, is the day they move
+// onto the house. The figure is the average price rather than the
+// index, since the index is that price over January 2015's, published
+// to a tenth: the ratio of two months' prices is the index's own, and
+// to the pound, where the index's tenth moved a house £400 or so at a
+// step.
 const region = "dorset";
 const indexed = "averagePriceDetached";
+export const indexedAs = "a detached house in Dorset";
 
 // The Registry's answer, as much of it as is read: the months it lists,
 // each with the month it is for, as the Registry writes a month, one of

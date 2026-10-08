@@ -1,31 +1,37 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { HousePrices } from "@/data/house-prices";
 import type { ProgressPoint } from "@/data/progress";
 
 import { soundKept } from "@/data/household";
-import { blank } from "@/data/household.fixture";
+import { blank, kept as reference } from "@/data/household.fixture";
 import { points } from "@/data/progress.fixture";
 import { getHousehold } from "@/store/household";
 
 import Progress from "./page";
 
 vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
+vi.mock("@/actions/house-prices", () => ({ pullHousePrices: vi.fn() }));
 
 // The page over the blank household, as the store reads it, with the
-// points a test gives.
+// points a test gives and the index pulled, or none.
 async function renderProgress(
   kept: readonly ProgressPoint[] = points,
+  housePrices: HousePrices | null = null,
 ): Promise<void> {
   vi.mocked(getHousehold).mockResolvedValue({
     ...soundKept(blank).household,
+    housePrices,
     points: kept,
   });
   render(await Progress());
 }
 
 describe("Progress", () => {
-  it("opens with the progress header and no action, since the points are loaded rather than typed", async () => {
+  // The points are loaded rather than typed, so the header's one
+  // action is the pull that writes the house into them.
+  it("opens with the progress header and the pull of the house price index", async () => {
     await renderProgress();
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -36,8 +42,10 @@ describe("Progress", () => {
       screen.getByText("6 month-ends from Mar 2026 to Aug 2026"),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByRole("banner")).queryByRole("button"),
-    ).not.toBeInTheDocument();
+      within(screen.getByRole("banner")).getByRole("button", {
+        name: "Pull house prices",
+      }),
+    ).toBeInTheDocument();
   });
 
   // Six points from March to August 2026, net worth rising from
@@ -145,11 +153,24 @@ describe("Progress", () => {
     expect(screen.getByText("No points yet")).toBeInTheDocument();
   });
 
-  it("closes with the note on what net worth counts", async () => {
+  it("closes with the notes on what net worth counts and what the house is held at before an index is pulled", async () => {
     await renderProgress();
 
-    expect(screen.getAllByRole("paragraph").at(-1)).toHaveTextContent(
+    expect(screen.getAllByRole("paragraph").at(-2)).toHaveTextContent(
       "Net worth is a point's five balances summed; cash is left out, as the sheet leaves it out.",
+    );
+    expect(screen.getAllByRole("paragraph").at(-1)).toHaveTextContent(
+      "Property & vehicles holds the house as the sheet gave it; pull the UK House Price Index to hold it at the index for a detached house in Dorset from the month it was bought.",
+    );
+  });
+
+  // The fixture's index was pulled on 15 September 2026, from a June
+  // 2022 purchase to July.
+  it("says from which month the house is held at the index and to which, and when the index was pulled", async () => {
+    await renderProgress(points, reference.housePrices);
+
+    expect(screen.getAllByRole("paragraph").at(-1)).toHaveTextContent(
+      "Property & vehicles holds the house since Jun 2022 at the UK House Price Index for a detached house in Dorset, to Jul 2026 and rolled forward after; pulled 15 Sep 2026.",
     );
   });
 });
