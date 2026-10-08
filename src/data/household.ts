@@ -11,6 +11,7 @@ import type {
   Vintages,
 } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
+import type { HousePrices } from "@/data/house-prices";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
@@ -55,14 +56,16 @@ import { isWithinAllowance } from "@/lib/tax";
 
 // Everything the projection runs on, the owners the wrappers name and
 // the milestones the plan is laid out by, the progress points the
-// balances were read at month by month, the inflation curve last
-// pulled from the Bank of England, or none before one is, the vintages
-// of BlackRock's capital market assumptions last pulled, or none before
-// one is, the rates typed by hand, what comes off the CMA's returns to
-// derive them instead, which of the two sets is chosen, the split of the
-// savings typed by hand, the rates the plan runs on as it is, held to the
-// rules every rate is, the target allocation last imported from
-// Portfolio Performance, or none before one is, and the class each of its
+// balances were read at month by month, the house price index last
+// pulled from the Land Registry to write the house into them, or none
+// before one is, the inflation curve last pulled from the Bank of
+// England, or none before one is, the vintages of BlackRock's capital
+// market assumptions last pulled, or none before one is, the rates
+// typed by hand, what comes off the CMA's returns to derive them
+// instead, which of the two sets is chosen, the split of the savings
+// typed by hand, the rates the plan runs on as it is, held to the rules
+// every rate is, the target allocation last imported from Portfolio
+// Performance, or none before one is, and the class each of its
 // categories is mapped onto: the whole of what the store holds for the
 // household, with the plan as it stands the day it is read.
 export interface Household {
@@ -71,6 +74,7 @@ export interface Household {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
+  readonly housePrices: HousePrices | null;
   readonly liveRates: Rates;
   readonly mappings: readonly Mapping[];
   readonly milestones: readonly Milestone[];
@@ -89,7 +93,8 @@ export interface Household {
 
 // The household as the store keeps it: the records, the month their
 // balances are as of, one for the whole household since they are
-// recorded together, the progress points, the ages the plan is set to
+// recorded together, the progress points and when the house price
+// index was last written into them, the ages the plan is set to
 // rather than the plan they make, the curve as the Bank gave it rather
 // than the inflation it
 // makes, the vintages as BlackRock priced them, the rates and the split
@@ -108,6 +113,7 @@ export interface Kept {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
+  readonly housePrices: HousePrices | null;
   readonly mappings: readonly Mapping[];
   readonly milestones: readonly Milestone[];
   readonly next: number;
@@ -288,6 +294,14 @@ const points = z.array(point).refine(
     }),
   "A point is recorded once a month, oldest first",
 );
+
+// The house price index as pulled: the month of the purchase it scaled
+// from, the day it was pulled on, and the latest month it ran to.
+const housePrices = z.object({
+  from: month,
+  pulledOn: z.iso.date(),
+  to: month,
+}) satisfies z.ZodType<HousePrices>;
 
 // A curve as the Bank gave it: the day it stood on, and a rate at each
 // maturity the plan reads.
@@ -501,6 +515,7 @@ export const household = z
     cma: vintages.nullable(),
     curve: curve.nullable(),
     deductions,
+    housePrices: housePrices.nullable(),
     liveRates: rates,
     mappings,
     milestones: z.array(milestone),
@@ -647,6 +662,7 @@ const kept = z
     cma: vintages.nullable(),
     curve: curve.nullable(),
     deductions,
+    housePrices: housePrices.nullable(),
     mappings,
     milestones: z.array(milestone),
     next: recordId,
@@ -698,11 +714,12 @@ export function holdWhileLive(
 }
 
 // The household before anything is saved: no records, balances as of
-// the month given, no progress point, the ages the dashboard has shown,
-// a plan to 89 retiring at 59, no curve or CMA pulled, the rates a
-// household opens with live and everything in stocks, the manual
-// method's fees and yield to deduct from a CMA's returns, no target
-// allocation imported or category mapped, and the first id.
+// the month given, no progress point and no house price index pulled,
+// the ages the dashboard has shown, a plan to 89 retiring at 59, no
+// curve or CMA pulled, the rates a household opens with live and
+// everything in stocks, the manual method's fees and yield to deduct
+// from a CMA's returns, no target allocation imported or category
+// mapped, and the first id.
 export function nothingKeptIn(asOf: Month): Kept {
   return {
     accounts: [],
@@ -712,6 +729,7 @@ export function nothingKeptIn(asOf: Month): Kept {
     cma: null,
     curve: null,
     deductions: openingDeductions,
+    housePrices: null,
     mappings: [],
     milestones: [],
     next: 1,
@@ -797,6 +815,7 @@ function householdOf(kept: Kept): Household {
     cma: kept.cma,
     curve: kept.curve,
     deductions: kept.deductions,
+    housePrices: kept.housePrices,
     liveRates: live.rates,
     mappings: kept.mappings,
     milestones: kept.milestones,
