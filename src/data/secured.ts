@@ -1,4 +1,9 @@
-import type { Account, AccountKind, AccountValues } from "@/data/accounts";
+import type {
+  Account,
+  AccountKind,
+  AccountValues,
+  Purchase,
+} from "@/data/accounts";
 import type { LineValues } from "@/data/schedule";
 
 // An asset and the loan secured on it, as the store holds them: two
@@ -13,17 +18,19 @@ export interface Secured {
 }
 
 // What an asset's model lays out to be written together: the asset,
-// and the loan secured on it with its payments, or none for an asset
-// owned outright.
+// with when it was bought where it is a house, and the loan secured on
+// it with its payments, or none for an asset owned outright.
 export interface SecuredRecords {
-  readonly asset: AccountValues;
+  readonly asset: AccountValues & Pick<Account, "bought">;
   readonly loan: Borrowing | null;
 }
 
 // The asset as its model hands it to be written: its own kind, its
-// name, what it is worth, and the rate it grows at, below nothing for
-// one that loses value.
+// name, what it is worth, the rate it grows at, below nothing for one
+// that loses value, and for a house when it was bought and what it
+// cost.
 interface Asset {
+  readonly bought?: Purchase;
   readonly kind: Extract<AccountKind, "car" | "house">;
   readonly name: string;
   readonly rate: number;
@@ -70,15 +77,17 @@ export function owes(loan: Omit<Loan, "balloon" | "name">): boolean {
 // household is read, so it moves with the month the balances are as
 // of. The engine counts the payment once, as the line, since it leaves
 // the contribution of a loan a line pays out of the month's fixed sums.
-// Both are named as the asset's model names the loan.
+// Both are named as the asset's model names the loan. A house's
+// purchase goes with it, beside the values.
 export function securedRecords(
   asset: Asset,
   loan: Loan | null,
   plan: { readonly from: number },
 ): SecuredRecords {
-  const held: AccountValues = {
+  const held: SecuredRecords["asset"] = {
     balance: asset.value,
     balloon: 0,
+    ...(asset.bought !== undefined && { bought: asset.bought }),
     cadence: "year",
     cap: 0,
     contribution: 0,

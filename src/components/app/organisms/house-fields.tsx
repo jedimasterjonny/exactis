@@ -6,7 +6,12 @@ import type { LoanFigure } from "@/lib/figures";
 import type { PlanMonth } from "@/lib/loans";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
-import { MoneyField, RateField } from "@/components/app/molecules/figure-field";
+import {
+  MoneyField,
+  RateField,
+  YearField,
+} from "@/components/app/molecules/figure-field";
+import { MonthField } from "@/components/app/molecules/month-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { LoanFields } from "@/components/app/organisms/loan-fields";
@@ -45,10 +50,15 @@ const words: LoanWords = {
 
 // The fields the house dialog takes: the name and the status on the first
 // row, what the house is worth and the rate it grows at on the second,
-// and for a mortgaged house the loan fields every secured loan takes
-// beneath them, in the house's words. The first four are uncontrolled,
-// mount with the house as it opened and report each change to the
-// dialog, whose draft mirrors them. A house owned outright shows no
+// the month and the year it was bought in and what it cost on the
+// third, and for a mortgaged house the loan fields every secured loan
+// takes beneath them, in the house's words. The year bought is held
+// between the first year there is and the year the plan starts in,
+// since a house is bought in a year that has begun and the store takes
+// none before the first. The typed fields are uncontrolled, mount with
+// the house as it opened and report each change to the dialog, whose
+// draft mirrors them; the month is a choice by value, as every month
+// field is, and shows the draft's. A house owned outright shows no
 // loan fields at all.
 export function HouseFields({
   draft,
@@ -94,6 +104,43 @@ export function HouseFields({
           label="Value growth"
           onValueCommitted={(growth) => {
             onAmend({ growth });
+          }}
+        />
+      </FieldRow>
+      <FieldRow layout="triple">
+        <MonthField
+          label="Month bought"
+          onValueChange={(month) => {
+            onAmend({
+              bought: {
+                ...draft.bought,
+                month: { ...draft.bought.month, month },
+              },
+            });
+          }}
+          value={draft.bought.month.month}
+        />
+        <YearField
+          defaultValue={initial.bought.month.year}
+          label="Year bought"
+          max={plan.from}
+          min={1}
+          onValueCommitted={(year) => {
+            onAmend({
+              bought: {
+                ...draft.bought,
+                month: { ...draft.bought.month, year },
+              },
+            });
+          }}
+        />
+        <MoneyField
+          defaultValue={initial.bought.price}
+          hint="What it cost"
+          label="Bought for"
+          min={0}
+          onValueCommitted={(price) => {
+            onAmend({ bought: { ...draft.bought, price } });
           }}
         />
       </FieldRow>

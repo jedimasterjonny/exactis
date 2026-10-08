@@ -74,10 +74,13 @@ const car = z
 // account's rate is, the mortgage's rate no lower than nothing, a
 // mortgaged house owing and paying something, a house owned outright
 // owing, paying and charged nothing, since the form zeroes what its
-// status hides, and the name as typed less the space around it.
+// status hides, the month it was bought in and the price, which its
+// soundness holds to something, and the name as typed less the space
+// around it.
 const house = z
   .object({
     balance: pounds,
+    bought: z.object({ month, price: pounds }),
     growth: z.number().min(-1),
     name: named,
     payment: pounds,
@@ -443,11 +446,12 @@ function securedIn(
 // The account written into the household: added as the next when the
 // id is null, else written over the one with that id in its place,
 // keeping the asset a loan is secured on, since what an account
-// secures is not among the values a save sends, and dated as below.
+// secures is not among the values a save sends, carrying the purchase
+// a house sends beside its values, and dated as below.
 function writtenIn(
   kept: Kept,
   at: null | number,
-  values: AccountValues,
+  values: AccountValues & Pick<Account, "bought">,
 ): { readonly kept: Kept; readonly result: Account } {
   const {
     next,

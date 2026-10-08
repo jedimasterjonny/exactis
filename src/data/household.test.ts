@@ -237,6 +237,25 @@ const held: readonly Case[] = [
     (given): Inputs => changed(given, 3, (cash) => ({ ...cash, secures: 4 })),
   ],
   [
+    "A house carries when it was bought, and nothing else does",
+    (given): Inputs =>
+      changed(given, 4, (home) => ({ ...home, kind: "house" })),
+  ],
+  [
+    "A house carries when it was bought, and nothing else does",
+    (given): Inputs =>
+      changed(given, 4, (home) => ({ ...home, bought: homeValues.bought })),
+  ],
+  [
+    "A house was bought for something",
+    (given): Inputs =>
+      changed(given, 4, (home) => ({
+        ...home,
+        bought: { ...homeValues.bought, price: 0 },
+        kind: "house",
+      })),
+  ],
+  [
     "A loan is secured on an asset the household lists",
     (given): Inputs =>
       changed(given, 5, (mortgage) => ({ ...mortgage, secures: 3 })),

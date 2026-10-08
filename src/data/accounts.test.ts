@@ -97,6 +97,24 @@ describe("accounts", () => {
     });
   });
 
+  // The purchase is the house dialog's alone, handed beside the values
+  // rather than among them, so the values read back carry none.
+  it("keeps a purchase handed beside the values, and writes none where none is", () => {
+    const bought = { month: { month: 5, year: 2022 }, price: 380000 };
+    const values = { ...toValues(accounts[3]), kind: "house" } as const;
+
+    expect(toAccount({ ...values, bought }, 4)).toStrictEqual({
+      ...accounts[3],
+      bought,
+      kind: "house",
+    });
+    expect(toAccount(values, 4)).toStrictEqual({
+      ...accounts[3],
+      kind: "house",
+    });
+    expect(toValues(toAccount({ ...values, bought }, 4))).toStrictEqual(values);
+  });
+
   // The sum and the cadence are dropped with the spare money, so the
   // values come back with nothing a year, whatever was typed before the
   // choice changed; and a cap of nothing is no cap on the account, which
