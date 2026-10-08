@@ -64,6 +64,7 @@ describe("Progress", () => {
       assets: 400000 + index * 1000,
       deferred: 0,
       free: 0,
+      house: 0,
       loans: 0,
       month: { month: index % 12, year: 2025 + Math.floor(index / 12) },
       unsecured: 0,
@@ -88,6 +89,7 @@ describe("Progress", () => {
       assets: 400000 + index * 1000,
       deferred: 0,
       free: 0,
+      house: 0,
       loans: 0,
       month:
         index === 12 ? { month: 2, year: 2022 } : { month: index, year: 2020 },
