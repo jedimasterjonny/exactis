@@ -123,6 +123,14 @@ export interface Kept {
 // the id it is listed by.
 const line = { ...lineValues, id: recordId };
 
+// When a house was bought: a month, and a price of something, whole
+// pounds, since what the house has been worth since is scaled from it
+// and nothing scales from nothing.
+const purchase = z.object({
+  month,
+  price: z.number().int().positive("A house was bought for something"),
+});
+
 // An account as the model lays it, with what the account save holds
 // it to and what the engine refuses of one account alone: a balance
 // below nothing only on a debt and above it never on one, the spare
@@ -130,14 +138,15 @@ const line = { ...lineValues, id: recordId };
 // pension and on nothing else,
 // a fixed sum within its allowance on its own, a rate no lower than
 // losing everything, a link to an asset only on the loan secured on
-// it, and the mark of an account always funded only on a pension. A
-// contribution, a balloon, an owner, a link, the mark and the day its
-// balance was set are absent rather than nothing, as the model has
-// them.
+// it, a purchase on a house and on nothing else, and the mark of an
+// account always funded only on a pension. A contribution, a balloon,
+// an owner, a link, the mark and the day its balance was set are
+// absent rather than nothing, as the model has them.
 const account = z
   .object({
     balance: z.number().int(),
     balloon: z.number().int().positive().exactOptional(),
+    bought: purchase.exactOptional(),
     contribution: z
       .discriminatedUnion("kind", [
         z.object({
@@ -189,6 +198,10 @@ const account = z
   .refine(
     (account) => account.secures === undefined || account.kind === "debt",
     "A loan secured on an asset is a debt",
+  )
+  .refine(
+    (account) => (account.kind === "house") === (account.bought !== undefined),
+    "A house carries when it was bought, and nothing else does",
   )
   .refine(
     (account) => account.isAlwaysFunded === undefined || isPension(account),

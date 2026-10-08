@@ -73,6 +73,11 @@ describe("HouseDialog", () => {
     expect(
       within(dialog).getByRole("combobox", { name: "Status" }),
     ).toHaveValue("mortgaged");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Month bought" }),
+    ).toHaveDisplayValue("September");
+    expect(field("Year bought", dialog)).toHaveValue("2026");
+    expect(field("Bought for", dialog)).toHaveValue("£0");
     expect(field("Loan balance", dialog)).toHaveValue("£0");
     expect(field("Rate", dialog)).toHaveValue("0.00%");
     expect(field("Monthly payment", dialog)).toHaveValue("£0");
@@ -95,6 +100,7 @@ describe("HouseDialog", () => {
 
     fireEvent.change(field("Name", dialog), { target: { value: " Home " } });
     commit(field("Value", dialog), "397,512");
+    commit(field("Bought for", dialog), "380,000");
     commit(field("Loan balance", dialog), "334,670");
     commit(field("Rate", dialog), "4.85");
     commit(field("Year", dialog), "2052");
@@ -115,6 +121,7 @@ describe("HouseDialog", () => {
 
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(null, {
       balance: 334670,
+      bought: { month: { month: 8, year: 2026 }, price: 380000 },
       growth: 0,
       name: "Home",
       payment: 1889,
@@ -156,6 +163,11 @@ describe("HouseDialog", () => {
     ).toHaveValue("mortgaged");
     expect(field("Value", dialog)).toHaveValue("£397,512");
     expect(field("Value growth", dialog)).toHaveValue("2.10%");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Month bought" }),
+    ).toHaveDisplayValue("October");
+    expect(field("Year bought", dialog)).toHaveValue("2021");
+    expect(field("Bought for", dialog)).toHaveValue("£380,000");
     expect(field("Loan balance", dialog)).toHaveValue("£176,520");
     expect(field("Rate", dialog)).toHaveValue("4.85%");
     expect(field("Monthly payment", dialog)).toHaveValue("£2,180");
@@ -176,6 +188,7 @@ describe("HouseDialog", () => {
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
       balance: 176520,
+      bought: { month: { month: 9, year: 2021 }, price: 380000 },
       growth: 0.021,
       name: "Home",
       payment: 2180,
@@ -248,6 +261,7 @@ describe("HouseDialog", () => {
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
       balance: 176520,
+      bought: { month: { month: 9, year: 2021 }, price: 380000 },
       growth: 0.021,
       name: "Home",
       payment: 2180,
@@ -278,6 +292,7 @@ describe("HouseDialog", () => {
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Home" } });
+    commit(field("Bought for", dialog), "380,000");
     fireEvent.change(
       within(dialog).getByRole("combobox", { name: "Work out" }),
       { target: { value: "rate" } },
@@ -313,6 +328,7 @@ describe("HouseDialog", () => {
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Home" } });
+    commit(field("Bought for", dialog), "380,000");
     fireEvent.change(
       within(dialog).getByRole("combobox", { name: "Work out" }),
       { target: { value: "term" } },
@@ -345,6 +361,7 @@ describe("HouseDialog", () => {
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(null, {
       balance: 334670,
+      bought: { month: { month: 8, year: 2026 }, price: 380000 },
       growth: 0,
       name: "Home",
       payment: 1000,
@@ -382,7 +399,9 @@ describe("HouseDialog", () => {
     expect(field("Rate", dialog)).not.toHaveAttribute("readonly");
   });
 
-  it("saves a house owned outright as the asset alone", async () => {
+  // A house is bought for something, so the save holds until the price
+  // is typed, with the month and the year as picked.
+  it("saves a house owned outright as the asset alone, once it has been bought for something", async () => {
     const onSaved = vi.fn<() => void>();
     saved({ ...home, id: 6, name: "Flat" });
     renderDialog({ onSaved });
@@ -397,9 +416,19 @@ describe("HouseDialog", () => {
     expect(
       within(dialog).queryByRole("textbox", { name: "Loan balance" }),
     ).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
 
     commit(field("Value", dialog), "250,000");
     commit(field("Value growth", dialog), "2");
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Month bought" }),
+      { target: { value: "9" } },
+    );
+    commit(field("Year bought", dialog), "2021");
+    commit(field("Bought for", dialog), "230,000");
+
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
+
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -407,6 +436,7 @@ describe("HouseDialog", () => {
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(null, {
       balance: 0,
+      bought: { month: { month: 9, year: 2021 }, price: 230000 },
       growth: 0.02,
       name: "Flat",
       payment: 0,
@@ -428,6 +458,7 @@ describe("HouseDialog", () => {
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), { target: { value: "Flat" } });
+    commit(field("Bought for", dialog), "230,000");
     fireEvent.change(within(dialog).getByRole("combobox", { name: "Status" }), {
       target: { value: "outright" },
     });

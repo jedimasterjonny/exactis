@@ -12,7 +12,7 @@ import type { PlanMonth } from "@/lib/loans";
 import { saveHouse } from "@/actions/accounts";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { HouseFields } from "@/components/app/organisms/house-fields";
-import { derive, houseOf, isSound } from "@/data/houses";
+import { derive, houseOf, isSound, openingPurchase } from "@/data/houses";
 import { useMountedEditor } from "@/hooks/use-editor";
 import { isSettled, kept, movesLoan, settled, workedOn } from "@/lib/figures";
 
@@ -40,8 +40,9 @@ interface HouseDialogProps {
 // A new house: mortgaged, since that is the case with something to work
 // out, worth nothing and owing nothing yet, over a term of twenty-five
 // years at no rate, working out the payment from the rate and the term
-// until another figure is chosen.
-const blank: Draft = {
+// until another figure is chosen. When it was bought is the plan's to
+// say, since a house opens on the plan's month before one is typed.
+const blank = {
   balance: 0,
   growth: 0,
   isHeld: false,
@@ -52,7 +53,7 @@ const blank: Draft = {
   term: 25,
   value: 0,
   worked: "payment",
-};
+} as const satisfies Omit<Draft, "bought">;
 
 // The dialog a house is entered or edited in, which takes the house as
 // the records it is and lets the store write them: the asset, and for a
@@ -90,7 +91,7 @@ export function HouseDialog({
         : saved.name,
     noun: "House",
     onSaved,
-    opening: openingOf(house),
+    opening: openingOf(house, plan),
     save: async (id, draft) => saveHouse(id, workedOut(draft).values),
   });
   if (entry === null) {
@@ -140,14 +141,16 @@ export function HouseDialog({
 // it, under its asset's id so a save writes back to it, with the term
 // worked out from them when it is mortgaged, since the store keeps the
 // balance, the rate and the payment and reads the term off those, and
-// the blank draft's term standing by otherwise; or the blank draft
-// under no id for a new one.
-function openingOf(house: null | Secured): Entry<Draft> {
+// the blank draft's term standing by otherwise; or the blank draft,
+// bought in the plan's month for nothing yet, under no id for a new
+// one.
+function openingOf(house: null | Secured, plan: PlanMonth): Entry<Draft> {
   if (house === null) {
-    return { draft: blank, id: null, initial: blank };
+    const draft: Draft = { ...blank, bought: openingPurchase(plan) };
+    return { draft, id: null, initial: draft };
   }
   const draft: Draft = {
-    ...houseOf(house),
+    ...houseOf(house, plan),
     isHeld: false,
     term: blank.term,
     worked: workedOn(house.loan !== null),
@@ -163,6 +166,7 @@ function valuesOf(draft: HouseDraft, out: WorkedOut): HouseValues {
   return settled(
     {
       balance: draft.balance,
+      bought: draft.bought,
       growth: draft.growth,
       name: draft.name.trim(),
       payment: draft.payment,

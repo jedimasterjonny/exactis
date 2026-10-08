@@ -385,6 +385,10 @@ describe("AccountLedger", () => {
       target: { value: "outright" },
     });
     commit(within(dialog).getByRole("textbox", { name: "Value" }), "250,000");
+    commit(
+      within(dialog).getByRole("textbox", { name: "Bought for" }),
+      "230,000",
+    );
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
