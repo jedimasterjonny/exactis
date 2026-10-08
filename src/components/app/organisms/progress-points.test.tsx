@@ -41,7 +41,15 @@ function pointOf(
     number,
   ],
 ): ProgressPoint {
-  return { assets, deferred, free, loans, month: { month, year }, unsecured };
+  return {
+    assets,
+    deferred,
+    free,
+    house: 0,
+    loans,
+    month: { month, year },
+    unsecured,
+  };
 }
 
 function yearRow(year: string): HTMLElement {

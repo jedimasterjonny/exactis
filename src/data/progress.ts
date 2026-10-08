@@ -10,10 +10,15 @@ import { monthsBetween } from "@/lib/months";
 // left out, as the sheet leaves it out, and a point carries no account
 // of its own, since the accounts a balance was summed over have come
 // and gone over the years the points span where the sums have not.
+// Beside the five it carries the house's share of what the property
+// and vehicles were worth, nothing before one was owned, so what the
+// house has been worth can be written again without the vehicles that
+// were summed beside it.
 export interface ProgressPoint {
   readonly assets: number;
   readonly deferred: number;
   readonly free: number;
+  readonly house: number;
   readonly loans: number;
   readonly month: Month;
   readonly unsecured: number;
