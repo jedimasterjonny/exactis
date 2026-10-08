@@ -8,11 +8,7 @@ import { points } from "./progress.fixture";
 
 // The fixture's first point and its last, March and August 2026.
 function ends(): { readonly from: ProgressPoint; readonly to: ProgressPoint } {
-  const [from] = points;
-  const to = points.at(-1);
-  if (from === undefined || to === undefined) {
-    throw new Error("The fixture keeps points.");
-  }
+  const [from, , , , , to] = points;
   return { from, to };
 }
 

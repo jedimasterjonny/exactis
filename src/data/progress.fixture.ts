@@ -2,8 +2,9 @@ import type { ProgressPoint } from "@/data/progress";
 
 // The reference kit's invented plan as its progress points: the six
 // months to the one its balances are as of, oldest first, the home the
-// whole of the property, since the kit owns no vehicle. For tests.
-export const points: readonly ProgressPoint[] = [
+// whole of the property, since the kit owns no vehicle. For tests. A
+// tuple, so a test reading one by its place gets a point.
+export const points = [
   {
     assets: 411420,
     deferred: 384220,
@@ -58,4 +59,4 @@ export const points: readonly ProgressPoint[] = [
     month: { month: 7, year: 2026 },
     unsecured: -2210,
   },
-];
+] as const satisfies readonly ProgressPoint[];
