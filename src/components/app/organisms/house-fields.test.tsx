@@ -76,6 +76,10 @@ describe("HouseFields", () => {
       "What it would sell for in September 2026",
     );
     expect(field("Value growth")).toHaveValue("2.10%");
+    expect(select("Month bought")).toHaveDisplayValue("June");
+    expect(field("Year bought")).toHaveValue("2022");
+    expect(field("Bought for")).toHaveValue("£380,000");
+    expect(field("Bought for")).toHaveAccessibleDescription("What it cost");
     expect(field("Loan balance")).toHaveValue("£341,810");
     expect(field("Loan balance")).toHaveAccessibleDescription(
       "What is owed in September 2026",
@@ -97,6 +101,9 @@ describe("HouseFields", () => {
     fireEvent.change(field("Name"), { target: { value: "Flat" } });
     commit(field("Value"), "420,000");
     commit(field("Value growth"), "3");
+    fireEvent.change(select("Month bought"), { target: { value: "7" } });
+    commit(field("Year bought"), "2021");
+    commit(field("Bought for"), "400,000");
     commit(field("Loan balance"), "300,000");
     commit(field("Rate"), "4.5");
     fireEvent.change(select("Work out"), { target: { value: "rate" } });
@@ -110,6 +117,9 @@ describe("HouseFields", () => {
       { name: "Flat" },
       { value: 420000 },
       { growth: 0.03 },
+      { bought: { month: { month: 7, year: 2022 }, price: 380000 } },
+      { bought: { month: { month: 5, year: 2021 }, price: 380000 } },
+      { bought: { month: { month: 5, year: 2022 }, price: 400000 } },
       { balance: 300000 },
       { rate: 0.045 },
       { term: 21.5 },
@@ -119,15 +129,23 @@ describe("HouseFields", () => {
     expect(onWork).toHaveBeenCalledExactlyOnceWith("rate");
   });
 
-  it("holds what is owed and paid at nothing or above", () => {
+  // The fixture plan starts in September 2026, so a house is bought in
+  // 2026 at the latest.
+  it("holds what is owed, paid and bought for at nothing or above, and the year bought between the first and the plan's", () => {
     const { onAmend } = renderFields(home, "rate", 0.0537);
 
     commit(field("Loan balance"), "-300,000");
     commit(field("Monthly payment"), "-2,000");
+    commit(field("Bought for"), "-1");
+    commit(field("Year bought"), "0");
+    commit(field("Year bought"), "2030");
 
     expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
       { balance: 0 },
       { payment: 0 },
+      { bought: { month: { month: 5, year: 2022 }, price: 0 } },
+      { bought: { month: { month: 5, year: 1 }, price: 380000 } },
+      { bought: { month: { month: 5, year: 2026 }, price: 380000 } },
     ]);
   });
 

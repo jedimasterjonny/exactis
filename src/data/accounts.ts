@@ -1,3 +1,5 @@
+import type { Month } from "@/data/schedule";
+
 // An account is a balance the plan grows: a tax wrapper, a cash account, a
 // real asset, or the loan against one. Balances are whole pounds, a debt's
 // negative, formatted where they are rendered; a rate is a fraction, so
@@ -9,17 +11,21 @@
 // the two are read and edited as one; any other account carries none.
 // A loan on a PCP carries the balloon its agreement leaves owing at the
 // end, so the car it is on opens as the PCP it is; any other account
-// carries none. An ISA or a pension carries the id of the owner it
-// belongs to, whose allowance it is paid under; any other account
-// carries none. A pension may be always funded, so what it is paid,
-// its own sum and what the salaries feeding it sacrifice, is kept up
-// out of the savings when the month cannot pay it; any other account,
-// and a pension that is not, carries no mark at all. An account carries
-// the day its balance was last set, an ISO date, once a save has dated
-// it; one kept before the day was carries none.
+// carries none. A house carries when it was bought and what it cost,
+// from which what it has been worth since is read off the house price
+// index; any other account carries none. An ISA or a pension carries
+// the id of the owner it belongs to, whose allowance it is paid under;
+// any other account carries none. A pension may be always funded, so
+// what it is paid, its own sum and what the salaries feeding it
+// sacrifice, is kept up out of the savings when the month cannot pay
+// it; any other account, and a pension that is not, carries no mark at
+// all. An account carries the day its balance was last set, an ISO
+// date, once a save has dated it; one kept before the day was carries
+// none.
 export interface Account {
   readonly balance: number;
   readonly balloon?: number;
+  readonly bought?: Purchase;
   readonly contribution?: Contribution;
   readonly growth: Growth;
   readonly id: number;
@@ -71,6 +77,14 @@ export interface AccountValues {
 export type Cadence = (typeof cadences)[number];
 
 export type Funding = (typeof fundings)[number];
+
+// When a house was bought, the month, and what it cost, whole pounds,
+// which is what it was worth that month and what its worth every month
+// since is scaled from.
+export interface Purchase {
+  readonly month: Month;
+  readonly price: number;
+}
 
 // A salary's share of its base sacrificed into the account, by the
 // line's id, as the account's dialog holds it beside the account.
@@ -216,12 +230,18 @@ export function takesSpare(account: { readonly kind: AccountKind }): boolean {
 // A contribution of nothing is an absence on the account, as a balloon
 // of nothing is, and so is an owner of null, a cap of nothing is the
 // account's own allowance, and a growth choice becomes the account's
-// growth with the rate only where it applies.
-export function toAccount(values: AccountValues, id: number): Account {
+// growth with the rate only where it applies. The purchase is beside
+// the values rather than among them, since only the house dialog asks
+// it and no flat form carries it: a house hands one, and it is kept.
+export function toAccount(
+  values: AccountValues & Pick<Account, "bought">,
+  id: number,
+): Account {
   const contribution = contributionOf(values);
   return {
     balance: values.balance,
     ...(values.balloon > 0 && { balloon: values.balloon }),
+    ...(values.bought !== undefined && { bought: values.bought }),
     ...(contribution !== undefined && { contribution }),
     growth:
       values.growth === "plan"

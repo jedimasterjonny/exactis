@@ -94,6 +94,7 @@ const outright = {
 // day the tests run on.
 const home = {
   balance: 416386,
+  bought: { month: { month: 5, year: 2022 }, price: 380000 },
   growth: { kind: "fixed", rate: 0.021 },
   id: 6,
   kind: "house",
@@ -654,6 +655,7 @@ describe("the account actions", () => {
     it("refuses what the form could not have sent, and an id no account has", async () => {
       for (const draft of [
         { ...house, name: "  " },
+        { ...house, bought: { ...house.bought, price: 0 } },
         { ...house, value: 0.5 },
         { ...house, growth: -1.5 },
         { ...house, rate: -0.01 },
