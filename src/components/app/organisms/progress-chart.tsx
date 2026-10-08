@@ -294,18 +294,20 @@ function RowTooltip({
 }
 
 // The balances the share given of the way from one point to the next,
-// each stepped evenly and held to whole pounds as a point kept is.
+// and the house's share of the property with them, each stepped evenly
+// and held to whole pounds as a point kept is.
 function stepOf(
   from: ProgressPoint,
   to: ProgressPoint,
   share: number,
 ): Omit<ProgressPoint, "month"> {
-  const at = (key: Balance): number =>
+  const at = (key: Exclude<keyof ProgressPoint, "month">): number =>
     Math.round(from[key] + (to[key] - from[key]) * share);
   return {
     assets: at("assets"),
     deferred: at("deferred"),
     free: at("free"),
+    house: at("house"),
     loans: at("loans"),
     unsecured: at("unsecured"),
   };

@@ -258,15 +258,22 @@ const owner = z.object({
 
 // A progress point as the model lays it: each sum whole pounds, the
 // three balances nothing or more and the two debts nothing or less, in
-// the words an account is held to the same.
-const point = z.object({
-  assets: z.number().int().nonnegative(rules.belowNothing),
-  deferred: z.number().int().nonnegative(rules.belowNothing),
-  free: z.number().int().nonnegative(rules.belowNothing),
-  loans: z.number().int().nonpositive(rules.owes),
-  month,
-  unsecured: z.number().int().nonpositive(rules.owes),
-}) satisfies z.ZodType<ProgressPoint>;
+// the words an account is held to the same, and the house nothing or
+// more and no more than the property and vehicles it is a share of.
+const point = z
+  .object({
+    assets: z.number().int().nonnegative(rules.belowNothing),
+    deferred: z.number().int().nonnegative(rules.belowNothing),
+    free: z.number().int().nonnegative(rules.belowNothing),
+    house: z.number().int().nonnegative(rules.belowNothing),
+    loans: z.number().int().nonpositive(rules.owes),
+    month,
+    unsecured: z.number().int().nonpositive(rules.owes),
+  })
+  .refine(
+    (point) => point.house <= point.assets,
+    "A point's house is no more than its property and vehicles",
+  ) satisfies z.ZodType<ProgressPoint>;
 
 // The progress points, oldest first and each in a month after the one
 // before it, so a month is recorded once and a screen reads them in

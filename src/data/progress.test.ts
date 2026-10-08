@@ -23,6 +23,7 @@ function monthly(worths: readonly number[]): ProgressPoint[] {
     assets,
     deferred: 0,
     free: 0,
+    house: 0,
     loans: 0,
     month: {
       month: (5 + index) % 12,

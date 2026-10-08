@@ -15,6 +15,7 @@ const points = Array.from({ length: 14 }, (_, index): ProgressPoint => ({
   assets: 300000,
   deferred: 100000 + index * 1000,
   free: 50000,
+  house: 300000,
   loans: -200000,
   month: {
     month: (10 + index) % 12,

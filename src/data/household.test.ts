@@ -509,6 +509,15 @@ const held: readonly Case[] = [
     (given): Inputs => recorded(given, (point) => ({ ...point, loans: 1 })),
   ],
   [
+    "A balance below nothing is a debt's",
+    (given): Inputs => recorded(given, (point) => ({ ...point, house: -1 })),
+  ],
+  [
+    "A point's house is no more than its property and vehicles",
+    (given): Inputs =>
+      recorded(given, (point) => ({ ...point, house: point.assets + 1 })),
+  ],
+  [
     "A point is recorded once a month, oldest first",
     (given): Inputs => ({ ...given, points: given.points.toReversed() }),
   ],
