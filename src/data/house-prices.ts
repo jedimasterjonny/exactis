@@ -7,6 +7,18 @@ import type { Month } from "@/data/schedule";
 import { Refusal } from "@/lib/answer";
 import { formatMonth, isOnOrBefore, monthsBetween } from "@/lib/months";
 
+// The index as the household keeps it once pulled: the month of the
+// purchase the points were scaled from, since the points before it are
+// the sheet's and the screen says so; the day it was pulled on, an ISO
+// date; and the latest month it ran to, from which the points after
+// are rolled forward. The figures themselves are not kept, since the
+// points carry what they made of them.
+export interface HousePrices {
+  readonly from: Month;
+  readonly pulledOn: string;
+  readonly to: Month;
+}
+
 // The index as read from the month the house was bought in: that
 // month's figure, which what the house cost is scaled from; the months
 // published from it; and the latest of them, which the months after it
@@ -15,6 +27,14 @@ export interface Index {
   readonly base: number;
   readonly months: readonly IndexedMonth[];
   readonly to: Month;
+}
+
+// What a pull hands back for the screen to say: what was kept, and the
+// house's name and what it is worth now, which the pull set its balance
+// to.
+export interface Pulled extends HousePrices {
+  readonly name: string;
+  readonly worth: number;
 }
 
 // A month of the UK House Price Index: the month, and the average price

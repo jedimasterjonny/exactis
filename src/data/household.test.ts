@@ -11,6 +11,7 @@ import type {
   Vintages,
 } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
+import type { HousePrices } from "@/data/house-prices";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
@@ -58,6 +59,7 @@ interface Inputs {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
+  readonly housePrices: HousePrices | null;
   readonly liveRates: Rates;
   readonly mappings: readonly Mapping[];
   readonly milestones: readonly Milestone[];
@@ -87,6 +89,7 @@ const sound: Inputs = {
   cma: { latest: cma, previous: null },
   curve,
   deductions: { dividends: 0.02, fees: 0.002 },
+  housePrices: kept.housePrices,
   liveRates: rates,
   mappings,
   milestones,
@@ -597,6 +600,7 @@ describe("soundKept", () => {
         cma: null,
         curve: null,
         deductions: { dividends: 0.02, fees: 0.002 },
+        housePrices: null,
         liveRates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
         mappings: [],
         milestones: [],
