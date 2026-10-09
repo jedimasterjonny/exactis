@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 import {
+  Cpu,
   Dices,
   History,
   LayoutDashboard,
@@ -64,12 +65,21 @@ export const assumptions: Screen = {
   title: "Plan assumptions",
 };
 
+export const cogitator: Screen = {
+  href: "/cogitator",
+  icon: Cpu,
+  label: "Cogitator",
+  title: "Next best trades",
+};
+
 // The screens in navigation order. Section numerals derive from this order,
 // so inserting a screen renumbers every header after it and nothing else
 // has to change. Only built screens appear, since a typed route cannot
 // point at one that does not exist. The chance of success sits beside the
 // dashboard, the two readings of where the plan goes, ahead of the
-// screens it is read from.
+// screens it is read from. The cogitator closes the list: it is read
+// from the target allocation at the end of the assumptions, and says
+// what to buy next rather than what the plan rests on.
 export const screens: readonly Screen[] = [
   dashboard,
   chance,
@@ -77,14 +87,15 @@ export const screens: readonly Screen[] = [
   plan,
   progress,
   assumptions,
+  cogitator,
 ];
 
 // Section numerals are roman, decorative and consistent, never the only
-// way to identify a screen. There are six screens and no screen has
+// way to identify a screen. There are seven screens and no screen has
 // more than six cards, so the numerals are listed rather than worked
 // out; a place past the list is written in figures, so it shows rather
 // than vanishing.
-const numerals = ["I", "II", "III", "IV", "V", "VI"] as const;
+const numerals = ["I", "II", "III", "IV", "V", "VI", "VII"] as const;
 
 // The screen at a pathname, or undefined where no built screen is.
 export function screenAt(pathname: string): Screen | undefined {
