@@ -348,6 +348,23 @@ sleeves' headings, and saved as it is chosen. While any category the CMA cannot
 blend has a class its name suggests, the card offers to map them all by name at
 once, saying how many.
 
+Pressing Retarget from LifeStrategy 80% Equity picks the file the same way and
+sets its weights from what Vanguard's LifeStrategy 80% Equity fund holds, at 90%
+equity and 10% bonds in the fund's own ratios. `src/actions/lifestrategy.ts`
+asks Vanguard's site what the fund holds, as the fund's own page asks it, and
+hands the holdings back without keeping them, since Vanguard answers only its
+own site from a browser. The browser then matches each fund to the category
+standing for it, by the fund's SEDOL through the table in
+`src/data/class-table.ts`, in `src/data/lifestrategy.ts`; where two categories
+stand for one fund the one asking for the larger share takes it, a fund no
+category stands for is refused by name, and a category standing for none of the
+fund's asks for nothing. `reweighted` in `src/lib/portfolio-file.ts` writes the
+weights down the taxonomy, each class's share over its parent's rounded so the
+classes beneath each parent add up to it, and the file as rewritten is imported
+as a chosen file is, so the targets kept are the ones the file now holds. The
+rewritten file can then be downloaded under its own name and saved over the
+original, so Portfolio Performance and the store hold one allocation.
+
 ## Signing in
 
 One user, one password. The app holds a hash of it in `APP_PASSWORD_HASH` and
