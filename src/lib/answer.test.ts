@@ -1,7 +1,23 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { acceptedOf, Refusal, refused, saved } from "./answer";
+import { acceptedOf, answerOf, Refusal, refused, saved } from "./answer";
+
+describe("answerOf", () => {
+  it("hands back what the call gives as saved, a refusal it throws in its own words, and fails on anything else", () => {
+    expect(answerOf(() => 7)).toStrictEqual(saved(7));
+    expect(
+      answerOf(() => {
+        throw new Refusal("A line pays a debt alone");
+      }),
+    ).toStrictEqual(refused("A line pays a debt alone"));
+    expect(() =>
+      answerOf(() => {
+        throw new Error("boom");
+      }),
+    ).toThrow(new Error("boom"));
+  });
+});
 
 describe("acceptedOf", () => {
   it("hands back what was saved, and throws a refusal in its own words", () => {

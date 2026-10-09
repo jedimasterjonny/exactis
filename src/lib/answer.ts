@@ -25,6 +25,20 @@ export function acceptedOf<TValue>(answer: Answer<TValue>): TValue {
   }
 }
 
+// What a call answers: what it hands back, as saved, or the refusal it
+// threw, in its own words, as the store's save answers an edit. Anything
+// else thrown stays a failure.
+export function answerOf<TValue>(call: () => TValue): Answer<TValue> {
+  try {
+    return saved(call());
+  } catch (error: unknown) {
+    if (error instanceof Refusal) {
+      return refused(error.message);
+    }
+    throw error;
+  }
+}
+
 export function refused(reason: string): Answer<never> {
   return { kind: "refused", reason };
 }
