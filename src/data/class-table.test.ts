@@ -3,7 +3,13 @@ import { describe, expect, it } from "vitest";
 
 import type { Cma } from "./cma";
 
-import { suggestedClass, suggestedMappings, tableNames } from "./class-table";
+import {
+  standingFor,
+  suggestedClass,
+  suggestedMappings,
+  tableNames,
+  tableSedols,
+} from "./class-table";
 import { cma, mappings } from "./cma.fixture";
 import { targets } from "./targets.fixture";
 
@@ -144,5 +150,43 @@ describe("suggestedMappings", () => {
     expect(
       suggestedMappings(august, targets, []).map(({ asset }) => asset),
     ).not.toContain("UK cash");
+  });
+});
+
+describe("standingFor", () => {
+  const named = (...names: readonly string[]): typeof targets.categories =>
+    targets.categories.filter(({ name }) => names.includes(name));
+
+  // The UK's two categories, UK equity and FTSE 100, both stand for the
+  // UK All Share fund; the all-cap fund, by name, for the developed
+  // world less the UK.
+  it("finds every category standing for the fund of the SEDOL given, by name, with the fund's sleeve", () => {
+    expect(standingFor("B3X7QG6", targets.categories)).toStrictEqual({
+      categories: named("UK equity", "FTSE 100"),
+      sleeve: "stocks",
+    });
+    expect(standingFor("B59G4Q7", targets.categories)).toStrictEqual({
+      categories: named("FTSE Global All Cap ex-UK"),
+      sleeve: "stocks",
+    });
+    expect(standingFor("B50W2R1", targets.categories)).toStrictEqual({
+      categories: named("Global bonds, hedged"),
+      sleeve: "bonds",
+    });
+  });
+
+  // Europe is a fund of LifeStrategy's the reference has no category for.
+  it("finds no category for a fund none stands for, and nothing for a SEDOL the table does not hold", () => {
+    expect(standingFor("B5B71H8", targets.categories)).toStrictEqual({
+      categories: [],
+      sleeve: "stocks",
+    });
+    expect(standingFor("B000000", targets.categories)).toBeUndefined();
+  });
+
+  // A SEDOL held twice would give a fund two sets of categories, with
+  // nothing to say so.
+  it("holds each SEDOL once", () => {
+    expect(new Set(tableSedols).size).toBe(tableSedols.length);
   });
 });
