@@ -31,6 +31,7 @@ vi.mock("@/store/household", () => ({
 }));
 vi.mock("@/actions/cma", () => ({ pullCma: vi.fn() }));
 vi.mock("@/actions/inflation", () => ({ pullCurve: vi.fn() }));
+vi.mock("@/actions/lifestrategy", () => ({ pullLifeStrategy: vi.fn() }));
 vi.mock("@/actions/targets", () => ({
   importTargets: vi.fn(),
   mapByName: vi.fn(),
