@@ -2,30 +2,55 @@
 
 import type { ChangeEvent, JSX } from "react";
 
-import { ChartPie, FolderSync, RefreshCw, WandSparkles } from "lucide-react";
-import { useRef } from "react";
+import {
+  ChartPie,
+  Crosshair,
+  Download,
+  FolderSync,
+  RefreshCw,
+  WandSparkles,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Cma, Mapping } from "@/data/cma";
 import type { Targets } from "@/data/targets";
 
+import { pullLifeStrategy } from "@/actions/lifestrategy";
 import { importTargets, mapByName } from "@/actions/targets";
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { TargetTable } from "@/components/app/organisms/target-table";
 import { Badge } from "@/components/kit/badge";
-import { Button } from "@/components/kit/button";
+import { Button, buttonVariants } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";
 import { suggestedMappings } from "@/data/class-table";
+import { fund, retargeted, split } from "@/data/lifestrategy";
 import { useSender } from "@/hooks/use-sender";
+import { acceptedOf, saved } from "@/lib/answer";
+import { formatWholePercent } from "@/lib/money";
 import { formatDay } from "@/lib/months";
 import { assumptions, subsectionLabel } from "@/lib/nav";
-import { readTargets, taxonomy } from "@/lib/portfolio-file";
+import { readTargets, reweighted, taxonomy } from "@/lib/portfolio-file";
+
+// What the file picker was opened for: to import the file as it is, or
+// to retarget it from LifeStrategy first.
+type Purpose = "import" | "retarget";
+
+// The file as retargeted, to be saved over the original: its name, and
+// the address its bytes are held at in this browser.
+interface Rewritten {
+  readonly name: string;
+  readonly url: string;
+}
 
 interface TargetAllocationProps {
   readonly cma: Cma | null;
   readonly mappings: readonly Mapping[];
   readonly targets: null | Targets;
 }
+
+// What the split reads as, "90% equity and 10% bonds".
+const splitSaid = `${formatWholePercent(split.stocks)} equity and ${formatWholePercent(split.bonds)} bonds`;
 
 // The assumptions screen's target allocation: the categories Portfolio
 // Performance's Asset Allocation taxonomy holds, the share of the whole
@@ -46,6 +71,21 @@ interface TargetAllocationProps {
 // to lay out, and the card says so. The footer states how a target is
 // worked out and the check the targets pass before they are kept.
 //
+// The header also retargets the allocation from LifeStrategy 80%
+// Equity, from a file chosen the same way: what the fund holds is
+// pulled from Vanguard by the store, since Vanguard answers only its
+// own site from a browser, and laid over the file's categories here, at
+// 90% equity and 10% bonds in the fund's own ratios; the weights are
+// written into the file, and the file as rewritten is read and imported
+// as a chosen file is, so the targets kept are the ones the file now
+// holds. The file is read before Vanguard is asked, so one that cannot
+// be read asks for nothing. Once it is imported the header offers the
+// rewritten file to download under the name it was chosen by, to be
+// saved over the original, so Portfolio Performance and the store hold
+// one allocation; the offer stands until the next retarget replaces it,
+// or a file imported as it is takes it off, since the file offered
+// would then no longer be the allocation the store holds.
+//
 // While a category the CMA cannot blend has a class its name suggests,
 // the header offers to map every such category by name, saying how many
 // it would map. The mapping spins while it is on its way, and the
@@ -59,12 +99,44 @@ export function TargetAllocation({
   targets,
 }: TargetAllocationProps): JSX.Element {
   const pickerRef = useRef<HTMLInputElement>(null);
+  const purposeRef = useRef<Purpose>("import");
+  const [rewritten, setRewritten] = useState<null | Rewritten>(null);
   const { isSending: isImporting, send } = useSender();
   const { isSending: isMapping, send: sendMapping } = useSender();
+  const { isSending: isRetargeting, send: sendRetarget } = useSender();
   const suggested =
     cma === null || targets === null
       ? 0
       : suggestedMappings(cma, targets, mappings).length;
+
+  // The address of the file last retargeted is let go when another
+  // replaces it, when a file imported as it is takes it off, and when
+  // the card leaves the screen.
+  useEffect(
+    (): (() => void) => () => {
+      if (rewritten !== null) {
+        URL.revokeObjectURL(rewritten.url);
+      }
+    },
+    [rewritten],
+  );
+
+  function importFile(file: File): void {
+    send(
+      async () =>
+        importTargets(readTargets(new Uint8Array(await file.arrayBuffer()))),
+      {
+        failure: "Allocation not imported",
+        onAccepted: () => {
+          setRewritten(null);
+        },
+        success: (imported) => ({
+          description: `From the ${taxonomy} taxonomy, as at ${formatDay(imported.importedOn)}`,
+          title: "Target allocation imported",
+        }),
+      },
+    );
+  }
 
   function mapNames(): void {
     sendMapping(mapByName, {
@@ -76,6 +148,39 @@ export function TargetAllocation({
     });
   }
 
+  function pick(purpose: Purpose): void {
+    purposeRef.current = purpose;
+    pickerRef.current?.click();
+  }
+
+  function retarget(file: File): void {
+    sendRetarget(
+      async () => {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const held = readTargets(bytes);
+        const holdings = acceptedOf(await pullLifeStrategy());
+        const written = reweighted(bytes, retargeted(held, holdings));
+        const imported = await importTargets(readTargets(written));
+        return imported.kind === "saved"
+          ? saved({ asOf: holdings.asOf, written })
+          : imported;
+      },
+      {
+        failure: "Allocation not retargeted",
+        onAccepted: ({ written }) => {
+          setRewritten({
+            name: file.name,
+            url: URL.createObjectURL(new Blob([written])),
+          });
+        },
+        success: ({ asOf }) => ({
+          description: `${fund.name} as at ${formatDay(asOf)}, at ${splitSaid}`,
+          title: "Target allocation retargeted",
+        }),
+      },
+    );
+  }
+
   function take(event: ChangeEvent<HTMLInputElement>): void {
     const input = event.currentTarget;
     const file = input.files?.[0];
@@ -83,17 +188,11 @@ export function TargetAllocation({
     if (file === undefined) {
       return;
     }
-    send(
-      async () =>
-        importTargets(readTargets(new Uint8Array(await file.arrayBuffer()))),
-      {
-        failure: "Allocation not imported",
-        success: (imported) => ({
-          description: `From the ${taxonomy} taxonomy, as at ${formatDay(imported.importedOn)}`,
-          title: "Target allocation imported",
-        }),
-      },
-    );
+    if (purposeRef.current === "retarget") {
+      retarget(file);
+    } else {
+      importFile(file);
+    }
   }
 
   return (
@@ -125,10 +224,31 @@ export function TargetAllocation({
             ref={pickerRef}
             type="file"
           />
+          {rewritten !== null && (
+            <a
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+              download={rewritten.name}
+              href={rewritten.url}
+            >
+              <Download aria-hidden />
+              Download the retargeted file
+            </a>
+          )}
+          <Button
+            isBusy={isRetargeting}
+            onClick={() => {
+              pick("retarget");
+            }}
+            size="sm"
+            variant="outline"
+          >
+            <Crosshair aria-hidden />
+            {`Retarget from ${fund.name}`}
+          </Button>
           <Button
             isBusy={isImporting}
             onClick={() => {
-              pickerRef.current?.click();
+              pick("import");
             }}
             size="sm"
             variant="outline"
@@ -159,7 +279,7 @@ export function TargetAllocation({
         />
       )}
       <CardFooter className="text-sm text-muted-foreground">
-        {`A target is its class's weight times the weights of the classes above it in the ${taxonomy} taxonomy, and the targets are checked to add up to 100% before they are kept. The file is read in the browser, and only the targets and what each category holds leave it; the holdings, prices and transactions they are worked out from do not. Each category blends at the 20-year GBP return of its CMA class.`}
+        {`A target is its class's weight times the weights of the classes above it in the ${taxonomy} taxonomy, and the targets are checked to add up to 100% before they are kept. The file is read in the browser, and only the targets and what each category holds leave it; the holdings, prices and transactions they are worked out from do not. Each category blends at the 20-year GBP return of its CMA class. Retargeting from ${fund.name} gives each category the share of the fund its own fund holds, at ${splitSaid}, writes the weights into the file and imports it; the file can then be downloaded and saved over the original.`}
       </CardFooter>
     </SectionCard>
   );
