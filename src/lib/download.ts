@@ -5,9 +5,12 @@ const patience = 30_000;
 // The file at the address, fresh rather than any copy a cache holds, or
 // why it did not come, saying who was asked for what: the status they
 // answered with instead, its body let go unread rather than holding the
-// connection open, or that nothing came in time.
+// connection open, or that nothing came in time. A request given in
+// place of an address is sent as it is, for a source that answers a
+// question posted to it rather than serving a file, and what it answers
+// with is the file.
 export async function download(
-  address: string,
+  address: Request | string,
   who: string,
   what: string,
 ): Promise<string | Uint8Array> {

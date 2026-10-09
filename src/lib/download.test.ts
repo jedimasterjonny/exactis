@@ -25,7 +25,21 @@ describe("download", () => {
       address,
       expect.objectContaining({ cache: "no-store" }),
     );
+    expect(fetch.mock.lastCall?.[1]).not.toHaveProperty("method");
     expect(fetch.mock.lastCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("sends a request given as it is, fresh and in limited time, and hands back what the source answers with", async () => {
+    const fetch = sourceSends(new Response(new Uint8Array([4, 5])));
+    const asked = new Request(address, { body: '{"ask":1}', method: "POST" });
+
+    expect(await download(asked, "The source", "its answer")).toStrictEqual(
+      new Uint8Array([4, 5]),
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      asked,
+      expect.objectContaining({ cache: "no-store" }),
+    );
   });
 
   // A fetch that runs out of time rejects, as one that finds nobody
