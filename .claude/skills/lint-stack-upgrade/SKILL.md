@@ -3,7 +3,8 @@ name: lint-stack-upgrade
 description:
   Bumping ESLint or TypeScript to a new major, or enabling a further react/ or
   import/ ESLint rule. The peer-range traps in the lint stack, the two checks to
-  repeat after any ESLint major, and why TypeScript 7 cannot lint here.
+  repeat after any ESLint major, and why TypeScript 7 runs beside 6 rather than
+  replacing it.
 ---
 
 # Lint stack version traps
@@ -41,8 +42,24 @@ plugin contributing nothing looks exactly like a plugin with nothing to report.
 Then provoke rules from each plugin with a throwaway file, to show they still
 report rather than merely being listed.
 
-TypeScript is held at 6 by a ceiling of the same kind. `typescript-eslint` and
-`eslint-plugin-sonarjs` both cap at `<6.1.0`, and 7.0 ships no JavaScript
-compiler API for either to build on, so 7 cannot lint here at all. The Renovate
-PR proposing it is left open, red, and commented with the detail rather than
-closed, so the question is not reopened from scratch each time.
+TypeScript runs side by side, because the lint stack has a ceiling of the same
+kind. `typescript-eslint` and `eslint-plugin-sonarjs` both cap at `<6.1.0`, and
+7.0 ships no JavaScript compiler API for either to build on, so 7 cannot lint
+here at all. `typescript` is therefore `@typescript/typescript6` under an npm
+alias: every peer that imports `typescript` gets the 6 API, and the only binary
+it ships is `tsc6`. `@typescript/native` is `typescript@7` under a second alias,
+and it is what supplies `tsc`, so the typecheck script, the pre-commit hook and
+CI's typecheck step all run 7.
+
+Three consequences are easy to miss. The compat package is a re-export of
+`@typescript/old`, a `typescript@^6` dependency of its own, so the 6 compiler's
+version is whatever the lockfile resolved, not the alias's `6.0.2`. sonarjs
+takes `typescript` as a dependency rather than a peer, so the alias never
+reaches it and it resolves a 6 of its own, today the same files. And
+`next build` finds its compiler by reading the `bin` of whatever `typescript`
+resolves to, so the build's type check runs `tsc6`: both majors gate every
+change, one in typecheck and one in the build, and neither is configured to.
+
+The aliases come out once `typescript-eslint` and sonarjs build on a 7 API. The
+7.0 announcement expects one in 7.1, and a different one from 6's, so that is a
+port on their side rather than a range bump.
