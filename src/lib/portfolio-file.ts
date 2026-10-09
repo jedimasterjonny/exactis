@@ -72,8 +72,9 @@ const whole = 10_000;
 // hundred-millionths.
 const scaled = 1e8;
 
-// What a pound is in each currency the reader prices, sterling and
-// pence. A security held in any other is refused by name rather than
+// What a pound is in each currency the reader prices on its own,
+// sterling and pence. Any other is priced at a rate read off the file's
+// transactions, or refused by name when none gives one, rather than
 // priced wrongly or at nothing.
 const factors: ReadonlyMap<string, number> = new Map([
   ["GBP", 1],
@@ -94,8 +95,10 @@ const signs: ReadonlyMap<number, -1 | 1> = new Map([
 // The fields read, by their numbers in Portfolio Performance's
 // client.proto: the client's securities, transactions and taxonomies,
 // a security's id, name, currency and prices, a price's close, a
-// transaction's type, shares and security, a taxonomy's name and
-// classes, what a class holds, and a holding's vehicle and weight.
+// transaction's type, date, currency, shares, security and units, a
+// timestamp's seconds, a unit's amount and the same in the currency
+// it was carried from, a taxonomy's name and classes, what a class
+// holds, and a holding's vehicle and weight.
 const fields = {
   assignment: { vehicle: 1, weight: 2 },
   class: { assignments: 9, id: 1, name: 3, parent: 2, rank: 7, weight: 6 },
@@ -103,7 +106,16 @@ const fields = {
   price: { close: 2 },
   security: { currency: 4, id: 1, name: 3, prices: 13 },
   taxonomy: { classes: 5, name: 2 },
-  transaction: { security: 14, shares: 12, type: 2 },
+  timestamp: { seconds: 1 },
+  transaction: {
+    currency: 10,
+    date: 9,
+    security: 14,
+    shares: 12,
+    type: 2,
+    units: 15,
+  },
+  unit: { amount: 2, fxAmount: 4, fxCurrency: 5 },
 } as const;
 
 // The target allocation a Portfolio Performance file holds, from its
@@ -118,22 +130,26 @@ const fields = {
 // since the root is the whole. What it holds is each security assigned
 // to it, what is held of the security summed from the transactions,
 // bought and delivered in less sold and delivered out, at the last
-// price the file holds for it, in sterling or in pence, by the weight
-// of the holding the class takes, to the whole pound; a security held
-// in any other currency is refused by name, since the reader cannot
-// price it. An account assigned to a category is worth nothing to the
-// reader, which does not open the accounts, as is a security the file
-// holds no price for. The classes at the top are read in the order
-// Portfolio Performance ranks them, each with its categories together
-// beneath it, the largest share first and a tie in the taxonomy's
-// order. Whether the shares add up to the whole is the household's to
-// hold, not the file's. What the reader cannot read, or cannot find,
-// is refused in words naming it, since the screen says why a file was
-// not imported. A file Portfolio Performance saved some other way,
-// with a password or as XML, compressed or not, is known by how it
-// opens, as Portfolio Performance knows it, and refused in words saying
-// how it was saved, since saving it again in binary is what makes it
-// read.
+// price the file holds for it, by the weight of the holding the class
+// takes, to the whole pound. A price in sterling or in pence is a
+// pound's worth as it is, and one in any other currency is carried
+// into pounds at the rate the file's latest transaction in pounds
+// carrying that currency was made at, which is as old as that
+// transaction; a security held in a currency no transaction gives a
+// rate for is refused by name, since the reader cannot price it and
+// the file leaves nothing on the network to ask. An account assigned
+// to a category is worth nothing to the reader, which does not open
+// the accounts, as is a security the file holds no price for. The
+// classes at the top are read in the order Portfolio Performance ranks
+// them, each with its categories together beneath it, the largest
+// share first and a tie in the taxonomy's order. Whether the shares
+// add up to the whole is the household's to hold, not the file's. What
+// the reader cannot read, or cannot find, is refused in words naming
+// it, since the screen says why a file was not imported. A file
+// Portfolio Performance saved some other way, with a password or as
+// XML, compressed or not, is known by how it opens, as Portfolio
+// Performance knows it, and refused in words saying how it was saved,
+// since saving it again in binary is what makes it read.
 export function readTargets(file: Uint8Array): readonly Target[] {
   if (opensWith(file, encrypted)) {
     throw new Refusal(
@@ -188,6 +204,13 @@ function classOf(message: Message): Class {
   };
 }
 
+// When a transaction was made, in seconds since the epoch as Portfolio
+// Performance writes a timestamp, or nought for one with no date.
+function dateOf(transaction: Message): number {
+  const [date] = messagesAt(transaction, fields.transaction.date);
+  return date === undefined ? 0 : int64At(date, fields.timestamp.seconds);
+}
+
 // The names of the taxonomies with one, as a sentence lists them, or
 // none.
 function listed(taxonomies: readonly Message[]): string {
@@ -201,6 +224,34 @@ function listed(taxonomies: readonly Message[]): string {
 // every signature read here is.
 function opensWith(bytes: Uint8Array, text: string): boolean {
   return strToU8(text).every((byte, at) => bytes[at] === byte);
+}
+
+// What a pound is in each currency the file gives a rate for, beside
+// sterling and pence. Portfolio Performance writes a transaction made
+// in pounds on a security priced in another currency with its gross
+// value, and a fee or a tax in that currency, in both: the pounds over
+// the other is the rate the transaction was made at. The file holds no
+// rate of the day, so the latest transaction's is taken, by date rather
+// than by the order written, since the file writes them in neither. A
+// transaction made in some other currency is not read, since its rate
+// is to that currency rather than the pound, and a unit worth nothing
+// in the other currency gives no rate.
+function poundsPer(client: Message): ReadonlyMap<string, number> {
+  const rates = new Map<string, number>();
+  const dated = messagesAt(client, fields.client.transactions)
+    .filter((each) => textAt(each, fields.transaction.currency) === "GBP")
+    .map((each) => [dateOf(each), each] as const)
+    .toSorted(([one], [other]) => one - other);
+  for (const [, transaction] of dated) {
+    for (const unit of messagesAt(transaction, fields.transaction.units)) {
+      const currency = textAt(unit, fields.unit.fxCurrency);
+      const foreign = int64At(unit, fields.unit.fxAmount);
+      if (currency !== undefined && foreign > 0) {
+        rates.set(currency, int64At(unit, fields.unit.amount) / foreign);
+      }
+    }
+  }
+  return new Map([...rates, ...factors]);
 }
 
 // The securities the file holds, by id, each as it is priced.
@@ -319,6 +370,7 @@ function worthOf(
 ): (assignments: readonly Assignment[]) => number {
   const securities = securitiesOf(client);
   const held = sharesHeld(client);
+  const pounds = poundsPer(client);
   return (assignments) =>
     Math.round(
       assignments.reduce((sum, { vehicle, weight }) => {
@@ -330,10 +382,10 @@ function worthOf(
         if (security === undefined || shares <= 0) {
           return sum;
         }
-        const factor = factors.get(security.currency);
+        const factor = pounds.get(security.currency);
         if (factor === undefined) {
           throw new Refusal(
-            `The file holds ${security.name}, priced in ${security.currency}, and only GBP and GBX are read`,
+            `The file holds ${security.name}, priced in ${security.currency}, and no transaction in pounds gives a rate for it`,
           );
         }
         return sum + (shares * security.price * factor * weight) / whole;

@@ -14,6 +14,19 @@ import {
 
 import { readTargets } from "./portfolio-file";
 
+// A transaction as a test writes it out: the security it is on, or
+// none, the currency it was made in, sterling unless said, and when it
+// has them, the day it was made and its gross value as a unit, as
+// Portfolio Performance writes one: the amount in the transaction's
+// currency, and for a security priced in another, the same in that
+// currency beside it.
+interface Made {
+  readonly currency?: string;
+  readonly day?: number;
+  readonly on?: null | string;
+  readonly unit?: Written;
+}
+
 // A file holding one category, Cash, the whole of the allocation, with
 // the holdings given assigned to it by vehicle and weight, among the
 // securities and transactions given.
@@ -80,9 +93,27 @@ function security(
 }
 
 // A transaction as a test writes one: its type, its shares in
-// hundred-millionths, and the security it is on, or none.
-function transaction(kind: number, shares: number, on: null | string): Written {
-  return [[2, kind], [12, shares], ...(on === null ? [] : [[14, on] as const])];
+// hundred-millionths, and the security it is on, or none, or the
+// transaction written out.
+function transaction(
+  kind: number,
+  shares: number,
+  on: Made | null | string,
+): Written {
+  const {
+    currency = "GBP",
+    day,
+    on: security = null,
+    unit,
+  }: Made = on === null || typeof on === "string" ? { on } : on;
+  return [
+    [2, kind],
+    ...(day === undefined ? [] : [[9, [[1, day * 86_400]]] as const]),
+    [10, currency],
+    [12, shares],
+    ...(security === null ? [] : [[14, security] as const]),
+    ...(unit === undefined ? [] : [[15, unit] as const]),
+  ];
 }
 
 describe("readTargets", () => {
@@ -327,14 +358,68 @@ describe("readTargets", () => {
 
     expect(() => readTargets(priced("USD"))).toThrow(
       new Refusal(
-        "The file holds Fund x, priced in USD, and only GBP and GBX are read",
+        "The file holds Fund x, priced in USD, and no transaction in pounds gives a rate for it",
       ),
     );
     expect(() => readTargets(priced(null))).toThrow(
       new Refusal(
-        "The file holds Fund x, priced in no currency, and only GBP and GBX are read",
+        "The file holds Fund x, priced in no currency, and no transaction in pounds gives a rate for it",
       ),
     );
+  });
+
+  // x is priced at $100 and ten are held: six bought on day 2 for £450,
+  // $600, and four on day 1 for £320, $400, written in that order, so
+  // the latest by date rather than the last written gives the rate,
+  // £0.75 a dollar. A fee of £3.99 on day 3 in pounds alone, a tax of
+  // £1 on day 3 naming dollars but with no figure in them, and a
+  // dividend on day 3 of €900 that was $1,000, give none. £750.
+  it("prices a security in another currency at the rate the latest transaction in pounds carrying that currency was made at", () => {
+    const file = holding(
+      [["x", 10_000]],
+      [security("x", "USD", 10_000_000_000)],
+      [
+        transaction(0, 600_000_000, {
+          day: 2,
+          on: "x",
+          unit: [
+            [2, 45_000],
+            [4, 60_000],
+            [5, "USD"],
+          ],
+        }),
+        transaction(0, 400_000_000, {
+          day: 1,
+          on: "x",
+          unit: [
+            [2, 32_000],
+            [4, 40_000],
+            [5, "USD"],
+          ],
+        }),
+        transaction(13, 0, { day: 3, on: "x", unit: [[2, 399]] }),
+        transaction(11, 0, {
+          day: 3,
+          on: "x",
+          unit: [
+            [2, 100],
+            [5, "USD"],
+          ],
+        }),
+        transaction(8, 0, {
+          currency: "EUR",
+          day: 3,
+          on: "x",
+          unit: [
+            [2, 90_000],
+            [4, 100_000],
+            [5, "USD"],
+          ],
+        }),
+      ],
+    );
+
+    expect(readTargets(file).map(({ value }) => value)).toStrictEqual([750]);
   });
 
   it("holds nothing of a security in another currency that nothing is held of, rather than refusing it", () => {
