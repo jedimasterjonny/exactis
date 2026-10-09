@@ -29,6 +29,7 @@ const cash: Target = {
   isImplemented: false,
   name: "Cash",
   share: 0,
+  value: 0,
 };
 
 // UK equity, which the reference maps onto UK large cap equities.

@@ -54,15 +54,18 @@ export const milestoneValues = {
 
 // What a category of the target allocation holds, as the file gave it:
 // the id Portfolio Performance gives its class, never empty, the
-// classes above it, its name, never empty, whether it is implemented
-// and its share of the whole. That the share is a part of the whole,
-// and the categories add up to it, is the household's to hold.
+// classes above it, its name, never empty, whether it is implemented,
+// its share of the whole and what it holds in whole pounds, taken as
+// nothing where it was kept before what a category holds was read.
+// That the share is a part of the whole, and the categories add up to
+// it, is the household's to hold.
 export const categoryValues = {
   classes: z.array(z.string()),
   id: z.string().min(1),
   isImplemented: z.boolean(),
   name: named,
   share: z.number(),
+  value: pounds.default(0),
 };
 
 // A month of a year.

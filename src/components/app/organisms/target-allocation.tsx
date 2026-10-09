@@ -34,8 +34,9 @@ interface TargetAllocationProps {
 // the day the targets were imported, and imports them again from a file
 // chosen on this device, Portfolio Performance's own file as it saves
 // it. The file is read here in the browser rather than sent, since it
-// holds every holding and transaction beside the taxonomy and only the
-// targets are wanted, so the store is sent the categories alone. The
+// holds every holding and transaction beside the taxonomy, so the
+// store is sent the categories alone, each with what it holds worked
+// out here. The
 // import spins while the file is read and the store asked, and the
 // store's answer draws the screen again from the targets kept, under a
 // toast. A file that cannot be read, or targets the store refuses, are
@@ -158,7 +159,7 @@ export function TargetAllocation({
         />
       )}
       <CardFooter className="text-sm text-muted-foreground">
-        {`A target is its class's weight times the weights of the classes above it in the ${taxonomy} taxonomy, and the targets are checked to add up to 100% before they are kept. The file is read in the browser, and only the targets leave it. Each category blends at the 20-year GBP return of its CMA class.`}
+        {`A target is its class's weight times the weights of the classes above it in the ${taxonomy} taxonomy, and the targets are checked to add up to 100% before they are kept. The file is read in the browser, and only the targets and what each category holds leave it; the holdings, prices and transactions they are worked out from do not. Each category blends at the 20-year GBP return of its CMA class.`}
       </CardFooter>
     </SectionCard>
   );

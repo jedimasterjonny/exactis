@@ -114,7 +114,7 @@ describe("TargetAllocation", () => {
         /^A target is its class's weight times the weights of the classes above it in the Asset Allocation taxonomy, and the targets are checked to add up to 100%/,
       ),
     ).toHaveTextContent(
-      "only the targets leave it. Each category blends at the 20-year GBP return of its CMA class.",
+      "only the targets and what each category holds leave it; the holdings, prices and transactions they are worked out from do not. Each category blends at the 20-year GBP return of its CMA class.",
     );
   });
 
