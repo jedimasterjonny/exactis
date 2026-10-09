@@ -10,6 +10,16 @@ import { Refusal } from "@/lib/answer";
 // stepped over rather than kept, since nothing read here is one.
 export type Message = ReadonlyMap<number, readonly Value[]>;
 
+// A field as it lies in the bytes: its number, where it starts and
+// where the next begins, and what it holds, which is nothing for a
+// field of a fixed width.
+interface Field {
+  readonly from: number;
+  readonly number: number;
+  readonly to: number;
+  readonly value: undefined | Value;
+}
+
 type Value = bigint | Uint8Array;
 
 // The wire types a field is written in, as its key's lowest three bits
@@ -26,6 +36,12 @@ const longest = 10;
 
 const cutShort = "The data is cut short partway through a field";
 
+// Bytes written under a number as a length-delimited field: its key,
+// how long they are and the bytes.
+export function delimitedOf(number: number, bytes: Uint8Array): Uint8Array {
+  return joined([varintOf(number * 8 + 2), varintOf(bytes.length), bytes]);
+}
+
 // The int32 written last under a number, or nought when none was, since
 // proto3 leaves a nought unwritten and a field written twice holds the
 // later.
@@ -41,18 +57,26 @@ export function int64At(message: Message, number: number): number {
   return Number(BigInt.asIntN(64, wholeAt(message, number)));
 }
 
+// The parts as one, as a message is written from its fields.
+export function joined(parts: readonly Uint8Array[]): Uint8Array<ArrayBuffer> {
+  const whole = new Uint8Array(
+    parts.reduce((length, part) => length + part.length, 0),
+  );
+  let at = 0;
+  for (const part of parts) {
+    whole.set(part, at);
+    at += part.length;
+  }
+  return whole;
+}
+
 // The fields of a message, read off its bytes. A field of a type the
 // wire does not write, or one running past the end of the bytes, is
 // refused, since either is a file read wrongly or no protobuf at all.
 export function messageOf(bytes: Uint8Array): Message {
   const fields = new Map<number, Value[]>();
-  let at = 0;
-  while (at < bytes.length) {
-    const [key, afterKey] = varintAt(bytes, at);
-    const [value, after] = valueAt(bytes, afterKey, Number(key & 7n));
-    at = after;
+  for (const { number, value } of fieldsOf(bytes)) {
     if (value !== undefined) {
-      const number = Number(key >> 3n);
       const written = fields.get(number);
       if (written === undefined) {
         fields.set(number, [value]);
@@ -83,13 +107,79 @@ export function textAt(message: Message, number: number): string | undefined {
   return value === undefined ? undefined : strFromU8(bytesOf(value, number));
 }
 
-function bytesOf(value: Value, number: number): Uint8Array {
-  if (typeof value === "bigint") {
+// A whole number as a varint, a negative one widened to ten bytes as a
+// negative int32 is written.
+export function varintOf(value: number): Uint8Array<ArrayBuffer> {
+  let left = BigInt.asUintN(64, BigInt(value));
+  const bytes: number[] = [];
+  do {
+    const low = Number(left & 0x7fn);
+    left >>= 7n;
+    bytes.push(left === 0n ? low : low | 0x80);
+  } while (left !== 0n);
+  return new Uint8Array(bytes);
+}
+
+// The message with each message written under a number rewritten as
+// the edit makes it, and every other field kept byte for byte as it was
+// written, wherever it was. What was written under the number is
+// refused where it is no message.
+export function withMessagesAt(
+  bytes: Uint8Array,
+  number: number,
+  edit: (message: Uint8Array) => Uint8Array,
+): Uint8Array {
+  return joined(
+    [...fieldsOf(bytes)].map((field) =>
+      field.number === number
+        ? delimitedOf(number, edit(bytesOf(field.value, number)))
+        : bytes.subarray(field.from, field.to),
+    ),
+  );
+}
+
+// The message with the whole number given written under a number, in
+// the place of the first field written there and over any other, or at
+// the end where none was; and with none written there for a nought, as
+// proto3 leaves a nought unwritten. Every other field is kept byte for
+// byte as it was written.
+export function withWholeAt(
+  bytes: Uint8Array,
+  number: number,
+  value: number,
+): Uint8Array {
+  const written = value === 0 ? [] : [varintOf(number * 8), varintOf(value)];
+  const parts: Uint8Array[] = [];
+  let isPlaced = false;
+  for (const field of fieldsOf(bytes)) {
+    if (field.number !== number) {
+      parts.push(bytes.subarray(field.from, field.to));
+    } else if (!isPlaced) {
+      parts.push(...written);
+      isPlaced = true;
+    }
+  }
+  return joined(isPlaced ? parts : [...parts, ...written]);
+}
+
+function bytesOf(value: undefined | Value, number: number): Uint8Array {
+  if (!(value instanceof Uint8Array)) {
     throw new Refusal(
       `The data holds a number where field ${String(number)}'s bytes are read`,
     );
   }
   return value;
+}
+
+// The fields of a message as they lie in its bytes, one after another.
+function* fieldsOf(bytes: Uint8Array): Generator<Field> {
+  let at = 0;
+  while (at < bytes.length) {
+    const [key, afterKey] = varintAt(bytes, at);
+    const [value, to] = valueAt(bytes, afterKey, Number(key & 7n));
+    yield { from: at, number: Number(key >> 3n), to, value };
+    at = to;
+  }
 }
 
 // What a field of the wire type given holds, from where its key ends,

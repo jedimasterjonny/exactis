@@ -2,9 +2,19 @@
 import { describe, expect, it } from "vitest";
 
 import { Refusal } from "@/lib/answer";
-import { protobufOf, varintOf } from "@/lib/protobuf.fixture";
+import { protobufOf } from "@/lib/protobuf.fixture";
 
-import { int32At, int64At, messageOf, messagesAt, textAt } from "./protobuf";
+import {
+  int32At,
+  int64At,
+  joined,
+  messageOf,
+  messagesAt,
+  textAt,
+  varintOf,
+  withMessagesAt,
+  withWholeAt,
+} from "./protobuf";
 
 // A key and what follows it, written byte by byte, for a field the
 // fixture does not write.
@@ -187,5 +197,130 @@ describe("messagesAt", () => {
     expect(() => messagesAt(messageOf(protobufOf([[5, 1]])), 5)).toThrow(
       new Refusal("The data holds a number where field 5's bytes are read"),
     );
+  });
+});
+
+describe("varintOf", () => {
+  it("writes a whole number in as few bytes as hold it, low bits first", () => {
+    expect(varintOf(0)).toStrictEqual(raw(0));
+    expect(varintOf(127)).toStrictEqual(raw(127));
+    expect(varintOf(300)).toStrictEqual(raw(0xac, 0x02));
+    expect(varintOf(21_345_600_000)).toStrictEqual(
+      raw(0x80, 0x84, 0xb0, 0xc2, 0x4f),
+    );
+  });
+
+  it("widens a negative number to ten bytes, as a negative int32 is written", () => {
+    expect(varintOf(-1)).toStrictEqual(
+      raw(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01),
+    );
+  });
+});
+
+describe("joined", () => {
+  it("lays the parts end to end, and nothing from none", () => {
+    expect(joined([raw(1, 2), raw(), raw(3)])).toStrictEqual(raw(1, 2, 3));
+    expect(joined([])).toStrictEqual(raw());
+  });
+});
+
+describe("withMessagesAt", () => {
+  it("rewrites each message under the number given as the edit makes it, keeping every other field as written", () => {
+    const written = protobufOf([
+      [1, 7],
+      [5, [[1, "first"]]],
+      [6, "between"],
+      [5, [[1, "second"]]],
+    ]);
+
+    const edited = withMessagesAt(written, 5, (message) =>
+      withWholeAt(message, 6, 9000),
+    );
+
+    expect(edited).toStrictEqual(
+      protobufOf([
+        [1, 7],
+        [
+          5,
+          [
+            [1, "first"],
+            [6, 9000],
+          ],
+        ],
+        [6, "between"],
+        [
+          5,
+          [
+            [1, "second"],
+            [6, 9000],
+          ],
+        ],
+      ]),
+    );
+  });
+
+  // The fixture writes no field of a fixed width, so one is written
+  // byte by byte: a fixed64 under 1 and a fixed32 under 2.
+  it("keeps a field of a fixed width byte for byte", () => {
+    const written = raw(0x09, 1, 2, 3, 4, 5, 6, 7, 8, 0x15, 1, 2, 3, 4);
+
+    expect(withMessagesAt(written, 3, () => raw())).toStrictEqual(written);
+  });
+
+  it("refuses a number, or a field of a fixed width, where a message is rewritten", () => {
+    const refusal = new Refusal(
+      "The data holds a number where field 5's bytes are read",
+    );
+
+    expect(() => withMessagesAt(protobufOf([[5, 1]]), 5, (m) => m)).toThrow(
+      refusal,
+    );
+    expect(() => withMessagesAt(raw(0x2d, 1, 2, 3, 4), 5, (m) => m)).toThrow(
+      refusal,
+    );
+  });
+});
+
+describe("withWholeAt", () => {
+  it("writes the number in the place of the first written under its number, and drops any other", () => {
+    const written = protobufOf([
+      [1, "before"],
+      [6, 2500],
+      [7, 1],
+      [6, 7000],
+    ]);
+
+    expect(withWholeAt(written, 6, 9000)).toStrictEqual(
+      protobufOf([
+        [1, "before"],
+        [6, 9000],
+        [7, 1],
+      ]),
+    );
+  });
+
+  it("writes the number at the end where none was written under its number", () => {
+    expect(withWholeAt(protobufOf([[1, "only"]]), 6, 300)).toStrictEqual(
+      protobufOf([
+        [1, "only"],
+        [6, 300],
+      ]),
+    );
+  });
+
+  it("writes nothing for a nought, as proto3 leaves one unwritten", () => {
+    const written = protobufOf([
+      [6, 2500],
+      [7, 1],
+    ]);
+
+    expect(withWholeAt(written, 6, 0)).toStrictEqual(protobufOf([[7, 1]]));
+    expect(withWholeAt(protobufOf([[7, 1]]), 6, 0)).toStrictEqual(
+      protobufOf([[7, 1]]),
+    );
+  });
+
+  it("writes into no bytes", () => {
+    expect(withWholeAt(raw(), 6, 5)).toStrictEqual(protobufOf([[6, 5]]));
   });
 });
