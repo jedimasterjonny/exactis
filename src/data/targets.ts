@@ -6,13 +6,17 @@
 // share is a fraction of the whole: its weight in its parent, times the
 // parent's in its own, and so on up the taxonomy. It is implemented
 // when a holding is assigned to it, and a category nothing is assigned
-// to is not, however much of the whole it asks for.
+// to is not, however much of the whole it asks for. What it holds is
+// the securities assigned to it at the price the file last held them
+// at, in whole pounds, or nothing for a category imported before what
+// it holds was read, or whose holdings the reader does not price.
 export interface Target {
   readonly classes: readonly string[];
   readonly id: string;
   readonly isImplemented: boolean;
   readonly name: string;
   readonly share: number;
+  readonly value: number;
 }
 
 // The target allocation as last imported from Portfolio Performance:

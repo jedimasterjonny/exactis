@@ -27,8 +27,8 @@ const mapped = z.object({ asset: named.nullable(), category: z.string() });
 // Keeps the target allocation read out of a Portfolio Performance file
 // over whatever the household held, as imported today, and hands it
 // back as kept. The file is read in the browser, so only the categories
-// are sent, never the holdings and transactions the file holds beside
-// them. An action answers a POST from anywhere, so it checks the
+// are sent, each with what it holds to the pound, never the holdings
+// and transactions that is worked out from. An action answers a POST from anywhere, so it checks the
 // session for itself and parses what it was sent rather than trusting
 // the reader that sent it. The categories are held by the household to
 // shares of the whole that add up to it, each listed once, and a

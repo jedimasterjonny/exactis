@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { Refusal } from "@/lib/answer";
 import { protobufOf, varintOf } from "@/lib/protobuf.fixture";
 
-import { int32At, messageOf, messagesAt, textAt } from "./protobuf";
+import { int32At, int64At, messageOf, messagesAt, textAt } from "./protobuf";
 
 // A key and what follows it, written byte by byte, for a field the
 // fixture does not write.
@@ -25,7 +25,7 @@ describe("messageOf", () => {
 
     expect(message).toStrictEqual(
       new Map([
-        [1, [7, 300]],
+        [1, [7n, 300n]],
         [2, [new TextEncoder().encode("first"), raw(0xff, 0)]],
       ]),
     );
@@ -40,7 +40,7 @@ describe("messageOf", () => {
       raw(0x09, 1, 2, 3, 4, 5, 6, 7, 8, 0x15, 1, 2, 3, 4, 0x18, 5),
     );
 
-    expect(message).toStrictEqual(new Map([[3, [5]]]));
+    expect(message).toStrictEqual(new Map([[3, [5n]]]));
   });
 
   it("refuses a field of a group's wire type, or any the wire does not write", () => {
@@ -112,6 +112,22 @@ describe("int32At", () => {
     expect(() => int32At(messageOf(protobufOf([[4, "text"]])), 4)).toThrow(
       new Refusal("The data holds bytes where field 4's number is read"),
     );
+  });
+});
+
+describe("int64At", () => {
+  it("reads a number wider than an int32 whole", () => {
+    expect(int64At(messageOf(protobufOf([[2, 21_345_600_000]])), 2)).toBe(
+      21_345_600_000,
+    );
+  });
+
+  it("reads nought for a field never written", () => {
+    expect(int64At(messageOf(protobufOf([[1, 4]])), 2)).toBe(0);
+  });
+
+  it("reads a negative int64 back through its widening", () => {
+    expect(int64At(messageOf(protobufOf([[1, -3]])), 1)).toBe(-3);
   });
 });
 

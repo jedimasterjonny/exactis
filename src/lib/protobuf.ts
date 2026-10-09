@@ -3,14 +3,14 @@ import { strFromU8 } from "fflate";
 import { Refusal } from "@/lib/answer";
 
 // A message as the protobuf wire writes it: each field's number to what
-// was written under it, in the order written. A varint is read as the
-// int32 it is in every field read here, and a length-delimited field as
-// its bytes, which hold a string, a message or packed values as the
-// schema says. A field of a fixed width is stepped over rather than
-// kept, since nothing read here is one.
+// was written under it, in the order written. A varint is read whole,
+// as the int32 or int64 the field is read back as, and a
+// length-delimited field as its bytes, which hold a string, a message
+// or packed values as the schema says. A field of a fixed width is
+// stepped over rather than kept, since nothing read here is one.
 export type Message = ReadonlyMap<number, readonly Value[]>;
 
-type Value = number | Uint8Array;
+type Value = bigint | Uint8Array;
 
 // The wire types a field is written in, as its key's lowest three bits
 // give them. The group types between them are proto2's, long
@@ -30,16 +30,15 @@ const cutShort = "The data is cut short partway through a field";
 // proto3 leaves a nought unwritten and a field written twice holds the
 // later.
 export function int32At(message: Message, number: number): number {
-  const value = message.get(number)?.at(-1);
-  if (value === undefined) {
-    return 0;
-  }
-  if (typeof value !== "number") {
-    throw new Refusal(
-      `The data holds bytes where field ${String(number)}'s number is read`,
-    );
-  }
-  return value;
+  return Number(BigInt.asIntN(32, wholeAt(message, number)));
+}
+
+// The int64 written last under a number, or nought when none was, as
+// int32At reads one. Read as a number, which is exact to 2^53, as every
+// int64 read here, a count of shares or a price in hundred-millionths,
+// is within.
+export function int64At(message: Message, number: number): number {
+  return Number(BigInt.asIntN(64, wholeAt(message, number)));
 }
 
 // The fields of a message, read off its bytes. A field of a type the
@@ -50,10 +49,10 @@ export function messageOf(bytes: Uint8Array): Message {
   let at = 0;
   while (at < bytes.length) {
     const [key, afterKey] = varintAt(bytes, at);
-    const [value, after] = valueAt(bytes, afterKey, key & 7);
+    const [value, after] = valueAt(bytes, afterKey, Number(key & 7n));
     at = after;
     if (value !== undefined) {
-      const number = key >>> 3;
+      const number = Number(key >> 3n);
       const written = fields.get(number);
       if (written === undefined) {
         fields.set(number, [value]);
@@ -85,7 +84,7 @@ export function textAt(message: Message, number: number): string | undefined {
 }
 
 function bytesOf(value: Value, number: number): Uint8Array {
-  if (typeof value === "number") {
+  if (typeof value === "bigint") {
     throw new Refusal(
       `The data holds a number where field ${String(number)}'s bytes are read`,
     );
@@ -104,7 +103,7 @@ function valueAt(
   switch (wireType) {
     case delimited: {
       const [length, start] = varintAt(bytes, at);
-      const end = within(bytes, start, length);
+      const end = within(bytes, start, Number(length));
       return [bytes.subarray(start, end), end];
     }
     case fixed32:
@@ -120,20 +119,17 @@ function valueAt(
   }
 }
 
-// The varint starting at a place in the bytes, as the low 32 bits it
-// carries read signed, which is the int32 it is, and the place after
-// it. Bits past the 32nd are those a negative int32 is widened with,
-// so the bytes carrying only them are stepped over.
-function varintAt(bytes: Uint8Array, at: number): readonly [number, number] {
-  let value = 0;
+// The varint starting at a place in the bytes, whole and unsigned as
+// the wire writes it, which the reader of the field makes the int32 or
+// int64 it is, and the place after it.
+function varintAt(bytes: Uint8Array, at: number): readonly [bigint, number] {
+  let value = 0n;
   for (let read = 0; read < longest; read++) {
     const byte = bytes[at + read];
     if (byte === undefined) {
       throw new Refusal(cutShort);
     }
-    if (read < 5) {
-      value |= (byte & 0x7f) << (7 * read);
-    }
+    value |= BigInt(byte & 0x7f) << BigInt(7 * read);
     if (byte < 0x80) {
       return [value, at + read + 1];
     }
@@ -143,12 +139,28 @@ function varintAt(bytes: Uint8Array, at: number): readonly [number, number] {
   );
 }
 
+// The whole number written last under a number, or nought when none
+// was, since proto3 leaves a nought unwritten and a field written twice
+// holds the later.
+function wholeAt(message: Message, number: number): bigint {
+  const value = message.get(number)?.at(-1);
+  if (value === undefined) {
+    return 0n;
+  }
+  if (typeof value !== "bigint") {
+    throw new Refusal(
+      `The data holds bytes where field ${String(number)}'s number is read`,
+    );
+  }
+  return value;
+}
+
 // Where a stretch of the length given, from a place in the bytes, ends,
-// or a refusal when the bytes end first, as they do for a length read
-// as a negative int32.
+// or a refusal when the bytes end first, as they do for a length
+// written as a negative number, which the wire widens past any file.
 function within(bytes: Uint8Array, at: number, length: number): number {
   const end = at + length;
-  if (length < 0 || end > bytes.length) {
+  if (end > bytes.length) {
     throw new Refusal(cutShort);
   }
   return end;
