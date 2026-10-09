@@ -1,15 +1,22 @@
-import { strToU8 } from "fflate";
+import type { Unzipped } from "fflate";
+
+import { strToU8, zipSync } from "fflate";
 
 import type { Target } from "@/data/targets";
 import type { Message } from "@/lib/protobuf";
 
 import { Refusal } from "@/lib/answer";
+import { sumOf } from "@/lib/ledger";
+import { formatPercent } from "@/lib/money";
 import {
   int32At,
   int64At,
+  joined,
   messageOf,
   messagesAt,
   textAt,
+  withMessagesAt,
+  withWholeAt,
 } from "@/lib/protobuf";
 import { unzipped } from "@/lib/workbook";
 
@@ -35,6 +42,13 @@ interface Class {
   readonly weight: number;
 }
 
+// A file opened: the parts of the zip, and the client's protobuf behind
+// the signature.
+interface Opened {
+  readonly client: Uint8Array;
+  readonly parts: Unzipped;
+}
+
 // A security as the file prices it: its name, the currency it is
 // priced in, or that it is priced in none, and its last price in that
 // currency, or nothing while the file holds no price for it.
@@ -42,6 +56,14 @@ interface Security {
   readonly currency: string;
   readonly name: string;
   readonly price: number;
+}
+
+// A taxonomy's classes as the tree from its root: the root, and the
+// classes beneath any class, in the order Portfolio Performance ranks
+// them.
+interface Tree {
+  readonly beneath: (above: Class) => readonly Class[];
+  readonly root: Class;
 }
 
 // The taxonomy the target allocation is read from, as tradey reads it.
@@ -67,6 +89,11 @@ const savedAsXml =
 // whole of itself, as Portfolio Performance writes a weight: in
 // hundredths of a per cent.
 const whole = 10_000;
+
+// How far shares given to write may add up from the whole: nothing but
+// the rounding of the arithmetic that made them, as the household
+// holds the targets.
+const tolerance = 1e-9;
 
 // What a count of shares and a price are both written in:
 // hundred-millionths.
@@ -151,30 +178,63 @@ const fields = {
 // Performance knows it, and refused in words saying how it was saved,
 // since saving it again in binary is what makes it read.
 export function readTargets(file: Uint8Array): readonly Target[] {
-  if (opensWith(file, encrypted)) {
+  const client = messageOf(opened(file).client);
+  return targetsOf(classesIn(client), worthOf(client));
+}
+
+// The file with its Asset Allocation taxonomy's weights set so that
+// each category holds the share of the whole given for it, by its id,
+// and everything else in the file as it was, byte for byte: the other
+// taxonomies, the holdings, the transactions, and the taxonomy's own
+// classes, names and assignments. A class's weight is of its parent,
+// so the share of a class with classes beneath it is theirs added up,
+// and each class is weighted by its share over its parent's, the
+// classes beneath one parent rounded to add up to the whole of it, the
+// odd hundredths of a per cent given one each to the largest
+// remainders; so the shares read back out of the file add up to the
+// whole. Shares given that do not add up to the whole are refused
+// saying what they add up to, since weighting each by its parent's
+// would scale them to the whole without a word, and the household's
+// check that the targets add up could then never fire. Beneath a class
+// holding nothing every class weighs nothing, and a category given no
+// share holds none. The root's weight is left as written, since the
+// root is the whole. The file is opened as it is read, and refused as
+// it is read, so a file that could not be read is not written either.
+export function reweighted(
+  file: Uint8Array,
+  shares: ReadonlyMap<string, number>,
+): Uint8Array<ArrayBuffer> {
+  const { client, parts } = opened(file);
+  const total = sumOf([...shares.values()], (share) => share);
+  if (Math.abs(total - 1) > tolerance) {
     throw new Refusal(
-      "The file is encrypted, and only a Portfolio Performance file saved in binary without a password can be read",
+      `The shares given add up to ${formatPercent(total)} rather than 100%`,
     );
   }
-  if (opensWith(file, xml)) {
-    throw new Refusal(savedAsXml);
-  }
-  const parts = unzipped(
-    file,
-    "The file is not a zip, as a Portfolio Performance file saved in binary is",
+  const weights = weightsOf(classesIn(messageOf(client)), shares);
+  const rewritten = withMessagesAt(
+    client,
+    fields.client.taxonomies,
+    (written) =>
+      textAt(messageOf(written), fields.taxonomy.name) === taxonomy
+        ? withMessagesAt(written, fields.taxonomy.classes, (each) => {
+            const weight = weights.get(
+              textOf(messageOf(each), fields.class.id),
+            );
+            return weight === undefined
+              ? each
+              : withWholeAt(each, fields.class.weight, weight);
+          })
+        : written,
   );
-  const data = parts[part];
-  if (data === undefined) {
-    throw new Refusal(
-      parts[xmlPart] === undefined ? `The file holds no ${part}` : savedAsXml,
-    );
-  }
-  if (!opensWith(data, signature)) {
-    throw new Refusal(
-      "The file is not in Portfolio Performance's binary format",
-    );
-  }
-  const client = messageOf(data.subarray(signature.length));
+  return new Uint8Array(
+    zipSync({ ...parts, [part]: joined([strToU8(signature), rewritten]) }),
+  );
+}
+
+// The classes of the client's Asset Allocation taxonomy, as written,
+// or a refusal naming the taxonomies it has instead.
+function classesIn(client: Message): readonly Class[] {
   const taxonomies = messagesAt(client, fields.client.taxonomies);
   const found = taxonomies.find(
     (each) => textAt(each, fields.taxonomy.name) === taxonomy,
@@ -184,10 +244,7 @@ export function readTargets(file: Uint8Array): readonly Target[] {
       `The file has no ${taxonomy} taxonomy, only ${listed(taxonomies)}`,
     );
   }
-  return targetsOf(
-    messagesAt(found, fields.taxonomy.classes).map(classOf),
-    worthOf(client),
-  );
+  return messagesAt(found, fields.taxonomy.classes).map(classOf);
 }
 
 function classOf(message: Message): Class {
@@ -211,6 +268,34 @@ function dateOf(transaction: Message): number {
   return date === undefined ? 0 : int64At(date, fields.timestamp.seconds);
 }
 
+// Fractions of a whole as hundredths of a per cent that add up to the
+// whole of what the fractions add up to: each rounded down, and the
+// hundredths left over given one each to the largest remainders, in
+// order, so fractions adding up to one add up to the whole, and
+// fractions of nothing stay nothing.
+function hundredthsOf(
+  fractions: ReadonlyMap<string, number>,
+): ReadonlyMap<string, number> {
+  const entries = [...fractions];
+  const down = (fraction: number): number => Math.floor(fraction * whole);
+  const left =
+    Math.round(sumOf(entries, ([, fraction]) => fraction) * whole) -
+    sumOf(entries, ([, fraction]) => down(fraction));
+  const bumped = new Set(
+    entries
+      .map(([id, fraction]) => [id, fraction * whole - down(fraction)] as const)
+      .toSorted(([, one], [, other]) => other - one)
+      .slice(0, left)
+      .map(([id]) => id),
+  );
+  return new Map(
+    entries.map(([id, fraction]) => [
+      id,
+      down(fraction) + (bumped.has(id) ? 1 : 0),
+    ]),
+  );
+}
+
 // The names of the taxonomies with one, as a sentence lists them, or
 // none.
 function listed(taxonomies: readonly Message[]): string {
@@ -218,6 +303,38 @@ function listed(taxonomies: readonly Message[]): string {
     (each) => textAt(each, fields.taxonomy.name) ?? [],
   );
   return names.length === 0 ? "none" : names.join(", ");
+}
+
+// The file opened, as Portfolio Performance knows a file it saved in
+// binary: a zip holding the client's protobuf behind the signature. A
+// file saved some other way, with a password or as XML, compressed or
+// not, is known by how it opens and refused in words saying how it was
+// saved, since saving it again in binary is what makes it read.
+function opened(file: Uint8Array): Opened {
+  if (opensWith(file, encrypted)) {
+    throw new Refusal(
+      "The file is encrypted, and only a Portfolio Performance file saved in binary without a password can be read",
+    );
+  }
+  if (opensWith(file, xml)) {
+    throw new Refusal(savedAsXml);
+  }
+  const parts = unzipped(
+    file,
+    "The file is not a zip, as a Portfolio Performance file saved in binary is",
+  );
+  const data = parts[part];
+  if (data === undefined) {
+    throw new Refusal(
+      parts[xmlPart] === undefined ? `The file holds no ${part}` : savedAsXml,
+    );
+  }
+  if (!opensWith(data, signature)) {
+    throw new Refusal(
+      "The file is not in Portfolio Performance's binary format",
+    );
+  }
+  return { client: data.subarray(signature.length), parts };
 }
 
 // Whether the bytes open with the text given, written as UTF-8 as
@@ -293,30 +410,14 @@ function sharesHeld(client: Message): ReadonlyMap<string, number> {
 }
 
 // The categories of a taxonomy's classes, from its root down, each
-// worth what the holdings assigned to it come to. A class with no id is
-// refused, and so is one listed twice, since either would leave the
-// taxonomy no single tree to read, and a category with no name, which
-// the household keeps none of, in words saying where it sits. A class
-// beneath none the taxonomy lists is part of no tree from its root, so
-// is not read.
+// worth what the holdings assigned to it come to. A category with no
+// name, which the household keeps none of, is refused in words saying
+// where it sits.
 function targetsOf(
   classes: readonly Class[],
   worth: (assignments: readonly Assignment[]) => number,
 ): readonly Target[] {
-  if (classes.some(({ id }) => id === "")) {
-    throw new Refusal(`The ${taxonomy} taxonomy has a class with no id`);
-  }
-  if (new Set(classes.map(({ id }) => id)).size !== classes.length) {
-    throw new Refusal(`The ${taxonomy} taxonomy lists a class twice`);
-  }
-  const root = classes.find(({ parent }) => parent === undefined);
-  if (root === undefined) {
-    throw new Refusal(`The ${taxonomy} taxonomy has no root`);
-  }
-  const beneath = (above: Class): readonly Class[] =>
-    classes
-      .filter(({ parent }) => parent === above.id)
-      .sort((one, other) => one.rank - other.rank);
+  const { beneath, root } = treeOf(classes);
   const categoriesOf = (
     of: Class,
     above: readonly string[],
@@ -344,11 +445,7 @@ function targetsOf(
           categoriesOf(each, [...above, of.name], within),
         );
   };
-  const top = beneath(root);
-  if (top.length === 0) {
-    throw new Refusal(`The ${taxonomy} taxonomy holds no classes`);
-  }
-  return top.flatMap((each) =>
+  return beneath(root).flatMap((each) =>
     categoriesOf(each, [], 1).toSorted((one, other) => other.share - one.share),
   );
 }
@@ -357,6 +454,67 @@ function targetsOf(
 // or a name the file leaves out reads.
 function textOf(message: Message, number: number): string {
   return textAt(message, number) ?? "";
+}
+
+// A taxonomy's classes as the tree from its root. A class with no id
+// is refused, and so is one listed twice, since either would leave the
+// taxonomy no single tree to read, as are a taxonomy with no root and
+// one with no class beneath it. A class beneath none the taxonomy lists
+// is part of no tree from its root, so is not read.
+function treeOf(classes: readonly Class[]): Tree {
+  if (classes.some(({ id }) => id === "")) {
+    throw new Refusal(`The ${taxonomy} taxonomy has a class with no id`);
+  }
+  if (new Set(classes.map(({ id }) => id)).size !== classes.length) {
+    throw new Refusal(`The ${taxonomy} taxonomy lists a class twice`);
+  }
+  const root = classes.find(({ parent }) => parent === undefined);
+  if (root === undefined) {
+    throw new Refusal(`The ${taxonomy} taxonomy has no root`);
+  }
+  const beneath = (above: Class): readonly Class[] =>
+    classes
+      .filter(({ parent }) => parent === above.id)
+      .sort((one, other) => one.rank - other.rank);
+  if (beneath(root).length === 0) {
+    throw new Refusal(`The ${taxonomy} taxonomy holds no classes`);
+  }
+  return { beneath, root };
+}
+
+// The weight of every class beneath the root, by its id, for the
+// categories to hold the shares of the whole given: each class's share
+// is its category's, or those of the classes beneath it added up, and
+// its weight is its share over its parent's in hundredths of a per
+// cent, the classes beneath one parent rounded to add up to the whole
+// of it, and all nothing beneath a parent holding nothing.
+function weightsOf(
+  classes: readonly Class[],
+  shares: ReadonlyMap<string, number>,
+): ReadonlyMap<string, number> {
+  const { beneath, root } = treeOf(classes);
+  const shareOf = (of: Class): number => {
+    const below = beneath(of);
+    return below.length === 0
+      ? (shares.get(of.id) ?? 0)
+      : sumOf(below, shareOf);
+  };
+  const weights = new Map<string, number>();
+  const weigh = (above: Class): void => {
+    const below = beneath(above);
+    const held = shareOf(above);
+    const rounded = hundredthsOf(
+      new Map(
+        below.map((each) => [each.id, held === 0 ? 0 : shareOf(each) / held]),
+      ),
+    );
+    for (const [id, weight] of rounded) {
+      weights.set(id, weight);
+    }
+    below.forEach(weigh);
+  };
+  weigh(root);
+  return weights;
 }
 
 // What holdings assigned to a class come to, in whole pounds, read off

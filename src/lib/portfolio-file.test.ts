@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { strToU8, zipSync } from "fflate";
+import { strToU8, unzipSync, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 
 import type { Written } from "@/lib/protobuf.fixture";
@@ -11,8 +11,9 @@ import {
   reference,
   taxonomyOf,
 } from "@/lib/portfolio-file.fixture";
+import { int32At, messageOf, messagesAt, textAt } from "@/lib/protobuf";
 
-import { readTargets } from "./portfolio-file";
+import { readTargets, reweighted } from "./portfolio-file";
 
 // A transaction as a test writes it out: the security it is on, or
 // none, the currency it was made in, sterling unless said, and when it
@@ -114,6 +115,24 @@ function transaction(
     ...(security === null ? [] : [[14, security] as const]),
     ...(unit === undefined ? [] : [[15, unit] as const]),
   ];
+}
+
+// The weight written on each class of a file's Asset Allocation
+// taxonomy, by the class's id, read back off the file as Portfolio
+// Performance would read it.
+function weightsIn(file: Uint8Array): ReadonlyMap<string, number> {
+  const client = messageOf(
+    (unzipSync(file)["data.portfolio"] ?? new Uint8Array()).subarray(6),
+  );
+  const taxonomy = messagesAt(client, 8).find(
+    (each) => textAt(each, 2) === "Asset Allocation",
+  );
+  return new Map(
+    messagesAt(taxonomy ?? new Map(), 5).map((each) => [
+      textAt(each, 1) ?? "",
+      int32At(each, 6),
+    ]),
+  );
 }
 
 describe("readTargets", () => {
@@ -628,6 +647,191 @@ describe("readTargets", () => {
   it("refuses a taxonomy with nothing beneath its root", () => {
     expect(() =>
       readTargets(portfolioFile(clientOf([["Asset Allocation", []]]))),
+    ).toThrow(new Refusal("The Asset Allocation taxonomy holds no classes"));
+  });
+});
+
+describe("reweighted", () => {
+  const file = portfolioFile(
+    clientOf([
+      ["Asset Allocation", reference],
+      ["Regions", [{ assigned: 1, name: "Europe", weight: 10_000 }]],
+    ]),
+  );
+  const idOf = (name: string): string =>
+    readTargets(file).find((category) => category.name === name)?.id ?? "";
+
+  // Developed is the two beneath it added up, 0.7875 of the 0.9 in
+  // equities, and its two split five sevenths to two, which no
+  // hundredth of a per cent holds: 7142.86 and 2857.14 are rounded to
+  // 7143 and 2857, the hundredth left over going to the larger
+  // remainder.
+  it("weights each class by its share over its parent's, rounded to add up to the whole beneath each parent", () => {
+    const shares = new Map([
+      [idOf("FTSE 100"), 0],
+      [idOf("FTSE Global All Cap ex-UK"), 0.5625],
+      [idOf("FTSE North America"), 0.225],
+      [idOf("Global bonds, hedged"), 0.075],
+      [idOf("Global emerging markets"), 0.05625],
+      [idOf("Global small cap"), 0],
+      [idOf("Short-dated gilts"), 0],
+      [idOf("UK equity"), 0.05625],
+      [idOf("UK index-linked gilts, 5y+"), 0.025],
+    ]);
+
+    const written = reweighted(file, shares);
+
+    expect(weightsIn(written)).toStrictEqual(
+      new Map([
+        ["Asset Allocation", 10_000],
+        ["Asset Allocation/Bonds", 1000],
+        ["Asset Allocation/Bonds/Global bonds, hedged", 7500],
+        ["Asset Allocation/Bonds/Short-dated gilts", 0],
+        ["Asset Allocation/Bonds/UK index-linked gilts, 5y+", 2500],
+        ["Asset Allocation/Equity", 9000],
+        ["Asset Allocation/Equity/Developed", 8750],
+        ["Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK", 7143],
+        ["Asset Allocation/Equity/Developed/FTSE North America", 2857],
+        ["Asset Allocation/Equity/Global emerging markets", 625],
+        ["Asset Allocation/Equity/Global small cap", 0],
+        ["Asset Allocation/Equity/UK", 625],
+        ["Asset Allocation/Equity/UK/FTSE 100", 0],
+        ["Asset Allocation/Equity/UK/UK equity", 10_000],
+      ]),
+    );
+    const read = readTargets(written);
+    expect(read.reduce((sum, { share }) => sum + share, 0)).toBeCloseTo(1, 12);
+    expect(read.map(({ name, share }) => [name, share])).toStrictEqual([
+      ["FTSE Global All Cap ex-UK", expect.closeTo(0.56251125, 12)],
+      ["FTSE North America", expect.closeTo(0.22498875, 12)],
+      ["Global emerging markets", expect.closeTo(0.05625, 12)],
+      ["UK equity", expect.closeTo(0.05625, 12)],
+      ["FTSE 100", 0],
+      ["Global small cap", 0],
+      ["Global bonds, hedged", expect.closeTo(0.075, 12)],
+      ["UK index-linked gilts, 5y+", expect.closeTo(0.025, 12)],
+      ["Short-dated gilts", 0],
+    ]);
+  });
+
+  // Written back with the shares it already holds, the file is the file:
+  // the weights land where they were written, a nought stays unwritten,
+  // and the other taxonomy, the securities and the transactions are not
+  // touched.
+  it("keeps everything but the weights byte for byte, and the weights where they were written", () => {
+    const shares = new Map(
+      readTargets(file).map(({ id, share }) => [id, share] as const),
+    );
+
+    const written = reweighted(file, shares);
+
+    expect(unzipSync(written)).toStrictEqual(unzipSync(file));
+    expect(readTargets(written)).toStrictEqual(readTargets(file));
+  });
+
+  it("weighs every class beneath a parent holding nothing as nothing, and a category given no share as holding none", () => {
+    const written = reweighted(
+      file,
+      new Map([
+        [idOf("Global emerging markets"), 0.75],
+        [idOf("UK equity"), 0.25],
+      ]),
+    );
+
+    expect(weightsIn(written)).toStrictEqual(
+      new Map([
+        ["Asset Allocation", 10_000],
+        ["Asset Allocation/Bonds", 0],
+        ["Asset Allocation/Bonds/Global bonds, hedged", 0],
+        ["Asset Allocation/Bonds/Short-dated gilts", 0],
+        ["Asset Allocation/Bonds/UK index-linked gilts, 5y+", 0],
+        ["Asset Allocation/Equity", 10_000],
+        ["Asset Allocation/Equity/Developed", 0],
+        ["Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK", 0],
+        ["Asset Allocation/Equity/Developed/FTSE North America", 0],
+        ["Asset Allocation/Equity/Global emerging markets", 7500],
+        ["Asset Allocation/Equity/Global small cap", 0],
+        ["Asset Allocation/Equity/UK", 2500],
+        ["Asset Allocation/Equity/UK/FTSE 100", 0],
+        ["Asset Allocation/Equity/UK/UK equity", 10_000],
+      ]),
+    );
+  });
+
+  // Three equal shares are 3333.33 each; the hundredth left over goes to
+  // the first, their remainders being equal.
+  it("gives the hundredths left over to the largest remainders, the earlier first among equals", () => {
+    const thirds = portfolioFile(
+      clientOf([
+        [
+          "Asset Allocation",
+          [
+            { name: "One", weight: 5000 },
+            { name: "Two", weight: 3000 },
+            { name: "Three", weight: 2000 },
+          ],
+        ],
+      ]),
+    );
+
+    expect(
+      weightsIn(
+        reweighted(
+          thirds,
+          new Map([
+            ["Asset Allocation/One", 1 / 3],
+            ["Asset Allocation/Three", 1 / 3],
+            ["Asset Allocation/Two", 1 / 3],
+          ]),
+        ),
+      ),
+    ).toStrictEqual(
+      new Map([
+        ["Asset Allocation", 10_000],
+        ["Asset Allocation/One", 3334],
+        ["Asset Allocation/Three", 3333],
+        ["Asset Allocation/Two", 3333],
+      ]),
+    );
+  });
+
+  // Weighted each by its parent's, nine tenths would scale to the
+  // whole without a word.
+  it("refuses shares that do not add up to the whole, saying what they add up to", () => {
+    expect(() =>
+      reweighted(
+        file,
+        new Map([
+          [idOf("FTSE Global All Cap ex-UK"), 0.6],
+          [idOf("Global bonds, hedged"), 0.3],
+        ]),
+      ),
+    ).toThrow(
+      new Refusal("The shares given add up to 90.00% rather than 100%"),
+    );
+    expect(() => reweighted(file, new Map())).toThrow(
+      new Refusal("The shares given add up to 0.00% rather than 100%"),
+    );
+  });
+
+  it("refuses what it could not read, as reading does", () => {
+    const whole = new Map([["Asset Allocation/Cash", 1]]);
+
+    expect(() => reweighted(strToU8("<?xml version='1.0'?>"), whole)).toThrow(
+      new Refusal(
+        "The file is saved as XML, and only a Portfolio Performance file saved in binary can be read",
+      ),
+    );
+    expect(() =>
+      reweighted(
+        portfolioFile(clientOf([["Regions", [{ name: "UK", weight: 1 }]]])),
+        whole,
+      ),
+    ).toThrow(
+      new Refusal("The file has no Asset Allocation taxonomy, only Regions"),
+    );
+    expect(() =>
+      reweighted(portfolioFile(clientOf([["Asset Allocation", []]])), whole),
     ).toThrow(new Refusal("The Asset Allocation taxonomy holds no classes"));
   });
 });
