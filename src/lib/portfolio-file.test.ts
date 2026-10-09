@@ -2,6 +2,8 @@
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 
+import type { Written } from "@/lib/protobuf.fixture";
+
 import { Refusal } from "@/lib/answer";
 import {
   clientOf,
@@ -11,6 +13,77 @@ import {
 } from "@/lib/portfolio-file.fixture";
 
 import { readTargets } from "./portfolio-file";
+
+// A file holding one category, Cash, the whole of the allocation, with
+// the holdings given assigned to it by vehicle and weight, among the
+// securities and transactions given.
+function holding(
+  assignments: readonly (readonly [vehicle: string, weight: number])[],
+  securities: readonly Written[],
+  transactions: readonly Written[],
+): Uint8Array {
+  return portfolioFile([
+    ...securities.map((each) => [2, each] as const),
+    ...transactions.map((each) => [5, each] as const),
+    [
+      8,
+      [
+        [2, "Asset Allocation"],
+        [5, [[1, "root"]]],
+        [
+          5,
+          [
+            [1, "cash"],
+            [2, "root"],
+            [3, "Cash"],
+            [6, 10_000],
+            ...assignments.map(
+              ([vehicle, weight]) =>
+                [
+                  9,
+                  [
+                    [1, vehicle],
+                    [2, weight],
+                  ],
+                ] as const,
+            ),
+          ],
+        ],
+      ],
+    ],
+  ]);
+}
+
+// A security as a test writes one: its id, a name from it, the
+// currency it is priced in, or none, and a close a day, the last its
+// price, in hundred-millionths as written.
+function security(
+  id: string,
+  currency: null | string,
+  ...closes: readonly number[]
+): Written {
+  return [
+    [1, id],
+    [3, `Fund ${id}`],
+    ...(currency === null ? [] : [[4, currency] as const]),
+    ...closes.map(
+      (close, day) =>
+        [
+          13,
+          [
+            [1, 20_000 + day],
+            [2, close],
+          ],
+        ] as const,
+    ),
+  ];
+}
+
+// A transaction as a test writes one: its type, its shares in
+// hundred-millionths, and the security it is on, or none.
+function transaction(kind: number, shares: number, on: null | string): Written {
+  return [[2, kind], [12, shares], ...(on === null ? [] : [[14, on] as const])];
+}
 
 describe("readTargets", () => {
   // Equities' categories come first, the largest first, the tie
@@ -26,6 +99,7 @@ describe("readTargets", () => {
         isImplemented: true,
         name: "FTSE Global All Cap ex-UK",
         share: 0.48,
+        value: 21401,
       },
       {
         classes: ["Equity"],
@@ -33,6 +107,7 @@ describe("readTargets", () => {
         isImplemented: true,
         name: "Global emerging markets",
         share: 0.12,
+        value: 21401,
       },
       {
         classes: ["Equity", "UK"],
@@ -40,6 +115,7 @@ describe("readTargets", () => {
         isImplemented: true,
         name: "UK equity",
         share: 0.12,
+        value: 21401,
       },
       {
         classes: ["Equity"],
@@ -47,6 +123,7 @@ describe("readTargets", () => {
         isImplemented: true,
         name: "Global small cap",
         share: 0.08,
+        value: 21401,
       },
       {
         classes: ["Equity", "Developed"],
@@ -54,6 +131,7 @@ describe("readTargets", () => {
         isImplemented: true,
         name: "FTSE North America",
         share: 0,
+        value: 21401,
       },
       {
         classes: ["Equity", "UK"],
@@ -61,6 +139,7 @@ describe("readTargets", () => {
         isImplemented: true,
         name: "FTSE 100",
         share: 0,
+        value: 21401,
       },
       {
         classes: ["Bonds"],
@@ -68,6 +147,7 @@ describe("readTargets", () => {
         isImplemented: true,
         name: "Global bonds, hedged",
         share: 0.14,
+        value: 21401,
       },
       {
         classes: ["Bonds"],
@@ -75,6 +155,7 @@ describe("readTargets", () => {
         isImplemented: false,
         name: "UK index-linked gilts, 5y+",
         share: 0.04,
+        value: 0,
       },
       {
         classes: ["Bonds"],
@@ -82,6 +163,7 @@ describe("readTargets", () => {
         isImplemented: true,
         name: "Short-dated gilts",
         share: 0.02,
+        value: 21401,
       },
     ]);
   });
@@ -108,6 +190,7 @@ describe("readTargets", () => {
         isImplemented: true,
         name: "Cash",
         share: 1,
+        value: 21401,
       },
     ]);
   });
@@ -159,7 +242,14 @@ describe("readTargets", () => {
     ]);
 
     expect(readTargets(file)).toStrictEqual([
-      { classes: [], id: "cash", isImplemented: false, name: "Cash", share: 1 },
+      {
+        classes: [],
+        id: "cash",
+        isImplemented: false,
+        name: "Cash",
+        share: 1,
+        value: 0,
+      },
     ]);
   });
 
@@ -183,6 +273,78 @@ describe("readTargets", () => {
     ]);
 
     expect(readTargets(file).map(({ name }) => name)).toStrictEqual(["Cash"]);
+  });
+
+  // A holds ten after a purchase, a delivery in, a sale and a delivery
+  // out, a dividend moving none, at its last close of £250.46; B two at
+  // 15,000p, the category taking half of it; C four of a security the
+  // file does not price; and the account is no security. £2,504.60 and
+  // £150, to the pound.
+  it("reads what each category holds: each security assigned to it, at its last price in pounds, by what the transactions leave held", () => {
+    const file = holding(
+      [
+        ["a", 10_000],
+        ["b", 5000],
+        ["c", 10_000],
+        ["account", 10_000],
+      ],
+      [
+        security("a", "GBP", 20_000_000_000, 25_046_000_000),
+        security("b", "GBX", 1_500_000_000_000),
+        security("c", "GBP"),
+      ],
+      [
+        transaction(0, 1_000_000_000, "a"),
+        transaction(2, 500_000_000, "a"),
+        transaction(1, 300_000_000, "a"),
+        transaction(3, 200_000_000, "a"),
+        transaction(8, 100_000_000, "a"),
+        transaction(0, 200_000_000, "b"),
+        transaction(0, 400_000_000, "c"),
+        transaction(6, 10_000_000_000, null),
+      ],
+    );
+
+    expect(readTargets(file)).toStrictEqual([
+      {
+        classes: [],
+        id: "cash",
+        isImplemented: true,
+        name: "Cash",
+        share: 1,
+        value: 2655,
+      },
+    ]);
+  });
+
+  it("refuses a security held and assigned that is priced in a currency it has no pound for, by name", () => {
+    const priced = (currency: null | string): Uint8Array =>
+      holding(
+        [["x", 10_000]],
+        [security("x", currency, 10_000_000_000)],
+        [transaction(0, 100_000_000, "x")],
+      );
+
+    expect(() => readTargets(priced("USD"))).toThrow(
+      new Refusal(
+        "The file holds Fund x, priced in USD, and only GBP and GBX are read",
+      ),
+    );
+    expect(() => readTargets(priced(null))).toThrow(
+      new Refusal(
+        "The file holds Fund x, priced in no currency, and only GBP and GBX are read",
+      ),
+    );
+  });
+
+  it("holds nothing of a security in another currency that nothing is held of, rather than refusing it", () => {
+    const file = holding(
+      [["x", 10_000]],
+      [security("x", "USD", 10_000_000_000)],
+      [transaction(0, 100_000_000, "x"), transaction(1, 100_000_000, "x")],
+    );
+
+    expect(readTargets(file).map(({ value }) => value)).toStrictEqual([0]);
   });
 
   it("refuses a file that is no zip", () => {

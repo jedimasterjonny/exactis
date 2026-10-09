@@ -80,6 +80,7 @@ describe("importTargets", () => {
         isImplemented: true,
         name: "Japan",
         share: 0.05,
+        value: 0,
       },
     ];
     await keepAfter(db, 0, { ...reference, rateSet: "cma" });
