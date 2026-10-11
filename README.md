@@ -137,28 +137,30 @@ pay two people's tax rather than one person's on £80,000. Income tax is charged
 on every kind of line, with the personal allowance withdrawn over £100,000,
 Class 1 National Insurance on a salary and Class 4 on self-employed profit, and
 none on a pension or other income. A sacrifice comes off the salary before
-either, so what it saves in tax is what it saves the month. A fixed sum or the
-spare money paid into a pension comes out of taxed money instead, so the pension
-claims the basic rate back on it and £800 paid lands as £1,000, which is what a
-pension's cap is held to; the relief a higher rate taxpayer claims on top is
-theirs rather than the pension's, and is not counted. Relief is claimed on no
-more than the owner earns from their own salary or self-employment, less what
-they sacrifice, or £3,600 a year when that is more, so a pension paid after its
-owner retires, or an owner who earns nothing whatever the rest of the household
-earns, lands a pound a pound past £300 a month. Each month is taxed as a twelfth
-of a year, which is the year's tax exactly when its months are alike and too
-much or too little when they are not, as in the year a salary stops. So the
-projection carries each owner's tax year, April to April, and settles it in the
-April after: the owner's income tax on everything their months earned and drew
-from their pensions, and their Class 4 on all their profit, less what they paid,
-is refunded into that month's money or owed out of it, every owner's together,
-since the month's money is the household's. Class 1 is charged a pay period at a
-time, as the months charge it, and is not settled. The first tax year is the
-months of it the plan holds, against their share of each band. The bands are
-frozen until April 2031 and are held so: flat in pounds through the 2030/31 tax
-year, so an income rising with prices is dragged into a higher band, and rising
-with the plan's inflation each April from 2031/32, so each tax year is charged
-and settled against its own.
+either, so what it saves in tax is what it saves the month; a salary feeds a
+pension of the owner who earns it, since a sacrifice is an employer's
+contribution to the employee's own pension, and the household refuses one
+feeding another owner's. A fixed sum or the spare money paid into a pension
+comes out of taxed money instead, so the pension claims the basic rate back on
+it and £800 paid lands as £1,000, which is what a pension's cap is held to; the
+relief a higher rate taxpayer claims on top is theirs rather than the pension's,
+and is not counted. Relief is claimed on no more than the owner earns from their
+own salary or self-employment, less what they sacrifice, or £3,600 a year when
+that is more, so a pension paid after its owner retires, or an owner who earns
+nothing whatever the rest of the household earns, lands a pound a pound past
+£300 a month. Each month is taxed as a twelfth of a year, which is the year's
+tax exactly when its months are alike and too much or too little when they are
+not, as in the year a salary stops. So the projection carries each owner's tax
+year, April to April, and settles it in the April after: the owner's income tax
+on everything their months earned and drew from their pensions, and their Class
+4 on all their profit, less what they paid, is refunded into that month's money
+or owed out of it, every owner's together, since the month's money is the
+household's. Class 1 is charged a pay period at a time, as the months charge it,
+and is not settled. The first tax year is the months of it the plan holds,
+against their share of each band. The bands are frozen until April 2031 and are
+held so: flat in pounds through the 2030/31 tax year, so an income rising with
+prices is dragged into a higher band, and rising with the plan's inflation each
+April from 2031/32, so each tax year is charged and settled against its own.
 
 A debt's own fixed sum is a loan's payments, so it runs only until the loan
 maths in `src/lib/loans.ts` says they clear what is owed: the term the payment
