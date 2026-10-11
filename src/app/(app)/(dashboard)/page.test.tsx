@@ -61,13 +61,9 @@ describe("Dashboard", () => {
     expect(screen.getByText("Net worth at 66")).toBeInTheDocument();
   });
 
-  it("opens the meta line with the plan's state badges", async () => {
+  it("opens the meta line with the plan's state badge", async () => {
     render(await Dashboard());
 
-    expect(screen.getByText("On track")).toHaveAttribute(
-      "data-variant",
-      "positive",
-    );
     expect(screen.getByText("CMA-derived · Aug 26")).toHaveAttribute(
       "data-variant",
       "secondary",
@@ -83,15 +79,14 @@ describe("Dashboard", () => {
   });
 
   // The first tile reads the plan at retirement to begin with, and the
-  // chance of success follows it, before the caller's two.
-  it("follows the header with the four dashboard tiles, the chance of success second", async () => {
+  // chance of success follows it, before the caller's.
+  it("follows the header with the three dashboard tiles, the chance of success second", async () => {
     render(await Dashboard());
 
     for (const label of [
       "At Retirement",
       "Net worth at 89",
       "Chance of success",
-      "Net legacy",
     ]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
@@ -102,7 +97,7 @@ describe("Dashboard", () => {
           { suggest: false },
         )
         .map(({ textContent }) => textContent.startsWith("Chance")),
-    ).toStrictEqual([false, true, false, false, false, false]);
+    ).toStrictEqual([false, true, false, false, false]);
   });
 
   // The first million and financial independence are reached when
@@ -132,7 +127,7 @@ describe("Dashboard", () => {
   });
 
   // A phone keeps the two the plan is steered by, in one row, and
-  // leaves the other two to a wider screen.
+  // leaves the net worth to a wider screen.
   it("keeps the milestone tile and the chance of success on a phone, and no other tile", async () => {
     render(await Dashboard());
 
@@ -148,7 +143,6 @@ describe("Dashboard", () => {
     expect(tileOf("At Retirement")).not.toHaveClass("max-sm:hidden");
     expect(tileOf("Chance of success")).not.toHaveClass("max-sm:hidden");
     expect(tileOf("Net worth at 89")).toHaveClass("max-sm:hidden");
-    expect(tileOf("Net legacy")).toHaveClass("max-sm:hidden");
   });
 
   // The chart counts the plan's liquidity to begin with, so it draws
