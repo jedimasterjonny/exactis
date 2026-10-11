@@ -49,10 +49,11 @@ describe("Accounts", () => {
     expect(screen.getByText("Sect. III · Accounts & assets")).toHaveClass(
       "label",
     );
-    // The fixture's balances come to £901,462, its mortgage taking away.
+    // The fixture's balances come to £901,462, its mortgage taking away,
+    // and its plan runs from September, so they are as of August's end.
     expect(
       screen.getByText(
-        "Starting net worth £901,462 · balances as of September 2026",
+        "Starting net worth £901,462 · balances as of the end of August 2026",
       ),
     ).toBeInTheDocument();
     // The fixture's balances were kept before their days were, so no

@@ -167,25 +167,27 @@ const order = z
   .refine((ids) => new Set(ids).size === ids.length);
 
 // Closes the month: moves the month the household's balances are as
-// of, which is the month the plan starts in, and writes the balances
-// checked against it, each dated today, whether it moved or was
-// confirmed as it stood, and hands back the month as the household now
-// has it. Every other balance stays as it was, with the day it was set,
-// so a balance nobody checked is never taken for one somebody did, and
-// none is made up for a month it was not read in. A month that has not
-// begun is refused, since a balance is what an account held, and so is
-// one before the plan's owner was born, since the plan would run from
-// it; a balance against an id no account has is refused as well, and
-// so is a list naming one twice, which the worksheet could not have
-// sent. The month and the balances land together or not at all, and a
-// balance the household's rules refuse, such as one below nothing on
-// anything but a debt, is refused in their words. Checked as a save is.
+// of, the one at whose end they were read and the one before the plan
+// starts in, and writes the balances checked against it, each dated
+// today, whether it moved or was confirmed as it stood, and hands back
+// the month as the household now has it. Every other balance stays as
+// it was, with the day it was set, so a balance nobody checked is never
+// taken for one somebody did, and none is made up for a month it was
+// not read in. A month that has not ended is refused, this one among
+// them, since a balance is what an account held at a month's end and a
+// month still running has none to read, and so is one before the plan's
+// owner was born, since the plan would run from it; a balance against
+// an id no account has is refused as well, and so is a list naming one
+// twice, which the worksheet could not have sent. The month and the
+// balances land together or not at all, and a balance the household's
+// rules refuse, such as one below nothing on anything but a debt, is
+// refused in their words. Checked as a save is.
 export async function closeBalances(draft: Closed): Promise<Answer<Month>> {
   await requireSession();
   const { asOf, balances } = closed.parse(draft);
   return amend(({ household, kept }) => {
-    if (!isOnOrBefore(asOf, thisMonth())) {
-      throw new Refusal("The balances are as of a month that has begun");
+    if (isOnOrBefore(thisMonth(), asOf)) {
+      throw new Refusal("The balances are as of a month that has ended");
     }
     if (asOf.year < household.plan.born) {
       throw new Refusal(
@@ -310,7 +312,7 @@ export async function saveAccount(
 // the finance appears among the accounts and its payments among the
 // expenses with no more asked of the form, and hands back the car's own
 // account. Checked as a save is, the payments laid from the month the
-// plan starts in, which the balances are as of.
+// plan starts in, the one after the balances' month.
 export async function saveCar(
   id: null | number,
   draft: CarValues,
@@ -329,7 +331,7 @@ export async function saveCar(
 // payments, so the mortgage appears among the accounts and its payments
 // among the expenses with no more asked of the form, and hands back the
 // house's own account. Checked as a save is, the payments laid from the
-// month the plan starts in, which the balances are as of.
+// month the plan starts in, the one after the balances' month.
 export async function saveHouse(
   id: null | number,
   draft: HouseValues,
