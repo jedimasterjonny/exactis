@@ -10,7 +10,6 @@ import {
   capOf,
   isOwned,
   isPension,
-  pensionAllowance,
   takesSpare,
 } from "@/data/accounts";
 import {
@@ -37,6 +36,7 @@ import { monthsBetween } from "@/lib/months";
 import {
   incomeTaxOn,
   insuranceOn,
+  pensionAllowanceOf,
   reliefOf,
   relievableOn,
   upratingIn,
@@ -183,9 +183,10 @@ interface Reading {
 
 // What is left of each allowance in the month, by the owner and the
 // kind it is held for, in what lands: a twelfth of the allowance until
-// something is paid under it, and nothing once the salaries' sacrifices
-// alone have filled it. An account whose kind has no allowance has no
-// room to run out of and is never entered.
+// something is paid under it, each owner's pension room opening at
+// their own allowance for the month, tapered or whole, and nothing once
+// the salaries' sacrifices alone have filled it. An account whose kind
+// has no allowance has no room to run out of and is never entered.
 type Rooms = Map<string, number>;
 
 // What the month's income pays in tax: the income tax on all of it,
@@ -369,11 +370,17 @@ const nanopound = 1e-9;
 // allowance is the annual allowance charge, added to the owner's
 // taxable income for the month and charged through their bands at
 // their marginal rate, and settled with the tax year as the rest of the
-// income tax is. A fixed sum or the spare money past the room is not
-// paid, since each is a payment the plan chooses rather than one it
-// owes, and stays in the month to pay the sums and the spare money
-// after it, and what none of them takes is left, which the plan takes
-// as spent rather than saved. A twelfth rather than what is left of the tax year, so a
+// income tax is. The allowance is each owner's own for the month:
+// £60,000, tapered by a pound for every two of adjusted income over
+// £260,000 to a floor of £10,000 for an owner whose threshold income is
+// over £200,000 as well, each read off the month's lines twelve times
+// over, the sacrifice counted back into the threshold income and what
+// it lands into the adjusted income. A fixed sum or the spare money
+// past the room is not paid, since each is a payment the plan chooses
+// rather than one it owes, and stays in the month to pay the sums and
+// the spare money after it, and what none of them takes is left, which
+// the plan takes as spent rather than saved. A twelfth rather than
+// what is left of the tax year, so a
 // month reads the same whenever in the year it falls and needs nothing
 // the projection carries. A pension paid out of taxed money claims the
 // basic rate back on no more than its owner is relieved on, held the
@@ -492,7 +499,16 @@ export function cashFlow(
           ([owner, lines]) => [owner, relievableOn(payOf(lines, fed, reading))],
         ),
       ),
-      rooms: new Map(),
+      rooms: new Map(
+        reading.plan.owners.map(({ id }) => [
+          roomOf({ kind: "tax-deferred", owner: id }),
+          allowanceIn(
+            id,
+            running.filter((line) => line.owner === id),
+            { fed, reading },
+          ),
+        ]),
+      ),
     };
     for (const entry of fed) {
       landIn(purse.rooms, entry.account, entry.amount);
@@ -651,6 +667,34 @@ function accountAt(
   id: null | number | undefined,
 ): Account | undefined {
   return accounts.find((account) => account.id === id);
+}
+
+// A twelfth of an owner's pension allowance for the month, read off the
+// month's lines twelve times over, as the tax is charged on a twelfth
+// of a year: the adjusted income is what the owner's lines pay after
+// the sacrifice with what their sacrifices land on top, which is the
+// employer's contributions, and the threshold income is that pay with
+// the sacrifice added back, as the law adds back a sacrifice arranged
+// since July 2015. What is paid into a pension out of taxed money,
+// which the law takes off the threshold income, is left in it here,
+// since the room it is paid under is set by the allowance this gives,
+// so an owner within those payments of £200,000 is tapered a little
+// early; and a draw on a pension in the month is in neither, since the
+// flow does not see the draws.
+function allowanceIn(
+  owner: number,
+  theirs: readonly IncomeLine[],
+  { fed, reading }: { readonly fed: readonly Fed[]; readonly reading: Reading },
+): number {
+  const own = fed.filter((entry) => entry.line.owner === owner);
+  const pay = payOf(theirs, fed, reading);
+  const sacrificed = own.reduce((sum, entry) => sum + entry.sacrificed, 0);
+  return (
+    pensionAllowanceOf({
+      adjusted: 12 * (pay + total(own)),
+      threshold: 12 * (pay + sacrificed),
+    }) / 12
+  );
 }
 
 // The owner who earns a line, as the lines are grouped by owner: the
@@ -892,7 +936,10 @@ function reliefIn(purse: Purse, account: Account): number {
 // What is left of an account's allowance in the month, in what lands:
 // its owner's for its kind, a twelfth of it until something has been
 // paid under it into any of the owner's accounts of the kind, and no
-// limit at all for an account whose kind has none.
+// limit at all for an account whose kind has none. A pension's room
+// opens at its owner's own allowance for the month, which the purse is
+// seeded with; a room nothing seeded, an ISA's or a pension's whose
+// owner the plan does not list, opens at a twelfth of the kind's.
 function roomIn(rooms: Rooms, account: Account): number {
   const allowance = allowanceOf(account.kind);
   return allowance === null
@@ -903,7 +950,7 @@ function roomIn(rooms: Rooms, account: Account): number {
 // The allowance an account is paid under, named by its owner and its
 // kind, since an owner has one of each kind shared across every account
 // of it they hold.
-function roomOf(account: Account): string {
+function roomOf(account: Pick<Account, "kind" | "owner">): string {
   return `${String(account.owner)} ${account.kind}`;
 }
 
@@ -1001,7 +1048,10 @@ function taxOn(
     (taxed, [owner, theirs]) => {
       const profit = ofKind(theirs, "self-employment");
       const landed = total(fed.filter((entry) => entry.line.owner === owner));
-      const excess = Math.max(0, landed - pensionAllowance / 12);
+      const excess = Math.max(
+        0,
+        landed - allowanceIn(owner, theirs, { fed, reading }),
+      );
       const taxable = payOf(theirs, fed, reading) + excess;
       return {
         earned: [...taxed.earned, { owner, profit, taxable }],
