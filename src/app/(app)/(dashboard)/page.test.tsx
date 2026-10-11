@@ -5,6 +5,7 @@ import type { Household } from "@/data/household";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
+import { goals } from "@/data/goals.fixture";
 import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
@@ -93,6 +94,16 @@ describe("Dashboard", () => {
       "Net legacy",
     ]) {
       expect(screen.getByText(label)).toBeInTheDocument();
+    }
+  });
+
+  it("hands the store's goals to the chance of success, which tiles each", async () => {
+    vi.mocked(getHousehold).mockResolvedValue({ ...household, goals });
+
+    render(await Dashboard());
+
+    for (const { name } of goals) {
+      expect(screen.getByText(name)).toHaveClass("label");
     }
   });
 

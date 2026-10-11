@@ -47,6 +47,7 @@ describe("ChanceTile", () => {
     render(
       <ChanceTile
         accounts={[isa]}
+        goals={[]}
         plan={plan}
         schedule={schedule}
         spread={{ inflation: 0, rate: 0 }}
@@ -65,10 +66,52 @@ describe("ChanceTile", () => {
     expect(screen.getByText("100%")).toHaveClass("figure");
   });
 
+  // Worth £30,000 as it opens, every future reaches that much at once,
+  // at 34; none ever reaches £40,000.
+  it("tiles each goal at the age half the futures reach it by, or a dash with the share that ever do", async () => {
+    render(
+      <ChanceTile
+        accounts={[isa]}
+        goals={[
+          {
+            conditions: [{ measure: "worth", of: "pounds", times: 30000 }],
+            id: 1,
+            name: "Thirty grand",
+          },
+          {
+            conditions: [{ measure: "worth", of: "pounds", times: 40000 }],
+            id: 2,
+            name: "Forty grand",
+          },
+        ]}
+        plan={plan}
+        schedule={schedule}
+        spread={{ inflation: 0, rate: 0 }}
+      />,
+    );
+
+    expect(screen.getByText("Thirty grand")).toHaveClass("label");
+    expect(screen.getAllByText("Drawing the futures…")).toHaveLength(2);
+    expect(
+      await screen.findByText(
+        "Median of 1,000 futures · 2026",
+        {},
+        { timeout: 5000 },
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("34")).toHaveClass("figure");
+    expect(screen.getByText("yrs")).toBeInTheDocument();
+    expect(
+      screen.getByText("Reached in 0% of 1,000 futures"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("—")).toHaveClass("figure");
+  });
+
   it("shows a dash, saying why, with no spread to draw the futures at or no savings for them", () => {
     const { rerender } = render(
       <ChanceTile
         accounts={[isa]}
+        goals={[]}
         plan={plan}
         schedule={schedule}
         spread={{ short: "No CMA is pulled" }}
@@ -82,7 +125,29 @@ describe("ChanceTile", () => {
 
     rerender(
       <ChanceTile
+        accounts={[isa]}
+        goals={[
+          {
+            conditions: [{ measure: "worth", of: "pounds", times: 30000 }],
+            id: 1,
+            name: "Thirty grand",
+          },
+        ]}
+        plan={plan}
+        schedule={schedule}
+        spread={{ short: "No CMA is pulled" }}
+      />,
+    );
+
+    expect(screen.getAllByText("—")).toHaveLength(2);
+    expect(
+      screen.getAllByText("No spread to draw the futures from"),
+    ).toHaveLength(2);
+
+    rerender(
+      <ChanceTile
         accounts={[]}
+        goals={[]}
         plan={plan}
         schedule={schedule}
         spread={{ inflation: 0, rate: 0 }}
