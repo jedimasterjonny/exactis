@@ -3,8 +3,11 @@
 // household that broke it reached the engine anyway, which only a bug
 // could hand it. The two say the same thing in the same words, so a
 // refusal read off either is the one rule, and the words are kept once
-// so the two cannot drift.
+// so the two cannot drift. A rule the model alone holds, the engine
+// running soundly on a household that breaks it, is kept here when it
+// extends one the two share, so the pair reads as one rule.
 export const rules = {
+  aboveBalloon: "A debt paid its own sum owes more than its balloon",
   alwaysFunded: "Only a pension is always funded",
   belongs: "An ISA or a pension belongs to an owner the household lists",
   belowNothing: "A balance below nothing is a debt's",
@@ -17,6 +20,7 @@ export const rules = {
   owes: "A debt's balance is nothing or less",
   owned: "An ISA or a pension belongs to an owner, and nothing else",
   paysDebt: "A line pays a debt alone",
+  paysSomething: "A line paying a debt pays something",
   share: "A salary gives up a share of its base",
   somebodys: "A plan is somebody's",
   spare: "A real asset or a debt takes no spare money",
