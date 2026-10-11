@@ -135,6 +135,19 @@ describe("MoneyFlow", () => {
     );
   });
 
+  // A salary matched to seven per cent of its base lands the employer's
+  // £700 a month beside its £1,150, and the step says the match is in
+  // it.
+  it("names the employer's match among what a matched salary lands", () => {
+    renderFlow({
+      schedule: { expenses: [], income: [{ ...salary, match: 0.07 }] },
+    });
+
+    expect(steps()[0]).toContain(
+      "£1,850 salary sacrifice and employer match from Salary",
+    );
+  });
+
   // The ISA takes what its allowance leaves room for and the cash the
   // rest, so nothing is left over; a pension always funded says so.
   it("hands the spare money down the savings that take it, each up to its cap", () => {

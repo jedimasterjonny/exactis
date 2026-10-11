@@ -55,6 +55,7 @@ const values = {
   kind: "self-employment",
   lastMonth: null,
   lastYear: 2035,
+  match: 0,
   name: " Bonus scheme ",
   opens: null,
   owner: 1,
@@ -81,6 +82,7 @@ function lineOf(draft: IncomeLineDraft, id: number): IncomeLine {
     kind: draft.kind,
     lastMonth: draft.lastMonth,
     lastYear: draft.lastYear,
+    match: draft.match,
     name: draft.name.trim(),
     owner: draft.owner,
     rsu: draft.rsu,
@@ -289,7 +291,7 @@ describe("the schedule actions", () => {
         ],
         [
           { ...values, kind: "employment", sacrifice: 0.1 },
-          "A salary gives up a share only into a pension it feeds",
+          "A salary gives up a share, and is matched one, only into a pension it feeds",
         ],
         [
           { ...values, owner: 99 },

@@ -190,6 +190,12 @@ const thrown: readonly Thrown[] = [
       earning(given, 1, (salary) => ({ ...salary, sacrifice: 1.5 })),
   ],
   [
+    "An employer matches a share of the base",
+    "An employer matches a share of the base",
+    (given): Inputs =>
+      earning(given, 1, (salary) => ({ ...salary, match: 1.5 })),
+  ],
+  [
     "A line pays a debt alone",
     "A line pays a debt alone",
     (given): Inputs => spending(given, 1, (line) => ({ ...line, pays: 2 })),
@@ -436,9 +442,14 @@ const held: readonly Case[] = [
       earning(given, 4, (pension) => ({ ...pension, bonus: 100 })),
   ],
   [
-    "A salary gives up a share only into a pension it feeds",
+    "A salary gives up a share, and is matched one, only into a pension it feeds",
     (given): Inputs =>
       earning(given, 2, (salary) => ({ ...salary, sacrifice: 0.1 })),
+  ],
+  [
+    "A salary gives up a share, and is matched one, only into a pension it feeds",
+    (given): Inputs =>
+      earning(given, 2, (salary) => ({ ...salary, match: 0.07 })),
   ],
   [
     "A plan's owner retires no later than it ends",
@@ -1041,6 +1052,21 @@ describe("soundKept", () => {
     expect(() => soundKept({ accounts: [] })).toThrow(
       "Invalid input: expected object, received undefined",
     );
+  });
+
+  // A version kept before salaries carried the share their employer
+  // matches is refused on the read, as any field a line lacks is,
+  // rather than read as matched nothing.
+  it("refuses an income line kept without the share its employer matches", () => {
+    expect(() =>
+      soundKept({
+        ...kept,
+        schedule: {
+          ...kept.schedule,
+          income: [{ ...incomeLines[0], match: undefined }],
+        },
+      }),
+    ).toThrow("Invalid input: expected number, received undefined");
   });
 
   // The current account and the home each below nothing break the one

@@ -273,6 +273,7 @@ function blank(plan: Plan, owner: number): Draft {
     kind: "employment",
     lastMonth: null,
     lastYear: retirement > plan.from ? retirement - 1 : null,
+    match: 0,
     name: "",
     opens: null,
     owner,

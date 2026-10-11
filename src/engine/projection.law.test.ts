@@ -336,6 +336,7 @@ function lineFrom(random: () => number, id: number, from: number): IncomeLine {
     lastMonth:
       lastYear !== null && random() < 0.5 ? Math.floor(random() * 12) : null,
     lastYear,
+    match: 0,
     name: `Line ${String(id)}`,
     owner: 1,
     rsu: 0,

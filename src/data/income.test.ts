@@ -8,6 +8,7 @@ import {
   contributionOf,
   isFeeding,
   isOpeningSound,
+  matchOf,
   sacrificeOf,
   toPension,
   totalOf,
@@ -104,11 +105,26 @@ describe("sacrificeOf", () => {
   });
 });
 
+describe("matchOf", () => {
+  // Seven per cent of the £120,000 base, £8,400, matched pound for pound
+  // with the tenth given up; a fifth is matched only as far as that
+  // tenth, £12,000; and a line giving up nothing is matched nothing,
+  // however much its employer would match.
+  it("pays pound for pound with the sacrifice up to the share matched, of the base alone", () => {
+    expect(matchOf({ ...salary, match: 0.07 })).toBeCloseTo(8400, 8);
+    expect(matchOf({ ...salary, match: 0.2 })).toBe(12000);
+    expect(matchOf(salary)).toBe(0);
+    expect(matchOf({ ...stepUp, match: 0.07 })).toBe(0);
+  });
+});
+
 describe("contributionOf", () => {
   // The £12,000 sacrificed and the employer's fifteen per cent NI saved
-  // on it, £1,800, land together.
-  it("pays the sacrifice into the pension with the employer's NI saved on it", () => {
+  // on it, £1,800, land together, and the employer's £8,400 match
+  // beside them where the salary is matched to seven per cent.
+  it("pays the sacrifice into the pension with the employer's NI saved on it, and the match", () => {
     expect(contributionOf(salary)).toBeCloseTo(13800, 8);
+    expect(contributionOf({ ...salary, match: 0.07 })).toBeCloseTo(22200, 8);
     expect(contributionOf(stepUp)).toBe(0);
   });
 });

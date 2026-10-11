@@ -13,9 +13,11 @@ export type IncomeKind = (typeof incomeKinds)[number];
 // are paid together, at the line's one cadence, but held apart, since
 // a pension contribution is a share of the base alone. An employment
 // line paid through a salary sacrifice names the pension its sacrifice
-// goes into, by the account's id, and the share of the base it gives up,
-// a fraction as every rate is; a line with no pension names none and
-// gives up nothing, as every other kind of line does. Lines overlap
+// goes into, by the account's id, the share of the base it gives up,
+// a fraction as every rate is, and the share of the base its employer
+// matches, pound for pound with the sacrifice up to that share; a line
+// with no pension names none, gives up nothing and is matched nothing,
+// as every other kind of line does. Lines overlap
 // freely: a step-up is a second line starting mid-way, not an edit to
 // the first, and both may feed the one pension. The kind says what the
 // money is, for the badge and for the tax it pays. Every line names
@@ -45,6 +47,7 @@ export interface IncomeLineValues extends LineValues {
   readonly bonus: number;
   readonly feeds: null | number;
   readonly kind: IncomeKind;
+  readonly match: number;
   readonly owner: number;
   readonly rsu: number;
   readonly sacrifice: number;
@@ -112,9 +115,10 @@ export function asPaid<TLine extends IncomeLineValues>(
 }
 
 // What lands in the pension a line feeds, at the line's cadence: the
-// sacrifice, and the employer's NI saved on it, passed on in full.
+// sacrifice, the employer's NI saved on it, passed on in full, and the
+// employer's match.
 export function contributionOf(line: IncomeLineValues): number {
-  return sacrificeOf(line) * (1 + employerNi);
+  return sacrificeOf(line) * (1 + employerNi) + matchOf(line);
 }
 
 // Whether the line is money earned by working, a salary or a
@@ -139,6 +143,16 @@ export function isFeeding(draft: IncomeLineDraft): boolean {
 export function isOpeningSound(draft: IncomeLineDraft): boolean {
   const { opens } = draft;
   return opens === null || (opens.name.trim() !== "" && opens.owner !== null);
+}
+
+// What a line's employer pays into its pension beside the sacrifice at
+// its cadence: pound for pound with what the line gives up, up to the
+// share of the base the line states, of the base alone as the sacrifice
+// is, and nothing for a line that gives up none, however much its
+// employer would match. It comes off nothing the owner is paid, so
+// the salary is taxed as it is without it.
+export function matchOf(line: IncomeLineValues): number {
+  return line.amount * Math.min(line.sacrifice, line.match);
 }
 
 // What a line gives up into its pension at its cadence: the share of
