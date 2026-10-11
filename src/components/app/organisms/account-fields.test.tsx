@@ -181,6 +181,17 @@ describe("AccountFields", () => {
     ).toHaveAccessibleDescription("A debt's is negative");
   });
 
+  // A debt is on a lender's rate, as a loan is, so it is offered no
+  // growth choice and asks for the rate alone.
+  it("offers a debt no growth choice", () => {
+    renderFields({ ...isa, growth: "fixed", kind: "debt", owner: null });
+
+    expect(
+      screen.queryByRole("combobox", { name: "Growth" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Rate" })).toHaveValue("0.00%");
+  });
+
   it("says nothing of a pension's balance's sign", () => {
     renderFields({ ...isa, kind: "tax-deferred" });
 
