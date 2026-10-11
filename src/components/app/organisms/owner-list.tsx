@@ -10,13 +10,17 @@ import type { Owner, OwnerValues } from "@/data/owners";
 import { removeOwner, saveOwner } from "@/actions/owners";
 import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { EmptyState } from "@/components/app/atoms/empty-state";
+import { FieldRow } from "@/components/app/atoms/field-row";
+import { AgeField } from "@/components/app/molecules/age-field";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
+import { YearField } from "@/components/app/molecules/figure-field";
 import { RowActions } from "@/components/app/molecules/row-actions";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { TextField } from "@/components/app/molecules/text-field";
 import { Button } from "@/components/kit/button";
 import { Table, TableBody, TableCell, TableRow } from "@/components/kit/table";
 import { openingOwner } from "@/data/owners";
+import { oldestAge } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { listed } from "@/lib/feeders";
@@ -33,10 +37,12 @@ const blank: OwnerValues = { ...openingOwner, name: "" };
 
 // The people the plan is for, as a section of the accounts screen: each
 // owner a row of its name with a pencil and a bin, and a button in the
-// header adding another. An owner is a name and nothing more, so its
-// dialog is a single field, and the section holds its own dialog and
-// question rather than handing them up to the ledger, as the payment
-// order holds its reordering. The rows are the store's, handed down by
+// header adding another. An owner is a name, the year they were born
+// and the age they retire at, so its dialog is the name over the two
+// years side by side, the age typed with no slider, since it is set on
+// purpose here and dragged on the dashboard; the section holds its own
+// dialog and question rather than handing them up to the ledger, as
+// the payment order holds its reordering. The rows are the store's, handed down by
 // the page, and a save or a deletion comes back with the page re-read.
 // A section holding no owners draws its empty state instead of the
 // table. An owner an account names says which beneath its name and has
@@ -128,6 +134,27 @@ export function OwnerList({
             }}
             placeholder="Me, a partner…"
           />
+          <FieldRow layout="pair">
+            <YearField
+              defaultValue={entry.initial.born}
+              hint="The year, which every age is read against"
+              label="Born"
+              onValueCommitted={(born) => {
+                amend(entry, { born });
+              }}
+            />
+            <AgeField
+              hasSlider={false}
+              hint="From which nothing is earned by working"
+              label="Retires at"
+              max={oldestAge}
+              min={0}
+              onValueCommitted={(retires) => {
+                amend(entry, { retires });
+              }}
+              value={entry.draft.retires}
+            />
+          </FieldRow>
         </EditDialog>
       )}
       {doomed !== null && (
