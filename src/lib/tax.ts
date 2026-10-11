@@ -3,7 +3,7 @@ import type { IncomeKind } from "@/data/income";
 import type { Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 
-import { allowanceOf, isPension } from "@/data/accounts";
+import { allowanceOf, isPension, pensionAllowance } from "@/data/accounts";
 import { inflationIn } from "@/data/plan";
 import { yearly } from "@/lib/cadence";
 
@@ -110,6 +110,13 @@ const leastRelievable = 3600;
 // replaced the lifetime allowance in April 2024.
 export const lumpSumAllowance = 268275;
 
+// Where the pension allowance is tapered: a pound for every two of
+// adjusted income over £260,000, down to a £10,000 floor, which is
+// reached at £360,000, for a person whose threshold income is over
+// £200,000 as well. Frozen in pounds as the allowances are, since the
+// law does not uprate them.
+const taper = { adjusted: 260000, floor: 10000, threshold: 200000 } as const;
+
 // The share of a draw on a pension that is free of tax while the lump
 // sum allowance lasts, the rest being taxed as income, as a draw that
 // takes its tax-free cash a piece at a time is.
@@ -213,6 +220,28 @@ export function isWithinAllowance(values: AccountValues): boolean {
 export function mostFixedOf(kind: AccountKind): null | number {
   const allowance = allowanceOf(kind);
   return allowance === null ? null : allowance / (1 + reliefOf({ kind }));
+}
+
+// A person's pension allowance for a year, from their two incomes as
+// the law reads them: the adjusted income, everything taxable with the
+// employer's pension contributions on top, and the threshold income,
+// everything taxable with a salary sacrifice added back. Whole unless
+// both are over their figures, and then tapered by a pound for every
+// two of adjusted income over £260,000, down to the floor.
+export function pensionAllowanceOf({
+  adjusted,
+  threshold,
+}: {
+  readonly adjusted: number;
+  readonly threshold: number;
+}): number {
+  if (threshold <= taper.threshold || adjusted <= taper.adjusted) {
+    return pensionAllowance;
+  }
+  return Math.max(
+    taper.floor,
+    pensionAllowance - (adjusted - taper.adjusted) / 2,
+  );
 }
 
 // What a pension adds to each pound paid into it out of taxed money:
