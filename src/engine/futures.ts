@@ -112,6 +112,15 @@ export interface Grading {
   readonly surplus: number;
 }
 
+// What a future is worth entering the plan's last year: the net worth
+// its last year measures, or nothing for a future holding no years, as
+// a run of none holds none. What the chance of success grades and
+// reads the middle of, and what the dashboard's net worth tile reads
+// of the plan at its own rates.
+export function endWorthOf({ measured }: Pick<Future, "measured">): number {
+  return measured.at(-1)?.worth ?? 0;
+}
+
 // A projection read as a future, over what it was run over: the year
 // it first fell short, by running out or by drawing a pension early,
 // the year it first ran out, and each year measured from the month it
@@ -234,7 +243,7 @@ export function outcomesOf(
 ): Readonly<Record<Outcome, number>> {
   function outcomeOf({ fell, measured }: Future): Outcome {
     if (fell === null) {
-      const left = measured.at(-1)?.worth ?? 0;
+      const left = endWorthOf({ measured });
       if (left > grading.surplus) {
         return "surplus";
       }
@@ -347,10 +356,7 @@ export function readingOf(futures: readonly Future[]): Reading {
     halfRanOut: ranOutIn[Math.floor((ranOutIn.length - 1) / 2)] ?? null,
     lasted,
     margin: run === 0 ? 0 : wilsonOf(chance, run),
-    middle:
-      sorted(futures.map(({ measured }) => measured.at(-1)?.worth ?? 0))[
-        Math.floor(run / 2)
-      ] ?? 0,
+    middle: sorted(futures.map(endWorthOf))[Math.floor(run / 2)] ?? 0,
     ranOut: ranOutIn.length,
     run,
   };
