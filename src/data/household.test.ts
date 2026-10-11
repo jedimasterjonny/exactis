@@ -392,6 +392,21 @@ const held: readonly Case[] = [
       ),
   ],
   [
+    "A debt paid its own sum owes more than its balloon",
+    (given): Inputs =>
+      changed(given, 5, (mortgage) => ({ ...mortgage, balloon: 176520 })),
+  ],
+  [
+    "A debt paid its own sum owes more than its balloon",
+    (given): Inputs =>
+      changed(given, 5, (mortgage) => ({ ...mortgage, balloon: 200000 })),
+  ],
+  [
+    "A line paying a debt pays something",
+    (given): Inputs =>
+      spending(given, 1, (line) => ({ ...line, amount: 0, pays: 5 })),
+  ],
+  [
     "A line ends no earlier than it starts",
     (given): Inputs =>
       spending(given, 1, (line) => ({ ...line, lastYear: 2025 })),

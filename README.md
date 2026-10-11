@@ -181,7 +181,9 @@ terms, or to the end of the plan when it never clears, as an interest-only
 mortgage does. So a mortgage's end moves with the balances' month as a plain
 debt's does. Saving a debt whose fixed payment never clears it is refused, since
 a payment the month's interest swallows gives the projection no month to stop
-at.
+at. So is saving one owing no more than its balloon, or a line paying a debt
+nothing: either leaves the debt standing as it is for the whole plan, paid
+nothing and charged nothing.
 
 Any other line may tie its first or last year to a milestone rather than fix it,
 and then runs as the milestone does. A milestone is the first year of what it
