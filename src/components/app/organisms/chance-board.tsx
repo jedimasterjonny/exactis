@@ -147,7 +147,8 @@ function Futures({
   });
   const reading = readingOf(futures);
   const asProjected = useMemo(
-    () => futureOf(project(accounts, schedule, plan), accounts),
+    () =>
+      futureOf(project(accounts, schedule, plan), { accounts, plan, schedule }),
     [accounts, plan, schedule],
   );
   const projected = readingOf([asProjected]);

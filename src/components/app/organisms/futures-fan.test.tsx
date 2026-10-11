@@ -18,12 +18,18 @@ const plan = {
 };
 
 // Ten futures, the nth worth n thousand pounds entering 2026, twice that
-// entering 2027 and three times entering 2028; the first runs out in
-// 2027 and the second in 2028.
+// entering 2027 and three times entering 2028, as liquid as it is worth
+// and owing and spending nothing; the first runs out in 2027 and the
+// second in 2028.
 const futures = Array.from({ length: 10 }, (_, nth): Future => ({
   fell: [2027, 2028][nth] ?? null,
+  measured: [1000 * nth, 2000 * nth, 3000 * nth].map((worth) => ({
+    debt: 0,
+    expenses: 0,
+    liquid: worth,
+    worth,
+  })),
   ranOut: [2027, 2028][nth] ?? null,
-  worth: [1000 * nth, 2000 * nth, 3000 * nth],
 }));
 
 // One milestone in the plan's years and one past them.
@@ -107,8 +113,8 @@ describe("FuturesFan", () => {
       <FuturesFan
         futures={futures.map((future) => ({
           ...future,
-          worth: future.worth.map((each, year) =>
-            year === 0 ? each - 1500 : each,
+          measured: future.measured.map((each, year) =>
+            year === 0 ? { ...each, worth: each.worth - 1500 } : each,
           ),
         }))}
         milestones={[]}

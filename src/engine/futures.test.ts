@@ -2,8 +2,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { Measured } from "@/data/goals";
 
 import { expenseLines } from "@/data/expenses.fixture";
+import { goals } from "@/data/goals.fixture";
 import { project } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
@@ -14,6 +16,8 @@ import {
   gradingOf,
   outcomesOf,
   pathOf,
+  reachedBy,
+  reachedIn,
   readingOf,
   yearsIn,
 } from "./futures";
@@ -30,6 +34,17 @@ function logOf(rate: number): number {
 function middleOf(values: readonly number[]): number {
   const sorted = values.toSorted((first, second) => first - second);
   return sorted[Math.floor(sorted.length / 2)] ?? Number.NaN;
+}
+
+// Years measured as worth what is given, holding no property, owing
+// nothing and spending nothing, so each is as liquid as it is worth.
+function worthOf(pounds: readonly number[]): Measured[] {
+  return pounds.map((worth) => ({
+    debt: 0,
+    expenses: 0,
+    liquid: worth,
+    worth,
+  }));
 }
 
 describe("pathOf", () => {
@@ -141,7 +156,9 @@ describe("futuresOf", () => {
 
   // £30,000 drawn £12,000 a year holds £18,000 entering 2027 and £6,000
   // entering 2028, which runs out that year; the home is no saving, but
-  // it is worth £400,000 throughout.
+  // it is worth £400,000 throughout, so the plan is worth that much
+  // more than it is liquid. Nothing is owed, and the £1,000 a month
+  // going out is £12,000 a year.
   it("runs every future as the plan at its rates where nothing strays", () => {
     const futures = taken(
       [isa, home],
@@ -152,10 +169,44 @@ describe("futuresOf", () => {
     expect(futures).toStrictEqual(
       Array.from({ length: 3 }, () => ({
         fell: 2028,
+        measured: [430000, 418000, 406000, 400000, 400000, 400000].map(
+          (worth) => ({
+            debt: 0,
+            expenses: 12000,
+            liquid: worth - 400000,
+            worth,
+          }),
+        ),
         ranOut: 2028,
-        worth: [430000, 418000, 406000, 400000, 400000, 400000],
       })),
     );
+  });
+
+  // Owing £100,000 on a loan nothing pays, charged nothing, the plan is
+  // worth £100,000 less than its ISA and its home and the loan is
+  // counted as owed; opening in July, the first year's expenses are
+  // still a year's, twelve of July's.
+  it("measures each year by what is owed and what a year of the lines costs, the first from the plan's month", () => {
+    const loan: Account = {
+      balance: -100000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 3,
+      kind: "debt",
+      name: "Loan",
+    };
+
+    const [future] = taken(
+      [isa, home, loan],
+      { plan: { ...planned, month: 6 }, spread: nothingStrays },
+      1,
+    );
+
+    expect(future?.measured[0]).toStrictEqual({
+      debt: 100000,
+      expenses: 12000,
+      liquid: -70000,
+      worth: 330000,
+    });
   });
 
   it("tells a future kept going only by drawing a pension early from one that ran out", () => {
@@ -176,7 +227,9 @@ describe("futuresOf", () => {
 
     expect(taken([isa], run, 3)).toStrictEqual(first);
     expect(taken([isa], run, 1)).toStrictEqual(first.slice(0, 1));
-    expect(new Set(first.map(({ worth }) => worth[2])).size).toBe(3);
+    expect(new Set(first.map(({ measured }) => measured[2]?.worth)).size).toBe(
+      3,
+    );
   });
 
   it("draws from any place in the run the futures the run holds there", () => {
@@ -228,11 +281,11 @@ describe("gradingOf", () => {
   // less either side of it.
   const projected: Future = {
     fell: null,
-    ranOut: null,
-    worth: [
+    measured: worthOf([
       50000, 60000, 70000, 80000, 100000, 90000, 80000, 70000, 60000, 50000,
       40000,
-    ],
+    ]),
+    ranOut: null,
   };
 
   // Over fifteen years of retirement the fifths land on whole years, six
@@ -278,11 +331,11 @@ describe("gradingOf", () => {
   it("grades against today's worth where the plan is worth nothing at retirement, and never against less than nothing", () => {
     const owing = (today: number, retiring: number): Future => ({
       ...projected,
-      worth: projected.worth.map((each, year) => {
+      measured: projected.measured.map((each, year) => {
         if (year === 0) {
-          return today;
+          return { ...each, worth: today };
         }
-        return year === 4 ? retiring : each;
+        return year === 4 ? { ...each, worth: retiring } : each;
       }),
     });
 
@@ -297,7 +350,7 @@ describe("gradingOf", () => {
   });
 
   it("reads a plan holding no years as worth nothing", () => {
-    expect(gradingOf({ ...projected, worth: [] }, plan)).toMatchObject({
+    expect(gradingOf({ ...projected, measured: [] }, plan)).toMatchObject({
       comfortable: 0,
       surplus: 0,
     });
@@ -313,11 +366,11 @@ describe("outcomesOf", () => {
   };
 
   function lasting(left: number): Future {
-    return { fell: null, ranOut: null, worth: [0, left] };
+    return { fell: null, measured: worthOf([0, left]), ranOut: null };
   }
 
   function short(fell: number, ranOut: null | number = fell): Future {
-    return { fell, ranOut, worth: [0, 0] };
+    return { fell, measured: worthOf([0, 0]), ranOut };
   }
 
   // More than £300,000 is a large surplus, £300,000 itself and down to
@@ -352,9 +405,9 @@ describe("outcomesOf", () => {
   });
 
   it("reads a future holding no years as holding nothing", () => {
-    expect(outcomesOf([{ ...lasting(0), worth: [] }], grading)).toMatchObject({
-      barely: 1,
-    });
+    expect(
+      outcomesOf([{ ...lasting(0), measured: [] }], grading),
+    ).toMatchObject({ barely: 1 });
   });
 });
 
@@ -366,7 +419,7 @@ describe("readingOf", () => {
     ranOut: null | number,
     end: number,
   ): Future {
-    return { fell, ranOut, worth: [100000, end] };
+    return { fell, measured: worthOf([100000, end]), ranOut };
   }
 
   // Ten futures: seven last; one runs out in 2060, one draws a pension
@@ -410,8 +463,8 @@ describe("readingOf", () => {
   it("gives a run that all lasted a range all the same", () => {
     const lasting = Array.from({ length: 1000 }, (): Future => ({
       fell: null,
+      measured: worthOf([1]),
       ranOut: null,
-      worth: [1],
     }));
 
     expect(readingOf(lasting).margin).toBeCloseTo(0.0019134, 6);
@@ -429,7 +482,77 @@ describe("readingOf", () => {
       ranOut: 0,
       run: 0,
     });
-    expect(readingOf([{ fell: null, ranOut: null, worth: [] }]).middle).toBe(0);
+    expect(readingOf([{ fell: null, measured: [], ranOut: null }]).middle).toBe(
+      0,
+    );
+  });
+});
+
+describe("reachedIn", () => {
+  const [firstMillion, independence] = goals;
+  const plan = { from: 2026 };
+
+  // Worth £900,000 entering 2026, a million entering 2027 and £1,100,000
+  // entering 2028, the first million is reached in 2027; nothing is
+  // spent or owed, so independence is reached at once.
+  it("reads the first year the goal's conditions all hold, or null where they never do", () => {
+    const future: Future = {
+      fell: null,
+      measured: worthOf([900000, 1000000, 1100000]),
+      ranOut: null,
+    };
+
+    expect(reachedIn(future, firstMillion, plan)).toBe(2027);
+    expect(reachedIn(future, independence, plan)).toBe(2026);
+    expect(
+      reachedIn(
+        { ...future, measured: worthOf([900000, 950000]) },
+        firstMillion,
+        plan,
+      ),
+    ).toBeNull();
+  });
+
+  it("reads the first year it holds, whatever the years after it do", () => {
+    expect(
+      reachedIn(
+        { fell: null, measured: worthOf([0, 1000000, 0]), ranOut: null },
+        firstMillion,
+        plan,
+      ),
+    ).toBe(2027);
+  });
+});
+
+describe("reachedBy", () => {
+  const [firstMillion] = goals;
+  const plan = { from: 2026 };
+
+  // Ten futures, the nth reaching a million entering 2030 + n for the
+  // first eight and the last two never: the earliest 5% and 10% have by
+  // 2030, the first of them; the earliest 25% by 2032, the third; half
+  // by 2034, the fifth; four in five by 2037, the eighth; and nine in
+  // ten never have.
+  it("reads the year by which the share of the run has reached the goal, or null where fewer ever do", () => {
+    const futures = Array.from({ length: 10 }, (_, nth): Future => ({
+      fell: null,
+      measured: worthOf(
+        Array.from({ length: 12 }, (_, offset) =>
+          nth < 8 && offset >= 4 + nth ? 1000000 : 0,
+        ),
+      ),
+      ranOut: null,
+    }));
+
+    expect(
+      [0.05, 0.1, 0.25, 0.5, 0.8, 0.9].map((share) =>
+        reachedBy(futures, firstMillion, { plan, share }),
+      ),
+    ).toStrictEqual([2030, 2030, 2032, 2034, 2037, null]);
+  });
+
+  it("reaches nothing over a run of none", () => {
+    expect(reachedBy([], firstMillion, { plan, share: 0.5 })).toBeNull();
   });
 });
 
@@ -445,8 +568,8 @@ describe("yearsIn", () => {
   it("lays a run on the plan's years, reading the spread of its worth and counting what has run out", () => {
     const futures = Array.from({ length: 10 }, (_, nth): Future => ({
       fell: [2027, 2028, 2027][nth] ?? null,
+      measured: worthOf([1000 * nth, 2000 * nth, 3000 * nth]),
       ranOut: [2027, 2028][nth] ?? null,
-      worth: [1000 * nth, 2000 * nth, 3000 * nth],
     }));
 
     expect(yearsIn(futures, span)).toStrictEqual([
@@ -489,7 +612,7 @@ describe("yearsIn", () => {
       [2028, 0],
     ]);
     expect(
-      yearsIn([{ fell: null, ranOut: null, worth: [] }], span).map(
+      yearsIn([{ fell: null, measured: [], ranOut: null }], span).map(
         ({ middle }) => middle,
       ),
     ).toStrictEqual([0, 0, 0]);
