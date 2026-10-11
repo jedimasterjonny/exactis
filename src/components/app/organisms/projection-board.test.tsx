@@ -81,9 +81,7 @@ function board(
       plan={held}
       schedule={lines}
       spread={spread}
-    >
-      <p>The other tiles</p>
-    </ProjectionBoard>
+    />
   );
 }
 
@@ -139,9 +137,24 @@ function typeAge(age: string): void {
   commit(input, age);
 }
 
+// The net worth the plan holds entering a year, as the net worth tile
+// reads it: every account the fixture holds, the home and the mortgage
+// owed on it among them.
+function worthIn(held: Plan, year: number, lines: Schedule = schedule): string {
+  const point = pointIn(held, year, lines);
+  return formatGbp(
+    accounts.reduce(
+      (sum, { id }) => sum + (point === undefined ? 0 : balanceIn(point, id)),
+      0,
+    ),
+  );
+}
+
 describe("ProjectionBoard", () => {
   // Retirement is chosen to begin with: the tile reads the balance the
   // plan holds entering 2053, and the age's hint the year before it.
+  // The plan runs to 2083, and the net worth tile reads what it holds
+  // entering that year.
   it("leads the tiles with the milestone tile at retirement, charts the engine's projection marked there, and gives the last working year under the age", () => {
     render(board());
 
@@ -158,20 +171,23 @@ describe("ProjectionBoard", () => {
       ),
     ).toBeInTheDocument();
     // The chance of success follows the milestone tile, with nothing to
-    // draw the futures at, and the caller's tiles follow it.
+    // draw the futures at, and the net worth follows it.
     expect(
       screen.getAllByText(
         (_content, element) => element?.hasAttribute("data-tone") === true,
         { suggest: false },
       ),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(screen.getByText("Chance of success")).toHaveClass("label");
     expect(
       screen.getByText("No spread to draw the futures from"),
     ).toBeInTheDocument();
+    expect(screen.getByText("Net worth at 91")).toHaveClass("label");
+    expect(screen.getByText(worthIn(retiring, 2083))).toHaveClass("figure");
+    expect(screen.getByText("At the plan's own rates")).toBeInTheDocument();
     expect(
       screen.getAllByRole("paragraph").map((line) => line.textContent),
-    ).toStrictEqual(["The other tiles", "Last working year 2052"]);
+    ).toStrictEqual(["Last working year 2052"]);
     expect(screen.getByRole("application")).toHaveClass("recharts-surface");
     expect(marks()).toStrictEqual(["2053"]);
     expect(screen.getByRole("textbox", { name: "Retirement age" })).toHaveValue(
@@ -289,6 +305,9 @@ describe("ProjectionBoard", () => {
     expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 64 });
   });
 
+  // Retiring at 55 stops the salary six years sooner, so the plan
+  // enters 2083 holding less, and the net worth tile reads the plan at
+  // the age moved to, as the milestone tile does.
   it("moves the tile and the mark to a typed age, and saves it", () => {
     vi.useFakeTimers();
     render(board());
@@ -298,8 +317,12 @@ describe("ProjectionBoard", () => {
       vi.advanceTimersByTime(settle);
     });
 
+    const moved = worthIn({ ...retiring, retires: 55 }, 2083);
+
     expect(screen.getByText("2047 · age 55")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2047"]);
+    expect(moved).not.toBe(worthIn(retiring, 2083));
+    expect(screen.getByText(moved)).toHaveClass("figure");
     expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 55 });
   });
 
@@ -365,9 +388,7 @@ describe("ProjectionBoard", () => {
         plan={retiring}
         schedule={schedule}
         spread={short}
-      >
-        {null}
-      </ProjectionBoard>,
+      />,
     );
 
     expect(screen.getByText("Nothing to project yet")).toBeInTheDocument();

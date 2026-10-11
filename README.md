@@ -224,10 +224,13 @@ on the accounts or the plan screen is a new projection on the next render and a
 retirement age dragged on the dashboard is projected as it moves, the lines tied
 to retirement moving with it. Chips over the chart choose a milestone, and the
 first tile reads the balance the plan holds entering its year, retirement's to
-begin with. The reads every screen goes through, one read of the latest version
-a request, and the save every action makes live under `src/store`, and the
-server actions a save goes to under `src/actions`: neither is a route, and the
-organisms that save through an action sit beneath the routes.
+begin with. A second tile reads the plan's net worth entering its last year, at
+its own rates: the one figure the chance of success's futures spread either side
+of, and the one its screen sets the middle future against. The reads every
+screen goes through, one read of the latest version a request, and the save
+every action makes live under `src/store`, and the server actions a save goes to
+under `src/actions`: neither is a route, and the organisms that save through an
+action sit beneath the routes.
 
 ## Inflation
 

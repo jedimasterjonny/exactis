@@ -1,8 +1,8 @@
 "use client";
 
-import type { JSX, ReactNode } from "react";
+import type { JSX } from "react";
 
-import { Flag } from "lucide-react";
+import { Flag, Landmark } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Run } from "@/components/app/organisms/chance-tile";
@@ -23,7 +23,7 @@ import { ProjectionChart } from "@/components/app/organisms/projection-chart";
 import { takesSpare } from "@/data/accounts";
 import { ageOf, timed } from "@/data/milestones";
 import { ageIn, endAge, retirementYear } from "@/data/plan";
-import { markersIn, runLength } from "@/engine/futures";
+import { endWorthOf, futureOf, markersIn, runLength } from "@/engine/futures";
 import { balanceOf, holdsAnything, project } from "@/engine/projection";
 import { useFutures } from "@/hooks/use-futures";
 import { useSender } from "@/hooks/use-sender";
@@ -51,7 +51,6 @@ interface Pending {
 
 interface ProjectionBoardProps {
   readonly accounts: readonly Account[];
-  readonly children: ReactNode;
   readonly milestones: readonly Milestone[];
   readonly plan: Plan;
   readonly schedule: Schedule;
@@ -67,7 +66,10 @@ export const settle = 400;
 // accounts, the two schedules and the plan as the store has them, and
 // charted with the milestones marked, retirement among them, under the
 // row of tiles, the milestone tile first, the chance of success after
-// it and the caller's after that. The futures the chance of success is
+// it and after that the net worth the plan holds entering its last
+// year, read off the one projection at the plan's own rates, as the
+// chance's screen reads it to set the middle future against, and left
+// to a wider screen than a phone's. The futures the chance of success is
 // read over are drawn here, once, as the chance's screen draws them,
 // so the tiles and the chart read the one run: a milestone reached when
 // conditions hold is marked on the chart in the year by which half the
@@ -130,7 +132,6 @@ export function ProjectionBoard({
 // has been drawn, or why it cannot be.
 function Board({
   accounts,
-  children,
   milestones,
   plan,
   run,
@@ -147,23 +148,27 @@ function Board({
   // what it returns. It folded the run into the scope that reads the
   // milestone chosen, so choosing one ran the engine again and handed
   // the chart points it had never seen, which recharts redraws whole.
+  // The run is read as a future beside its points, each year measured
+  // as a milestone measures one, so the tiles read the net worth as the
+  // chance's screen reads the plan at its own rates, by the one function.
   const drafted = useMemo(() => ({ ...plan, retires }), [plan, retires]);
-  const points = useMemo(
-    () =>
-      project(
-        accounts,
-        {
-          expenses: schedule.expenses.map((line) =>
-            timed(line, milestones, drafted),
-          ),
-          income: schedule.income.map((line) =>
-            timed(line, milestones, drafted),
-          ),
-        },
-        drafted,
+  const { points, projected } = useMemo(() => {
+    const lines = {
+      expenses: schedule.expenses.map((line) =>
+        timed(line, milestones, drafted),
       ),
-    [accounts, drafted, milestones, schedule],
-  );
+      income: schedule.income.map((line) => timed(line, milestones, drafted)),
+    };
+    const projection = project(accounts, lines, drafted);
+    return {
+      points: projection,
+      projected: futureOf(projection, {
+        accounts,
+        plan: drafted,
+        schedule: lines,
+      }),
+    };
+  }, [accounts, drafted, milestones, schedule]);
   const isProjecting = points.some(holdsAnything);
   // The milestones are placed by the whole run once it is drawn, and by
   // none before, so a chip and a line land once rather than drifting
@@ -247,7 +252,13 @@ function Board({
           />
         )}
         <ChanceTile milestones={milestones} plan={plan} run={run} />
-        {children}
+        <StatTile
+          caption="At the plan's own rates"
+          icon={Landmark}
+          isHiddenOnPhone
+          label={`Net worth at ${String(endAge(plan))}`}
+          value={formatGbp(endWorthOf(projected))}
+        />
       </TileGrid>
       <ProjectionChart
         accounts={accounts}
