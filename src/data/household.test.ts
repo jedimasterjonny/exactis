@@ -11,6 +11,7 @@ import type {
   Vintages,
 } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
+import type { Goal } from "@/data/goals";
 import type { HousePrices } from "@/data/house-prices";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
@@ -30,6 +31,7 @@ import { golfValues } from "@/data/cars.fixture";
 import { derivedSet } from "@/data/cma";
 import { cma, mappings } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
+import { goals } from "@/data/goals.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
 import { homeValues } from "@/data/houses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
@@ -59,6 +61,7 @@ interface Inputs {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
+  readonly goals: readonly Goal[];
   readonly housePrices: HousePrices | null;
   readonly liveRates: Rates;
   readonly mappings: readonly Mapping[];
@@ -89,6 +92,7 @@ const sound: Inputs = {
   cma: { latest: cma, previous: null },
   curve,
   deductions: { dividends: 0.02, fees: 0.002 },
+  goals,
   housePrices: kept.housePrices,
   liveRates: rates,
   mappings,
@@ -291,6 +295,14 @@ const held: readonly Case[] = [
       ...given,
       milestones: [...given.milestones, ...given.milestones],
     }),
+  ],
+  [
+    "A goal is listed once",
+    (given): Inputs => ({ ...given, goals: [...given.goals, ...given.goals] }),
+  ],
+  [
+    "A goal holds a condition",
+    (given): Inputs => ({ ...given, goals: [{ ...goals[0], conditions: [] }] }),
   ],
   [
     "An owner is listed once",
@@ -600,6 +612,7 @@ describe("soundKept", () => {
         cma: null,
         curve: null,
         deductions: { dividends: 0.02, fees: 0.002 },
+        goals: [],
         housePrices: null,
         liveRates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
         mappings: [],
@@ -878,6 +891,9 @@ describe("soundKept", () => {
         ...kept,
         milestones: [...kept.milestones, { id: 6, name: "Late", year: 2070 }],
       }),
+    ).toThrow("A record's id is below the one the next record is given");
+    expect(() =>
+      soundKept({ ...kept, goals: [...kept.goals, { ...goals[0], id: 6 }] }),
     ).toThrow("A record's id is below the one the next record is given");
   });
 
