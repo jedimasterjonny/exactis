@@ -791,15 +791,19 @@ describe("cashFlow", () => {
   });
 
   // 12% of a £600,000 base lands £6,900 a month with the employer's
-  // NI on it, £1,900 past the £5,000 a twelfth of the allowance holds. The
-  // sacrifice is given up whole all the same, being the employer's
-  // contribution under the scheme, so the £624,000 a year with its parts
-  // is taxed on the £46,000 a month left of it and on the £1,900 landed
-  // past the allowance, £47,900: £20,405.25 of income tax, where the
-  // £46,000 alone pays £19,550.25, the £855 between them being 45% of
-  // the £1,900, the owner's marginal rate; and the NI stays on the £46,000
-  // of pay, £1,087.55, since the charge is no earnings. The pension's
-  // own fixed sum finds no room left and is paid nothing.
+  // NI on it. The £624,000 a year with its parts is £624,000 of
+  // threshold income and, with the £82,800 landed on top of the £552,000
+  // paid, £634,800 of adjusted income, far past where the taper reaches
+  // the £10,000 floor, so the allowance is £833.33 a month and the
+  // £6,900 is £6,066.67 past it. The sacrifice is given up whole all the
+  // same, being the employer's contribution under the scheme, so the
+  // month is taxed on the £46,000 left of the salary and on the
+  // £6,066.67 landed past the allowance, £52,066.67: £22,280.25 of
+  // income tax, where the £46,000 alone pays £19,550.25, the £2,730
+  // between them being 45% of the £6,066.67, the owner's marginal rate;
+  // and the NI stays on the £46,000 of pay, £1,087.55, since the charge
+  // is no earnings. The pension's own fixed sum finds no room left and
+  // is paid nothing.
   it("gives up a sacrifice whole and charges what lands past the allowance as the owner's income", () => {
     const rich: IncomeLine = { ...salary, amount: 600000 };
     const flow = cashFlow(
@@ -816,20 +820,22 @@ describe("cashFlow", () => {
         sacrificed: 6000,
       },
     ]);
-    expect(flow.taxable).toBe(47900);
-    expect(flow.earned).toStrictEqual([
-      { owner: 1, profit: 0, taxable: 47900 },
-    ]);
-    expect(flow.incomeTax).toBeCloseTo(20405.25, 10);
+    expect(flow.taxable).toBeCloseTo(46000 + 6900 - 10000 / 12, 8);
+    expect(
+      flow.earned.map(({ owner, taxable }) => [owner, taxable]),
+    ).toStrictEqual([[1, flow.taxable]]);
+    expect(flow.incomeTax).toBeCloseTo(22280.25, 8);
     expect(flow.insurance).toBeCloseTo(1087.55, 10);
     expect(flow.fixed).toStrictEqual([{ account: pension, amount: 0 }]);
   });
 
   // Two salaries feeding the one pension are each given up whole, the
   // £600,000 base's £6,900 and the £144,000 salary's £1,380, and the
-  // owner is charged on what the two land past the allowance together,
-  // the £3,280 of their £8,280 over £5,000: the month is taxed on the
-  // £46,000 and £10,800 left of the two and on that £3,280, £60,080.
+  // owner is charged on what the two land past the allowance together:
+  // £768,000 a year of threshold income and £780,960 of adjusted leave
+  // the £10,000 floor, £833.33 a month, which the £8,280 landed is
+  // £7,446.67 past, so the month is taxed on the £46,000 and £10,800
+  // left of the two and on that £7,446.67, £64,246.67.
   it("charges an owner on what every salary feeding their pensions lands past the allowance", () => {
     const rich: IncomeLine = { ...salary, amount: 600000 };
     const second: IncomeLine = { ...salary, id: 9 };
@@ -840,7 +846,81 @@ describe("cashFlow", () => {
     );
 
     expect(flow.fed.map((entry) => entry.line)).toStrictEqual([rich, second]);
-    expect(flow.taxable).toBeCloseTo(60080, 10);
+    expect(flow.taxable).toBeCloseTo(56800 + 8280 - 10000 / 12, 8);
+  });
+
+  // £400,000 of salary with nothing sacrificed is £400,000 of threshold
+  // income and of adjusted income, £140,000 over £260,000, which would
+  // take £70,000 off the £60,000 allowance and so leaves the £10,000
+  // floor: a pension paid £5,000 a month has room for the £833.33 a
+  // twelfth of that holds, and is paid the £666.67 that lands as it once
+  // the basic rate is claimed back, the other £4,333.33 staying in the
+  // month.
+  it("tapers an owner's pension allowance to the £10,000 floor and holds a fixed sum to a twelfth of it", () => {
+    const topped: Account = {
+      ...pension,
+      contribution: { amount: 5000, cadence: "month", kind: "fixed" },
+    };
+    const flow = cashFlow(
+      [topped],
+      { expenses: [], income: [{ ...plain, amount: 400000 }] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+
+    expect(pennies(flow.fixed)).toStrictEqual([
+      { account: topped, amount: 666.67 },
+    ]);
+    expect(pennies(flow.relief)).toStrictEqual([
+      { account: topped, amount: 166.67 },
+    ]);
+  });
+
+  // A £200,000 base with a £94,000 bonus and a fifth of the base
+  // sacrificed is £294,000 of threshold income, the £40,000 sacrifice
+  // counted back in, and £300,000 of adjusted income, the £46,000 the
+  // sacrifice lands with the employer's NI on top of the £254,000 paid.
+  // Both are over, so the £40,000 over £260,000 takes £20,000 off and
+  // the allowance is £40,000, £3,333.33 a month, which the £3,833.33
+  // landed is £500 past: the month is taxed on the £21,166.67 paid and
+  // that £500, and the pension's own fixed sum finds no room. Sam's
+  // pension beside it is under Sam's own allowance, whole on a £36,000
+  // salary, so Sam's £2,000 a month is paid in full.
+  it("tapers each owner's pension allowance off their own adjusted and threshold income", () => {
+    const earner: IncomeLine = {
+      ...salary,
+      amount: 200000,
+      bonus: 94000,
+      rsu: 0,
+      sacrifice: 0.2,
+    };
+    const sipp: Account = {
+      ...pension,
+      contribution: { amount: 2000, cadence: "month", kind: "fixed" },
+      id: 7,
+      name: "Sam's SIPP",
+      owner: sam.id,
+    };
+    const flow = cashFlow(
+      [pension, sipp],
+      { expenses: [], income: [earner, { ...plain, id: 9, owner: sam.id }] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+    const [mine, theirs] = flow.earned;
+
+    expect(flow.fed).toStrictEqual([
+      {
+        account: pension,
+        amount: (40000 * 1.15) / 12,
+        line: earner,
+        sacrificed: 40000 / 12,
+      },
+    ]);
+    expect(mine?.taxable).toBeCloseTo(254000 / 12 + 500, 8);
+    expect(theirs?.taxable).toBe(3000);
+    expect(pennies(flow.fixed)).toStrictEqual([
+      { account: pension, amount: 0 },
+      { account: sipp, amount: 2000 },
+    ]);
   });
 
   // The salary's pension is not listed, so it is earned whole, £7,342.20
