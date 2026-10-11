@@ -49,7 +49,7 @@ function rateOf(sources: Sources): number {
   if ("short" in derived) {
     throw new Error(derived.short);
   }
-  return planRate(derived.rates, derived.allocation);
+  return planRate(derived.rates, derived.allocation, derived.rebalancing);
 }
 
 describe("movesBetween", () => {

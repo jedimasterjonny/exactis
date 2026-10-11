@@ -8,6 +8,7 @@ import {
   blendsOf,
   cmaRates,
   derivedSet,
+  rebalancingOf,
   riskOf,
   spreadOf,
   stocksMoved,
@@ -18,6 +19,15 @@ import { cma, mappings } from "./cma.fixture";
 import { inflationOf } from "./inflation";
 import { curve } from "./inflation.fixture";
 import { targets } from "./targets.fixture";
+
+// August's vintage as one pulled before volatilities were read: every
+// class at its return, with no risk, and no correlation between
+// government bonds and equities.
+const unread: Cma = {
+  asOf: cma.asOf,
+  assets: cma.assets.map(({ name, rate, sleeve }) => ({ name, rate, sleeve })),
+  vintage: cma.vintage,
+};
 
 // The blends the vintage, allocation and mappings given make, the
 // reference ones unless given, or a failure naming why they make none.
@@ -258,21 +268,28 @@ describe("derivedSet", () => {
   };
 
   // Four fifths of the reference blend into stocks and a fifth into
-  // bonds.
-  it("derives the rates from the latest vintage's blends, with the curve's inflation, and the split from the target allocation's", () => {
+  // bonds, and rebalancing earns the portfolio's term over the blend,
+  // 0.398 of a point.
+  it("derives the rates from the latest vintage's blends, with the curve's inflation, the split from the target allocation's, and what rebalancing earns from the vintage's risk", () => {
     const derived = derivedSet(sources);
+    const risk = riskOf(cma, blended());
 
     expect(derived).toMatchObject({
       rates: cmaRates(blended(), sources.deductions, inflationOf(curve).rate),
+      rebalancing: expect.closeTo(0.0039837, 7) as unknown,
     });
     expect("short" in derived ? null : derived.allocation.stocks).toBeCloseTo(
       0.8,
       12,
     );
+    expect("short" in derived ? null : derived.rebalancing).toBe(
+      "short" in risk ? null : rebalancingOf(blended(), risk).portfolio,
+    );
   });
 
   // All in UK equities, the plan holds everything in stocks, and bonds'
-  // rate is stocks' return in all less the fees, which weighs nothing.
+  // rate is stocks' return in all less the fees, which weighs nothing;
+  // one class in one sleeve, nothing is rebalanced, and nothing earned.
   it("derives a set for an allocation with nothing in one sleeve, splitting everything into the other", () => {
     const derived = derivedSet({ ...sources, targets: onlyIn("UK equity") });
     const all = "short" in derived ? null : derived;
@@ -280,6 +297,21 @@ describe("derivedSet", () => {
     expect(all?.allocation.stocks).toBeCloseTo(1, 12);
     expect(all?.rates.bonds).toBeCloseTo(0.08156 - 0.002, 12);
     expect(all?.rates.stocks).toBeCloseTo(0.08156 - 0.002 - 0.02, 12);
+    expect(all?.rebalancing).toBe(0);
+  });
+
+  // A vintage pulled before volatilities were read gives the same rates
+  // and nothing over them, so the plan runs on the blend as it did.
+  it("derives the rates with nothing earned by rebalancing while the vintage gives no risk", () => {
+    const derived = derivedSet({
+      ...sources,
+      cma: { latest: unread, previous: null },
+    });
+
+    expect(derived).toMatchObject({
+      rates: cmaRates(blended(), sources.deductions, inflationOf(curve).rate),
+      rebalancing: 0,
+    });
   });
 
   it("derives none before a vintage or a curve is pulled, or while the vintage makes no blend", () => {
@@ -385,15 +417,6 @@ describe("riskOf", () => {
   });
 
   it("gives none for a vintage pulled before its volatilities were read, while a class blended carries none, or while the vintage does not say how bonds and equities move together", () => {
-    const unread: Cma = {
-      asOf: cma.asOf,
-      assets: cma.assets.map(({ name, rate, sleeve }) => ({
-        name,
-        rate,
-        sleeve,
-      })),
-      vintage: cma.vintage,
-    };
     const ukUnrisked: Cma = {
       ...cma,
       assets: cma.assets.map((asset) =>
@@ -421,21 +444,88 @@ describe("riskOf", () => {
   });
 });
 
+describe("rebalancingOf", () => {
+  // The blends and the risk the allocation given makes.
+  function parted(allocation: Targets): Parameters<typeof rebalancingOf> {
+    const blends = blended(cma, allocation);
+    const risk = riskOf(cma, blends);
+    if ("short" in risk) {
+      throw new Error(risk.short);
+    }
+    return [blends, risk];
+  }
+
+  // Half in UK equities at 16% and half in the equities at 19%, blended
+  // to 0.027585 of variance: half of 0.5 × 0.16² + 0.5 × 0.19² less
+  // that, 0.0016325, within stocks. Nothing is in bonds, so they earn
+  // nothing, and all in stocks the portfolio earns what stocks do.
+  it("earns within a sleeve half the gap between its classes' variances in their weights and its own", () => {
+    expect(
+      rebalancingOf(
+        ...parted(onlyIn("UK equity", "FTSE Global All Cap ex-UK")),
+      ),
+    ).toStrictEqual({
+      bonds: 0,
+      portfolio: expect.closeTo(0.0016325, 12) as unknown,
+      stocks: expect.closeTo(0.0016325, 12) as unknown,
+    });
+  });
+
+  // One class to a sleeve earns nothing within it. Half in UK equities
+  // at 16% and half in hedged bonds at 3.5%, moving -0.0541 together,
+  // earns half of 0.25 × (0.16² + 0.035² - 2 × -0.0541 × 0.16 × 0.035)
+  // between the two, 0.0034289.
+  it("earns between the sleeves half their shares' product times how far apart they move", () => {
+    expect(
+      rebalancingOf(...parted(onlyIn("UK equity", "Global bonds, hedged"))),
+    ).toStrictEqual({
+      bonds: 0,
+      portfolio: expect.closeTo(0.0034289, 7) as unknown,
+      stocks: 0,
+    });
+  });
+
+  // The reference allocation: stocks stray 16.68% blended against a
+  // weighted variance of their four classes earning 0.205 of a point,
+  // bonds 3.42% earning 0.020, and the two moving 0.013 together, 0.231
+  // between them at four fifths and a fifth: 0.8 × 0.205 + 0.2 × 0.020 +
+  // 0.231, 0.398 of a point on the portfolio.
+  it("earns the portfolio the sleeves' terms in their shares and the term between them", () => {
+    expect(rebalancingOf(...parted(targets))).toStrictEqual({
+      bonds: expect.closeTo(0.0002031, 7) as unknown,
+      portfolio: expect.closeTo(0.0039837, 7) as unknown,
+      stocks: expect.closeTo(0.0020462, 7) as unknown,
+    });
+  });
+
+  // All in UK equities, bonds stand in with no parts and none of the
+  // whole, so they earn nothing and add nothing between the sleeves.
+  it("earns nothing on a sleeve nothing blends into", () => {
+    expect(rebalancingOf(...parted(onlyIn("UK equity")))).toStrictEqual({
+      bonds: 0,
+      portfolio: 0,
+      stocks: 0,
+    });
+  });
+});
+
 describe("spreadOf", () => {
   const vintages = { latest: cma, previous: null };
 
   // Stocks at 6% and a 2% yield, 8% in all, bonds at 4%, prices at 3%.
   const rates = { bonds: 0.04, dividends: 0.02, inflation: 0.03, stocks: 0.06 };
 
-  // The split given, on the rates above.
-  function live(stocks: number): DerivedSet {
-    return { allocation: { stocks }, rates };
+  // The split given, on the rates above, with rebalancing earning what
+  // is given over them, or nothing.
+  function live(stocks: number, rebalancing = 0): DerivedSet {
+    return { allocation: { stocks }, rates, rebalancing };
   }
 
   // Half in UK equities at 16% and half in hedged bonds at 3.5%, moving
   // -0.0541 together: 0.25 × 0.16² + 0.25 × 0.035² + 2 × 0.25 × -0.0541
   // × 0.16 × 0.035, a portfolio straying 8.10% a year about the 6% the
-  // split makes, which in logs is 7.60%. All in stocks, the stocks' 16%
+  // split makes, which in logs is 7.60%; about the 7% it makes with a
+  // point earned by rebalancing, 7.53%. All in stocks, the stocks' 16%
   // about 8% is 14.58% in logs, and prices' standing 2% about 3% is
   // 1.94% in logs either way.
   it("spreads the plan rate as far as the portfolio strays in the split it runs on, and prices by the standing figure, each in logs", () => {
@@ -445,9 +535,11 @@ describe("spreadOf", () => {
       targets: onlyIn("UK equity", "Global bonds, hedged"),
     };
     const halved = spreadOf(sources, live(0.5));
+    const earning = spreadOf(sources, live(0.5, 0.01));
     const stocked = spreadOf(sources, live(1));
 
     expect("rate" in halved && halved.rate).toBeCloseTo(0.0760476, 6);
+    expect("rate" in earning && earning.rate).toBeCloseTo(0.0753429, 6);
     expect("rate" in stocked && stocked.rate).toBeCloseTo(0.1458034, 6);
     expect("inflation" in stocked && stocked.inflation).toBeCloseTo(
       0.019412,
@@ -456,16 +548,6 @@ describe("spreadOf", () => {
   });
 
   it("spreads nothing before a vintage is pulled, while it makes no blend or gives no risk, or while the plan holds what the target allocation does not", () => {
-    const unread: Cma = {
-      asOf: cma.asOf,
-      assets: cma.assets.map(({ name, rate, sleeve }) => ({
-        name,
-        rate,
-        sleeve,
-      })),
-      vintage: cma.vintage,
-    };
-
     expect(spreadOf({ cma: null, mappings, targets }, live(0.8))).toStrictEqual(
       { short: "No CMA is pulled" },
     );

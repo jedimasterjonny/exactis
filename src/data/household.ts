@@ -951,7 +951,7 @@ function liveOf(kept: Kept): DerivedSet {
       return derived;
     }
     case "custom":
-      return { allocation: kept.allocation, rates: kept.rates };
+      return { allocation: kept.allocation, rates: kept.rates, rebalancing: 0 };
   }
 }
 

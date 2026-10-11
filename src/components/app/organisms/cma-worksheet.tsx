@@ -25,7 +25,7 @@ import { EmptyState } from "@/components/app/atoms/empty-state";
 import { Note } from "@/components/app/atoms/note";
 import { Worksheet } from "@/components/app/atoms/worksheet";
 import { CardContent, CardFooter } from "@/components/kit/card";
-import { blendsOf, cmaRates } from "@/data/cma";
+import { blendsOf, cmaRates, rebalancingOf, riskOf } from "@/data/cma";
 import { inflationOf } from "@/data/inflation";
 import { movesBetween } from "@/data/moves";
 import { resultsOf } from "@/data/rates";
@@ -78,12 +78,16 @@ const sourceRows: Record<Source, { detail: string; label: string }> = {
 //
 // Beneath, the worksheet: the target weight of each sleeve, the blended
 // 20-year return, the hedging adjustment where a class is hedged to
-// sterling, and the fees, closing on the return each comes to, which for
-// the portfolio is the plan rate; then the growth and the yield that
-// return is made of, which are the rates the plan takes, and what it
-// comes to over the curve's inflation. The portfolio's figure in each
-// row is the sleeves' in the shares the target allocation holds of them.
-// A sleeve nothing blends into is dashed. Under the worksheet, every
+// sterling, the fees, and what rebalancing earns over the blend where
+// the vintage gives the risk to work it from, closing on the return each
+// comes to, which for the portfolio is the plan rate; then the growth
+// and the yield that return is made of, which are the rates the plan
+// takes, and what it comes to over the curve's inflation. The
+// portfolio's figure in each row is the sleeves' in the shares the
+// target allocation holds of them, but for the rebalancing, which the
+// portfolio earns between the sleeves as well as within each, so its
+// return stands over the sleeves' weighted by as much. A sleeve nothing
+// blends into is dashed. Under the worksheet, every
 // category's share of the whole, under the sleeve it blends into.
 // Beneath the worksheet, what has moved the rates since the household
 // as it stood a while ago, given as its sources then: the plan rate, the
@@ -192,11 +196,7 @@ function Blended({
       <Worksheet
         columns={columns}
         label="CMA-derived rates, worked out"
-        rows={rowsOf(
-          blends,
-          deductions,
-          curve === null ? null : inflationOf(curve).rate,
-        )}
+        rows={rowsOf(blends, { cma, curve, deductions })}
       />
       <Weights cma={cma} mappings={mappings} targets={targets} />
     </>
@@ -274,18 +274,32 @@ function Moved({
 // portfolio's is the sleeves' in the shares the target allocation holds,
 // which leaves out the sleeve that holds none. The hedging row is there
 // only while a class is hedged to sterling, and dashed for a sleeve with
-// none hedged. Bonds pay no yield, so theirs is dashed. Before a curve
-// is pulled there is no inflation to read the return over, and the real
-// return is dashed.
+// none hedged. The rebalancing row is there only while the vintage gives
+// the risk it is worked from, and without it the return is the blend
+// alone, as the plan then runs. Bonds pay no yield, so theirs is dashed.
+// Before a curve is pulled there is no inflation to read the return
+// over, and the real return is dashed.
 function rowsOf(
   blends: { readonly bonds: Blend; readonly stocks: Blend },
-  deductions: Deductions,
-  inflation: null | number,
+  {
+    cma,
+    curve,
+    deductions,
+  }: {
+    readonly cma: Cma;
+    readonly curve: Curve | null;
+    readonly deductions: Deductions;
+  },
 ): readonly WorksheetRow[] {
   const { bonds, stocks } = blends;
-  const results = resultsOf(cmaRates(blends, deductions, inflation ?? 0), {
-    stocks: stocks.share,
-  });
+  const inflation = curve === null ? null : inflationOf(curve).rate;
+  const risk = riskOf(cma, blends);
+  const rebalancing = "short" in risk ? null : rebalancingOf(blends, risk);
+  const results = resultsOf(
+    cmaRates(blends, deductions, inflation ?? 0),
+    { stocks: stocks.share },
+    rebalancing === null ? 0 : rebalancing.portfolio,
+  );
   const isHedged = (blend: Blend): boolean =>
     blend.parts.some(({ asset }) => asset.hedges !== undefined);
   const figuresOf = (
@@ -347,6 +361,16 @@ function rowsOf(
       ),
       label: "Fee drag",
     },
+    ...(rebalancing === null
+      ? []
+      : [
+          {
+            detail:
+              "Earned yearly within each sleeve, and between them for the portfolio, over the blend of geometric returns",
+            figures: figuresOf(formatPoints, rebalancing),
+            label: "Rebalancing",
+          },
+        ]),
     {
       detail: "What each comes to; the portfolio's is the plan rate",
       figures: figuresOf(formatPercent, results.nominal),

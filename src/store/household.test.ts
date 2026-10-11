@@ -2,6 +2,8 @@
 import { refresh } from "next/cache";
 import { describe, expect, it, vi } from "vitest";
 
+import type { DerivedSet } from "@/data/cma";
+import type { Kept } from "@/data/household";
 import type { Answer } from "@/lib/answer";
 
 import { spreadOf } from "@/data/cma";
@@ -30,6 +32,12 @@ vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 const memory = inMemory();
 const { db } = memory;
 
+// The rates and the split a kept household runs on while the rates
+// typed are live, over which rebalancing earns nothing.
+function typed({ allocation, rates }: Kept): DerivedSet {
+  return { allocation, rates, rebalancing: 0 };
+}
+
 describe("the household store", () => {
   standUp(memory, { today });
 
@@ -52,7 +60,7 @@ describe("the household store", () => {
       mappings: [],
       milestones: [],
       owners: blank.owners,
-      plan: planOf(blank, blank),
+      plan: planOf(blank, typed(blank)),
       points: [],
       rates: openingRates,
       rateSet: "custom",
@@ -91,10 +99,7 @@ describe("the household store", () => {
       rates: reference.rates,
       rateSet: reference.rateSet,
       schedule: reference.schedule,
-      spread: spreadOf(reference, {
-        allocation: reference.allocation,
-        rates: reference.rates,
-      }),
+      spread: spreadOf(reference, typed(reference)),
       targets: reference.targets,
     });
   });
@@ -141,7 +146,7 @@ describe("the household store", () => {
     await keepAfter(db, 0, reference);
 
     const result = await amend(({ household, kept }) => {
-      expect(household.plan).toStrictEqual(planOf(reference, reference));
+      expect(household.plan).toStrictEqual(planOf(reference, typed(reference)));
       return {
         kept: {
           ...kept,
