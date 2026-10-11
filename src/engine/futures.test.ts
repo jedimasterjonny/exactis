@@ -14,6 +14,7 @@ import type { Future } from "./futures";
 import {
   futuresOf,
   gradingOf,
+  markersIn,
   outcomesOf,
   pathOf,
   reachedBy,
@@ -544,35 +545,76 @@ describe("reachedIn", () => {
   });
 });
 
+// Ten futures over twelve years, the nth reaching a million entering
+// 2030 + n for the first eight and the last two never: the earliest 5%
+// and 10% have by 2030, the first of them; the earliest 25% by 2032,
+// the third; half by 2034, the fifth; four in five by 2037, the eighth;
+// and nine in ten never have.
+const reaching = Array.from({ length: 10 }, (_, nth): Future => ({
+  fell: null,
+  measured: worthOf(
+    Array.from({ length: 12 }, (_, offset) =>
+      nth < 8 && offset >= 4 + nth ? 1000000 : 0,
+    ),
+  ),
+  ranOut: null,
+}));
+
 describe("reachedBy", () => {
   const [, , firstMillion] = milestones;
   const plan = { from: 2026 };
 
-  // Ten futures, the nth reaching a million entering 2030 + n for the
-  // first eight and the last two never: the earliest 5% and 10% have by
-  // 2030, the first of them; the earliest 25% by 2032, the third; half
-  // by 2034, the fifth; four in five by 2037, the eighth; and nine in
-  // ten never have.
   it("reads the year by which the share of the run has reached the goal, or null where fewer ever do", () => {
-    const futures = Array.from({ length: 10 }, (_, nth): Future => ({
-      fell: null,
-      measured: worthOf(
-        Array.from({ length: 12 }, (_, offset) =>
-          nth < 8 && offset >= 4 + nth ? 1000000 : 0,
-        ),
-      ),
-      ranOut: null,
-    }));
-
     expect(
       [0.05, 0.1, 0.25, 0.5, 0.8, 0.9].map((share) =>
-        reachedBy(futures, firstMillion, { plan, share }),
+        reachedBy(reaching, firstMillion, { plan, share }),
       ),
     ).toStrictEqual([2030, 2030, 2032, 2034, 2037, null]);
   });
 
   it("reaches nothing over a run of none", () => {
     expect(reachedBy([], firstMillion, { plan, share: 0.5 })).toBeNull();
+  });
+});
+
+describe("markersIn", () => {
+  const [kidsLeave, , firstMillion] = milestones;
+  // Born in 1990, from 2026 over eleven years and retiring at 59, in
+  // 2049, past the plan's end; the children leave home at 46, in 2036.
+  const planned = {
+    born: 1990,
+    from: 2026,
+    inflation: 0,
+    month: 0,
+    rate: 0,
+    retires: 59,
+    years: 11,
+  };
+  const retirement = { id: "retirement", name: "Retirement", year: 2049 };
+
+  it("places a milestone reached at an age where the plan lays it, and one reached when conditions hold in the year by which half the futures have, in the order their years come", () => {
+    expect(
+      markersIn(reaching, [kidsLeave, firstMillion], planned),
+    ).toStrictEqual([
+      { id: 3, name: "First million", year: 2034 },
+      { id: 1, name: "Kids leave home", year: 2036 },
+      retirement,
+    ]);
+  });
+
+  it("leaves out one fewer than half the futures ever reach, and every one reached when conditions hold over a run of none", () => {
+    const twoMillion: Milestone = {
+      ...firstMillion,
+      conditions: [{ measure: "worth", of: "pounds", times: 2000000 }],
+    };
+
+    expect(markersIn(reaching, [twoMillion], planned)).toStrictEqual([
+      retirement,
+    ]);
+    expect(markersIn([], [kidsLeave, firstMillion], planned)).toStrictEqual([
+      { id: 1, name: "Kids leave home", year: 2036 },
+      retirement,
+    ]);
   });
 });
 

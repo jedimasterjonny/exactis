@@ -7,9 +7,11 @@ import { useState } from "react";
 
 import type { Condition, Milestone, MilestoneValues } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
+import type { Schedule } from "@/engine/cash-flow";
 import type { Entry } from "@/hooks/use-editor";
 
-import { saveMilestone } from "@/actions/milestones";
+import { removeMilestone, saveMilestone } from "@/actions/milestones";
+import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { RadioChoice } from "@/components/app/atoms/radio-choice";
 import { RowAction } from "@/components/app/atoms/row-action";
 import { AgeField } from "@/components/app/molecules/age-field";
@@ -27,11 +29,13 @@ import {
   atAge,
   basisNames,
   conditionOf,
+  isTiedTo,
   measureNames,
   sums,
 } from "@/data/milestones";
 import { ageIn, endAge, endYear, yearAt } from "@/data/plan";
 import { useMountedEditor } from "@/hooks/use-editor";
+import { useRemover } from "@/hooks/use-remover";
 import { optionsOf } from "@/lib/options";
 
 interface ConditionFieldsProps {
@@ -71,10 +75,9 @@ type Kind = "age" | "conditions";
 interface MilestoneDialogProps {
   readonly kind?: Kind;
   readonly milestone: Milestone | null;
-  readonly onDelete?: ((milestone: Milestone) => void) | undefined;
-  readonly onDismiss: () => void;
-  readonly onSaved: () => void;
+  readonly onClose: () => void;
   readonly plan: Plan;
+  readonly schedule: Schedule;
 }
 
 // A condition added beneath the first: ten times the debt, in liquid
@@ -108,27 +111,50 @@ const measureOptions = optionsOf(measureNames, sums);
 // for every dialog; what is the milestone's own is the draft the two
 // ways share and the values the save sends, which are the one
 // condition on the age or the conditions as typed. The caller is told
-// when the milestone has been saved, so it can close the dialog.
-// Given a delete handler, the dialog of a milestone the store holds
-// offers a Delete, which reports the milestone for the caller to ask
-// about, since what goes with it, the lines tied to it, is the
-// caller's to say, and holds while a save is on its way; a new
+// when the dialog is done with, saved, deleted or dismissed, so it can
+// drop it.
+// A milestone lines are tied to is held to its age: the choice of
+// conditions is held, saying why, since a tied line moves with the
+// milestone's year and one reached when conditions hold has none the
+// plan can say, which the store would refuse after the round trip in
+// its own words. The dialog is handed the schedules to count the lines
+// tied to it, and the dialog of a milestone the store holds offers a
+// Delete, which closes it and asks through the confirm dialog before
+// the milestone goes, saying what becomes of those lines; a new
 // milestone has nothing yet to delete and is offered none.
 export function MilestoneDialog({
   kind = "age",
   milestone,
-  onDelete,
-  onDismiss,
-  onSaved,
+  onClose,
   plan,
+  schedule,
 }: MilestoneDialogProps): JSX.Element | null {
   const { amend, dialogOf, entry } = useMountedEditor<Draft, Milestone>({
     describe: (saved) => describeOf(saved, plan),
     noun: "Milestone",
-    onSaved,
+    onSaved: onClose,
     opening: openingOf(milestone, kind, plan),
     save: async (id, draft) => saveMilestone(id, valuesOf(draft)),
   });
+  const { ask, doomed, questionOf } = useRemover<Milestone>({
+    describe: ({ name }) => name,
+    noun: "Milestone",
+    onRemoved: onClose,
+    remove: removeMilestone,
+  });
+  const tied =
+    milestone === null
+      ? 0
+      : [...schedule.income, ...schedule.expenses].filter((line) =>
+          isTiedTo(line, milestone.id),
+        ).length;
+  if (doomed !== null) {
+    return (
+      <ConfirmDialog {...questionOf(doomed)} onCancel={onClose}>
+        {freedOf(tied)}
+      </ConfirmDialog>
+    );
+  }
   if (entry === null) {
     return null;
   }
@@ -139,13 +165,13 @@ export function MilestoneDialog({
       canSave={draft.name.trim() !== ""}
       isWide
       onDelete={
-        milestone === null || onDelete === undefined
+        milestone === null
           ? undefined
           : (): void => {
-              onDelete(milestone);
+              ask(milestone);
             }
       }
-      onDismiss={onDismiss}
+      onDismiss={onClose}
       title={draft.name.trim() || "Untitled milestone"}
     >
       <TextField
@@ -169,9 +195,14 @@ export function MilestoneDialog({
         <RadioChoice label="At an age" value="age">
           In the year the age is reached, which a line can be tied to
         </RadioChoice>
-        <RadioChoice label="When conditions hold" value="conditions">
-          In the first year a future meets them, which the chance of success
-          reads
+        <RadioChoice
+          isDisabled={tied > 0}
+          label="When conditions hold"
+          value="conditions"
+        >
+          {tied === 0
+            ? "In the first year a future meets them, which the chance of success reads"
+            : heldBy(tied)}
         </RadioChoice>
       </RadioGroup>
       {draft.kind === "age" ? (
@@ -331,6 +362,25 @@ function describeOf(saved: Milestone, plan: Plan): string {
       ? saved.conditions.map(conditionOf).join(" · ")
       : String(yearAt(age, plan));
   return `${saved.name} · ${when}`;
+}
+
+// What deleting the milestone does to the lines tied to it, so many of
+// them, before the warning every deletion carries: they stay where it
+// put them.
+function freedOf(tied: number): string {
+  const stay =
+    tied === 1
+      ? "The line tied to it stays where it is, in a fixed year. "
+      : `The ${String(tied)} lines tied to it stay where they are, in fixed years. `;
+  return `${tied === 0 ? "" : stay}It cannot be brought back.`;
+}
+
+// Why the milestone is held to its age, under the choice it cannot
+// make: the lines tied to it, so many of them, move with its year.
+function heldBy(tied: number): string {
+  return tied === 1
+    ? "Not while the line tied to it moves with its year: untie it first"
+    : `Not while the ${String(tied)} lines tied to it move with its year: untie them first`;
 }
 
 // The conditions as the dialog holds them, each keyed by its place.

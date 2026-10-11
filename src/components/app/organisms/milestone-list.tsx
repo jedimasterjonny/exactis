@@ -12,8 +12,6 @@ import type { Plan } from "@/data/plan";
 import type { LineValues } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
 
-import { removeMilestone } from "@/actions/milestones";
-import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { PinBar } from "@/components/app/atoms/pin-bar";
 import { RowLock } from "@/components/app/atoms/row-lock";
@@ -25,15 +23,8 @@ import { MilestoneDialog } from "@/components/app/organisms/milestone-dialog";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { asPaid } from "@/data/income";
-import {
-  ageOf,
-  conditionOf,
-  isTiedTo,
-  markersOf,
-  yearsOf,
-} from "@/data/milestones";
+import { ageOf, conditionOf, markersOf, yearsOf } from "@/data/milestones";
 import { ageIn } from "@/data/plan";
-import { useRemover } from "@/hooks/use-remover";
 import { counted } from "@/lib/count";
 import { listed } from "@/lib/feeders";
 import { dashboard, plan as planScreen, subsectionLabel } from "@/lib/nav";
@@ -86,10 +77,9 @@ const retirementLock = `Set by the retirement age on the ${dashboard.label}`;
 // A milestone is added from the card's button and edited from its row,
 // in the dialog the chance of success opens too, since how it is
 // reached is a choice and conditions are more than a row holds; the
-// dialog of a saved milestone offers a Delete, which asks through the
-// confirm dialog before the milestone goes, and the question says what
-// becomes of the lines tied to it, which keep the years it gives them
-// now. Retirement draws a lock in place of the chevron, since it is set
+// dialog is handed the schedules, so it can hold a milestone lines are
+// tied to at its age and say, before deleting one, what becomes of
+// them. Retirement draws a lock in place of the chevron, since it is set
 // on the dashboard, as the caption says, and its name links there.
 // The span is ruled in decades above the rows, in the pins' column, and
 // every pin's track carries a faint rule at each milestone, as every
@@ -104,7 +94,6 @@ export function MilestoneList({
   schedule,
 }: MilestoneListProps): JSX.Element {
   const [opened, setOpened] = useState<"new" | Milestone | null>(null);
-  const lines = [...schedule.income, ...schedule.expenses];
   const markers = markersOf(milestones, plan);
   const marks = yearsOf(markers);
   const paid = [
@@ -114,16 +103,6 @@ export function MilestoneList({
   const reached = milestones.filter(
     (milestone) => ageOf(milestone) === undefined,
   );
-  const { ask, doomed, questionOf } = useRemover<Milestone>({
-    describe: (milestone) => milestone.name,
-    noun: "Milestone",
-    remove: removeMilestone,
-  });
-
-  function close(): void {
-    setOpened(null);
-  }
-
   return (
     <>
       <SectionCard
@@ -187,21 +166,15 @@ export function MilestoneList({
           </ul>
         </CardContent>
       </SectionCard>
-      {doomed !== null && (
-        <ConfirmDialog {...questionOf(doomed)}>
-          {freed(lines.filter((line) => isTiedTo(line, doomed.id)).length)}
-        </ConfirmDialog>
-      )}
       {opened !== null && (
         <MilestoneDialog
+          key={opened === "new" ? opened : opened.id}
           milestone={opened === "new" ? null : opened}
-          onDelete={(milestone) => {
-            close();
-            ask(milestone);
+          onClose={() => {
+            setOpened(null);
           }}
-          onDismiss={close}
-          onSaved={close}
           plan={plan}
+          schedule={schedule}
         />
       )}
     </>
@@ -213,16 +186,6 @@ export function MilestoneList({
 function endingAfter(lines: readonly LineValues[], after: number): string {
   const ends = `Ends ${namesOf(lines)}`;
   return after === 0 ? ends : `${ends} ${counted(after, "year")} after`;
-}
-
-// What deleting a milestone does to the lines tied to it, before the
-// warning every deletion carries: they stay where it put them.
-function freed(tied: number): string {
-  const stay =
-    tied === 1
-      ? "The line tied to it stays where it is, in a fixed year. "
-      : `The ${String(tied)} lines tied to it stay where they are, in fixed years. `;
-  return `${tied === 0 ? "" : stay}It cannot be brought back.`;
 }
 
 // A milestone's row as it is listed, drawn in its columns and again in

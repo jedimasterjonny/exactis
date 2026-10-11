@@ -27,10 +27,13 @@ interface Remover<TDoomed> {
 }
 
 // What the remover is given: the store action a deletion goes to, the
-// noun the toast reports under, and how to describe what went.
+// noun the toast reports under, how to describe what went, and anything
+// else the caller does once it has gone, as a dialog that offered the
+// Delete closes.
 interface RemoverProps<TDoomed> {
   readonly describe: (doomed: TDoomed) => string;
   readonly noun: string;
+  readonly onRemoved?: () => void;
   readonly remove: (id: number) => Promise<Answer<undefined>>;
 }
 
@@ -49,6 +52,7 @@ interface RemoverProps<TDoomed> {
 export function useRemover<TDoomed extends { readonly id: number }>({
   describe,
   noun,
+  onRemoved,
   remove: store,
 }: RemoverProps<TDoomed>): Remover<TDoomed> {
   const [doomed, setDoomed] = useState<null | TDoomed>(null);
@@ -64,15 +68,17 @@ export function useRemover<TDoomed extends { readonly id: number }>({
 
   // What the dialog asked about goes to the store by its id. The question
   // stays open with its confirm held until the store answers, then
-  // closes, and the page re-read takes the row with it. What the toast
-  // says went is described from the record asked about rather than from
-  // anything the store answers with, since a deletion answers with
-  // nothing. A store that refuses, or fails, leaves the question open as
-  // it was, with the confirm free again, and the sender says why.
+  // closes, onto whatever the caller does once the record has gone, and
+  // the page re-read takes the row with it. What the toast says went is
+  // described from the record asked about rather than from anything the
+  // store answers with, since a deletion answers with nothing. A store
+  // that refuses, or fails, leaves the question open as it was, with the
+  // confirm free again, and the sender says why.
   function confirm(current: TDoomed): void {
     send(async () => store(current.id), {
       failure: `${noun} not deleted`,
       onAccepted: () => {
+        onRemoved?.();
         setDoomed(null);
       },
       success: () => ({
