@@ -336,7 +336,7 @@ const curve = z.object({
 const correlation = z.number().min(-1).max(1);
 
 // An asset class as a vintage priced it: its name, the class of the
-// plan it blends into, and a return no lower than losing everything,
+// plan it blends into, and a return between losing everything and 50%,
 // the class it is the hedged form of, if it is one, and the currency it
 // was carried into sterling from, if it was; and how far it strays, a
 // volatility of nothing or more and its two correlations, kept by
@@ -345,7 +345,7 @@ const asset = z.object({
   carriedFrom: named.exactOptional(),
   hedges: named.exactOptional(),
   name: named,
-  rate: z.number().min(-1, rules.beyondLoss),
+  rate: z.number().min(-1, rules.beyondLoss).max(0.5, rules.beyondGain),
   risk: z
     .object({
       bonds: correlation,
@@ -421,25 +421,37 @@ const mappings = z
 
 // What comes off the CMA's returns: a dividend yield of nothing or
 // more, as a typed one is, fees of nothing or more, since a fee is
-// charged and never paid, and the day they were last set, if one is
-// kept.
+// charged and never paid, each no more than a tenth, since no fund
+// charges or yields more and a figure past it is a percentage typed as
+// a fraction, and the day they were last set, if one is kept.
 const deductions = z.object({
-  dividends: z.number().min(0, "A dividend yield is nothing or more"),
-  fees: z.number().min(0, "A fee is nothing or more"),
+  dividends: z
+    .number()
+    .min(0, "A dividend yield is nothing or more")
+    .max(0.1, "A deduction is no more than 10%"),
+  fees: z
+    .number()
+    .min(0, "A fee is nothing or more")
+    .max(0.1, "A deduction is no more than 10%"),
   setOn: z.iso.date().exactOptional(),
 }) satisfies z.ZodType<Deductions>;
 
 // The rates as typed: each class growing at a rate no lower than losing
 // everything, a yield on stocks of nothing or more, since a dividend is
 // paid and never charged, and prices falling by less than everything,
-// in the words the plan they make is refused in. Stocks' total is then
-// no lower than losing everything either, and so is the rate the plan
-// blends from it.
+// in the words the plan they make is refused in, and each no more than
+// 50%, since no market has returned more over a plan's span and a
+// figure past it is a percentage typed as a fraction. Stocks' total is
+// then no lower than losing everything either, and so is the rate the
+// plan blends from it.
 const rates = z.object({
-  bonds: z.number().min(-1, rules.beyondLoss),
-  dividends: z.number().min(0, "A dividend yield is nothing or more"),
-  inflation: z.number().gt(-1, rules.inflation),
-  stocks: z.number().min(-1, rules.beyondLoss),
+  bonds: z.number().min(-1, rules.beyondLoss).max(0.5, rules.beyondGain),
+  dividends: z
+    .number()
+    .min(0, "A dividend yield is nothing or more")
+    .max(0.5, rules.beyondGain),
+  inflation: z.number().gt(-1, rules.inflation).max(0.5, rules.beyondGain),
+  stocks: z.number().min(-1, rules.beyondLoss).max(0.5, rules.beyondGain),
 }) satisfies z.ZodType<Rates>;
 
 // A category of the target allocation as the file gave it, its share

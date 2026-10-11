@@ -468,6 +468,37 @@ const held: readonly Case[] = [
     (given): Inputs => ({ ...given, rates: { ...given.rates, inflation: -1 } }),
   ],
   [
+    "A rate is no more than 50%",
+    (given): Inputs => ({ ...given, rates: { ...given.rates, stocks: 0.51 } }),
+  ],
+  [
+    "A rate is no more than 50%",
+    (given): Inputs => ({ ...given, rates: { ...given.rates, bonds: 0.51 } }),
+  ],
+  [
+    "A rate is no more than 50%",
+    (given): Inputs => ({
+      ...given,
+      rates: { ...given.rates, dividends: 0.51 },
+    }),
+  ],
+  [
+    "A rate is no more than 50%",
+    (given): Inputs => ({
+      ...given,
+      rates: { ...given.rates, inflation: 0.51 },
+    }),
+  ],
+  [
+    "A rate is no more than 50%",
+    (given): Inputs =>
+      priced(given, (assets) =>
+        assets.map((asset, index) =>
+          index === 0 ? { ...asset, rate: 0.51 } : asset,
+        ),
+      ),
+  ],
+  [
     "Stocks hold none of the savings, all of them, or a share",
     (given): Inputs => ({ ...given, allocation: { stocks: -0.1 } }),
   ],
@@ -548,6 +579,20 @@ const held: readonly Case[] = [
     (given): Inputs => ({
       ...given,
       deductions: { ...given.deductions, dividends: -0.01 },
+    }),
+  ],
+  [
+    "A deduction is no more than 10%",
+    (given): Inputs => ({
+      ...given,
+      deductions: { ...given.deductions, fees: 0.11 },
+    }),
+  ],
+  [
+    "A deduction is no more than 10%",
+    (given): Inputs => ({
+      ...given,
+      deductions: { ...given.deductions, dividends: 0.11 },
     }),
   ],
   [
