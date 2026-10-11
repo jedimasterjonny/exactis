@@ -313,8 +313,10 @@ function Worksheet({
         />
       </FieldRow>
       <Note>
-        Each balance opens at what the plan expected of it. Check one that
-        matches its statement, or type what the statement says. Only the
+        Each balance opens at what the plan expected of it. A month the income
+        did not cover is not drawn from the savings here, though the projection
+        draws it, so what the plan would have drawn reads as moved. Check one
+        that matches its statement, or type what the statement says. Only the
         balances checked are saved, each dated today; the rest keep what they
         held and the day they were set.
       </Note>
