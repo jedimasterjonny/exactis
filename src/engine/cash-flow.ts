@@ -10,6 +10,7 @@ import {
   capOf,
   isOwned,
   isPension,
+  pensionAllowance,
   takesSpare,
 } from "@/data/accounts";
 import {
@@ -59,10 +60,12 @@ export interface CashFlow extends Taxed {
 }
 
 // What one owner's lines running in the month are taxed on: the income
-// their income tax is charged on, which a draw on a pension of theirs
-// is taxed on top of, and the self-employed profit among it that their
-// Class 4 is charged on. The projection carries each owner's tax year
-// from these, since a year is settled a person at a time.
+// their income tax is charged on, what their lines pay with what lands
+// in their pensions past the pension allowance on top, which a draw on
+// a pension of theirs is taxed on top of, and the self-employed profit
+// among it that their Class 4 is charged on. The projection carries
+// each owner's tax year from these, since a year is settled a person at
+// a time.
 export interface Earned {
   readonly owner: number;
   readonly profit: number;
@@ -73,8 +76,10 @@ export interface Earned {
 // with the employer's NI saved on it and the employer's match, the line
 // it is fed from, and what that line gives up a month, which comes off
 // the month before the month is taxed, where the match comes off
-// nothing. Both are as much of the line's feed as the pension's
-// allowance takes, which is all of it until the allowance is full.
+// nothing. Both are the whole of the line's feed whatever room the
+// pension's allowance has, since the sacrifice is the employer's
+// contribution under the scheme and the scheme pays it in with its
+// match; what lands past the allowance is charged as the owner's income.
 export interface Fed extends Paid {
   readonly line: IncomeLine;
   readonly sacrificed: number;
@@ -178,8 +183,9 @@ interface Reading {
 
 // What is left of each allowance in the month, by the owner and the
 // kind it is held for, in what lands: a twelfth of the allowance until
-// something is paid under it. An account whose kind has no allowance has
-// no room to run out of and is never entered.
+// something is paid under it, and nothing once the salaries' sacrifices
+// alone have filled it. An account whose kind has no allowance has no
+// room to run out of and is never entered.
 type Rooms = Map<string, number>;
 
 // What the month's income pays in tax: the income tax on all of it,
@@ -356,9 +362,16 @@ const nanopound = 1e-9;
 // place; read as a number rather than as present, so an owner of null
 // from a caller that skipped the model is refused too rather than
 // pooling every such wrapper into one allowance. An account nobody
-// owns naming an owner is refused beside it, as the store refuses it. A sacrifice past it is not given up, so the salary is paid
-// and taxed on that part as on the rest; a fixed sum past it is not
-// paid, and stays in the month to pay the sums and the spare money
+// owns naming an owner is refused beside it, as the store refuses it. A
+// sacrifice is given up whole whatever room the allowance has, since it
+// is the employer's contribution under the scheme and the scheme pays
+// it in; what lands in an owner's pensions past a twelfth of their
+// allowance is the annual allowance charge, added to the owner's
+// taxable income for the month and charged through their bands at
+// their marginal rate, and settled with the tax year as the rest of the
+// income tax is. A fixed sum or the spare money past the room is not
+// paid, since each is a payment the plan chooses rather than one it
+// owes, and stays in the month to pay the sums and the spare money
 // after it, and what none of them takes is left, which the plan takes
 // as spent rather than saved. A twelfth rather than what is left of the tax year, so a
 // month reads the same whenever in the year it falls and needs nothing
@@ -418,30 +431,22 @@ export function cashFlow(
         at.year < retirementYear(earnerOf(line, reading.plan))),
   );
   const income = payOf(running, [], reading);
-  const feedingInto = (
-    isFed: (account: Account) => boolean,
-  ): readonly Fed[] => {
-    const offered: Rooms = new Map();
-    return running.flatMap((line) => {
+  const feedingInto = (isFed: (account: Account) => boolean): readonly Fed[] =>
+    running.flatMap((line) => {
       const account = accountAt(accounts, line.feeds);
       const wanted = monthlyOf(line, contributionOf(line), reading);
       if (account === undefined || !isFed(account) || wanted === 0) {
         return [];
       }
-      const share = Math.min(1, roomIn(offered, account) / wanted);
-      landIn(offered, account, wanted * share);
-      return share === 0
-        ? []
-        : [
-            {
-              account,
-              amount: wanted * share,
-              line,
-              sacrificed: monthlyOf(line, sacrificeOf(line), reading) * share,
-            },
-          ];
+      return [
+        {
+          account,
+          amount: wanted,
+          line,
+          sacrificed: monthlyOf(line, sacrificeOf(line), reading),
+        },
+      ];
     });
-  };
   const spent = spentIn(accounts, schedule, reading);
   const expenses = total(spent);
   const paid = new Set(
@@ -690,12 +695,11 @@ function chargedIn(
 // there are no years to tax it by or stop it at. A salary gives up a
 // share of its base, from none of it to
 // all of it, and the action holds it there: a share below nothing
-// would be a feed below nothing, which the allowance's room divided by
-// would turn into the whole room fed from nothing given up, and a share
-// past the whole would give up pay the salary never paid. The share
-// its employer matches is held the same way, in words of its own, since
-// a match below nothing would take back out of the pension what the
-// sacrifice put in.
+// would feed the pension less than nothing and pay the salary more than
+// it earns, and a share past the whole would give up pay the salary
+// never paid. The share its employer matches is held the same way, in
+// words of its own, since a match below nothing would take back out of
+// the pension what the sacrifice put in.
 function checkLinks(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -795,10 +799,11 @@ function fixedSums(
 }
 
 // What lands in an account, taken off what is left of its owner's
-// allowance for its kind in the month, never below nothing, so the
-// residue of grossing a pension's payment up for its relief and back
-// cannot leave a room a fraction of a penny short of empty. An account
-// with no allowance is left out.
+// allowance for its kind in the month, never below nothing, so a
+// sacrifice landing past the room empties it rather than owing against
+// it, and the residue of grossing a pension's payment up for its relief
+// and back cannot leave a room a fraction of a penny short of empty. An
+// account with no allowance is left out.
 function landIn(rooms: Rooms, account: Account, landed: number): void {
   if (allowanceOf(account.kind) !== null) {
     rooms.set(roomOf(account), Math.max(0, roomIn(rooms, account) - landed));
@@ -973,9 +978,13 @@ function spareMoney(
 // job with a threshold of its own. Each is charged on the month alone
 // against a twelfth of each band as the bands stand in its tax year,
 // which is a twelfth of what a year of the month would pay, so a month
-// is charged the same whenever in the tax year it falls. What the month
+// is charged the same whenever in the tax year it falls. What lands in
+// an owner's pensions past a twelfth of the pension allowance is
+// charged on top of what they earned, as their income and so at their
+// marginal rate, which is the annual allowance charge; it is no
+// earnings, so the National Insurance leaves it out. What the month
 // pays is the owners' summed, and what it is charged on is everything
-// they earned together.
+// they earned together, with that excess among it.
 function taxOn(
   lines: readonly IncomeLine[],
   fed: readonly Fed[],
@@ -991,7 +1000,9 @@ function taxOn(
   return [...Map.groupBy(lines, ({ owner }) => owner)].reduce<Taxed>(
     (taxed, [owner, theirs]) => {
       const profit = ofKind(theirs, "self-employment");
-      const taxable = payOf(theirs, fed, reading);
+      const landed = total(fed.filter((entry) => entry.line.owner === owner));
+      const excess = Math.max(0, landed - pensionAllowance / 12);
+      const taxable = payOf(theirs, fed, reading) + excess;
       return {
         earned: [...taxed.earned, { owner, profit, taxable }],
         incomeTax: taxed.incomeTax + incomeTaxOn(taxable, stretch),

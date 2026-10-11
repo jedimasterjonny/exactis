@@ -159,6 +159,10 @@ export const kindLabels: Record<AccountKind, string> = {
   "tax-free": "ISA (tax-free)",
 };
 
+// The most a year's payments into a person's pensions, from every
+// source, land within before the excess is charged as their income.
+export const pensionAllowance = 60000;
+
 // The most the kind may be paid a year, as the UK sets it: £20,000 into
 // an ISA and £60,000 into a pension. Cash has no allowance, and a house,
 // a car, a real asset or a debt is paid only a fixed sum, so none has
@@ -172,7 +176,7 @@ export function allowanceOf(kind: AccountKind): null | number {
     case "real-asset":
       return null;
     case "tax-deferred":
-      return 60000;
+      return pensionAllowance;
     case "tax-free":
       return 20000;
   }
