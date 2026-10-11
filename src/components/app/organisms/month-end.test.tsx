@@ -33,17 +33,19 @@ function ledger(sheet: HTMLElement): (null | string)[] {
     .map((step) => step.textContent);
 }
 
-// The month end over the fixture's accounts, as of September 2026, on
-// the fourth of October, the salary feeding the pension, with whatever
-// a test gives in their place; opened from its button. Save reports
-// through the toast manager, which needs its Toaster mounted.
+// The month end over the fixture's accounts, their plan running from
+// September 2026 on balances as of the end of August, on the fourth of
+// October, when September is the last month that has ended, the salary
+// feeding the pension, with whatever a test gives in their place; opened
+// from its button. Save reports through the toast manager, which needs
+// its Toaster mounted.
 function openWorksheet(
   props: Partial<ComponentProps<typeof MonthEnd>> = {},
 ): HTMLElement {
   render(
     <MonthEnd
       accounts={accounts}
-      month={{ month: 9, year: 2026 }}
+      month={{ month: 8, year: 2026 }}
       plan={plan}
       schedule={{ expenses: [], income: [salary] }}
       today="2026-10-04"
@@ -56,21 +58,23 @@ function openWorksheet(
 }
 
 describe("MonthEnd", () => {
-  // A month on from September, the pension is expected at £418,561
-  // with £3,983 paid in, the salary's sacrifice with the NI saved, its
-  // own sum and the relief on it; the ISA at £288,984; the current
-  // account where it was; the home grown a month at 2.1%; and the
-  // mortgage £181,515 owed once £2,210 is paid off it, which the number
-  // field writes with the hyphen Intl gives it rather than the minus the
-  // ledger writes.
-  it("opens on the month it is, each balance at what the plan expected of it, in its group", () => {
+  // September carried, the one month from the plan's first through the
+  // month closed, the pension is expected at £418,561 with £3,983 paid
+  // in, the salary's sacrifice with the NI saved, its own sum and the
+  // relief on it; the ISA at £288,984; the current account where it
+  // was; the home grown a month at 2.1%; and the mortgage £181,515 owed
+  // once £2,210 is paid off it, which the number field writes with the
+  // hyphen Intl gives it rather than the minus the ledger writes.
+  it("opens on the last month that has ended, each balance at what the plan expected of it, in its group", () => {
     const sheet = openWorksheet();
 
     expect(within(sheet).getByText("Month end")).toHaveClass("text-brand");
     expect(
-      within(sheet).getByRole("heading", { name: "Balances for October 2026" }),
+      within(sheet).getByRole("heading", {
+        name: "Balances at the end of September 2026",
+      }),
     ).toBeInTheDocument();
-    expect(select("Month")).toHaveValue("9");
+    expect(select("Month")).toHaveValue("8");
     expect(field("Year")).toHaveValue("2026");
     for (const name of ["Savings", "Property & vehicles", "Loans & debts"]) {
       expect(within(sheet).getByRole("group", { name })).toBeInTheDocument();
@@ -95,7 +99,7 @@ describe("MonthEnd", () => {
     );
     expect(within(sheet).getByText("0 of 5 checked")).toBeInTheDocument();
     expect(ledger(sheet)).toStrictEqual([
-      "As the balances stoodThe starting net worth as of September 2026£950,771",
+      "As the balances stoodThe starting net worth as of the end of August 2026£950,771",
       "Paid inWhat the plan paid into the balances checked, or off them£0",
       "MovedMarkets, interest, and whatever the plan did not expect£0",
     ]);
@@ -114,7 +118,7 @@ describe("MonthEnd", () => {
   // £785 of interest, so the month leaves £957,877.
   it("checks a balance as it reads, and says what moved it", async () => {
     const sheet = openWorksheet();
-    vi.mocked(closeBalances).mockResolvedValue(saved({ month: 9, year: 2026 }));
+    vi.mocked(closeBalances).mockResolvedValue(saved({ month: 8, year: 2026 }));
 
     fireEvent.click(
       within(sheet).getByRole("button", { name: "Check Workplace pension" }),
@@ -138,14 +142,16 @@ describe("MonthEnd", () => {
       "MovedMarkets, interest, and whatever the plan did not expect£913",
     ]);
     expect(
-      within(sheet).getByText("Starting net worth for October 2026"),
+      within(sheet).getByText(
+        "Starting net worth at the end of September 2026",
+      ),
     ).toHaveClass("label");
     expect(within(sheet).getByText("£957,877")).toBeInTheDocument();
 
     fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));
 
     expect(closeBalances).toHaveBeenCalledExactlyOnceWith({
-      asOf: { month: 9, year: 2026 },
+      asOf: { month: 8, year: 2026 },
       balances: [
         { balance: 418561, id: pension.id },
         { balance: -181515, id: 5 },
@@ -153,12 +159,14 @@ describe("MonthEnd", () => {
     });
     await waitFor(() => {
       expect(
-        screen.queryByRole("dialog", { name: /^Balances for/ }),
+        screen.queryByRole("dialog", { name: /^Balances at the end of/ }),
       ).not.toBeInTheDocument();
     });
     expect(
       screen.getByRole("dialog", { name: "Balances updated" }),
-    ).toHaveAccessibleDescription("2 balances set as of October 2026");
+    ).toHaveAccessibleDescription(
+      "2 balances set as of the end of September 2026",
+    );
   });
 
   // The ISA's statement says £290,000, which checks it; the mortgage's
@@ -166,7 +174,7 @@ describe("MonthEnd", () => {
   // the pension again, so it is not sent.
   it("checks a balance typed, takes a debt typed as what is owed, and sends only what is checked", () => {
     const sheet = openWorksheet();
-    vi.mocked(closeBalances).mockResolvedValue(saved({ month: 9, year: 2026 }));
+    vi.mocked(closeBalances).mockResolvedValue(saved({ month: 8, year: 2026 }));
 
     commit(field("Stocks & shares ISA"), "290,000");
     commit(field("Mortgage"), "181,000");
@@ -186,7 +194,7 @@ describe("MonthEnd", () => {
     fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));
 
     expect(closeBalances).toHaveBeenCalledExactlyOnceWith({
-      asOf: { month: 9, year: 2026 },
+      asOf: { month: 8, year: 2026 },
       balances: [
         { balance: 290000, id: isa.id },
         { balance: -181000, id: 5 },
@@ -194,16 +202,16 @@ describe("MonthEnd", () => {
     });
   });
 
-  // Closing onto September, the month the balances are already as of,
-  // runs no months: each balance opens at what it holds, nothing paid.
+  // Closing onto August, the month the balances are already as of, runs
+  // no months: each balance opens at what it holds, nothing paid.
   it("runs no months onto the month the balances are as of, or one before it", () => {
     const sheet = openWorksheet();
 
-    fireEvent.change(select("Month"), { target: { value: "8" } });
+    fireEvent.change(select("Month"), { target: { value: "7" } });
 
     expect(
       within(sheet).getByRole("heading", {
-        name: "Balances for September 2026",
+        name: "Balances at the end of August 2026",
       }),
     ).toBeInTheDocument();
     expect(field("Workplace pension")).toHaveValue("£412,880");
@@ -247,15 +255,17 @@ describe("MonthEnd", () => {
       "true",
     );
 
-    answer(refused("The balances are as of a month that has begun"));
+    answer(refused("The balances are as of a month that has ended"));
 
     expect(
       await screen.findByRole("dialog", { name: "Balances not saved" }),
     ).toHaveAccessibleDescription(
-      "The balances are as of a month that has begun",
+      "The balances are as of a month that has ended",
     );
     expect(
-      screen.getByRole("dialog", { name: "Balances for October 2026" }),
+      screen.getByRole("dialog", {
+        name: "Balances at the end of September 2026",
+      }),
     ).toBeInTheDocument();
   });
 

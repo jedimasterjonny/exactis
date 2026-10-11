@@ -867,17 +867,17 @@ describe("the account actions", () => {
       expect(await versions()).toBe(2);
     });
 
-    // It is 15 September 2026: September has begun, October has not, and
-    // the plan's owner was born in 1990.
-    it("takes this month and none after it, and none before the owner was born", async () => {
+    // It is 15 September 2026: August has ended, September has not and
+    // nor has any month after it, and the plan's owner was born in 1990.
+    it("takes a month that has ended, none from this one on, and none before the owner was born", async () => {
       for (const [month, refusal] of [
         [
-          { month: 9, year: 2026 },
-          "The balances are as of a month that has begun",
+          { month: 8, year: 2026 },
+          "The balances are as of a month that has ended",
         ],
         [
           { month: 0, year: 2027 },
-          "The balances are as of a month that has begun",
+          "The balances are as of a month that has ended",
         ],
         [
           { month: 11, year: 1989 },
@@ -889,7 +889,7 @@ describe("the account actions", () => {
       expect(await versions()).toBe(1);
 
       await moveTo({ month: 0, year: 1990 });
-      await moveTo({ month: 8, year: 2026 });
+      await moveTo({ month: 7, year: 2026 });
 
       expect(await versions()).toBe(3);
     });
@@ -897,13 +897,13 @@ describe("the account actions", () => {
     it("refuses a balance on no account, or one the household's rules refuse, and writes nothing", async () => {
       expect(
         await closeBalances({
-          asOf: { month: 8, year: 2026 },
+          asOf: { month: 7, year: 2026 },
           balances: [{ balance: 1000, id: 99 }],
         }),
       ).toStrictEqual(refused("No account has the id"));
       expect(
         await closeBalances({
-          asOf: { month: 8, year: 2026 },
+          asOf: { month: 7, year: 2026 },
           balances: [{ balance: -1000, id: 2 }],
         }),
       ).toStrictEqual(refused("A balance below nothing is a debt's"));

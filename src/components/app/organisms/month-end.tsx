@@ -25,7 +25,12 @@ import { monthsOn } from "@/engine/projection";
 import { useSender } from "@/hooks/use-sender";
 import { counted } from "@/lib/count";
 import { formatGbp, negated } from "@/lib/money";
-import { formatDated, formatMonth, monthsBetween } from "@/lib/months";
+import {
+  formatDated,
+  formatMonth,
+  monthBefore,
+  monthsBetween,
+} from "@/lib/months";
 
 // The worksheet while it is open: the month the balances are being
 // closed onto, the balances checked, and the figures typed, by the
@@ -54,11 +59,12 @@ interface Row {
 }
 
 // The month end: the header's button, which opens a worksheet of every
-// balance closed onto the month it is, or another month picked. Each
-// balance opens at what the plan expected it to reach by then, as the
-// projection carries it over the months from the one the balances are
-// as of, so a loan, whose payments and interest the plan knows, is
-// usually only checked, and a saving is typed from its statement. A
+// balance closed onto the end of the last month that has ended, or of
+// another month picked. Each balance opens at what the plan expected it
+// to reach by then, as the projection carries it over the months from
+// the plan's first through the month closed, so a loan, whose payments
+// and interest the plan knows, is usually only checked, and a saving is
+// typed from its statement. A
 // balance typed is checked by the typing; one confirmed as it reads is
 // checked by its press. Only the balances checked are saved, each dated
 // today, with the month, in one version; every other balance keeps what
@@ -74,10 +80,11 @@ interface Row {
 // what moved, over the balances checked; the footer counts them. A
 // store that refuses leaves the worksheet open and says why. The year
 // picked is held between the year the plan's owner was born and the
-// one it is, which are the months the store takes, so a year mistyped
-// asks the plan for no more months than it has. The day it is is given
-// rather than read, so the ages draw the same on the server as in a
-// test, and so is the month it is.
+// year of the last month that has ended, which are the months the store
+// takes, so a year mistyped asks the plan for no more months than it
+// has. The day it is is given rather than read, so the ages draw the
+// same on the server as in a test, and so is the month the worksheet
+// opens on.
 export function MonthEnd({
   accounts,
   month,
@@ -127,7 +134,7 @@ export function MonthEnd({
                   setDraft(null);
                 },
                 success: (saved) => ({
-                  description: `${counted(checked.length, "balance")} set as of ${formatMonth(saved)}`,
+                  description: `${counted(checked.length, "balance")} set as of the end of ${formatMonth(saved)}`,
                   title: "Balances updated",
                 }),
               },
@@ -208,6 +215,10 @@ function typedAs(account: Account, value: number): number {
 
 // The open worksheet: the month, a field a balance in its group, and
 // the net worth the month leaves, between the title and the footer.
+// Closing the end of a month carries every month from the plan's first
+// through it, the one more than the months between them: the plan's
+// first month alone closes its own end, and the month the balances are
+// already as of, the one before the plan's first, carries none.
 function Worksheet({
   accounts,
   draft,
@@ -233,7 +244,7 @@ function Worksheet({
   readonly schedule: Schedule;
   readonly today: string;
 }): JSX.Element {
-  const months = Math.max(0, monthsBetween(from, draft.asOf));
+  const months = Math.max(0, monthsBetween(from, draft.asOf) + 1);
   const rows = monthsOn(accounts, schedule, { months, plan }).map(
     ({ account, balance, paid }): Row => ({
       account,
@@ -292,7 +303,7 @@ function Worksheet({
         </>
       }
       onDismiss={onDismiss}
-      title={`Balances for ${formatMonth(draft.asOf)}`}
+      title={`Balances at the end of ${formatMonth(draft.asOf)}`}
     >
       <FieldRow layout="pair">
         <MonthField
@@ -349,7 +360,7 @@ function Worksheet({
       <Ledger
         steps={[
           {
-            detail: `The starting net worth as of ${formatMonth(from)}`,
+            detail: `The starting net worth as of the end of ${formatMonth(monthBefore(from))}`,
             figure: formatGbp(was),
             label: "As the balances stood",
           },
@@ -365,7 +376,7 @@ function Worksheet({
           },
         ]}
         total={formatGbp(was + paid + moved)}
-        totalName={`Starting net worth for ${formatMonth(draft.asOf)}`}
+        totalName={`Starting net worth at the end of ${formatMonth(draft.asOf)}`}
       />
     </DialogFrame>
   );
