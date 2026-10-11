@@ -3,6 +3,7 @@ import * as z from "zod";
 import type { Month } from "@/data/schedule";
 
 import { cadences } from "@/data/accounts";
+import { bases, measures } from "@/data/goals";
 import { lineGrowths } from "@/data/schedule";
 
 // The pieces the model's rules and the actions' parsing are both built
@@ -50,6 +51,22 @@ export const lineValues = {
 export const milestoneValues = {
   name: named,
   year: z.number().int().positive(),
+};
+
+// What a condition of a goal holds: the measure, the basis it is held
+// to, and the multiple, nothing or more, so a measure may be held to
+// nothing, a liquid net worth above nothing say.
+const condition = z.object({
+  measure: z.enum(measures),
+  of: z.enum(bases),
+  times: z.number().nonnegative(),
+});
+
+// What a goal holds: the name, and a condition at least, since a goal
+// with none is reached at once.
+export const goalValues = {
+  conditions: z.array(condition).min(1, "A goal holds a condition"),
+  name: named,
 };
 
 // What a category of the target allocation holds, as the file gave it:
