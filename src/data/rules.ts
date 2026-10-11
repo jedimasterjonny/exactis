@@ -11,6 +11,7 @@ export const rules = {
   alwaysFunded: "Only a pension is always funded",
   belongs: "An ISA or a pension belongs to an owner the household lists",
   belowNothing: "A balance below nothing is a debt's",
+  beyondGain: "A rate is no more than 50%",
   beyondLoss: "A rate loses no more than everything",
   debtEnds: "A debt's payments end",
   earner: "An income line is earned by an owner the plan lists",
