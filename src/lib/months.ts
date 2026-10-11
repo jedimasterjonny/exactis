@@ -71,8 +71,9 @@ export function formatMonthShort({ month, year }: Month): string {
 
 // Whether a month falls in or before another: an earlier year, or the
 // same year and no later month. A line runs to its last month, a loan's
-// payments to the month they clear it in, and a balance is held as of
-// a month that has begun, each asked this way.
+// payments to the month they clear it in, and a month said to have
+// ended has not when this one falls in or before it, each asked this
+// way.
 export function isOnOrBefore(month: Month, other: Month): boolean {
   return monthsBetween(month, other) >= 0;
 }
