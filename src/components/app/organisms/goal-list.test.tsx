@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -15,7 +16,8 @@ import { removeGoal, saveGoal } from "@/actions/goals";
 import { Toaster } from "@/components/kit/toast";
 import { goals } from "@/data/goals.fixture";
 import { saved } from "@/lib/answer";
-import { commit, openEntry, openRow } from "@/test/dom";
+import { placed } from "@/lib/span";
+import { bySlot, commit, openEntry, openRow } from "@/test/dom";
 
 import { GoalList } from "./goal-list";
 
@@ -37,9 +39,10 @@ const plan = {
 // Ten futures over twelve years, the nth worth a million from 2030 + n
 // on for the first eight and nothing ever for the last two, none owing
 // or spending anything. So half reach the first million by 2034, the
-// earliest 5% and 10% by 2030, the earliest 25% by 2032, and four in
-// five at all; and independence, twenty-five years of nothing and ten
-// times nothing, is reached at once by all of them.
+// earliest 5% and 10% by 2030, the earliest 25% by 2032, all but the
+// latest 25% by 2037, the latest 10% and 5% never, and four in five at
+// all; and independence, twenty-five years of nothing and ten times
+// nothing, is reached at once by all of them.
 const futures = Array.from({ length: 10 }, (_, nth): Future => ({
   fell: null,
   measured: Array.from({ length: 12 }, (_, offset) => {
@@ -49,108 +52,113 @@ const futures = Array.from({ length: 10 }, (_, nth): Future => ({
   ranOut: null,
 }));
 
+// Where each row's median dot sits on the span, folded and unfolded, a
+// row's two bars one after the other.
+function medians(): string[] {
+  return screen
+    .queryAllByText(bySlot("spread-bar-median"), { suggest: false })
+    .map(({ style }) => style.left);
+}
+
 // Save and delete report through the toast manager, which needs its
 // Toaster mounted.
 function renderList(
   listed: readonly Goal[] = goals,
   drawn: readonly Future[] = futures,
 ): void {
-  render(<GoalList futures={drawn} goals={listed} plan={plan} />, {
-    wrapper: Toaster,
-  });
-}
-
-// The table's rows as read across, each cell's text run together.
-function rows(): string[][] {
-  return within(screen.getByRole("table"))
-    .getAllByRole("row")
-    .slice(1)
-    .map((row) =>
-      within(row)
-        .getAllByRole("cell")
-        .map(({ textContent }) => textContent),
-    );
+  render(
+    <GoalList futures={drawn} goals={listed} milestones={[]} plan={plan} />,
+    { wrapper: Toaster },
+  );
 }
 
 describe("GoalList", () => {
-  it("lists each goal with its conditions, the ages the futures reach it by at each share, and the share reaching it", () => {
+  it("lays each goal on the plan's span with its conditions, the ages the futures reach it by at each share, the median and the share reaching it", () => {
     renderList();
 
     const card = screen.getByRole("region", {
       name: "When the goals are reached",
     });
-
     expect(within(card).getByText("Sect. II.ii")).toHaveClass("label");
+    // A row is drawn in its columns and again in its folded lines, only
+    // one of which is on screen at any width, so each is found twice.
+    expect(
+      within(card).getAllByRole("button", { name: "First million" }),
+    ).toHaveLength(2);
+    expect(within(card).getAllByText("Net worth ≥ £1,000,000")).toHaveLength(2);
+    expect(within(card).getAllByText("80%")).toHaveLength(2);
+    expect(within(card).getAllByText("reach it")).toHaveLength(2);
+    expect(within(card).getByText("2034")).toHaveClass("figure");
+    expect(within(card).getByText("Median · age 44")).toHaveClass("label");
+    expect(within(card).getByText("Median 2034 · age 44")).toBeInTheDocument();
+    expect(within(card).getAllByText("100%")).toHaveLength(2);
+    expect(within(card).getByText("Median 2026 · age 36")).toBeInTheDocument();
+    // The bars sit on the plan's span, ruled at retirement, which falls
+    // past its end.
+    expect(medians()).toStrictEqual(
+      [2034, 2034, 2026, 2026].map((year) => `${String(placed(year, plan))}%`),
+    );
     expect(
       within(card)
-        .getAllByRole("columnheader")
-        .map(({ textContent }) => textContent),
-    ).toStrictEqual([
-      "Goal",
-      "Median",
-      "Earliest 5%",
-      "Earliest 10%",
-      "Earliest 25%",
-      "Reached",
-      "",
-    ]);
-    // Each row is drawn folded, the share its figure and the ages along
-    // one line, and again in its columns; a width shows one of the two.
-    expect(rows()).toStrictEqual([
-      [
-        "First million80%Net worth ≥ £1,000,000Median age 44 · Earliest 5% age 40 · Earliest 10% age 40 · Earliest 25% age 42",
-        "First millionNet worth ≥ £1,000,000",
-        "Age 442034",
-        "Age 402030",
-        "Age 402030",
-        "Age 422032",
-        "80%",
-        "",
-      ],
-      [
-        "Financial independence100%Liquid net worth ≥ 25 years of expenses · Liquid net worth ≥ 10 times the debtMedian age 36 · Earliest 5% age 36 · Earliest 10% age 36 · Earliest 25% age 36",
-        "Financial independenceLiquid net worth ≥ 25 years of expenses · Liquid net worth ≥ 10 times the debt",
-        "Age 362026",
-        "Age 362026",
-        "Age 362026",
-        "Age 362026",
-        "100%",
-        "",
-      ],
-    ]);
-    expect(screen.getAllByText("2034")).toHaveLength(1);
-    expect(screen.getAllByText("2034")[0]).toHaveClass("label");
-    expect(within(card).getAllByRole("rowgroup")[0]).toHaveClass(
-      "folded:hidden",
-    );
-    const [folded, ...columns] = within(
-      within(card).getAllByRole("row")[1] ?? card,
-    ).getAllByRole("cell");
-    expect(folded).toHaveClass("unfolded:hidden");
-    for (const cell of columns) {
-      expect(cell).toHaveClass("folded:hidden");
-    }
+        .getAllByText(bySlot("spread-bar-mark"), { suggest: false })
+        .map(({ style }) => style.left),
+    ).toStrictEqual(["100%", "100%", "100%", "100%"]);
+    expect(within(card).getAllByText("2030")).toHaveLength(1);
   });
 
-  it("dashes a share the run never reaches a goal by, and says nothing before the first futures are drawn", () => {
+  it("says never for a share the run never reaches a goal by, with no dot, and says nothing before the first futures are drawn", () => {
     const twoMillion: Goal = {
       ...firstMillion,
       conditions: [{ measure: "worth", of: "pounds", times: 2000000 }],
     };
     const { rerender } = render(
-      <GoalList futures={futures} goals={[twoMillion]} plan={plan} />,
+      <GoalList
+        futures={futures}
+        goals={[twoMillion]}
+        milestones={[]}
+        plan={plan}
+      />,
     );
 
-    expect(rows()[0]?.slice(2)).toStrictEqual(["—", "—", "—", "—", "0%", ""]);
-    expect(rows()[0]?.[0]).toBe(
-      "First million0%Net worth ≥ £2,000,000Median — · Earliest 5% — · Earliest 10% — · Earliest 25% —",
+    expect(screen.getAllByText("0%")).toHaveLength(2);
+    expect(screen.getByText("—")).toHaveClass("figure");
+    expect(screen.getByText("Median")).toHaveClass("label");
+    expect(screen.getByText("Median —")).toBeInTheDocument();
+    expect(medians()).toStrictEqual([]);
+
+    rerender(
+      <GoalList
+        futures={[]}
+        goals={[twoMillion]}
+        milestones={[]}
+        plan={plan}
+      />,
     );
 
-    rerender(<GoalList futures={[]} goals={[twoMillion]} plan={plan} />);
+    expect(screen.getAllByText("…")).toHaveLength(3);
+    expect(screen.getByText("Median …")).toBeInTheDocument();
+  });
 
-    expect(rows()[0]?.slice(2)).toStrictEqual(["…", "…", "…", "…", "…", ""]);
-    expect(rows()[0]?.[0]).toBe(
-      "First million…Net worth ≥ £2,000,000Median … · Earliest 5% … · Earliest 10% … · Earliest 25% …",
+  // The bar is a button named for the goal, folded and in its columns,
+  // and either says the same on hover or focus.
+  it("says on the bar, hovered or focused, the year and age the run reaches a goal by at each share", async () => {
+    renderList();
+
+    const triggers = screen.getAllByRole("button", {
+      name: "When the futures reach First million",
+    });
+    expect(triggers).toHaveLength(2);
+
+    // Focus moved by the keyboard opens it, as a pointer's hover does;
+    // the focus is real, since the tooltip asks whether it is visible.
+    act(() => {
+      triggers[0]?.focus();
+    });
+
+    expect(
+      await screen.findByText(bySlot("tooltip-content"), { suggest: false }),
+    ).toHaveTextContent(
+      "Earliest 5%2030 · age 40Earliest 10%2030 · age 40Earliest 25%2032 · age 42Median2034 · age 44Latest 25%2037 · age 47Latest 10%neverLatest 5%never",
     );
   });
 

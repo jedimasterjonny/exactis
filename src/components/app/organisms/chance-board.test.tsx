@@ -197,14 +197,12 @@ describe("ChanceBoard", () => {
     });
 
     expect(within(card).getByText("Sect. II.ii")).toHaveClass("label");
+    // Drawn folded and in its columns, so each figure is found twice.
     expect(
-      await within(card).findByRole(
-        "cell",
-        { name: "100%" },
-        { timeout: 5000 },
-      ),
-    ).toHaveClass("figure");
-    expect(within(card).getAllByText("Age 36")).toHaveLength(4);
+      await within(card).findAllByText("100%", {}, { timeout: 5000 }),
+    ).toHaveLength(2);
+    expect(within(card).getByText("Median · age 36")).toHaveClass("label");
+    expect(within(card).getByText("Median 2026 · age 36")).toBeInTheDocument();
   });
 
   // A pension alone, drawn from at 36, long before it can be: the plan

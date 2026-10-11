@@ -2,10 +2,13 @@
 
 import type { JSX } from "react";
 
+import { cn } from "cn";
 import { ChevronRight, Goal as GoalIcon, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
+import type { Spread } from "@/components/app/atoms/spread-bar";
 import type { Condition, Goal, GoalValues } from "@/data/goals";
+import type { Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Future } from "@/engine/futures";
 import type { Entry } from "@/hooks/use-editor";
@@ -13,27 +16,27 @@ import type { Entry } from "@/hooks/use-editor";
 import { removeGoal, saveGoal } from "@/actions/goals";
 import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { EmptyState } from "@/components/app/atoms/empty-state";
+import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { RowAction } from "@/components/app/atoms/row-action";
 import { RowOpener } from "@/components/app/atoms/row-opener";
+import { SpanRuler } from "@/components/app/atoms/span-ruler";
+import { SpreadBar } from "@/components/app/atoms/spread-bar";
+import { YearAge } from "@/components/app/atoms/year-age";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import {
   MoneyField,
   MultipleField,
 } from "@/components/app/molecules/figure-field";
-import { FoldedCell } from "@/components/app/molecules/folded-cell";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/kit/table";
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/kit/tooltip";
 import {
   bases,
   basisNames,
@@ -41,6 +44,7 @@ import {
   measureNames,
   measures,
 } from "@/data/goals";
+import { markersOf, yearsOf } from "@/data/milestones";
 import { ageIn } from "@/data/plan";
 import { reachedBy, reachedIn } from "@/engine/futures";
 import { useEditor } from "@/hooks/use-editor";
@@ -48,6 +52,7 @@ import { useRemover } from "@/hooks/use-remover";
 import { formatWholePercent } from "@/lib/money";
 import { chance, subsectionLabel } from "@/lib/nav";
 import { optionsOf } from "@/lib/options";
+import { laneColumns } from "@/lib/span";
 
 interface ConditionRowProps {
   readonly condition: Keyed;
@@ -75,12 +80,14 @@ interface GoalFieldsProps {
 interface GoalListProps {
   readonly futures: readonly Future[];
   readonly goals: readonly Goal[];
+  readonly milestones: readonly Milestone[];
   readonly plan: Plan;
 }
 
 interface GoalRowProps {
   readonly futures: readonly Future[];
   readonly goal: Goal;
+  readonly marks: readonly number[];
   readonly onEdit: (goal: Goal) => void;
   readonly plan: Plan;
 }
@@ -101,31 +108,30 @@ const blank: GoalValues = {
   name: "",
 };
 
-// The shares of the run a goal's year is read at, in the order the
-// columns come: the median first, since it is the year the dashboard
-// tiles, then the earliest 5%, 10% and 25%.
-const columns = [
-  { name: "Median", share: 0.5 },
-  { name: "Earliest 5%", share: 0.05 },
-  { name: "Earliest 10%", share: 0.1 },
-  { name: "Earliest 25%", share: 0.25 },
-] as const;
-
 const measureOptions = optionsOf(measureNames, measures);
 
-// The goals and when the futures reach them, a row apiece: the goal's
-// name over its conditions in words, then the age and the year the
-// run reaches it by at each share, the median first, then the share of
-// the run that reaches it at all, read over the futures drawn so far
-// while the run comes in and dashed where that many never reach it.
-// A goal is added from the card's button and edited from its row, in a
-// dialog, since its conditions are more than a row holds; the dialog of
-// a saved goal offers a Delete that asks through the confirm dialog
-// before the goal goes. A save goes to the store and comes back with
-// the page re-read, which draws the run again. A phone folds each row
-// into its name, with the share reaching it as the figure, over its
-// conditions and the ages on one line.
-export function GoalList({ futures, goals, plan }: GoalListProps): JSX.Element {
+// The goals and when the futures reach them, a lane apiece on the
+// plan's span, as the plan screen lays its milestones and lines: the
+// goal's name over its conditions in words, over where the futures
+// reach it, the fan on its side, with the share of the run that
+// reaches it at all and the median year beside, and the year and age
+// at each share from the earliest 5% to the latest 5% on the bar,
+// hovered or focused, all read over the futures drawn so far while
+// the run comes in. The lanes are ruled at the milestones, so a median
+// is read against retirement. A goal is added from the card's button
+// and edited from its row, in a dialog, since its conditions are more
+// than a row holds; the dialog of a saved goal offers a Delete that
+// asks through the confirm dialog before the goal goes. A save goes
+// to the store and comes back with the page re-read, which draws the
+// run again. A phone folds each lane into lines, as the plan screen's
+// fold, with the bar the row's width.
+export function GoalList({
+  futures,
+  goals,
+  milestones,
+  plan,
+}: GoalListProps): JSX.Element {
+  const marks = yearsOf(markersOf(milestones, plan));
   const { amend, dialogOf, dismiss, entry, open } = useEditor<Draft, Goal>({
     describe: (goal) => goal.conditions.map(conditionOf).join(" · "),
     noun: "Goal",
@@ -168,7 +174,7 @@ export function GoalList({ futures, goals, plan }: GoalListProps): JSX.Element {
             Add goal
           </Button>
         }
-        caption="Milestones the plan reaches rather than ones it is laid out by, each the first year a future meets its conditions: the year by which half the futures have reached it, which the Dashboard tiles, and by which the earliest 5%, 10% and 25% have."
+        caption="Milestones the plan reaches rather than ones it is laid out by, each the first year a future meets its conditions: where on the plan's span the futures reach it, from the earliest 5% to the latest 5%, the middle four in five and the middle half banded as the fan bands them and the median the dot, which the Dashboard tiles; and the share of the run that reaches it at all."
         label={subsectionLabel(chance, 2)}
         title="When the goals are reached"
       >
@@ -181,31 +187,23 @@ export function GoalList({ futures, goals, plan }: GoalListProps): JSX.Element {
             />
           </CardContent>
         ) : (
-          <Table>
-            <TableHeader className="folded:hidden">
-              <TableRow>
-                <TableHead>Goal</TableHead>
-                {columns.map(({ name }) => (
-                  <TableHead className="text-right" key={name}>
-                    {name}
-                  </TableHead>
-                ))}
-                <TableHead className="text-right">Reached</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <CardContent className="@container grid gap-1">
+            <div className={cn("grid gap-4 folded:grid-cols-1", laneColumns)}>
+              <SpanRuler plan={plan} />
+            </div>
+            <ul className="@container divide-y">
               {goals.map((goal) => (
                 <GoalRow
                   futures={futures}
                   goal={goal}
                   key={goal.id}
+                  marks={marks}
                   onEdit={edit}
                   plan={plan}
                 />
               ))}
-            </TableBody>
-          </Table>
+            </ul>
+          </CardContent>
         )}
       </SectionCard>
       {doomed !== null && (
@@ -376,77 +374,130 @@ function GoalFields({ draft, initial, onAmend }: GoalFieldsProps): JSX.Element {
   );
 }
 
-// A goal's row: its name, which opens it, over its conditions; the age
-// and the year the run reaches it by at each share, a dash where that
-// many never do and an ellipsis before any future is drawn; and the
-// share of the run that reaches it. Folded, the share is the figure and
-// the ages run along one line beneath the conditions.
-function GoalRow({ futures, goal, onEdit, plan }: GoalRowProps): JSX.Element {
+// A goal's row, drawn in its columns and again in its folded lines,
+// only one of which is shown at any width: its name, which opens it,
+// over its conditions, over where the futures reach it on the plan's
+// span; then the share of the run that reaches it at all, labelled,
+// and the year by which half have, with the age beneath, a dash where
+// half never do and an ellipsis before any future is drawn. The year
+// and age at every share are read on the bar, hovered or focused, in a
+// tooltip, since seven of them written beneath each bar crowded the
+// card; the bar is the tooltip's trigger, a button named for the goal
+// and tall enough to land on, over the press that opens the row.
+// Folded, the share is the figure beside the name and the median a
+// line of its own, since the columns that held them fold away.
+function GoalRow({
+  futures,
+  goal,
+  marks,
+  onEdit,
+  plan,
+}: GoalRowProps): JSX.Element {
   const run = futures.length;
   const reached = futures.filter(
     (future) => reachedIn(future, goal, plan) !== null,
   ).length;
-  const share = run === 0 ? "…" : formatWholePercent(reached / run);
-  const read = columns.map(({ name, share: at }) => ({
-    name,
-    year: reachedBy(futures, goal, { plan, share: at }),
-  }));
+  const reaching = run === 0 ? "…" : formatWholePercent(reached / run);
+  const yearBy = (share: number): null | number =>
+    reachedBy(futures, goal, { plan, share });
+  const spread: Spread = {
+    ends: [yearBy(0.05), yearBy(0.95)],
+    inner: [yearBy(0.25), yearBy(0.75)],
+    median: yearBy(0.5),
+    outer: [yearBy(0.1), yearBy(0.9)],
+  };
   const conditions = goal.conditions.map(conditionOf).join(" · ");
-  function agedOf(year: null | number): string {
-    return year === null ? unreached(run) : `age ${String(ageIn(year, plan))}`;
-  }
+  const year = spread.median ?? unreached(run);
+  const age =
+    spread.median === null
+      ? ""
+      : ` · age ${String(ageIn(spread.median, plan))}`;
   function open(): void {
     onEdit(goal);
   }
+  const bar = (
+    <Tooltip>
+      <TooltipTrigger
+        aria-label={`When the futures reach ${goal.name}`}
+        className="relative block w-full rounded-full py-2 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden"
+        delay={150}
+      >
+        <SpreadBar marks={marks} plan={plan} spread={spread} />
+      </TooltipTrigger>
+      <TooltipContent>
+        <dl className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5">
+          {reachesOf(spread, plan, run).map(([share, reach]) => (
+            <Fragment key={share}>
+              <dt>{share}</dt>
+              <dd className="text-right figure">{reach}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      </TooltipContent>
+    </Tooltip>
+  );
   return (
-    <TableRow>
-      <FoldedCell figure={share} name={goal.name} onOpen={open}>
-        <span>{conditions}</span>
-        <span>
-          {read.map(({ name, year }) => `${name} ${agedOf(year)}`).join(" · ")}
-        </span>
-      </FoldedCell>
-      <TableCell className="relative py-3 folded:hidden">
+    <li
+      className={cn(
+        "relative grid items-center gap-4 py-3 first:pt-0 last:pb-0 folded:grid-cols-1",
+        laneColumns,
+      )}
+    >
+      <div className="unfolded:hidden">
+        <FoldedLines figure={reaching} name={goal.name} onOpen={open}>
+          <span>{conditions}</span>
+          <span>{`Median ${String(year)}${age}`}</span>
+          {bar}
+        </FoldedLines>
+      </div>
+      <div className="grid min-w-0 gap-2 folded:hidden">
         <div className="grid gap-1">
           <RowOpener onOpen={open}>{goal.name}</RowOpener>
           <span className="text-xs text-muted-foreground">{conditions}</span>
         </div>
-      </TableCell>
-      {read.map(({ name, year }) => (
-        <TableCell className="text-right folded:hidden" key={name}>
-          <Reached plan={plan} run={run} year={year} />
-        </TableCell>
-      ))}
-      <TableCell className="text-right figure folded:hidden">{share}</TableCell>
-      <TableCell className="folded:hidden">
+        {bar}
+      </div>
+      <span className="grid gap-0.5 text-right folded:hidden">
+        <span className="figure">{reaching}</span>
+        <span className="label text-muted-foreground">reach it</span>
+      </span>
+      <YearAge age={`Median${age}`} className="folded:hidden" year={year} />
+      <span className="inline-flex size-7 items-center justify-center folded:hidden">
         <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
-      </TableCell>
-    </TableRow>
+      </span>
+    </li>
   );
 }
 
-// A year the run reaches a goal by: the age reached in it, leading,
-// since a goal is read by age, over the year as a muted label.
-function Reached({
-  plan,
-  run,
-  year,
-}: {
-  readonly plan: Plan;
-  readonly run: number;
-  readonly year: null | number;
-}): JSX.Element {
-  if (year === null) {
-    return (
-      <span className="figure text-muted-foreground">{unreached(run)}</span>
-    );
-  }
-  return (
-    <span className="grid gap-0.5">
-      <span className="figure">{`Age ${String(ageIn(year, plan))}`}</span>
-      <span className="label text-muted-foreground">{year}</span>
-    </span>
-  );
+// The years a run reaches a goal by at each share, from the earliest
+// 5% to the latest 5%, each named as the owner names it with the year
+// and the age reached in it: "never" where that many never do, and an
+// ellipsis before any future is drawn.
+function reachesOf(
+  { ends, inner, median, outer }: Spread,
+  plan: Plan,
+  run: number,
+): readonly (readonly [string, string])[] {
+  const listed: readonly (readonly [string, null | number])[] = [
+    ["Earliest 5%", ends[0]],
+    ["Earliest 10%", outer[0]],
+    ["Earliest 25%", inner[0]],
+    ["Median", median],
+    ["Latest 25%", inner[1]],
+    ["Latest 10%", outer[1]],
+    ["Latest 5%", ends[1]],
+  ];
+  return listed.map(([share, year]) => {
+    if (run === 0) {
+      return [share, "…"];
+    }
+    return [
+      share,
+      year === null
+        ? "never"
+        : `${String(year)} · age ${String(ageIn(year, plan))}`,
+    ];
+  });
 }
 
 // What stands for a year the run never reaches a goal by: a dash, or an
