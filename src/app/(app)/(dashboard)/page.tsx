@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { Check, Landmark, ScrollText } from "lucide-react";
+import { Landmark } from "lucide-react";
 
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
@@ -21,15 +21,17 @@ import { getHousehold } from "@/store/household";
 // since the futures it is read over are the board's to draw, once,
 // for the tiles and the chart alike, as the screen of that name draws
 // them, with the milestones reached when conditions hold beside it,
-// each at the median year the futures reach it; the badges and the
-// rest of the tiles are the reference kit's invented plan, standing in
-// until the engine projects what they show, save the age the net worth
-// is read at, which is the plan's. It reads the store from its header
-// down, since the header is titled with the age the plan runs to, so
-// the whole of it renders behind the loading screen beside it rather
-// than the chart alone. A phone keeps the milestone tile and the chance
-// of success, the two the plan is steered by, in one row, and leaves
-// the net worth and the legacy to a wider screen.
+// each at the median year the futures reach it; the badge and the net
+// worth tile are the reference kit's invented plan, standing in until
+// the engine projects what they show, save the age the net worth is
+// read at, which is the plan's. The kit's verdict and its legacy tile
+// are gone rather than standing in: nothing here grades the plan but
+// the chance of success, and nothing models an estate. It reads the
+// store from its header down, since the header is titled with the age
+// the plan runs to, so the whole of it renders behind the loading
+// screen beside it rather than the chart alone. A phone keeps the
+// milestone tile and the chance of success, the two the plan is
+// steered by, in one row, and leaves the net worth to a wider screen.
 export default async function Dashboard(): Promise<JSX.Element> {
   const { accounts, milestones, plan, schedule, spread } = await getHousehold();
   const age = String(endAge(plan));
@@ -40,10 +42,6 @@ export default async function Dashboard(): Promise<JSX.Element> {
         label={sectionLabel(dashboard)}
         title={`${dashboard.title} ${age}`}
       >
-        <Badge variant="positive">
-          <Check aria-hidden />
-          On track
-        </Badge>
         <Badge variant="secondary">CMA-derived · Aug 26</Badge>
         {"Figures in today's money"}
       </ScreenHeader>
@@ -62,13 +60,6 @@ export default async function Dashboard(): Promise<JSX.Element> {
             isHiddenOnPhone
             label={`Net worth at ${age}`}
             value="£4,218,760"
-          />
-          <StatTile
-            caption="After IHT and estate costs"
-            icon={ScrollText}
-            isHiddenOnPhone
-            label="Net legacy"
-            value="£1,642,315"
           />
         </ProjectionBoard>
       </ScreenBody>
