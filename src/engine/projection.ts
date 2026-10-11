@@ -1,10 +1,10 @@
 import type { Account, AccountKind } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
-import type { CashFlow, Paid, Schedule } from "@/engine/cash-flow";
+import type { CashFlow, Earned, Paid, Schedule } from "@/engine/cash-flow";
 
 import { isPension } from "@/data/accounts";
-import { ageIn, pricesIn, rateFrom } from "@/data/plan";
+import { ageIn, holderOf, pricesIn, rateFrom } from "@/data/plan";
 import { rules } from "@/data/rules";
 import { cashFlow } from "@/engine/cash-flow";
 import { isOnOrBefore } from "@/lib/months";
@@ -75,14 +75,17 @@ export interface ProjectionPoint {
 }
 
 // The month a shortfall is drawn in, as the draw reads it: what is left
-// of the lump sum allowance; what the month earned that the tax is
-// charged on, which a draw on a pension is taxed on top of; whether
-// the month falls before the pension age, when a pension is drawn only
-// early; and how far the bands have risen by its tax year.
+// of each owner's lump sum allowance, by the owner's id, an owner not
+// yet entered having the whole of it; what each owner's lines earned
+// that the tax is charged on, which a draw on a pension of theirs is
+// taxed on top of; the month itself and the plan, which say whether
+// the month falls before the pension's owner's pension age, when it is
+// drawn only early; and how far the bands have risen by its tax year.
 interface Drawing {
-  readonly allowance: number;
-  readonly below: number;
-  readonly isEarly: boolean;
+  readonly allowances: ReadonlyMap<number, number>;
+  readonly at: Month;
+  readonly earned: readonly Earned[];
+  readonly plan: Plan;
   readonly uprating: number;
 }
 
@@ -95,10 +98,12 @@ interface Held {
   readonly balance: number;
 }
 
-// A tax year as the projection has carried it so far: how many of its
-// months the plan holds, what they earned and drew that is taxed as
-// income, the self-employed profit among it that Class 4 is charged on,
-// and the income tax and Class 4 each month was charged on its own.
+// One owner's tax year as the projection has carried it so far: how
+// many of its months the plan holds, what they earned and drew that is
+// taxed as the owner's income, the self-employed profit among it that
+// their Class 4 is charged on, and the income tax and Class 4 each
+// month was charged on its own. Each owner has one, since a year is
+// settled a person at a time.
 interface TaxYear {
   readonly months: number;
   readonly paid: number;
@@ -112,7 +117,11 @@ interface TaxYear {
 // kept paid out of, as far as they reach.
 const drawOrder: readonly AccountKind[] = ["cash", "tax-free", "tax-deferred"];
 
-// The age the plan's owner may draw a pension at as income, the UK
+// A tax year the plan holds no months of yet: an owner's as April opens,
+// and one the plan has not entered.
+const noMonths: TaxYear = { months: 0, paid: 0, profit: 0, taxable: 0 };
+
+// The age an owner may draw a pension at as income, the UK
 // normal minimum pension age: 55, until it rises to 57 on 6 April 2028,
 // taken here from the start of that April. Someone who is 55 or 56 when
 // it rises can draw as income before it and not again until 57, save
@@ -228,23 +237,24 @@ export function monthsOn(
 // pension not listed would be fed nothing. A month the income does not
 // cover is drawn from the savings: cash first, then the tax-free
 // wrapper, then the tax-deferred one, grossed up for its tax, and before
-// the year the pension age is reached for the charge on taking it
-// early, at the start of the month and before
+// the year its owner reaches the pension age for the charge on taking
+// it early, at the start of the month and before
 // its growth as a payment lands, so what leaves earns nothing for the
 // month it is gone. The lump sum allowance a pension's tax-free quarter
-// comes out of is the plan's owner's for life, so what is left of it is
-// carried from month to month rather than read afresh. Each month is
-// taxed as a twelfth of a year, which overcharges a tax year whose
-// months are not alike, the one a salary stops in above all, so the
-// projection carries each tax year as well, what its months were taxed
-// on and what they were charged, and settles it in the April after: the
-// year's tax on all of it, against as much of each band as the months
-// it held, as the bands stood that year, less what the months paid,
-// refunded into April's money or owed out of it. Income tax is settled
-// so, and Class 4 with it, since it too is due on the year's profit
-// rather than a month's; Class 1 is charged a pay period at a time, as
-// the flow charges it, and owes nothing more at the year's end. The
-// first tax year is the months of
+// comes out of is its owner's for life, one each, so what is left of
+// each is carried from month to month rather than read afresh. Each
+// month is taxed as a twelfth of a year, which overcharges a tax year
+// whose months are not alike, the one a salary stops in above all, so
+// the projection carries each owner's tax year as well, what its
+// months were taxed on and what they were charged, and settles it in
+// the April after: the year's tax on all of it, against as much of
+// each band as the months it held, as the bands stood that year, less
+// what the months paid, refunded into April's money or owed out of it,
+// every owner's together, since the month's money is the household's.
+// Income tax is settled so, and Class 4 with it, since it too is due
+// on the year's profit rather than a month's; Class 1 is charged a pay
+// period at a time, as the flow charges it, and owes nothing more at
+// the year's end. The first tax year is the months of
 // it the plan holds, taxed against their share of each band, and the
 // last is cut off where the plan ends and never settled. A draw
 // and a payment into savings never meet in one month: the flow pays a
@@ -279,7 +289,11 @@ export function monthsOn(
 // balance where it is saved, and a debt opening above nothing beside
 // it: carried as the debt it is, a balance above nothing would read as
 // money held on the first point and be wiped off by its first payment,
-// paid down no further than nothing.
+// paid down no further than nothing. A wrapper belonging to nobody the
+// plan lists is refused beside them, as the household refuses it, since
+// there is no age to draw it at and no allowance to draw it under; read
+// before any month, as the flow reads its links, rather than in the
+// first month a draw reaches it.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -300,8 +314,11 @@ export function project(
   if (owing.some(({ balance }) => balance > 0)) {
     throw new Error(rules.owes);
   }
-  let allowance = lumpSumAllowance;
-  let taxYear: TaxYear = { months: 0, paid: 0, profit: 0, taxable: 0 };
+  for (const account of accounts.filter(({ owner }) => owner !== undefined)) {
+    holderOf(account, plan);
+  }
+  let allowances: ReadonlyMap<number, number> = new Map();
+  let taxYears: ReadonlyMap<number, TaxYear> = new Map();
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
     const age = ageIn(year, plan);
@@ -325,10 +342,18 @@ export function project(
         const stretch = { months: 1, uprating: upratingIn(plan, at) };
         const settlement =
           month === april
-            ? settled(taxYear, upratingIn(plan, { month: april - 1, year }))
+            ? [...taxYears.values()].reduce(
+                (sum, taxYear) =>
+                  sum +
+                  settled(
+                    taxYear,
+                    upratingIn(plan, { month: april - 1, year }),
+                  ),
+                0,
+              )
             : 0;
         if (month === april) {
-          taxYear = { months: 0, paid: 0, profit: 0, taxable: 0 };
+          taxYears = new Map();
         }
         const flow = cashFlow(accounts, schedule, {
           at,
@@ -337,23 +362,35 @@ export function project(
           settlement,
         });
         const draw = drawnFrom(held, Math.max(0, -flow.left), {
-          allowance,
-          below: flow.taxable,
-          isEarly: isBeforePensionAge(age, at),
+          allowances,
+          at,
+          earned: flow.earned,
+          plan,
           uprating: stretch.uprating,
         });
         const risen = pricesIn(plan, at);
-        allowance = draw.allowance;
+        allowances = draw.allowances;
         early += draw.early / risen;
-        taxYear = {
-          months: taxYear.months + 1,
-          paid:
-            taxYear.paid +
-            incomeTaxOn(draw.taxable, stretch) +
-            insuranceOn("self-employment", flow.profit, stretch),
-          profit: taxYear.profit + flow.profit,
-          taxable: taxYear.taxable + draw.taxable,
-        };
+        taxYears = new Map(
+          plan.owners.map(({ id }) => {
+            const taxYear = taxYears.get(id) ?? noMonths;
+            const taxable = draw.below.get(id) ?? 0;
+            const profit =
+              flow.earned.find((entry) => entry.owner === id)?.profit ?? 0;
+            return [
+              id,
+              {
+                months: taxYear.months + 1,
+                paid:
+                  taxYear.paid +
+                  incomeTaxOn(taxable, stretch) +
+                  insuranceOn("self-employment", profit, stretch),
+                profit: taxYear.profit + profit,
+                taxable: taxYear.taxable + taxable,
+              },
+            ];
+          }),
+        );
         uncovered += draw.uncovered / risen;
         held = draw.held.map((account) => ({
           account: account.account,
@@ -389,13 +426,14 @@ function carried(balance: number, paid: number, rate: number): number {
 }
 
 // What a month's shortfall takes out of the savings, and what is left
-// of it after them, with what is left of the lump sum allowance, what
-// the month is taxed on once its pension draws are counted, and what it
-// drew from a pension early. The kinds are drawn cash first, since it is
+// of it after them, with what is left of each owner's lump sum
+// allowance, what each owner is taxed on once the draws on their
+// pensions are counted, and what it drew from a pension early. The
+// kinds are drawn cash first, since it is
 // spent as it stands and grows least; then the tax-free wrapper, which
 // is reached at any age and owes nothing on the way out; then the
-// tax-deferred one. From the pension age a pension is drawn as income;
-// before it, only once cash and the ISA are
+// tax-deferred one. From its owner's pension age a pension is drawn as
+// income; before it, only once cash and the ISA are
 // empty, as the last thing between the month and running out, and at
 // the charge on a payment the rules do not allow, 45p kept of each
 // pound, since the money can be had that way and at no other. Within a
@@ -403,12 +441,14 @@ function carried(balance: number, paid: number, rate: number): number {
 // order they are listed, each giving up what it holds or what the month
 // is still short, whichever is the lesser, so an account is emptied and
 // never overdrawn and what it could not cover passes to the next. A
-// pension is taxed on the way out, so what it gives up is grossed up
-// until what is left of it covers what is short: a quarter free of tax
-// while the allowance lasts, and the rest taxed as income on top of what
-// the month earned and what any pension drawn before it gave up, so a
-// second pension in the same month is taxed from where the first left
-// off. One that holds less than that gives up all it holds and covers
+// pension is taxed on the way out, as its owner's income, so what it
+// gives up is grossed up until what is left of it covers what is short:
+// a quarter free of tax while its owner's allowance lasts, and the rest
+// taxed as income on top of what its owner earned in the month and what
+// any pension of theirs drawn before it gave up, so a second pension of
+// the one owner's in the same month is taxed from where the first left
+// off, and another owner's from where their own income stands. One that
+// holds less than that gives up all it holds and covers
 // what that leaves once taxed. Taking the pension before the ISA to use
 // the personal allowance first would pay less tax over a life, and is a
 // second way of drawing down rather than this one. What the last of
@@ -417,18 +457,21 @@ function carried(balance: number, paid: number, rate: number): number {
 function drawnFrom(
   held: readonly Held[],
   shortfall: number,
-  { allowance, below, isEarly, uprating }: Drawing,
+  { allowances, at, earned, plan, uprating }: Drawing,
 ): {
-  readonly allowance: number;
+  readonly allowances: ReadonlyMap<number, number>;
+  readonly below: ReadonlyMap<number, number>;
   readonly early: number;
   readonly held: readonly Held[];
-  readonly taxable: number;
   readonly uncovered: number;
 } {
   let drawn = held;
   let left = shortfall;
   let early = 0;
-  let taxed = { allowance, below, isEarly, months: 1, uprating };
+  const allowanceOf = new Map(allowances);
+  const below = new Map(
+    earned.map(({ owner, taxable }) => [owner, taxable] as const),
+  );
   for (const kind of drawOrder) {
     drawn = drawn.map(({ account, balance }) => {
       if (account.kind !== kind || !isPension(account)) {
@@ -437,31 +480,36 @@ function drawnFrom(
         left -= taken;
         return { account, balance: balance - taken };
       }
+      const owner = holderOf(account, plan);
+      const taxed = {
+        allowance: allowanceOf.get(owner.id) ?? lumpSumAllowance,
+        below: below.get(owner.id) ?? 0,
+        isEarly: isBeforePensionAge(ageIn(at.year, owner), at),
+        months: 1,
+        uprating,
+      };
       const wanted = drawFor(left, taxed);
       const draw = wanted.gross <= balance ? wanted : drawOf(balance, taxed);
       left = draw === wanted ? 0 : Math.max(0, left - draw.net);
       early += taxed.isEarly ? draw.gross : 0;
-      taxed = {
-        ...taxed,
-        allowance: taxed.allowance - draw.taxFree,
-        below: taxed.below + draw.taxable,
-      };
+      allowanceOf.set(owner.id, taxed.allowance - draw.taxFree);
+      below.set(owner.id, taxed.below + draw.taxable);
       return { account, balance: balance - draw.gross };
     });
   }
   return {
-    allowance: taxed.allowance,
+    allowances: allowanceOf,
+    below,
     early,
     held: drawn,
-    taxable: taxed.below,
     uncovered: left,
   };
 }
 
 // Whether a month falls before the pension age, when a pension can be
 // had only as a payment the rules do not allow: before 55 until the age
-// rises in April 2028, and before 57 from then. The plan holds the year
-// its owner was born in and not the day, so the age is the one reached
+// rises in April 2028, and before 57 from then. An owner holds the year
+// they were born in and not the day, so the age is the one reached
 // that year, and the whole of the year it is reached in counts as
 // reaching it.
 function isBeforePensionAge(age: number, { month, year }: Month): boolean {
@@ -621,17 +669,18 @@ function reserveOf(held: readonly Held[]): number {
 // Class 4 on itself, less the income tax on everything they were taxed
 // on together and the Class 4 on all their profit, each against as much
 // of each band as the months the plan held of the year, as the bands
-// had risen by it. A year of no months, the one before a plan starting
-// in April, settles nothing.
+// had risen by it. An owner's year is entered with its first month, so
+// one of no months is never here: the April a plan opens in has no year
+// behind it and settles nothing without asking.
 function settled(
   { months, paid, profit, taxable }: TaxYear,
   uprating: number,
 ): number {
-  return months === 0
-    ? 0
-    : paid -
-        incomeTaxOn(taxable, { months, uprating }) -
-        insuranceOn("self-employment", profit, { months, uprating });
+  return (
+    paid -
+    incomeTaxOn(taxable, { months, uprating }) -
+    insuranceOn("self-employment", profit, { months, uprating })
+  );
 }
 
 // The wrapper's balance this year, whole pounds of today's money, read

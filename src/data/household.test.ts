@@ -166,6 +166,11 @@ const thrown: readonly Thrown[] = [
       earning(given, 4, (pension) => ({ ...pension, owner: 2 })),
   ],
   [
+    "An ISA or a pension belongs to an owner the household lists",
+    "An ISA or a pension belongs to an owner the household lists",
+    (given): Inputs => changed(given, 2, (isa) => ({ ...isa, owner: 2 })),
+  ],
+  [
     "An ISA or a pension belongs to an owner, and nothing else",
     "An ISA or a pension belongs to an owner, and nothing else",
     (given): Inputs =>
@@ -287,10 +292,6 @@ const held: readonly Case[] = [
         accounts: [...secured.accounts, { ...account(secured, 5), id: 6 }],
       };
     },
-  ],
-  [
-    "An ISA or a pension belongs to an owner the household lists",
-    (given): Inputs => changed(given, 2, (isa) => ({ ...isa, owner: 2 })),
   ],
   [
     "A milestone is listed once",
