@@ -172,8 +172,8 @@ describe("ChanceBoard", () => {
   });
 
   // Worth £30,000 as it opens, every future reaches that much at once,
-  // at 36, and the goals are read over the futures drawn.
-  it("lists the goals beneath the fan, read over the futures drawn", async () => {
+  // at 36, and the milestones are read over the futures drawn.
+  it("lists the milestones beneath the fan, read over the futures drawn", async () => {
     render(
       <ChanceBoard
         accounts={[isa]}
@@ -191,7 +191,7 @@ describe("ChanceBoard", () => {
     );
 
     const card = screen.getByRole("region", {
-      name: "When the goals are reached",
+      name: "When the milestones are reached",
     });
 
     expect(within(card).getByText("Sect. II.ii")).toHaveClass("label");

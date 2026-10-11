@@ -48,6 +48,23 @@ const milestones = [
   },
 ] as const;
 
+// Two milestones reached when conditions hold: ten thousand pounds,
+// which the fifth to the ninth futures reach entering 2027 and the
+// fourth entering 2028, so half have by 2027; and twenty thousand,
+// which only the seventh to the ninth ever reach, entering 2028.
+const reached = [
+  {
+    conditions: [{ measure: "worth", of: "pounds", times: 10000 }],
+    id: 3,
+    name: "Ten grand",
+  },
+  {
+    conditions: [{ measure: "worth", of: "pounds", times: 20000 }],
+    id: 4,
+    name: "Twenty grand",
+  },
+] as const;
+
 // What recharts draws with the class given: the vertical rule of a
 // ReferenceLine, or an axis's tick. Neither has a role or a label, so no
 // query is more accessible than the class and none can be suggested.
@@ -90,6 +107,28 @@ describe("FuturesFan", () => {
         .getAllByRole("button")
         .map(({ textContent }) => textContent),
     ).toStrictEqual(["Ada 18 2027"]);
+  });
+
+  // The plan's own milestone in 2027 comes before the one the futures
+  // place there.
+  it("marks a milestone reached when conditions hold in the year half the futures have reached it by, and not one fewer than half ever reach", () => {
+    render(
+      <FuturesFan
+        futures={futures}
+        milestones={[...milestones, ...reached]}
+        plan={plan}
+      />,
+    );
+
+    expect(marks().map((mark) => mark.getAttribute("x"))).toStrictEqual([
+      "2027",
+      "2027",
+    ]);
+    expect(
+      within(screen.getByRole("group", { name: "Milestones" }))
+        .getAllByRole("button")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual(["Ada 18 2027", "Ten grand 2027"]);
   });
 
   it("draws the milestone chosen solid until it is chosen again", () => {

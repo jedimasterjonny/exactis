@@ -1,12 +1,17 @@
 import type { Account } from "@/data/accounts";
-import type { Measured, MilestoneValues } from "@/data/milestones";
+import type {
+  Marker,
+  Measured,
+  Milestone,
+  MilestoneValues,
+} from "@/data/milestones";
 import type { Path, Plan, Spread } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
 import type { ProjectionPoint } from "@/engine/projection";
 
 import { isAsset } from "@/data/accounts";
-import { isReached } from "@/data/milestones";
+import { ageOf, isReached, markersOf } from "@/data/milestones";
 import { ageIn, endYear, pricesIn, retirementYear } from "@/data/plan";
 import { spentIn } from "@/engine/cash-flow";
 import { balanceIn, isShort, project } from "@/engine/projection";
@@ -194,6 +199,30 @@ export function gradingOf(projected: Future, plan: Plan): Grading {
     middle: opens + Math.ceil((2 * span) / 5),
     surplus: 3 * worth,
   };
+}
+
+// The milestones as a run of futures places them on the plan's years:
+// those reached at an age where the plan lays them, retirement among
+// them, as markersOf lays them out, and those reached when conditions
+// hold each in the year by which half the futures have reached it, the
+// median, left out where fewer ever do, as every one is over a run of
+// none. In the order their years come, two in the one year keeping the
+// order they are given in, the plan's before the futures'.
+export function markersIn(
+  futures: readonly Future[],
+  milestones: readonly Milestone[],
+  plan: Plan,
+): readonly Marker[] {
+  const reached = milestones.flatMap(({ conditions, id, name }) => {
+    if (ageOf({ conditions }) !== undefined) {
+      return [];
+    }
+    const year = reachedBy(futures, { conditions }, { plan, share: 0.5 });
+    return year === null ? [] : [{ id, name, year }];
+  });
+  return [...markersOf(milestones, plan), ...reached].sort(
+    (first, second) => first.year - second.year,
+  );
 }
 
 // A run of futures graded on the lines given, counted. A future kept

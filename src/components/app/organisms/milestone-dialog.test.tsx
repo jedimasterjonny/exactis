@@ -10,11 +10,13 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { Milestone } from "@/data/milestones";
+import type { Schedule } from "@/engine/cash-flow";
 import type { Answer } from "@/lib/answer";
 
-import { saveMilestone } from "@/actions/milestones";
+import { removeMilestone, saveMilestone } from "@/actions/milestones";
 import { Toaster } from "@/components/kit/toast";
-import { retiring } from "@/data/income.fixture";
+import { expenseLines } from "@/data/expenses.fixture";
+import { incomeLines, retiring } from "@/data/income.fixture";
 import { atAge } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { refused, saved } from "@/lib/answer";
@@ -22,26 +24,50 @@ import { commit, field, openDialog, select } from "@/test/dom";
 
 import { MilestoneDialog } from "./milestone-dialog";
 
-vi.mock("@/actions/milestones", () => ({ saveMilestone: vi.fn() }));
+vi.mock("@/actions/milestones", () => ({
+  removeMilestone: vi.fn(),
+  saveMilestone: vi.fn(),
+}));
 
-const [kidsLeave, , firstMillion, independence] = milestones;
+const [kidsLeave, downsize, firstMillion, independence] = milestones;
+const [, stepUp] = incomeLines;
+const [, childcare, mortgage] = expenseLines;
+
+// Nothing coming in or going out, so nothing tied to any milestone.
+const nothing: Schedule = { expenses: [], income: [] };
+
+// The childcare tied to end at the children leaving home.
+const oneTied: Schedule = {
+  expenses: [{ ...childcare, endsAt: 1 }],
+  income: [],
+};
+
+// The childcare and the mortgage, three years after, tied to end at
+// the children leaving home, and the step-up to start at it.
+const threeTied: Schedule = {
+  expenses: [
+    { ...childcare, endsAt: 1 },
+    { ...mortgage, endsAfter: 3, endsAt: 1 },
+  ],
+  income: [{ ...stepUp, startsAt: 1 }],
+};
 
 function radio(name: string): HTMLElement {
   return screen.getByRole("radio", { name });
 }
 
 // The dialog as a list mounts it, on a new milestone or one to edit,
-// with spies where the list listens. Save reports through the toast
-// manager, which needs its Toaster mounted.
+// with a spy where the list listens. Save and delete report through the
+// toast manager, which needs its Toaster mounted.
 function renderDialog(
   props: Partial<ComponentProps<typeof MilestoneDialog>> = {},
 ): void {
   render(
     <MilestoneDialog
       milestone={null}
-      onDismiss={vi.fn<() => void>()}
-      onSaved={vi.fn<() => void>()}
+      onClose={vi.fn<() => void>()}
       plan={retiring}
+      schedule={nothing}
       {...props}
     />,
     { wrapper: Toaster },
@@ -89,8 +115,8 @@ describe("MilestoneDialog", () => {
   });
 
   it("saves a named milestone at the age typed, says the year it falls in, and tells the caller", async () => {
-    const onSaved = vi.fn<() => void>();
-    renderDialog({ onSaved });
+    const onClose = vi.fn<() => void>();
+    renderDialog({ onClose });
     const dialog = openDialog();
 
     fireEvent.change(field("Name", dialog), {
@@ -117,7 +143,7 @@ describe("MilestoneDialog", () => {
     answer(saved({ conditions: atAge(50), id: 5, name: "Sabbatical" }));
 
     await waitFor(() => {
-      expect(onSaved).toHaveBeenCalledOnce();
+      expect(onClose).toHaveBeenCalledOnce();
     });
     expect(
       screen.getByRole("dialog", { name: "Milestone added" }),
@@ -211,11 +237,10 @@ describe("MilestoneDialog", () => {
     expect(field("At least", dialog)).toHaveValue("£2,000,000");
   });
 
-  // The children leave home at 46; independence is twenty-five years of
-  // expenses and ten times the debt, in liquid net worth.
-  it("opens a milestone reached at an age on its age, with a Delete that reports it", () => {
-    const onDelete = vi.fn<(milestone: Milestone) => void>();
-    renderDialog({ milestone: kidsLeave, onDelete });
+  // The children leave home at 46; nothing is tied to it here, so
+  // either way is open to it.
+  it("opens a milestone reached at an age on its age, free to be reached when conditions hold instead", () => {
+    renderDialog({ milestone: kidsLeave });
     const dialog = screen.getByRole("dialog", { name: "Kids leave home" });
 
     expect(within(dialog).getByText("Edit milestone")).toHaveClass(
@@ -224,13 +249,120 @@ describe("MilestoneDialog", () => {
     expect(field("Name", dialog)).toHaveValue("Kids leave home");
     expect(radio("At an age")).toBeChecked();
     expect(field("Age", dialog)).toHaveValue("46");
-
-    fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
-
-    expect(onDelete).toHaveBeenCalledExactlyOnceWith(kidsLeave);
+    expect(radio("When conditions hold")).not.toHaveAttribute("aria-disabled");
+    expect(radio("When conditions hold")).toHaveAccessibleDescription(
+      "In the first year a future meets them, which the chance of success reads",
+    );
   });
 
-  it("opens a milestone reached when conditions hold on its conditions, and offers no Delete to a caller that asks for none", () => {
+  // A tied line moves with the milestone's year, so the milestone
+  // cannot be reached when conditions hold instead; the choice is held
+  // and says why, for one line and for more.
+  it.each([
+    [
+      oneTied,
+      "Not while the line tied to it moves with its year: untie it first",
+    ],
+    [
+      threeTied,
+      "Not while the 3 lines tied to it move with its year: untie them first",
+    ],
+  ])(
+    "holds a milestone lines are tied to at its age, and says why",
+    (schedule, why) => {
+      renderDialog({ milestone: kidsLeave, schedule });
+
+      expect(radio("At an age")).toBeChecked();
+      expect(radio("When conditions hold")).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+      expect(radio("When conditions hold")).toHaveAccessibleDescription(why);
+
+      fireEvent.click(radio("When conditions hold"));
+
+      expect(radio("At an age")).toBeChecked();
+    },
+  );
+
+  // A saved milestone's dialog is where it is deleted from: the Delete
+  // closes the dialog and asks first, saying what becomes of the lines
+  // tied to it, holds the confirm while the store answers, and tells
+  // the caller once the milestone has gone.
+  it("asks before deleting the milestone, the dialog closing first, and tells the caller once it has gone", async () => {
+    const onClose = vi.fn<() => void>();
+    renderDialog({ milestone: kidsLeave, onClose, schedule: threeTied });
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<undefined>>();
+    vi.mocked(removeMilestone).mockReturnValue(promise);
+
+    fireEvent.click(
+      within(openDialog()).getByRole("button", { name: "Delete" }),
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    const question = screen.getByRole("alertdialog", {
+      name: "Delete Kids leave home?",
+    });
+
+    expect(question).toHaveAccessibleDescription(
+      "The 3 lines tied to it stay where they are, in fixed years. It cannot be brought back.",
+    );
+
+    fireEvent.click(within(question).getByRole("button", { name: "Delete" }));
+
+    expect(removeMilestone).toHaveBeenCalledExactlyOnceWith(kidsLeave.id);
+    expect(
+      within(question).getByRole("button", { name: "Delete" }),
+    ).toHaveAttribute("aria-busy", "true");
+    expect(onClose).not.toHaveBeenCalled();
+
+    answer(saved(undefined));
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+    expect(
+      screen.getByRole("dialog", { name: "Milestone deleted" }),
+    ).toHaveAccessibleDescription("Kids leave home");
+  });
+
+  it("says the one line tied to the milestone stays where it is, and tells the caller on Cancel, deleting nothing", () => {
+    const onClose = vi.fn<() => void>();
+    renderDialog({ milestone: kidsLeave, onClose, schedule: oneTied });
+
+    fireEvent.click(
+      within(openDialog()).getByRole("button", { name: "Delete" }),
+    );
+
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete Kids leave home?" }),
+    ).toHaveAccessibleDescription(
+      "The line tied to it stays where it is, in a fixed year. It cannot be brought back.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(removeMilestone).not.toHaveBeenCalled();
+  });
+
+  it("asks about a milestone nothing is tied to with the warning alone", () => {
+    renderDialog({ milestone: downsize });
+
+    fireEvent.click(
+      within(openDialog()).getByRole("button", { name: "Delete" }),
+    );
+
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete Downsize?" }),
+    ).toHaveAccessibleDescription("It cannot be brought back.");
+  });
+
+  // Independence is twenty-five years of expenses and ten times the
+  // debt, in liquid net worth.
+  it("opens a milestone reached when conditions hold on its conditions, with a Delete", () => {
     renderDialog({ milestone: independence });
     const dialog = screen.getByRole("dialog", {
       name: "Financial independence",
@@ -257,8 +389,8 @@ describe("MilestoneDialog", () => {
     expect(twentyFive).toHaveValue("25");
     expect(ten).toHaveValue("10");
     expect(
-      within(dialog).queryByRole("button", { name: "Delete" }),
-    ).not.toBeInTheDocument();
+      within(dialog).getByRole("button", { name: "Delete" }),
+    ).toBeInTheDocument();
   });
 
   it("writes an edit back over the milestone", async () => {
@@ -301,13 +433,13 @@ describe("MilestoneDialog", () => {
     ).toBeVisible();
   });
 
-  it("dismisses on Cancel", () => {
-    const onDismiss = vi.fn<() => void>();
-    renderDialog({ onDismiss });
+  it("tells the caller on Cancel, saving nothing", () => {
+    const onClose = vi.fn<() => void>();
+    renderDialog({ onClose });
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    expect(onDismiss).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledOnce();
     expect(saveMilestone).not.toHaveBeenCalled();
   });
 });
