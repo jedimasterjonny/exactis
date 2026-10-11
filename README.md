@@ -176,37 +176,41 @@ read off the month's lines twelve times over, the sacrifice counted back into
 threshold income and what the salary lands in the pension into adjusted income;
 what is paid into a pension out of taxed money is not taken off threshold
 income, so an owner within those payments of £200,000 is tapered a little early.
-Each month is taxed as a twelfth of a year, which is the year's tax exactly when
-its months are alike and too much or too little when they are not, as in the
-year a salary stops. So the projection carries each owner's tax year, April to
-April, and settles it in the April after: the owner's income tax on everything
-their months earned and drew from their pensions, and their Class 4 on all their
-profit, less what they paid, is refunded into that month's money or owed out of
-it, every owner's together, since the month's money is the household's. Class 1
-is charged a pay period at a time, as the months charge it, and is not settled.
-The first tax year is the months of it the plan holds, against their share of
-each band. The bands are frozen until April 2031 and are held so: flat in pounds
-through the 2030/31 tax year, so an income rising with prices is dragged into a
-higher band, and rising with the plan's inflation each April from 2031/32, so
-each tax year is charged and settled against its own. A debt's own fixed sum is
-a loan's payments, so it runs only until the loan maths in `src/lib/loans.ts`
-says they clear what is owed: the term the payment takes at the debt's rate,
-counted from the month the plan starts in, and nothing charged after the month
-the last payment falls in. In that month only what clears the debt is charged,
-what is owed with the month's interest, since the term is rounded up to a whole
-month and the last payment is more than is left; a lender takes what is left,
-and the rest is the month's to save. A debt whose payments an expense line
-carries is left out of the fixed sums as before, the line being the payment, and
-the line is charged the same way in the month it clears the loan. When it runs
-is the loan's to say, not the line's: whenever the household is read, the line
-runs from the plan's first year to the month the same loan maths clears the loan
-in, a PCP's balloon refinanced on the same terms, or to the end of the plan when
-it never clears, as an interest-only mortgage does. So a mortgage's end moves
-with the balances' month as a plain debt's does. Saving a debt whose fixed
-payment never clears it is refused, since a payment the month's interest
-swallows gives the projection no month to stop at. So is saving one owing no
-more than its balloon, or a line paying a debt nothing: either leaves the debt
-standing as it is for the whole plan, paid nothing and charged nothing.
+Once an owner has drawn on a pension as income, their pension allowance is the
+money purchase one, £10,000, from the month after for the rest of the plan; a
+draw before the pension age, being a payment the rules do not allow, does not do
+that. Each month is taxed as a twelfth of a year, which is the year's tax
+exactly when its months are alike and too much or too little when they are not,
+as in the year a salary stops. So the projection carries each owner's tax year,
+April to April, and settles it in the April after: the owner's income tax on
+everything their months earned and drew from their pensions, and their Class 4
+on all their profit, less what they paid, is refunded into that month's money or
+owed out of it, every owner's together, since the month's money is the
+household's. Class 1 is charged a pay period at a time, as the months charge it,
+and is not settled. The first tax year is the months of it the plan holds,
+against their share of each band. The bands are frozen until April 2031 and are
+held so: flat in pounds through the 2030/31 tax year, so an income rising with
+prices is dragged into a higher band, and rising with the plan's inflation each
+April from 2031/32, so each tax year is charged and settled against its own. A
+debt's own fixed sum is a loan's payments, so it runs only until the loan maths
+in `src/lib/loans.ts` says they clear what is owed: the term the payment takes
+at the debt's rate, counted from the month the plan starts in, and nothing
+charged after the month the last payment falls in. In that month only what
+clears the debt is charged, what is owed with the month's interest, since the
+term is rounded up to a whole month and the last payment is more than is left; a
+lender takes what is left, and the rest is the month's to save. A debt whose
+payments an expense line carries is left out of the fixed sums as before, the
+line being the payment, and the line is charged the same way in the month it
+clears the loan. When it runs is the loan's to say, not the line's: whenever the
+household is read, the line runs from the plan's first year to the month the
+same loan maths clears the loan in, a PCP's balloon refinanced on the same
+terms, or to the end of the plan when it never clears, as an interest-only
+mortgage does. So a mortgage's end moves with the balances' month as a plain
+debt's does. Saving a debt whose fixed payment never clears it is refused, since
+a payment the month's interest swallows gives the projection no month to stop
+at. So is saving one owing no more than its balloon, or a line paying a debt
+nothing: either leaves the debt standing as it is for the whole plan, paid
+nothing and charged nothing.
 
 Any other line may tie its first or last year to a milestone rather than fix it,
 and then runs as the milestone does. A milestone is the first year of what it

@@ -923,6 +923,45 @@ describe("cashFlow", () => {
     ]);
   });
 
+  // Handed the first owner as having drawn on a pension as income, the
+  // month holds their pensions to a twelfth of the £10,000 money
+  // purchase allowance, £833.33: the salary's £1,150 is given up whole
+  // and is £316.67 past it, which is charged on top of the £11,250 paid,
+  // and the pension's own fixed sum finds no room. Sam has not drawn, so
+  // Sam's pension keeps the whole £5,000 a month and Sam's £2,000 is
+  // paid in full. A month read on its own has nobody drawn, which the
+  // first test above pays the pension's fixed sum under.
+  it("holds the pensions of an owner who has drawn on one as income to the money purchase allowance", () => {
+    const sipp: Account = {
+      ...pension,
+      contribution: { amount: 2000, cadence: "month", kind: "fixed" },
+      id: 7,
+      name: "Sam's SIPP",
+      owner: sam.id,
+    };
+    const flow = cashFlow(
+      [pension, sipp],
+      { expenses: [], income: [salary, { ...plain, id: 9, owner: sam.id }] },
+      { at: { month: 0, year: 2026 }, drawn: new Set([working.id]), plan },
+    );
+    const [mine, theirs] = flow.earned;
+
+    expect(flow.fed).toStrictEqual([
+      {
+        account: pension,
+        amount: (12000 * 1.15) / 12,
+        line: salary,
+        sacrificed: 1000,
+      },
+    ]);
+    expect(mine?.taxable).toBeCloseTo(11250 + 1150 - 10000 / 12, 8);
+    expect(theirs?.taxable).toBe(3000);
+    expect(pennies(flow.fixed)).toStrictEqual([
+      { account: pension, amount: 0 },
+      { account: sipp, amount: 2000 },
+    ]);
+  });
+
   // The salary's pension is not listed, so it is earned whole, £7,474.70
   // after its tax. A pension paid £6,000 a month has room for £4,000 of
   // it, which lands as the £5,000 a twelfth of its allowance holds; an
