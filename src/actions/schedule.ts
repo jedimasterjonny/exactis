@@ -28,15 +28,16 @@ import { amend } from "@/store/household";
 // its ends fall on the day, is the save's.
 const expenseValues = z.object(lineValues) satisfies z.ZodType<LineValues>;
 
-// An income line adds its kind and its parts, whole and never negative,
-// the pension it feeds and the share of its base it sacrifices, a
-// fraction of the base at most, and the pension it opens, named, holding
-// nothing or more and naming its owner, as every pension does. A line
-// opens one only while it is a salary, and not while it feeds one by
-// id, since the id is the household's to give. What else holds a line,
-// the parts and the pension a salary's alone and a share given up only
-// into a pension, is the household's to hold, once any pension the line
-// opens is among its accounts.
+// An income line adds its kind, the owner who earns it, its parts, whole
+// and never negative, the pension it feeds and the share of its base it
+// sacrifices, a fraction of the base at most, and the pension it opens,
+// named, holding nothing or more and naming its owner, as every pension
+// does. A line opens one only while it is a salary, and not while it
+// feeds one by id, since the id is the household's to give. What else
+// holds a line, the owner one the household lists, the parts and the
+// pension a salary's alone and a share given up only into a pension, is
+// the household's to hold, once any pension the line opens is among its
+// accounts.
 const incomeValues = z
   .object({
     ...lineValues,
@@ -46,6 +47,7 @@ const incomeValues = z
     opens: z
       .object({ balance: pounds, name: named, owner: recordId })
       .nullable(),
+    owner: recordId,
     rsu: pounds,
     sacrifice: z.number().min(0).max(1),
   })

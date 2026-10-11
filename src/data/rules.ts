@@ -9,6 +9,7 @@ export const rules = {
   belowNothing: "A balance below nothing is a debt's",
   beyondLoss: "A rate loses no more than everything",
   debtEnds: "A debt's payments end",
+  earner: "An income line is earned by an owner the plan lists",
   feedsPension: "A salary feeds a pension alone",
   inflation: "Inflation is a rate, and prices fall by less than everything",
   listedOnce: "An account is listed once",

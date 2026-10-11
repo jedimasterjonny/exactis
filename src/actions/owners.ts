@@ -16,9 +16,10 @@ import { amend } from "@/store/household";
 // retiring, each as the model holds them.
 const values = z.object(ownerValues) satisfies z.ZodType<OwnerValues>;
 
-// Deletes the owner with that id, unless an account names it: an ISA or
-// a pension belongs to an owner, and the household refuses to leave it
-// belonging to none, so the account is given to another owner or
+// Deletes the owner with that id, unless an account or an income line
+// names it: an ISA or a pension belongs to an owner, and an income line
+// is earned by one, and the household refuses to leave either with
+// none, so the account or the line is given to another owner or
 // deleted first, and the refusal says so in words that say what to do.
 // The last owner is refused by the household in its own words, since a
 // plan is somebody's. Checked as a save is.
@@ -29,6 +30,9 @@ export async function removeOwner(id: number): Promise<Answer<undefined>> {
     const owners = removed(kept.owners, at, "owner");
     if (kept.accounts.some(({ owner }) => owner === at)) {
       throw new Refusal("An owner who holds an account stays");
+    }
+    if (kept.schedule.income.some(({ owner }) => owner === at)) {
+      throw new Refusal("An owner who earns an income line stays");
     }
     return { kept: { ...kept, owners }, result: undefined };
   });

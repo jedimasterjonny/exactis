@@ -8,11 +8,13 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { IncomeLine } from "@/data/income";
 import type { Owner } from "@/data/owners";
 
 import { removeOwner, saveOwner } from "@/actions/owners";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
+import { incomeLines } from "@/data/income.fixture";
 import { owners, sam } from "@/data/owners.fixture";
 import { saved } from "@/lib/answer";
 import { commit, field } from "@/test/dom";
@@ -31,10 +33,17 @@ const [me] = owners;
 function renderList(
   listed: readonly Owner[],
   held: readonly Account[] = [],
+  earned: readonly IncomeLine[] = [],
 ): void {
-  render(<OwnerList accounts={held} label="Sect. II.v" owners={listed} />, {
-    wrapper: Toaster,
-  });
+  render(
+    <OwnerList
+      accounts={held}
+      label="Sect. II.v"
+      lines={earned}
+      owners={listed}
+    />,
+    { wrapper: Toaster },
+  );
 }
 
 describe("OwnerList", () => {
@@ -222,5 +231,39 @@ describe("OwnerList", () => {
     expect(screen.getByRole("button", { name: "Edit Me" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Delete Sam" })).toBeEnabled();
     expect(screen.getByRole("cell", { name: "Sam" })).toBeInTheDocument();
+  });
+
+  // The fixture's salary is the first owner's, so the store would refuse
+  // to delete them for that too: the row says what they earn, on a line
+  // of its own beneath what they hold, and the lock names both.
+  it("says what an owner earns and holds the bin while they earn anything", () => {
+    const [salary] = incomeLines;
+    renderList([me, sam], accounts, [salary]);
+
+    const cell = screen.getByRole("cell", { name: /^Me/ });
+
+    expect(
+      within(cell).getByText("Holds Workplace pension and Stocks & shares ISA"),
+    ).toBeInTheDocument();
+    expect(within(cell).getByText("Earns Salary")).toHaveClass(
+      "whitespace-normal",
+      "text-muted-foreground",
+    );
+    expect(
+      screen.getByRole("img", {
+        name: "Give Workplace pension, Stocks & shares ISA and Salary to another owner first",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("holds the bin of an owner who earns a line and holds no account", () => {
+    const [salary] = incomeLines;
+    renderList([sam, me], [], [{ ...salary, owner: sam.id }]);
+
+    expect(screen.getByText("Earns Salary")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Give Salary to another owner first" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Me" })).toBeEnabled();
   });
 });

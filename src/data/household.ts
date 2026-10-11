@@ -227,16 +227,18 @@ const expenseLine = z
     "A line ends in a month only of a year it ends in",
   ) satisfies z.ZodType<ExpenseLine>;
 
-// An income line adds the parts only a salary is paid in and the pension
-// only a salary feeds, and a share given up only into a pension, a
-// fraction of the base at most, in the engine's words for a share
-// outside it.
+// An income line adds the owner who earns it, the parts only a salary is
+// paid in and the pension only a salary feeds, and a share given up
+// only into a pension, a fraction of the base at most, in the engine's
+// words for a share outside it. That the owner is one the household
+// lists is the household's to hold.
 const incomeLine = z
   .object({
     ...line,
     bonus: pounds,
     feeds: recordId.nullable(),
     kind: z.enum(incomeKinds),
+    owner: recordId,
     rsu: pounds,
     sacrifice: z.number().min(0, rules.share).max(1, rules.share),
   })
@@ -507,7 +509,8 @@ const plan = z
 // sound on its own, as above, and the whole sound together, which no
 // one record can say. Every record is listed once by its id. Every link
 // names a record the household lists, and one of the kind it has to
-// be: a wrapper its owner, a loan the asset it is secured on, a salary
+// be: a wrapper its owner, an income line the owner who earns it, a
+// loan the asset it is secured on, a salary
 // the pension it feeds, a payments line the debt it pays and a line
 // the milestone it is tied to, which is reached at an age, since one
 // reached when conditions hold falls in a year that depends on the
@@ -569,6 +572,13 @@ export const household = z
         new Set([undefined, ...owners.map(({ id }) => id)]),
       ),
     "An ISA or a pension belongs to an owner the household lists",
+  )
+  .refine(
+    ({ owners, schedule }) =>
+      new Set(schedule.income.map(({ owner }) => owner)).isSubsetOf(
+        new Set(owners.map(({ id }) => id)),
+      ),
+    rules.earner,
   )
   .refine(
     ({ accounts }) =>

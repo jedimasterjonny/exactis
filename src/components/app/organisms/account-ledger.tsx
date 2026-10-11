@@ -79,7 +79,8 @@ type AssetOpening = "new" | Secured;
 // rate the savings grow at. The owners close the screen, a section of
 // their own beneath the flow, and are handed to the sheet and the flow,
 // to say whose each wrapper is, and to the account dialog, to choose
-// it.
+// it; the income lines are handed to the owners too, to say who earns
+// what and why they stay.
 export function AccountLedger({
   accounts,
   expenses,
@@ -244,6 +245,7 @@ export function AccountLedger({
       <OwnerList
         accounts={order}
         label={subsectionLabel(accountsAndAssets, ownersPlace)}
+        lines={lines}
         owners={owners}
       />
       {account !== null && (
