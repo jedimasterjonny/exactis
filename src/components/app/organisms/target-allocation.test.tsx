@@ -323,7 +323,13 @@ describe("TargetAllocation", () => {
       screen
         .getByRole("link", { name: "Download the retargeted file" })
         .getAttribute("href") ?? "";
-    expect(StubUrl.revokeObjectURL).toHaveBeenCalledWith(first);
+    // The first is let go in an effect, which React runs after the
+    // commit the new link is read from, and in a turn of its own once
+    // the redraw has run past its slice, so it is waited for rather
+    // than read off at once.
+    await waitFor(() => {
+      expect(StubUrl.revokeObjectURL).toHaveBeenCalledWith(first);
+    });
     expect(StubUrl.revokeObjectURL).not.toHaveBeenCalledWith(second);
 
     // Leaving the screen lets the last one go too.
