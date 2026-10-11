@@ -177,7 +177,12 @@ function Futures({
         reading={reading}
       />
       <FuturesFan futures={futures} milestones={milestones} plan={plan} />
-      <GoalList futures={futures} goals={goals} plan={plan} />
+      <GoalList
+        futures={futures}
+        goals={goals}
+        milestones={milestones}
+        plan={plan}
+      />
       <FuturesCount
         count={runLength}
         plan={plan}
