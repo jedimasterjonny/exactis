@@ -218,13 +218,17 @@ const account = z
     rules.alwaysFunded,
   ) satisfies z.ZodType<Account>;
 
+// An expense line adds the debt it pays, if it pays one, and then pays
+// it something, since a line paying a debt nothing clears none of it and
+// the debt stands as it is for the whole plan.
 const expenseLine = z
   .object({ ...line, pays: recordId.exactOptional() })
   .refine(isInOrder, "A line ends no earlier than it starts")
   .refine(endsAfterATie, "A line ends years after a milestone only")
+  .refine(endsInAYear, "A line ends in a month only of a year it ends in")
   .refine(
-    endsInAYear,
-    "A line ends in a month only of a year it ends in",
+    (line) => line.pays === undefined || line.amount > 0,
+    rules.paysSomething,
   ) satisfies z.ZodType<ExpenseLine>;
 
 // An income line adds the owner who earns it, the parts only a salary is
@@ -521,11 +525,13 @@ const plan = z
 // An asset has
 // one loan and a debt one line paying it, since the house and car
 // dialogs read the one they find. And a debt paying its own fixed sum,
-// rather than through a line, pays it down at the rate it is charged,
-// its own or the plan's, since the engine charges it to the month the
-// payments clear the debt in and one the interest swallows has none.
-// How far its rates stray is a spread of nothing or more, or why there
-// is none.
+// rather than through a line, owes more than the balloon it pays down
+// to and pays it down at the rate it is charged, its own or the plan's,
+// since the engine charges it to the month the payments clear the debt
+// in: one owing no more than its balloon has no payment to charge, as
+// one the interest swallows has no month to stop at, and either would
+// stand as it is for the whole plan. How far its rates stray is a spread
+// of nothing or more, or why there is none.
 export const household = z
   .object({
     accounts: z.array(account),
@@ -647,13 +653,15 @@ export const household = z
   )
   .refine(
     ({ accounts, plan, schedule }) =>
-      accounts
-        .filter(
-          (account) =>
-            !schedule.expenses.some((listed) => listed.pays === account.id),
-        )
-        .every((account) => doesClear(account, plan)),
+      paidByNoLine(accounts, schedule).every((account) =>
+        doesClear(account, plan),
+      ),
     rules.debtEnds,
+  )
+  .refine(
+    ({ accounts, schedule }) =>
+      paidByNoLine(accounts, schedule).every(owesPastBalloon),
+    rules.aboveBalloon,
   ) satisfies z.ZodType<Household>;
 
 // The sources the CMA-derived rates rest on, as the store keeps them:
@@ -933,6 +941,32 @@ function liveOf(kept: Kept): DerivedSet {
     case "custom":
       return { allocation: kept.allocation, rates: kept.rates };
   }
+}
+
+// Whether a debt's own fixed sum has anything to pay down: what the debt
+// owes is more than the balloon a PCP leaves standing, which the loan
+// maths reads as paid down in no time, so the engine charges no payment
+// and the debt stands as it is for the whole plan. Every other account,
+// and a debt paid no fixed sum, is asked nothing, as it is asked nothing
+// of clearing.
+function owesPastBalloon(account: Account): boolean {
+  return (
+    account.kind !== "debt" ||
+    account.contribution?.kind !== "fixed" ||
+    -account.balance > (account.balloon ?? 0)
+  );
+}
+
+// The accounts no expense line pays, so that a debt among them is paid
+// its own fixed sum or nothing; one a line pays is the line's to clear.
+function paidByNoLine(
+  accounts: readonly Account[],
+  schedule: Household["schedule"],
+): readonly Account[] {
+  return accounts.filter(
+    (account) =>
+      !schedule.expenses.some((listed) => listed.pays === account.id),
+  );
 }
 
 // A line as it runs once the loan it pays is read with the plan: from
