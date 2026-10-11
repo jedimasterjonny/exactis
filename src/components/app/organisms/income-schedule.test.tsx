@@ -236,6 +236,18 @@ describe("IncomeSchedule", () => {
     expect(screen.getByText("No income yet")).toBeInTheDocument();
   });
 
+  // A salary matched by its employer says so on the row, beside the
+  // share it gives up, in its columns and on its folded lines.
+  it("names the share the employer matches beside the share given up", () => {
+    renderSchedule([{ ...salary, match: 0.07 }]);
+
+    expect(
+      screen.getAllByText(
+        "£120,000 base · £15,000 bonus · £12,000 RSUs · 10.00% of the base into Workplace pension, matched to 7.00%",
+      ),
+    ).toHaveLength(2);
+  });
+
   // A salary naming a pension not among the accounts, or giving up
   // nothing, has no sacrifice to name.
   it("names only the parts a line has beyond its base", () => {
@@ -275,7 +287,7 @@ describe("IncomeSchedule", () => {
 
     expect(choice).toHaveValue("none");
     expect(choice).toHaveAccessibleDescription(
-      "Fed by salary sacrifice, with the employer's NI saved",
+      "Fed by salary sacrifice, with the employer's NI saved and their match",
     );
     expect(
       within(choice)
@@ -284,6 +296,9 @@ describe("IncomeSchedule", () => {
     ).toStrictEqual(["None", "Workplace pension", "SIPP", "A new pension"]);
     expect(
       within(dialog).queryByRole("textbox", { name: "Salary sacrifice" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("textbox", { name: "Employer match" }),
     ).not.toBeInTheDocument();
 
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
@@ -308,6 +323,10 @@ describe("IncomeSchedule", () => {
     expect(share).toHaveValue("100.00%");
 
     commit(share, "8");
+    commit(
+      within(dialog).getByRole("textbox", { name: "Employer match" }),
+      "7",
+    );
     saved({ ...salary, id: 5 });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
@@ -328,7 +347,7 @@ describe("IncomeSchedule", () => {
       kind: "employment",
       lastMonth: null,
       lastYear: 2079,
-      match: 0,
+      match: 0.07,
       name: "New job",
       opens: null,
       owner: 1,
@@ -864,9 +883,11 @@ describe("IncomeSchedule", () => {
     });
   });
 
+  // The salary matched to seven per cent of its base, so the match is
+  // seen to go with the category and come back with it.
   it("opens an employment line's parts as they are, keeps them across the category and writes an edit back", async () => {
-    renderSchedule();
-    saved({ ...salary, rsu: 20000 });
+    renderSchedule([{ ...salary, match: 0.07 }]);
+    saved({ ...salary, match: 0.07, rsu: 20000 });
 
     const dialog = openRow("Salary");
 
@@ -879,6 +900,9 @@ describe("IncomeSchedule", () => {
     expect(within(dialog).getByRole("textbox", { name: "RSUs" })).toHaveValue(
       "£12,000",
     );
+    expect(
+      within(dialog).getByRole("textbox", { name: "Employer match" }),
+    ).toHaveValue("7.00%");
 
     fireEvent.change(
       within(dialog).getByRole("combobox", { name: "Category" }),
@@ -903,6 +927,9 @@ describe("IncomeSchedule", () => {
     expect(within(dialog).getByRole("textbox", { name: "RSUs" })).toHaveValue(
       "£12,000",
     );
+    expect(
+      within(dialog).getByRole("textbox", { name: "Employer match" }),
+    ).toHaveValue("7.00%");
 
     commit(within(dialog).getByRole("textbox", { name: "RSUs" }), "20,000");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
@@ -927,7 +954,7 @@ describe("IncomeSchedule", () => {
       kind: "employment",
       lastMonth: null,
       lastYear: 2048,
-      match: 0,
+      match: 0.07,
       name: "Salary",
       opens: null,
       owner: 1,

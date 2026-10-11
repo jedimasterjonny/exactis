@@ -127,11 +127,19 @@ export function IncomeSchedule({
         ? {
             bonus: initial.bonus,
             feeds: initial.feeds,
+            match: initial.match,
             opens: initial.opens,
             rsu: initial.rsu,
             sacrifice: initial.sacrifice,
           }
-        : { bonus: 0, feeds: null, opens: null, rsu: 0, sacrifice: 0 }),
+        : {
+            bonus: 0,
+            feeds: null,
+            match: 0,
+            opens: null,
+            rsu: 0,
+            sacrifice: 0,
+          }),
     });
   }
 
@@ -285,15 +293,20 @@ function blank(plan: Plan, owner: number): Draft {
 
 // An employment line's parts, each named, leaving out one it has none
 // of, and the share of the base it sacrifices into the pension it
-// feeds, named, when it feeds one among the pensions.
+// feeds, named, when it feeds one among the pensions, with the share
+// its employer matches where it is matched.
 function formatParts(line: IncomeLine, pensions: readonly Account[]): string {
   const pension = pensions.find(({ id }) => id === line.feeds);
+  const matched =
+    line.match > 0 ? `, matched to ${formatPercent(line.match)}` : "";
   return [
     `${formatGbp(line.amount)} base`,
     ...(line.bonus > 0 ? [`${formatGbp(line.bonus)} bonus`] : []),
     ...(line.rsu > 0 ? [`${formatGbp(line.rsu)} RSUs`] : []),
     ...(pension !== undefined && line.sacrifice > 0
-      ? [`${formatPercent(line.sacrifice)} of the base into ${pension.name}`]
+      ? [
+          `${formatPercent(line.sacrifice)} of the base into ${pension.name}${matched}`,
+        ]
       : []),
   ].join(" · ");
 }
