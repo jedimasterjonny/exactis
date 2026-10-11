@@ -294,6 +294,14 @@ const held: readonly Case[] = [
     },
   ],
   [
+    "A salary feeds a pension of the owner who earns it",
+    (given): Inputs => ({
+      ...earning(given, 1, (salary) => ({ ...salary, owner: sam.id })),
+      owners: [...given.owners, sam],
+      plan: { ...given.plan, owners: [...given.plan.owners, sam] },
+    }),
+  ],
+  [
     "A milestone is listed once",
     (given): Inputs => ({
       ...given,
