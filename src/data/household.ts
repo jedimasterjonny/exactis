@@ -846,10 +846,10 @@ function endsInAYear(line: {
 }
 
 // The whole a kept household makes, its plan running from the month
-// its balances are as of on the rates and the split live, for the first
-// listed owner, each line's tied ends read off the milestones they are
-// tied to, and each line paying a loan running as the loan's payments
-// do.
+// after the one its balances are as of on the rates and the split live,
+// for the first listed owner, each line's tied ends read off the
+// milestones they are tied to, and each line paying a loan running as
+// the loan's payments do.
 function householdOf(kept: Kept): Household {
   const live = liveOf(kept);
   const plan = planOf(kept, live);

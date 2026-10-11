@@ -10,7 +10,7 @@ import { nothingKeptIn, soundKept, sourcesIn } from "@/data/household";
 import { getDb } from "@/db/client";
 import { keepAfter, readAsOf, readLatest } from "@/db/household";
 import { Refusal, refused, saved } from "@/lib/answer";
-import { dayOf, thisMonth } from "@/lib/months";
+import { dayOf, monthBefore, thisMonth } from "@/lib/months";
 import { requireSession } from "@/lib/session";
 
 // What a save works from: the household as it stands, the whole it makes
@@ -95,15 +95,17 @@ export async function getSourcesDaysAgo(days: number): Promise<Before | null> {
 }
 
 // The latest version the store has kept, or the household before
-// anything is saved, its balances as of this month, held to every rule as it is today, so a version the
-// rules have since tightened past is refused in their words rather than
-// handed to the engine to throw on, and with the version it is, which a
-// save writes the one after. The month is read at request time, since
-// the session is read before anything that reads it.
+// anything is saved, its balances as of the end of the month before
+// this one, so that its plan starts in this one, held to every rule as
+// it is today, so a version the rules have since tightened past is
+// refused in their words rather than handed to the engine to throw on,
+// and with the version it is, which a save writes the one after. The
+// month is read at request time, since the session is read before
+// anything that reads it.
 async function readHeld(): Promise<Held & { readonly version: number }> {
   const latest = await readLatest(getDb());
   return {
-    ...soundKept(latest?.household ?? nothingKeptIn(thisMonth())),
+    ...soundKept(latest?.household ?? nothingKeptIn(monthBefore(thisMonth()))),
     version: latest?.version ?? 0,
   };
 }

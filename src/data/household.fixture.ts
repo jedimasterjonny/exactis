@@ -14,8 +14,9 @@ import { allInStocks } from "@/data/rates";
 import { targets } from "@/data/targets.fixture";
 
 // The reference kit's invented plan as the store keeps it: the fixtures'
-// records, balances as of September 2026 and the six months of progress
-// points before it, the house price index pulled on the day the
+// records, balances as of the end of August 2026, the month the last
+// of its six progress points was read at, so the plan runs from
+// September, the house price index pulled on the day the
 // household is read, scaled from a June 2022 purchase and running to
 // July 2026, a plan to 89 whose owner, the owners fixture's one,
 // retires at 59, the curve its card reads, the August 2026 CMA with no
@@ -29,7 +30,7 @@ export const kept: Kept = {
   accounts,
   ages: { ends: 89 },
   allocation: allInStocks,
-  asOf: { month: 8, year: 2026 },
+  asOf: { month: 7, year: 2026 },
   cma: { latest: cma, previous: null },
   curve,
   deductions: { dividends: 0.02, fees: 0.002 },
@@ -58,6 +59,7 @@ export const kept: Kept = {
 // month as the reference's.
 export const blank: Kept = nothingKeptIn(kept.asOf);
 
-// The day the household is read on, in the month its balances are as
-// of, when the plan's owner, born in 1990, is 36.
+// The day the household is read on, in the month its plan runs from,
+// the one after its balances' month, when the plan's owner, born in
+// 1990, is 36.
 export const today = new Date("2026-09-15T12:00:00Z");

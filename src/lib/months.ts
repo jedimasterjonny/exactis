@@ -77,6 +77,24 @@ export function isOnOrBefore(month: Month, other: Month): boolean {
   return monthsBetween(month, other) >= 0;
 }
 
+// The month after a month, December's being the January of the year
+// after: the month a plan starts in, from the one its balances are as
+// of.
+export function monthAfter({ month, year }: Month): Month {
+  return month === 11
+    ? { month: 0, year: year + 1 }
+    : { month: month + 1, year };
+}
+
+// The month before a month, January's being the December of the year
+// before: the last month that has ended, from the one it is, and the
+// month a plan's balances are as of, from the one it starts in.
+export function monthBefore({ month, year }: Month): Month {
+  return month === 0
+    ? { month: 11, year: year - 1 }
+    : { month: month - 1, year };
+}
+
 // The month's name, January being nought as the date gives it. The
 // short form is the first three letters of the full one rather than
 // Intl's own, since that is written from locale data the server and
