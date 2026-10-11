@@ -18,7 +18,10 @@ export type IncomeKind = (typeof incomeKinds)[number];
 // gives up nothing, as every other kind of line does. Lines overlap
 // freely: a step-up is a second line starting mid-way, not an edit to
 // the first, and both may feed the one pension. The kind says what the
-// money is, for the badge and for the tax it pays. The id is the line's
+// money is, for the badge and for the tax it pays. Every line names
+// the owner who earns it, by the owner's id, since tax is charged on
+// each person's income and not on the household's, whatever kind of
+// income it is. The id is the line's
 // identity, handed out by the store in the order lines were added, which
 // is the order they are listed in.
 export interface IncomeLine extends IncomeLineValues {
@@ -42,6 +45,7 @@ export interface IncomeLineValues extends LineValues {
   readonly bonus: number;
   readonly feeds: null | number;
   readonly kind: IncomeKind;
+  readonly owner: number;
   readonly rsu: number;
   readonly sacrifice: number;
 }

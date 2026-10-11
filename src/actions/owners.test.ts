@@ -120,6 +120,24 @@ describe("the owner actions", () => {
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
 
+    // The state pension earned by the partner, who holds no account.
+    it("refuses to delete an owner who earns an income line, and writes nothing", async () => {
+      await keepAfter(db, 1, {
+        ...shared,
+        schedule: {
+          ...shared.schedule,
+          income: shared.schedule.income.map((line) =>
+            line.id === 4 ? { ...line, owner: 6 } : line,
+          ),
+        },
+      });
+
+      await expect(removeOwner(6)).resolves.toStrictEqual(
+        refused("An owner who earns an income line stays"),
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 2 });
+    });
+
     // The household before anything is saved holds its one owner, who
     // holds nothing and still cannot go.
     it("refuses to delete the last owner, in the household's words, and writes nothing", async () => {

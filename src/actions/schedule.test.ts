@@ -57,6 +57,7 @@ const values = {
   lastYear: 2035,
   name: " Bonus scheme ",
   opens: null,
+  owner: 1,
   rsu: 0,
   sacrifice: 0,
   startsAt: null,
@@ -81,6 +82,7 @@ function lineOf(draft: IncomeLineDraft, id: number): IncomeLine {
     lastMonth: draft.lastMonth,
     lastYear: draft.lastYear,
     name: draft.name.trim(),
+    owner: draft.owner,
     rsu: draft.rsu,
     sacrifice: draft.sacrifice,
     startsAt: null,
@@ -288,6 +290,10 @@ describe("the schedule actions", () => {
         [
           { ...values, kind: "employment", sacrifice: 0.12 },
           "A salary gives up a share only into a pension it feeds",
+        ],
+        [
+          { ...values, owner: 99 },
+          "An income line is earned by an owner the plan lists",
         ],
       ] as const) {
         await expect(saveIncomeLine(null, draft)).resolves.toStrictEqual(

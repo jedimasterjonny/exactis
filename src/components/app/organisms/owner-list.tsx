@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { UserPlus, Users } from "lucide-react";
 
 import type { Account } from "@/data/accounts";
+import type { IncomeLine } from "@/data/income";
 import type { Owner, OwnerValues } from "@/data/owners";
 
 import { removeOwner, saveOwner } from "@/actions/owners";
@@ -28,6 +29,7 @@ import { listed } from "@/lib/feeders";
 interface OwnerListProps {
   readonly accounts: readonly Account[];
   readonly label: string;
+  readonly lines: readonly IncomeLine[];
   readonly owners: readonly Owner[];
 }
 
@@ -45,15 +47,17 @@ const blank: OwnerValues = { ...openingOwner, name: "" };
 // the payment order holds its reordering. The rows are the store's, handed down by
 // the page, and a save or a deletion comes back with the page re-read.
 // A section holding no owners draws its empty state instead of the
-// table. An owner an account names says which beneath its name and has
-// its bin held, since the store refuses to delete it while the account
-// is theirs: offered, the bin would ask and then fail on a refusal the
-// production build hides, where the row can say why before it is asked.
-// The last owner's bin is held the same way, since a plan is somebody's
-// and the store refuses to keep a household with no one.
+// table. An owner an account names, or an income line is earned by,
+// says which beneath its name and has its bin held, since the store
+// refuses to delete it while either is theirs: offered, the bin would
+// ask and then fail on a refusal the production build hides, where the
+// row can say why before it is asked. The last owner's bin is held the
+// same way, since a plan is somebody's and the store refuses to keep a
+// household with no one.
 export function OwnerList({
   accounts,
   label,
+  lines,
   owners,
 }: OwnerListProps): JSX.Element {
   const { amend, dialogOf, dismiss, entry, open } = useEditor({
@@ -100,11 +104,15 @@ export function OwnerList({
                 <TableRow key={owner.id}>
                   <TableCell className="font-medium">
                     {owner.name}
-                    <Holdings accounts={accounts} owner={owner} />
+                    <Holdings accounts={accounts} lines={lines} owner={owner} />
                   </TableCell>
                   <TableCell className="w-px py-1">
                     <RowActions
-                      deleteLock={deleteLockOf(owner, accounts, owners)}
+                      deleteLock={deleteLockOf(owner, {
+                        accounts,
+                        lines,
+                        owners,
+                      })}
                       name={owner.name}
                       onDelete={ask}
                       onEdit={({ born, id, name, retires }) => {
@@ -166,22 +174,44 @@ export function OwnerList({
   );
 }
 
-// Why an owner's bin is held, if it is: the accounts naming them are
-// given to another owner or deleted first, or another owner is added
-// first, since the plan is the last owner's. An owner holding none,
-// with another listed, can go.
+// A faint line beneath an owner's name, wrapping where the cell would
+// hold it to one, since three names run wider than a phone and the card
+// scrolled.
+function Beneath({ children }: { readonly children: string }): JSX.Element {
+  return (
+    <span className="block text-xs font-normal whitespace-normal text-muted-foreground">
+      {children}
+    </span>
+  );
+}
+
+// Why an owner's bin is held, if it is: the accounts naming them and
+// the income lines they earn are given to another owner or deleted
+// first, or another owner is added first, since the plan is the last
+// owner's. An owner holding and earning nothing, with another listed,
+// can go.
 function deleteLockOf(
   owner: Owner,
-  accounts: readonly Account[],
-  owners: readonly Owner[],
+  {
+    accounts,
+    lines,
+    owners,
+  }: Pick<OwnerListProps, "accounts" | "lines" | "owners">,
 ): string | undefined {
-  const held = heldBy(owner, accounts);
-  if (held.length > 0) {
-    return `Give ${listed.format(held)} to another owner first`;
+  const theirs = [...heldBy(owner, accounts), ...earnedBy(owner, lines)];
+  if (theirs.length > 0) {
+    return `Give ${listed.format(theirs)} to another owner first`;
   }
   return owners.length === 1
     ? "Add another owner first, since a plan is somebody's"
     : undefined;
+}
+
+// The names of the income lines the owner earns, in the order listed.
+function earnedBy(owner: Owner, lines: readonly IncomeLine[]): string[] {
+  return lines
+    .filter((line) => line.owner === owner.id)
+    .map(({ name }) => name);
 }
 
 // The names of the accounts naming the owner, in the order listed.
@@ -191,21 +221,26 @@ function heldBy(owner: Owner, accounts: readonly Account[]): string[] {
     .map((account) => account.name);
 }
 
-// What an owner holds, beneath their name, faint: the accounts naming
-// them, which are why they cannot be deleted, or nothing for an owner
-// who holds none. The line wraps where the cell would hold it to one,
-// since three names run wider than a phone and the card scrolled.
+// What an owner holds and what they earn, beneath their name, a line
+// each: the accounts naming them and the income lines they earn, which
+// are why they cannot be deleted, or nothing for an owner with neither.
 function Holdings({
   accounts,
+  lines,
   owner,
 }: {
   readonly accounts: readonly Account[];
+  readonly lines: readonly IncomeLine[];
   readonly owner: Owner;
-}): JSX.Element | null {
+}): JSX.Element {
   const held = heldBy(owner, accounts);
-  return held.length === 0 ? null : (
-    <span className="block text-xs font-normal whitespace-normal text-muted-foreground">
-      {`Holds ${listed.format(held)}`}
-    </span>
+  const earned = earnedBy(owner, lines);
+  return (
+    <>
+      {held.length > 0 && <Beneath>{`Holds ${listed.format(held)}`}</Beneath>}
+      {earned.length > 0 && (
+        <Beneath>{`Earns ${listed.format(earned)}`}</Beneath>
+      )}
+    </>
   );
 }
