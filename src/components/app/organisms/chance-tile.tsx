@@ -1,39 +1,36 @@
-"use client";
-
 import type { JSX } from "react";
 
-import { Goal as GoalIcon } from "lucide-react";
+import { Flag } from "lucide-react";
 
-import type { Account } from "@/data/accounts";
-import type { Shortfall } from "@/data/cma";
 import type { Milestone } from "@/data/milestones";
-import type { Plan, Spread } from "@/data/plan";
-import type { Schedule } from "@/engine/cash-flow";
+import type { Plan } from "@/data/plan";
 import type { Future } from "@/engine/futures";
 
 import { StatTile } from "@/components/app/molecules/stat-tile";
-import { takesSpare } from "@/data/accounts";
 import { ageOf } from "@/data/milestones";
 import { ageIn, endAge } from "@/data/plan";
 import { reachedBy, reachedIn, readingOf, runLength } from "@/engine/futures";
-import { useFutures } from "@/hooks/use-futures";
 import { formatCount } from "@/lib/count";
 import { formatWholePercent } from "@/lib/money";
 
+// A run of the futures as the board hands it down: the futures drawn
+// so far and whether that is all of them, or why there is nothing to
+// draw, which the tiles say in place of a figure.
+export type Run =
+  | { readonly futures: readonly Future[]; readonly isDone: boolean }
+  | { readonly unrun: string };
+
 interface ChanceTileProps {
-  readonly accounts: readonly Account[];
   readonly milestones: readonly Milestone[];
   readonly plan: Plan;
-  readonly schedule: Schedule;
-  readonly spread: Shortfall | Spread;
+  readonly run: Run;
 }
 
-interface DrawnProps {
-  readonly accounts: readonly Account[];
-  readonly goals: readonly Milestone[];
+interface ReachedTileProps {
+  readonly futures: readonly Future[];
+  readonly isDone: boolean;
+  readonly milestone: Milestone;
   readonly plan: Plan;
-  readonly schedule: Schedule;
-  readonly spread: Spread;
 }
 
 // What the tile is called, on the dashboard as on the screen it reads.
@@ -42,55 +39,39 @@ const label = "Chance of success";
 // The dashboard's chance of success: the share of the plan's futures
 // that last, drawn as the dashboard opens over the same run the chance
 // of success draws and written as it writes it, so the two say the
-// same, with how many futures and the age they last to beneath it;
-// and beside it a tile a goal, which is a milestone reached when
-// conditions hold, the age reached in the year by which half the
-// futures have reached it, the median alone, since a tile is one
-// figure and the spread either side is read on the chance of success.
-// While they are drawn, how many have been; and a dash, saying why,
-// while the plan has no spread to draw them at or no savings for them
-// to grow. It reads the plan as the store holds it, so an age being
-// dragged on the chart is drawn for once it is saved.
+// same, with how many futures and the age they last to beneath it; and
+// beside it a tile for each milestone reached when conditions hold,
+// the age reached in the year by which half the futures have reached
+// it, the median alone, since a tile is one figure and the spread
+// either side is read on the chance of success. While they are drawn,
+// how many have been; and a dash, saying why, while there is nothing
+// to draw them at. The run is the board's, which draws it once for the
+// tiles and the chart alike.
 export function ChanceTile({
-  accounts,
   milestones,
   plan,
-  schedule,
-  spread,
+  run,
 }: ChanceTileProps): JSX.Element {
-  const goals = milestones.filter(
+  const reached = milestones.filter(
     (milestone) => ageOf(milestone) === undefined,
   );
-  if ("short" in spread) {
-    return <Unrun caption="No spread to draw the futures from" goals={goals} />;
+  if ("unrun" in run) {
+    return (
+      <>
+        <StatTile caption={run.unrun} label={label} value="—" />
+        {reached.map((milestone) => (
+          <StatTile
+            caption={run.unrun}
+            icon={Flag}
+            key={milestone.id}
+            label={milestone.name}
+            value="—"
+          />
+        ))}
+      </>
+    );
   }
-  if (!accounts.some(takesSpare)) {
-    return <Unrun caption="No savings for the futures to grow" goals={goals} />;
-  }
-  return (
-    <Drawn
-      accounts={accounts}
-      goals={goals}
-      plan={plan}
-      schedule={schedule}
-      spread={spread}
-    />
-  );
-}
-
-// The tiles over the futures as they are drawn.
-function Drawn({
-  accounts,
-  goals,
-  plan,
-  schedule,
-  spread,
-}: DrawnProps): JSX.Element {
-  const { futures, isDone } = useFutures(accounts, schedule, {
-    count: runLength,
-    plan,
-    spread,
-  });
+  const { futures, isDone } = run;
   return (
     <>
       {isDone ? (
@@ -106,12 +87,12 @@ function Drawn({
           value="…"
         />
       )}
-      {goals.map((goal) => (
-        <GoalTile
+      {reached.map((milestone) => (
+        <ReachedTile
           futures={futures}
-          goal={goal}
           isDone={isDone}
-          key={goal.id}
+          key={milestone.id}
+          milestone={milestone}
           plan={plan}
         />
       ))}
@@ -119,41 +100,36 @@ function Drawn({
   );
 }
 
-// A goal's tile: the age reached in the year by which half the futures
-// have reached it, the year beneath, or a dash with the share of the
-// run that reaches it at all where fewer than half ever do; and an
-// ellipsis while the futures are drawn, as the chance's.
-function GoalTile({
+// A milestone's tile: the age reached in the year by which half the
+// futures have reached it, the year beneath, or a dash with the share
+// of the run that reaches it at all where fewer than half ever do; and
+// an ellipsis while the futures are drawn, as the chance's.
+function ReachedTile({
   futures,
-  goal,
   isDone,
+  milestone,
   plan,
-}: {
-  readonly futures: readonly Future[];
-  readonly goal: Milestone;
-  readonly isDone: boolean;
-  readonly plan: Plan;
-}): JSX.Element {
+}: ReachedTileProps): JSX.Element {
   if (!isDone) {
     return (
       <StatTile
         caption="Drawing the futures…"
-        icon={GoalIcon}
-        label={goal.name}
+        icon={Flag}
+        label={milestone.name}
         value="…"
       />
     );
   }
-  const median = reachedBy(futures, goal, { plan, share: 0.5 });
+  const median = reachedBy(futures, milestone, { plan, share: 0.5 });
   if (median === null) {
     const reached = futures.filter(
-      (future) => reachedIn(future, goal, plan) !== null,
+      (future) => reachedIn(future, milestone, plan) !== null,
     ).length;
     return (
       <StatTile
         caption={`Reached in ${formatWholePercent(reached / runLength)} of ${formatCount(runLength)} futures`}
-        icon={GoalIcon}
-        label={goal.name}
+        icon={Flag}
+        label={milestone.name}
         value="—"
       />
     );
@@ -161,34 +137,10 @@ function GoalTile({
   return (
     <StatTile
       caption={`Median of ${formatCount(runLength)} futures · ${String(median)}`}
-      icon={GoalIcon}
-      label={goal.name}
+      icon={Flag}
+      label={milestone.name}
       unit="yrs"
       value={String(ageIn(median, plan))}
     />
-  );
-}
-
-// The tiles with nothing to draw, each dashed and saying why.
-function Unrun({
-  caption,
-  goals,
-}: {
-  readonly caption: string;
-  readonly goals: readonly Milestone[];
-}): JSX.Element {
-  return (
-    <>
-      <StatTile caption={caption} label={label} value="—" />
-      {goals.map((goal) => (
-        <StatTile
-          caption={caption}
-          icon={GoalIcon}
-          key={goal.id}
-          label={goal.name}
-          value="—"
-        />
-      ))}
-    </>
   );
 }

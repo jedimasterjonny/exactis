@@ -1,15 +1,15 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import type { Account } from "@/data/accounts";
+import type { Milestone } from "@/data/milestones";
+import type { Future } from "@/engine/futures";
 
-import { expenseLines } from "@/data/expenses.fixture";
-import { FuturesWorker } from "@/test/futures-worker";
+import { atAge } from "@/data/milestones";
 
 import { ChanceTile } from "./chance-tile";
 
 // Born in 1990, from January 2026 over three years, so the plan runs to
-// 39 and every future is drawn in a moment.
+// 39.
 const plan = {
   born: 1990,
   from: 2026,
@@ -20,84 +20,83 @@ const plan = {
   years: 3,
 };
 
-const isa: Account = {
-  balance: 30000,
-  growth: { kind: "plan" },
-  id: 1,
-  kind: "tax-free",
-  name: "ISA",
-  owner: 1,
-};
+// Ten futures over four years from 36, each worth £30,000 throughout,
+// owing and spending nothing, the last two falling short in 2028.
+const futures = Array.from({ length: 10 }, (_, nth): Future => ({
+  fell: nth < 8 ? null : 2028,
+  measured: Array.from({ length: 4 }, (_, offset) => ({
+    age: 36 + offset,
+    debt: 0,
+    expenses: 0,
+    liquid: 30000,
+    worth: 30000,
+  })),
+  ranOut: nth < 8 ? null : 2028,
+}));
 
-// £500 a month going out, which the ISA covers at the plan's rates.
-const schedule = {
-  expenses: [{ ...expenseLines[0], amount: 500, growth: "nominal" as const }],
-  income: [],
-};
+// Thirty grand, which every future reaches at once; forty, which none
+// ever does; and a milestone reached at an age, which has no tile.
+const milestones: readonly Milestone[] = [
+  {
+    conditions: [{ measure: "worth", of: "pounds", times: 30000 }],
+    id: 1,
+    name: "Thirty grand",
+  },
+  {
+    conditions: [{ measure: "worth", of: "pounds", times: 40000 }],
+    id: 2,
+    name: "Forty grand",
+  },
+  { conditions: atAge(37), id: 3, name: "Ada 18" },
+];
 
 describe("ChanceTile", () => {
-  // jsdom has no Worker, and the chance of success draws its futures on two.
-  beforeEach(() => {
-    vi.stubGlobal("Worker", FuturesWorker);
-  });
-
-  // Nothing strays, so every future is the plan at its rates, which
-  // lasts.
-  it("draws the plan's futures and shows the share that last, with how many and to what age", async () => {
+  // Eight in ten last.
+  it("shows the share of the futures that last once the run is drawn, with how many and to what age", () => {
     render(
       <ChanceTile
-        accounts={[isa]}
         milestones={[]}
         plan={plan}
-        schedule={schedule}
-        spread={{ inflation: 0, rate: 0 }}
+        run={{ futures, isDone: true }}
       />,
     );
 
     expect(screen.getByText("Chance of success")).toHaveClass("label");
-    expect(screen.getByText("…")).toHaveClass("figure");
+    expect(screen.getByText("80%")).toHaveClass("figure");
     expect(
-      await screen.findByText(
-        "Of 1,000 futures, lasting to 39",
-        {},
-        { timeout: 5000 },
-      ),
+      screen.getByText("Of 1,000 futures, lasting to 39"),
     ).toBeInTheDocument();
-    expect(screen.getByText("100%")).toHaveClass("figure");
+  });
+
+  it("says how many futures are drawn while the run is, for the chance and for each milestone", () => {
+    render(
+      <ChanceTile
+        milestones={milestones}
+        plan={plan}
+        run={{ futures: futures.slice(0, 3), isDone: false }}
+      />,
+    );
+
+    expect(screen.getAllByText("…")).toHaveLength(3);
+    expect(screen.getByText("Drawing 3 of 1,000 futures…")).toBeInTheDocument();
+    expect(screen.getAllByText("Drawing the futures…")).toHaveLength(2);
+    expect(screen.queryByText("Ada 18")).not.toBeInTheDocument();
   });
 
   // Worth £30,000 as it opens, every future reaches that much at once,
   // at 36; none ever reaches £40,000.
-  it("tiles each goal at the age half the futures reach it by, or a dash with the share that ever do", async () => {
+  it("tiles each milestone reached when conditions hold at the age half the futures reach it by, or a dash with the share that ever do", () => {
     render(
       <ChanceTile
-        accounts={[isa]}
-        milestones={[
-          {
-            conditions: [{ measure: "worth", of: "pounds", times: 30000 }],
-            id: 1,
-            name: "Thirty grand",
-          },
-          {
-            conditions: [{ measure: "worth", of: "pounds", times: 40000 }],
-            id: 2,
-            name: "Forty grand",
-          },
-        ]}
+        milestones={milestones}
         plan={plan}
-        schedule={schedule}
-        spread={{ inflation: 0, rate: 0 }}
+        run={{ futures, isDone: true }}
       />,
     );
 
     expect(screen.getByText("Thirty grand")).toHaveClass("label");
-    expect(screen.getAllByText("Drawing the futures…")).toHaveLength(2);
     expect(
-      await screen.findByText(
-        "Median of 1,000 futures · 2026",
-        {},
-        { timeout: 5000 },
-      ),
+      screen.getByText("Median of 1,000 futures · 2026"),
     ).toBeInTheDocument();
     expect(screen.getByText("36")).toHaveClass("figure");
     expect(screen.getByText("yrs")).toBeInTheDocument();
@@ -107,55 +106,19 @@ describe("ChanceTile", () => {
     expect(screen.getByText("—")).toHaveClass("figure");
   });
 
-  it("shows a dash, saying why, with no spread to draw the futures at or no savings for them", () => {
-    const { rerender } = render(
+  it("shows a dash, saying why, with nothing to draw the futures at", () => {
+    render(
       <ChanceTile
-        accounts={[isa]}
-        milestones={[]}
+        milestones={milestones}
         plan={plan}
-        schedule={schedule}
-        spread={{ short: "No CMA is pulled" }}
+        run={{ unrun: "No spread to draw the futures from" }}
       />,
     );
 
-    expect(screen.getByText("—")).toHaveClass("figure");
-    expect(
-      screen.getByText("No spread to draw the futures from"),
-    ).toBeInTheDocument();
-
-    rerender(
-      <ChanceTile
-        accounts={[isa]}
-        milestones={[
-          {
-            conditions: [{ measure: "worth", of: "pounds", times: 30000 }],
-            id: 1,
-            name: "Thirty grand",
-          },
-        ]}
-        plan={plan}
-        schedule={schedule}
-        spread={{ short: "No CMA is pulled" }}
-      />,
-    );
-
-    expect(screen.getAllByText("—")).toHaveLength(2);
+    expect(screen.getAllByText("—")).toHaveLength(3);
     expect(
       screen.getAllByText("No spread to draw the futures from"),
-    ).toHaveLength(2);
-
-    rerender(
-      <ChanceTile
-        accounts={[]}
-        milestones={[]}
-        plan={plan}
-        schedule={schedule}
-        spread={{ inflation: 0, rate: 0 }}
-      />,
-    );
-
-    expect(
-      screen.getByText("No savings for the futures to grow"),
-    ).toBeInTheDocument();
+    ).toHaveLength(3);
+    expect(screen.getByText("Forty grand")).toHaveClass("label");
   });
 });
