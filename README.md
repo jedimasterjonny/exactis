@@ -323,8 +323,13 @@ The rates are derived in `src/data/cma.ts`. Each sleeve's return is the target
 allocation's blend of the classes its categories are mapped onto, each category
 weighted by its share of the sleeve; a class hedged to sterling is blended at
 the return of the class it hedges, with the hedging kept apart as an adjustment.
-A sleeve nothing blends into, as bonds in an allocation all in equities, stands
-in at the other's return with none of the whole, so its rate weighs nothing, and
+The blend is linear in the classes' geometric returns, and the plan rate is the
+same blend of the sleeves, so each leaves out the rebalancing term a yearly
+rebalanced portfolio earns on top, half the gap between the classes' weighted
+variances and the portfolio's, which at the fixture's split is a tenth or two of
+a point; so the plan rate and the chance of success read low rather than high. A
+sleeve nothing blends into, as bonds in an allocation all in equities, stands in
+at the other's return with none of the whole, so its rate weighs nothing, and
 the screen shows it as empty. The household keeps two deductions, typed: the
 fees every fund charges, which BlackRock's index returns are gross of and the
 plan charges nowhere else, and the dividend yield, which the workbook does not
