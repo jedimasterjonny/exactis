@@ -11,6 +11,7 @@ import type {
   Vintages,
 } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
+import type { Goal } from "@/data/goals";
 import type { HousePrices } from "@/data/house-prices";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
@@ -39,6 +40,7 @@ import { allInStocks, openingRates, rateSets } from "@/data/rates";
 import { rules } from "@/data/rules";
 import {
   categoryValues,
+  goalValues,
   lineValues,
   milestoneValues,
   month,
@@ -54,8 +56,9 @@ import { paidUntil, termOf } from "@/lib/loans";
 import { monthsBetween } from "@/lib/months";
 import { isWithinAllowance } from "@/lib/tax";
 
-// Everything the projection runs on, the owners the wrappers name and
-// the milestones the plan is laid out by, the progress points the
+// Everything the projection runs on, the owners the wrappers name, the
+// milestones the plan is laid out by and the goals it is read against,
+// the progress points the
 // balances were read at month by month, the house price index last
 // pulled from the Land Registry to write the house into them, or none
 // before one is, the inflation curve last pulled from the Bank of
@@ -74,6 +77,7 @@ export interface Household {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
+  readonly goals: readonly Goal[];
   readonly housePrices: HousePrices | null;
   readonly liveRates: Rates;
   readonly mappings: readonly Mapping[];
@@ -113,6 +117,7 @@ export interface Kept {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
+  readonly goals: readonly Goal[];
   readonly housePrices: HousePrices | null;
   readonly mappings: readonly Mapping[];
   readonly milestones: readonly Milestone[];
@@ -256,6 +261,12 @@ const milestone = z.object({
   ...milestoneValues,
   id: recordId,
 }) satisfies z.ZodType<Milestone>;
+
+// A goal the same way.
+const goal = z.object({
+  ...goalValues,
+  id: recordId,
+}) satisfies z.ZodType<Goal>;
 
 const owner = z.object({
   id: recordId,
@@ -515,6 +526,7 @@ export const household = z
     cma: vintages.nullable(),
     curve: curve.nullable(),
     deductions,
+    goals: z.array(goal),
     housePrices: housePrices.nullable(),
     liveRates: rates,
     mappings,
@@ -542,6 +554,7 @@ export const household = z
     ({ milestones }) => isListedOnce(milestones),
     "A milestone is listed once",
   )
+  .refine(({ goals }) => isListedOnce(goals), "A goal is listed once")
   .refine(({ owners }) => isListedOnce(owners), "An owner is listed once")
   .refine(
     ({ schedule }) => isListedOnce(schedule.income),
@@ -662,6 +675,7 @@ const kept = z
     cma: vintages.nullable(),
     curve: curve.nullable(),
     deductions,
+    goals: z.array(goal),
     housePrices: housePrices.nullable(),
     mappings,
     milestones: z.array(milestone),
@@ -677,9 +691,10 @@ const kept = z
     targets: targets.nullable(),
   })
   .refine(
-    ({ accounts, milestones, next, owners, schedule }) =>
+    ({ accounts, goals, milestones, next, owners, schedule }) =>
       [
         ...accounts,
+        ...goals,
         ...milestones,
         ...owners,
         ...schedule.expenses,
@@ -713,8 +728,9 @@ export function holdWhileLive(
   }
 }
 
-// The household before anything is saved: no records, balances as of
-// the month given, no progress point and no house price index pulled,
+// The household before anything is saved: no records and no goal,
+// balances as of the month given, no progress point and no house price
+// index pulled,
 // the ages the dashboard has shown, a plan to 89 retiring at 59, no
 // curve or CMA pulled, the rates a household opens with live and
 // everything in stocks, the manual method's fees and yield to deduct
@@ -729,6 +745,7 @@ export function nothingKeptIn(asOf: Month): Kept {
     cma: null,
     curve: null,
     deductions: openingDeductions,
+    goals: [],
     housePrices: null,
     mappings: [],
     milestones: [],
@@ -815,6 +832,7 @@ function householdOf(kept: Kept): Household {
     cma: kept.cma,
     curve: kept.curve,
     deductions: kept.deductions,
+    goals: kept.goals,
     housePrices: kept.housePrices,
     liveRates: live.rates,
     mappings: kept.mappings,
