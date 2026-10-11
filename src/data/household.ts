@@ -480,7 +480,8 @@ const allocation = z.object({
 
 // The plan as the day it is read makes it: a month of the year, whole
 // years forward, the plan rate no lower than losing everything, prices
-// falling by less than everything, and the ages the plan action holds,
+// falling by less than everything, the owners it carries for the
+// engine, one at least, and the ages the plan action holds,
 // its owner retiring no later than it ends and it ending by the oldest
 // age a plan may run to. That it ends after
 // the age its owner has reached is the save's to hold and not the
@@ -492,6 +493,7 @@ const plan = z
     from: z.number().int(),
     inflation: z.number().gt(-1, rules.inflation),
     month: monthOfYear,
+    owners,
     rate: z.number().min(-1, rules.beyondLoss),
     retires: z.number().int().nonnegative(),
     years: z.number().int().nonnegative(),

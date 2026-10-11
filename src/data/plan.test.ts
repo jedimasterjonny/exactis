@@ -11,12 +11,14 @@ import { termOf } from "@/lib/loans";
 import {
   ageIn,
   debtTermOf,
+  earnerOf,
   endAge,
   inflationIn,
   loggedSpread,
   marginOf,
   planOf,
   pricesIn,
+  retiringAt,
   risenBy,
   risenWith,
   statedSpread,
@@ -84,6 +86,7 @@ describe("planOf", () => {
       from: 2026,
       inflation: 0.0295,
       month: 8,
+      owners,
       rate: planRate(rates, allocation),
       retires: 59,
       years: 53,
@@ -110,6 +113,29 @@ describe("planOf", () => {
     expect(planOf({ ...setting, ages: { ends: 30 } }, opening)).toMatchObject({
       from: 2026,
       years: 0,
+    });
+  });
+});
+
+describe("earnerOf", () => {
+  it("reads the owner who earns a line off the plan, and refuses one the plan does not list in the rule's words", () => {
+    const plan = planOf({ ...setting, owners: [...owners, sam] }, opening);
+
+    expect(earnerOf({ owner: 2 }, plan)).toBe(sam);
+    expect(() => earnerOf({ owner: 3 }, plan)).toThrow(
+      "An income line is earned by an owner the plan lists",
+    );
+  });
+});
+
+describe("retiringAt", () => {
+  it("moves the plan's retirement age and its owner's together, leaving the rest", () => {
+    const plan = planOf({ ...setting, owners: [...owners, sam] }, opening);
+
+    expect(retiringAt(plan, 65)).toStrictEqual({
+      ...plan,
+      owners: [{ ...owners[0], retires: 65 }, sam],
+      retires: 65,
     });
   });
 });
