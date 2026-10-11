@@ -1868,6 +1868,7 @@ describe("cashFlow", () => {
     expect(
       cashFlow([], schedule, { at: { month: 0, year: 2025 }, plan }),
     ).toStrictEqual({
+      earned: [],
       expenses: 0,
       fed: [],
       fixed: [],
