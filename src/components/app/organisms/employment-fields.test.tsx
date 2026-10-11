@@ -61,7 +61,7 @@ describe("EmploymentFields", () => {
     );
     expect(choice).toHaveValue("1");
     expect(choice).toHaveAccessibleDescription(
-      "Fed by salary sacrifice, with the employer's NI saved",
+      "Fed by salary sacrifice, with the employer's NI saved and their match",
     );
     expect(
       within(choice)
@@ -72,15 +72,21 @@ describe("EmploymentFields", () => {
     expect(field("Salary sacrifice")).toHaveAccessibleDescription(
       "Of the base alone",
     );
+    expect(field("Employer match")).toHaveValue("0.00%");
+    expect(field("Employer match")).toHaveAccessibleDescription(
+      "Pound for pound with the sacrifice, up to this share of the base",
+    );
 
     commit(field("Bonus"), "20,000");
     commit(field("RSUs"), "14,000");
     commit(field("Salary sacrifice"), "8");
+    commit(field("Employer match"), "7");
 
     expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
       { bonus: 20000 },
       { rsu: 14000 },
       { sacrifice: 0.08 },
+      { match: 0.07 },
     ]);
   });
 
@@ -103,16 +109,21 @@ describe("EmploymentFields", () => {
     expect(screen.getByText("£1,764,000 a year")).toBeInTheDocument();
   });
 
-  it("holds the share to the base it comes out of", () => {
+  it("holds the shares to the base they come out of", () => {
     const { onAmend } = renderFields(salary);
 
     commit(field("Salary sacrifice"), "150");
+    commit(field("Employer match"), "150");
 
     expect(field("Salary sacrifice")).toHaveValue("100.00%");
-    expect(onAmend).toHaveBeenCalledExactlyOnceWith({ sacrifice: 1 });
+    expect(field("Employer match")).toHaveValue("100.00%");
+    expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
+      { sacrifice: 1 },
+      { match: 1 },
+    ]);
   });
 
-  it("opens a line feeding no pension on none, with no share to give up", () => {
+  it("opens a line feeding no pension on none, with no share to give up or match", () => {
     renderFields({ ...salary, feeds: null, sacrifice: 0 });
 
     expect(screen.getByRole("combobox", { name: "Pension" })).toHaveValue(
@@ -121,10 +132,13 @@ describe("EmploymentFields", () => {
     expect(
       screen.queryByRole("textbox", { name: "Salary sacrifice" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Employer match" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("gives up nothing when the pension goes", () => {
-    const { onAmend } = renderFields(salary);
+  it("gives up nothing and is matched nothing when the pension goes", () => {
+    const { onAmend } = renderFields({ ...salary, match: 0.07 });
 
     fireEvent.change(screen.getByRole("combobox", { name: "Pension" }), {
       target: { value: "none" },
@@ -132,18 +146,21 @@ describe("EmploymentFields", () => {
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
       feeds: null,
+      match: 0,
       opens: null,
       sacrifice: 0,
     });
   });
 
-  // The share field comes back mounted on the share the line opened
-  // with, so the draft is given it back rather than the nothing the
+  // The share fields come back mounted on the shares the line opened
+  // with, so the draft is given them back rather than the nothing the
   // choice of none left behind.
-  it("takes back the share the line opened with when a pension comes back", () => {
-    const { onAmend } = renderFields(salary, {
-      ...salary,
+  it("takes back the shares the line opened with when a pension comes back", () => {
+    const matched = { ...salary, match: 0.07 };
+    const { onAmend } = renderFields(matched, {
+      ...matched,
       feeds: null,
+      match: 0,
       sacrifice: 0,
     });
 
@@ -153,15 +170,20 @@ describe("EmploymentFields", () => {
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
       feeds: 1,
+      match: 0.07,
       opens: null,
       sacrifice: 0.1,
     });
   });
 
-  // The field stays across a change of pension, so what was typed into
-  // it stays with it.
-  it("keeps a typed share across a change of pension", () => {
-    const { onAmend } = renderFields(salary, { ...salary, sacrifice: 0.05 });
+  // The fields stay across a change of pension, so what was typed into
+  // them stays with them.
+  it("keeps typed shares across a change of pension", () => {
+    const { onAmend } = renderFields(salary, {
+      ...salary,
+      match: 0.05,
+      sacrifice: 0.05,
+    });
 
     fireEvent.change(screen.getByRole("combobox", { name: "Pension" }), {
       target: { value: "6" },
@@ -169,6 +191,7 @@ describe("EmploymentFields", () => {
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
       feeds: 6,
+      match: 0.05,
       opens: null,
       sacrifice: 0.05,
     });
@@ -195,6 +218,7 @@ describe("EmploymentFields", () => {
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
       feeds: null,
+      match: 0,
       opens: { balance: 0, name: "", owner: 1 },
       sacrifice: 0.1,
     });
@@ -231,7 +255,7 @@ describe("EmploymentFields", () => {
     expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
       { opens: { balance: 500, name: "Nest", owner: 1 } },
       { opens: { balance: 1000, name: "Aviva", owner: 1 } },
-      { feeds: 1, opens: null, sacrifice: 0.05 },
+      { feeds: 1, match: 0, opens: null, sacrifice: 0.05 },
     ]);
   });
 
@@ -270,6 +294,7 @@ describe("EmploymentFields", () => {
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
       feeds: null,
+      match: 0,
       opens: { balance: 0, name: "", owner: null },
       sacrifice: 0.1,
     });

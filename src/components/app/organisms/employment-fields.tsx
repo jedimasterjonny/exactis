@@ -35,8 +35,9 @@ const opened = "new";
 // year's and left on a monthly salary is paid twelve times over, and
 // beneath them the pension it feeds, chosen from the
 // pensions among the accounts the page hands down, or none, or a new
-// one the save opens, with the share of the base it sacrifices beside
-// it while there is a pension to take it. A new pension asks its name,
+// one the save opens, with the share of the base it sacrifices and the
+// share its employer matches beside it while there is a pension to
+// take them. A new pension asks its name,
 // what it holds today and its owner on a row of its own beneath, since
 // the accounts list it by name and every pension belongs to an owner,
 // the first the page hands down until another is chosen; the rest of
@@ -65,27 +66,28 @@ export function EmploymentFields({
     { label: "A new pension", value: opened },
   ];
 
-  // The pension choice: a line feeding none gives up nothing, and the
-  // share goes with the field that shows it; a line given a pension,
-  // listed or new, keeps the share it has, or takes the one it opened
-  // with when the field comes back, which is what it mounts showing. A
-  // new pension opens unnamed, holding nothing and belonging to the
-  // first owner, which its fields mount showing, and a listed one opens
-  // none.
+  // The pension choice: a line feeding none gives up nothing and is
+  // matched nothing, and the shares go with the fields that show them;
+  // a line given a pension, listed or new, keeps the shares it has, or
+  // takes the ones it opened with when the fields come back, which is
+  // what they mount showing. A new pension opens unnamed, holding
+  // nothing and belonging to the first owner, which its fields mount
+  // showing, and a listed one opens none.
   function feed(choice: string): void {
     if (choice === none) {
-      onAmend({ feeds: null, opens: null, sacrifice: 0 });
+      onAmend({ feeds: null, match: 0, opens: null, sacrifice: 0 });
       return;
     }
-    const sacrifice = isFeeding(draft) ? draft.sacrifice : initial.sacrifice;
+    const { match, sacrifice } = isFeeding(draft) ? draft : initial;
     onAmend(
       choice === opened
         ? {
             feeds: null,
+            match,
             opens: { balance: 0, name: "", owner: ownerFor(null, owners) },
             sacrifice,
           }
-        : { feeds: Number(choice), opens: null, sacrifice },
+        : { feeds: Number(choice), match, opens: null, sacrifice },
     );
   }
 
@@ -118,25 +120,37 @@ export function EmploymentFields({
           </span>
         </div>
       </FieldRow>
-      <FieldRow layout="pair">
+      <FieldRow layout="triple">
         <SelectField
           defaultValue={choiceOf(initial)}
-          hint="Fed by salary sacrifice, with the employer's NI saved"
+          hint="Fed by salary sacrifice, with the employer's NI saved and their match"
           label="Pension"
           onValueChange={feed}
           options={pensionChoices}
         />
         {isFeeding(draft) && (
-          <RateField
-            defaultValue={initial.sacrifice}
-            hint="Of the base alone"
-            label="Salary sacrifice"
-            max={1}
-            min={0}
-            onValueCommitted={(sacrifice) => {
-              onAmend({ sacrifice });
-            }}
-          />
+          <>
+            <RateField
+              defaultValue={initial.sacrifice}
+              hint="Of the base alone"
+              label="Salary sacrifice"
+              max={1}
+              min={0}
+              onValueCommitted={(sacrifice) => {
+                onAmend({ sacrifice });
+              }}
+            />
+            <RateField
+              defaultValue={initial.match}
+              hint="Pound for pound with the sacrifice, up to this share of the base"
+              label="Employer match"
+              max={1}
+              min={0}
+              onValueCommitted={(match) => {
+                onAmend({ match });
+              }}
+            />
+          </>
         )}
       </FieldRow>
       {opens !== null && (
