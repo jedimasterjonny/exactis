@@ -93,7 +93,7 @@ export function CustomRates({
     );
   }
 
-  const results = resultsOf(shownRates, shownSplit);
+  const results = resultsOf(shownRates, shownSplit, 0);
   const figuresOf = ({ bonds, portfolio, stocks }: Across): string[] =>
     [stocks, bonds, portfolio].map((figure) => formatPercent(figure));
   return (

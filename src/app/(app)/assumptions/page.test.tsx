@@ -199,18 +199,20 @@ describe("Assumptions", () => {
 
   // August's blends less the deductions run stocks at 7.84% in all and
   // bonds at 4.25%, so the target allocation's four fifths in stocks grow
-  // at 7.13%; the rates and the split typed by hand are kept, not shown.
+  // at 7.52% with what rebalancing earns, which the line above the cards
+  // reads off the plan the store hands it; the rates and the split typed
+  // by hand are kept, not shown.
   it("says the CMA-derived rates are live and lays out their worksheet, with the target split in place of the split typed", async () => {
     vi.mocked(getHousehold).mockResolvedValue({
       ...household,
-      plan: { ...retiring, inflation: 0.0295, rate: 0.071255 },
+      plan: { ...retiring, inflation: 0.0295, rate: 0.075238 },
       rateSet: "cma",
     });
 
     render(await Assumptions());
 
     expect(
-      screen.getByText("Plan rate 7.13% · inflation 2.95% · CMA-derived rates"),
+      screen.getByText("Plan rate 7.52% · inflation 2.95% · CMA-derived rates"),
     ).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "From CMA" })).toBeChecked();
     expect(
@@ -225,11 +227,11 @@ describe("Assumptions", () => {
       "20.00%",
       "100.00%",
     ]);
-    expect(worksheet("CMA-derived rates, worked out")[4]).toStrictEqual([
+    expect(worksheet("CMA-derived rates, worked out")[5]).toStrictEqual([
       "Return",
       "7.84%",
       "4.25%",
-      "7.13%",
+      "7.52%",
     ]);
     expect(
       screen.queryByRole("textbox", { name: "Stocks share" }),

@@ -103,28 +103,30 @@ and grown at the plan rate. That is made from the rates live, one to a class and
 flat for life, either those typed or those derived from the capital market
 assumptions, below: what stocks return in all, their growth and the dividend
 yield on top, which every wrapper reinvests, and what bonds return, each in the
-share of the savings the live set holds in it, typed or the target allocation's.
-Each rate typed is held between losing everything and 50% a year, as is every
-class return a vintage keeps, since a return outside that is no reading of any
-market and a figure past it is a percentage typed as a fraction. Cash is carried
-beside them, so a short month can be drawn from it, but it is not plotted, since
-the progress points a projection is laid over carry no cash figure. The first
-year runs from the month after the one the household's balances are as of, since
-a balance is what an account held at that month's end, as a statement is dated
-and as each progress point is read, so the plan pays nothing into a month the
-statements already hold, whatever day the plan is read on; a household read
-before anything is saved opens as of the month before the one it is read in, so
-its plan starts in that one, and keeps the month from its first save. What an
-account is paid in a month is what `src/engine/cash-flow.ts` works out: the
-month's income, less what the salaries sacrifice, the tax on the rest, what the
-expense lines cost and each debt's own fixed sum, pays the other fixed sums,
-handed down the accounts in the order they are listed, and what survives them is
-the spare money, handed down the accounts that take it the same way, each to a
-twelfth of its cap. A fixed sum into savings is therefore paid only out of what
-the month has, so a contribution stops when the income funding it ends. A debt's
-is owed rather than saved, so it is paid whole and first wherever the debt is
-listed, and a month short of it draws on the savings as it would for an expense;
-the order sets which saving is paid first, and a debt is no saving.
+share of the savings the live set holds in it, typed or the target allocation's;
+under the derived set the plan rate also earns what rebalancing adds over that
+blend, as the capital market assumptions section says. Each rate typed is held
+between losing everything and 50% a year, as is every class return a vintage
+keeps, since a return outside that is no reading of any market and a figure past
+it is a percentage typed as a fraction. Cash is carried beside them, so a short
+month can be drawn from it, but it is not plotted, since the progress points a
+projection is laid over carry no cash figure. The first year runs from the month
+after the one the household's balances are as of, since a balance is what an
+account held at that month's end, as a statement is dated and as each progress
+point is read, so the plan pays nothing into a month the statements already
+hold, whatever day the plan is read on; a household read before anything is
+saved opens as of the month before the one it is read in, so its plan starts in
+that one, and keeps the month from its first save. What an account is paid in a
+month is what `src/engine/cash-flow.ts` works out: the month's income, less what
+the salaries sacrifice, the tax on the rest, what the expense lines cost and
+each debt's own fixed sum, pays the other fixed sums, handed down the accounts
+in the order they are listed, and what survives them is the spare money, handed
+down the accounts that take it the same way, each to a twelfth of its cap. A
+fixed sum into savings is therefore paid only out of what the month has, so a
+contribution stops when the income funding it ends. A debt's is owed rather than
+saved, so it is paid whole and first wherever the debt is listed, and a month
+short of it draws on the savings as it would for an expense; the order sets
+which saving is paid first, and a debt is no saving.
 
 A pension can be marked always funded, for a pension worth keeping paid when the
 month cannot, since what it is paid out of taxed money is relieved. It is paid
@@ -324,21 +326,24 @@ allocation's blend of the classes its categories are mapped onto, each category
 weighted by its share of the sleeve; a class hedged to sterling is blended at
 the return of the class it hedges, with the hedging kept apart as an adjustment.
 The blend is linear in the classes' geometric returns, and the plan rate is the
-same blend of the sleeves, so each leaves out the rebalancing term a yearly
-rebalanced portfolio earns on top, half the gap between the classes' weighted
-variances and the portfolio's, which at the fixture's split is a tenth or two of
-a point; so the plan rate and the chance of success read low rather than high. A
-sleeve nothing blends into, as bonds in an allocation all in equities, stands in
-at the other's return with none of the whole, so its rate weighs nothing, and
-the screen shows it as empty. The household keeps two deductions, typed: the
-fees every fund charges, which BlackRock's index returns are gross of and the
-plan charges nowhere else, and the dividend yield, which the workbook does not
-carry, each held to a tenth at most, since no fund charges or yields more. Both
-open on the app's default figures, 0.20% of
-fees and a 2.00% yield, until they are typed over. Stocks grow at their blend
-less both, with the yield on top as their dividend yield, so the two add back to
-the blend less fees; bonds grow at theirs less the fees. Inflation is the
-curve's derived rate, since the returns are nominal.
+same blend of the sleeves, so the derived set adds what a portfolio rebalanced
+yearly to its weights earns over the blend: half the gap between the classes'
+variances in their weights and the portfolio's, earned within each sleeve and
+between the two, read from the same volatilities and correlations the chance of
+success's spread is, which at the fixture's split is about 0.4 of a point. A
+vintage pulled before its volatilities were read gives nothing to work it from,
+and the plan runs on the blend; the rates typed carry no volatilities and earn
+nothing either. The worksheet shows it as a row of its own. A sleeve nothing
+blends into, as bonds in an allocation all in equities, stands in at the other's
+return with none of the whole, so its rate weighs nothing, and the screen shows
+it as empty. The household keeps two deductions, typed: the fees every fund
+charges, which BlackRock's index returns are gross of and the plan charges
+nowhere else, and the dividend yield, which the workbook does not carry, each
+held to a tenth at most, since no fund charges or yields more. Both open on the
+app's defaults, 0.20% of fees and a 2.00% yield, until they are typed over.
+Stocks grow at their blend less both, with the yield on top as their dividend
+yield, so the two add back to the blend less fees; bonds grow at theirs less the
+fees. Inflation is the curve's derived rate, since the returns are nominal.
 
 The household keeps which set the plan runs on, the rates typed or the derived,
 and leaves the other as it was. The derived set carries its own split of the

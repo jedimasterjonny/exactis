@@ -1,6 +1,6 @@
 import type { Curve } from "@/data/inflation";
 import type { Spread } from "@/data/plan";
-import type { Allocation, Rates } from "@/data/rates";
+import type { Across, Allocation, Rates } from "@/data/rates";
 import type { Month } from "@/data/schedule";
 import type { Target, Targets } from "@/data/targets";
 
@@ -73,11 +73,16 @@ export interface Deductions {
   readonly setOn?: string;
 }
 
-// What the CMA gives the plan to run on: the rates, and the split of the
-// savings between stocks and bonds.
+// What the CMA gives the plan to run on: the rates, the split of the
+// savings between stocks and bonds, and what rebalancing the portfolio
+// yearly earns over the blend the two make, a fraction a year; nothing
+// while the vintage gives no risk to work it from, as one pulled before
+// its volatilities were read does, when the plan runs on the blend as
+// it did, and nothing for the rates typed, which carry no volatilities.
 export interface DerivedSet {
   readonly allocation: Allocation;
   readonly rates: Rates;
+  readonly rebalancing: number;
 }
 
 // A category of the target allocation mapped onto an asset class a
@@ -238,7 +243,9 @@ export function cmaRates(
 // returns are nominal and the market's inflation is the one they are
 // priced against. The split is the target allocation's between the
 // sleeves, so the plan holds stocks and bonds in the shares the rates
-// were blended for, and the two cannot be set apart. There is nothing
+// were blended for, and the two cannot be set apart. The rebalancing is
+// what the portfolio earns over the blend, from the vintage's risk under
+// the same blends, and nothing while it gives none. There is nothing
 // before a vintage or a curve is pulled, or while the vintage makes no
 // blend, and what is missing is said.
 export function derivedSet({
@@ -264,9 +271,60 @@ export function derivedSet({
   if (curve === null) {
     return { short: "No inflation curve is pulled" };
   }
+  const risk = riskOf(cma.latest, blends);
   return {
     allocation: { stocks: blends.stocks.share },
     rates: cmaRates(blends, deductions, inflationOf(curve).rate),
+    rebalancing: "short" in risk ? 0 : rebalancingOf(blends, risk).portfolio,
+  };
+}
+
+// What rebalancing yearly to the target allocation's weights earns over
+// a blend of the classes' returns, for each sleeve and the portfolio,
+// each a fraction a year: half the gap between the classes' variances in
+// their weights and the portfolio's, the second-order term a linear
+// blend of geometric returns leaves out, since what a class compounds
+// to is less than its average year by half its variance and a portfolio
+// held to its weights strays less than its classes do. BlackRock quotes
+// each class's return geometric, what it compounds to over the horizon,
+// so the blends are a shade under what a portfolio holding the classes
+// earns, and this is the shade. Each sleeve earns it within itself, as
+// its classes are rebalanced to their weights, and the portfolio earns
+// the sleeves' in their shares and, between the two, half the gap
+// between the sleeves' variances in their shares and the portfolio's,
+// which is half their shares' product times how far apart the two move.
+// The variances are the ones spreadOf reads for how far the portfolio
+// strays, so the plan rate and its spread are read from the same
+// figures. A sleeve nothing blends into earns nothing and weighs
+// nothing, so it adds nothing.
+export function rebalancingOf(
+  { bonds, stocks }: { readonly bonds: Blend; readonly stocks: Blend },
+  risk: SleeveRisk,
+): Across {
+  const within = (blend: Blend, strays: number): number =>
+    (blend.parts
+      .filter(isRisked)
+      .reduce(
+        (sum, { asset, weight }) => sum + weight * asset.risk.volatility ** 2,
+        0,
+      ) -
+      strays ** 2) /
+    2;
+  const sleeves = {
+    bonds: within(bonds, risk.bonds),
+    stocks: within(stocks, risk.stocks),
+  };
+  return {
+    ...sleeves,
+    portfolio:
+      stocks.share * sleeves.stocks +
+      bonds.share * sleeves.bonds +
+      (stocks.share *
+        bonds.share *
+        (risk.stocks ** 2 +
+          risk.bonds ** 2 -
+          2 * risk.correlation * risk.stocks * risk.bonds)) /
+        2,
   };
 }
 
@@ -370,7 +428,7 @@ export function spreadOf(
     readonly mappings: readonly Mapping[];
     readonly targets: null | Targets;
   },
-  { allocation, rates }: DerivedSet,
+  { allocation, rates, rebalancing }: DerivedSet,
 ): Shortfall | Spread {
   if (cma === null) {
     return { short: "No CMA is pulled" };
@@ -400,7 +458,7 @@ export function spreadOf(
   return {
     inflation: loggedSpread(rates.inflation, inflationSpread),
     rate: loggedSpread(
-      planRate(rates, allocation),
+      planRate(rates, allocation, rebalancing),
       Math.sqrt(Math.max(0, variance)),
     ),
   };

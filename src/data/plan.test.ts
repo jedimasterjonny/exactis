@@ -26,8 +26,13 @@ import {
 } from "./plan";
 
 // The rates a household opens with, 5% for stocks and bonds alike and
-// the Bank's 2% target, and everything in stocks.
-const opening = { allocation: allInStocks, rates: openingRates };
+// the Bank's 2% target, and everything in stocks, typed, so rebalancing
+// earns nothing over them.
+const opening = {
+  allocation: allInStocks,
+  rates: openingRates,
+  rebalancing: 0,
+};
 
 // The reference plan as the store sets it: to 91, its balances as of
 // September 2026, so running from October, for the owners fixture's
@@ -84,16 +89,25 @@ describe("planOf", () => {
   // 2.95% typed for inflation; the balances read at the end of
   // September, so the plan opens in October.
   it("runs from the month after the one the balances are as of to the age given, for the owner, on the rates given as the savings are split", () => {
-    expect(planOf(setting, { allocation, rates })).toStrictEqual({
+    expect(
+      planOf(setting, { allocation, rates, rebalancing: 0 }),
+    ).toStrictEqual({
       born: 1992,
       from: 2026,
       inflation: 0.0295,
       month: 9,
       owners,
-      rate: planRate(rates, allocation),
+      rate: planRate(rates, allocation, 0),
       retires: 61,
       years: 57,
     });
+  });
+
+  // The 7.25% the rates blend to and 0.4 of a point rebalancing earns.
+  it("grows at the blend and what rebalancing earns over it", () => {
+    expect(
+      planOf(setting, { allocation, rates, rebalancing: 0.004 }).rate,
+    ).toBeCloseTo(0.0765, 15);
   });
 
   // Balances read at the end of December open the plan in the January

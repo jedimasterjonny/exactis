@@ -297,11 +297,11 @@ describe("RateSet", () => {
     commit(field("Fee drag"), "0.25");
 
     await waitFor(() => {
-      expect(worksheet(derived)[4]).toStrictEqual([
+      expect(worksheet(derived)[5]).toStrictEqual([
         "Return",
         "7.79%",
         "4.20%",
-        "7.08%",
+        "7.47%",
       ]);
     });
     expect(saveDeductions).toHaveBeenCalledExactlyOnceWith({ fees: 0.0025 });
@@ -314,7 +314,7 @@ describe("RateSet", () => {
       ).toHaveAccessibleDescription("Fees 0.25% · dividend yield 2.00%");
     });
     await waitFor(() => {
-      expect(worksheet(derived)[4]?.[1]).toBe("7.84%");
+      expect(worksheet(derived)[5]?.[1]).toBe("7.84%");
     });
   });
 
@@ -335,9 +335,9 @@ describe("RateSet", () => {
       dividends: 0.025,
     });
     await waitFor(() => {
-      expect(worksheet(derived).slice(4, 7)).toStrictEqual([
-        ["Return", "7.84%", "4.25%", "7.13%"],
-        ["Growth", "5.34%", "4.25%", "5.13%"],
+      expect(worksheet(derived).slice(5, 8)).toStrictEqual([
+        ["Return", "7.84%", "4.25%", "7.52%"],
+        ["Growth", "5.34%", "4.25%", "5.52%"],
         ["Dividend yield", "2.50%", "—", "2.00%"],
       ]);
     });
