@@ -27,48 +27,58 @@ export interface GoalValues {
   readonly name: string;
 }
 
-// A year of a future as a goal measures it, every figure in today's
-// money: what the plan is worth entering the year, every account less
-// every debt; what it is worth less the property and vehicles, which
-// is the savings less every debt, the mortgage among them, as a liquid
-// net worth is read; what a year of its expense lines comes to as the
-// year opens; and what it owes, every debt summed, as a sum owed rather
-// than a balance below nothing.
+// A year of a future as a goal measures it: the age the plan's owner
+// reaches in it, and every sum in today's money: what the plan is
+// worth entering the year, every account less every debt; what it is
+// worth less the property and vehicles, which is the savings less
+// every debt, the mortgage among them, as a liquid net worth is read;
+// what a year of its expense lines comes to as the year opens; and
+// what it owes, every debt summed, as a sum owed rather than a balance
+// below nothing.
 export type Measured = Readonly<Record<Measure, number>>;
 
 type Basis = (typeof bases)[number];
 
 type Measure = (typeof measures)[number];
 
-// The measures as a list, so the store's column takes the same words
-// the type does, in the order a choice offers them.
-export const measures = ["worth", "liquid", "expenses", "debt"] as const;
+// The sums a year is measured in, in the order a choice offers them.
+export const sums = ["worth", "liquid", "expenses", "debt"] as const;
 
-// What a measure may be held to: a pound, or any measure.
-export const bases = ["pounds", ...measures] as const;
+// The measures as a list, so the store's column takes the same words
+// the type does: the age reached in the year, and the sums.
+export const measures = ["age", ...sums] as const;
+
+// What a measure may be held to: a pound or a year, which are units of
+// their own, or any sum. An age is held to years and nothing else is,
+// which the model holds.
+export const bases = ["pounds", "years", ...sums] as const;
 
 export const measureNames: Readonly<Record<Measure, string>> = {
+  age: "Age",
   debt: "Debt",
   expenses: "A year's expenses",
   liquid: "Liquid net worth",
   worth: "Net worth",
 };
 
-// What each basis is called after the multiple, "25 years of expenses"
-// or "10 times the debt"; pounds are formatted as a sum instead.
+// What each basis is called after the multiple, "25 years of expenses",
+// "10 times the debt" or "46 years"; pounds are formatted as a sum
+// instead.
 export const basisNames: Readonly<Record<Basis, string>> = {
   debt: "times the debt",
   expenses: "years of expenses",
   liquid: "times liquid net worth",
   pounds: "pounds",
   worth: "times net worth",
+  years: "years",
 };
 
 // A multiple, to two places where it needs them: "25", "2.5".
 const multiple = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 2 });
 
-// A condition in words, "Net worth ≥ £1,000,000" or "Liquid net worth
-// ≥ 25 years of expenses", as a row and a toast say it.
+// A condition in words, "Net worth ≥ £1,000,000", "Liquid net worth ≥
+// 25 years of expenses" or "Age ≥ 46 years", as a row and a toast say
+// it.
 export function conditionOf({ measure, of, times }: Condition): string {
   const held =
     of === "pounds"
@@ -78,14 +88,15 @@ export function conditionOf({ measure, of, times }: Condition): string {
 }
 
 // Whether a goal is reached in a year measured so: every condition
-// holds. A goal with no condition is reached at once, which the model
-// refuses to keep.
+// holds, a pound and a year each counting once. A goal with no
+// condition is reached at once, which the model refuses to keep.
 export function isReached(
   { conditions }: Pick<GoalValues, "conditions">,
   measured: Measured,
 ): boolean {
   return conditions.every(
     ({ measure, of, times }) =>
-      measured[measure] >= times * (of === "pounds" ? 1 : measured[of]),
+      measured[measure] >=
+      times * (of === "pounds" || of === "years" ? 1 : measured[of]),
   );
 }

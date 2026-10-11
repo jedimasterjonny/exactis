@@ -7,7 +7,7 @@ import type { ProjectionPoint } from "@/engine/projection";
 
 import { isAsset } from "@/data/accounts";
 import { isReached } from "@/data/goals";
-import { endYear, pricesIn, retirementYear } from "@/data/plan";
+import { ageIn, endYear, pricesIn, retirementYear } from "@/data/plan";
 import { spentIn } from "@/engine/cash-flow";
 import { balanceIn, isShort, project } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
@@ -353,13 +353,13 @@ export function yearsIn(
 }
 
 // A year of a projection as a goal measures it, from the month it opens
-// with, every figure whole pounds of today's money: what every account
-// comes to, which is the plan's net worth; what it owes, every debt's
-// balance turned to a sum owed, nothing where it owes nothing rather
-// than nothing with a sign; what it is worth less the property and
-// vehicles; and twelve of what the expense lines running in the month
-// cost it, read in today's money at how far prices have risen by then
-// along the future's path.
+// with: the age the plan's owner reaches in it, and every sum whole
+// pounds of today's money: what every account comes to, which is the
+// plan's net worth; what it owes, every debt's balance turned to a sum
+// owed, nothing where it owes nothing rather than nothing with a sign;
+// what it is worth less the property and vehicles; and twelve of what
+// the expense lines running in the month cost it, read in today's
+// money at how far prices have risen by then along the future's path.
 function measuredOf(
   point: ProjectionPoint,
   at: Month,
@@ -369,6 +369,7 @@ function measuredOf(
     held.reduce((total, { id }) => total + balanceIn(point, id), 0);
   const worth = sum(accounts);
   return {
+    age: ageIn(at.year, plan),
     debt: 0 - sum(accounts.filter(({ kind }) => kind === "debt")),
     expenses: Math.round(
       (12 *

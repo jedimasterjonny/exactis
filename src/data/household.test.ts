@@ -305,6 +305,18 @@ const held: readonly Case[] = [
     (given): Inputs => ({ ...given, goals: [{ ...goals[0], conditions: [] }] }),
   ],
   [
+    "An age is held to years, and nothing else is",
+    (given): Inputs => ({
+      ...given,
+      goals: [
+        {
+          ...goals[0],
+          conditions: [{ measure: "age", of: "pounds", times: 46 }],
+        },
+      ],
+    }),
+  ],
+  [
     "An owner is listed once",
     (given): Inputs => ({
       ...given,

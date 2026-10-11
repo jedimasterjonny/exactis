@@ -37,13 +37,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/kit/tooltip";
-import {
-  bases,
-  basisNames,
-  conditionOf,
-  measureNames,
-  measures,
-} from "@/data/goals";
+import { basisNames, conditionOf, measureNames, sums } from "@/data/goals";
 import { markersOf, yearsOf } from "@/data/milestones";
 import { ageIn } from "@/data/plan";
 import { reachedBy, reachedIn } from "@/engine/futures";
@@ -100,7 +94,9 @@ interface Keyed extends Condition {
 // in liquid net worth.
 const another: Condition = { measure: "liquid", of: "debt", times: 10 };
 
-const basisOptions = optionsOf(basisNames, bases);
+// The choices a condition offers: the sums, and what a sum may be held
+// to. An age is no goal's to reach, so it is offered by neither.
+const basisOptions = optionsOf(basisNames, ["pounds", ...sums]);
 
 // A new goal: the first million, in net worth, unnamed.
 const blank: GoalValues = {
@@ -108,7 +104,7 @@ const blank: GoalValues = {
   name: "",
 };
 
-const measureOptions = optionsOf(measureNames, measures);
+const measureOptions = optionsOf(measureNames, sums);
 
 // The goals and when the futures reach them, a lane apiece on the
 // plan's span, as the plan screen lays its milestones and lines: the
