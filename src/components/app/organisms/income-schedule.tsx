@@ -14,8 +14,10 @@ import type { Entry } from "@/hooks/use-editor";
 
 import { removeIncomeLine, saveIncomeLine } from "@/actions/schedule";
 import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
+import { FieldRow } from "@/components/app/atoms/field-row";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { SectionCard } from "@/components/app/molecules/section-card";
+import { SelectField } from "@/components/app/molecules/select-field";
 import { EmploymentFields } from "@/components/app/organisms/employment-fields";
 import { LineFields } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
@@ -31,6 +33,7 @@ import { isSound, spanOf } from "@/lib/lines";
 import { formatGbp, formatPercent } from "@/lib/money";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 import { optionsOf } from "@/lib/options";
+import { firstOwnerOf, ownerOptions } from "@/lib/owners";
 
 // What the dialog holds while it is open: the line's values, which are
 // flat already, with no last year for a line that runs to the end of the
@@ -70,9 +73,12 @@ const kinds = optionsOf(kindLabels, [
 // schedule holding rows of its own. The entry doubles as the dialog's
 // open state, as the ledger's does. The fields are the ones every line's
 // dialog takes, mounted fresh with the entry's opening values each time
-// the dialog opens, and the draft mirrors what they report. An
+// the dialog opens, and the draft mirrors what they report. Every line
+// is earned by one of the owners the page hands down, chosen in the
+// slot beneath the fields every line takes, a new line by the first
+// listed, whose plan it is. An
 // employment line's amount is its base salary, and the fields only it
-// takes sit in the slot beneath them, shown the pensions among the
+// takes sit beneath the owner, shown the pensions among the
 // accounts the page hands down; a salary may open a pension of its own
 // with the save, belonging to one of the owners the page hands down,
 // so the save holds while the one it opens is unnamed or has no owner,
@@ -156,7 +162,7 @@ export function IncomeSchedule({
         actions={
           <Button
             onClick={() => {
-              open(blank(plan), null);
+              open(blank(plan, firstOwnerOf(owners)), null);
             }}
             size="sm"
           >
@@ -217,6 +223,17 @@ export function IncomeSchedule({
             plan={plan}
             side="income"
           >
+            <FieldRow layout="pair">
+              <SelectField
+                defaultValue={String(entry.initial.owner)}
+                hint="Whose income it is"
+                label="Owner"
+                onValueChange={(owner) => {
+                  amend(entry, { owner: Number(owner) });
+                }}
+                options={ownerOptions(owners)}
+              />
+            </FieldRow>
             {entry.draft.kind === "employment" && (
               <EmploymentFields
                 draft={entry.draft}
@@ -236,13 +253,13 @@ export function IncomeSchedule({
 }
 
 // A new line: a salary of nothing a year from the plan's first year,
-// growing with inflation and feeding no pension, listed or opened, as
-// the reference's new line opens, and ending at retirement, since the
-// engine stops a salary there whatever its own end says, so a salary
-// that says so is drawn where it is paid. One opened after the owner
-// has retired runs with the plan instead, as the reference's does,
-// rather than opening on an end before its start.
-function blank(plan: Plan): Draft {
+// earned by the owner given, growing with inflation and feeding no
+// pension, listed or opened, as the reference's new line opens, and
+// ending at retirement, since the engine stops a salary there whatever
+// its own end says, so a salary that says so is drawn where it is paid.
+// One opened after the owner has retired runs with the plan instead, as
+// the reference's does, rather than opening on an end before its start.
+function blank(plan: Plan, owner: number): Draft {
   const retirement = retirementYear(plan);
   return {
     amount: 0,
@@ -258,6 +275,7 @@ function blank(plan: Plan): Draft {
     lastYear: retirement > plan.from ? retirement - 1 : null,
     name: "",
     opens: null,
+    owner,
     rsu: 0,
     sacrifice: 0,
     startsAt: null,

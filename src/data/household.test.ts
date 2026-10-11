@@ -287,6 +287,11 @@ const held: readonly Case[] = [
     (given): Inputs => changed(given, 2, (isa) => ({ ...isa, owner: 2 })),
   ],
   [
+    "An income line is earned by an owner the plan lists",
+    (given): Inputs =>
+      earning(given, 4, (pension) => ({ ...pension, owner: 2 })),
+  ],
+  [
     "A milestone is listed once",
     (given): Inputs => ({
       ...given,

@@ -16,7 +16,7 @@ import { accounts, sipp } from "@/data/accounts.fixture";
 import { incomeKinds } from "@/data/income";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
-import { owners } from "@/data/owners.fixture";
+import { owners, sam } from "@/data/owners.fixture";
 import { lineGrowths } from "@/data/schedule";
 import { saved as accepted, refused } from "@/lib/answer";
 import { bySlot, commit, openEntry, openRow } from "@/test/dom";
@@ -329,6 +329,7 @@ describe("IncomeSchedule", () => {
       lastYear: 2079,
       name: "New job",
       opens: null,
+      owner: 1,
       rsu: 0,
       sacrifice: 0.08,
       startsAt: null,
@@ -417,6 +418,7 @@ describe("IncomeSchedule", () => {
       lastYear: 2079,
       name: "New job",
       opens: { balance: 2500, name: " Aviva ", owner: 1 },
+      owner: 1,
       rsu: 0,
       sacrifice: 0.05,
       startsAt: null,
@@ -501,6 +503,7 @@ describe("IncomeSchedule", () => {
       lastYear: 2048,
       name: "Salary",
       opens: null,
+      owner: 1,
       rsu: 12000,
       sacrifice: 0.05,
       startsAt: null,
@@ -703,6 +706,7 @@ describe("IncomeSchedule", () => {
       lastYear: 2035,
       name: "Bonus scheme",
       opens: null,
+      owner: 1,
       rsu: 0,
       sacrifice: 0,
       startsAt: null,
@@ -727,6 +731,7 @@ describe("IncomeSchedule", () => {
         lastMonth: null,
         lastYear: 2035,
         name: "Bonus scheme",
+        owner: 1,
         rsu: 0,
         sacrifice: 0,
         startsAt: null,
@@ -847,6 +852,7 @@ describe("IncomeSchedule", () => {
       lastYear: 2070,
       name: "State pension",
       opens: null,
+      owner: 1,
       rsu: 0,
       sacrifice: 0,
       startsAt: null,
@@ -918,6 +924,7 @@ describe("IncomeSchedule", () => {
       lastYear: 2048,
       name: "Salary",
       opens: null,
+      owner: 1,
       rsu: 20000,
       sacrifice: 0.1,
       startsAt: null,
@@ -975,40 +982,53 @@ describe("IncomeSchedule", () => {
       lastYear: null,
       name: "Salary",
       opens: null,
+      owner: 1,
       rsu: 12000,
       sacrifice: 0.1,
       startsAt: null,
     });
   });
 
-  // With no owner to give it, a pension the salary opens cannot be
-  // saved, however it is named.
-  it("holds the save of a salary opening a pension while the plan has no owner", () => {
+  // Every line is somebody's: the salary opens on its owner, and is
+  // given to Sam.
+  it("opens a line on the owner who earns it, and writes another back", async () => {
     render(
       <IncomeSchedule
         accounts={accounts}
         lines={incomeLines}
         milestones={milestones}
-        owners={[]}
+        owners={[...owners, sam]}
         plan={plan}
       />,
       { wrapper: Toaster },
     );
+    saved({ ...salary, owner: sam.id });
 
-    const dialog = openEntry("Add income line");
+    const dialog = openRow("Salary");
+    const owner = within(dialog).getByRole("combobox", { name: "Owner" });
 
-    fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
-      target: { value: "New job" },
+    expect(owner).toHaveValue("1");
+    expect(owner).toHaveAccessibleDescription("Whose income it is");
+    expect(
+      within(owner)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual(["Me", "Sam"]);
+
+    fireEvent.change(owner, { target: { value: String(sam.id) } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    const { id, ...values } = salary;
+
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(id, {
+      ...values,
+      opens: null,
+      owner: sam.id,
     });
-    fireEvent.change(
-      within(dialog).getByRole("combobox", { name: "Pension" }),
-      { target: { value: "new" } },
-    );
-    fireEvent.change(
-      within(dialog).getByRole("textbox", { name: "Pension name" }),
-      { target: { value: "Aviva" } },
-    );
-
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Salary" }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

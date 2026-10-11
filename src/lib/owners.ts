@@ -1,6 +1,20 @@
 import type { Owner } from "@/data/owners";
 import type { Option } from "@/lib/options";
 
+import { rules } from "@/data/rules";
+
+// The owner a new income line opens on: the first listed, whose plan it
+// is, by their id. A household holds an owner at least, so a list with
+// none is a caller's mistake rather than a state a screen can reach,
+// and is refused in the rule's words rather than given nobody.
+export function firstOwnerOf(owners: readonly Owner[]): number {
+  const [first] = owners;
+  if (first === undefined) {
+    throw new Error(rules.somebodys);
+  }
+  return first.id;
+}
+
 // The owner a wrapper opens on in a dialog: its own, or the first the
 // plan has for one that has none yet, or none at all while the plan has
 // no owner to give it. The field mounts showing it and the draft takes
