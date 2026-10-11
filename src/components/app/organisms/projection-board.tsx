@@ -5,9 +5,11 @@ import type { JSX, ReactNode } from "react";
 import { Flag } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import type { Run } from "@/components/app/organisms/chance-tile";
 import type { Account } from "@/data/accounts";
+import type { Shortfall } from "@/data/cma";
 import type { Milestone } from "@/data/milestones";
-import type { Plan } from "@/data/plan";
+import type { Plan, Spread } from "@/data/plan";
 import type { Tie } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
 
@@ -16,12 +18,20 @@ import { MilestoneChips } from "@/components/app/atoms/milestone-chips";
 import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { AgeField } from "@/components/app/molecules/age-field";
 import { StatTile } from "@/components/app/molecules/stat-tile";
+import { ChanceTile } from "@/components/app/organisms/chance-tile";
 import { ProjectionChart } from "@/components/app/organisms/projection-chart";
-import { markersOf, timed } from "@/data/milestones";
+import { takesSpare } from "@/data/accounts";
+import { ageOf, timed } from "@/data/milestones";
 import { ageIn, endAge, retirementYear } from "@/data/plan";
+import { markersIn, runLength } from "@/engine/futures";
 import { balanceOf, holdsAnything, project } from "@/engine/projection";
+import { useFutures } from "@/hooks/use-futures";
 import { useSender } from "@/hooks/use-sender";
 import { formatGbp } from "@/lib/money";
+
+interface BoardProps extends Omit<ProjectionBoardProps, "spread"> {
+  readonly run: Run;
+}
 
 // An age moved on the board and not yet known to be in the store, and
 // the age the store held when it was moved.
@@ -45,6 +55,7 @@ interface ProjectionBoardProps {
   readonly milestones: readonly Milestone[];
   readonly plan: Plan;
   readonly schedule: Schedule;
+  readonly spread: Shortfall | Spread;
 }
 
 // How long an age committed has to stand before it is saved, in
@@ -55,7 +66,17 @@ export const settle = 400;
 // The dashboard's projection: the engine run in the browser over the
 // accounts, the two schedules and the plan as the store has them, and
 // charted with the milestones marked, retirement among them, under the
-// row of tiles, the milestone tile first and the caller's after it.
+// row of tiles, the milestone tile first, the chance of success after
+// it and the caller's after that. The futures the chance of success is
+// read over are drawn here, once, as the chance's screen draws them,
+// so the tiles and the chart read the one run: a milestone reached when
+// conditions hold is marked on the chart in the year by which half the
+// futures have reached it, named in a chip with that year, and until
+// the run is drawn its chip says it is coming; one fewer than half ever
+// reach is not marked. There is nothing to draw while the plan has no
+// spread, the CMA giving it none, or no savings for the futures to
+// grow, and then the tiles say which and the chart marks the
+// milestones the plan lays out alone.
 // One milestone is chosen at a time, from the chips in the chart's top
 // row, which name what the chart's lines cannot: the tile reads the
 // balance the plan holds entering its year, with the year and the age,
@@ -76,23 +97,45 @@ export const settle = 400;
 // line's tied ends are read off the milestones again at the age
 // dragged to, so a salary ending at retirement stops and the spending
 // starting at it starts wherever the age is, as the store will have
-// them once the age is saved. The age shown is the store's, which the
-// board is handed, save while a draft moved over that same age stands:
-// once the store's age changes, from this board's save or from anywhere
-// else, the draft was drawn over an age that has gone and the store's
-// is shown instead, so the board never holds on to an age the store has
-// moved past. An age committed is saved once it has stood for a moment,
-// so a run of arrow steps is one save and not one for each; a board
-// taken down with a save still waiting sends it as it goes. A store that
-// refuses drops the draft, so the board shows what the store holds,
-// read afresh, and says why under a toast.
+// them once the age is saved. The futures are not drawn again as the
+// age moves: they read the plan as the store holds it, so an age being
+// dragged is drawn for once it is saved. The age shown is the store's,
+// which the board is handed, save while a draft moved over that same
+// age stands: once the store's age changes, from this board's save or
+// from anywhere else, the draft was drawn over an age that has gone and
+// the store's is shown instead, so the board never holds on to an age
+// the store has moved past. An age committed is saved once it has
+// stood for a moment, so a run of arrow steps is one save and not one
+// for each; a board taken down with a save still waiting sends it as
+// it goes. A store that refuses drops the draft, so the board shows
+// what the store holds, read afresh, and says why under a toast.
 export function ProjectionBoard({
+  spread,
+  ...props
+}: ProjectionBoardProps): JSX.Element {
+  if ("short" in spread) {
+    return (
+      <Board {...props} run={{ unrun: "No spread to draw the futures from" }} />
+    );
+  }
+  if (!props.accounts.some(takesSpare)) {
+    return (
+      <Board {...props} run={{ unrun: "No savings for the futures to grow" }} />
+    );
+  }
+  return <Drawn {...props} spread={spread} />;
+}
+
+// The board over the tiles and the chart, handed the run as far as it
+// has been drawn, or why it cannot be.
+function Board({
   accounts,
   children,
   milestones,
   plan,
+  run,
   schedule,
-}: ProjectionBoardProps): JSX.Element {
+}: BoardProps): JSX.Element {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [choice, setChoice] = useState<Tie>("retirement");
   const pendingRef = useRef<null | Pending>(null);
@@ -122,11 +165,21 @@ export function ProjectionBoard({
     [accounts, drafted, milestones, schedule],
   );
   const isProjecting = points.some(holdsAnything);
+  // The milestones are placed by the whole run once it is drawn, and by
+  // none before, so a chip and a line land once rather than drifting
+  // in as the slices do; until then the ones the run will place are
+  // said to be coming.
+  const isDrawing = !("unrun" in run) && !run.isDone;
+  const placed = "unrun" in run || isDrawing ? [] : run.futures;
   const markers = isProjecting
-    ? markersOf(milestones, drafted).filter(({ year }) =>
+    ? markersIn(placed, milestones, drafted).filter(({ year }) =>
         points.some((point) => point.year === year),
       )
     : [];
+  const pending =
+    isProjecting && isDrawing
+      ? milestones.filter((milestone) => ageOf(milestone) === undefined)
+      : [];
   const chosen =
     markers.find(({ id }) => id === choice) ??
     markers.find(({ id }) => id === "retirement") ??
@@ -193,6 +246,7 @@ export function ProjectionBoard({
             value={formatGbp(balanceOf(at))}
           />
         )}
+        <ChanceTile milestones={milestones} plan={plan} run={run} />
         {children}
       </TileGrid>
       <ProjectionChart
@@ -202,6 +256,7 @@ export function ProjectionBoard({
             <MilestoneChips
               markers={markers}
               onSelect={setChoice}
+              pending={pending}
               selected={chosen.id}
             />
           )
@@ -225,4 +280,19 @@ export function ProjectionBoard({
       />
     </>
   );
+}
+
+// The board over the futures as they are drawn, at the spread given.
+function Drawn({
+  spread,
+  ...props
+}: Omit<ProjectionBoardProps, "spread"> & {
+  readonly spread: Spread;
+}): JSX.Element {
+  const { futures, isDone } = useFutures(props.accounts, props.schedule, {
+    count: runLength,
+    plan: props.plan,
+    spread,
+  });
+  return <Board {...props} run={{ futures, isDone }} />;
 }

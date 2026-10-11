@@ -9,7 +9,15 @@ import type { Tie } from "@/data/schedule";
 interface MilestoneChipsProps {
   readonly markers: readonly Marker[];
   readonly onSelect: (tie: Tie) => void;
+  readonly pending?: readonly Pending[];
   readonly selected?: Tie | undefined;
+}
+
+// A milestone not yet placed on the years: the one the futures will
+// place once they are drawn.
+interface Pending {
+  readonly id: number;
+  readonly name: string;
 }
 
 // The milestones as a row of chips, one chosen at a time, or none: each a button
@@ -22,13 +30,17 @@ interface MilestoneChipsProps {
 // chosen is read where the choice is shown. The year is the name's size,
 // set back from it by its weight and, on a chip not chosen, its tone: a
 // smaller figure centred beside the name stood a pixel above its line.
-// The chips are drawn 32px tall and
+// A milestone the caller says is pending, one the futures have yet to
+// place, follows them as a chip that cannot be pressed, dashed and
+// muted, with an ellipsis where its year will be, so it is seen to be
+// coming rather than missing. The chips are drawn 32px tall and
 // reach 44px for a finger past their own edges, so a row of them stays
 // compact. The row is a group named for a screen reader, and each chip
 // says whether it is the one chosen.
 export function MilestoneChips({
   markers,
   onSelect,
+  pending = [],
   selected,
 }: MilestoneChipsProps): JSX.Element {
   return (
@@ -74,6 +86,16 @@ export function MilestoneChips({
           </button>
         );
       })}
+      {pending.map(({ id, name }) => (
+        <span
+          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-dashed px-3 text-sm font-medium text-muted-foreground"
+          data-slot="milestone-chip-pending"
+          key={id}
+        >
+          <Flag aria-hidden className="size-3.5 max-sm:hidden" />
+          {name} <span className="figure font-normal max-sm:hidden">…</span>
+        </span>
+      ))}
     </div>
   );
 }

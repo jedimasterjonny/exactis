@@ -82,8 +82,9 @@ describe("Dashboard", () => {
     ).toBeInTheDocument();
   });
 
-  // The first tile reads the plan at retirement to begin with.
-  it("follows the header with the four dashboard tiles", async () => {
+  // The first tile reads the plan at retirement to begin with, and the
+  // chance of success follows it, before the caller's two.
+  it("follows the header with the four dashboard tiles, the chance of success second", async () => {
     render(await Dashboard());
 
     for (const label of [
@@ -94,6 +95,14 @@ describe("Dashboard", () => {
     ]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    expect(
+      screen
+        .getAllByText(
+          (_content, element) => element?.hasAttribute("data-tone") === true,
+          { suggest: false },
+        )
+        .map(({ textContent }) => textContent.startsWith("Chance")),
+    ).toStrictEqual([false, true, false, false, false, false]);
   });
 
   // The first million and financial independence are reached when
