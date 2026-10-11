@@ -12,6 +12,7 @@ import { drawFor, lumpSumAllowance } from "@/lib/tax";
 
 import type { ProjectionPoint } from "./projection";
 
+import { cashFlow } from "./cash-flow";
 import {
   balanceIn,
   balanceOf,
@@ -505,13 +506,15 @@ describe("project", () => {
   // £1,000 going out, which is under its £1,666.67 a month. 2026 pays
   // the card twelve times, so the ISA takes 12 × £1,203.30 =
   // £14,439.60; 2027 the same, £28,879.20; 2028 pays it twice and the
-  // ISA takes 2 × £1,203.30 and then ten whole months of £1,453.30,
-  // £45,818.80. Charged for every month of the plan instead, as it
-  // was, the card would take £250 a month for ever and the ISA would be
-  // held to £1,203.30 a month in every year after the debt was gone.
-  // The card owes £2,896.21 after its twelfth payment and £279.95 after
-  // its twenty-fourth, and its twenty-sixth, £214.28 more than it
-  // owes, leaves it owing nothing rather than owed.
+  // ISA takes £1,203.30 in January, £1,453.30 less the £35.72 that
+  // clears the card in February, and then ten whole months of
+  // £1,453.30, £46,033.08. Charged for every month of the plan instead,
+  // as it was, the card would take £250 a month for ever and the ISA
+  // would be held to £1,203.30 a month in every year after the debt was
+  // gone. The card owes £2,896.21 after its twelfth payment, £279.95
+  // after its twenty-fourth and £35.08 after its twenty-fifth, so its
+  // twenty-sixth is the £35.72 that with the month's interest clears
+  // it, rather than £250 with £214.28 of it paid into nothing.
   it("charges a debt's fixed sum only to the month its payments clear it", () => {
     const card: Account = {
       balance: -5000,
@@ -539,7 +542,7 @@ describe("project", () => {
     const points = project([card, saving], earned, { ...plan, years: 3 });
 
     expect(points.map(({ free }) => free)).toStrictEqual([
-      0, 14440, 28879, 45819,
+      0, 14440, 28879, 46033,
     ]);
     expect(points.map(({ balances }) => balances[card.id])).toStrictEqual([
       -5000, -2896, -280, 0,
@@ -1327,6 +1330,43 @@ describe("monthsOn", () => {
 
     expect(cleared?.balance).toBe(0);
     expect(cleared?.paid).toBeCloseTo(150 * (1 + 0.0515 / 12));
+  });
+
+  // £341,810 at 5.15% paying £2,166 a month clears with its 265th
+  // payment, 264 of £2,166 and a last of £160.85, which is what the flow
+  // charges the month it clears in and what that month pays off the
+  // debt, so the two agree; and the payments come to the £571,984.85
+  // that clears it, so what the household is charged over the loan is
+  // what the debt is credited, with nothing paid into nothing, and the
+  // debt owes nothing after.
+  it("charges a debt in the month it clears what it credits it, so the payments sum to what clears the debt", () => {
+    const loan: Account = {
+      ...mortgage,
+      balance: -341810,
+      contribution: { amount: 2166, cadence: "month", kind: "fixed" },
+    };
+    const over = (
+      months: number,
+    ): undefined | { readonly balance: number; readonly paid: number } =>
+      byId(monthsOn([loan], funded, { months, plan: year })).get(loan.id);
+    const charged = Array.from({ length: 265 }, (_, offset) =>
+      cashFlow([loan], funded, {
+        at: { month: offset % 12, year: 2026 + Math.floor(offset / 12) },
+        plan: year,
+      }).fixed.reduce((sum, { amount }) => sum + amount, 0),
+    );
+
+    expect(charged.at(-1)).toBeCloseTo(160.85, 2);
+    expect((over(265)?.paid ?? 0) - (over(264)?.paid ?? 0)).toBeCloseTo(
+      160.85,
+      2,
+    );
+    expect(over(265)?.paid).toBeCloseTo(571984.85, 2);
+    expect(charged.reduce((sum, amount) => sum + amount, 0)).toBeCloseTo(
+      over(265)?.paid ?? 0,
+      6,
+    );
+    expect(over(265)?.balance).toBeCloseTo(0, 6);
   });
 
   // A month spending £1,000 with nothing coming in keeps a pension always

@@ -405,7 +405,7 @@ function measuredOf(
     debt: 0 - sum(accounts.filter(({ kind }) => kind === "debt")),
     expenses: Math.round(
       (12 *
-        spentIn(schedule, { at, plan }).reduce(
+        spentIn(accounts, schedule, { at, plan }).reduce(
           (total, { amount }) => total + amount,
           0,
         )) /

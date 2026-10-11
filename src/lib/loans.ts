@@ -3,6 +3,14 @@ import type { LoanFigure } from "@/lib/figures";
 
 import { monthsBetween } from "@/lib/months";
 
+// The three figures of a loan that fix each other, as a dialog holds
+// them: what is paid a month, the rate, and the years left to run.
+export interface Figures {
+  readonly payment: number;
+  readonly rate: number;
+  readonly term: number;
+}
+
 // What a loan's payments are over: the balance owed, whole pounds and
 // positive, and the balloon they leave standing at the end of the term,
 // which is nothing for a loan they clear and the final payment a PCP
@@ -17,14 +25,6 @@ export interface Owed {
 export interface PlanMonth {
   readonly from: number;
   readonly month: number;
-}
-
-// The three figures of a loan that fix each other, as a dialog holds
-// them: what is paid a month, the rate, and the years left to run.
-interface Figures {
-  readonly payment: number;
-  readonly rate: number;
-  readonly term: number;
 }
 
 // The month the last payment falls in. The plan's month is a paying
@@ -55,6 +55,33 @@ export function figureOf(
     case "term":
       return termOf(owed, payment, rate);
   }
+}
+
+// What the last payment clears, which is less than the payment: what is
+// owed as its month opens, after the payments before it, with that
+// month's interest on it, down to the balloon. The term is rounded up to
+// the whole month the last payment falls in, so the payments before it
+// leave less than a payment to clear, and a lender takes what is left
+// rather than the payment whole. What is owed after any number of
+// payments is the annuity's closed form, the balance grown at the
+// monthly rate over them less what the payments have grown to at the
+// same rate, which is the month by month step the projection takes,
+// summed; at no rate, or one too small to compound, the payments come
+// flat off the balance. Held to the payment itself, since a term a
+// whisker over a whole number of months is read as that many and what
+// such a term leaves to its last payment is the payment and a whisker.
+export function lastPaymentOf(
+  { balance, balloon }: Owed,
+  { payment, rate, term }: Figures,
+): number {
+  const before = monthsIn(term) - 1;
+  const monthly = rate / 12;
+  const grown = (1 + monthly) ** before;
+  const owed =
+    1 + monthly === 1
+      ? balance - payment * before
+      : balance * grown - (payment * (grown - 1)) / monthly;
+  return Math.min(payment, owed * (1 + monthly) - balloon);
 }
 
 // The month a loan the plan carries is paid through: the month its last

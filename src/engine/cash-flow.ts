@@ -3,6 +3,7 @@ import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeKind, IncomeLine } from "@/data/income";
 import type { Plan } from "@/data/plan";
 import type { LineValues, Month } from "@/data/schedule";
+import type { Figures, Owed } from "@/lib/loans";
 
 import {
   allowanceOf,
@@ -22,14 +23,15 @@ import {
   debtTermOf,
   marginOf,
   pricesIn,
+  rateFrom,
   retirementYear,
   risenWith,
 } from "@/data/plan";
 import { rules } from "@/data/rules";
 import { fixedMonthly, monthly } from "@/lib/cadence";
 import { runsIn } from "@/lib/lines";
-import { paidUntil } from "@/lib/loans";
-import { isOnOrBefore } from "@/lib/months";
+import { lastPaymentOf, paidUntil, termOf } from "@/lib/loans";
+import { monthsBetween } from "@/lib/months";
 import {
   incomeTaxOn,
   insuranceOn,
@@ -68,8 +70,9 @@ export interface Fed extends Paid {
 
 // An account and what the month actually pays it, which for a fixed sum
 // is the sum it states or as much of it as the month had, and for a
-// debt's is the sum it states, which it is paid whether or not the
-// month has it. The stated sum
+// debt's is the sum it states, or what clears it in the month its last
+// payment falls, which it is paid whether or not the month has it. The
+// stated sum
 // is not carried alongside what was paid, since nothing reads it yet and
 // the account itself still holds it. A pension paid out of the month
 // lands more than it is paid by the relief it claims, which the flow
@@ -251,7 +254,12 @@ const nanopound = 1e-9;
 // debt paying its own fixed sum stops too, at the month the loan maths
 // says the payments clear it, read off the balance it owes, the balloon
 // it leaves standing, the rate it is charged at and the sum itself, and
-// counted from the month the plan starts in. A debt's payments have an
+// counted from the month the plan starts in. In that month it is
+// charged only what clears it, what it owes with the month's interest,
+// since the term is rounded up to a whole month and the sum it states
+// is more than is left; the rest is the month's to save, and a line
+// paying a loan is charged the same way in the month it clears the
+// loan. A debt's payments have an
 // end, always: charged for every month of the plan instead, a £5,000
 // card at £250 a month costs £90,000 over thirty years and the money it
 // would have saved after the second is never saved. A payment that
@@ -407,7 +415,7 @@ export function cashFlow(
           ];
     });
   };
-  const spent = spentIn(schedule, reading);
+  const spent = spentIn(accounts, schedule, reading);
   const expenses = total(spent);
   const paid = new Set(
     schedule.expenses.flatMap((line) =>
@@ -536,14 +544,39 @@ export function inTodaysMoney(
 
 // The expense lines running in the month and what each costs it, in
 // its pounds: what the flow pays out, and what a goal reads a year's
-// expenses off, twelve of the month the year opens with.
+// expenses off, twelve of the month the year opens with. A line paying
+// a loan the plan lists is the loan's payment, so in the month the loan
+// maths says its payments clear the loan it costs what clears it and no
+// more, as a debt's own fixed sum does, worked out as the household
+// works out where such a line ends: over the whole balance, a PCP's
+// balloon refinanced on the same terms. In every other month it runs in
+// it costs what it states, and so does one paying a loan its payments
+// never clear, which has no such month.
 export function spentIn(
+  accounts: readonly Account[],
   schedule: Schedule,
   reading: Pick<Reading, "at" | "plan">,
 ): Spent[] {
   return schedule.expenses
     .filter((line) => runsIn(line, reading.at))
-    .map((line) => ({ amount: monthlyOf(line, line.amount, reading), line }));
+    .map((line) => {
+      const amount = monthlyOf(line, line.amount, reading);
+      const loan = accountAt(accounts, line.pays);
+      if (loan === undefined) {
+        return { amount, line };
+      }
+      const owed = { balance: -loan.balance, balloon: 0 };
+      const rate = rateFrom(loan, reading.plan);
+      const term = termOf(owed, amount, rate);
+      return {
+        amount:
+          term === null
+            ? amount
+            : (chargedIn(owed, { payment: amount, rate, term }, reading) ??
+              amount),
+        line,
+      };
+    });
 }
 
 // The account a link names, or none, since a link may name an account
@@ -576,6 +609,29 @@ function accountAt(
   id: null | number | undefined,
 ): Account | undefined {
   return accounts.find((account) => account.id === id);
+}
+
+// What a loan's payments charge the month, given the term the loan maths
+// says they clear it in: the payment itself through the month before
+// the last falls in; in that month what clears the loan, which
+// lastPaymentOf gives and which is less than the payment, since the
+// term is rounded up to a whole month and a lender takes what is left
+// rather than a payment whole; and nothing at all, null rather than
+// nought, after it, as a line that has ended costs nothing. The last
+// payment falls in the month paidUntil counts to from the month the
+// plan starts in, which is the test runsIn makes of a line's last year
+// and month, made here of the month the loan maths gives rather than of
+// one anybody typed.
+function chargedIn(
+  owed: Owed,
+  figures: Figures,
+  { at, plan }: Pick<Reading, "at" | "plan">,
+): null | number {
+  const left = monthsBetween(at, paidUntil(figures.term, plan));
+  if (left < 0) {
+    return null;
+  }
+  return left === 0 ? lastPaymentOf(owed, figures) : figures.payment;
 }
 
 // Every link the schedule holds, whether or not the line holding it
@@ -612,19 +668,37 @@ function checkLinks(accounts: readonly Account[], schedule: Schedule): void {
 // The fixed sum an account states a month, before the month is asked
 // whether it has it, which it is asked of any account but a debt, or
 // nothing for an account paid the spare money or
-// nothing. A debt states one only in the months its payments run, and
-// nothing at all once they have cleared it: a debt whose payments are
-// over states no sum, as a line that has ended costs nothing, rather
-// than standing in the ledger at nothing a month for the rest of the
-// plan.
+// nothing. A debt states one only in the months its payments run, in
+// the month the last of them falls only what clears it, and nothing at
+// all once they have cleared it: a debt whose payments are over states
+// no sum, as a line that has ended costs nothing, rather than standing
+// in the ledger at nothing a month for the rest of the plan. What is
+// owed is the balance it holds, which a debt holds as a negative, down
+// to the balloon a PCP leaves standing, and the term is what that sum a
+// month takes to pay it down at the rate the debt is charged, its own
+// fixed one or the plan's. A debt owing no more than its balloon takes
+// no time to pay down, and its payments do not run at all. A payment
+// the interest swallows clears nothing and has no last month; the
+// action refuses to save such a debt, so one here is a caller's
+// mistake.
 function fixedSum(account: Account, reading: Reading): Paid[] {
   if (account.contribution?.kind !== "fixed") {
     return [];
   }
-  const amount = fixedMonthly(account);
-  return account.kind === "debt" && !isPaying(account, amount, reading)
-    ? []
-    : [{ account, amount }];
+  const payment = fixedMonthly(account);
+  if (account.kind !== "debt") {
+    return [{ account, amount: payment }];
+  }
+  const term = debtTermOf(account, payment, reading.plan);
+  if (term === null) {
+    throw new Error(rules.debtEnds);
+  }
+  const amount = chargedIn(
+    { balance: -account.balance, balloon: account.balloon ?? 0 },
+    { payment, rate: rateFrom(account, reading.plan), term },
+    reading,
+  );
+  return amount === null ? [] : [{ account, amount }];
 }
 
 // The fixed sums paid out of what is available to them, handed down
@@ -660,31 +734,6 @@ function fixedSums(
     left -= sum;
   }
   return { left, sums };
-}
-
-// Whether a debt's payments still run in the month. What is owed is
-// the balance it holds, which a debt holds as a negative, down to the
-// balloon a PCP leaves standing, and the term is what that sum a month
-// takes to pay it down at the rate the debt is charged, its own fixed
-// one or the plan's. The last payment falls in the month paidUntil
-// counts to from the month the plan starts in, and the sum is charged
-// whole through that month and not at all after it, which is the test
-// runsIn makes of a line's last year and month, made here of the month
-// the loan maths gives rather than of one anybody typed. A debt owing
-// no more than its balloon takes no time to pay down, and its payments
-// do not run at all. A payment the
-// interest swallows clears nothing and has no last month; the action
-// refuses to save such a debt, so one here is a caller's mistake.
-function isPaying(
-  account: Account,
-  payment: number,
-  { at, plan }: Reading,
-): boolean {
-  const term = debtTermOf(account, payment, plan);
-  if (term === null) {
-    throw new Error(rules.debtEnds);
-  }
-  return isOnOrBefore(at, paidUntil(term, plan));
 }
 
 // What lands in an account, taken off what is left of its owner's
