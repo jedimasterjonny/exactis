@@ -17,7 +17,7 @@ import { Toaster } from "@/components/kit/toast";
 import { milestones } from "@/data/milestones.fixture";
 import { saved } from "@/lib/answer";
 import { placed } from "@/lib/span";
-import { bySlot, commit, openEntry, openRow } from "@/test/dom";
+import { bySlot, field, openEntry, openRow } from "@/test/dom";
 
 import { GoalList } from "./goal-list";
 
@@ -174,68 +174,22 @@ describe("GoalList", () => {
     expect(screen.getByText("No goals yet")).toBeInTheDocument();
   });
 
-  // The sum turns to a multiple as the unit turns, and the rows are
-  // mounted afresh as a condition is added or removed, so the one left
-  // shows the condition now in its place.
-  it("adds a goal from its dialog, its conditions added and removed, and reports it", async () => {
+  // The dialog opens on conditions, a goal being a milestone reached
+  // when they hold, and closes once the store has it.
+  it("adds a goal from the milestone dialog, opened on conditions, and closes it once saved", async () => {
     renderList();
 
     const dialog = openEntry("Add goal");
-    const field = (name: string): HTMLElement =>
-      within(dialog).getByRole("textbox", { name });
-    const choice = (name: string): HTMLElement =>
-      within(dialog).getByRole("combobox", { name });
 
-    expect(within(dialog).getByText("New goal")).toHaveClass("text-brand");
+    expect(within(dialog).getByText("New milestone")).toHaveClass("text-brand");
     expect(
-      within(dialog).getByRole("heading", { name: "Untitled goal" }),
-    ).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
-    expect(
-      within(dialog).queryByRole("button", { name: "Delete" }),
-    ).not.toBeInTheDocument();
-    expect(choice("Measure")).toHaveValue("worth");
-    expect(field("At least")).toHaveValue("£1,000,000");
-    expect(choice("Unit")).toHaveValue("pounds");
-    expect(
-      within(dialog).getByRole("button", { name: "Remove condition 1" }),
-    ).toBeDisabled();
+      screen.getByRole("radio", { name: "When conditions hold" }),
+    ).toBeChecked();
+    expect(field("At least", dialog)).toHaveValue("£1,000,000");
 
-    fireEvent.change(field("Name"), { target: { value: " Independence " } });
-    fireEvent.change(choice("Measure"), { target: { value: "liquid" } });
-    fireEvent.change(choice("Unit"), { target: { value: "expenses" } });
-
-    expect(field("At least")).toHaveValue("1,000,000");
-
-    commit(field("At least"), "25");
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "Add condition" }),
-    );
-
-    expect(
-      within(dialog).getAllByRole("combobox", { name: "Measure" }),
-    ).toHaveLength(2);
-    expect(
-      within(dialog).getAllByRole("combobox", { name: "Unit" })[1],
-    ).toHaveValue("debt");
-
-    // The second row's measure is turned, and the first is left as it is.
-    for (const measure of within(dialog)
-      .getAllByRole("combobox", { name: "Measure" })
-      .slice(-1)) {
-      fireEvent.change(measure, { target: { value: "worth" } });
-    }
-
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "Remove condition 1" }),
-    );
-
-    expect(
-      within(dialog).getAllByRole("combobox", { name: "Measure" }),
-    ).toHaveLength(1);
-    expect(choice("Unit")).toHaveValue("debt");
-    expect(field("At least")).toHaveValue("10");
-    expect(choice("Measure")).toHaveValue("worth");
+    fireEvent.change(field("Name", dialog), {
+      target: { value: "Independence" },
+    });
 
     // The store's answer is held back, so the save can be seen in flight.
     const { promise, resolve: answer } =
@@ -244,7 +198,7 @@ describe("GoalList", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(null, {
-      conditions: [{ measure: "worth", of: "debt", times: 10 }],
+      conditions: [{ measure: "worth", of: "pounds", times: 1000000 }],
       name: "Independence",
     });
     expect(
@@ -253,7 +207,7 @@ describe("GoalList", () => {
 
     answer(
       saved({
-        conditions: [{ measure: "worth", of: "debt", times: 10 }],
+        conditions: [{ measure: "worth", of: "pounds", times: 1000000 }],
         id: 5,
         name: "Independence",
       }),
@@ -265,44 +219,20 @@ describe("GoalList", () => {
       ).not.toBeInTheDocument();
     });
     expect(
-      screen.getByRole("dialog", { name: "Goal added" }),
-    ).toHaveAccessibleDescription("Net worth ≥ 10 times the debt");
+      screen.getByRole("dialog", { name: "Milestone added" }),
+    ).toHaveAccessibleDescription("Independence · Net worth ≥ £1,000,000");
   });
 
-  it("opens a goal from its row and writes the edit back", async () => {
+  it("opens a goal from its row in the milestone dialog", () => {
     renderList();
-    vi.mocked(saveMilestone).mockResolvedValue(
-      saved({
-        ...firstMillion,
-        conditions: [{ measure: "worth", of: "pounds", times: 2000000 }],
-      }),
-    );
 
     const dialog = openRow("First million");
 
-    expect(within(dialog).getByText("Edit goal")).toHaveClass("text-brand");
-    expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue(
-      "First million",
+    expect(within(dialog).getByText("Edit milestone")).toHaveClass(
+      "text-brand",
     );
-
-    commit(
-      within(dialog).getByRole("textbox", { name: "At least" }),
-      "2,000,000",
-    );
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-
-    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(firstMillion.id, {
-      conditions: [{ measure: "worth", of: "pounds", times: 2000000 }],
-      name: "First million",
-    });
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("dialog", { name: "First million" }),
-      ).not.toBeInTheDocument();
-    });
-    expect(
-      screen.getByRole("dialog", { name: "Goal updated" }),
-    ).toHaveAccessibleDescription("Net worth ≥ £2,000,000");
+    expect(field("Name", dialog)).toHaveValue("First million");
+    expect(field("At least", dialog)).toHaveValue("£1,000,000");
   });
 
   // A saved goal's dialog is where it is deleted from: the Delete closes
@@ -344,9 +274,7 @@ describe("GoalList", () => {
 
     let dialog = openEntry("Add goal");
 
-    fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
-      target: { value: "Holidays" },
-    });
+    fireEvent.change(field("Name", dialog), { target: { value: "Holidays" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -354,8 +282,6 @@ describe("GoalList", () => {
 
     dialog = openEntry("Add goal");
 
-    expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue(
-      "",
-    );
+    expect(field("Name", dialog)).toHaveValue("");
   });
 });

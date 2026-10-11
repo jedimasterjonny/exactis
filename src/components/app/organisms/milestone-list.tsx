@@ -1,18 +1,18 @@
 "use client";
 
-import type { JSX, SubmitEvent } from "react";
+import type { Route } from "next";
+import type { JSX } from "react";
 
 import { cn } from "cn";
-import { ChevronRight, Plus, Trash2 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { ChevronRight, Plus } from "lucide-react";
+import { useState } from "react";
 
 import type { Marker, Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { LineValues } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
-import type { Entry } from "@/hooks/use-editor";
 
-import { removeMilestone, saveMilestone } from "@/actions/milestones";
+import { removeMilestone } from "@/actions/milestones";
 import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { PinBar } from "@/components/app/atoms/pin-bar";
@@ -20,40 +20,24 @@ import { RowLock } from "@/components/app/atoms/row-lock";
 import { RowOpener } from "@/components/app/atoms/row-opener";
 import { SpanRuler } from "@/components/app/atoms/span-ruler";
 import { YearAge } from "@/components/app/atoms/year-age";
-import { YearField } from "@/components/app/molecules/figure-field";
 import { SectionCard } from "@/components/app/molecules/section-card";
-import { TextField } from "@/components/app/molecules/text-field";
+import { MilestoneDialog } from "@/components/app/organisms/milestone-dialog";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { asPaid } from "@/data/income";
-import { atAge, isTiedTo, markersOf, yearsOf } from "@/data/milestones";
-import { ageIn, endYear } from "@/data/plan";
-import { useEditor } from "@/hooks/use-editor";
+import {
+  ageOf,
+  conditionOf,
+  isTiedTo,
+  markersOf,
+  yearsOf,
+} from "@/data/milestones";
+import { ageIn } from "@/data/plan";
 import { useRemover } from "@/hooks/use-remover";
 import { counted } from "@/lib/count";
 import { listed } from "@/lib/feeders";
 import { dashboard, plan as planScreen, subsectionLabel } from "@/lib/nav";
 import { laneColumns } from "@/lib/span";
-
-// What the row edits: the name, and the year, which the age the
-// milestone is reached at is read off, since the plan lays its
-// milestones out by year.
-interface Draft {
-  readonly name: string;
-  readonly year: number;
-}
-
-interface MilestoneFormProps {
-  readonly canSave: boolean;
-  readonly entry: Entry<Draft>;
-  readonly isSaving: boolean;
-  readonly label: string;
-  readonly onAmend: (patch: Partial<Draft>) => void;
-  readonly onDelete: (() => void) | undefined;
-  readonly onDismiss: () => void;
-  readonly onSave: (values: Draft) => void;
-  readonly plan: Plan;
-}
 
 interface MilestoneListProps {
   readonly milestones: readonly Milestone[];
@@ -62,48 +46,51 @@ interface MilestoneListProps {
 }
 
 interface MilestoneRowProps {
-  readonly lines: readonly LineValues[];
-  readonly marker: Marker;
+  readonly detail: string | undefined;
   readonly marks: readonly number[];
-  readonly milestone: Milestone | undefined;
-  readonly onEdit: (milestone: Milestone, year: number) => void;
+  readonly name: string;
+  readonly opens: Opens;
   readonly plan: Plan;
+  readonly year: number | undefined;
 }
+
+// What a row opens: the screen a milestone held here is set on, which
+// is retirement's dashboard, or the dialog a milestone listed here is
+// edited in.
+type Opens = { readonly href: Route } | { readonly onOpen: () => void };
 
 // Why retirement's row is held here: it is set on another screen, and
 // moves when it is, so the row links there.
 const retirementLock = `Set by the retirement age on the ${dashboard.label}`;
 
 // The plan screen's first card: the years the plan turns on, retirement
-// among them, in the order they come. Each is a row laid out as a
-// schedule's line is, its name over a pin on the plan's span where the
-// line's bar would be, and its year over the age reached in it where the
-// line's years would be, so a milestone reads as a line with no length
-// on the same span as the lines beneath it. The columns are the
-// schedules' own, the one template, the figure's left empty, so the
-// span is as wide here as there and a pin sits over the years a bar
-// beneath it reaches. The
-// card comes before the schedules because the lines are laid out by the
-// milestones rather than the other way round. Each row says which lines
-// start and end at it, from either schedule, so what moves with a
-// milestone is read where the milestone is, and retirement names the
+// among them, in the order they come, and after them the milestones
+// reached when conditions hold, which fall in no year the plan can say.
+// Each is a row laid out as a schedule's line is, its name over a pin
+// on the plan's span where the line's bar would be, and its year over
+// the age reached in it where the line's years would be, so a milestone
+// reads as a line with no length on the same span as the lines beneath
+// it. The columns are the schedules' own, the one template, the
+// figure's left empty, so the span is as wide here as there and a pin
+// sits over the years a bar beneath it reaches. A milestone reached
+// when conditions hold has no pin and no year, its conditions in words
+// beneath its name instead: the chance of success reads when the
+// futures reach it, and this card says only that it is listed. The
+// card comes before the schedules because the lines are laid out by
+// the milestones rather than the other way round. Each row says which
+// lines start and end at it, from either schedule, so what moves with
+// a milestone is read where the milestone is, and retirement names the
 // salaries and profits it stops as ending there, whatever their own
-// ends say, since that is where they are paid to. There is always one row,
-// retirement's, so there is no empty state.
-// A milestone is a name and a year, too little to open a dialog for, so
-// it is added and edited where it is listed: the card's button opens a
-// new one at the foot of the list, and a press anywhere on a row turns
-// it into its two fields, its name the button and a chevron at its end
-// saying so, as a schedule's row opens its dialog. Save or Enter keeps
-// it, Cancel or Escape leaves it as it was, and one row is edited at a
-// time, so opening another drops the first. The entry is the editor
-// every dialog is driven by, since only where the fields are drawn
-// differs. The row being edited offers a Delete, which is where a
-// milestone is deleted from: it asks through the confirm dialog before
-// the milestone goes, and the question says what becomes of the lines
-// tied to it, which keep the years it gives them now. Retirement draws
-// a lock in place of the chevron, since it is set on the dashboard, as
-// the caption says, and its name links there.
+// ends say, since that is where they are paid to. There is always one
+// row, retirement's, so there is no empty state.
+// A milestone is added from the card's button and edited from its row,
+// in the dialog the chance of success opens too, since how it is
+// reached is a choice and conditions are more than a row holds; the
+// dialog of a saved milestone offers a Delete, which asks through the
+// confirm dialog before the milestone goes, and the question says what
+// becomes of the lines tied to it, which keep the years it gives them
+// now. Retirement draws a lock in place of the chevron, since it is set
+// on the dashboard, as the caption says, and its name links there.
 // The span is ruled in decades above the rows, in the pins' column, and
 // every pin's track carries a faint rule at each milestone, as every
 // line's bar beneath does, so the three cards read as lanes on the one
@@ -116,68 +103,25 @@ export function MilestoneList({
   plan,
   schedule,
 }: MilestoneListProps): JSX.Element {
+  const [opened, setOpened] = useState<"new" | Milestone | null>(null);
   const lines = [...schedule.income, ...schedule.expenses];
   const markers = markersOf(milestones, plan);
+  const marks = yearsOf(markers);
   const paid = [
     ...schedule.income.map((line) => asPaid(line, plan)),
     ...schedule.expenses,
   ];
-  const { amend, dialogOf, dismiss, entry, isSaving, open, save } = useEditor<
-    Draft,
-    Milestone
-  >({
-    describe: (milestone, { year }) => `${milestone.name} · ${String(year)}`,
-    noun: "Milestone",
-    save: async (id, { name, year }) =>
-      saveMilestone(id, { conditions: atAge(ageIn(year, plan)), name }),
-  });
+  const reached = milestones.filter(
+    (milestone) => ageOf(milestone) === undefined,
+  );
   const { ask, doomed, questionOf } = useRemover<Milestone>({
     describe: (milestone) => milestone.name,
     noun: "Milestone",
     remove: removeMilestone,
   });
 
-  function edit({ id, name }: Milestone, year: number): void {
-    open({ name, year }, id);
-  }
-
-  // The form for the entry, wherever it is drawn: in the place of the
-  // row it edits, keyed as the row is, or at the foot of the list for a
-  // new one. A row's key is the same while it is drawn and while it is
-  // edited, but not the same kind of thing, so each opening mounts the
-  // fields fresh. The Delete it offers for a saved milestone asks once
-  // the form has closed, so the question stands alone.
-  function formFor(
-    current: Entry<Draft>,
-    key: "new" | Marker["id"],
-  ): JSX.Element {
-    const listed = milestones.find(({ id }) => id === current.id);
-    return (
-      <li className="py-3 first:pt-0 last:pb-0" key={key}>
-        <MilestoneForm
-          canSave={current.draft.name.trim() !== ""}
-          entry={current}
-          isSaving={isSaving}
-          label={dialogOf(current).eyebrow}
-          onAmend={(patch) => {
-            amend(current, patch);
-          }}
-          onDelete={
-            listed === undefined
-              ? undefined
-              : (): void => {
-                  dismiss();
-                  ask(listed);
-                }
-          }
-          onDismiss={dismiss}
-          onSave={(values) => {
-            save({ ...current, draft: values });
-          }}
-          plan={plan}
-        />
-      </li>
-    );
+  function close(): void {
+    setOpened(null);
   }
 
   return (
@@ -185,12 +129,8 @@ export function MilestoneList({
       <SectionCard
         actions={
           <Button
-            disabled={entry !== null && entry.id === null}
             onClick={() => {
-              open(
-                { name: "", year: Math.min(plan.from + 10, endYear(plan)) },
-                null,
-              );
+              setOpened("new");
             }}
             size="sm"
           >
@@ -198,7 +138,7 @@ export function MilestoneList({
             Add milestone
           </Button>
         }
-        caption="The years the plan turns on. A line tied to one moves with it, and retirement moves with the age set on the Dashboard."
+        caption="The years the plan turns on. A line tied to one moves with it, and retirement moves with the age set on the Dashboard. A milestone reached when conditions hold has no year of its own: the Chance of success reads when the futures reach it."
         label={subsectionLabel(planScreen, 1)}
         title="Milestones"
       >
@@ -209,21 +149,41 @@ export function MilestoneList({
           <ul className="@container divide-y">
             {markers.map((marker) => {
               const milestone = milestones.find(({ id }) => id === marker.id);
-              return entry !== null && isOpenOn(entry, milestone) ? (
-                formFor(entry, marker.id)
-              ) : (
+              return (
                 <MilestoneRow
+                  detail={tiesAt(marker, paid)}
                   key={marker.id}
-                  lines={paid}
-                  marker={marker}
-                  marks={yearsOf(markers)}
-                  milestone={milestone}
-                  onEdit={edit}
+                  marks={marks}
+                  name={marker.name}
+                  opens={
+                    milestone === undefined
+                      ? { href: dashboard.href }
+                      : {
+                          onOpen: (): void => {
+                            setOpened(milestone);
+                          },
+                        }
+                  }
                   plan={plan}
+                  year={marker.year}
                 />
               );
             })}
-            {entry !== null && entry.id === null && formFor(entry, "new")}
+            {reached.map((milestone) => (
+              <MilestoneRow
+                detail={milestone.conditions.map(conditionOf).join(" · ")}
+                key={milestone.id}
+                marks={marks}
+                name={milestone.name}
+                opens={{
+                  onOpen: (): void => {
+                    setOpened(milestone);
+                  },
+                }}
+                plan={plan}
+                year={undefined}
+              />
+            ))}
           </ul>
         </CardContent>
       </SectionCard>
@@ -231,6 +191,18 @@ export function MilestoneList({
         <ConfirmDialog {...questionOf(doomed)}>
           {freed(lines.filter((line) => isTiedTo(line, doomed.id)).length)}
         </ConfirmDialog>
+      )}
+      {opened !== null && (
+        <MilestoneDialog
+          milestone={opened === "new" ? null : opened}
+          onDelete={(milestone) => {
+            close();
+            ask(milestone);
+          }}
+          onDismiss={close}
+          onSaved={close}
+          plan={plan}
+        />
       )}
     </>
   );
@@ -253,144 +225,33 @@ function freed(tied: number): string {
   return `${tied === 0 ? "" : stay}It cannot be brought back.`;
 }
 
-// Whether the entry is open on the milestone, which it never is on
-// retirement, since retirement is no record.
-function isOpenOn(
-  entry: Entry<Draft>,
-  milestone: Milestone | undefined,
-): boolean {
-  return entry.id !== null && entry.id === milestone?.id;
-}
-
-// A milestone's two fields in the place of its row, with Cancel and Save
-// beneath them and, for a saved milestone, a Delete set apart at the
-// other edge, as the edit dialog lays its footer out. The form is named
-// as the dialog would be, "New milestone" or "Edit milestone". The name
-// takes the focus as the form opens, since the form is opened to be
-// typed in. The year commits when its field loses the focus, as every
-// figure does, and Enter submits without the focus leaving it, so a
-// submit takes the focus off its fields first and saves what they
-// last reported, which is held beside the draft for that moment: the
-// draft the form was drawn with would not yet have the year the blur
-// has just committed. Escape leaves the milestone as it was, wherever
-// the focus is, as it closes a dialog wherever the focus is in it. Save
-// holds while the name is empty and spins while a save is on its way,
-// and the Delete holds while a save is, as the dialog's do.
-function MilestoneForm({
-  canSave,
-  entry,
-  isSaving,
-  label,
-  onAmend,
-  onDelete,
-  onDismiss,
-  onSave,
-  plan,
-}: MilestoneFormProps): JSX.Element {
-  const formRef = useRef<HTMLFormElement>(null);
-  const typedRef = useRef(entry.draft);
-
-  useEffect(() => {
-    formRef.current?.querySelector("input")?.focus();
-  }, []);
-
-  useEffect(() => {
-    function escape(event: KeyboardEvent): void {
-      if (event.key === "Escape") {
-        onDismiss();
-      }
-    }
-    document.addEventListener("keydown", escape);
-    return (): void => {
-      document.removeEventListener("keydown", escape);
-    };
-  }, [onDismiss]);
-
-  function amendWith(patch: Partial<Draft>): void {
-    typedRef.current = { ...typedRef.current, ...patch };
-    onAmend(patch);
-  }
-
-  function submit(event: SubmitEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    for (const input of event.currentTarget.querySelectorAll("input")) {
-      input.blur();
-    }
-    onSave(typedRef.current);
-  }
-
-  return (
-    <form
-      aria-label={label}
-      className="grid gap-4 rounded-md bg-muted/50 p-3"
-      onSubmit={submit}
-      ref={formRef}
-    >
-      <div className="grid grid-cols-[minmax(0,1fr)_11rem] items-start gap-4 folded:grid-cols-1">
-        <TextField
-          defaultValue={entry.initial.name}
-          label="Name"
-          onValueChange={(name) => {
-            amendWith({ name });
-          }}
-          placeholder="Kids leave home, downsize…"
-        />
-        <YearField
-          defaultValue={entry.initial.year}
-          hint={`Age ${String(ageIn(entry.draft.year, plan))}`}
-          label="Year"
-          max={endYear(plan)}
-          min={plan.from}
-          onValueCommitted={(year) => {
-            amendWith({ year });
-          }}
-        />
-      </div>
-      <div className="flex justify-end gap-2">
-        {onDelete !== undefined && (
-          <Button
-            className="mr-auto"
-            disabled={isSaving}
-            onClick={onDelete}
-            size="sm"
-            type="button"
-            variant="destructive"
-          >
-            <Trash2 aria-hidden />
-            Delete
-          </Button>
-        )}
-        <Button onClick={onDismiss} size="sm" type="button" variant="outline">
-          Cancel
-        </Button>
-        <Button disabled={!canSave} isBusy={isSaving} size="sm" type="submit">
-          Save
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 // A milestone's row as it is listed, drawn in its columns and again in
 // its folded lines, only one of which is shown at any width, and saying
-// beside its name which lines end and start at it. A saved milestone
-// opens from anywhere on it, either way, with a chevron at its end;
-// retirement draws its lock in the chevron's place instead, and links to
-// the dashboard, where it is set.
+// beside its name which lines end and start at it, or, for one reached
+// when conditions hold, what they are. A row with a year pins it on the
+// span and writes the year over the age reached in it; one without
+// draws no pin and a dash where the year would be, since when it is
+// reached is the futures' to say. A saved milestone opens from anywhere
+// on it, either way, with a chevron at its end; retirement draws its
+// lock in the chevron's place instead, and links to the dashboard,
+// where it is set.
 function MilestoneRow({
-  lines,
-  marker,
+  detail,
   marks,
-  milestone,
-  onEdit,
+  name,
+  opens,
   plan,
+  year,
 }: MilestoneRowProps): JSX.Element {
-  const age = `Age ${String(ageIn(marker.year, plan))}`;
-  const detail = tiesAt(marker, lines);
+  const age =
+    year === undefined ? "When reached" : `Age ${String(ageIn(year, plan))}`;
+  const figure = year === undefined ? "—" : String(year);
   const lock =
-    milestone === undefined ? <RowLock reason={retirementLock} /> : undefined;
-
-  const bar = <PinBar marks={marks} plan={plan} year={marker.year} />;
+    "href" in opens ? <RowLock reason={retirementLock} /> : undefined;
+  const bar =
+    year === undefined ? undefined : (
+      <PinBar marks={marks} plan={plan} year={year} />
+    );
   return (
     <li
       className={cn(
@@ -400,45 +261,34 @@ function MilestoneRow({
     >
       <div className="unfolded:hidden">
         <FoldedLines
-          figure={String(marker.year)}
-          name={marker.name}
-          {...(milestone === undefined
-            ? { href: dashboard.href, lock }
-            : {
-                onOpen: (): void => {
-                  onEdit(milestone, marker.year);
-                },
-              })}
+          figure={figure}
+          isFigureMuted={year === undefined}
+          name={name}
+          {...("href" in opens
+            ? { href: opens.href, lock }
+            : { onOpen: opens.onOpen })}
         >
           {detail !== undefined && <span>{detail}</span>}
-          <div className="pointer-events-none my-1">{bar}</div>
+          {bar !== undefined && (
+            <div className="pointer-events-none my-1">{bar}</div>
+          )}
           <span>{age}</span>
         </FoldedLines>
       </div>
       <div className="grid min-w-0 gap-2 folded:hidden">
         <div className="flex flex-wrap items-baseline gap-2">
-          {milestone === undefined ? (
-            <RowOpener href={dashboard.href}>{marker.name}</RowOpener>
+          {"href" in opens ? (
+            <RowOpener href={opens.href}>{name}</RowOpener>
           ) : (
-            <RowOpener
-              onOpen={() => {
-                onEdit(milestone, marker.year);
-              }}
-            >
-              {marker.name}
-            </RowOpener>
+            <RowOpener onOpen={opens.onOpen}>{name}</RowOpener>
           )}
           {detail !== undefined && (
             <span className="text-xs text-muted-foreground">{detail}</span>
           )}
         </div>
-        <div className="pointer-events-none">{bar}</div>
+        {bar !== undefined && <div className="pointer-events-none">{bar}</div>}
       </div>
-      <YearAge
-        age={age}
-        className="col-start-3 folded:hidden"
-        year={marker.year}
-      />
+      <YearAge age={age} className="col-start-3 folded:hidden" year={figure} />
       <span className="inline-flex size-7 items-center justify-center folded:hidden">
         {lock ?? (
           <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
