@@ -29,7 +29,7 @@ import { CardContent } from "@/components/kit/card";
 import { markersOf, yearsOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { cashFlow, inTodaysMoney, totalsOf } from "@/engine/cash-flow";
-import { project } from "@/engine/projection";
+import { isShort, project } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { listed } from "@/lib/feeders";
 import { growthLabels, spanOf } from "@/lib/lines";
@@ -40,7 +40,8 @@ import { laneColumns } from "@/lib/span";
 
 // What every year of the book reads the plan by: the accounts and the
 // schedule the engine runs on, the plan, its milestones within its span,
-// and the projection's years, for what each leaves uncovered.
+// and the projection's years, for what each leaves uncovered or draws
+// from a pension early.
 interface Book {
   readonly accounts: readonly Account[];
   readonly markers: readonly Marker[];
@@ -76,6 +77,13 @@ interface RowProps {
   readonly label: string;
 }
 
+// A year as the book reads it: the strip's year, and whether the plan is
+// carried through it only by a pension drawn before the pension age,
+// which the strip tones as a loss and the figure beside it names.
+interface Year extends StripYear {
+  readonly isEarly: boolean;
+}
+
 // The plan screen's fourth card, beneath the two schedules it is read
 // from: the plan year by year, as one strip on the span the lines above
 // are laid on, ruled in decades as their span is. Each year is a column
@@ -84,8 +92,10 @@ interface RowProps {
 // money, so the plan's shape is seen at once: the years saving, the year
 // the savings start paying the month, and how the sums move between,
 // gently as payments fixed in pounds shrink and in a step as a line
-// starts or stops. A year the projection runs out of savings in draws in
-// the loss tone, since only then is a draw a failure rather than the
+// starts or stops. A year the plan falls short in draws in the loss tone,
+// by running out of savings or by being carried only by a pension drawn
+// before the pension age, as the chance of success counts a future as
+// falling short, since only then is a draw a failure rather than the
 // plan spending what it saved. The strip is the slider that chooses a
 // year, opening on the plan's first, and the chosen year's figure and
 // age stand beside it in the lanes' columns, with the milestones as
@@ -184,13 +194,15 @@ export function CashFlowCard({
 
 // What closes the ledger: what is left over, and what becomes of it, or
 // what the month is short by and where that comes from, in the loss tone
-// and saying what is left uncovered when the savings run out in the
-// year. A fraction of a pound short is read as nothing left over, as
-// the figure shown is.
+// when the plan falls short in the year, by the savings running out or by
+// a pension drawn before the pension age. A fraction of a pound short is
+// read as nothing left over, as the figure shown is.
 function Closing({
+  early,
   left,
   uncovered,
 }: {
+  readonly early: number;
   readonly left: number;
   readonly uncovered: number;
 }): JSX.Element {
@@ -207,12 +219,8 @@ function Closing({
   return (
     <Row
       amount={-left}
-      detail={
-        uncovered > 0
-          ? `The savings run out this year, leaving ${formatGbp(uncovered)} of it uncovered.`
-          : "What the month is short by is drawn from the savings, cash first."
-      }
-      isLoss={uncovered > 0}
+      detail={describeShort(early, uncovered)}
+      isLoss={uncovered > 0 || early > 0}
       isTotal
       label="Short"
     />
@@ -224,6 +232,24 @@ function Closing({
 // name.
 function describeFed({ amount, line }: Fed): string {
   return `Salary sacrifice from ${line.name}, paid in as ${formatGbp(amount)} with the NI saved`;
+}
+
+// Where what the month is short by comes from, beneath the figure: the
+// savings, cash first, while they carry it; what the year leaves
+// uncovered where they run out in it; and, where the year is carried only
+// by a pension drawn before the pension age, that the savings fall short,
+// in the words the screen's headline says it in, with the gross draw the
+// 55% charge makes of it, which is what the pension is debited. The run
+// out is said first where a year does both, since that is where the money
+// ends.
+function describeShort(early: number, uncovered: number): string {
+  if (uncovered > 0) {
+    return `The savings run out this year, leaving ${formatGbp(uncovered)} of it uncovered.`;
+  }
+  if (early > 0) {
+    return `The savings fall short this year, carried by an early pension draw of ${formatGbp(early)} at the 55% charge.`;
+  }
+  return "What the month is short by is drawn from the savings, cash first.";
 }
 
 // What a line is paid at, how that grows and the years it runs, "£2,130
@@ -345,6 +371,7 @@ function MonthLedger({ book, onYear, year }: LedgerProps): JSX.Element {
     .filter((marker) => marker.year === year)
     .map(({ name }) => name);
   const unpaid = [...flow.fixed, ...flow.spare].filter((paid) => !isPaid(paid));
+  const inYear = points.filter((point) => point.year === year);
   return (
     <div className="grid gap-3 rounded-md bg-muted/50 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -410,10 +437,9 @@ function MonthLedger({ book, onYear, year }: LedgerProps): JSX.Element {
           />
         )}
         <Closing
+          early={inYear.reduce((sum, point) => sum + point.early, 0)}
           left={flow.left}
-          uncovered={points
-            .filter((point) => point.year === year)
-            .reduce((sum, point) => sum + point.uncovered, 0)}
+          uncovered={inYear.reduce((sum, point) => sum + point.uncovered, 0)}
         />
       </ul>
     </div>
@@ -421,16 +447,25 @@ function MonthLedger({ book, onYear, year }: LedgerProps): JSX.Element {
 }
 
 // What a year's month comes to, as one figure: what it draws from the
-// savings when it draws anything, which a month short does, and
-// otherwise what it puts by. A draw of less than a pound is none, as the
-// ledger writes it.
-function netOf({ drawn, saved }: StripYear): {
+// savings when it draws anything, which a month short does, or what it
+// is short by in a year carried by a pension drawn before the pension
+// age, named as the screen's headline names such a year, since the
+// savings are empty then and the pension is debited more than the month
+// is short; and otherwise what it puts by. A draw of less than a pound
+// is none, as the ledger writes it.
+function netOf({ drawn, isEarly, saved }: Year): {
   readonly name: string;
   readonly sum: number;
 } {
-  return isZero(drawn)
-    ? { name: "put by", sum: saved }
-    : { name: "drawn from the savings", sum: drawn };
+  if (isZero(drawn)) {
+    return { name: "put by", sum: saved };
+  }
+  return {
+    name: isEarly
+      ? "carried by an early pension draw"
+      : "drawn from the savings",
+    sum: drawn,
+  };
 }
 
 // How an account is paid, and for a pension what lands in it once the
@@ -477,20 +512,23 @@ function Row({
 }
 
 // A year as the strip draws it, from a month of it, the first the plan
-// runs in the year, in today's money, and whether the projection runs
-// out of savings in it.
+// runs in the year, in today's money, and whether the plan falls short in
+// it, by the projection's one test of that, and whether by a pension
+// drawn before the pension age.
 function yearOf(
   year: number,
   { accounts, plan, points, schedule }: Book,
-): StripYear {
+): Year {
   const month = year === plan.from ? plan.month : 0;
   const reading = { at: { month, year }, plan };
   const { drawn, saved } = totalsOf(
     inTodaysMoney(cashFlow(accounts, schedule, reading), reading),
   );
+  const inYear = points.filter((point) => point.year === year);
   return {
     drawn,
-    isShort: points.some((point) => point.year === year && point.uncovered > 0),
+    isEarly: inYear.some((point) => point.early > 0),
+    isShort: inYear.some(isShort),
     saved,
     year,
   };
