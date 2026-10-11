@@ -929,6 +929,99 @@ describe("project", () => {
     ]);
   });
 
+  // A £36,000 salary sacrificing half its base into the SIPP, £1,500 a
+  // month landing as £1,725 with the NI saved, against £2,500 going out
+  // in January alone. January is short either way, so nothing is
+  // sacrificed and the month is taxed whole, £2,453.30 after £390.50 of
+  // income tax and £156.20 of NI, and the £46.70 it is short is drawn
+  // from the SIPP as income, since the owner, born in 1960, is past the
+  // pension age: £54.94, each pound keeping 85p in the basic rate band
+  // with a quarter of it free. That draw is a flexible access, so from
+  // February the owner's allowance is the £10,000 money purchase one,
+  // £833.33 a month, which the £1,725 is £891.67 past; the month is
+  // taxed on £1,500 and that £891.67, £268.83 at the basic rate where
+  // the £1,500 alone pays £90.50, and with £36.20 of NI leaves
+  // £1,194.97 for the ISA, £13,144.63 over the eleven months, while the
+  // SIPP is fed its £1,725 whatever the charge, 100,000 − 54.94 +
+  // 18,975 = 118,920.06. The three months of the 2025/26 tax year each
+  // sit in the basic rate band, so April settles nothing. With nothing
+  // going out in January nothing is drawn, the allowance stays whole and
+  // every month leaves the ISA £1,373.30, £16,479.60 on the year.
+  it("holds an owner's pensions to the money purchase allowance from the month after they draw on one as income", () => {
+    const earner = {
+      ...salary,
+      amount: 36000,
+      bonus: 0,
+      feeds: sipp.id,
+      rsu: 0,
+      sacrifice: 0.5,
+    };
+    const once = { ...household, amount: 2500, lastMonth: 0, lastYear: 2026 };
+    const saving: Account = { ...spareIsa, balance: 0 };
+    const drawn: Account = { ...sipp, balance: 100000 };
+    const over = (expenses: (typeof once)[]): ProjectionPoint[] =>
+      project(
+        [saving, drawn],
+        { expenses, income: [earner] },
+        { ...bornIn(1960), years: 1 },
+      );
+
+    expect(over([once])).toStrictEqual([
+      point(2026, { 2: 0, 7: 100000 }, { age: 66, deferred: 100000 }),
+      point(
+        2027,
+        { 2: 13145, 7: 118920 },
+        { age: 67, deferred: 118920, free: 13145 },
+      ),
+    ]);
+    expect(over([]).at(-1)).toStrictEqual(
+      point(
+        2027,
+        { 2: 16480, 7: 120700 },
+        { age: 67, deferred: 120700, free: 16480 },
+      ),
+    );
+  });
+
+  // The same year for an owner born in 1980, for whom the January draw
+  // is early: £103.78 at 45p kept of each pound, reported as drawn
+  // early, and no flexible access, so the allowance stays whole and the
+  // eleven months after leave the ISA £1,373.30 each, £15,106.30, with
+  // the SIPP at 100,000 − 103.78 + 18,975 = 118,871.22.
+  it("leaves the allowance whole after a draw before the pension age, which is no flexible access", () => {
+    const earner = {
+      ...salary,
+      amount: 36000,
+      bonus: 0,
+      feeds: sipp.id,
+      rsu: 0,
+      sacrifice: 0.5,
+    };
+    const once = { ...household, amount: 2500, lastMonth: 0, lastYear: 2026 };
+
+    expect(
+      project(
+        [
+          { ...spareIsa, balance: 0 },
+          { ...sipp, balance: 100000 },
+        ],
+        { expenses: [once], income: [earner] },
+        { ...bornIn(1980), years: 1 },
+      ),
+    ).toStrictEqual([
+      point(
+        2026,
+        { 2: 0, 7: 100000 },
+        { age: 46, deferred: 100000, early: 104 },
+      ),
+      point(
+        2027,
+        { 2: 15106, 7: 118871 },
+        { age: 47, deferred: 118871, free: 15106 },
+      ),
+    ]);
+  });
+
   // Sam, born in 1995, reaches 57 in 2052, three years after the first
   // owner: from 2049 a pension of Sam's is drawn early, at the charge,
   // £2,222.22 for each £1,000 and £26,666.67 a year, for three years,

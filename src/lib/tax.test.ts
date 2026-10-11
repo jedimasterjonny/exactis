@@ -351,36 +351,44 @@ describe("mostFixedOf", () => {
 });
 
 describe("pensionAllowanceOf", () => {
+  // The incomes of someone who has not drawn on a pension.
+  const earning = (adjusted: number, threshold: number): number =>
+    pensionAllowanceOf({ adjusted, hasDrawn: false, threshold });
+
   // Whole at £200,000 of threshold income exactly and at £260,000 of
   // adjusted income exactly, each the last pound before the taper; over
   // both, £300,000 of adjusted income is £40,000 over £260,000 and takes
   // £20,000 off; £360,000 takes £50,000 off, to the £10,000 floor, which
   // £1,000,000 stays on.
   it("tapers the allowance by a pound for every two of adjusted income over £260,000, to £10,000", () => {
-    expect(pensionAllowanceOf({ adjusted: 300000, threshold: 200000 })).toBe(
-      60000,
-    );
-    expect(pensionAllowanceOf({ adjusted: 260000, threshold: 250000 })).toBe(
-      60000,
-    );
-    expect(pensionAllowanceOf({ adjusted: 300000, threshold: 250000 })).toBe(
-      40000,
-    );
-    expect(pensionAllowanceOf({ adjusted: 360000, threshold: 250000 })).toBe(
-      10000,
-    );
-    expect(pensionAllowanceOf({ adjusted: 1000000, threshold: 250000 })).toBe(
-      10000,
-    );
+    expect(earning(300000, 200000)).toBe(60000);
+    expect(earning(260000, 250000)).toBe(60000);
+    expect(earning(300000, 250000)).toBe(40000);
+    expect(earning(360000, 250000)).toBe(10000);
+    expect(earning(1000000, 250000)).toBe(10000);
   });
 
   // A threshold income of £200,000 or under leaves the allowance whole
   // however high the adjusted income stands.
   it("leaves the allowance whole for a threshold income of £200,000 or under, whatever the adjusted", () => {
-    expect(pensionAllowanceOf({ adjusted: 1000000, threshold: 200000 })).toBe(
-      60000,
-    );
-    expect(pensionAllowanceOf({ adjusted: 1000000, threshold: 0 })).toBe(60000);
+    expect(earning(1000000, 200000)).toBe(60000);
+    expect(earning(1000000, 0)).toBe(60000);
+  });
+
+  // Someone who has drawn on a pension as income has the money purchase
+  // allowance, earning nothing or more than the taper's floor would
+  // leave them anyway.
+  it("gives the money purchase allowance to someone who has drawn on a pension, whatever they earn", () => {
+    expect(
+      pensionAllowanceOf({ adjusted: 0, hasDrawn: true, threshold: 0 }),
+    ).toBe(10000);
+    expect(
+      pensionAllowanceOf({
+        adjusted: 300000,
+        hasDrawn: true,
+        threshold: 250000,
+      }),
+    ).toBe(10000);
   });
 });
 

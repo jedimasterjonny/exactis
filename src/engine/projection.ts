@@ -76,7 +76,9 @@ export interface ProjectionPoint {
 
 // The month a shortfall is drawn in, as the draw reads it: what is left
 // of each owner's lump sum allowance, by the owner's id, an owner not
-// yet entered having the whole of it; what each owner's lines earned
+// yet entered having the whole of it; the owners who have drawn on a
+// pension as income before the month, by id, whose pensions are on the
+// money purchase allowance; what each owner's lines earned
 // that the tax is charged on, which a draw on a pension of theirs is
 // taxed on top of; the month itself and the plan, which say whether
 // the month falls before the pension's owner's pension age, when it is
@@ -84,6 +86,7 @@ export interface ProjectionPoint {
 interface Drawing {
   readonly allowances: ReadonlyMap<number, number>;
   readonly at: Month;
+  readonly drawn: ReadonlySet<number>;
   readonly earned: readonly Earned[];
   readonly plan: Plan;
   readonly uprating: number;
@@ -243,7 +246,10 @@ export function monthsOn(
 // its growth as a payment lands, so what leaves earns nothing for the
 // month it is gone. The lump sum allowance a pension's tax-free quarter
 // comes out of is its owner's for life, one each, so what is left of
-// each is carried from month to month rather than read afresh. Each
+// each is carried from month to month rather than read afresh, and so
+// are the owners who have drawn on a pension as income, since from the
+// month after their pension allowance is the money purchase one for the
+// rest of the plan, which the flow is handed with the month. Each
 // month is taxed as a twelfth of a year, which overcharges a tax year
 // whose months are not alike, the one a salary stops in above all, so
 // the projection carries each owner's tax year as well, what its
@@ -319,6 +325,7 @@ export function project(
     holderOf(account, plan);
   }
   let allowances: ReadonlyMap<number, number> = new Map();
+  let drawn: ReadonlySet<number> = new Set();
   let taxYears: ReadonlyMap<number, TaxYear> = new Map();
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
@@ -358,6 +365,7 @@ export function project(
         }
         const flow = cashFlow(accounts, schedule, {
           at,
+          drawn,
           plan,
           reserve: reserveOf(held),
           settlement,
@@ -365,12 +373,14 @@ export function project(
         const draw = drawnFrom(held, Math.max(0, -flow.left), {
           allowances,
           at,
+          drawn,
           earned: flow.earned,
           plan,
           uprating: stretch.uprating,
         });
         const risen = pricesIn(plan, at);
         allowances = draw.allowances;
+        drawn = draw.drawn;
         early += draw.early / risen;
         taxYears = new Map(
           plan.owners.map(({ id }) => {
@@ -454,27 +464,33 @@ function carried(balance: number, paid: number, rate: number): number {
 // the personal allowance first would pay less tax over a life, and is a
 // second way of drawing down rather than this one. What the last of
 // them leaves is uncovered: the plan is short by it, and the projection
-// says so rather than lending it.
+// says so rather than lending it. A draw as income is a flexible access
+// of the pension, which puts every pension of its owner's on the money
+// purchase allowance from the month after, so the owner is marked as
+// having drawn; a draw before the pension age is an unauthorised
+// payment, and is no such access.
 function drawnFrom(
   held: readonly Held[],
   shortfall: number,
-  { allowances, at, earned, plan, uprating }: Drawing,
+  { allowances, at, drawn, earned, plan, uprating }: Drawing,
 ): {
   readonly allowances: ReadonlyMap<number, number>;
   readonly below: ReadonlyMap<number, number>;
+  readonly drawn: ReadonlySet<number>;
   readonly early: number;
   readonly held: readonly Held[];
   readonly uncovered: number;
 } {
-  let drawn = held;
+  let carried = held;
   let left = shortfall;
   let early = 0;
   const allowanceOf = new Map(allowances);
+  const accessed = new Set(drawn);
   const below = new Map(
     earned.map(({ owner, taxable }) => [owner, taxable] as const),
   );
   for (const kind of drawOrder) {
-    drawn = drawn.map(({ account, balance }) => {
+    carried = carried.map(({ account, balance }) => {
       if (account.kind !== kind || !isPension(account)) {
         const taken =
           account.kind === kind ? Math.max(0, Math.min(balance, left)) : 0;
@@ -493,6 +509,9 @@ function drawnFrom(
       const draw = wanted.gross <= balance ? wanted : drawOf(balance, taxed);
       left = draw === wanted ? 0 : Math.max(0, left - draw.net);
       early += taxed.isEarly ? draw.gross : 0;
+      if (!taxed.isEarly && draw.gross > 0) {
+        accessed.add(owner.id);
+      }
       allowanceOf.set(owner.id, taxed.allowance - draw.taxFree);
       below.set(owner.id, taxed.below + draw.taxable);
       return { account, balance: balance - draw.gross };
@@ -501,8 +520,9 @@ function drawnFrom(
   return {
     allowances: allowanceOf,
     below,
+    drawn: accessed,
     early,
-    held: drawn,
+    held: carried,
     uncovered: left,
   };
 }
