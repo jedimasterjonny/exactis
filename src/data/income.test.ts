@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import { sam } from "@/data/owners.fixture";
+
 import {
   asPaid,
   contributionOf,
@@ -60,6 +62,29 @@ describe("asPaid", () => {
 
     expect(asPaid(ending, retiring)).toBe(ending);
     expect(asPaid(statePension, retiring)).toBe(statePension);
+  });
+
+  // Sam, born in 1995 and retiring at 61, retires in 2056, three years
+  // after the plan's owner, so a salary of Sam's running with the plan
+  // is paid to 2055 and ends in a fixed year, since Retirement is the
+  // plan's owner's milestone; born in 1992 like them, Sam's ends at it.
+  it("stops a line at its own owner's retirement, tied to Retirement only where that is the milestone's year", () => {
+    const theirs = { ...salary, lastYear: null, owner: sam.id };
+    const shared = { ...retiring, owners: [...retiring.owners, sam] };
+
+    expect(asPaid(theirs, shared)).toStrictEqual({
+      ...theirs,
+      endsAfter: 0,
+      endsAt: null,
+      lastMonth: null,
+      lastYear: 2055,
+    });
+    expect(
+      asPaid(theirs, {
+        ...retiring,
+        owners: [...retiring.owners, { ...sam, born: 1992 }],
+      }),
+    ).toMatchObject({ endsAt: "retirement", lastYear: 2052 });
   });
 });
 

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Slice } from "@/hooks/futures.worker";
 
 import { expenseLines } from "@/data/expenses.fixture";
+import { working } from "@/data/owners.fixture";
 import { futuresOf } from "@/engine/futures";
 
 // What the worker adds to hear a slice it is handed.
@@ -17,6 +18,7 @@ const run = {
     from: 2026,
     inflation: 0.02,
     month: 0,
+    owners: [working],
     rate: 0.05,
     retires: 92,
     years: 3,

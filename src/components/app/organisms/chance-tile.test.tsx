@@ -5,6 +5,7 @@ import type { Milestone } from "@/data/milestones";
 import type { Future } from "@/engine/futures";
 
 import { atAge } from "@/data/milestones";
+import { working } from "@/data/owners.fixture";
 
 import { ChanceTile } from "./chance-tile";
 
@@ -15,6 +16,7 @@ const plan = {
   from: 2026,
   inflation: 0,
   month: 0,
+  owners: [working],
   rate: 0,
   retires: 92,
   years: 3,

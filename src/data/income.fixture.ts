@@ -1,13 +1,17 @@
 import type { IncomeLine } from "@/data/income";
 import type { Plan } from "@/data/plan";
 
+import { working } from "@/data/owners.fixture";
+import { retiringAt } from "@/data/plan";
+
 // The reference kit's invented schedule: four income lines, in the order
 // the reference lists them, with the ids a store would have given them,
-// the salary paid in parts that sum to the reference's figure and
-// sacrificing 12% of its base into the reference's workplace
-// pension, which is the first of the accounts fixture, and the plan they
-// are laid over, which runs from September 2026 to 2083 for someone born
-// in 1992, with prices held level, so every line pays what it states in
+// each the first owner's, the salary paid in parts that sum to the
+// reference's figure and sacrificing 12% of its base into the
+// reference's workplace pension, which is the first of the accounts
+// fixture, and the plan they are laid over, which runs from September
+// 2026 to 2083 for that owner, born in 1992 and retiring at 92, past
+// its end, with prices held level, so every line pays what it states in
 // every year. For tests, since the screen reads the store. A
 // tuple, so a test reading a line by its place gets a line.
 export const incomeLines = [
@@ -94,6 +98,7 @@ export const plan: Plan = {
   from: 2026,
   inflation: 0,
   month: 8,
+  owners: [working],
   rate: 0.05,
   retires: 92,
   years: 57,
@@ -101,4 +106,4 @@ export const plan: Plan = {
 
 // The plan with its owner retiring at 61, as the reference household's
 // ages have it, where the plan above has them retire at 92.
-export const retiring: Plan = { ...plan, retires: 61 };
+export const retiring: Plan = retiringAt(plan, 61);

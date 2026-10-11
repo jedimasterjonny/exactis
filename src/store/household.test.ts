@@ -82,6 +82,7 @@ describe("the household store", () => {
         from: 2026,
         inflation: inflationOf(curve).rate,
         month: 8,
+        owners: reference.owners,
         rate: 0.05,
         retires: 61,
         years: 57,

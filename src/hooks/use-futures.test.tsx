@@ -6,6 +6,7 @@ import type { Account } from "@/data/accounts";
 import type { Slice } from "@/hooks/futures.worker";
 
 import { expenseLines } from "@/data/expenses.fixture";
+import { working } from "@/data/owners.fixture";
 import { futuresOf } from "@/engine/futures";
 import { FuturesWorker } from "@/test/futures-worker";
 
@@ -34,6 +35,7 @@ const plan = {
   from: 2026,
   inflation: 0.02,
   month: 0,
+  owners: [working],
   rate: 0.05,
   retires: 92,
   years: 3,

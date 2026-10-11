@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Future } from "@/engine/futures";
 
+import { working } from "@/data/owners.fixture";
+
 import { FuturesFan } from "./futures-fan";
 
 // Born in 1992, from January 2026 over two years, so the plan runs to 36
@@ -12,6 +14,7 @@ const plan = {
   from: 2026,
   inflation: 0,
   month: 0,
+  owners: [working],
   rate: 0.05,
   retires: 92,
   years: 2,

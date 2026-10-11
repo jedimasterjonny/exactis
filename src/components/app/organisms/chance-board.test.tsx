@@ -5,6 +5,7 @@ import type { Account } from "@/data/accounts";
 import type { Schedule } from "@/engine/cash-flow";
 
 import { expenseLines } from "@/data/expenses.fixture";
+import { working } from "@/data/owners.fixture";
 import { FuturesWorker } from "@/test/futures-worker";
 
 import { ChanceBoard } from "./chance-board";
@@ -22,6 +23,7 @@ const plan = {
   from: 2026,
   inflation: 0,
   month: 0,
+  owners: [working],
   rate: 0,
   retires: 92,
   years: 3,

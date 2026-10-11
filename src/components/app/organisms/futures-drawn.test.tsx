@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { owners } from "@/data/owners.fixture";
 import { loggedSpread } from "@/data/plan";
 
 import { FuturesDrawn } from "./futures-drawn";
@@ -10,6 +11,7 @@ const plan = {
   from: 2026,
   inflation: 0.03,
   month: 0,
+  owners: [...owners],
   rate: 0.07,
   retires: 61,
   years: 57,

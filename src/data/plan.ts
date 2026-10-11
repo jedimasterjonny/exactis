@@ -29,7 +29,11 @@ export interface Path {
 // than from its start; how many years it runs forward; the year the
 // plan's owner was born, which turns a year into an age; and the age
 // they retire at, from which they earn nothing by working. The plan's
-// owner is the first listed, whose years these are. It sits
+// owner is the first listed, whose years these are; and every owner
+// the household lists is carried with it, since the engine taxes each
+// owner's income on its own, stops it when they retire and draws their
+// pensions at their age, so the first's years are written twice and
+// retiringAt moves both. It sits
 // beside the accounts and the lines rather than inside the engine,
 // since the flow and the projection each read it and the flow is what
 // the projection is built on. A plan run over one future of the markets
@@ -39,6 +43,7 @@ export interface Plan {
   readonly from: number;
   readonly inflation: number;
   readonly month: number;
+  readonly owners: readonly Owner[];
   readonly path?: Path;
   readonly rate: number;
   readonly retires: number;
@@ -112,6 +117,21 @@ export function debtTermOf(
     payment,
     rateFrom(debt, plan),
   );
+}
+
+// The owner who earns a line, among those the plan carries, by the id
+// the line names. A line earned by nobody the plan lists is refused in
+// the rule's words, as the household refuses the same link, since the
+// engine has no years to tax it by or stop it at.
+export function earnerOf(
+  line: { readonly owner: number },
+  plan: Pick<Plan, "owners">,
+): Owner {
+  const owner = plan.owners.find(({ id }) => id === line.owner);
+  if (owner === undefined) {
+    throw new Error(rules.earner);
+  }
+  return owner;
 }
 
 // The age the plan runs to, the age its owner reaches in its last year.
@@ -213,6 +233,7 @@ export function planOf(
     from: asOf.year,
     inflation: rates.inflation,
     month: asOf.month,
+    owners,
     rate: planRate(rates, allocation),
     retires: owner.retires,
     years: Math.max(0, owner.born + ages.ends - asOf.year),
@@ -241,12 +262,28 @@ export function rateFrom(account: Account, plan: Plan): number {
 }
 
 // The year the plan's owner retires in, the first in which they earn
-// nothing by working. The plan holds the year they were born and not
+// nothing by working, or any owner's, since an owner holds the same two
+// years. The plan holds the year they were born and not
 // the day, so the whole of the year they reach the age counts as
 // retired, as the whole of the year they reach the pension age counts
 // as reaching it, and the year before is their last working year.
-export function retirementYear(plan: Plan): number {
+export function retirementYear(plan: Pick<Plan, "born" | "retires">): number {
   return yearAt(plan.retires, plan);
+}
+
+// The plan with its owner retiring at the age given, as the dashboard
+// drags it: written on the plan, which the Retirement milestone and the
+// slider read, and on the first listed owner, whose plan it is and
+// whose lines the engine stops by their own years, so the two cannot
+// drift apart.
+export function retiringAt(plan: Plan, retires: number): Plan {
+  return {
+    ...plan,
+    owners: plan.owners.map((owner, index) =>
+      index === 0 ? { ...owner, retires } : owner,
+    ),
+    retires,
+  };
 }
 
 // How many times over a sum rising at a rate a year has risen by a

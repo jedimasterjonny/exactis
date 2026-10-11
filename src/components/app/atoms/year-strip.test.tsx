@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Plan } from "@/data/plan";
 
+import { working } from "@/data/owners.fixture";
 import { bySlot } from "@/test/dom";
 
 import type { StripYear } from "./year-strip";
@@ -16,6 +17,7 @@ const plan: Plan = {
   from: 2026,
   inflation: 0,
   month: 0,
+  owners: [working],
   rate: 0.05,
   retires: 92,
   years: 4,

@@ -7,6 +7,7 @@ import type { IncomeLine } from "@/data/income";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { working } from "@/data/owners.fixture";
 import { endYear } from "@/data/plan";
 import { drawFor, lumpSumAllowance } from "@/lib/tax";
 
@@ -37,6 +38,7 @@ const plan = {
   from: 2026,
   inflation: 0,
   month: 0,
+  owners: [working],
   rate: 0.05,
   retires: 92,
 };

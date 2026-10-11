@@ -6,6 +6,7 @@ import type { Measured, Milestone } from "@/data/milestones";
 
 import { expenseLines } from "@/data/expenses.fixture";
 import { milestones } from "@/data/milestones.fixture";
+import { owners, working } from "@/data/owners.fixture";
 import { project } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
@@ -117,6 +118,7 @@ describe("futuresOf", () => {
     from: 2026,
     inflation: 0,
     month: 0,
+    owners: [working],
     rate: 0,
     retires: 92,
     years: 5,
@@ -277,6 +279,7 @@ describe("gradingOf", () => {
     from: 2026,
     inflation: 0,
     month: 0,
+    owners: [{ ...working, born: 1970, retires: 60 }],
     rate: 0,
     retires: 60,
     years: 10,
@@ -587,6 +590,7 @@ describe("markersIn", () => {
     from: 2026,
     inflation: 0,
     month: 0,
+    owners: [...owners],
     rate: 0,
     retires: 61,
     years: 11,

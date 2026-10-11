@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Plan } from "@/data/plan";
 
+import { working } from "@/data/owners.fixture";
+
 import { decadesOf, placed } from "./span";
 
 // Forty years from 2026, so the span ends in 2066 and the shares are round.
@@ -11,6 +13,7 @@ const plan: Plan = {
   from: 2026,
   inflation: 0,
   month: 0,
+  owners: [working],
   rate: 0.05,
   retires: 92,
   years: 40,

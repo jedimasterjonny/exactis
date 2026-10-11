@@ -22,7 +22,7 @@ import { ChanceTile } from "@/components/app/organisms/chance-tile";
 import { ProjectionChart } from "@/components/app/organisms/projection-chart";
 import { takesSpare } from "@/data/accounts";
 import { ageOf, measureNames, timed } from "@/data/milestones";
-import { ageIn, endAge, retirementYear } from "@/data/plan";
+import { ageIn, endAge, retirementYear, retiringAt } from "@/data/plan";
 import { endWorthOf, futureOf, markersIn, runLength } from "@/engine/futures";
 import { holdsAnything, project } from "@/engine/projection";
 import { useFutures } from "@/hooks/use-futures";
@@ -159,7 +159,7 @@ function Board({
   // The run is read as a future beside its points, each year measured
   // as a milestone measures one, so the tiles read the net worth as the
   // chance's screen reads the plan at its own rates, by the one function.
-  const drafted = useMemo(() => ({ ...plan, retires }), [plan, retires]);
+  const drafted = useMemo(() => retiringAt(plan, retires), [plan, retires]);
   const { points, projected } = useMemo(() => {
     const lines = {
       expenses: schedule.expenses.map((line) =>
