@@ -8,22 +8,21 @@ noticed. None is small.
 
 Each owner has one ISA and one pension allowance, shared across their accounts
 of the kind. What a salary feeds, a fixed sum and the spare money all count
-against it, a typed cap only lowers it, and money past it is not paid, staying
-in the month for the accounts after it; what none of them takes is spent. A
-fixed sum that alone is past it is refused when it is saved. It is held a
-twelfth a month rather than across the tax year, so a month short of spare money
-loses its twelfth for good, and a sum paid once a year is spread as if paid
-monthly. Each allowance is held in pounds as the law sets it and never raised,
-so over a plan of decades it shrinks in today's money as prices rise, as it
-would if no government changed it again.
+against it, a typed cap only lowers it, and a fixed sum or the spare money past
+it is not paid, staying in the month for the accounts after it, while a
+sacrifice is given up whole and what lands past it is charged as the owner's
+income; what none of them takes is spent. A fixed sum that alone is past it is
+refused when it is saved. It is held a twelfth a month rather than across the
+tax year, so a month short of spare money loses its twelfth for good, and a sum
+paid once a year is spread as if paid monthly. Each allowance is held in pounds
+as the law sets it and never raised, so over a plan of decades it shrinks in
+today's money as prices rise, as it would if no government changed it again.
 
 What the law adds on top is not held. There is no taper above £260,000 of
 adjusted income, no carry-forward of the three years before, and no money
 purchase annual allowance, although the engine draws on a pension and a draw
-would cut the allowance to £10,000. Money past the pension allowance is simply
-not paid, where a sacrifice past it would really be paid in and charged at the
-owner's marginal rate. And the ISA allowance is one figure, with no Lifetime ISA
-held to £4,000 within it.
+would cut the allowance to £10,000. And the ISA allowance is one figure, with no
+Lifetime ISA held to £4,000 within it.
 
 Decide whether the allowance is held across the tax year rather than a month at
 a time, which would have the projection carry it as it carries the tax year; the
