@@ -36,18 +36,18 @@ const plan = {
   years: 15,
 };
 
-// Ten futures over twelve years, the nth worth a million from 2030 + n
-// on for the first eight and nothing ever for the last two, none owing
-// or spending anything. So half reach the first million by 2034, the
-// earliest 5% and 10% by 2030, the earliest 25% by 2032, all but the
-// latest 25% by 2037, the latest 10% and 5% never, and four in five at
-// all; and independence, twenty-five years of nothing and ten times
-// nothing, is reached at once by all of them.
+// Ten futures over sixteen years from 34, the nth worth a million from
+// 2030 + n on for the first eight and nothing ever for the last two,
+// none owing or spending anything. So half reach the first million by
+// 2034, the earliest 5% and 10% by 2030, the earliest 25% by 2032, all
+// but the latest 25% by 2037, the latest 10% and 5% never, and four in
+// five at all; and independence, twenty-five years of nothing and ten
+// times nothing, is reached at once by all of them.
 const futures = Array.from({ length: 10 }, (_, nth): Future => ({
   fell: null,
-  measured: Array.from({ length: 12 }, (_, offset) => {
+  measured: Array.from({ length: 16 }, (_, offset) => {
     const worth = nth < 8 && offset >= 4 + nth ? 1000000 : 0;
-    return { debt: 0, expenses: 0, liquid: worth, worth };
+    return { age: 34 + offset, debt: 0, expenses: 0, liquid: worth, worth };
   }),
   ranOut: null,
 }));

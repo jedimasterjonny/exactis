@@ -17,13 +17,14 @@ const plan = {
   years: 2,
 };
 
-// Ten futures, the nth worth n thousand pounds entering 2026, twice that
-// entering 2027 and three times entering 2028, as liquid as it is worth
-// and owing and spending nothing; the first runs out in 2027 and the
-// second in 2028.
+// Ten futures from 34, the nth worth n thousand pounds entering 2026,
+// twice that entering 2027 and three times entering 2028, as liquid as
+// it is worth and owing and spending nothing; the first runs out in
+// 2027 and the second in 2028.
 const futures = Array.from({ length: 10 }, (_, nth): Future => ({
   fell: [2027, 2028][nth] ?? null,
-  measured: [1000 * nth, 2000 * nth, 3000 * nth].map((worth) => ({
+  measured: [1000 * nth, 2000 * nth, 3000 * nth].map((worth, offset) => ({
+    age: 34 + offset,
     debt: 0,
     expenses: 0,
     liquid: worth,

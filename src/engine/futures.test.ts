@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { Measured } from "@/data/goals";
+import type { Goal, Measured } from "@/data/goals";
 
 import { expenseLines } from "@/data/expenses.fixture";
 import { goals } from "@/data/goals.fixture";
@@ -36,10 +36,12 @@ function middleOf(values: readonly number[]): number {
   return sorted[Math.floor(sorted.length / 2)] ?? Number.NaN;
 }
 
-// Years measured as worth what is given, holding no property, owing
-// nothing and spending nothing, so each is as liquid as it is worth.
+// Years measured as worth what is given, from 34, holding no property,
+// owing nothing and spending nothing, so each is as liquid as it is
+// worth.
 function worthOf(pounds: readonly number[]): Measured[] {
-  return pounds.map((worth) => ({
+  return pounds.map((worth, offset) => ({
+    age: 34 + offset,
     debt: 0,
     expenses: 0,
     liquid: worth,
@@ -157,8 +159,8 @@ describe("futuresOf", () => {
   // £30,000 drawn £12,000 a year holds £18,000 entering 2027 and £6,000
   // entering 2028, which runs out that year; the home is no saving, but
   // it is worth £400,000 throughout, so the plan is worth that much
-  // more than it is liquid. Nothing is owed, and the £1,000 a month
-  // going out is £12,000 a year.
+  // more than it is liquid. Nothing is owed, the £1,000 a month going
+  // out is £12,000 a year, and the owner is 34 as the plan opens.
   it("runs every future as the plan at its rates where nothing strays", () => {
     const futures = taken(
       [isa, home],
@@ -170,7 +172,8 @@ describe("futuresOf", () => {
       Array.from({ length: 3 }, () => ({
         fell: 2028,
         measured: [430000, 418000, 406000, 400000, 400000, 400000].map(
-          (worth) => ({
+          (worth, offset) => ({
+            age: 34 + offset,
             debt: 0,
             expenses: 12000,
             liquid: worth - 400000,
@@ -202,6 +205,7 @@ describe("futuresOf", () => {
     );
 
     expect(future?.measured[0]).toStrictEqual({
+      age: 34,
       debt: 100000,
       expenses: 12000,
       liquid: -70000,
@@ -521,6 +525,22 @@ describe("reachedIn", () => {
         plan,
       ),
     ).toBe(2027);
+  });
+
+  // From 34 in 2026, 36 is reached in 2028, whatever the future holds.
+  it("reads the year an age is reached in off the future's ages", () => {
+    const atAge = (times: number): Goal => ({
+      ...firstMillion,
+      conditions: [{ measure: "age", of: "years", times }],
+    });
+    const future: Future = {
+      fell: null,
+      measured: worthOf([0, 0, 0]),
+      ranOut: null,
+    };
+
+    expect(reachedIn(future, atAge(36), plan)).toBe(2028);
+    expect(reachedIn(future, atAge(37), plan)).toBeNull();
   });
 });
 

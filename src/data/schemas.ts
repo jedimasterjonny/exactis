@@ -55,12 +55,18 @@ export const milestoneValues = {
 
 // What a condition of a goal holds: the measure, the basis it is held
 // to, and the multiple, nothing or more, so a measure may be held to
-// nothing, a liquid net worth above nothing say.
-const condition = z.object({
-  measure: z.enum(measures),
-  of: z.enum(bases),
-  times: z.number().nonnegative(),
-});
+// nothing, a liquid net worth above nothing say. An age is held to
+// years, since a year is what an age counts, and no sum is.
+const condition = z
+  .object({
+    measure: z.enum(measures),
+    of: z.enum(bases),
+    times: z.number().nonnegative(),
+  })
+  .refine(
+    (held) => (held.measure === "age") === (held.of === "years"),
+    "An age is held to years, and nothing else is",
+  );
 
 // What a goal holds: the name, and a condition at least, since a goal
 // with none is reached at once.
