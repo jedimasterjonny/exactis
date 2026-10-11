@@ -29,8 +29,9 @@ import {
 // the Bank's 2% target, and everything in stocks.
 const opening = { allocation: allInStocks, rates: openingRates };
 
-// The reference plan as the store sets it: to 89, from September 2026,
-// for the owners fixture's one owner, born in 1990 and retiring at 59.
+// The reference plan as the store sets it: to 89, its balances as of
+// September 2026, so running from October, for the owners fixture's
+// one owner, born in 1990 and retiring at 59.
 const setting = { ages: { ends: 89 }, asOf: { month: 8, year: 2026 }, owners };
 
 describe("ageIn", () => {
@@ -80,18 +81,28 @@ describe("debtTermOf", () => {
 
 describe("planOf", () => {
   // Four fifths at stocks' 7.95% and a fifth at bonds' 4.45%, with the
-  // 2.95% typed for inflation.
-  it("runs from the month the balances are as of to the age given, for the owner, on the rates given as the savings are split", () => {
+  // 2.95% typed for inflation; the balances read at the end of
+  // September, so the plan opens in October.
+  it("runs from the month after the one the balances are as of to the age given, for the owner, on the rates given as the savings are split", () => {
     expect(planOf(setting, { allocation, rates })).toStrictEqual({
       born: 1990,
       from: 2026,
       inflation: 0.0295,
-      month: 8,
+      month: 9,
       owners,
       rate: planRate(rates, allocation),
       retires: 59,
       years: 53,
     });
+  });
+
+  // Balances read at the end of December open the plan in the January
+  // after, so its first year is the new one, and it runs a year fewer
+  // to the same age.
+  it("opens the year after on balances as of December", () => {
+    expect(
+      planOf({ ...setting, asOf: { month: 11, year: 2026 } }, opening),
+    ).toMatchObject({ from: 2027, month: 0, years: 52 });
   });
 
   // Sam, born in 1993, listed first: the plan is theirs, so it reaches

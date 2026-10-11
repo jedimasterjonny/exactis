@@ -85,8 +85,8 @@ export function isSound(house: HouseValues): boolean {
 }
 
 // The purchase a house opens on before one is typed: the month the
-// balances are as of, for nothing, which holds the save until what it
-// cost is typed.
+// plan starts in, for nothing, which holds the save until what it cost
+// is typed.
 export function openingPurchase(plan: PlanMonth): Purchase {
   return { month: { month: plan.month, year: plan.from }, price: 0 };
 }

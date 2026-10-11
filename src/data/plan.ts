@@ -6,7 +6,7 @@ import type { LineGrowth, Month } from "@/data/schedule";
 import { planRate } from "@/data/rates";
 import { rules } from "@/data/rules";
 import { termOf } from "@/lib/loans";
-import { monthsBetween } from "@/lib/months";
+import { monthAfter, monthsBetween } from "@/lib/months";
 
 // One future of the markets, a figure for each year the plan carries,
 // the first year's the one the plan starts in and each after it the
@@ -24,9 +24,10 @@ export interface Path {
 // grows at, a nominal return as a fixed rate is, and the inflation the
 // plan takes, which the lines, stated in today's money, rise with, each
 // a fraction a year as every rate is; the first year plotted, which
-// holds the balances, and the month of it they are as of, January being
-// nought as the date gives it, so the first year runs from there rather
-// than from its start; how many years it runs forward; the year the
+// holds the balances, and the month of it the plan starts in, the one
+// after the month the balances are as of, January being nought as the
+// date gives it, so the first year runs from there rather than from its
+// start; how many years it runs forward; the year the
 // plan's owner was born, which turns a year into an age; and the age
 // they retire at, from which they earn nothing by working. The plan's
 // owner is the first listed, whose years these are; and every owner
@@ -214,17 +215,19 @@ export function marginOf(line: {
   }
 }
 
-// The plan from the month the balances are as of, since they are what
-// its first year opens with, to the age it is set to run to, for the
-// first listed owner, whose plan it is: born in their year, retiring at
-// their age, growing at the rate the rates given make with the savings
-// split as the allocation given splits them, and taking the rates'
-// inflation: what the projection runs on and what the plan screen lays
-// its lines over. The rates and the split are taken together, as the
-// household keeps them. A plan whose age is already reached runs no
-// years forward rather than a count below nothing. A household with no
-// owner has no plan to make, and the store refuses to keep one, so a
-// caller handing one here has skipped the model.
+// The plan from the month after the one the balances are as of: a
+// balance is what an account held at that month's end, so the plan
+// opens on the balances the month after and pays nothing into a month
+// the statements already hold. It runs to the age it is set to run to,
+// for the first listed owner, whose plan it is: born in their year,
+// retiring at their age, growing at the rate the rates given make with
+// the savings split as the allocation given splits them, and taking the
+// rates' inflation: what the projection runs on and what the plan
+// screen lays its lines over. The rates and the split are taken
+// together, as the household keeps them. A plan whose age is already
+// reached runs no years forward rather than a count below nothing. A
+// household with no owner has no plan to make, and the store refuses to
+// keep one, so a caller handing one here has skipped the model.
 export function planOf(
   { ages, asOf, owners }: Setting,
   {
@@ -232,19 +235,20 @@ export function planOf(
     rates,
   }: { readonly allocation: Allocation; readonly rates: Rates },
 ): Plan {
+  const start = monthAfter(asOf);
   const [owner] = owners;
   if (owner === undefined) {
     throw new Error(rules.somebodys);
   }
   return {
     born: owner.born,
-    from: asOf.year,
+    from: start.year,
     inflation: rates.inflation,
-    month: asOf.month,
+    month: start.month,
     owners,
     rate: planRate(rates, allocation),
     retires: owner.retires,
-    years: Math.max(0, owner.born + ages.ends - asOf.year),
+    years: Math.max(0, owner.born + ages.ends - start.year),
   };
 }
 

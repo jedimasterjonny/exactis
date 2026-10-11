@@ -646,6 +646,7 @@ describe("household", () => {
 describe("soundKept", () => {
   const september = { month: 8, year: 2026 };
 
+  // Balances read at the end of September open the plan in October.
   it("keeps the household before anything is saved and the reference plan, each with the plan on the day", () => {
     expect(soundKept(nothingKeptIn(september))).toStrictEqual({
       household: {
@@ -663,7 +664,7 @@ describe("soundKept", () => {
           born: 1990,
           from: 2026,
           inflation: 0.02,
-          month: 8,
+          month: 9,
           owners: [{ born: 1990, id: 1, name: "Me", retires: 59 }],
           rate: 0.05,
           retires: 59,
@@ -994,8 +995,9 @@ describe("a line paying a loan", () => {
   // The fixtures' house owes £341,810 at 5.15%, paying £2,210 a month,
   // and their Golf £14,000 at 7.9%, paying £290 a month on a PCP towards
   // a £6,000 balloon, or £438 a month on a loan with none; the balances
-  // are as of September 2026 unless a test says otherwise.
-  const september = { month: 8, year: 2026 };
+  // are as of the end of August 2026 unless a test says otherwise, so
+  // the plan runs from September.
+  const august = { month: 7, year: 2026 };
 
   // The reference household with the records an asset is saved as added
   // under the next ids, the asset 6, its loan 7 and the line paying it 8,
@@ -1003,7 +1005,7 @@ describe("a line paying a loan", () => {
   // reads it.
   function paymentsOf(
     { asset, loan }: SecuredRecords,
-    asOf: Month = september,
+    asOf: Month = august,
   ): ExpenseLine | undefined {
     const { household: read } = soundKept({
       ...kept,
@@ -1039,8 +1041,9 @@ describe("a line paying a loan", () => {
 
   // £1,000 a month at no rate clears £114,000 in 114 payments: the last
   // falls in February 2036 counted from September 2026, and in August
-  // 2034 counted from March 2025, whatever year the line was saved from.
-  it("counts the payments from the month the balances are as of, so the end moves with it", () => {
+  // 2034 counted from March 2025, the month after balances read at the
+  // end of February, whatever year the line was saved from.
+  it("counts the payments from the month after the one the balances are as of, so the end moves with it", () => {
     const flat = toHouseRecords(
       { ...homeValues, balance: 114000, payment: 1000, rate: 0 },
       { from: 2026 },
@@ -1051,7 +1054,7 @@ describe("a line paying a loan", () => {
       lastMonth: 1,
       lastYear: 2036,
     });
-    expect(paymentsOf(flat, { month: 2, year: 2025 })).toMatchObject({
+    expect(paymentsOf(flat, { month: 1, year: 2025 })).toMatchObject({
       firstYear: 2025,
       lastMonth: 7,
       lastYear: 2034,
@@ -1059,10 +1062,11 @@ describe("a line paying a loan", () => {
   });
 
   // A mortgage already paid off, its line left in place, owes nothing
-  // the £2,210 is for, so the line runs through the month before the
-  // balances' month and no month of the plan: from September, through
-  // August 2026, and from January, through December 2025, starting in
-  // that year so that it still ends no earlier than it starts.
+  // the £2,210 is for, so the line runs through the balances' month,
+  // the one before the plan's first, and no month of the plan: from
+  // September, through August 2026, and from January, through December
+  // 2025, starting in that year so that it still ends no earlier than
+  // it starts.
   it("runs a cleared loan's payments in no month of the plan", () => {
     const cleared = toHouseRecords(
       { ...homeValues, balance: 0 },
@@ -1074,7 +1078,7 @@ describe("a line paying a loan", () => {
       lastMonth: 7,
       lastYear: 2026,
     });
-    expect(paymentsOf(cleared, { month: 0, year: 2026 })).toMatchObject({
+    expect(paymentsOf(cleared, { month: 11, year: 2025 })).toMatchObject({
       firstYear: 2025,
       lastMonth: 11,
       lastYear: 2025,
