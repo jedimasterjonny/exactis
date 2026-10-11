@@ -29,8 +29,9 @@ import { amend } from "@/store/household";
 const expenseValues = z.object(lineValues) satisfies z.ZodType<LineValues>;
 
 // An income line adds its kind, the owner who earns it, its parts, whole
-// and never negative, the pension it feeds and the share of its base it
-// sacrifices, a fraction of the base at most, and the pension it opens,
+// and never negative, the pension it feeds, the share of its base it
+// sacrifices and the share its employer matches, each a fraction of the
+// base at most, and the pension it opens,
 // named, holding nothing or more and naming its owner, as every pension
 // does. A line opens one only while it is a salary, and not while it
 // feeds one by id, since the id is the household's to give. What else
@@ -44,6 +45,7 @@ const incomeValues = z
     bonus: pounds,
     feeds: recordId.nullable(),
     kind: z.enum(incomeKinds),
+    match: z.number().min(0).max(1),
     opens: z
       .object({ balance: pounds, name: named, owner: recordId })
       .nullable(),

@@ -11,10 +11,12 @@ const [salary, stepUp] = incomeLines;
 
 describe("fedOf", () => {
   // Twelve per cent of the salary's £120,000 base with the employer's
-  // on it, £16,560 a year, and the step-up's £1,000 a month at a
-  // twentieth of its base, stated a year beside it.
+  // NI saved on it, £16,560 a year, the employer's £7,200 beside it
+  // where the salary is matched to six per cent, and the step-up's
+  // £1,000 a month at a twentieth of its base, stated a year beside it.
   it("sums what every salary feeding the account lands in it a year, whatever its cadence", () => {
     expect(fedOf(1, incomeLines)).toBeCloseTo(16560, 8);
+    expect(fedOf(1, [{ ...salary, match: 0.06 }])).toBeCloseTo(23760, 8);
     expect(
       fedOf(1, [
         salary,

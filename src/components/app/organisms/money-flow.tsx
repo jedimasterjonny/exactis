@@ -23,11 +23,13 @@ import { formatMonth } from "@/lib/months";
 
 type Direction = "down" | "up";
 
-// What lands in an account in the month, by where it comes from.
+// What lands in an account in the month, by where it comes from, and
+// whether an employer's match is in what the salaries feed it.
 interface Landed {
   readonly fed: number;
   readonly feeders: readonly string[];
   readonly fixed: number;
+  readonly isMatched: boolean;
   readonly relief: number;
   readonly spare: number;
 }
@@ -241,15 +243,17 @@ export function MoneyFlow({
 }
 
 // What lands in an account in the month, from each source the flow
-// lists it under: what the salaries feeding it land with the NI saved,
-// and who they are, its own fixed sum, its take of the spare money, and
-// the relief a pension claims back on what it is paid.
+// lists it under: what the salaries feeding it land with the NI saved
+// and any match, who they are and whether one is matched, its own fixed
+// sum, its take of the spare money, and the relief a pension claims
+// back on what it is paid.
 function landedIn(account: Account, flow: CashFlow): Landed {
   const fed = flow.fed.filter((entry) => entry.account.id === account.id);
   return {
     fed: sumIn(fed),
     feeders: fed.map(({ line }) => line.name),
     fixed: sumIn(flow.fixed.filter((entry) => entry.account.id === account.id)),
+    isMatched: fed.some(({ line }) => line.match > 0),
     relief: sumIn(
       flow.relief.filter((entry) => entry.account.id === account.id),
     ),
@@ -320,11 +324,13 @@ function opposite(direction: Direction): Direction {
 
 // Where what lands in an account comes from, each with its amount when
 // there are two or more, since the step's figure is the amount of one.
+// What the salaries feed is their sacrifice, and the employer's match
+// where one of them is matched.
 function sourcesOf(landed: Landed): string | undefined {
   const sources = [
     {
       amount: landed.fed,
-      what: `salary sacrifice from ${listed.format(landed.feeders)}`,
+      what: `salary sacrifice${landed.isMatched ? " and employer match" : ""} from ${listed.format(landed.feeders)}`,
     },
     { amount: landed.fixed, what: "fixed sum" },
     { amount: landed.spare, what: "spare money" },

@@ -230,7 +230,8 @@ export function monthsOn(
 // time by what the flow pays off it, as the loan maths reads a month,
 // and never drawn on either. What an account is paid a
 // month is what that month's cash flow says, a salary's sacrifice with
-// the NI saved on it, a fixed sum spread over the months as the flow
+// the NI saved on it and the employer's match, a fixed sum spread over
+// the months as the flow
 // spreads it or the spare money's take, read afresh each month since a
 // line may end in one; and the flow is read over every account, since
 // a fixed sum into any of them is money the month no longer has, and a

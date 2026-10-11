@@ -617,6 +617,43 @@ describe("cashFlow", () => {
     expect(nothing.left).toBeCloseTo(7342.2 - 2376, 10);
   });
 
+  // The salary matched to six per cent of its base: the employer's
+  // £600 a month lands beside the £1,200 given up and the £180 of NI
+  // saved on it, £1,980, while the £1,200 alone comes off the month and
+  // the tax is charged on the £10,800 left of it as before, leaving the
+  // £6,706.20 it leaves unmatched. A match of a fifth is matched only to
+  // the 12% given up, so it lands what a match of 12% does. What the
+  // month put by is the £1,200 the owner gave up: the match, like
+  // the NI saved, is no money the month had.
+  it("feeds the pension the employer's match with the sacrifice, off nothing the owner is paid", () => {
+    const unpaid: Account = {
+      balance: 391640,
+      growth: { kind: "plan" },
+      id: pension.id,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+      owner: 1,
+    };
+    const flowWith = (match: number): CashFlow =>
+      cashFlow(
+        [unpaid],
+        { expenses: [], income: [{ ...salary, match }] },
+        { at: { month: 0, year: 2026 }, plan },
+      );
+    const matched = flowWith(0.06);
+
+    expect(matched.fed).toHaveLength(1);
+    expect(matched.fed[0]?.amount).toBeCloseTo(1980, 9);
+    expect(matched.fed[0]?.sacrificed).toBe(1200);
+    expect(matched.taxable).toBe(10800);
+    expect(matched.incomeTax).toBeCloseTo(3710.25, 10);
+    expect(matched.insurance).toBeCloseTo(383.55, 10);
+    expect(matched.left).toBeCloseTo(6706.2, 10);
+    expect(flowWith(0.2).fed[0]?.amount).toBeCloseTo(2580, 9);
+    expect(flowWith(0.12).fed[0]?.amount).toBeCloseTo(2580, 9);
+    expect(totalsOf(matched).saved).toBe(1200);
+  });
+
   // The feed runs with the line: before its first year, and after the
   // month it ends in, the pension is fed nothing and the month is
   // short by nothing, though the pension is listed and the line names
@@ -1628,6 +1665,30 @@ describe("cashFlow", () => {
         cashFlow(
           [pension],
           { expenses: [], income: [{ ...salary, sacrifice }] },
+          { at: { month: 0, year: 2026 }, plan },
+        ),
+      ).not.toThrow();
+    }
+  });
+
+  // The share an employer matches is held the same way, in words of its
+  // own: below nothing it would take back out of the pension what the
+  // sacrifice put in.
+  it("refuses a salary matched less than none of its base or more than all of it", () => {
+    for (const match of [-0.1, 1.5, Number.NaN]) {
+      expect(() =>
+        cashFlow(
+          [pension],
+          { expenses: [], income: [{ ...salary, match }] },
+          { at: { month: 0, year: 2026 }, plan },
+        ),
+      ).toThrow("An employer matches a share of the base");
+    }
+    for (const match of [0, 1]) {
+      expect(() =>
+        cashFlow(
+          [pension],
+          { expenses: [], income: [{ ...salary, match }] },
           { at: { month: 0, year: 2026 }, plan },
         ),
       ).not.toThrow();

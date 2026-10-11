@@ -228,10 +228,10 @@ function Closing({
 }
 
 // Which salary a pension is fed from and what lands in it, which is
-// more than comes off the month by the NI saved, beneath the pension's
-// name.
+// more than comes off the month by the NI saved, and by the employer's
+// match where the salary is matched, beneath the pension's name.
 function describeFed({ amount, line }: Fed): string {
-  return `Salary sacrifice from ${line.name}, paid in as ${formatGbp(amount)} with the NI saved`;
+  return `Salary sacrifice from ${line.name}, paid in as ${formatGbp(amount)} with the NI saved${line.match > 0 ? " and the employer's match" : ""}`;
 }
 
 // Where what the month is short by comes from, beneath the figure: the

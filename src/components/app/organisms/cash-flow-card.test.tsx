@@ -123,6 +123,25 @@ describe("CashFlowCard", () => {
     );
   });
 
+  // A salary matched to six per cent of its base lands the employer's
+  // £600 beside the £1,380, and the row says the match is in what
+  // landed, while the £1,200 given up is still all that comes off the
+  // month.
+  it("says the employer's match lands with the sacrifice of a matched salary", () => {
+    render(
+      <CashFlowCard
+        accounts={held}
+        milestones={milestones}
+        plan={plan}
+        schedule={{ ...schedule, income: [{ ...salary, match: 0.06 }] }}
+      />,
+    );
+
+    expect(ledger()[1]).toBe(
+      "Workplace pensionSalary sacrifice from Salary, paid in as £1,980 with the NI saved and the employer's match−£1,200",
+    );
+  });
+
   // The plan runs from 2026 to 2083, a column a year, ruled at the
   // children leaving home in 2040 and the downsize in 2059, retirement
   // falling past its end.
