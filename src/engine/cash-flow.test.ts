@@ -9,6 +9,8 @@ import type { LineValues, Month } from "@/data/schedule";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { sam, working } from "@/data/owners.fixture";
+import { retiringAt } from "@/data/plan";
 
 import type { CashFlow, Schedule } from "./cash-flow";
 
@@ -46,6 +48,7 @@ const plan = {
   from: 2026,
   inflation: 0,
   month: 0,
+  owners: [working, sam],
   rate: 0.05,
   retires: 90,
   years: 53,
@@ -188,7 +191,7 @@ describe("cashFlow", () => {
   // January 2049 is the state pension and the other income alone, with
   // nothing fed and no profit for Class 4 to be charged on.
   it("stops a salary and a self-employed profit at the retirement age, whatever their lines say, and runs the rest on", () => {
-    const retiring = { ...plan, retires: 59 };
+    const retiring = retiringAt(plan, 59);
     const working = { ...lean, lastYear: null };
     const lines: Schedule = {
       expenses: [],
@@ -215,6 +218,83 @@ describe("cashFlow", () => {
     expect(first.income).toBe(2450);
     expect(first.fed).toStrictEqual([]);
     expect(first.profit).toBe(0);
+  });
+
+  // Retiring at 59, the first owner retires in 2049 and Sam, born in
+  // 1993, in 2052: both £36,000 salaries pay in 2048, Sam's alone in
+  // 2050, and neither in 2052.
+  it("stops each owner's salary at their own retirement", () => {
+    const income = [
+      { ...plain, lastYear: null },
+      { ...plain, id: 9, lastYear: null, owner: sam.id },
+    ];
+    const incomeIn = (year: number): number =>
+      cashFlow(
+        [],
+        { expenses: [], income },
+        { at: { month: 0, year }, plan: retiringAt(plan, 59) },
+      ).income;
+
+    expect(incomeIn(2048)).toBe(6000);
+    expect(incomeIn(2050)).toBe(3000);
+    expect(incomeIn(2052)).toBe(0);
+  });
+
+  // Two salaries of £40,000, one each owner's: each pays £5,486 of
+  // income tax and £2,194.40 of NI a year, £15,360.80 together, where
+  // one person on £80,000 pays £23,042.60. Both the one owner's, they
+  // are the one job's step-up and pay that.
+  it("taxes each owner's income on its own, against their own allowance, bands and thresholds", () => {
+    const mine: IncomeLine = { ...plain, amount: 40000 };
+    const theirs: IncomeLine = { ...mine, id: 9, owner: sam.id };
+    const taxed = (income: readonly IncomeLine[]): number => {
+      const flow = cashFlow(
+        [],
+        { expenses: [], income },
+        { at: { month: 0, year: 2026 }, plan },
+      );
+      return (flow.incomeTax + flow.insurance) * 12;
+    };
+
+    expect(taxed([mine, theirs])).toBeCloseTo(15360.8, 8);
+    expect(taxed([mine, { ...theirs, owner: mine.owner }])).toBeCloseTo(
+      23042.6,
+      8,
+    );
+  });
+
+  // Sam's SIPP is paid £2,000 a month out of taxed money while Sam earns
+  // nothing and the first owner earns £5,000 a month: Sam is relieved on
+  // £3,600 a year, £300 a month, so £240 of the £2,000 claims £60 back
+  // and the rest lands a pound a pound, where pooling the household's
+  // earnings relieved £500. Earning £1,000 a month of their own, Sam is
+  // relieved on that, £800 paid and £200 back.
+  it("relieves a pension on its own owner's earnings, and on £3,600 a year for an owner earning nothing", () => {
+    const sipp: Account = {
+      ...pension,
+      contribution: { amount: 2000, cadence: "month", kind: "fixed" },
+      id: 7,
+      name: "Sam's SIPP",
+      owner: sam.id,
+    };
+    const reliefWith = (income: readonly IncomeLine[]): CashFlow["relief"] =>
+      pennies(
+        cashFlow(
+          [sipp],
+          { expenses: [], income },
+          { at: { month: 0, year: 2026 }, plan },
+        ).relief,
+      );
+
+    expect(reliefWith([{ ...plain, amount: 60000 }])).toStrictEqual([
+      { account: sipp, amount: 60 },
+    ]);
+    expect(
+      reliefWith([
+        { ...plain, amount: 60000 },
+        { ...plain, amount: 12000, id: 9, owner: sam.id },
+      ]),
+    ).toStrictEqual([{ account: sipp, amount: 200 }]);
   });
 
   // £3,489.78 a month after the sacrifice and the tax on the rest, less

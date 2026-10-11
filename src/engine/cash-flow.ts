@@ -21,6 +21,7 @@ import {
 } from "@/data/income";
 import {
   debtTermOf,
+  earnerOf,
   marginOf,
   pricesIn,
   rateFrom,
@@ -137,13 +138,13 @@ interface Feeding {
 
 // What the payments out of the month are held to as they are made:
 // what is left of each allowance, in what lands, and what is left of
-// each owner's relief, in what lands with it, which opens at what the
-// month's earnings relieve, with the relief each pension has claimed so
-// far.
+// each owner's relief, in what lands with it, which opens at what that
+// owner's own earnings in the month relieve, by the owner's id, with
+// the relief each pension has claimed so far.
 interface Purse {
   readonly relief: Paid[];
   readonly reliefs: Rooms;
-  readonly relievable: number;
+  readonly relievable: Rooms;
   readonly rooms: Rooms;
 }
 
@@ -171,12 +172,12 @@ interface Reading {
 type Rooms = Map<string, number>;
 
 // What the month's income pays in tax: the income tax on all of it,
-// and the National Insurance on the kinds that pay it, and the income
-// the tax is charged on, which is what a draw on a pension that month
-// is taxed on top of. Beside them is the self-employed profit the
-// month's Class 4 is charged on, since Class 4 is due on the year's
-// profit as income tax is on the year's income, and the projection
-// settles the one as it settles the other.
+// each owner's charged on their own, and the National Insurance on the
+// kinds that pay it, and the income the tax is charged on, which is
+// what a draw on a pension that month is taxed on top of. Beside them
+// is the self-employed profit the month's Class 4 is charged on, since
+// Class 4 is due on the year's profit as income tax is on the year's
+// income, and the projection settles the one as it settles the other.
 interface Taxed {
   readonly incomeTax: number;
   readonly insurance: number;
@@ -219,11 +220,17 @@ const nanopound = 1e-9;
 // band that the quieter months leave unused. The projection settles
 // the difference in the April after the tax year, which comes into
 // that month's money as income does, untaxed, and is spent, saved or
-// drawn for with the rest of it. A salary or a self-employed profit
-// runs only until the plan's owner retires, whatever its own last year
-// says, since money earned by working is not earned once the work
-// stops; a line ending before then ends where it says, and a pension
-// or any other income runs on. What is left within a
+// drawn for with the rest of it. The tax is each owner's: income tax
+// and National Insurance are charged on a person, so each owner's
+// lines are taxed together against their own allowance, bands and
+// thresholds and apart from everyone else's, and two salaries of
+// £40,000 pay two people's tax rather than one person's on £80,000;
+// the month's figures are the owners' summed. A salary or a
+// self-employed profit runs only until the owner who earns it retires,
+// at their own age, whatever its own last year says, since money
+// earned by working is not earned once the work stops; a line ending
+// before then ends where it says, and a pension or any other income
+// runs on. What is left within a
 // nanopound of nothing is nothing exactly: a month whose lines cancel
 // to the penny need not
 // cancel in binary, and a shortfall too small to write down is no
@@ -339,11 +346,12 @@ const nanopound = 1e-9;
 // month reads the same whenever in the year it falls and needs nothing
 // the projection carries. A pension paid out of taxed money claims the
 // basic rate back on no more than its owner is relieved on, held the
-// same way: a twelfth of what the month's salaries and self-employed
-// profit earn a year, less what they sacrifice, or of £3,600 when that
-// is more, shared across the owner's pensions in the order the month
-// pays them, and a pound paid past it lands as a pound. The earnings
-// are the plan's, since no line names whose they are. The month is
+// same way: a twelfth of what the owner's own salaries and
+// self-employed profit earn a year, less what they sacrifice, or of
+// £3,600 when that is more, shared across the owner's pensions in the
+// order the month pays them, and a pound paid past it lands as a pound.
+// An owner who earns nothing is relieved on the £3,600 whatever anyone
+// else in the household earns. The month is
 // worked out in its own pounds. A line states its amount in today's
 // money, the money of the month the plan starts in, and is paid it risen
 // since then at the rate its growth gives, a month at a time: with the
@@ -384,11 +392,12 @@ export function cashFlow(
   ) {
     throw new Error(rules.alwaysFunded);
   }
-  checkLinks(accounts, schedule);
+  checkLinks(accounts, schedule, reading.plan);
   const running = schedule.income.filter(
     (line) =>
       runsIn(line, at) &&
-      (!isEarned(line) || at.year < retirementYear(reading.plan)),
+      (!isEarned(line) ||
+        at.year < retirementYear(earnerOf(line, reading.plan))),
   );
   const income = payOf(running, [], reading);
   const feedingInto = (
@@ -455,7 +464,11 @@ export function cashFlow(
     const purse: Purse = {
       relief: [],
       reliefs: new Map(),
-      relievable: relievableOn(payOf(running.filter(isEarned), fed, reading)),
+      relievable: new Map(
+        [...Map.groupBy(running.filter(isEarned), byOwner)].map(
+          ([owner, lines]) => [owner, relievableOn(payOf(lines, fed, reading))],
+        ),
+      ),
       rooms: new Map(),
     };
     for (const entry of fed) {
@@ -611,6 +624,12 @@ function accountAt(
   return accounts.find((account) => account.id === id);
 }
 
+// The owner who earns a line, as the lines are grouped by owner: the
+// id as a string, which is how a room is keyed too.
+function byOwner(line: IncomeLine): string {
+  return String(line.owner);
+}
+
 // What a loan's payments charge the month, given the term the loan maths
 // says they clear it in: the payment itself through the month before
 // the last falls in; in that month what clears the loan, which
@@ -635,20 +654,29 @@ function chargedIn(
 }
 
 // Every link the schedule holds, whether or not the line holding it
-// runs in the month being worked out: a salary feeds a pension and
-// nothing else, and an expense line pays a debt and nothing else. Read
+// runs in the month being worked out: an income line is earned by an
+// owner the plan lists, a salary feeds a pension and nothing else, and
+// an expense line pays a debt and nothing else. Read
 // a month at a time, a link checked only where its line runs would be
 // refused part way through a projection, in the first year the line
 // reaches, while the screens reading a single month stayed green and
 // the plan looked sound. A line naming an account that is not listed
 // names nothing here and is sound: it is earned whole, or pays nothing
-// off a loan. A salary gives up a share of its base, from none of it to
+// off a loan. A line earned by nobody the plan lists is not, since
+// there are no years to tax it by or stop it at. A salary gives up a
+// share of its base, from none of it to
 // all of it, and the action holds it there: a share below nothing
 // would be a feed below nothing, which the allowance's room divided by
 // would turn into the whole room fed from nothing given up, and a share
 // past the whole would give up pay the salary never paid.
-function checkLinks(accounts: readonly Account[], schedule: Schedule): void {
-  for (const { feeds, sacrifice } of schedule.income) {
+function checkLinks(
+  accounts: readonly Account[],
+  schedule: Schedule,
+  plan: Plan,
+): void {
+  for (const line of schedule.income) {
+    const { feeds, sacrifice } = line;
+    earnerOf(line, plan);
     const account = accountAt(accounts, feeds);
     if (account !== undefined && !isPension(account)) {
       throw new Error(rules.feedsPension);
@@ -814,13 +842,16 @@ function payOf(
 }
 
 // What is left of the relief an account's owner may claim in the month,
-// in what lands with it: what the month's earnings relieve until a
-// payment has claimed some of it, and nothing for an account that
-// claims no relief.
+// in what lands with it: what the owner's own earnings in the month
+// relieve until a payment has claimed some of it, the £3,600 floor for
+// an owner earning nothing, and nothing for an account that claims no
+// relief.
 function reliefIn(purse: Purse, account: Account): number {
   return reliefOf(account) === 0
     ? 0
-    : (purse.reliefs.get(roomOf(account)) ?? purse.relievable);
+    : (purse.reliefs.get(roomOf(account)) ??
+        purse.relievable.get(String(account.owner)) ??
+        relievableOn(0));
 }
 
 // What is left of an account's allowance in the month, in what lands:
@@ -903,36 +934,48 @@ function spareMoney(
 }
 
 // The tax on the lines running in the month, each as it is earned less
-// what it gives up into the pension it feeds: income tax on the whole
-// of it, and National Insurance on each kind of income that pays it,
-// the lines of a kind summed first, since a step-up is a second line
-// of the one job rather than a second job with a threshold of its own.
-// Each is charged on the month alone against a twelfth of each band as
-// the bands stand in its tax year, which is a twelfth of what a year of
-// the month would pay, so a month is charged the same whenever in the
-// tax year it falls.
+// what it gives up into the pension it feeds, owner by owner, since
+// income tax and National Insurance are charged on a person and each
+// owner has an allowance, bands and thresholds of their own: income tax
+// on the whole of an owner's, and National Insurance on each kind of
+// income of theirs that pays it, their lines of a kind summed first,
+// since a step-up is a second line of the one job rather than a second
+// job with a threshold of its own. Each is charged on the month alone
+// against a twelfth of each band as the bands stand in its tax year,
+// which is a twelfth of what a year of the month would pay, so a month
+// is charged the same whenever in the tax year it falls. What the month
+// pays is the owners' summed, and what it is charged on is everything
+// they earned together.
 function taxOn(
   lines: readonly IncomeLine[],
   fed: readonly Fed[],
   reading: Reading,
 ): Taxed {
   const stretch = { months: 1, uprating: upratingIn(reading.plan, reading.at) };
-  const ofKind = (kind: IncomeKind): number =>
+  const ofKind = (theirs: readonly IncomeLine[], kind: IncomeKind): number =>
     payOf(
-      lines.filter((line) => line.kind === kind),
+      theirs.filter((line) => line.kind === kind),
       fed,
       reading,
     );
-  const taxable = payOf(lines, fed, reading);
-  return {
-    incomeTax: incomeTaxOn(taxable, stretch),
-    insurance: incomeKinds.reduce(
-      (sum, kind) => sum + insuranceOn(kind, ofKind(kind), stretch),
-      0,
-    ),
-    profit: ofKind("self-employment"),
-    taxable,
-  };
+  return [...Map.groupBy(lines, byOwner).values()].reduce<Taxed>(
+    (taxed, theirs) => {
+      const taxable = payOf(theirs, fed, reading);
+      return {
+        incomeTax: taxed.incomeTax + incomeTaxOn(taxable, stretch),
+        insurance:
+          taxed.insurance +
+          incomeKinds.reduce(
+            (sum, kind) =>
+              sum + insuranceOn(kind, ofKind(theirs, kind), stretch),
+            0,
+          ),
+        profit: taxed.profit + ofKind(theirs, "self-employment"),
+        taxable: taxed.taxable + taxable,
+      };
+    },
+    { incomeTax: 0, insurance: 0, profit: 0, taxable: 0 },
+  );
 }
 
 function total(amounts: readonly { readonly amount: number }[]): number {

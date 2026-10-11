@@ -16,3 +16,7 @@ export const sam = {
   name: "Sam",
   retires: 59,
 } as const satisfies Owner;
+
+// The first owner retiring at 90, past the end of a plan to 89, so a
+// salary runs as long as its line says. For tests.
+export const working = { ...owners[0], retires: 90 } as const satisfies Owner;

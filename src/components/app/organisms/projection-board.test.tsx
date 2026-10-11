@@ -18,6 +18,7 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
 import { retiring } from "@/data/income.fixture";
 import { atAge } from "@/data/milestones";
+import { retiringAt } from "@/data/plan";
 import { balanceIn, project } from "@/engine/projection";
 import { refused } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
@@ -216,7 +217,7 @@ describe("ProjectionBoard", () => {
       vi.advanceTimersToNextFrame();
     });
 
-    const moved = totalIn({ ...retiring, retires: 36 }, 2028);
+    const moved = totalIn(retiringAt(retiring, 36), 2028);
 
     expect(screen.getByText("2028 · Age 38")).toBeInTheDocument();
     expect(moved).not.toBe(totalIn(retiring, 2028));
@@ -246,7 +247,7 @@ describe("ProjectionBoard", () => {
       vi.advanceTimersToNextFrame();
     });
 
-    const early = { ...retiring, retires: 50 };
+    const early = retiringAt(retiring, 50);
     const moved = totalIn(early, 2045, livingFrom(2040, false));
 
     expect(screen.getByText("2045 · Age 55")).toBeInTheDocument();
@@ -312,7 +313,7 @@ describe("ProjectionBoard", () => {
       vi.advanceTimersByTime(settle);
     });
 
-    const moved = worthIn({ ...retiring, retires: 55 }, 2079);
+    const moved = worthIn(retiringAt(retiring, 55), 2079);
 
     expect(screen.getByText("Net worth · 2045 · age 55")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2045"]);
@@ -331,7 +332,7 @@ describe("ProjectionBoard", () => {
 
     expect(screen.getByText("Net worth · 2050 · age 60")).toBeInTheDocument();
 
-    rerender(board({ ...retiring, retires: 62 }));
+    rerender(board(retiringAt(retiring, 62)));
 
     expect(screen.getByText("Net worth · 2052 · age 62")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2052"]);
@@ -431,7 +432,7 @@ describe("ProjectionBoard", () => {
   // the home counts in the one and not in the other.
   it("draws the futures once, says a milestone reached when conditions hold is coming, and marks it at the median once the run is drawn", async () => {
     vi.stubGlobal("Worker", FuturesWorker);
-    const planned = { ...retiring, retires: 90, years: 3 };
+    const planned = { ...retiringAt(retiring, 90), years: 3 };
     const isa: Account = {
       balance: 30000,
       growth: { kind: "plan" },
@@ -555,7 +556,7 @@ describe("ProjectionBoard", () => {
   // the plan's years: the tile reads the first milestone they reach,
   // and with none, keeps the retirement tile.
   it("reads the first milestone the plan's years reach once retirement is before them, and the retirement tile with none", () => {
-    const retired = { ...retiring, retires: 30 };
+    const retired = retiringAt(retiring, 30);
     const { rerender } = render(
       board(retired, schedule, { listed: milestones }),
     );

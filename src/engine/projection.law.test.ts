@@ -7,6 +7,8 @@ import type { IncomeKind, IncomeLine } from "@/data/income";
 import type { Plan } from "@/data/plan";
 import type { LineValues, Month } from "@/data/schedule";
 
+import { working } from "@/data/owners.fixture";
+
 import { project } from "./projection";
 
 // The projection held to the law rather than to its own arithmetic.
@@ -391,6 +393,7 @@ function planFrom(random: () => number, born: number): Plan {
     from: 2026,
     inflation: 0,
     month: Math.floor(random() * 12),
+    owners: [{ ...working, born }],
     rate: 0,
     retires: 90,
     years: 1 + Math.floor(random() * 5),

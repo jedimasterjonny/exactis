@@ -2,7 +2,7 @@ import type { AccountValues } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
 import type { LineValues } from "@/data/schedule";
 
-import { retirementYear } from "@/data/plan";
+import { earnerOf, retirementYear } from "@/data/plan";
 
 export type IncomeKind = (typeof incomeKinds)[number];
 
@@ -79,18 +79,21 @@ export const incomeKinds = [
 const employerNi = 0.15;
 
 // A line as it is paid: one earned by working that runs into the year
-// the plan's owner retires in is paid to the year before and no further,
-// whatever its own end says, since the engine pays no salary or profit
-// from retirement on. One that starts before then reads as a line ending
-// at retirement; one that starts there or later is never paid, and reads
-// as running no years rather than as ending somewhere it never reached.
-// Any other line is handed back as it is, which is how a caller tells
-// the two apart.
+// the owner who earns it retires in is paid to the year before and no
+// further, whatever its own end says, since the engine pays no salary or
+// profit from their retirement on. One that starts before then reads as
+// a line ending there, tied to Retirement where that is the Retirement
+// milestone's year, which is the plan's owner's and anyone's retiring
+// in the same year, and ending in a fixed year otherwise, since the
+// milestone is the plan's owner's alone; one that starts there or later
+// is never paid, and reads as running no years rather than as ending
+// somewhere it never reached. Any other line is handed back as it is,
+// which is how a caller tells the two apart.
 export function asPaid<TLine extends IncomeLineValues>(
   line: TLine,
   plan: Plan,
 ): TLine {
-  const retirement = retirementYear(plan);
+  const retirement = retirementYear(earnerOf(line, plan));
   if (
     !isEarned(line) ||
     (line.lastYear !== null && line.lastYear < retirement)
@@ -99,7 +102,12 @@ export function asPaid<TLine extends IncomeLineValues>(
   }
   const stopped = { lastMonth: null, lastYear: retirement - 1 };
   return line.firstYear < retirement
-    ? { ...line, ...stopped, endsAfter: 0, endsAt: "retirement" }
+    ? {
+        ...line,
+        ...stopped,
+        endsAfter: 0,
+        endsAt: retirement === retirementYear(plan) ? "retirement" : null,
+      }
     : { ...line, ...stopped };
 }
 
@@ -110,8 +118,8 @@ export function contributionOf(line: IncomeLineValues): number {
 }
 
 // Whether the line is money earned by working, a salary or a
-// self-employed profit, which stops when the plan's owner retires,
-// rather than a pension or anything else, which runs on.
+// self-employed profit, which stops when the owner who earns it
+// retires, rather than a pension or anything else, which runs on.
 export function isEarned(line: IncomeLineValues): boolean {
   return line.kind === "employment" || line.kind === "self-employment";
 }

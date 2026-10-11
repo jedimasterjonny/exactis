@@ -26,7 +26,7 @@ import { CardContent } from "@/components/kit/card";
 import { isPension } from "@/data/accounts";
 import { asPaid, isOpeningSound, totalOf } from "@/data/income";
 import { markersOf } from "@/data/milestones";
-import { retirementYear } from "@/data/plan";
+import { earnerOf, retirementYear } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { isSound, spanOf } from "@/lib/lines";
@@ -226,7 +226,7 @@ export function IncomeSchedule({
             <FieldRow layout="pair">
               <SelectField
                 defaultValue={String(entry.initial.owner)}
-                hint="Whose income it is"
+                hint="Taxed as theirs, and paid until they retire if earned by working"
                 label="Owner"
                 onValueChange={(owner) => {
                   amend(entry, { owner: Number(owner) });
@@ -303,16 +303,17 @@ function hasParts(line: IncomeLine): boolean {
   return line.bonus > 0 || line.rsu > 0 || line.sacrifice > 0;
 }
 
-// What the dialog says of a line stopped short of its end at
-// retirement, as a salary or a profit is, and the line as it is paid,
-// for the bar beneath; that it is never paid, for one starting once its
-// owner has retired; and nothing for a line paid as it says.
+// What the dialog says of a line stopped short of its end when the
+// owner who earns it retires, as a salary or a profit is, and the line
+// as it is paid, for the bar beneath; that it is never paid, for one
+// starting once that owner has retired; and nothing for a line paid as
+// it says.
 function paidOf(
   draft: Draft,
   plan: Plan,
 ): undefined | { readonly line: Draft; readonly says: string } {
   const paid = asPaid(draft, plan);
-  const retirement = retirementYear(plan);
+  const retirement = retirementYear(earnerOf(draft, plan));
   if (paid === draft) {
     return undefined;
   }
@@ -320,8 +321,8 @@ function paidOf(
     line: paid,
     says:
       draft.firstYear < retirement
-        ? `Paid to ${String(retirement - 1)}, since pay stops at Retirement whatever the end says.`
-        : `Never paid, since pay stops at Retirement in ${String(retirement)}.`,
+        ? `Paid to ${String(retirement - 1)}, since pay stops when its owner retires, whatever the end says.`
+        : `Never paid, since its owner retires in ${String(retirement)}.`,
   };
 }
 

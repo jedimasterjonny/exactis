@@ -160,6 +160,12 @@ const thrown: readonly Thrown[] = [
     (given): Inputs => changed(given, 3, (cash) => ({ ...cash, owner: 1 })),
   ],
   [
+    "An income line is earned by an owner the plan lists",
+    "An income line is earned by an owner the plan lists",
+    (given): Inputs =>
+      earning(given, 4, (pension) => ({ ...pension, owner: 2 })),
+  ],
+  [
     "An ISA or a pension belongs to an owner, and nothing else",
     "An ISA or a pension belongs to an owner, and nothing else",
     (given): Inputs =>
@@ -285,11 +291,6 @@ const held: readonly Case[] = [
   [
     "An ISA or a pension belongs to an owner the household lists",
     (given): Inputs => changed(given, 2, (isa) => ({ ...isa, owner: 2 })),
-  ],
-  [
-    "An income line is earned by an owner the plan lists",
-    (given): Inputs =>
-      earning(given, 4, (pension) => ({ ...pension, owner: 2 })),
   ],
   [
     "A milestone is listed once",
@@ -654,6 +655,7 @@ describe("soundKept", () => {
           from: 2026,
           inflation: 0.02,
           month: 8,
+          owners: [{ born: 1990, id: 1, name: "Me", retires: 59 }],
           rate: 0.05,
           retires: 59,
           years: 53,

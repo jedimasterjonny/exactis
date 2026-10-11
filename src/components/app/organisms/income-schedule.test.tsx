@@ -17,6 +17,7 @@ import { incomeKinds } from "@/data/income";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { owners, sam } from "@/data/owners.fixture";
+import { retiringAt } from "@/data/plan";
 import { lineGrowths } from "@/data/schedule";
 import { saved as accepted, refused } from "@/lib/answer";
 import { bySlot, commit, openEntry, openRow } from "@/test/dom";
@@ -521,7 +522,7 @@ describe("IncomeSchedule", () => {
         lines={incomeLines}
         milestones={milestones}
         owners={owners}
-        plan={{ ...plan, retires: 30 }}
+        plan={retiringAt(plan, 30)}
       />,
     );
 
@@ -531,9 +532,7 @@ describe("IncomeSchedule", () => {
       "open",
     );
     expect(
-      within(dialog).getByText(
-        "Never paid, since pay stops at Retirement in 2020.",
-      ),
+      within(dialog).getByText("Never paid, since its owner retires in 2020."),
     ).toBeInTheDocument();
     expect(
       within(dialog).queryByText("Runs to 2079, the last year of the plan."),
@@ -568,7 +567,7 @@ describe("IncomeSchedule", () => {
     );
     expect(
       within(dialog).getByText(
-        "Paid to 2048, since pay stops at Retirement whatever the end says.",
+        "Paid to 2048, since pay stops when its owner retires, whatever the end says.",
       ),
     ).toBeInTheDocument();
     expect(
@@ -990,7 +989,7 @@ describe("IncomeSchedule", () => {
   });
 
   // Every line is somebody's: the salary opens on its owner, and is
-  // given to Sam.
+  // given to Sam, whom the plan carries as the page's owners do.
   it("opens a line on the owner who earns it, and writes another back", async () => {
     render(
       <IncomeSchedule
@@ -998,7 +997,7 @@ describe("IncomeSchedule", () => {
         lines={incomeLines}
         milestones={milestones}
         owners={[...owners, sam]}
-        plan={plan}
+        plan={{ ...plan, owners: [...plan.owners, sam] }}
       />,
       { wrapper: Toaster },
     );
@@ -1008,7 +1007,9 @@ describe("IncomeSchedule", () => {
     const owner = within(dialog).getByRole("combobox", { name: "Owner" });
 
     expect(owner).toHaveValue("1");
-    expect(owner).toHaveAccessibleDescription("Whose income it is");
+    expect(owner).toHaveAccessibleDescription(
+      "Taxed as theirs, and paid until they retire if earned by working",
+    );
     expect(
       within(owner)
         .getAllByRole("option")

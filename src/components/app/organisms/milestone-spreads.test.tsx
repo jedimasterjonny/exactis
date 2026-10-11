@@ -17,6 +17,7 @@ import { removeMilestone, saveMilestone } from "@/actions/milestones";
 import { Toaster } from "@/components/kit/toast";
 import { expenseLines } from "@/data/expenses.fixture";
 import { milestones } from "@/data/milestones.fixture";
+import { working } from "@/data/owners.fixture";
 import { saved } from "@/lib/answer";
 import { placed } from "@/lib/span";
 import { bySlot, field, openEntry, openRow } from "@/test/dom";
@@ -44,6 +45,7 @@ const plan = {
   from: 2026,
   inflation: 0,
   month: 0,
+  owners: [working],
   rate: 0,
   retires: 90,
   years: 11,

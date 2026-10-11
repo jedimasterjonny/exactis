@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Outcome, Reading } from "@/engine/futures";
 
+import { working } from "@/data/owners.fixture";
+
 import { FuturesOutcomes } from "./futures-outcomes";
 
 // Born in 1990, from January 2026 to 2079, so the plan runs to 89.
@@ -11,6 +13,7 @@ const plan = {
   from: 2026,
   inflation: 0,
   month: 0,
+  owners: [{ ...working, retires: 55 }],
   rate: 0,
   retires: 55,
   years: 53,
