@@ -9,28 +9,36 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { Milestone } from "@/data/milestones";
+import type { Schedule } from "@/engine/cash-flow";
 import type { Future } from "@/engine/futures";
 import type { Answer } from "@/lib/answer";
 
 import { removeMilestone, saveMilestone } from "@/actions/milestones";
 import { Toaster } from "@/components/kit/toast";
+import { expenseLines } from "@/data/expenses.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { saved } from "@/lib/answer";
 import { placed } from "@/lib/span";
 import { bySlot, field, openEntry, openRow } from "@/test/dom";
 
-import { GoalList } from "./goal-list";
+import { MilestoneSpreads } from "./milestone-spreads";
 
 vi.mock("@/actions/milestones", () => ({
   removeMilestone: vi.fn(),
   saveMilestone: vi.fn(),
 }));
 
-// The milestones reached when conditions hold, which are the goals.
-const goals = milestones.slice(2);
-const [, , firstMillion] = milestones;
+const [kidsLeave, , firstMillion] = milestones;
+const [, childcare] = expenseLines;
 
-// Born in 1992, from January 2026.
+// The milestones reached when conditions hold alone.
+const reached = milestones.slice(2);
+
+// Nothing coming in or going out.
+const nothing: Schedule = { expenses: [], income: [] };
+
+// Born in 1992, from January 2026 over fifteen years, so the children
+// leave home fourteen years in and the downsize past the end.
 const plan = {
   born: 1992,
   from: 2026,
@@ -68,21 +76,27 @@ function medians(): string[] {
 // Save and delete report through the toast manager, which needs its
 // Toaster mounted.
 function renderList(
-  listed: readonly Milestone[] = goals,
+  listed: readonly Milestone[] = reached,
   drawn: readonly Future[] = futures,
+  schedule: Schedule = nothing,
 ): void {
   render(
-    <GoalList futures={drawn} goals={listed} milestones={[]} plan={plan} />,
+    <MilestoneSpreads
+      futures={drawn}
+      milestones={listed}
+      plan={plan}
+      schedule={schedule}
+    />,
     { wrapper: Toaster },
   );
 }
 
-describe("GoalList", () => {
-  it("lays each goal on the plan's span with its conditions, the ages the futures reach it by at each share, the median and the share reaching it", () => {
+describe("MilestoneSpreads", () => {
+  it("lays each milestone reached when conditions hold on the plan's span with its conditions, the ages the futures reach it by at each share, the median and the share reaching it", () => {
     renderList();
 
     const card = screen.getByRole("region", {
-      name: "When the goals are reached",
+      name: "When the milestones are reached",
     });
     expect(within(card).getByText("Sect. II.ii")).toHaveClass("label");
     // A row is drawn in its columns and again in its folded lines, only
@@ -111,17 +125,74 @@ describe("GoalList", () => {
     expect(within(card).getAllByText("2030")).toHaveLength(1);
   });
 
-  it("says never for a share the run never reaches a goal by, with no dot, and says nothing before the first futures are drawn", () => {
+  // The children leave home at 48, in 2040, fourteen of the plan's
+  // years in, and the downsize at 67 falls past the plan's end, so its
+  // pin is held to the edge; the two come before the rest, pinned with
+  // the year and the age beside and nothing to read on hover, and rule
+  // every bar.
+  it("pins each milestone reached at an age where it falls, first, with no share and nothing on the bar", () => {
+    renderList(milestones);
+
+    const card = screen.getByRole("region", {
+      name: "When the milestones are reached",
+    });
+
+    expect(
+      within(card)
+        .getAllByRole("button", {
+          name: /^(Kids leave home|Downsize|First million|Financial independence)$/,
+        })
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual([
+      "Kids leave home",
+      "Kids leave home",
+      "Downsize",
+      "Downsize",
+      "First million",
+      "First million",
+      "Financial independence",
+      "Financial independence",
+    ]);
+    expect(
+      within(card)
+        .getAllByText(bySlot("pin-bar-pin"), { suggest: false })
+        .map(({ style }) => style.left),
+    ).toStrictEqual(
+      [2040, 2040, 2059, 2059].map((year) => `${String(placed(year, plan))}%`),
+    );
+    // The ruler marks 2040 with its age too, so the row's are read off
+    // the list.
+    const rows = within(within(card).getByRole("list"));
+    expect(rows.getAllByText("2040")).toHaveLength(2);
+    expect(rows.getAllByText("2040").at(-1)).toHaveClass("figure");
+    expect(rows.getAllByText("Age 48")).toHaveLength(2);
+    expect(within(card).getAllByText("Age 67")).toHaveLength(2);
+    // The share is written once a row, in its columns, for the two
+    // reached when conditions hold alone.
+    expect(within(card).getAllByText("reach it")).toHaveLength(2);
+    expect(
+      within(card).getAllByRole("button", { name: /^When the futures reach/ }),
+    ).toHaveLength(4);
+    // Three milestones' years rule each of the eight tracks.
+    expect(
+      within(card).getAllByText(bySlot("pin-bar-mark"), { suggest: false }),
+    ).toHaveLength(12);
+    expect(
+      within(card).getAllByText(bySlot("spread-bar-mark"), { suggest: false }),
+    ).toHaveLength(12);
+  });
+
+  it("says never for a share the run never reaches a milestone by, with no dot, and says nothing before the first futures are drawn", () => {
     const twoMillion: Milestone = {
       ...firstMillion,
       conditions: [{ measure: "worth", of: "pounds", times: 2000000 }],
     };
     const { rerender } = render(
-      <GoalList
+      <MilestoneSpreads
         futures={futures}
-        goals={[twoMillion]}
-        milestones={[]}
+        milestones={[twoMillion]}
         plan={plan}
+        schedule={nothing}
       />,
     );
 
@@ -132,11 +203,11 @@ describe("GoalList", () => {
     expect(medians()).toStrictEqual([]);
 
     rerender(
-      <GoalList
+      <MilestoneSpreads
         futures={[]}
-        goals={[twoMillion]}
-        milestones={[]}
+        milestones={[twoMillion]}
         plan={plan}
+        schedule={nothing}
       />,
     );
 
@@ -144,9 +215,9 @@ describe("GoalList", () => {
     expect(screen.getByText("Median …")).toBeInTheDocument();
   });
 
-  // The bar is a button named for the goal, folded and in its columns,
-  // and either says the same on hover or focus.
-  it("says on the bar, hovered or focused, the year and age the run reaches a goal by at each share", async () => {
+  // The bar is a button named for the milestone, folded and in its
+  // columns, and either says the same on hover or focus.
+  it("says on the bar, hovered or focused, the year and age the run reaches a milestone by at each share", async () => {
     renderList();
 
     const triggers = screen.getAllByRole("button", {
@@ -170,16 +241,16 @@ describe("GoalList", () => {
   it("draws the empty state for none", () => {
     renderList([]);
 
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.getByText("No goals yet")).toBeInTheDocument();
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    expect(screen.getByText("No milestones yet")).toBeInTheDocument();
   });
 
-  // The dialog opens on conditions, a goal being a milestone reached
-  // when they hold, and closes once the store has it.
-  it("adds a goal from the milestone dialog, opened on conditions, and closes it once saved", async () => {
+  // The dialog opens on conditions, since that is what this card reads,
+  // and closes once the store has it.
+  it("adds a milestone from the dialog, opened on conditions, and closes it once saved", async () => {
     renderList();
 
-    const dialog = openEntry("Add goal");
+    const dialog = openEntry("Add milestone");
 
     expect(within(dialog).getByText("New milestone")).toHaveClass("text-brand");
     expect(
@@ -223,29 +294,38 @@ describe("GoalList", () => {
     ).toHaveAccessibleDescription("Independence · Net worth ≥ £1,000,000");
   });
 
-  it("opens a goal from its row in the milestone dialog", () => {
-    renderList();
+  it("opens a milestone from its row in the dialog, on its conditions or on its age", () => {
+    renderList(milestones);
 
-    const dialog = openRow("First million");
+    let dialog = openRow("First million");
 
     expect(within(dialog).getByText("Edit milestone")).toHaveClass(
       "text-brand",
     );
-    expect(field("Name", dialog)).toHaveValue("First million");
     expect(field("At least", dialog)).toHaveValue("£1,000,000");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    dialog = openRow("Kids leave home");
+
+    expect(screen.getByRole("radio", { name: "At an age" })).toBeChecked();
+    expect(field("Age", dialog)).toHaveValue("48");
   });
 
-  // A saved goal's dialog is where it is deleted from: the Delete closes
-  // the dialog and asks first, holds the confirm while the store
-  // answers, and closes on the answer.
-  it("asks from a saved goal's dialog before deleting it, the dialog closing first", async () => {
-    renderList();
+  // A saved milestone's dialog is where it is deleted from: the Delete
+  // closes the dialog and asks first, saying what becomes of the lines
+  // tied to it, holds the confirm while the store answers, and closes
+  // on the answer.
+  it("asks from a saved milestone's dialog before deleting it, the dialog closing first, saying what becomes of the lines tied to it", async () => {
+    renderList(milestones, futures, {
+      expenses: [{ ...childcare, endsAt: 1 }],
+      income: [],
+    });
     const { promise, resolve: answer } =
       Promise.withResolvers<Answer<undefined>>();
     vi.mocked(removeMilestone).mockReturnValue(promise);
 
     fireEvent.click(
-      within(openRow("Financial independence")).getByRole("button", {
+      within(openRow("Kids leave home")).getByRole("button", {
         name: "Delete",
       }),
     );
@@ -253,11 +333,16 @@ describe("GoalList", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     const question = screen.getByRole("alertdialog", {
-      name: "Delete Financial independence?",
+      name: "Delete Kids leave home?",
     });
+
+    expect(question).toHaveAccessibleDescription(
+      "The line tied to it stays where it is, in a fixed year. It cannot be brought back.",
+    );
+
     fireEvent.click(within(question).getByRole("button", { name: "Delete" }));
 
-    expect(removeMilestone).toHaveBeenCalledExactlyOnceWith(4);
+    expect(removeMilestone).toHaveBeenCalledExactlyOnceWith(kidsLeave.id);
     expect(
       within(question).getByRole("button", { name: "Delete" }),
     ).toHaveAttribute("aria-busy", "true");
@@ -272,7 +357,7 @@ describe("GoalList", () => {
   it("drops a cancelled draft", () => {
     renderList();
 
-    let dialog = openEntry("Add goal");
+    let dialog = openEntry("Add milestone");
 
     fireEvent.change(field("Name", dialog), { target: { value: "Holidays" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
@@ -280,7 +365,7 @@ describe("GoalList", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(saveMilestone).not.toHaveBeenCalled();
 
-    dialog = openEntry("Add goal");
+    dialog = openEntry("Add milestone");
 
     expect(field("Name", dialog)).toHaveValue("");
   });

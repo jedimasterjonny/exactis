@@ -24,9 +24,8 @@ import { MilestoneChips } from "@/components/app/atoms/milestone-chips";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
-import { markersOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
-import { yearsIn } from "@/engine/futures";
+import { markersIn, yearsIn } from "@/engine/futures";
 import { axisOf } from "@/lib/axis";
 import { listed } from "@/lib/feeders";
 import { formatAxisGbp, formatGbp, formatWholePercent } from "@/lib/money";
@@ -96,7 +95,11 @@ const tenths = ({ bottomTenth, topTenth }: FutureYear): number[] => [
 // and is announced to a screen reader as it moves, the chart being
 // named for one. The milestones in the plan's years are faint lines in
 // oxide, as the dashboard draws them, named by the chips beneath, and
-// the one chosen is drawn solid until it is chosen again. The pounds on
+// the one chosen is drawn solid until it is chosen again: one reached
+// at an age where the plan lays it, and one reached when conditions
+// hold in the year by which half the futures drawn so far have reached
+// it, moving as the run comes in, as the lanes beneath read it, and
+// not drawn while fewer than half have. The pounds on
 // the axis reach below nothing only as far as the bottom of the fan
 // does, as a plan whose debts outweigh it can, on the dashboard's scale.
 // The years are read off the run once for each run and plan, rather
@@ -112,7 +115,7 @@ export function FuturesFan({
 }: FuturesFanProps): JSX.Element {
   const [chosen, setChosen] = useState<Tie | undefined>();
   const end = endYear(plan);
-  const markers = markersOf(milestones, plan).filter(
+  const markers = markersIn(futures, milestones, plan).filter(
     (marker) => marker.year >= plan.from && marker.year <= end,
   );
   const years = useMemo(() => yearsIn(futures, plan), [futures, plan]);

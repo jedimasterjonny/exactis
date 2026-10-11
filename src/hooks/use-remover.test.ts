@@ -105,8 +105,11 @@ describe("useRemover", () => {
     });
   });
 
-  it("holds a deletion in flight, then closes and reports it deleted", async () => {
+  // The caller is told once the record has gone, and not while the
+  // deletion is on its way.
+  it("holds a deletion in flight, then closes, reports it deleted and tells the caller", async () => {
     const store = vi.fn<Store>();
+    const onRemoved = vi.fn<() => void>();
     // The store's answer is held back, so the deletion can be seen in
     // flight.
     const { promise, resolve: answer } =
@@ -116,6 +119,7 @@ describe("useRemover", () => {
       useRemover<Doomed>({
         describe: (record) => record.name,
         noun: "Account",
+        onRemoved,
         remove: store,
       }),
     );
@@ -131,6 +135,7 @@ describe("useRemover", () => {
     expect(result.current.questionOf(doomed).isBusy).toBe(true);
     expect(result.current.doomed).not.toBeNull();
     expect(toast.add).not.toHaveBeenCalled();
+    expect(onRemoved).not.toHaveBeenCalled();
 
     answer(saved(undefined));
 
@@ -138,6 +143,7 @@ describe("useRemover", () => {
       expect(result.current.doomed).toBeNull();
     });
     expect(result.current.questionOf(doomed).isBusy).toBe(false);
+    expect(onRemoved).toHaveBeenCalledOnce();
     expect(toast.add).toHaveBeenCalledExactlyOnceWith({
       description: "Lifetime ISA",
       title: "Account deleted",
