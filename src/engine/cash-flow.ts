@@ -407,9 +407,7 @@ export function cashFlow(
           ];
     });
   };
-  const spent = schedule.expenses
-    .filter((line) => runsIn(line, at))
-    .map((line) => ({ amount: monthlyOf(line, line.amount, reading), line }));
+  const spent = spentIn(schedule, reading);
   const expenses = total(spent);
   const paid = new Set(
     schedule.expenses.flatMap((line) =>
@@ -534,6 +532,18 @@ export function inTodaysMoney(
     })),
     taxable: read(flow.taxable),
   };
+}
+
+// The expense lines running in the month and what each costs it, in
+// its pounds: what the flow pays out, and what a goal reads a year's
+// expenses off, twelve of the month the year opens with.
+export function spentIn(
+  schedule: Schedule,
+  reading: Pick<Reading, "at" | "plan">,
+): Spent[] {
+  return schedule.expenses
+    .filter((line) => runsIn(line, reading.at))
+    .map((line) => ({ amount: monthlyOf(line, line.amount, reading), line }));
 }
 
 // The account a link names, or none, since a link may name an account
