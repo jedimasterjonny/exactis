@@ -185,14 +185,16 @@ the plan's rates are held in the store. Before the pension age a pension is
 drawn only as the last resort, once cash and the tax-free wrapper are empty, and
 at the 55% a payment before the pension age is charged; a registered scheme will
 not normally make one, so what a year draws that way is carried on its point to
-be marked rather than counted on. Each account is drawn to nothing and no lower,
-and what a year could not draw from anywhere is carried on its point, so the
-projection can say when the money runs out and the dashboard's chart marks that
-year. Cash and the tax-free wrapper give up what the month is short, and a
-pension is grossed up so that what is left of the draw once taxed is what the
-month is short: a quarter of each draw is free of tax until the £268,275 lump
-sum allowance is used up over the plan, and the rest is taxed as income on top
-of what the month earned.
+be marked rather than counted on: the dashboard's chart marks the year, and the
+plan screen's year book draws it in the loss tone as it draws a year the money
+runs out in, saying beneath the month what was drawn early. Each account is
+drawn to nothing and no lower, and what a year could not draw from anywhere is
+carried on its point, so the projection can say when the money runs out and the
+dashboard's chart marks that year. Cash and the tax-free wrapper give up what
+the month is short, and a pension is grossed up so that what is left of the draw
+once taxed is what the month is short: a quarter of each draw is free of tax
+until the £268,275 lump sum allowance is used up over the plan, and the rest is
+taxed as income on top of what the month earned.
 
 The engine works in the pounds of each month and reads out in today's money, the
 money of the month the plan starts in. A line states its amount in today's
