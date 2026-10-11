@@ -152,9 +152,13 @@ dragged into a higher band, and rising with the plan's inflation each April from
 A debt's own fixed sum is a loan's payments, so it runs only until the loan
 maths in `src/lib/loans.ts` says they clear what is owed: the term the payment
 takes at the debt's rate, counted from the month the plan starts in, and nothing
-charged after the month the last payment falls in. A debt whose payments an
-expense line carries is left out of the fixed sums as before, the line being the
-payment. When it runs is the loan's to say, not the line's: whenever the
+charged after the month the last payment falls in. In that month only what
+clears the debt is charged, what is owed with the month's interest, since the
+term is rounded up to a whole month and the last payment is more than is left; a
+lender takes what is left, and the rest is the month's to save. A debt whose
+payments an expense line carries is left out of the fixed sums as before, the
+line being the payment, and the line is charged the same way in the month it
+clears the loan. When it runs is the loan's to say, not the line's: whenever the
 household is read, the line runs from the plan's first year to the month the
 same loan maths clears the loan in, a PCP's balloon refinanced on the same
 terms, or to the end of the plan when it never clears, as an interest-only
