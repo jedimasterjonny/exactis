@@ -6,13 +6,14 @@ import { Goal as GoalIcon } from "lucide-react";
 
 import type { Account } from "@/data/accounts";
 import type { Shortfall } from "@/data/cma";
-import type { Goal } from "@/data/goals";
+import type { Milestone } from "@/data/milestones";
 import type { Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { Future } from "@/engine/futures";
 
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { takesSpare } from "@/data/accounts";
+import { ageOf } from "@/data/milestones";
 import { ageIn, endAge } from "@/data/plan";
 import { reachedBy, reachedIn, readingOf, runLength } from "@/engine/futures";
 import { useFutures } from "@/hooks/use-futures";
@@ -21,10 +22,18 @@ import { formatWholePercent } from "@/lib/money";
 
 interface ChanceTileProps {
   readonly accounts: readonly Account[];
-  readonly goals: readonly Goal[];
+  readonly milestones: readonly Milestone[];
   readonly plan: Plan;
   readonly schedule: Schedule;
   readonly spread: Shortfall | Spread;
+}
+
+interface DrawnProps {
+  readonly accounts: readonly Account[];
+  readonly goals: readonly Milestone[];
+  readonly plan: Plan;
+  readonly schedule: Schedule;
+  readonly spread: Spread;
 }
 
 // What the tile is called, on the dashboard as on the screen it reads.
@@ -34,20 +43,24 @@ const label = "Chance of success";
 // that last, drawn as the dashboard opens over the same run the chance
 // of success draws and written as it writes it, so the two say the
 // same, with how many futures and the age they last to beneath it;
-// and beside it a tile a goal, the age reached in the year by which
-// half the futures have reached it, the median alone, since a tile is
-// one figure and the spread either side is read on the chance of
-// success. While they are drawn, how many have been; and a dash, saying
-// why, while the plan has no spread to draw them at or no savings for
-// them to grow. It reads the plan as the store holds it, so an age
-// being dragged on the chart is drawn for once it is saved.
+// and beside it a tile a goal, which is a milestone reached when
+// conditions hold, the age reached in the year by which half the
+// futures have reached it, the median alone, since a tile is one
+// figure and the spread either side is read on the chance of success.
+// While they are drawn, how many have been; and a dash, saying why,
+// while the plan has no spread to draw them at or no savings for them
+// to grow. It reads the plan as the store holds it, so an age being
+// dragged on the chart is drawn for once it is saved.
 export function ChanceTile({
   accounts,
-  goals,
+  milestones,
   plan,
   schedule,
   spread,
 }: ChanceTileProps): JSX.Element {
+  const goals = milestones.filter(
+    (milestone) => ageOf(milestone) === undefined,
+  );
   if ("short" in spread) {
     return <Unrun caption="No spread to draw the futures from" goals={goals} />;
   }
@@ -72,7 +85,7 @@ function Drawn({
   plan,
   schedule,
   spread,
-}: Omit<ChanceTileProps, "spread"> & { readonly spread: Spread }): JSX.Element {
+}: DrawnProps): JSX.Element {
   const { futures, isDone } = useFutures(accounts, schedule, {
     count: runLength,
     plan,
@@ -117,7 +130,7 @@ function GoalTile({
   plan,
 }: {
   readonly futures: readonly Future[];
-  readonly goal: Goal;
+  readonly goal: Milestone;
   readonly isDone: boolean;
   readonly plan: Plan;
 }): JSX.Element {
@@ -162,7 +175,7 @@ function Unrun({
   goals,
 }: {
   readonly caption: string;
-  readonly goals: readonly Goal[];
+  readonly goals: readonly Milestone[];
 }): JSX.Element {
   return (
     <>

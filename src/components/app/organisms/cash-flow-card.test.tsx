@@ -205,7 +205,14 @@ describe("CashFlowCard", () => {
     render(
       <CashFlowCard
         accounts={held}
-        milestones={[...milestones, { id: 3, name: "Sabbatical", year: 2049 }]}
+        milestones={[
+          ...milestones,
+          {
+            conditions: [{ measure: "age", of: "years", times: 59 }],
+            id: 5,
+            name: "Sabbatical",
+          },
+        ]}
         plan={retiring}
         schedule={schedule}
       />,

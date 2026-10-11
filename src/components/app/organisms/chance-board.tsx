@@ -7,7 +7,6 @@ import { useMemo } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { Shortfall } from "@/data/cma";
-import type { Goal } from "@/data/goals";
 import type { Milestone } from "@/data/milestones";
 import type { Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
@@ -25,6 +24,7 @@ import { FuturesOutcomes } from "@/components/app/organisms/futures-outcomes";
 import { GoalList } from "@/components/app/organisms/goal-list";
 import { CardContent } from "@/components/kit/card";
 import { takesSpare } from "@/data/accounts";
+import { ageOf } from "@/data/milestones";
 import { ageIn, endAge } from "@/data/plan";
 import {
   futureOf,
@@ -40,7 +40,6 @@ import { chance, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 interface ChanceBoardProps {
   readonly accounts: readonly Account[];
-  readonly goals: readonly Goal[];
   readonly milestones: readonly Milestone[];
   readonly plan: Plan;
   readonly schedule: Schedule;
@@ -56,7 +55,6 @@ interface ChanceBoardProps {
 // futures to grow, and the screen says which.
 export function ChanceBoard({
   accounts,
-  goals,
   milestones,
   plan,
   schedule,
@@ -83,7 +81,6 @@ export function ChanceBoard({
   return (
     <Futures
       accounts={accounts}
-      goals={goals}
       milestones={milestones}
       plan={plan}
       schedule={schedule}
@@ -128,8 +125,9 @@ function AtItsRates({
 // The plan's futures as they come in, under a header saying how many
 // there are and over what ages, or, while they are coming in, how many
 // have; then what they come to, graded, the run fanned over the plan's
-// years, the goals and when the run reaches them, and the count beneath
-// them. The plan at its own rates is read
+// years, the milestones reached when conditions hold and when the run
+// reaches them, and the count beneath them. The plan at its own rates
+// is read
 // as a future, for what it is worth at the end beside the middle future
 // and as its owner retires, which the futures that last are graded
 // against. A plan that
@@ -139,7 +137,6 @@ function AtItsRates({
 // from closes the screen.
 function Futures({
   accounts,
-  goals,
   milestones,
   plan,
   schedule,
@@ -179,7 +176,7 @@ function Futures({
       <FuturesFan futures={futures} milestones={milestones} plan={plan} />
       <GoalList
         futures={futures}
-        goals={goals}
+        goals={milestones.filter((milestone) => ageOf(milestone) === undefined)}
         milestones={milestones}
         plan={plan}
       />

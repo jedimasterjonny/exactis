@@ -1,12 +1,12 @@
 import type { Account } from "@/data/accounts";
-import type { Goal, Measured } from "@/data/goals";
+import type { Measured, MilestoneValues } from "@/data/milestones";
 import type { Path, Plan, Spread } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
 import type { ProjectionPoint } from "@/engine/projection";
 
 import { isAsset } from "@/data/accounts";
-import { isReached } from "@/data/goals";
+import { isReached } from "@/data/milestones";
 import { ageIn, endYear, pricesIn, retirementYear } from "@/data/plan";
 import { spentIn } from "@/engine/cash-flow";
 import { balanceIn, isShort, project } from "@/engine/projection";
@@ -17,8 +17,8 @@ import { normalsFrom } from "@/lib/random";
 // pension before the pension age, or null for a future that lasts; the
 // year it first ran out, or null for one that never did, so a future
 // kept going only by drawing a pension early is told from one that ran
-// out; and each year of it measured as a goal measures one, entering
-// it and in today's money as the projection's points are: what the
+// out; and each year of it measured as a milestone measures one,
+// entering it and in today's money as the projection's points are: what the
 // plan is worth, every account it holds less every debt it owes, a
 // house or a car at its value less the loan on it, as the dashboard
 // counts net worth, and the rest beside it. A future that falls short
@@ -266,32 +266,35 @@ export function pathOf(
 }
 
 // The year by which the share given of a run of futures have reached
-// the goal, or null where fewer ever do: at a twentieth the year the
-// earliest 5% have reached it by, and at a half the median. A run of
-// none reaches nothing.
+// the milestone, or null where fewer ever do: at a twentieth the year
+// the earliest 5% have reached it by, and at a half the median. A run
+// of none reaches nothing.
 export function reachedBy(
   futures: readonly Future[],
-  goal: Goal,
+  milestone: Pick<MilestoneValues, "conditions">,
   {
     plan,
     share,
   }: { readonly plan: Pick<Plan, "from">; readonly share: number },
 ): null | number {
   const years = sorted(
-    futures.flatMap((future) => reachedIn(future, goal, plan) ?? []),
+    futures.flatMap((future) => reachedIn(future, milestone, plan) ?? []),
   );
   return years[Math.ceil(share * futures.length) - 1] ?? null;
 }
 
-// The year a future first reaches the goal in, the first its conditions
-// all hold entering, whatever the years after it do, or null for a
-// future that never reaches it over the plan's years.
+// The year a future first reaches the milestone in, the first its
+// conditions all hold entering, whatever the years after it do, or
+// null for a future that never reaches it over the plan's years. One
+// reached at an age is reached in the same year of every future.
 export function reachedIn(
   future: Future,
-  goal: Goal,
+  milestone: Pick<MilestoneValues, "conditions">,
   plan: Pick<Plan, "from">,
 ): null | number {
-  const at = future.measured.findIndex((measured) => isReached(goal, measured));
+  const at = future.measured.findIndex((measured) =>
+    isReached(milestone, measured),
+  );
   return at === -1 ? null : plan.from + at;
 }
 
@@ -352,8 +355,8 @@ export function yearsIn(
   });
 }
 
-// A year of a projection as a goal measures it, from the month it opens
-// with: the age the plan's owner reaches in it, and every sum whole
+// A year of a projection as a milestone measures it, from the month it
+// opens with: the age the plan's owner reaches in it, and every sum whole
 // pounds of today's money: what every account comes to, which is the
 // plan's net worth; what it owes, every debt's balance turned to a sum
 // owed, nothing where it owes nothing rather than nothing with a sign;

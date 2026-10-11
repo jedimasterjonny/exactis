@@ -11,7 +11,6 @@ import type {
   Vintages,
 } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
-import type { Goal } from "@/data/goals";
 import type { HousePrices } from "@/data/house-prices";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
@@ -34,13 +33,12 @@ import {
 } from "@/data/accounts";
 import { derivedSet, openingDeductions, sleeves, spreadOf } from "@/data/cma";
 import { incomeKinds } from "@/data/income";
-import { timed } from "@/data/milestones";
+import { ageOf, timed } from "@/data/milestones";
 import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
 import { allInStocks, openingRates, rateSets } from "@/data/rates";
 import { rules } from "@/data/rules";
 import {
   categoryValues,
-  goalValues,
   lineValues,
   milestoneValues,
   month,
@@ -57,8 +55,8 @@ import { monthsBetween } from "@/lib/months";
 import { isWithinAllowance } from "@/lib/tax";
 
 // Everything the projection runs on, the owners the wrappers name, the
-// milestones the plan is laid out by and the goals it is read against,
-// the progress points the
+// milestones the plan is laid out by and read against, the progress
+// points the
 // balances were read at month by month, the house price index last
 // pulled from the Land Registry to write the house into them, or none
 // before one is, the inflation curve last pulled from the Bank of
@@ -77,7 +75,6 @@ export interface Household {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
-  readonly goals: readonly Goal[];
   readonly housePrices: HousePrices | null;
   readonly liveRates: Rates;
   readonly mappings: readonly Mapping[];
@@ -117,7 +114,6 @@ export interface Kept {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
-  readonly goals: readonly Goal[];
   readonly housePrices: HousePrices | null;
   readonly mappings: readonly Mapping[];
   readonly milestones: readonly Milestone[];
@@ -261,12 +257,6 @@ const milestone = z.object({
   ...milestoneValues,
   id: recordId,
 }) satisfies z.ZodType<Milestone>;
-
-// A goal the same way.
-const goal = z.object({
-  ...goalValues,
-  id: recordId,
-}) satisfies z.ZodType<Goal>;
 
 const owner = z.object({
   id: recordId,
@@ -510,8 +500,10 @@ const plan = z
 // names a record the household lists, and one of the kind it has to
 // be: a wrapper its owner, a loan the asset it is secured on, a salary
 // the pension it feeds, a payments line the debt it pays and a line
-// the milestone it is tied to, in the engine's words where the engine
-// refuses the same link. An asset has
+// the milestone it is tied to, which is reached at an age, since one
+// reached when conditions hold falls in a year that depends on the
+// lines, in the engine's words where the engine refuses the same link.
+// An asset has
 // one loan and a debt one line paying it, since the house and car
 // dialogs read the one they find. And a debt paying its own fixed sum,
 // rather than through a line, pays it down at the rate it is charged,
@@ -526,7 +518,6 @@ export const household = z
     cma: vintages.nullable(),
     curve: curve.nullable(),
     deductions,
-    goals: z.array(goal),
     housePrices: housePrices.nullable(),
     liveRates: rates,
     mappings,
@@ -554,7 +545,6 @@ export const household = z
     ({ milestones }) => isListedOnce(milestones),
     "A milestone is listed once",
   )
-  .refine(({ goals }) => isListedOnce(goals), "A goal is listed once")
   .refine(({ owners }) => isListedOnce(owners), "An owner is listed once")
   .refine(
     ({ schedule }) => isListedOnce(schedule.income),
@@ -607,14 +597,21 @@ export const household = z
   )
   .refine(
     ({ milestones, schedule }) =>
-      new Set(
-        [...schedule.expenses, ...schedule.income].flatMap(
-          ({ endsAt, startsAt }) => [endsAt, startsAt],
-        ),
-      ).isSubsetOf(
+      tiesOf(schedule).isSubsetOf(
         new Set([null, "retirement", ...milestones.map(({ id }) => id)]),
       ),
     "A line is tied to a milestone the household lists",
+  )
+  .refine(
+    ({ milestones, schedule }) =>
+      tiesOf(schedule).isDisjointFrom(
+        new Set(
+          milestones
+            .filter((milestone) => ageOf(milestone) === undefined)
+            .map(({ id }) => id),
+        ),
+      ),
+    "A line is tied to a milestone reached at an age",
   )
   .refine(
     ({ accounts, plan, schedule }) =>
@@ -675,7 +672,6 @@ const kept = z
     cma: vintages.nullable(),
     curve: curve.nullable(),
     deductions,
-    goals: z.array(goal),
     housePrices: housePrices.nullable(),
     mappings,
     milestones: z.array(milestone),
@@ -691,10 +687,9 @@ const kept = z
     targets: targets.nullable(),
   })
   .refine(
-    ({ accounts, goals, milestones, next, owners, schedule }) =>
+    ({ accounts, milestones, next, owners, schedule }) =>
       [
         ...accounts,
-        ...goals,
         ...milestones,
         ...owners,
         ...schedule.expenses,
@@ -728,9 +723,8 @@ export function holdWhileLive(
   }
 }
 
-// The household before anything is saved: no records and no goal,
-// balances as of the month given, no progress point and no house price
-// index pulled,
+// The household before anything is saved: no records, balances as of
+// the month given, no progress point and no house price index pulled,
 // the ages the dashboard has shown, a plan to 89 retiring at 59, no
 // curve or CMA pulled, the rates a household opens with live and
 // everything in stocks, the manual method's fees and yield to deduct
@@ -745,7 +739,6 @@ export function nothingKeptIn(asOf: Month): Kept {
     cma: null,
     curve: null,
     deductions: openingDeductions,
-    goals: [],
     housePrices: null,
     mappings: [],
     milestones: [],
@@ -832,7 +825,6 @@ function householdOf(kept: Kept): Household {
     cma: kept.cma,
     curve: kept.curve,
     deductions: kept.deductions,
-    goals: kept.goals,
     housePrices: kept.housePrices,
     liveRates: live.rates,
     mappings: kept.mappings,
@@ -955,5 +947,15 @@ function paidOver(
 function refusalOf(error: z.ZodError): Refusal {
   return new Refusal(
     [...new Set(error.issues.map(({ message }) => message))].join("; "),
+  );
+}
+
+// What every line of both schedules is tied to at either end, nothing
+// among them for an end tied to none.
+function tiesOf(schedule: Household["schedule"]): Set<null | Tie> {
+  return new Set(
+    [...schedule.expenses, ...schedule.income].flatMap(
+      ({ endsAt, startsAt }) => [endsAt, startsAt],
+    ),
   );
 }

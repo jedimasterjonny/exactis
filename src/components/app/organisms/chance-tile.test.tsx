@@ -47,7 +47,7 @@ describe("ChanceTile", () => {
     render(
       <ChanceTile
         accounts={[isa]}
-        goals={[]}
+        milestones={[]}
         plan={plan}
         schedule={schedule}
         spread={{ inflation: 0, rate: 0 }}
@@ -72,7 +72,7 @@ describe("ChanceTile", () => {
     render(
       <ChanceTile
         accounts={[isa]}
-        goals={[
+        milestones={[
           {
             conditions: [{ measure: "worth", of: "pounds", times: 30000 }],
             id: 1,
@@ -111,7 +111,7 @@ describe("ChanceTile", () => {
     const { rerender } = render(
       <ChanceTile
         accounts={[isa]}
-        goals={[]}
+        milestones={[]}
         plan={plan}
         schedule={schedule}
         spread={{ short: "No CMA is pulled" }}
@@ -126,7 +126,7 @@ describe("ChanceTile", () => {
     rerender(
       <ChanceTile
         accounts={[isa]}
-        goals={[
+        milestones={[
           {
             conditions: [{ measure: "worth", of: "pounds", times: 30000 }],
             id: 1,
@@ -147,7 +147,7 @@ describe("ChanceTile", () => {
     rerender(
       <ChanceTile
         accounts={[]}
-        goals={[]}
+        milestones={[]}
         plan={plan}
         schedule={schedule}
         spread={{ inflation: 0, rate: 0 }}

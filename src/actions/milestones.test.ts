@@ -3,9 +3,12 @@ import { refresh } from "next/cache";
 import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
+import type { MilestoneValues } from "@/data/milestones";
+
 import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { atAge } from "@/data/milestones";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
@@ -22,7 +25,19 @@ vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 const memory = inMemory();
 const { db } = memory;
 
-const [kidsLeave, downsize] = kept.milestones;
+const [kidsLeave, downsize, firstMillion, independence] = kept.milestones;
+
+// A sabbatical at 50.
+const sabbatical: MilestoneValues = {
+  conditions: atAge(50),
+  name: "Sabbatical",
+};
+
+// Owing nothing at all: a debt of nothing.
+const debtFree: MilestoneValues = {
+  conditions: [{ measure: "liquid", of: "debt", times: 1 }],
+  name: "Debt free",
+};
 
 describe("the milestone actions", () => {
   standUp(memory, { seed: kept });
@@ -31,22 +46,19 @@ describe("the milestone actions", () => {
     it("writes nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(
-        saveMilestone(null, { name: "Sabbatical", year: 2040 }),
-      ).rejects.toThrow("redirected");
+      await expect(saveMilestone(null, sabbatical)).rejects.toThrow(
+        "redirected",
+      );
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
 
     it("adds a new milestone with the name trimmed, given the next id, and draws the page again", async () => {
       expect(
-        await saveMilestone(null, { name: "  Sabbatical  ", year: 2040 }),
-      ).toStrictEqual(saved({ id: 6, name: "Sabbatical", year: 2040 }));
+        await saveMilestone(null, { ...sabbatical, name: "  Sabbatical  " }),
+      ).toStrictEqual(saved({ ...sabbatical, id: 6 }));
       expect(await readLatest(db)).toMatchObject({
         household: {
-          milestones: [
-            ...kept.milestones,
-            { id: 6, name: "Sabbatical", year: 2040 },
-          ],
+          milestones: [...kept.milestones, { ...sabbatical, id: 6 }],
           next: 7,
         },
         version: 2,
@@ -54,31 +66,78 @@ describe("the milestone actions", () => {
       expect(refresh).toHaveBeenCalledOnce();
     });
 
-    it("writes over the milestone with the id, in its place", async () => {
-      expect(
-        await saveMilestone(1, { name: "Kids leave home", year: 2038 }),
-      ).toStrictEqual(saved({ id: 1, name: "Kids leave home", year: 2038 }));
+    it("adds one reached when conditions hold the same way", async () => {
+      expect(await saveMilestone(null, debtFree)).toStrictEqual(
+        saved({ ...debtFree, id: 6 }),
+      );
       expect(await readLatest(db)).toMatchObject({
-        household: {
-          milestones: [{ ...kidsLeave, year: 2038 }, downsize],
-          next: 6,
-        },
+        household: { milestones: [...kept.milestones, { ...debtFree, id: 6 }] },
       });
     });
 
-    it("refuses a name of nothing but space, a year of none, an id the row could not have sent, and one no milestone has", async () => {
+    it("writes over the milestone with the id, in its place, whichever way it is reached", async () => {
+      const twoMillion: MilestoneValues = {
+        conditions: [{ measure: "worth", of: "pounds", times: 2000000 }],
+        name: "Second million",
+      };
+
+      expect(
+        await saveMilestone(1, {
+          conditions: atAge(48),
+          name: "Kids leave home",
+        }),
+      ).toStrictEqual(
+        saved({ conditions: atAge(48), id: 1, name: "Kids leave home" }),
+      );
+      expect(await saveMilestone(3, twoMillion)).toStrictEqual(
+        saved({ ...twoMillion, id: 3 }),
+      );
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          milestones: [
+            { ...kidsLeave, conditions: atAge(48) },
+            downsize,
+            { ...twoMillion, id: 3 },
+            independence,
+          ],
+          next: 6,
+        },
+        version: 3,
+      });
+    });
+
+    it("refuses a name of nothing but space, no condition, a multiple below nothing, a sum held to years, an age of part of a year or beside a sum, an id the dialog could not have sent, and one no milestone has", async () => {
       await expect(
-        saveMilestone(null, { name: "   ", year: 2040 }),
+        saveMilestone(null, { ...sabbatical, name: "   " }),
       ).rejects.toThrow(z.ZodError);
       await expect(
-        saveMilestone(null, { name: "Sabbatical", year: 0 }),
+        saveMilestone(null, { ...sabbatical, conditions: [] }),
       ).rejects.toThrow(z.ZodError);
       await expect(
-        saveMilestone(0, { name: "Sabbatical", year: 2040 }),
+        saveMilestone(null, {
+          ...debtFree,
+          conditions: [{ measure: "worth", of: "pounds", times: -1 }],
+        }),
       ).rejects.toThrow(z.ZodError);
       await expect(
-        saveMilestone(99, { name: "Sabbatical", year: 2040 }),
-      ).resolves.toStrictEqual(refused("No milestone has the id"));
+        saveMilestone(null, {
+          ...debtFree,
+          conditions: [{ measure: "worth", of: "years", times: 1 }],
+        }),
+      ).rejects.toThrow(z.ZodError);
+      await expect(
+        saveMilestone(null, { ...sabbatical, conditions: atAge(50.5) }),
+      ).rejects.toThrow("An age is whole years");
+      await expect(
+        saveMilestone(null, {
+          ...sabbatical,
+          conditions: [...atAge(50), ...debtFree.conditions],
+        }),
+      ).rejects.toThrow("An age is a milestone's only condition");
+      await expect(saveMilestone(0, sabbatical)).rejects.toThrow(z.ZodError);
+      await expect(saveMilestone(99, sabbatical)).resolves.toStrictEqual(
+        refused("No milestone has the id"),
+      );
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
   });
@@ -112,7 +171,7 @@ describe("the milestone actions", () => {
 
       expect(await readLatest(db)).toMatchObject({
         household: {
-          milestones: [downsize],
+          milestones: [downsize, firstMillion, independence],
           schedule: {
             expenses: kept.schedule.expenses.with(1, {
               ...childcare,
@@ -134,10 +193,21 @@ describe("the milestone actions", () => {
     it("deletes the milestone with the id and draws the page again", async () => {
       expect(await removeMilestone(2)).toStrictEqual(saved(undefined));
       expect(await readLatest(db)).toMatchObject({
-        household: { milestones: [kidsLeave] },
+        household: { milestones: [kidsLeave, firstMillion, independence] },
         version: 2,
       });
       expect(refresh).toHaveBeenCalledOnce();
+    });
+
+    it("deletes one reached when conditions hold, which no line is tied to, and leaves every line as it is", async () => {
+      expect(await removeMilestone(3)).toStrictEqual(saved(undefined));
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          milestones: [kidsLeave, downsize, independence],
+          schedule: kept.schedule,
+        },
+        version: 2,
+      });
     });
 
     it("refuses an id the row could not have sent, and one no milestone has", async () => {

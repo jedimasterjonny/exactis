@@ -9,7 +9,10 @@ import { FuturesWorker } from "@/test/futures-worker";
 
 import Chance from "./page";
 
-vi.mock("@/actions/goals", () => ({ removeGoal: vi.fn(), saveGoal: vi.fn() }));
+vi.mock("@/actions/milestones", () => ({
+  removeMilestone: vi.fn(),
+  saveMilestone: vi.fn(),
+}));
 vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
 
 // The household before anything is saved, as the store reads it, for
