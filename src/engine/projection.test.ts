@@ -15,7 +15,6 @@ import type { ProjectionPoint } from "./projection";
 import { cashFlow } from "./cash-flow";
 import {
   balanceIn,
-  balanceOf,
   holdsAnything,
   isShort,
   monthsOn,
@@ -1452,20 +1451,6 @@ describe("balanceIn", () => {
     expect(point && balanceIn(point, isa.id)).toBe(286145);
     expect(point && balanceIn(point, mortgage.id)).toBe(-182940);
     expect(point && balanceIn(point, pension.id)).toBe(0);
-  });
-});
-
-describe("balanceOf", () => {
-  it("sums both wrappers a point holds", () => {
-    expect(
-      balanceOf(
-        point(
-          2030,
-          { 1: 1200, 2: 300 },
-          { deferred: 1200, early: 5, free: 300, uncovered: 7 },
-        ),
-      ),
-    ).toBe(1500);
   });
 });
 

@@ -223,15 +223,20 @@ the store and hands them to the browser, which runs the engine itself, so a save
 on the accounts or the plan screen is a new projection on the next render and a
 retirement age dragged on the dashboard is projected as it moves, the lines tied
 to retirement moving with it. Chips over the chart choose a milestone, and the
-first tile reads the balance the plan holds entering its year, retirement's to
-begin with. A second tile reads the plan's net worth entering its last year, at
-its own rates: the one figure the chance of success's futures spread either side
-of, and the one its screen sets the middle future against. The header names the
-set of rates the plan runs on, the CMA's vintage with it when that set is live.
-The reads every screen goes through, one read of the latest version a request,
-and the save every action makes live under `src/store`, and the server actions a
-save goes to under `src/actions`: neither is a route, and the organisms that
-save through an action sit beneath the routes.
+first tile reads what the plan holds entering its year on the measure the
+milestone is on, the liquid net worth for a milestone reached on that and the
+net worth for one reached on it, at an age or for retirement, retirement's to
+begin with; a milestone reached when conditions hold stands in the year by which
+half the futures have reached it, and the figure is still the plan's own
+projection entering that year. A second tile reads the plan's net worth entering
+its last year, at its own rates: the one figure the chance of success's futures
+spread either side of, and the one its screen sets the middle future against.
+The header names the set of rates the plan runs on, the CMA's vintage with it
+when that set is live. The reads every screen goes through, one read of the
+latest version a request, and the save every action makes live under
+`src/store`, and the server actions a save goes to under `src/actions`: neither
+is a route, and the organisms that save through an action sit beneath the
+routes.
 
 ## Inflation
 

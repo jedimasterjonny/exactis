@@ -132,13 +132,6 @@ export function balanceIn(point: ProjectionPoint, id: number): number {
   return point.balances[id] ?? 0;
 }
 
-// What a point holds across both wrappers: the balance entering its
-// year, which the chart stacks the wrappers to and the dashboard's
-// milestone tile reads.
-export function balanceOf(point: ProjectionPoint): number {
-  return point.deferred + point.free;
-}
-
 // Whether a point holds or owes anything at all, in any account.
 export function holdsAnything(point: ProjectionPoint): boolean {
   return Object.values(point.balances).some((balance) => balance !== 0);
