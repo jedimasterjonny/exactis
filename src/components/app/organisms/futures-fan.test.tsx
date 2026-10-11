@@ -33,11 +33,20 @@ const futures = Array.from({ length: 10 }, (_, nth): Future => ({
   ranOut: [2027, 2028][nth] ?? null,
 }));
 
-// One milestone in the plan's years and one past them.
+// One milestone in the plan's years, at 37 in 2027, and one past them,
+// at 50 in 2040.
 const milestones = [
-  { id: 1, name: "Ada 18", year: 2027 },
-  { id: 2, name: "Tom 18", year: 2040 },
-];
+  {
+    conditions: [{ measure: "age", of: "years", times: 37 }],
+    id: 1,
+    name: "Ada 18",
+  },
+  {
+    conditions: [{ measure: "age", of: "years", times: 50 }],
+    id: 2,
+    name: "Tom 18",
+  },
+] as const;
 
 // What recharts draws with the class given: the vertical rule of a
 // ReferenceLine, or an axis's tick. Neither has a role or a label, so no

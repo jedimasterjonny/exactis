@@ -5,7 +5,6 @@ import type { Household } from "@/data/household";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
-import { goals } from "@/data/goals.fixture";
 import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
@@ -97,14 +96,20 @@ describe("Dashboard", () => {
     }
   });
 
-  it("hands the store's goals to the chance of success, which tiles each", async () => {
-    vi.mocked(getHousehold).mockResolvedValue({ ...household, goals });
-
+  // The first million and financial independence are reached when
+  // conditions hold, and are tiled; the two reached at an age are
+  // chips on the chart and no tile, so the caption every tile carries
+  // while there is nothing to draw is written three times, once for
+  // the chance and once for each of the two.
+  it("hands the store's milestones to the chance of success, which tiles each reached when conditions hold", async () => {
     render(await Dashboard());
 
-    for (const { name } of goals) {
+    for (const { name } of milestones.slice(2)) {
       expect(screen.getByText(name)).toHaveClass("label");
     }
+    expect(
+      screen.getAllByText("No spread to draw the futures from"),
+    ).toHaveLength(3);
   });
 
   // The household before anything is saved has no CMA, so the tile has
@@ -113,8 +118,8 @@ describe("Dashboard", () => {
     render(await Dashboard());
 
     expect(
-      screen.getByText("No spread to draw the futures from"),
-    ).toBeInTheDocument();
+      screen.getAllByText("No spread to draw the futures from"),
+    ).not.toHaveLength(0);
   });
 
   // A phone keeps the two the plan is steered by, in one row, and

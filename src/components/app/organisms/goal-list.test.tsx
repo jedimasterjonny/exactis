@@ -8,22 +8,27 @@ import {
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Goal } from "@/data/goals";
+import type { Milestone } from "@/data/milestones";
 import type { Future } from "@/engine/futures";
 import type { Answer } from "@/lib/answer";
 
-import { removeGoal, saveGoal } from "@/actions/goals";
+import { removeMilestone, saveMilestone } from "@/actions/milestones";
 import { Toaster } from "@/components/kit/toast";
-import { goals } from "@/data/goals.fixture";
+import { milestones } from "@/data/milestones.fixture";
 import { saved } from "@/lib/answer";
 import { placed } from "@/lib/span";
 import { bySlot, commit, openEntry, openRow } from "@/test/dom";
 
 import { GoalList } from "./goal-list";
 
-vi.mock("@/actions/goals", () => ({ removeGoal: vi.fn(), saveGoal: vi.fn() }));
+vi.mock("@/actions/milestones", () => ({
+  removeMilestone: vi.fn(),
+  saveMilestone: vi.fn(),
+}));
 
-const [firstMillion] = goals;
+// The milestones reached when conditions hold, which are the goals.
+const goals = milestones.slice(2);
+const [, , firstMillion] = milestones;
 
 // Born in 1990, from January 2026.
 const plan = {
@@ -63,7 +68,7 @@ function medians(): string[] {
 // Save and delete report through the toast manager, which needs its
 // Toaster mounted.
 function renderList(
-  listed: readonly Goal[] = goals,
+  listed: readonly Milestone[] = goals,
   drawn: readonly Future[] = futures,
 ): void {
   render(
@@ -107,7 +112,7 @@ describe("GoalList", () => {
   });
 
   it("says never for a share the run never reaches a goal by, with no dot, and says nothing before the first futures are drawn", () => {
-    const twoMillion: Goal = {
+    const twoMillion: Milestone = {
       ...firstMillion,
       conditions: [{ measure: "worth", of: "pounds", times: 2000000 }],
     };
@@ -233,11 +238,12 @@ describe("GoalList", () => {
     expect(choice("Measure")).toHaveValue("worth");
 
     // The store's answer is held back, so the save can be seen in flight.
-    const { promise, resolve: answer } = Promise.withResolvers<Answer<Goal>>();
-    vi.mocked(saveGoal).mockReturnValue(promise);
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Answer<Milestone>>();
+    vi.mocked(saveMilestone).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveGoal).toHaveBeenCalledExactlyOnceWith(null, {
+    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(null, {
       conditions: [{ measure: "worth", of: "debt", times: 10 }],
       name: "Independence",
     });
@@ -248,7 +254,7 @@ describe("GoalList", () => {
     answer(
       saved({
         conditions: [{ measure: "worth", of: "debt", times: 10 }],
-        id: 3,
+        id: 5,
         name: "Independence",
       }),
     );
@@ -265,7 +271,7 @@ describe("GoalList", () => {
 
   it("opens a goal from its row and writes the edit back", async () => {
     renderList();
-    vi.mocked(saveGoal).mockResolvedValue(
+    vi.mocked(saveMilestone).mockResolvedValue(
       saved({
         ...firstMillion,
         conditions: [{ measure: "worth", of: "pounds", times: 2000000 }],
@@ -285,7 +291,7 @@ describe("GoalList", () => {
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveGoal).toHaveBeenCalledExactlyOnceWith(firstMillion.id, {
+    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(firstMillion.id, {
       conditions: [{ measure: "worth", of: "pounds", times: 2000000 }],
       name: "First million",
     });
@@ -306,7 +312,7 @@ describe("GoalList", () => {
     renderList();
     const { promise, resolve: answer } =
       Promise.withResolvers<Answer<undefined>>();
-    vi.mocked(removeGoal).mockReturnValue(promise);
+    vi.mocked(removeMilestone).mockReturnValue(promise);
 
     fireEvent.click(
       within(openRow("Financial independence")).getByRole("button", {
@@ -321,7 +327,7 @@ describe("GoalList", () => {
     });
     fireEvent.click(within(question).getByRole("button", { name: "Delete" }));
 
-    expect(removeGoal).toHaveBeenCalledExactlyOnceWith(2);
+    expect(removeMilestone).toHaveBeenCalledExactlyOnceWith(4);
     expect(
       within(question).getByRole("button", { name: "Delete" }),
     ).toHaveAttribute("aria-busy", "true");
@@ -344,7 +350,7 @@ describe("GoalList", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(saveGoal).not.toHaveBeenCalled();
+    expect(saveMilestone).not.toHaveBeenCalled();
 
     dialog = openEntry("Add goal");
 
