@@ -20,7 +20,8 @@ import { getHousehold } from "@/store/household";
 // tile, since the milestone it reads is chosen on it and the retirement
 // age set there; the chance of success is drawn over the plan's futures
 // as the screen of that name draws it, with the spread the store gives
-// the plan; the badges and the rest
+// the plan, and the goals beside it, each at the median year the
+// futures reach it; the badges and the rest
 // of the tiles are the reference kit's invented plan, standing in until
 // the engine projects what they show, save the age the net worth is
 // read at, which is the plan's. It reads the store from its header
@@ -30,7 +31,8 @@ import { getHousehold } from "@/store/household";
 // of success, the two the plan is steered by, in one row, and leaves
 // the net worth and the legacy to a wider screen.
 export default async function Dashboard(): Promise<JSX.Element> {
-  const { accounts, milestones, plan, schedule, spread } = await getHousehold();
+  const { accounts, goals, milestones, plan, schedule, spread } =
+    await getHousehold();
   const age = String(endAge(plan));
   return (
     <>
@@ -63,6 +65,7 @@ export default async function Dashboard(): Promise<JSX.Element> {
           />
           <ChanceTile
             accounts={accounts}
+            goals={goals}
             plan={plan}
             schedule={schedule}
             spread={spread}
