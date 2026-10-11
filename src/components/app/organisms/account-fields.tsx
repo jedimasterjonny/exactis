@@ -76,7 +76,8 @@ const kinds = optionsOf(kindLabels, [
 // second, with a pension's choice beside them of what it is paid in a
 // month that cannot pay it, what that choice asks for on the third, a
 // sum and its cadence or a cap, and on the last the growth choice, with its rate stacked
-// beneath it while the growth is fixed, beside whatever the dialog
+// beneath it while the growth is fixed, or the rate alone for a debt,
+// which is on a lender's rate as a loan is, beside whatever the dialog
 // adds. The fields are uncontrolled and mount with the account as it
 // opened, and report each change to the ledger, whose draft mirrors
 // them. The treatment and the contribution choices are reported apart
@@ -221,15 +222,17 @@ export function AccountFields({
       </FieldRow>
       <FieldRow layout="pair-top">
         <div className="grid gap-4">
-          <SelectField
-            defaultValue={initial.growth}
-            hint="The plan rate is set on the assumptions screen"
-            label="Growth"
-            onValueChange={(growth) => {
-              onAmend({ growth, rate: initial.rate });
-            }}
-            options={growths}
-          />
+          {draft.kind !== "debt" && (
+            <SelectField
+              defaultValue={initial.growth}
+              hint="The plan rate is set on the assumptions screen"
+              label="Growth"
+              onValueChange={(growth) => {
+                onAmend({ growth, rate: initial.rate });
+              }}
+              options={growths}
+            />
+          )}
           {draft.growth === "fixed" && (
             <RateField
               defaultValue={initial.rate}

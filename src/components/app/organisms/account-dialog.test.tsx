@@ -25,7 +25,7 @@ import { AccountDialog } from "./account-dialog";
 
 vi.mock("@/actions/accounts", () => ({ saveAccount: vi.fn() }));
 
-const [pension, isa] = accounts;
+const [pension, isa, cash] = accounts;
 
 // The fixture's salary, which feeds the workplace pension.
 const [salary] = incomeLines;
@@ -250,6 +250,81 @@ describe("AccountDialog", () => {
     fireEvent.change(treatment, { target: { value: "tax-free" } });
 
     expect(field("Amount", dialog)).toHaveValue("£250");
+  });
+
+  // A debt is charged a lender's rate and never the plan's, so an
+  // account made a debt is put on a fixed rate, with the rate's field
+  // in place of the growth choice, and saves so; made something else
+  // it goes back to the growth it opened with, which is what the choice
+  // mounts showing, and a rate typed for the debt goes with the field.
+  // A change that stays off a debt leaves the growth where it is.
+  it("puts a debt on a fixed rate and brings the growth back as it opened with another treatment", async () => {
+    const onSaved = vi.fn<(account: Account) => void>();
+    renderDialog({ onSaved });
+    const dialog = openDialog();
+    vi.mocked(saveAccount).mockResolvedValue(saved(isa));
+    const treatment = choice(dialog, "Type");
+
+    fireEvent.change(field("Name", dialog), { target: { value: "Loan" } });
+    fireEvent.change(treatment, { target: { value: "cash" } });
+
+    expect(choice(dialog, "Growth")).toHaveValue("plan");
+
+    fireEvent.change(treatment, { target: { value: "debt" } });
+
+    expect(
+      within(dialog).queryByRole("combobox", { name: "Growth" }),
+    ).not.toBeInTheDocument();
+    expect(field("Rate", dialog)).toHaveValue("0.00%");
+
+    commit(field("Rate", dialog), "12.9");
+    fireEvent.change(treatment, { target: { value: "real-asset" } });
+
+    expect(choice(dialog, "Growth")).toHaveValue("plan");
+    expect(
+      within(dialog).queryByRole("textbox", { name: "Rate" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(treatment, { target: { value: "debt" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(vi.mocked(saveAccount).mock.calls[0]?.[1]).toMatchObject({
+      growth: "fixed",
+      kind: "debt",
+      rate: 0,
+    });
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+  });
+
+  // An account opened on a fixed rate keeps it through a debt and back,
+  // with the rate typed for it, since the debt took nothing away: the
+  // rate's field stays where it is, and the draft with it.
+  it("keeps the rate typed for an account opened fixed through a debt and back", async () => {
+    const onSaved = vi.fn<(account: Account) => void>();
+    renderDialog({ account: cash, onSaved });
+    const dialog = openDialog();
+    vi.mocked(saveAccount).mockResolvedValue(saved(cash));
+    const treatment = choice(dialog, "Type");
+
+    commit(field("Rate", dialog), "5");
+    fireEvent.change(treatment, { target: { value: "debt" } });
+    fireEvent.change(treatment, { target: { value: "cash" } });
+
+    expect(choice(dialog, "Growth")).toHaveValue("fixed");
+    expect(field("Rate", dialog)).toHaveValue("5.00%");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(vi.mocked(saveAccount).mock.calls[0]?.[1]).toMatchObject({
+      growth: "fixed",
+      kind: "cash",
+      rate: 0.05,
+    });
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
   });
 
   // A pension a salary feeds stays a pension until the salary is
