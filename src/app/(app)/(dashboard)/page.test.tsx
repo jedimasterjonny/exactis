@@ -6,7 +6,7 @@ import type { Household } from "@/data/household";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
-import { blank } from "@/data/household.fixture";
+import { blank, kept } from "@/data/household.fixture";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { getHousehold } from "@/store/household";
@@ -61,10 +61,29 @@ describe("Dashboard", () => {
     expect(screen.getByText("Net worth at 66")).toBeInTheDocument();
   });
 
-  it("opens the meta line with the plan's state badge", async () => {
+  // The household before anything is saved runs on the rates it opens
+  // with, typed by hand, and the badge says so.
+  it("opens the meta line with the set of rates the plan runs on", async () => {
     render(await Dashboard());
 
-    expect(screen.getByText("CMA-derived · Aug 26")).toHaveAttribute(
+    expect(screen.getByText("Custom rates")).toHaveAttribute(
+      "data-variant",
+      "secondary",
+    );
+  });
+
+  // The fixture's CMA is the August 2026 vintage, and a plan running on
+  // the rates derived from it is badged with the vintage.
+  it("names the CMA's vintage when the plan runs on the rates derived from it", async () => {
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      cma: kept.cma,
+      rateSet: "cma",
+    });
+
+    render(await Dashboard());
+
+    expect(screen.getByText("CMA-derived rates · Aug 2026")).toHaveAttribute(
       "data-variant",
       "secondary",
     );
