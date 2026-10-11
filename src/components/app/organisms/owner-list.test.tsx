@@ -15,6 +15,7 @@ import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 import { owners, sam } from "@/data/owners.fixture";
 import { saved } from "@/lib/answer";
+import { commit, field } from "@/test/dom";
 
 import { OwnerList } from "./owner-list";
 
@@ -65,7 +66,9 @@ describe("OwnerList", () => {
     expect(within(section).queryByRole("table")).not.toBeInTheDocument();
   });
 
-  it("adds a named owner and reports it", async () => {
+  // A new owner opens on the years the household's first owner opens
+  // with, and each is typed over.
+  it("adds a named owner, born in a year and retiring at an age, and reports it", async () => {
     renderList([]);
     vi.mocked(saveOwner).mockResolvedValue(saved(me));
 
@@ -75,16 +78,26 @@ describe("OwnerList", () => {
 
     expect(within(dialog).getByText("New owner")).toHaveClass("text-brand");
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(field("Born", dialog)).toHaveValue("1990");
+    expect(field("Born", dialog)).toHaveAccessibleDescription(
+      "The year, which every age is read against",
+    );
+    expect(field("Retires at", dialog)).toHaveValue("59");
+    expect(field("Retires at", dialog)).toHaveAccessibleDescription(
+      "From which nothing is earned by working",
+    );
 
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: " Me " },
     });
+    commit(field("Born", dialog), "1988");
+    commit(field("Retires at", dialog), "60");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(saveOwner).toHaveBeenCalledExactlyOnceWith(null, {
-      born: 1990,
+      born: 1988,
       name: "Me",
-      retires: 59,
+      retires: 60,
     });
     await waitFor(() => {
       expect(
@@ -108,6 +121,8 @@ describe("OwnerList", () => {
     expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue(
       "Sam",
     );
+    expect(field("Born", dialog)).toHaveValue("1993");
+    expect(field("Retires at", dialog)).toHaveValue("59");
 
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: "Samira" },
