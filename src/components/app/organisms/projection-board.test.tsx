@@ -1,6 +1,13 @@
 import type { JSX } from "react";
 
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
@@ -466,8 +473,15 @@ describe("ProjectionBoard", () => {
       }),
     );
 
+    // The chance tile's caption, held: what the run comes to is read off
+    // it again rather than looked for over the screen, since a look over
+    // the chart's every column costs about as much as a slice of the run,
+    // which the worker double draws on the test's own thread, and the
+    // run was looked for at every slice.
+    const chance = screen.getByText("Drawing 0 of 1,000 futures…");
+
     expect(screen.getByText("At Ada 18")).toBeInTheDocument();
-    expect(screen.getByText("Drawing 0 of 1,000 futures…")).toBeInTheDocument();
+    expect(chance).toBeInTheDocument();
     expect(screen.getAllByText("Drawing the futures…")).toHaveLength(2);
     expect(
       screen
@@ -476,13 +490,12 @@ describe("ProjectionBoard", () => {
     ).toStrictEqual(["Thirty grand …", "Thirty liquid …"]);
     expect(marks()).toStrictEqual(["2027"]);
 
-    expect(
-      await screen.findByText(
-        "Of 1,000 futures, lasting to 39",
-        {},
-        { timeout: 5000 },
-      ),
-    ).toBeInTheDocument();
+    await waitFor(
+      () => {
+        expect(chance).toHaveTextContent(/^Of 1,000 futures, lasting to 39$/);
+      },
+      { timeout: 5000 },
+    );
     expect(screen.getByText("100%")).toHaveClass("figure");
     expect(screen.getAllByText("Median of 1,000 futures · 2026")).toHaveLength(
       2,
