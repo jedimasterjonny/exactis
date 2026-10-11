@@ -39,7 +39,7 @@ describe("FuturesDrawn", () => {
       name: "What the futures are drawn from",
     });
 
-    expect(within(card).getByText("Sect. II.iii")).toHaveClass("label");
+    expect(within(card).getByText("Sect. II.iv")).toHaveClass("label");
     expect(
       within(sheet)
         .getAllByRole("row")

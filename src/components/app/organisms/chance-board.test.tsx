@@ -9,6 +9,8 @@ import { FuturesWorker } from "@/test/futures-worker";
 
 import { ChanceBoard } from "./chance-board";
 
+vi.mock("@/actions/goals", () => ({ removeGoal: vi.fn(), saveGoal: vi.fn() }));
+
 // Born in 1992, from January 2026 over three years, so the plan runs to
 // 37 and every future is drawn in a moment; no inflation, so every
 // figure is the pounds it states.
@@ -59,6 +61,7 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
+        goals={[]}
         milestones={[]}
         plan={plan}
         schedule={spending(500)}
@@ -85,6 +88,7 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[home]}
+        goals={[]}
         milestones={[]}
         plan={plan}
         schedule={spending(500)}
@@ -108,6 +112,7 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
+        goals={[]}
         milestones={[]}
         plan={plan}
         schedule={spending(500)}
@@ -141,8 +146,9 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
+        goals={[]}
         milestones={[]}
-        plan={{ ...plan, rate: 0.05, retires: 35 }}
+        plan={{ ...plan, rate: 0.05, retires: 39 }}
         schedule={spending(10000 / 12)}
         spread={{ inflation: 0.02, rate: 0.15 }}
       />,
@@ -166,12 +172,48 @@ describe("ChanceBoard", () => {
     ).toBeInTheDocument();
   });
 
+  // Worth £30,000 as it opens, every future reaches that much at once,
+  // at 34, and the goals are read over the futures drawn.
+  it("lists the goals beneath the fan, read over the futures drawn", async () => {
+    render(
+      <ChanceBoard
+        accounts={[isa]}
+        goals={[
+          {
+            conditions: [{ measure: "worth", of: "pounds", times: 30000 }],
+            id: 1,
+            name: "Thirty grand",
+          },
+        ]}
+        milestones={[]}
+        plan={plan}
+        schedule={spending(500)}
+        spread={nothingStrays}
+      />,
+    );
+
+    const card = screen.getByRole("region", {
+      name: "When the goals are reached",
+    });
+
+    expect(within(card).getByText("Sect. II.ii")).toHaveClass("label");
+    expect(
+      await within(card).findByRole(
+        "cell",
+        { name: "100%" },
+        { timeout: 5000 },
+      ),
+    ).toHaveClass("figure");
+    expect(within(card).getAllByText("Age 34")).toHaveLength(4);
+  });
+
   // A pension alone, drawn from at 34, long before it can be: the plan
   // lasts at its own rates only by the early draw, every year from 2026.
   it("says before the count that the plan lasts at its own rates only by drawing a pension early", () => {
     render(
       <ChanceBoard
         accounts={[{ ...isa, balance: 1000000, kind: "tax-deferred" }]}
+        goals={[]}
         milestones={[]}
         plan={plan}
         schedule={spending(500)}
@@ -195,6 +237,7 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
+        goals={[]}
         milestones={[]}
         plan={plan}
         schedule={spending(1000)}
