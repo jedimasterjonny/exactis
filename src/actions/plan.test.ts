@@ -3,6 +3,7 @@ import { refresh } from "next/cache";
 import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
+import { cma } from "@/data/cma.fixture";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { owners, sam } from "@/data/owners.fixture";
 import { allocation, rates } from "@/data/rates.fixture";
@@ -303,22 +304,38 @@ describe("saveDeductions", () => {
     await expect(saveDeductions({ dividends: -0.01 })).resolves.toStrictEqual(
       refused("A dividend yield is nothing or more"),
     );
+    await expect(saveDeductions({ fees: 0.11 })).resolves.toStrictEqual(
+      refused("A deduction is no more than 10%"),
+    );
+    await expect(saveDeductions({ dividends: 0.11 })).resolves.toStrictEqual(
+      refused("A deduction is no more than 10%"),
+    );
     expect(await readLatest(db)).toBeNull();
   });
 
-  // Fees of 150% leave stocks growing at less than losing everything,
-  // which the rates typed are never asked to make while they are not
-  // the ones live.
+  // Fees of 10% off classes losing 95% a year leave stocks growing at
+  // less than losing everything, which the rates typed are never asked
+  // to make while they are not the ones live.
   it("holds the rates the deductions make to their rules while the CMA's are live", async () => {
-    await keepAfter(db, 0, reference);
+    const losing = {
+      ...reference,
+      cma: {
+        latest: {
+          ...cma,
+          assets: cma.assets.map((asset) => ({ ...asset, rate: -0.95 })),
+        },
+        previous: null,
+      },
+    };
+    await keepAfter(db, 0, losing);
 
-    expect(await saveDeductions({ fees: 1.5 })).toStrictEqual(
-      saved({ dividends: 0.02, fees: 1.5, setOn: "2026-09-15" }),
+    expect(await saveDeductions({ fees: 0.1 })).toStrictEqual(
+      saved({ dividends: 0.02, fees: 0.1, setOn: "2026-09-15" }),
     );
 
-    await keepAfter(db, 2, { ...reference, rateSet: "cma" });
+    await keepAfter(db, 2, { ...losing, rateSet: "cma" });
 
-    await expect(saveDeductions({ fees: 1.5 })).resolves.toStrictEqual(
+    await expect(saveDeductions({ fees: 0.1 })).resolves.toStrictEqual(
       refused("A rate loses no more than everything"),
     );
     expect(await readLatest(db)).toMatchObject({ version: 3 });

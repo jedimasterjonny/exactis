@@ -104,25 +104,27 @@ flat for life, either those typed or those derived from the capital market
 assumptions, below: what stocks return in all, their growth and the dividend
 yield on top, which every wrapper reinvests, and what bonds return, each in the
 share of the savings the live set holds in it, typed or the target allocation's.
-Cash is carried beside them, so a short month can be drawn from it, but it is
-not plotted, since the progress points a projection is laid over carry no cash
-figure. The first year runs from the month after the one the household's
-balances are as of, since a balance is what an account held at that month's end,
-as a statement is dated and as each progress point is read, so the plan pays
-nothing into a month the statements already hold, whatever day the plan is read
-on; a household read before anything is saved opens as of the month before the
-one it is read in, so its plan starts in that one, and keeps the month from its
-first save. What an account is paid in a month is what `src/engine/cash-flow.ts`
-works out: the month's income, less what the salaries sacrifice, the tax on the
-rest, what the expense lines cost and each debt's own fixed sum, pays the other
-fixed sums, handed down the accounts in the order they are listed, and what
-survives them is the spare money, handed down the accounts that take it the same
-way, each to a twelfth of its cap. A fixed sum into savings is therefore paid
-only out of what the month has, so a contribution stops when the income funding
-it ends. A debt's is owed rather than saved, so it is paid whole and first
-wherever the debt is listed, and a month short of it draws on the savings as it
-would for an expense; the order sets which saving is paid first, and a debt is
-no saving.
+Each rate typed is held between losing everything and 50% a year, as is every
+class return a vintage keeps, since a return outside that is no reading of any
+market and a figure past it is a percentage typed as a fraction. Cash is carried
+beside them, so a short month can be drawn from it, but it is not plotted, since
+the progress points a projection is laid over carry no cash figure. The first
+year runs from the month after the one the household's balances are as of, since
+a balance is what an account held at that month's end, as a statement is dated
+and as each progress point is read, so the plan pays nothing into a month the
+statements already hold, whatever day the plan is read on; a household read
+before anything is saved opens as of the month before the one it is read in, so
+its plan starts in that one, and keeps the month from its first save. What an
+account is paid in a month is what `src/engine/cash-flow.ts` works out: the
+month's income, less what the salaries sacrifice, the tax on the rest, what the
+expense lines cost and each debt's own fixed sum, pays the other fixed sums,
+handed down the accounts in the order they are listed, and what survives them is
+the spare money, handed down the accounts that take it the same way, each to a
+twelfth of its cap. A fixed sum into savings is therefore paid only out of what
+the month has, so a contribution stops when the income funding it ends. A debt's
+is owed rather than saved, so it is paid whole and first wherever the debt is
+listed, and a month short of it draws on the savings as it would for an expense;
+the order sets which saving is paid first, and a debt is no saving.
 
 A pension can be marked always funded, for a pension worth keeping paid when the
 month cannot, since what it is paid out of taxed money is relieved. It is paid
@@ -323,11 +325,12 @@ in at the other's return with none of the whole, so its rate weighs nothing, and
 the screen shows it as empty. The household keeps two deductions, typed: the
 fees every fund charges, which BlackRock's index returns are gross of and the
 plan charges nowhere else, and the dividend yield, which the workbook does not
-carry. Both open on the figures the manual method settled on in September 2026,
-0.20% of fees and a 2.00% yield, until they are typed over. Stocks grow at their
-blend less both, with the yield on top as their dividend yield, so the two add
-back to the blend less fees; bonds grow at theirs less the fees. Inflation is
-the curve's derived rate, since the returns are nominal.
+carry, each held to a tenth at most, since no fund charges or yields more. Both
+open on the figures the manual method settled on in September 2026, 0.20% of
+fees and a 2.00% yield, until they are typed over. Stocks grow at their blend
+less both, with the yield on top as their dividend yield, so the two add back to
+the blend less fees; bonds grow at theirs less the fees. Inflation is the
+curve's derived rate, since the returns are nominal.
 
 The household keeps which set the plan runs on, the rates typed or the derived,
 and leaves the other as it was. The derived set carries its own split of the
