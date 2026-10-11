@@ -151,7 +151,10 @@ export function readCma(file: Uint8Array): Cma {
 // A sterling row as the asset class it prices, or nothing for one in a
 // class blending into neither of the plan's. One whose return is not a
 // number is refused, since a class with no return can blend into
-// nothing.
+// nothing, and so is one whose return is past what any market has
+// returned, below losing everything or above 50% a year, naming the
+// figure, since a workbook in percent units reads every return a
+// hundredfold and is better refused at the pull than kept.
 function assetOf(row: Listed): readonly Asset[] {
   const sleeve = sleeves.get(row.kind);
   if (sleeve === undefined) {
@@ -160,6 +163,11 @@ function assetOf(row: Listed): readonly Asset[] {
   if (typeof row.rate !== "number") {
     throw new Refusal(
       `The ${sheet} sheet gives ${row.name} no ${String(horizon)}-year return`,
+    );
+  }
+  if (row.rate < -1 || row.rate > 0.5) {
+    throw new Refusal(
+      `The ${sheet} sheet gives ${row.name} a ${String(horizon)}-year return of ${String(row.rate)}, past what any market has returned`,
     );
   }
   return [{ name: row.name, rate: row.rate, ...riskOf(row.risk), sleeve }];

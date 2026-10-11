@@ -303,8 +303,11 @@ sterling, equities blending into the plan's stocks and fixed income into its
 bonds, private markets left out. Nothing is read by position. The header is
 found by its first cell and the 20-year column within the block of expected
 returns, since the interquartile ranges beside it head their columns the same
-way. BlackRock prices a hedged return only in dollars, so each class it prices
-hedged in dollars and unhedged in sterling gains a sterling-hedged form, the
+way. A return past what any market has returned, below losing everything or
+above 50% a year, is refused as an unknown header is, naming the class and the
+figure, so a workbook in percent units is refused at the pull rather than kept.
+BlackRock prices a hedged return only in dollars, so each class it prices hedged
+in dollars and unhedged in sterling gains a sterling-hedged form, the
 dollar-hedged return carried from US to UK cash. Japan's large caps, which
 sterling stopped pricing in August 2026, and US small caps are priced only in
 their own markets' currencies, so each is carried into sterling by its gap over

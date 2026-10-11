@@ -335,6 +335,28 @@ describe("readCma", () => {
     );
   });
 
+  // A workbook in percent units reads every return a hundredfold, and is
+  // refused at its first sterling class rather than kept.
+  it.each([[8.156], [-1.5]])(
+    "refuses a sterling equity or fixed income with a 20-year return of %s, past what any market has returned",
+    (rate) => {
+      const file = withRows({
+        "UK large cap equities": [
+          "GBP",
+          "Equities",
+          "UK large cap equities",
+          rate,
+        ],
+      });
+
+      expect(() => readCma(file)).toThrow(
+        new Refusal(
+          `The Starting point sheet gives UK large cap equities a 20-year return of ${String(rate)}, past what any market has returned`,
+        ),
+      );
+    },
+  );
+
   // A private market's return is never read, so one missing is no
   // reason to refuse.
   it("reads a sheet whose private market has no return", () => {
