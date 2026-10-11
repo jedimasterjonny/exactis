@@ -52,6 +52,27 @@ describe("MilestoneChips", () => {
     }
   });
 
+  it("follows the chips with a milestone yet to be placed, dashed, with an ellipsis for its year and no press", () => {
+    render(
+      <MilestoneChips
+        markers={markers}
+        onSelect={vi.fn<(tie: Tie) => void>()}
+        pending={[{ id: 3, name: "First million" }]}
+        selected="retirement"
+      />,
+    );
+
+    const group = screen.getByRole("group", { name: "Milestones" });
+    const chip = within(group).getByText(bySlot("milestone-chip-pending"), {
+      suggest: false,
+    });
+
+    expect(within(group).getAllByRole("button")).toHaveLength(2);
+    expect(chip).toHaveTextContent("First million …");
+    expect(chip).toHaveClass("border-dashed", "text-muted-foreground");
+    expect(within(chip).getByText("…")).toHaveClass("max-sm:hidden");
+  });
+
   it("reports the milestone a chip chooses", () => {
     const onSelect = vi.fn<(tie: Tie) => void>();
     render(

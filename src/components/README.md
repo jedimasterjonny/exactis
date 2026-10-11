@@ -42,7 +42,7 @@ in the vendored file works until the next refresh silently discards it.
 | `templates/` | the shell a page sits in                                     | `app-frame`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 A component composes what is below it, never above, and only an organism
-composes beside it. There are twenty-eight of those same-tier edges:
+composes beside it. There are twenty-nine of those same-tier edges:
 `account-ledger` on `account-dialog`, `balance-sheet`, `car-dialog`,
 `house-dialog`, `money-flow` and `owner-list`, `account-dialog` on
 `account-fields` and `sacrifice-fields`, `car-dialog` on `car-fields`,
@@ -51,8 +51,9 @@ composes beside it. There are twenty-eight of those same-tier edges:
 each of `car-fields` and `house-fields` on `loan-fields`, `income-schedule` on
 `employment-fields`, each of the two schedules on both `line-fields` and
 `schedule-rows`, each of `milestone-list` and `milestone-spreads` on
-`milestone-dialog`, `projection-board` on `projection-chart`, `rate-set` on both
-`cma-worksheet` and `custom-rates`, and `target-allocation` on `target-table`.
+`milestone-dialog`, `projection-board` on both `chance-tile` and
+`projection-chart`, `rate-set` on both `cma-worksheet` and `custom-rates`, and
+`target-allocation` on `target-table`.
 
 ## Placing a new component
 

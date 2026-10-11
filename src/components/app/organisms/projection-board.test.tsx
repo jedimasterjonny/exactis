@@ -3,8 +3,10 @@ import type { JSX } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { Account } from "@/data/accounts";
+import type { Shortfall } from "@/data/cma";
 import type { Milestone } from "@/data/milestones";
-import type { Plan } from "@/data/plan";
+import type { Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { ProjectionPoint } from "@/engine/projection";
 
@@ -12,12 +14,15 @@ import { saveAges } from "@/actions/plan";
 import { toast } from "@/components/kit/toast";
 import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
+import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
 import { retiring } from "@/data/income.fixture";
+import { atAge } from "@/data/milestones";
 import { balanceIn, balanceOf, project } from "@/engine/projection";
 import { refused } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
-import { commit, slider } from "@/test/dom";
+import { bySlot, commit, slider } from "@/test/dom";
+import { FuturesWorker } from "@/test/futures-worker";
 
 import { ProjectionBoard, settle } from "./projection-board";
 
@@ -31,6 +36,11 @@ vi.mock(import("@/engine/projection"), async (importOriginal) => {
 });
 
 const { milestones, schedule } = kept;
+const [, , , home, mortgage] = accounts;
+
+// No CMA, so no spread to draw the futures at, which is how most of
+// the board is read: the futures are the chance of success's to test.
+const short: Shortfall = { short: "No CMA is pulled" };
 
 // The vertical rule recharts draws for a ReferenceLine, which carries the
 // year it stands at as an attribute. A rule has no role, label or text,
@@ -49,18 +59,28 @@ const marks = (): (null | string)[] =>
 // milestone but retirement, or those given, on the plan given or the
 // fixture's retiring one: born in 1992 and retiring at 61, its owner
 // retires in 2053, within the plan from 2026, when they are 34, to
-// 2083, when they are 91.
+// 2083, when they are 91; with no spread to draw the futures at,
+// unless one is given, over the fixture's accounts, unless others are.
 function board(
   held: Plan = retiring,
   lines: Schedule = schedule,
-  listed: readonly Milestone[] = [],
+  {
+    listed = [],
+    owned = accounts,
+    spread = short,
+  }: {
+    readonly listed?: readonly Milestone[];
+    readonly owned?: readonly Account[];
+    readonly spread?: Shortfall | Spread;
+  } = {},
 ): JSX.Element {
   return (
     <ProjectionBoard
-      accounts={accounts}
+      accounts={owned}
       milestones={listed}
       plan={held}
       schedule={lines}
+      spread={spread}
     >
       <p>The other tiles</p>
     </ProjectionBoard>
@@ -136,6 +156,18 @@ describe("ProjectionBoard", () => {
         "button",
         { name: "Retirement 2053", pressed: true },
       ),
+    ).toBeInTheDocument();
+    // The chance of success follows the milestone tile, with nothing to
+    // draw the futures at, and the caller's tiles follow it.
+    expect(
+      screen.getAllByText(
+        (_content, element) => element?.hasAttribute("data-tone") === true,
+        { suggest: false },
+      ),
+    ).toHaveLength(2);
+    expect(screen.getByText("Chance of success")).toHaveClass("label");
+    expect(
+      screen.getByText("No spread to draw the futures from"),
     ).toBeInTheDocument();
     expect(
       screen.getAllByRole("paragraph").map((line) => line.textContent),
@@ -216,7 +248,7 @@ describe("ProjectionBoard", () => {
   // side of retirement in 2053, and each is marked beside it; the
   // retirement mark moves with the age as the others stay.
   it("marks every milestone the household lists beside retirement", () => {
-    render(board(retiring, schedule, milestones));
+    render(board(retiring, schedule, { listed: milestones }));
 
     expect(marks()).toStrictEqual(["2040", "2053", "2059"]);
 
@@ -332,6 +364,7 @@ describe("ProjectionBoard", () => {
         milestones={milestones}
         plan={retiring}
         schedule={schedule}
+        spread={short}
       >
         {null}
       </ProjectionBoard>,
@@ -345,11 +378,106 @@ describe("ProjectionBoard", () => {
     ).not.toBeInTheDocument();
   });
 
+  // The home and its mortgage alone hold something to project and
+  // nothing for the futures to grow: the chart draws, and the chance
+  // says why it does not, for itself and for each milestone reached
+  // when conditions hold.
+  it("says there are no savings for the futures to grow over a plan of a home and its mortgage alone", () => {
+    render(
+      board(retiring, schedule, {
+        listed: milestones,
+        owned: [home, mortgage],
+        spread: { inflation: 0, rate: 0 },
+      }),
+    );
+
+    expect(screen.getByRole("application")).toHaveClass("recharts-surface");
+    expect(
+      screen.getAllByText("No savings for the futures to grow"),
+    ).toHaveLength(3);
+    // The three milestones, and the mark where the plan runs out, at
+    // retirement, since nothing is saved for the years after it.
+    expect(marks()).toStrictEqual(["2040", "2053", "2059", "2053"]);
+    expect(
+      screen.queryByText(bySlot("milestone-chip-pending"), { suggest: false }),
+    ).not.toBeInTheDocument();
+  });
+
+  // Born in 1992, a plan of three years from 2026 holds £30,000 in an
+  // ISA spending £500 a month, which lasts, so every future is the plan
+  // at its rates where nothing strays, and each reaches thirty grand at
+  // once, in 2026; retiring at 92 falls past the plan's years, so the
+  // milestone at 35, in 2027, is chosen to begin with. The futures are
+  // drawn by the worker stood in for jsdom's missing one, and until
+  // they are the milestone the run will place is said to be coming.
+  it("draws the futures once, says a milestone reached when conditions hold is coming, and marks it at the median once the run is drawn", async () => {
+    vi.stubGlobal("Worker", FuturesWorker);
+    const planned = { ...retiring, retires: 92, years: 3 };
+    const isa: Account = {
+      balance: 30000,
+      growth: { kind: "plan" },
+      id: 1,
+      kind: "tax-free",
+      name: "ISA",
+      owner: 1,
+    };
+    const spending: Schedule = {
+      expenses: [{ ...expenseLines[0], amount: 500, growth: "nominal" }],
+      income: [],
+    };
+    const listed: readonly Milestone[] = [
+      { conditions: atAge(35), id: 1, name: "Ada 18" },
+      {
+        conditions: [{ measure: "worth", of: "pounds", times: 30000 }],
+        id: 2,
+        name: "Thirty grand",
+      },
+    ];
+    render(
+      board(planned, spending, {
+        listed,
+        owned: [isa],
+        spread: { inflation: 0, rate: 0 },
+      }),
+    );
+
+    expect(screen.getByText("At Ada 18")).toBeInTheDocument();
+    expect(screen.getByText("Drawing 0 of 1,000 futures…")).toBeInTheDocument();
+    expect(screen.getByText("Drawing the futures…")).toBeInTheDocument();
+    expect(
+      screen.getByText(bySlot("milestone-chip-pending"), { suggest: false }),
+    ).toHaveTextContent("Thirty grand …");
+    expect(marks()).toStrictEqual(["2027"]);
+
+    expect(
+      await screen.findByText(
+        "Of 1,000 futures, lasting to 37",
+        {},
+        { timeout: 5000 },
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("100%")).toHaveClass("figure");
+    expect(
+      screen.getByText("Median of 1,000 futures · 2026"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(bySlot("milestone-chip-pending"), { suggest: false }),
+    ).not.toBeInTheDocument();
+    // Recharts keeps a rule where it was mounted, so the one the run
+    // adds comes after the plan's own, whatever their years.
+    expect(new Set(marks())).toStrictEqual(new Set(["2026", "2027"]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Thirty grand 2026" }));
+
+    expect(screen.getByText("At Thirty grand")).toBeInTheDocument();
+    expect(screen.getByText("2026 · age 34")).toBeInTheDocument();
+  });
+
   // The children leave home in 2040, when the owner is 48: the tile
   // reads the plan then, and the chart draws that line solid. Moving
   // the age chooses retirement again, at the age moved to.
   it("reads the plan at the milestone a chip chooses, and at retirement again once the age moves", () => {
-    render(board(retiring, schedule, milestones));
+    render(board(retiring, schedule, { listed: milestones }));
 
     fireEvent.click(
       screen.getByRole("button", { name: "Kids leave home 2040" }),
@@ -375,7 +503,7 @@ describe("ProjectionBoard", () => {
   // than running the engine again, since a run the chart has not seen is
   // redrawn column by column, and that held the chip's press back.
   it("reads the milestone a chip chooses without running the engine again", () => {
-    render(board(retiring, schedule, milestones));
+    render(board(retiring, schedule, { listed: milestones }));
     vi.mocked(project).mockClear();
 
     fireEvent.click(
@@ -391,7 +519,9 @@ describe("ProjectionBoard", () => {
   // and with none, keeps the retirement tile.
   it("reads the first milestone the plan's years reach once retirement is before them, and the retirement tile with none", () => {
     const retired = { ...retiring, retires: 28 };
-    const { rerender } = render(board(retired, schedule, milestones));
+    const { rerender } = render(
+      board(retired, schedule, { listed: milestones }),
+    );
 
     expect(screen.getByText("At Kids leave home")).toBeInTheDocument();
     expect(
@@ -400,7 +530,7 @@ describe("ProjectionBoard", () => {
       ),
     ).toHaveLength(2);
 
-    rerender(board(retired, schedule, []));
+    rerender(board(retired, schedule));
 
     expect(screen.getByText("Retirement")).toBeInTheDocument();
     expect(screen.getByText("28")).toBeInTheDocument();
