@@ -269,7 +269,7 @@ describe("CashFlowCard", () => {
   // account at all, so the year leaves £55,000 uncovered, its £60,000
   // less what April settles of the salary's last tax year, and that the
   // ISA's £286,145 covers whole.
-  it("weights what is left, and tones a shortfall as a loss only when the savings run out", () => {
+  it("weights what is left, and tones a shortfall as a loss when the savings run out", () => {
     const flows = { expenses: [retirement], income: [salary] };
     const { unmount } = render(
       <CashFlowCard
@@ -312,6 +312,41 @@ describe("CashFlowCard", () => {
 
     expect(screen.getByText("£5,000 / mo")).not.toHaveClass("text-destructive");
     expect(screen.getByText(drawn)).toBeInTheDocument();
+  });
+
+  // The household's £3,500 a month with nothing coming in and only the
+  // pension to draw on, at 36: September to December are each short
+  // £3,500 that no cash or ISA stands behind, so each is met by a gross
+  // pension draw of £7,777.78 at the 55% charge, £31,111.11 over the four
+  // months, carried on the year's point rounded up to the pound. The
+  // pension covers every month, so nothing is uncovered, and the plan has
+  // fallen short all the same, as the chance of success counts it.
+  it("tones a year carried by an early pension draw as a loss, and says so", () => {
+    render(
+      <CashFlowCard
+        accounts={[pension]}
+        milestones={[]}
+        plan={plan}
+        schedule={{ expenses: [household], income: [] }}
+      />,
+    );
+
+    expect(year()).toHaveAttribute(
+      "aria-valuetext",
+      "2026, age 36: £3,500 a month carried by an early pension draw",
+    );
+    expect(screen.getByText("£3,500 / mo")).toHaveClass("text-destructive");
+    expect(screen.getByText("carried by an early pension draw")).toHaveClass(
+      "text-muted-foreground",
+    );
+    expect(screen.getByText("£3,500")).toHaveClass(
+      "figure",
+      "font-medium",
+      "text-destructive",
+    );
+    expect(ledger().at(-1)).toBe(
+      "ShortThe savings fall short this year, carried by an early pension draw of £31,112 at the 55% charge.£3,500",
+    );
   });
 
   // The salary alone, taxed whole, leaves £7,474.70 a month: the ISA
