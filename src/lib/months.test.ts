@@ -8,6 +8,8 @@ import {
   formatMonth,
   formatMonthShort,
   isOnOrBefore,
+  monthAfter,
+  monthBefore,
   monthName,
   monthsBetween,
   thisMonth,
@@ -102,6 +104,32 @@ describe("isOnOrBefore", () => {
     expect(isOnOrBefore({ month: 1, year: 2028 }, march)).toBe(true);
     expect(isOnOrBefore({ month: 3, year: 2028 }, march)).toBe(false);
     expect(isOnOrBefore({ month: 0, year: 2029 }, march)).toBe(false);
+  });
+});
+
+describe("monthAfter", () => {
+  it("steps a month on, December into the January of the next year", () => {
+    expect(monthAfter({ month: 8, year: 2026 })).toStrictEqual({
+      month: 9,
+      year: 2026,
+    });
+    expect(monthAfter({ month: 11, year: 2026 })).toStrictEqual({
+      month: 0,
+      year: 2027,
+    });
+  });
+});
+
+describe("monthBefore", () => {
+  it("steps a month back, January into the December of the year before", () => {
+    expect(monthBefore({ month: 8, year: 2026 })).toStrictEqual({
+      month: 7,
+      year: 2026,
+    });
+    expect(monthBefore({ month: 0, year: 2027 })).toStrictEqual({
+      month: 11,
+      year: 2026,
+    });
   });
 });
 

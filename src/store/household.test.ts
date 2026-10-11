@@ -99,28 +99,30 @@ describe("the household store", () => {
     });
   });
 
-  // The balances were recorded in March; read in September, the plan
-  // still opens on them in March, so a debt's payments and every figure
-  // after it are counted from the month the balances are as of rather
-  // than sliding with the day the page is read.
-  it("runs the plan from the month the balances are as of, whatever day it is read", async () => {
+  // The balances were read at the end of March; read in September, the
+  // plan still opens on them in April, so a debt's payments and every
+  // figure after it are counted from the month after the one the
+  // balances are as of rather than sliding with the day the page is
+  // read.
+  it("runs the plan from the month after the one the balances are as of, whatever day it is read", async () => {
     await keepAfter(db, 0, { ...reference, asOf: { month: 2, year: 2026 } });
 
-    expect((await getHousehold()).plan).toMatchObject({ from: 2026, month: 2 });
+    expect((await getHousehold()).plan).toMatchObject({ from: 2026, month: 3 });
 
     vi.setSystemTime(new Date("2027-01-15T12:00:00Z"));
 
-    expect((await getHousehold()).plan).toMatchObject({ from: 2026, month: 2 });
+    expect((await getHousehold()).plan).toMatchObject({ from: 2026, month: 3 });
   });
 
-  // The first save keeps the month the household was read in, so the
-  // balances it records are that month's from then on.
-  it("keeps the month a household is first saved in as its balances' month", async () => {
+  // Read in September, the household opens as of the end of August, so
+  // its plan runs from September; the first save keeps that month, so
+  // the plan runs from September from then on.
+  it("keeps the month before the one a household is first saved in as its balances' month", async () => {
     await amend(({ kept }) => ({ kept, result: null }));
     vi.setSystemTime(new Date("2027-01-15T12:00:00Z"));
 
     expect(await readLatest(db)).toMatchObject({
-      household: { asOf: { month: 8, year: 2026 } },
+      household: { asOf: { month: 7, year: 2026 } },
     });
     expect((await getHousehold()).plan).toMatchObject({ from: 2026, month: 8 });
   });

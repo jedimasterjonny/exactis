@@ -841,14 +841,14 @@ describe("the account actions", () => {
     it("writes each balance checked, dated today, with the month, in one version", async () => {
       expect(
         await closeBalances({
-          asOf: { month: 8, year: 2026 },
+          asOf: { month: 7, year: 2026 },
           balances: [
             { balance: 275000, id: 2 },
             { balance: -175500, id: 5 },
             { balance: 16900, id: 3 },
           ],
         }),
-      ).toStrictEqual(saved({ month: 8, year: 2026 }));
+      ).toStrictEqual(saved({ month: 7, year: 2026 }));
       expect(await latest()).toStrictEqual({
         ...kept,
         accounts: kept.accounts.map((account) => {
