@@ -128,10 +128,13 @@ export function AccountDialog({
   // a treatment nobody owns and comes back with a wrapper's, as below.
   // Whether the account is always funded goes with any treatment but a
   // pension's and comes back as the account opened with it, which is
-  // what the choice mounts showing when a pension is chosen again.
+  // what the choice mounts showing when a pension is chosen again. The
+  // growth goes to a fixed rate with a debt and comes back as the
+  // account opened with it where the debt took it away, as below.
   function treat(current: Entry<Draft>, kind: AccountKind): void {
     const willTakeSpare = takesSpare({ kind });
     const treated = {
+      ...grownBy(current, kind),
       isAlwaysFunded: isPension({ kind }) && current.initial.isAlwaysFunded,
       kind,
       owner: ownerAfter(current, kind, owners),
@@ -232,6 +235,26 @@ function fundedBy(current: Entry<Draft>, funding: Funding): Partial<Draft> {
         funding,
       }
     : { cadence: "year", cap: current.initial.cap, contribution: 0, funding };
+}
+
+// The growth a treatment leaves the draft with. A debt is charged a
+// lender's rate and never the plan's, so it is put on a fixed rate, and
+// the rate stays, since its field does: it mounts showing what the
+// account opened with, which is what the draft holds while the growth
+// is the plan's. An account made something else goes back to the growth
+// it opened with where the debt took it away, which is what the choice
+// mounts showing, and to the rate it opened with, since the rate's field
+// leaves with the growth; one opened on a fixed rate keeps the rate
+// typed for it, since its field stays. A change that stays off a debt
+// leaves both where they are.
+function grownBy(current: Entry<Draft>, kind: AccountKind): Partial<Draft> {
+  if (kind === "debt") {
+    return { growth: "fixed" };
+  }
+  return current.draft.kind === "debt" &&
+    current.draft.growth !== current.initial.growth
+    ? { growth: current.initial.growth, rate: current.initial.rate }
+    : {};
 }
 
 // Why the treatment of the account being edited is held, if it is: a
