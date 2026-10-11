@@ -39,7 +39,7 @@ export function FuturesDrawn({
   return (
     <SectionCard
       caption="Each future draws a year of returns and a year of prices at a time, about the plan's own rates, as far either side as the markets are expected to stray."
-      label={subsectionLabel(chance, 3)}
+      label={subsectionLabel(chance, 4)}
       title="What the futures are drawn from"
     >
       <CardContent className="grid gap-6">

@@ -3,9 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import { commit } from "@/test/dom";
 
-import { MoneyField, RateField, YearField } from "./figure-field";
+import {
+  MoneyField,
+  MultipleField,
+  RateField,
+  YearField,
+} from "./figure-field";
 
-// What tells the three apart: how each writes a figure, how far a key
+// What tells the four apart: how each writes a figure, how far a key
 // steps it and then with shift, and how a typed one is read.
 const presets = [
   {
@@ -14,6 +19,13 @@ const presets = [
     shown: "£412,880",
     stepped: ["£412,980", "£411,980"],
     typed: ["415,000", 415000, "£415,000"],
+  },
+  {
+    figure: 25,
+    preset: MultipleField,
+    shown: "25",
+    stepped: ["26", "21"],
+    typed: ["2.5", 2.5, "2.5"],
   },
   {
     figure: 0.021,

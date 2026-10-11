@@ -37,6 +37,9 @@ const presets = {
     largeStep: 1000,
     step: 100,
   },
+  // A multiple is written to two places where it needs them, so 25
+  // reads 25 and 2.5 reads 2.5. One at a time, five with shift.
+  multiple: { format: { maximumFractionDigits: 2 }, largeStep: 5, step: 1 },
   // A rate is held as a fraction and shown as a percentage, so 0.021
   // reads 2.10% and a typed 2.1 commits as 0.021: Intl formats the one
   // way, with the options the ledger formats with, and the number field
@@ -73,6 +76,15 @@ export function MoneyInput(
   props: Figure & Pick<Forwarded, "onValueCommitted">,
 ): JSX.Element {
   return <FigureInput {...props} {...presets.money} />;
+}
+
+// A multiple input, a goal's so many years of expenses or times the
+// debt, held inside the bounds it is given if any, so one below nothing
+// cannot be typed.
+export function MultipleField(
+  props: PresetProps<"max" | "min"> & { readonly hint?: string | undefined },
+): JSX.Element {
+  return <FigureField {...props} {...presets.multiple} />;
 }
 
 // A rate input. An error is the caller's, for a rate it could not work

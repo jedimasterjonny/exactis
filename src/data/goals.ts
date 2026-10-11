@@ -47,7 +47,7 @@ export const measures = ["worth", "liquid", "expenses", "debt"] as const;
 // What a measure may be held to: a pound, or any measure.
 export const bases = ["pounds", ...measures] as const;
 
-const measureNames: Readonly<Record<Measure, string>> = {
+export const measureNames: Readonly<Record<Measure, string>> = {
   debt: "Debt",
   expenses: "A year's expenses",
   liquid: "Liquid net worth",
@@ -56,7 +56,7 @@ const measureNames: Readonly<Record<Measure, string>> = {
 
 // What each basis is called after the multiple, "25 years of expenses"
 // or "10 times the debt"; pounds are formatted as a sum instead.
-const basisNames: Readonly<Record<Basis, string>> = {
+export const basisNames: Readonly<Record<Basis, string>> = {
   debt: "times the debt",
   expenses: "years of expenses",
   liquid: "times liquid net worth",
