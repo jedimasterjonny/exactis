@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
 
+import { owners, sam } from "@/data/owners.fixture";
 import { allInStocks, openingRates, planRate } from "@/data/rates";
 import { allocation, rates } from "@/data/rates.fixture";
 import { termOf } from "@/lib/loans";
@@ -25,13 +26,13 @@ import {
 // the Bank's 2% target, and everything in stocks.
 const opening = { allocation: allInStocks, rates: openingRates };
 
+// The reference plan as the store sets it: to 89, from September 2026,
+// for the owners fixture's one owner, born in 1990 and retiring at 59.
+const setting = { ages: { ends: 89 }, asOf: { month: 8, year: 2026 }, owners };
+
 describe("ageIn", () => {
   it("reads the age the plan's owner reaches in a year, and in the plan's last", () => {
-    const plan = planOf(
-      { ends: 89, retires: 59 },
-      { month: 8, year: 2026 },
-      opening,
-    );
+    const plan = planOf(setting, opening);
 
     expect(ageIn(2026, plan)).toBe(36);
     expect(endAge(plan)).toBe(89);
@@ -39,11 +40,7 @@ describe("ageIn", () => {
 });
 
 describe("debtTermOf", () => {
-  const plan = planOf(
-    { ends: 89, retires: 59 },
-    { month: 8, year: 2026 },
-    opening,
-  );
+  const plan = planOf(setting, opening);
 
   // A PCP owing £14,000, £6,000 of it the balloon, at its own 7.9%.
   const finance: Account = {
@@ -81,14 +78,8 @@ describe("debtTermOf", () => {
 describe("planOf", () => {
   // Four fifths at stocks' 7.95% and a fifth at bonds' 4.45%, with the
   // 2.95% typed for inflation.
-  it("runs from the month given to the ages given, on the rates given as the savings are split", () => {
-    expect(
-      planOf(
-        { ends: 89, retires: 59 },
-        { month: 8, year: 2026 },
-        { allocation, rates },
-      ),
-    ).toStrictEqual({
+  it("runs from the month the balances are as of to the age given, for the owner, on the rates given as the savings are split", () => {
+    expect(planOf(setting, { allocation, rates })).toStrictEqual({
       born: 1990,
       from: 2026,
       inflation: 0.0295,
@@ -99,12 +90,27 @@ describe("planOf", () => {
     });
   });
 
+  // Sam, born in 1993, listed first: the plan is theirs, so it reaches
+  // 89 three years later and retires when they do.
+  it("is the first listed owner's, and nobody's is refused", () => {
+    expect(
+      planOf(
+        { ...setting, owners: [{ ...sam, retires: 65 }, ...owners] },
+        opening,
+      ),
+    ).toMatchObject({ born: 1993, retires: 65, years: 56 });
+    expect(() => planOf({ ...setting, owners: [] }, opening)).toThrow(
+      "A plan is somebody's",
+    );
+  });
+
   // Born in 1990, a plan to 30 has run its course by 2026, and runs no
   // years forward rather than a count below nothing.
   it("runs no years forward once its age is reached", () => {
-    expect(
-      planOf({ ends: 30, retires: 30 }, { month: 8, year: 2026 }, opening),
-    ).toMatchObject({ from: 2026, years: 0 });
+    expect(planOf({ ...setting, ages: { ends: 30 } }, opening)).toMatchObject({
+      from: 2026,
+      years: 0,
+    });
   });
 });
 

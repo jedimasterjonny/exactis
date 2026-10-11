@@ -84,6 +84,17 @@ export const milestoneValues = {
   name: named,
 };
 
+// What an owner holds: the name, the year they were born, whole, since
+// the plan reads an age off it and a fraction of a year is no year, and
+// the age they retire at, whole and nothing or more. That the first
+// listed owner retires no later than the plan ends is the household's
+// to hold, since the plan's end is kept beside the owners.
+export const ownerValues = {
+  born: z.number().int(),
+  name: named,
+  retires: z.number().int().nonnegative(),
+};
+
 // What a category of the target allocation holds, as the file gave it:
 // the id Portfolio Performance gives its class, never empty, the
 // classes above it, its name, never empty, whether it is implemented,

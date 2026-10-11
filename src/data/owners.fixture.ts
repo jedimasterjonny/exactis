@@ -1,11 +1,18 @@
 import type { Owner } from "@/data/owners";
 
 // The owner the accounts fixture's wrappers belong to, with the id a
-// store would have given it. For tests. A tuple, so a test reading the
+// store would have given it: born in 1990 and retiring at 59, the ages
+// the reference plan runs on. For tests. A tuple, so a test reading the
 // owner by its place gets one.
 export const owners = [
-  { id: 1, name: "Me" },
+  { born: 1990, id: 1, name: "Me", retires: 59 },
 ] as const satisfies readonly Owner[];
 
-// A second owner, holding nothing, for a choice of two. For tests.
-export const sam = { id: 2, name: "Sam" } as const satisfies Owner;
+// A second owner, holding nothing, three years younger and retiring at
+// the same age, for a choice of two. For tests.
+export const sam = {
+  born: 1993,
+  id: 2,
+  name: "Sam",
+  retires: 59,
+} as const satisfies Owner;

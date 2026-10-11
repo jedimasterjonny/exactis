@@ -17,7 +17,7 @@ import { targets } from "@/data/targets.fixture";
 // records, balances as of September 2026 and the six months of progress
 // points before it, the house price index pulled on the day the
 // household is read, scaled from a June 2022 purchase and running to
-// July 2026, a plan to 89 whose owner
+// July 2026, a plan to 89 whose owner, the owners fixture's one,
 // retires at 59, the curve its card reads, the August 2026 CMA with no
 // vintage before it, the rates it ran on before
 // there were rates to type, 5% for stocks and bonds alike and the
@@ -27,7 +27,7 @@ import { targets } from "@/data/targets.fixture";
 // next id past every one of theirs. For tests.
 export const kept: Kept = {
   accounts,
-  ages: { ends: 89, retires: 59 },
+  ages: { ends: 89 },
   allocation: allInStocks,
   asOf: { month: 8, year: 2026 },
   cma: { latest: cma, previous: null },

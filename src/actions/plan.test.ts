@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
 import { blank, kept as reference, today } from "@/data/household.fixture";
+import { owners, sam } from "@/data/owners.fixture";
 import { allocation, rates } from "@/data/rates.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -27,7 +28,15 @@ vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 const memory = inMemory();
 const { db } = memory;
 
+const [me] = owners;
+
 standUp(memory, { today });
+
+// The household before anything is saved, its one owner retiring at the
+// age given.
+function retiringAt(retires: number): typeof blank {
+  return { ...blank, owners: [{ ...me, retires }] };
+}
 
 describe("saveAges", () => {
   it("writes nothing without a session", async () => {
@@ -37,15 +46,27 @@ describe("saveAges", () => {
     expect(await readLatest(db)).toBeNull();
   });
 
-  it("writes the retirement age over the household's, keeping its end age, and draws the page again", async () => {
+  // The plan is the first listed owner's, so the retirement age is
+  // written onto them and nobody else.
+  it("writes the retirement age onto the first listed owner, keeping the end age, and draws the page again", async () => {
     expect(await saveAges({ retires: 55 })).toStrictEqual(
       saved({ ends: 89, retires: 55 }),
     );
     expect(await readLatest(db)).toStrictEqual({
-      household: { ...blank, ages: { ends: 89, retires: 55 } },
+      household: retiringAt(55),
       version: 1,
     });
     expect(refresh).toHaveBeenCalledOnce();
+
+    await keepAfter(db, 1, { ...blank, next: 3, owners: [me, sam] });
+
+    expect(await saveAges({ retires: 50 })).toStrictEqual(
+      saved({ ends: 89, retires: 50 }),
+    );
+    expect(await readLatest(db)).toMatchObject({
+      household: { owners: [{ ...me, retires: 50 }, sam] },
+      version: 3,
+    });
   });
 
   it("writes the end age over the household's, keeping its retirement age", async () => {
@@ -82,7 +103,7 @@ describe("saveAges", () => {
   // than held to today again, so a retirement age saved beside it
   // stands, while one past it is still refused.
   it("keeps an end age already outlived rather than refusing a retirement age saved beside it", async () => {
-    await keepAfter(db, 0, { ...blank, ages: { ends: 35, retires: 34 } });
+    await keepAfter(db, 0, { ...retiringAt(34), ages: { ends: 35 } });
 
     expect(await saveAges({ retires: 30 })).toStrictEqual(
       saved({ ends: 35, retires: 30 }),

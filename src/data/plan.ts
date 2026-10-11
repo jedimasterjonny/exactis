@@ -1,8 +1,10 @@
 import type { Account } from "@/data/accounts";
+import type { Owner } from "@/data/owners";
 import type { Allocation, Rates } from "@/data/rates";
 import type { LineGrowth, Month } from "@/data/schedule";
 
 import { planRate } from "@/data/rates";
+import { rules } from "@/data/rules";
 import { termOf } from "@/lib/loans";
 import { monthsBetween } from "@/lib/months";
 
@@ -26,7 +28,8 @@ export interface Path {
 // nought as the date gives it, so the first year runs from there rather
 // than from its start; how many years it runs forward; the year the
 // plan's owner was born, which turns a year into an age; and the age
-// they retire at, from which they earn nothing by working. It sits
+// they retire at, from which they earn nothing by working. The plan's
+// owner is the first listed, whose years these are. It sits
 // beside the accounts and the lines rather than inside the engine,
 // since the flow and the projection each read it and the flow is what
 // the projection is built on. A plan run over one future of the markets
@@ -42,10 +45,12 @@ export interface Plan {
   readonly years: number;
 }
 
-// The ages the plan is set to, as the store keeps them: the age it runs
-// to, from which the years it runs forward are worked out from the
+// The ages the plan is set to, as the dashboard sets them: the age it
+// runs to, from which the years it runs forward are worked out from the
 // month it starts in, so the plan ends at the same age wherever it
-// starts, and the age its owner retires at.
+// starts, and the age its owner retires at. The store keeps the end age
+// with the plan and the retirement age on the owner, since each owner
+// retires at an age of their own.
 export interface PlanAges {
   readonly ends: number;
   readonly retires: number;
@@ -66,9 +71,14 @@ export interface Spread {
 // one.
 type Priced = Pick<Plan, "from" | "inflation" | "month" | "path">;
 
-// The rest of the plan, until there is somewhere to set it: someone
-// born in 1990.
-const born = 1990;
+// What the plan is set by, as the store keeps it: the age it runs to,
+// the month its balances are as of, which its first year opens with,
+// and the owners, the first listed of whom it is.
+interface Setting {
+  readonly ages: Pick<PlanAges, "ends">;
+  readonly asOf: Month;
+  readonly owners: readonly Owner[];
+}
 
 // How far a sum has risen by the start of each year of a plan along a
 // path, by the margin it rises at and the year, each worked out once and
@@ -176,31 +186,36 @@ export function marginOf(line: {
   }
 }
 
-// The plan from the month given, the month the balances are as of,
-// since they are what its first year opens with, to the age the ages
-// say it runs to and with the age they say its owner retires at,
-// growing at the rate the rates given make with the savings split as
-// the allocation given splits them, and taking the rates' inflation:
-// what the projection runs on and what the plan screen lays its lines
-// over. The rates and the split are taken together, as the household
-// keeps them. A plan whose age is already reached runs no years forward
-// rather than a count below nothing.
+// The plan from the month the balances are as of, since they are what
+// its first year opens with, to the age it is set to run to, for the
+// first listed owner, whose plan it is: born in their year, retiring at
+// their age, growing at the rate the rates given make with the savings
+// split as the allocation given splits them, and taking the rates'
+// inflation: what the projection runs on and what the plan screen lays
+// its lines over. The rates and the split are taken together, as the
+// household keeps them. A plan whose age is already reached runs no
+// years forward rather than a count below nothing. A household with no
+// owner has no plan to make, and the store refuses to keep one, so a
+// caller handing one here has skipped the model.
 export function planOf(
-  ages: PlanAges,
-  start: Month,
+  { ages, asOf, owners }: Setting,
   {
     allocation,
     rates,
   }: { readonly allocation: Allocation; readonly rates: Rates },
 ): Plan {
+  const [owner] = owners;
+  if (owner === undefined) {
+    throw new Error(rules.somebodys);
+  }
   return {
-    born,
-    from: start.year,
+    born: owner.born,
+    from: asOf.year,
     inflation: rates.inflation,
-    month: start.month,
+    month: asOf.month,
     rate: planRate(rates, allocation),
-    retires: ages.retires,
-    years: Math.max(0, born + ages.ends - start.year),
+    retires: owner.retires,
+    years: Math.max(0, owner.born + ages.ends - asOf.year),
   };
 }
 

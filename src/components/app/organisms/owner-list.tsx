@@ -16,6 +16,7 @@ import { SectionCard } from "@/components/app/molecules/section-card";
 import { TextField } from "@/components/app/molecules/text-field";
 import { Button } from "@/components/kit/button";
 import { Table, TableBody, TableCell, TableRow } from "@/components/kit/table";
+import { openingOwner } from "@/data/owners";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { listed } from "@/lib/feeders";
@@ -27,8 +28,8 @@ interface OwnerListProps {
 }
 
 // What a new owner opens as: no name, which holds the save until one is
-// typed.
-const blank: OwnerValues = { name: "" };
+// typed, and the years a household's first owner opens with.
+const blank: OwnerValues = { ...openingOwner, name: "" };
 
 // The people the plan is for, as a section of the accounts screen: each
 // owner a row of its name with a pencil and a bin, and a button in the
@@ -42,6 +43,8 @@ const blank: OwnerValues = { name: "" };
 // its bin held, since the store refuses to delete it while the account
 // is theirs: offered, the bin would ask and then fail on a refusal the
 // production build hides, where the row can say why before it is asked.
+// The last owner's bin is held the same way, since a plan is somebody's
+// and the store refuses to keep a household with no one.
 export function OwnerList({
   accounts,
   label,
@@ -95,11 +98,11 @@ export function OwnerList({
                   </TableCell>
                   <TableCell className="w-px py-1">
                     <RowActions
-                      deleteLock={deleteLockOf(owner, accounts)}
+                      deleteLock={deleteLockOf(owner, accounts, owners)}
                       name={owner.name}
                       onDelete={ask}
-                      onEdit={({ id, name }) => {
-                        open({ name }, id);
+                      onEdit={({ born, id, name, retires }) => {
+                        open({ born, name, retires }, id);
                       }}
                       row={owner}
                     />
@@ -137,15 +140,21 @@ export function OwnerList({
 }
 
 // Why an owner's bin is held, if it is: the accounts naming them are
-// given to another owner or deleted first. An owner holding none can go.
+// given to another owner or deleted first, or another owner is added
+// first, since the plan is the last owner's. An owner holding none,
+// with another listed, can go.
 function deleteLockOf(
   owner: Owner,
   accounts: readonly Account[],
+  owners: readonly Owner[],
 ): string | undefined {
   const held = heldBy(owner, accounts);
-  return held.length === 0
-    ? undefined
-    : `Give ${listed.format(held)} to another owner first`;
+  if (held.length > 0) {
+    return `Give ${listed.format(held)} to another owner first`;
+  }
+  return owners.length === 1
+    ? "Add another owner first, since a plan is somebody's"
+    : undefined;
 }
 
 // The names of the accounts naming the owner, in the order listed.
