@@ -46,38 +46,50 @@ const deductionsPatch = z.object({
 const split = z.object({ stocks: z.number() });
 
 // Writes the plan's ages, the ones sent over the ones the household
-// has, and hands back the ages as it now has them. An action answers a
-// POST from anywhere, so it checks the session for itself and parses
-// what it was sent rather than trusting the form. An end age sent is
-// held to a plan that runs: past the age its owner has already reached,
-// so it has a year to project, and no later than the oldest age a plan
-// may run to. One kept as the household has it is not held there again,
-// so an end age the owner has since outlived does not refuse a
-// retirement age saved beside it. Whichever is sent, the household
-// holds the owner to retiring no later than the plan ends, since the
-// chart can mark a retirement only within the plan. A retirement
-// already past is sound, since it says only that nothing is earned by
-// working. Each refusal says why, since the screen says so under a
-// toast.
+// has, and hands back the ages as it now has them: the end age with the
+// plan, and the retirement age on the first listed owner, whose plan it
+// is, so the dashboard moves their retirement and nobody else's. An
+// action answers a POST from anywhere, so it checks the session for
+// itself and parses what it was sent rather than trusting the form. An
+// end age sent is held to a plan that runs: past the age its owner has
+// already reached, so it has a year to project, and no later than the
+// oldest age a plan may run to. One kept as the household has it is not
+// held there again, so an end age the owner has since outlived does not
+// refuse a retirement age saved beside it. Whichever is sent, the
+// household holds the owner to retiring no later than the plan ends,
+// since the chart can mark a retirement only within the plan. A
+// retirement already past is sound, since it says only that nothing is
+// earned by working. Each refusal says why, since the screen says so
+// under a toast.
 export async function saveAges(
   draft: Partial<PlanAges>,
 ): Promise<Answer<PlanAges>> {
   await requireSession();
   const parsed = patch.parse(draft);
   return amend(({ household, kept }) => {
-    if (parsed.ends !== undefined) {
-      const { plan } = household;
-      if (parsed.ends <= ageIn(plan.from, plan) || parsed.ends > oldestAge) {
-        throw new Refusal(
-          `A plan ends after the age already reached and by ${String(oldestAge)}`,
-        );
-      }
+    const { plan } = household;
+    if (
+      parsed.ends !== undefined &&
+      (parsed.ends <= ageIn(plan.from, plan) || parsed.ends > oldestAge)
+    ) {
+      throw new Refusal(
+        `A plan ends after the age already reached and by ${String(oldestAge)}`,
+      );
     }
     const ages = {
       ends: parsed.ends ?? kept.ages.ends,
-      retires: parsed.retires ?? kept.ages.retires,
+      retires: parsed.retires ?? plan.retires,
     };
-    return { kept: { ...kept, ages }, result: ages };
+    return {
+      kept: {
+        ...kept,
+        ages: { ends: ages.ends },
+        owners: kept.owners.map((owner, index) =>
+          index === 0 ? { ...owner, retires: ages.retires } : owner,
+        ),
+      },
+      result: ages,
+    };
   });
 }
 

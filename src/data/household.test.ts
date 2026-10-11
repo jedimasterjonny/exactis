@@ -37,7 +37,7 @@ import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
 import { atAge } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
-import { owners } from "@/data/owners.fixture";
+import { owners, sam } from "@/data/owners.fixture";
 import { points } from "@/data/progress.fixture";
 import { planRate } from "@/data/rates";
 import { allocation, rates } from "@/data/rates.fixture";
@@ -643,7 +643,7 @@ describe("soundKept", () => {
         liveRates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
         mappings: [],
         milestones: [],
-        owners: [],
+        owners: [{ born: 1992, id: 1, name: "Me", retires: 61 }],
         plan: {
           born: 1992,
           from: 2026,
@@ -920,13 +920,30 @@ describe("soundKept", () => {
     ).toThrow("A record's id is below the one the next record is given");
   });
 
+  // The first listed owner's retirement is the plan's; a second owner
+  // retires when they like.
   it("refuses ages the plan action refuses, in its words", () => {
+    expect(() => soundKept({ ...kept, ages: { ends: 60 } })).toThrow(
+      "A plan's owner retires no later than it ends",
+    );
     expect(() =>
-      soundKept({ ...kept, ages: { ends: 62, retires: 63 } }),
+      soundKept({ ...kept, owners: [{ ...owners[0], retires: 92 }] }),
     ).toThrow("A plan's owner retires no later than it ends");
-    expect(() =>
-      soundKept({ ...kept, ages: { ends: 121, retires: 61 } }),
-    ).toThrow("A plan ends by 120");
+    expect(
+      soundKept({ ...kept, owners: [...owners, { ...sam, retires: 92 }] })
+        .household.plan.retires,
+    ).toBe(61);
+    expect(() => soundKept({ ...kept, ages: { ends: 121 } })).toThrow(
+      "A plan ends by 120",
+    );
+  });
+
+  // A plan is somebody's: the household opens with an owner, and keeps
+  // one at least.
+  it("refuses a household with no owner, in its words", () => {
+    expect(() => soundKept({ ...kept, accounts: [], owners: [] })).toThrow(
+      /^A plan is somebody's$/,
+    );
   });
 
   it("refuses a balances month that is no month", () => {

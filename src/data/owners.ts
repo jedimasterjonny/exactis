@@ -2,13 +2,29 @@
 // pensions are paid under their own allowances. The id is the owner's
 // identity, handed out by the store, so an account names its owner
 // rather than a name two owners could share, and the owners are listed
-// in the order they were added.
+// in the order they were added. The plan is the first listed owner's:
+// it runs to the age they reach, and the retirement its lines are tied
+// to is theirs, as the first listed account is the first paid.
 export interface Owner extends OwnerValues {
   readonly id: number;
 }
 
 // The owner as its dialog holds it, which is the owner less its id: the
-// name alone, which is what the accounts screen lists an owner by.
+// name the accounts screen lists an owner by, the year they were born,
+// which turns a year of the plan into an age of theirs, and the age
+// they retire at, from which they earn nothing by working.
 export interface OwnerValues {
+  readonly born: number;
   readonly name: string;
+  readonly retires: number;
 }
+
+// The owner a household opens with, before anyone is named: "Me", born
+// in 1992 and retiring at 61, ages to type over, so a plan is
+// somebody's from its first read. A new owner's dialog opens on the
+// same years, with no name.
+export const openingOwner: OwnerValues = {
+  born: 1992,
+  name: "Me",
+  retires: 61,
+};

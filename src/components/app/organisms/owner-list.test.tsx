@@ -81,7 +81,11 @@ describe("OwnerList", () => {
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(null, { name: "Me" });
+    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(null, {
+      born: 1992,
+      name: "Me",
+      retires: 61,
+    });
     await waitFor(() => {
       expect(
         screen.queryByRole("dialog", { name: "Me" }),
@@ -111,7 +115,9 @@ describe("OwnerList", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(saveOwner).toHaveBeenCalledExactlyOnceWith(sam.id, {
+      born: sam.born,
       name: "Samira",
+      retires: sam.retires,
     });
     await waitFor(() => {
       expect(
@@ -152,13 +158,30 @@ describe("OwnerList", () => {
   });
 
   it("drops the question on cancel and deletes nothing", () => {
-    renderList([me]);
+    renderList([me, sam]);
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete Me" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Sam" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(removeOwner).not.toHaveBeenCalled();
+  });
+
+  // A plan is somebody's, so the store refuses to delete the last owner:
+  // the row draws a lock in place of the bin, saying what has to happen
+  // first.
+  it("holds the bin of the last owner, saying another is added first", () => {
+    renderList([sam]);
+
+    expect(
+      screen.queryByRole("button", { name: "Delete Sam" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "Add another owner first, since a plan is somebody's",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Sam" })).toBeEnabled();
   });
 
   // The fixture's pension and ISA are the first owner's, so the store

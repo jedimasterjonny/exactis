@@ -16,5 +16,6 @@ export const rules = {
   owned: "An ISA or a pension belongs to an owner, and nothing else",
   paysDebt: "A line pays a debt alone",
   share: "A salary gives up a share of its base",
+  somebodys: "A plan is somebody's",
   spare: "A real asset or a debt takes no spare money",
 } as const;

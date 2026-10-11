@@ -34,6 +34,7 @@ import {
 import { derivedSet, openingDeductions, sleeves, spreadOf } from "@/data/cma";
 import { incomeKinds } from "@/data/income";
 import { ageOf, timed } from "@/data/milestones";
+import { openingOwner } from "@/data/owners";
 import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
 import { allInStocks, openingRates, rateSets } from "@/data/rates";
 import { rules } from "@/data/rules";
@@ -44,6 +45,7 @@ import {
   month,
   monthOfYear,
   named,
+  ownerValues,
   pounds,
   recordId,
 } from "@/data/schemas";
@@ -95,8 +97,9 @@ export interface Household {
 // The household as the store keeps it: the records, the month their
 // balances are as of, one for the whole household since they are
 // recorded together, the progress points and when the house price
-// index was last written into them, the ages the plan is set to
-// rather than the plan they make, the curve as the Bank gave it rather
+// index was last written into them, the age the plan runs to rather
+// than the plan it makes with the first listed owner's years, the
+// curve as the Bank gave it rather
 // than the inflation it
 // makes, the vintages as BlackRock priced them, the rates and the split
 // as typed rather than the rate they make, the deductions and the rate
@@ -108,7 +111,7 @@ export interface Household {
 // write over.
 export interface Kept {
   readonly accounts: readonly Account[];
-  readonly ages: PlanAges;
+  readonly ages: Pick<PlanAges, "ends">;
   readonly allocation: Allocation;
   readonly asOf: Month;
   readonly cma: null | Vintages;
@@ -258,10 +261,16 @@ const milestone = z.object({
   id: recordId,
 }) satisfies z.ZodType<Milestone>;
 
+// An owner as the model lays it: what the owner save holds it to, and
+// the id it is listed by.
 const owner = z.object({
+  ...ownerValues,
   id: recordId,
-  name: named,
 }) satisfies z.ZodType<Owner>;
+
+// The owners, one at least, since the plan is the first listed owner's
+// and a household with none has no plan to make.
+const owners = z.array(owner).min(1, rules.somebodys);
 
 // A progress point as the model lays it: each sum whole pounds, the
 // three balances nothing or more and the two debts nothing or less, in
@@ -522,7 +531,7 @@ export const household = z
     liveRates: rates,
     mappings,
     milestones: z.array(milestone),
-    owners: z.array(owner),
+    owners,
     plan,
     points,
     rates,
@@ -645,24 +654,20 @@ const sources = z.object({
 }) satisfies z.ZodType<Sources>;
 
 // The household as the store may keep it: its records sound on their
-// own, the ages the plan action holds them to, and every record's id
-// below the one the next is given. Every save writes the household as
-// read here, and only the latest version is read whole, so nothing is
-// defaulted: a version kept in a shape since changed is refused rather
-// than read, and the store holding one is emptied. An older version is
-// read only for its sources, above.
+// own, the end age the plan action holds it to, the first listed owner
+// retiring no later than it, since the plan is theirs and the chart can
+// mark a retirement only within it, and every record's id below the one
+// the next is given. Every save writes the household as read here, and
+// only the latest version is read whole, so nothing is defaulted: a
+// version kept in a shape since changed is refused rather than read,
+// and the store holding one is emptied. An older version is read only
+// for its sources, above. A household with no owner is refused for
+// that, and holds nobody to the plan's end.
 const kept = z
   .object({
     accounts: z.array(account),
     ages: z
-      .object({
-        ends: z.number().int().nonnegative(),
-        retires: z.number().int().nonnegative(),
-      })
-      .refine(
-        (ages) => ages.retires <= ages.ends,
-        "A plan's owner retires no later than it ends",
-      )
+      .object({ ends: z.number().int().nonnegative() })
       .refine(
         (ages) => ages.ends <= oldestAge,
         `A plan ends by ${String(oldestAge)}`,
@@ -676,7 +681,7 @@ const kept = z
     mappings,
     milestones: z.array(milestone),
     next: recordId,
-    owners: z.array(owner),
+    owners,
     points,
     rates,
     rateSet: z.enum(rateSets),
@@ -686,6 +691,10 @@ const kept = z
     }),
     targets: targets.nullable(),
   })
+  .refine(
+    ({ ages, owners }) => (owners[0]?.retires ?? 0) <= ages.ends,
+    "A plan's owner retires no later than it ends",
+  )
   .refine(
     ({ accounts, milestones, next, owners, schedule }) =>
       [
@@ -723,17 +732,18 @@ export function holdWhileLive(
   }
 }
 
-// The household before anything is saved: no records, balances as of
-// the month given, no progress point and no house price index pulled,
-// the ages the dashboard has shown, a plan to 91 retiring at 61, no
-// curve or CMA pulled, the rates a household opens with live and
+// The household before anything is saved: the one owner a plan opens
+// with, under the first id, and no other record, balances as of the
+// month given, no progress point and no house price index pulled, the
+// ages the dashboard has shown, a plan to 91 whose owner retires at 61,
+// no curve or CMA pulled, the rates a household opens with live and
 // everything in stocks, the manual method's fees and yield to deduct
 // from a CMA's returns, no target allocation imported or category
-// mapped, and the first id.
+// mapped, and the id after the owner's.
 export function nothingKeptIn(asOf: Month): Kept {
   return {
     accounts: [],
-    ages: { ends: 91, retires: 61 },
+    ages: { ends: 91 },
     allocation: allInStocks,
     asOf,
     cma: null,
@@ -742,8 +752,8 @@ export function nothingKeptIn(asOf: Month): Kept {
     housePrices: null,
     mappings: [],
     milestones: [],
-    next: 1,
-    owners: [],
+    next: 2,
+    owners: [{ ...openingOwner, id: 1 }],
     points: [],
     rates: openingRates,
     rateSet: "custom",
@@ -813,12 +823,13 @@ function endsInAYear(line: {
 }
 
 // The whole a kept household makes, its plan running from the month
-// its balances are as of on the rates and the split live, each line's
-// tied ends read off the milestones they are tied to, and each line
-// paying a loan running as the loan's payments do.
+// its balances are as of on the rates and the split live, for the first
+// listed owner, each line's tied ends read off the milestones they are
+// tied to, and each line paying a loan running as the loan's payments
+// do.
 function householdOf(kept: Kept): Household {
   const live = liveOf(kept);
-  const plan = planOf(kept.ages, kept.asOf, live);
+  const plan = planOf(kept, live);
   return {
     accounts: kept.accounts,
     allocation: kept.allocation,

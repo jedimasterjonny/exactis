@@ -37,18 +37,18 @@ nvm install "$(cat .node-version)" && nvm alias default "$(cat .node-version)"
 
 ## The store
 
-The household, its owners, accounts, milestones, income and expense lines, the
-month its balances are as of, the progress points its balances were read at
-month by month and when the Land Registry's house price index was last written
-into them, the ages the plan is set to, the rates and the split of the savings
-the plan runs on, the inflation curve last pulled from the Bank of England, the
-vintages of BlackRock's capital market assumptions last pulled and the target
-allocation last imported from Portfolio Performance, lives in Postgres as one
-document, a version of it a save, reached through
-[Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The table is
-`src/db/schema.ts`, the migration generated from it is in `drizzle/`, and the
-two queries, reading the latest version and keeping the next, are in
-`src/db/household.ts`.
+The household, its owners, each with the year they were born and the age they
+retire at, its accounts, milestones, income and expense lines, the month its
+balances are as of, the progress points its balances were read at month by month
+and when the Land Registry's house price index was last written into them, the
+age the plan runs to, the rates and the split of the savings the plan runs on,
+the inflation curve last pulled from the Bank of England, the vintages of
+BlackRock's capital market assumptions last pulled and the target allocation
+last imported from Portfolio Performance, lives in Postgres as one document, a
+version of it a save, reached through [Drizzle](https://orm.drizzle.team) over
+Neon's HTTP driver. The table is `src/db/schema.ts`, the migration generated
+from it is in `drizzle/`, and the two queries, reading the latest version and
+keeping the next, are in `src/db/household.ts`.
 
 A save reads the latest version, makes the household it leaves, holds the whole
 of it to the rules in `src/data/household.ts`, and keeps it as the version after
@@ -59,15 +59,19 @@ version is written over or deleted, which the table holds with a trigger, so
 every household the store has held stays. A read holds the latest version to the
 same rules before any screen draws from it.
 
-The accounts and plan screens read and write it, the dashboard projects what it
-holds and saves the ages the plan runs to and its owner retires at, and the
-assumptions screen types the rates, the deductions and the split of the savings
-into it, chooses the set of rates the plan runs on, pulls the inflation curve
-and the CMA into it, and imports the target allocation into it and maps its
-categories; the progress screen reads the progress points and pulls the house
-price index into them. `DATABASE_URL` names the database, as `.env.example`
-shows. Nothing reads it until a query runs, so a build needs no database.
-Locally, point it at a Neon branch of your own and apply the migrations once:
+The plan is the first listed owner's, as the first listed account is the first
+paid: it runs to the age they reach, and the retirement its lines are tied to is
+theirs. A household holds an owner at least, so it opens with one, and the last
+cannot be deleted. The accounts and plan screens read and write it, the
+dashboard projects what it holds and saves the age the plan runs to and the age
+its owner retires at, and the assumptions screen types the rates, the deductions
+and the split of the savings into it, chooses the set of rates the plan runs on,
+pulls the inflation curve and the CMA into it, and imports the target allocation
+into it and maps its categories; the progress screen reads the progress points
+and pulls the house price index into them. `DATABASE_URL` names the database, as
+`.env.example` shows. Nothing reads it until a query runs, so a build needs no
+database. Locally, point it at a Neon branch of your own and apply the
+migrations once:
 
 ```bash
 bun run db:migrate

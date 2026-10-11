@@ -5,21 +5,23 @@ import * as z from "zod";
 import type { Owner, OwnerValues } from "@/data/owners";
 import type { Answer } from "@/lib/answer";
 
-import { named, recordId, target } from "@/data/schemas";
+import { ownerValues, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
 // What a save may carry: the name as typed less the space around it,
-// which the form also trims, and never empty.
-const values = z.object({ name: named }) satisfies z.ZodType<OwnerValues>;
+// which the form also trims, and never empty, the year born and the age
+// retiring, each as the model holds them.
+const values = z.object(ownerValues) satisfies z.ZodType<OwnerValues>;
 
 // Deletes the owner with that id, unless an account names it: an ISA or
 // a pension belongs to an owner, and the household refuses to leave it
 // belonging to none, so the account is given to another owner or
 // deleted first, and the refusal says so in words that say what to do.
-// Checked as a save is.
+// The last owner is refused by the household in its own words, since a
+// plan is somebody's. Checked as a save is.
 export async function removeOwner(id: number): Promise<Answer<undefined>> {
   await requireSession();
   const at = recordId.parse(id);

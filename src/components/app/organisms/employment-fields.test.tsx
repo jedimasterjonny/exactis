@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 import type { IncomeLineDraft } from "@/data/income";
+import type { Owner } from "@/data/owners";
 
 import { accounts, sipp } from "@/data/accounts.fixture";
 import { incomeLines } from "@/data/income.fixture";
@@ -26,10 +27,7 @@ const pensions: readonly Account[] = [workplace, sipp];
 function renderFields(
   initial: IncomeLineDraft,
   draft: IncomeLineDraft = initial,
-  held: readonly { readonly id: number; readonly name: string }[] = [
-    ...owners,
-    sam,
-  ],
+  held: readonly Owner[] = [...owners, sam],
 ): {
   readonly onAmend: ReturnType<
     typeof vi.fn<(patch: Partial<IncomeLineDraft>) => void>

@@ -9,6 +9,7 @@ import { cma } from "@/data/cma.fixture";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
+import { sam } from "@/data/owners.fixture";
 import { planOf } from "@/data/plan";
 import { allInStocks, openingRates } from "@/data/rates";
 import { getDb } from "@/db/client";
@@ -39,7 +40,7 @@ describe("the household store", () => {
     expect(getDb).not.toHaveBeenCalled();
   });
 
-  it("reads the household before anything is saved as empty, to 91 retiring at 61", async () => {
+  it("reads the household before anything is saved as its one owner and nothing else, to 91 retiring at 61", async () => {
     expect(await getHousehold()).toStrictEqual({
       accounts: [],
       allocation: allInStocks,
@@ -50,8 +51,8 @@ describe("the household store", () => {
       liveRates: openingRates,
       mappings: [],
       milestones: [],
-      owners: [],
-      plan: planOf(blank.ages, blank.asOf, blank),
+      owners: blank.owners,
+      plan: planOf(blank, blank),
       points: [],
       rates: openingRates,
       rateSet: "custom",
@@ -137,14 +138,12 @@ describe("the household store", () => {
     await keepAfter(db, 0, reference);
 
     const result = await amend(({ household, kept }) => {
-      expect(household.plan).toStrictEqual(
-        planOf(reference.ages, reference.asOf, reference),
-      );
+      expect(household.plan).toStrictEqual(planOf(reference, reference));
       return {
         kept: {
           ...kept,
           next: 7,
-          owners: [...kept.owners, { id: 6, name: "Partner" }],
+          owners: [...kept.owners, { ...sam, id: 6, name: "Partner" }],
         },
         result: "added",
       };
@@ -154,7 +153,7 @@ describe("the household store", () => {
     expect(await readLatest(db)).toMatchObject({
       household: {
         next: 7,
-        owners: [...reference.owners, { id: 6, name: "Partner" }],
+        owners: [...reference.owners, { ...sam, id: 6, name: "Partner" }],
       },
       version: 2,
     });
@@ -175,9 +174,7 @@ describe("the household store", () => {
 
     await expect(
       amend(({ kept }) => ({ kept: { ...kept, owners: [] }, result: null })),
-    ).resolves.toStrictEqual(
-      refused("An ISA or a pension belongs to an owner the household lists"),
-    );
+    ).resolves.toStrictEqual(refused("A plan is somebody's"));
     expect(await readLatest(db)).toMatchObject({ version: 1 });
     expect(refresh).not.toHaveBeenCalled();
   });
@@ -203,7 +200,10 @@ describe("the household store", () => {
     await keepAfter(db, 0, reference);
     const renamed = async (name: string): Promise<Answer<string>> =>
       amend(({ kept }) => ({
-        kept: { ...kept, owners: [{ id: 1, name }] },
+        kept: {
+          ...kept,
+          owners: kept.owners.map((owner) => ({ ...owner, name })),
+        },
         result: name,
       }));
 
@@ -222,7 +222,7 @@ describe("the household store", () => {
       },
     ]);
     expect(await readLatest(db)).toMatchObject({
-      household: { owners: [{ id: 1, name: "First" }] },
+      household: { owners: [{ ...reference.owners[0], name: "First" }] },
       version: 2,
     });
   });
