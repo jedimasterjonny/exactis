@@ -48,10 +48,14 @@ function renderSheet(
 describe("CmaWorksheet", () => {
   // Four fifths in stocks blending to 8.044% and a fifth in bonds to
   // 4.466%, with 0.015 of a point of hedging on bonds, less 0.20% of
-  // fees: 7.84%, 4.25% and 7.13% for the portfolio, which is the plan
-  // rate. Stocks' 2% yield leaves 5.84% of growth, a fifth of which the
-  // portfolio holds none of, and over the curve's 2.95% the three come
-  // to 4.75%, 1.26% and 4.05%. Every portfolio figure is the sleeves' in
+  // fees, 7.84% and 4.25%, which blend to 7.13%; rebalancing earns 0.205
+  // of a point within stocks and 0.020 within bonds, and the portfolio
+  // those in four fifths and a fifth and 0.231 between the two, 0.398,
+  // so it returns 7.52%, which is the plan rate. Stocks' 2% yield leaves
+  // 5.84% of growth, a fifth of which the portfolio holds none of, and
+  // the portfolio's growth carries the rebalancing, so its growth and
+  // yield still add up; over the curve's 2.95% the three come to 4.75%,
+  // 1.26% and 4.44%. Every other portfolio figure is the sleeves' in
   // four fifths and a fifth.
   it("works the vintage out by the target allocation down to the real return, a column a sleeve and one for the portfolio", () => {
     renderSheet();
@@ -66,10 +70,11 @@ describe("CmaWorksheet", () => {
       ["Blended 20y GBP return", "8.044%", "4.466%", "7.328%"],
       ["GBP-hedging adjustment", "—", "−0.015pp", "−0.003pp"],
       ["Fee drag", "−0.200pp", "−0.200pp", "−0.200pp"],
-      ["Return", "7.84%", "4.25%", "7.13%"],
-      ["Growth", "5.84%", "4.25%", "5.53%"],
+      ["Rebalancing", "0.205pp", "0.020pp", "0.398pp"],
+      ["Return", "7.84%", "4.25%", "7.52%"],
+      ["Growth", "5.84%", "4.25%", "5.92%"],
       ["Dividend yield", "2.00%", "—", "1.60%"],
-      ["Real return", "4.75%", "1.26%", "4.05%"],
+      ["Real return", "4.75%", "1.26%", "4.44%"],
     ]);
   });
 
@@ -82,6 +87,9 @@ describe("CmaWorksheet", () => {
     expect(row("Blended 20y GBP return")).toHaveAccessibleDescription(
       "Weighted by target allocation; Global bonds, hedged is 70.00% of bonds",
     );
+    expect(row("Rebalancing")).toHaveAccessibleDescription(
+      "Earned yearly within each sleeve, and between them for the portfolio, over the blend of geometric returns",
+    );
     expect(row("Return")).toHaveAccessibleDescription(
       "What each comes to; the portfolio's is the plan rate",
     );
@@ -90,9 +98,41 @@ describe("CmaWorksheet", () => {
     );
   });
 
+  // A vintage pulled before its volatilities were read gives no risk to
+  // work the rebalancing from, so the row is left out and the return is
+  // the blend alone, 7.13%, as the plan then runs.
+  it("leaves the rebalancing out while the vintage gives no risk, the return the blend alone", () => {
+    renderSheet({
+      cma: {
+        latest: {
+          asOf: cma.asOf,
+          assets: cma.assets.map(({ name, rate, sleeve }) => ({
+            name,
+            rate,
+            sleeve,
+          })),
+          vintage: cma.vintage,
+        },
+        previous: null,
+      },
+    });
+
+    expect(
+      screen.queryByRole("rowheader", { name: "Rebalancing" }),
+    ).not.toBeInTheDocument();
+    expect(worksheet(sheet)).toContainEqual([
+      "Return",
+      "7.84%",
+      "4.25%",
+      "7.13%",
+    ]);
+  });
+
   // All in equities, bonds stand in at stocks' return and weigh nothing,
-  // so their column is dashed and the portfolio is stocks alone. Nothing
-  // hedged is held, so there is no hedging row.
+  // so their column is dashed and the portfolio is stocks alone, earning
+  // by rebalancing what stocks earn within themselves and nothing
+  // between the sleeves. Nothing hedged is held, so there is no hedging
+  // row.
   it("dashes a sleeve nothing in the target allocation blends into", () => {
     renderSheet({ targets: targetsUnder("Equity") });
 
@@ -100,10 +140,11 @@ describe("CmaWorksheet", () => {
       ["Target weight", "100.00%", "0.00%", "100.00%"],
       ["Blended 20y GBP return", "8.044%", "—", "8.044%"],
       ["Fee drag", "−0.200pp", "—", "−0.200pp"],
-      ["Return", "7.84%", "—", "7.84%"],
-      ["Growth", "5.84%", "—", "5.84%"],
+      ["Rebalancing", "0.205pp", "—", "0.205pp"],
+      ["Return", "7.84%", "—", "8.05%"],
+      ["Growth", "5.84%", "—", "6.05%"],
       ["Dividend yield", "2.00%", "—", "2.00%"],
-      ["Real return", "4.75%", "—", "4.75%"],
+      ["Real return", "4.75%", "—", "4.95%"],
     ]);
     expect(
       screen.getByRole("rowheader", { name: "Blended 20y GBP return" }),
@@ -111,7 +152,8 @@ describe("CmaWorksheet", () => {
   });
 
   // All in bonds, stocks have no yield to pay, so the portfolio's is
-  // nothing.
+  // nothing, and rebalancing earns the 0.020 of a point bonds earn
+  // within themselves.
   it("dashes stocks, yield and all, when nothing blends into them", () => {
     renderSheet({ targets: targetsUnder("Bonds") });
 
@@ -120,10 +162,11 @@ describe("CmaWorksheet", () => {
       ["Blended 20y GBP return", "—", "4.466%", "4.466%"],
       ["GBP-hedging adjustment", "—", "−0.015pp", "−0.015pp"],
       ["Fee drag", "—", "−0.200pp", "−0.200pp"],
-      ["Return", "—", "4.25%", "4.25%"],
-      ["Growth", "—", "4.25%", "4.25%"],
+      ["Rebalancing", "—", "0.020pp", "0.020pp"],
+      ["Return", "—", "4.25%", "4.27%"],
+      ["Growth", "—", "4.25%", "4.27%"],
       ["Dividend yield", "—", "—", "0.00%"],
-      ["Real return", "—", "1.26%", "1.26%"],
+      ["Real return", "—", "1.26%", "1.28%"],
     ]);
   });
 
@@ -180,8 +223,9 @@ describe("CmaWorksheet", () => {
   });
 
   // On the first of September the fees were a tenth of a point less, so
-  // the plan rate was 7.23% where it is 7.13% now, 4.15% real where it
-  // is 4.05%, at the same 2.95% of inflation.
+  // the plan rate was 7.62% where it is 7.52% now, each with the 0.398
+  // of a point rebalancing earns, 4.54% real where it is 4.44%, at the
+  // same 2.95% of inflation.
   it("lays out what moved the rates since the household stood a while ago, adding up down the columns", () => {
     renderSheet({
       before: {
@@ -195,9 +239,9 @@ describe("CmaWorksheet", () => {
     });
 
     expect(worksheet("What moved the rates, worked out", moved)).toStrictEqual([
-      ["Then", "7.23%", "2.95%", "4.15%"],
+      ["Then", "7.62%", "2.95%", "4.54%"],
       ["Fees and yield", "−0.10pp", "0.00pp", "−0.10pp"],
-      ["Now", "7.13%", "2.95%", "4.05%"],
+      ["Now", "7.52%", "2.95%", "4.44%"],
     ]);
     expect(
       within(moved).getByRole("rowheader", { name: "Then" }),

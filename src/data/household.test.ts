@@ -889,15 +889,17 @@ describe("soundKept", () => {
     expect(read).toMatchObject({ allocation, rates });
     expect(read.plan).toMatchObject({
       inflation: 0.0295,
-      rate: planRate(rates, allocation),
+      rate: planRate(rates, allocation, 0),
     });
   });
 
   // August's blends less 0.20% of fees and a 2% yield, the first of
   // September's 2.95%, and the target allocation's four fifths in
-  // stocks at 7.84% in all and a fifth in bonds at 4.25%, 7.13%, where
-  // the split typed holds everything in stocks. The rates and the split
-  // typed are kept as they were.
+  // stocks at 7.84% in all and a fifth in bonds at 4.25%, 7.13%, and
+  // the 0.398 of a point rebalancing earns over that blend, 0.205 within
+  // stocks and 0.020 within bonds in their shares and 0.231 between the
+  // two, 7.52%; where the split typed holds everything in stocks. The
+  // rates and the split typed are kept as they were.
   it("runs the plan on the CMA's rates and the target allocation's split when they are chosen", () => {
     const { household: read } = soundKept({ ...kept, rateSet: "cma" });
     const derived = derivedSet(kept);
@@ -905,19 +907,25 @@ describe("soundKept", () => {
     expect(derived).toMatchObject({
       allocation: { stocks: expect.closeTo(0.8, 12) as unknown },
       rates: read.liveRates,
+      rebalancing: expect.closeTo(0.0039837, 7) as unknown,
     });
     expect(read.rates).toStrictEqual(kept.rates);
     expect(read.allocation).toStrictEqual(kept.allocation);
     expect(read.plan.inflation).toBe(inflationOf(curve).rate);
     expect(read.plan.rate).toBeCloseTo(
-      planRate(read.liveRates, { stocks: 0.8 }),
+      planRate(
+        read.liveRates,
+        { stocks: 0.8 },
+        "short" in derived ? 0 : derived.rebalancing,
+      ),
       12,
     );
-    expect(read.plan.rate).toBeCloseTo(0.0712544, 12);
+    expect(read.plan.rate).toBeCloseTo(0.0712544 + 0.0039837, 7);
   });
 
   // All in equities, everything is in stocks at their 7.84% in all, and
-  // bonds' rate weighs nothing.
+  // bonds' rate weighs nothing; rebalancing earns the 0.205 of a point
+  // it earns within stocks, and nothing between the sleeves.
   it("runs the plan on the CMA's rates for an allocation with nothing in one sleeve", () => {
     const { household: read } = soundKept({
       ...kept,
@@ -925,7 +933,7 @@ describe("soundKept", () => {
       targets: targetsUnder("Equity"),
     });
 
-    expect(read.plan.rate).toBeCloseTo(0.078441, 12);
+    expect(read.plan.rate).toBeCloseTo(0.078441 + 0.0020462, 7);
   });
 
   // An import of a category asking for a share with no class leaves the
@@ -939,7 +947,7 @@ describe("soundKept", () => {
     const { household: typed } = soundKept({ ...kept, mappings: [] });
 
     expect(typed.liveRates).toStrictEqual(kept.rates);
-    expect(typed.plan.rate).toBe(planRate(kept.rates, kept.allocation));
+    expect(typed.plan.rate).toBe(planRate(kept.rates, kept.allocation, 0));
   });
 
   it("refuses a line growing by a growth not offered", () => {

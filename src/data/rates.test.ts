@@ -24,9 +24,9 @@ describe("openingRates", () => {
   // Stocks and bonds alike at 5%, so the plan rate is 5% however the
   // savings are split.
   it("grows the plan at 5% whatever the split", () => {
-    expect(planRate(openingRates, allInStocks)).toBeCloseTo(0.05, 15);
-    expect(planRate(openingRates, { stocks: 0 })).toBeCloseTo(0.05, 15);
-    expect(planRate(openingRates, allocation)).toBeCloseTo(0.05, 15);
+    expect(planRate(openingRates, allInStocks, 0)).toBeCloseTo(0.05, 15);
+    expect(planRate(openingRates, { stocks: 0 }, 0)).toBeCloseTo(0.05, 15);
+    expect(planRate(openingRates, allocation, 0)).toBeCloseTo(0.05, 15);
   });
 });
 
@@ -36,12 +36,12 @@ describe("resultsOf", () => {
   // growth and 1.60% yield, and over 2.95% of inflation each comes to
   // what realRate makes of its return.
   it("works out each class and the portfolio, which adds up down and across", () => {
-    const results = resultsOf(rates, allocation);
+    const results = resultsOf(rates, allocation, 0);
 
     expect(results.nominal.stocks).toBeCloseTo(0.0795, 15);
     expect(results.nominal.bonds).toBeCloseTo(0.0445, 15);
     expect(results.nominal.portfolio).toBeCloseTo(
-      planRate(rates, allocation),
+      planRate(rates, allocation, 0),
       15,
     );
     expect(results.growth.stocks).toBeCloseTo(0.0595, 15);
@@ -51,6 +51,23 @@ describe("resultsOf", () => {
     expect(results.yield.bonds).toBe(0);
     expect(results.yield.portfolio).toBeCloseTo(0.016, 15);
     expect(results.real.portfolio).toBeCloseTo(realRate(0.0725, 0.0295), 15);
+    expect(results.real.bonds).toBeCloseTo(realRate(0.0445, 0.0295), 15);
+  });
+
+  // Rebalancing earning 0.4 of a point takes the portfolio's return to
+  // 7.65% and its growth to 6.05%, so the two still add up with the
+  // 1.60% yield, and the real return follows; each class stays as it
+  // was, since the term is the portfolio's alone.
+  it("adds what rebalancing earns to the portfolio's return and growth, and to nothing else", () => {
+    const results = resultsOf(rates, allocation, 0.004);
+
+    expect(results.nominal.portfolio).toBeCloseTo(0.0765, 15);
+    expect(results.growth.portfolio).toBeCloseTo(0.0605, 15);
+    expect(results.yield.portfolio).toBeCloseTo(0.016, 15);
+    expect(results.real.portfolio).toBeCloseTo(realRate(0.0765, 0.0295), 15);
+    expect(results.nominal.stocks).toBeCloseTo(0.0795, 15);
+    expect(results.nominal.bonds).toBeCloseTo(0.0445, 15);
+    expect(results.growth.stocks).toBeCloseTo(0.0595, 15);
     expect(results.real.bonds).toBeCloseTo(realRate(0.0445, 0.0295), 15);
   });
 });
@@ -75,11 +92,16 @@ describe("stocksTotal", () => {
 describe("planRate", () => {
   // Four fifths at 7.95% and a fifth at 4.45%.
   it("blends stocks' total and bonds' growth by the share held in each", () => {
-    expect(planRate(rates, allocation)).toBeCloseTo(0.0725, 15);
+    expect(planRate(rates, allocation, 0)).toBeCloseTo(0.0725, 15);
   });
 
   it("takes stocks' total alone when everything is in stocks, and bonds' alone when nothing is", () => {
-    expect(planRate(rates, allInStocks)).toBeCloseTo(0.0795, 15);
-    expect(planRate(rates, { stocks: 0 })).toBeCloseTo(0.0445, 15);
+    expect(planRate(rates, allInStocks, 0)).toBeCloseTo(0.0795, 15);
+    expect(planRate(rates, { stocks: 0 }, 0)).toBeCloseTo(0.0445, 15);
+  });
+
+  // The 7.25% the blend makes and 0.4 of a point rebalancing earns.
+  it("adds what rebalancing earns over the blend", () => {
+    expect(planRate(rates, allocation, 0.004)).toBeCloseTo(0.0765, 15);
   });
 });

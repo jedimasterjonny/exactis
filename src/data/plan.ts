@@ -221,10 +221,11 @@ export function marginOf(line: {
 // the statements already hold. It runs to the age it is set to run to,
 // for the first listed owner, whose plan it is: born in their year,
 // retiring at their age, growing at the rate the rates given make with
-// the savings split as the allocation given splits them, and taking the
-// rates' inflation: what the projection runs on and what the plan
-// screen lays its lines over. The rates and the split are taken
-// together, as the household keeps them. A plan whose age is already
+// the savings split as the allocation given splits them and what
+// rebalancing earns over it, and taking the rates' inflation: what the
+// projection runs on and what the plan screen lays its lines over. The
+// rates, the split and the rebalancing are taken together, as the
+// household keeps them. A plan whose age is already
 // reached runs no years forward rather than a count below nothing. A
 // household with no owner has no plan to make, and the store refuses to
 // keep one, so a caller handing one here has skipped the model.
@@ -233,7 +234,12 @@ export function planOf(
   {
     allocation,
     rates,
-  }: { readonly allocation: Allocation; readonly rates: Rates },
+    rebalancing,
+  }: {
+    readonly allocation: Allocation;
+    readonly rates: Rates;
+    readonly rebalancing: number;
+  },
 ): Plan {
   const start = monthAfter(asOf);
   const [owner] = owners;
@@ -246,7 +252,7 @@ export function planOf(
     inflation: rates.inflation,
     month: start.month,
     owners,
-    rate: planRate(rates, allocation),
+    rate: planRate(rates, allocation, rebalancing),
     retires: owner.retires,
     years: Math.max(0, owner.born + ages.ends - start.year),
   };

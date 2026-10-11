@@ -143,7 +143,11 @@ function standingOf(sources: Sources): null | Standing {
   if ("short" in derived) {
     return null;
   }
-  const { nominal, real } = resultsOf(derived.rates, derived.allocation);
+  const { nominal, real } = resultsOf(
+    derived.rates,
+    derived.allocation,
+    derived.rebalancing,
+  );
   return {
     inflation: derived.rates.inflation,
     planRate: nominal.portfolio,

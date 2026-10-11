@@ -51,9 +51,16 @@ export const openingRates: Rates = {
 };
 
 // The rate every account on the plan rate grows at: what stocks return
-// in all and what bonds return, each in the share the split holds of it.
-export function planRate(rates: Rates, allocation: Allocation): number {
-  return weighted(allocation, stocksTotal(rates), rates.bonds);
+// in all and what bonds return, each in the share the split holds of it,
+// and what rebalancing earns over that blend, which the derived set
+// works out from its vintage's volatilities and the rates typed, which
+// carry none, give as nothing.
+export function planRate(
+  rates: Rates,
+  allocation: Allocation,
+  rebalancing: number,
+): number {
+  return weighted(allocation, stocksTotal(rates), rates.bonds) + rebalancing;
 }
 
 // What a rate comes to once prices have risen by the inflation given: a
@@ -68,33 +75,35 @@ export function realRate(rate: number, inflation: number): number {
 // portfolio: the return in all, the growth and the yield it is made of,
 // and the return over inflation. Bonds pay no yield, so their growth is
 // their return. The portfolio's figure is each class's in the share the
-// split holds of it, so its return is the plan rate, and its growth and
+// split holds of it, plus what rebalancing earns on its return and so
+// on its growth, so its return is the plan rate, and its growth and
 // yield add up to its return as each class's do.
 export function resultsOf(
   rates: Rates,
   allocation: Allocation,
+  rebalancing: number,
 ): {
   readonly growth: Across;
   readonly nominal: Across;
   readonly real: Across;
   readonly yield: Across;
 } {
-  const across = (stocks: number, bonds: number): Across => ({
+  const across = (stocks: number, bonds: number, earns: number): Across => ({
     bonds,
-    portfolio: weighted(allocation, stocks, bonds),
+    portfolio: weighted(allocation, stocks, bonds) + earns,
     stocks,
   });
-  const nominal = across(stocksTotal(rates), rates.bonds);
+  const nominal = across(stocksTotal(rates), rates.bonds, rebalancing);
   const real = (rate: number): number => realRate(rate, rates.inflation);
   return {
-    growth: across(rates.stocks, rates.bonds),
+    growth: across(rates.stocks, rates.bonds, rebalancing),
     nominal,
     real: {
       bonds: real(nominal.bonds),
       portfolio: real(nominal.portfolio),
       stocks: real(nominal.stocks),
     },
-    yield: across(rates.dividends, 0),
+    yield: across(rates.dividends, 0, 0),
   };
 }
 
