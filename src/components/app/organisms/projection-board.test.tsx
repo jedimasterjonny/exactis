@@ -18,7 +18,7 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
 import { retiring } from "@/data/income.fixture";
 import { atAge } from "@/data/milestones";
-import { balanceIn, balanceOf, project } from "@/engine/projection";
+import { balanceIn, project } from "@/engine/projection";
 import { refused } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
 import { bySlot, commit, slider } from "@/test/dom";
@@ -85,12 +85,6 @@ function board(
   );
 }
 
-// What the milestone tile gives for a year of a plan: the two wrappers.
-function heldIn(held: Plan, year: number, lines: Schedule = schedule): string {
-  const point = pointIn(held, year, lines);
-  return formatGbp(point === undefined ? 0 : balanceOf(point));
-}
-
 // The fixture's schedule with the retirement living starting in the
 // year given.
 function livingFrom(firstYear: number, isTied: boolean): Schedule {
@@ -151,16 +145,17 @@ function worthIn(held: Plan, year: number, lines: Schedule = schedule): string {
 }
 
 describe("ProjectionBoard", () => {
-  // Retirement is chosen to begin with: the tile reads the balance the
-  // plan holds entering 2049, and the age's hint the year before it.
-  // The plan runs to 2079, and the net worth tile reads what it holds
-  // entering that year.
+  // Retirement is chosen to begin with: the tile reads the net worth the
+  // plan holds entering 2049, the home and the mortgage owed on it among
+  // the accounts, and the age's hint the year before it. The plan runs
+  // to 2079, and the net worth tile reads what it holds entering that
+  // year.
   it("leads the tiles with the milestone tile at retirement, charts the engine's projection marked there, and gives the last working year under the age", () => {
     render(board());
 
     expect(screen.getByText("At Retirement")).toBeInTheDocument();
-    expect(screen.getByText(heldIn(retiring, 2049))).toHaveClass("figure");
-    expect(screen.getByText("2049 · age 59")).toBeInTheDocument();
+    expect(screen.getByText(worthIn(retiring, 2049))).toHaveClass("figure");
+    expect(screen.getByText("Net worth · 2049 · age 59")).toBeInTheDocument();
     expect(
       screen.getByRole("textbox", { name: "Retirement age" }),
     ).toHaveAccessibleDescription("Last working year 2048");
@@ -279,7 +274,7 @@ describe("ProjectionBoard", () => {
 
     fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
 
-    expect(screen.getByText("2050 · age 60")).toBeInTheDocument();
+    expect(screen.getByText("Net worth · 2050 · age 60")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2050"]);
     expect(saveAges).not.toHaveBeenCalled();
 
@@ -301,7 +296,7 @@ describe("ProjectionBoard", () => {
       vi.advanceTimersByTime(settle);
     });
 
-    expect(screen.getByText("2052 · age 62")).toBeInTheDocument();
+    expect(screen.getByText("Net worth · 2052 · age 62")).toBeInTheDocument();
     expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 62 });
   });
 
@@ -319,7 +314,7 @@ describe("ProjectionBoard", () => {
 
     const moved = worthIn({ ...retiring, retires: 55 }, 2079);
 
-    expect(screen.getByText("2045 · age 55")).toBeInTheDocument();
+    expect(screen.getByText("Net worth · 2045 · age 55")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2045"]);
     expect(moved).not.toBe(worthIn(retiring, 2079));
     expect(screen.getByText(moved)).toHaveClass("figure");
@@ -334,11 +329,11 @@ describe("ProjectionBoard", () => {
 
     fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
 
-    expect(screen.getByText("2050 · age 60")).toBeInTheDocument();
+    expect(screen.getByText("Net worth · 2050 · age 60")).toBeInTheDocument();
 
     rerender(board({ ...retiring, retires: 62 }));
 
-    expect(screen.getByText("2052 · age 62")).toBeInTheDocument();
+    expect(screen.getByText("Net worth · 2052 · age 62")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2052"]);
   });
 
@@ -354,7 +349,7 @@ describe("ProjectionBoard", () => {
       await vi.advanceTimersByTimeAsync(settle);
     });
 
-    expect(screen.getByText("2049 · age 59")).toBeInTheDocument();
+    expect(screen.getByText("Net worth · 2049 · age 59")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2049"]);
     expect(toast.add).toHaveBeenCalledExactlyOnceWith({
       description: "A plan's owner retires no later than it ends",
@@ -425,12 +420,15 @@ describe("ProjectionBoard", () => {
   });
 
   // Born in 1990, a plan of three years from 2026 holds £30,000 in an
-  // ISA spending £500 a month, which lasts, so every future is the plan
-  // at its rates where nothing strays, and each reaches thirty grand at
-  // once, in 2026; retiring at 90 falls past the plan's years, so the
-  // milestone at 37, in 2027, is chosen to begin with. The futures are
-  // drawn by the worker stood in for jsdom's missing one, and until
-  // they are the milestone the run will place is said to be coming.
+  // ISA and the fixture's home, spending £500 a month, which lasts, so
+  // every future is the plan at its rates where nothing strays, and
+  // each reaches thirty grand of net worth and thirty grand of liquid
+  // net worth at once, in 2026; retiring at 90 falls past the plan's
+  // years, so the milestone at 37, in 2027, is chosen to begin with.
+  // The futures are drawn by the worker stood in for jsdom's missing
+  // one, and until they are the milestones the run will place are said
+  // to be coming. Each tile reads the measure its milestone is on, so
+  // the home counts in the one and not in the other.
   it("draws the futures once, says a milestone reached when conditions hold is coming, and marks it at the median once the run is drawn", async () => {
     vi.stubGlobal("Worker", FuturesWorker);
     const planned = { ...retiring, retires: 90, years: 3 };
@@ -453,21 +451,28 @@ describe("ProjectionBoard", () => {
         id: 2,
         name: "Thirty grand",
       },
+      {
+        conditions: [{ measure: "liquid", of: "pounds", times: 30000 }],
+        id: 3,
+        name: "Thirty liquid",
+      },
     ];
     render(
       board(planned, spending, {
         listed,
-        owned: [isa],
+        owned: [isa, home],
         spread: { inflation: 0, rate: 0 },
       }),
     );
 
     expect(screen.getByText("At Ada 18")).toBeInTheDocument();
     expect(screen.getByText("Drawing 0 of 1,000 futures…")).toBeInTheDocument();
-    expect(screen.getByText("Drawing the futures…")).toBeInTheDocument();
+    expect(screen.getAllByText("Drawing the futures…")).toHaveLength(2);
     expect(
-      screen.getByText(bySlot("milestone-chip-pending"), { suggest: false }),
-    ).toHaveTextContent("Thirty grand …");
+      screen
+        .getAllByText(bySlot("milestone-chip-pending"), { suggest: false })
+        .map((chip) => chip.textContent),
+    ).toStrictEqual(["Thirty grand …", "Thirty liquid …"]);
     expect(marks()).toStrictEqual(["2027"]);
 
     expect(
@@ -478,20 +483,31 @@ describe("ProjectionBoard", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("100%")).toHaveClass("figure");
-    expect(
-      screen.getByText("Median of 1,000 futures · 2026"),
-    ).toBeInTheDocument();
+    expect(screen.getAllByText("Median of 1,000 futures · 2026")).toHaveLength(
+      2,
+    );
     expect(
       screen.queryByText(bySlot("milestone-chip-pending"), { suggest: false }),
     ).not.toBeInTheDocument();
-    // Recharts keeps a rule where it was mounted, so the one the run
-    // adds comes after the plan's own, whatever their years.
+    // Recharts keeps a rule where it was mounted, so the ones the run
+    // adds come after the plan's own, whatever their years.
     expect(new Set(marks())).toStrictEqual(new Set(["2026", "2027"]));
 
     fireEvent.click(screen.getByRole("button", { name: "Thirty grand 2026" }));
 
     expect(screen.getByText("At Thirty grand")).toBeInTheDocument();
-    expect(screen.getByText("2026 · age 36")).toBeInTheDocument();
+    expect(screen.getByText(formatGbp(30000 + home.balance))).toHaveClass(
+      "figure",
+    );
+    expect(screen.getByText("Net worth · 2026 · age 36")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Thirty liquid 2026" }));
+
+    expect(screen.getByText("At Thirty liquid")).toBeInTheDocument();
+    expect(screen.getByText("£30,000")).toHaveClass("figure");
+    expect(
+      screen.getByText("Liquid net worth · 2026 · age 36"),
+    ).toBeInTheDocument();
   });
 
   // The children leave home in 2036, when the owner is 46: the tile
@@ -505,8 +521,8 @@ describe("ProjectionBoard", () => {
     );
 
     expect(screen.getByText("At Kids leave home")).toBeInTheDocument();
-    expect(screen.getByText(heldIn(retiring, 2036))).toHaveClass("figure");
-    expect(screen.getByText("2036 · age 46")).toBeInTheDocument();
+    expect(screen.getByText(worthIn(retiring, 2036))).toHaveClass("figure");
+    expect(screen.getByText("Net worth · 2036 · age 46")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Kids leave home 2036" }),
     ).toHaveAttribute("aria-pressed", "true");
@@ -517,7 +533,7 @@ describe("ProjectionBoard", () => {
     fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
 
     expect(screen.getByText("At Retirement")).toBeInTheDocument();
-    expect(screen.getByText("2050 · age 60")).toBeInTheDocument();
+    expect(screen.getByText("Net worth · 2050 · age 60")).toBeInTheDocument();
   });
 
   // Choosing a milestone reads a year off the run the board holds rather

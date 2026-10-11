@@ -21,10 +21,10 @@ import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ChanceTile } from "@/components/app/organisms/chance-tile";
 import { ProjectionChart } from "@/components/app/organisms/projection-chart";
 import { takesSpare } from "@/data/accounts";
-import { ageOf, timed } from "@/data/milestones";
+import { ageOf, measureNames, timed } from "@/data/milestones";
 import { ageIn, endAge, retirementYear } from "@/data/plan";
 import { endWorthOf, futureOf, markersIn, runLength } from "@/engine/futures";
-import { balanceOf, holdsAnything, project } from "@/engine/projection";
+import { holdsAnything, project } from "@/engine/projection";
 import { useFutures } from "@/hooks/use-futures";
 import { useSender } from "@/hooks/use-sender";
 import { formatGbp } from "@/lib/money";
@@ -80,9 +80,17 @@ export const settle = 400;
 // grow, and then the tiles say which and the chart marks the
 // milestones the plan lays out alone.
 // One milestone is chosen at a time, from the chips in the chart's top
-// row, which name what the chart's lines cannot: the tile reads the
-// balance the plan holds entering its year, with the year and the age,
-// and the chart draws its line solid. Retirement is chosen to begin
+// row, which name what the chart's lines cannot: the tile reads what
+// the plan holds entering its year on the measure the milestone is on,
+// the liquid net worth for one reached on that and the net worth for
+// one reached on it, at an age or for retirement, named in the caption
+// beside the year and the age, and the chart draws its line solid. The
+// figure is the plan's own projection whichever milestone it is: one
+// reached when conditions hold stands in the year by which half the
+// futures have reached it and is read at what the plan itself holds
+// entering that year, which can be short of what the milestone asks,
+// where the plan at its rates reaches it later than half the futures
+// do. Retirement is chosen to begin
 // with, and chosen again whenever the age is moved, so the tile shows
 // what the plan holds at retirement as the age is dragged. A choice
 // the milestones no longer hold, one deleted or moved out of the plan's
@@ -189,7 +197,17 @@ function Board({
     markers.find(({ id }) => id === choice) ??
     markers.find(({ id }) => id === "retirement") ??
     markers[0];
-  const at = points.find(({ year }) => year === chosen?.year);
+  const at =
+    projected.measured[points.findIndex(({ year }) => year === chosen?.year)];
+  // The measure the tile reads the chosen milestone on: the sum its
+  // first condition is on, or the net worth for one whose condition is
+  // on the age, as retirement's is, which no sum answers to.
+  const condition = milestones.find(({ id }) => id === chosen?.id)
+    ?.conditions[0];
+  const measure =
+    condition === undefined || condition.measure === "age"
+      ? "worth"
+      : condition.measure;
   const lastWorking = `Last working year ${String(retirementYear(drafted) - 1)}`;
 
   function save(age: number): void {
@@ -244,11 +262,11 @@ function Board({
           />
         ) : (
           <StatTile
-            caption={`${String(at.year)} · age ${String(at.age)}`}
+            caption={`${measureNames[measure]} · ${String(chosen.year)} · age ${String(at.age)}`}
             icon={Flag}
             label={`At ${chosen.name}`}
             tone="inverse"
-            value={formatGbp(balanceOf(at))}
+            value={formatGbp(at[measure])}
           />
         )}
         <ChanceTile milestones={milestones} plan={plan} run={run} />
