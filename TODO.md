@@ -29,26 +29,6 @@ Decide whether the allowance is held across the tax year rather than a month at
 a time, which would have the projection carry it as it carries the tax year; the
 rest are figures to add as the plan needs them.
 
-## Owners
-
-An ISA or a pension belongs to an owner, and nothing else in the plan knows
-whose it is. Income lines name no owner, so every salary is taxed together, as
-one person's income against one set of bands, and a salary may sacrifice into
-another owner's pension. The plan holds one year of birth, so every pension is
-drawn from the one pension age, as though all the owners were born in the same
-year, and one lump sum allowance is shared by all of them. It holds one
-retirement age too, so every salary and every self-employed line stops in the
-same year, whoever earns it, and one starting later is never paid at all, which
-the plan screen draws as it is paid rather than as it says. A draw on one
-owner's pension is taxed on top of every other owner's earnings, and each
-owner's pensions are relieved on everyone's earnings, as though each owner
-earned them all.
-
-Decide whose each income line is, and the year each owner was born and retires,
-so tax, the pension age, the lump sum allowance, the earnings relief is held to
-and the last working year are each a person's rather than the plan's, and a
-salary feeds only its own owner's pension.
-
 ## Tax
 
 The month's income pays income tax and the employee's NI, a pension draw is

@@ -512,9 +512,10 @@ const plan = z
 // one record can say. Every record is listed once by its id. Every link
 // names a record the household lists, and one of the kind it has to
 // be: a wrapper its owner, an income line the owner who earns it, a
-// loan the asset it is secured on, a salary
-// the pension it feeds, a payments line the debt it pays and a line
-// the milestone it is tied to, which is reached at an age, since one
+// loan the asset it is secured on, a salary the pension it feeds, which
+// is that owner's, since a sacrifice is an employer's contribution to
+// the employee's own pension, a payments line the debt it pays and a
+// line the milestone it is tied to, which is reached at an age, since one
 // reached when conditions hold falls in a year that depends on the
 // lines, in the engine's words where the engine refuses the same link.
 // An asset has
@@ -600,6 +601,16 @@ export const household = z
         new Set([null, ...accounts.filter(isPension).map(({ id }) => id)]),
       ),
     rules.feedsPension,
+  )
+  .refine(
+    ({ accounts, schedule }) =>
+      schedule.income.every((line) => {
+        const pension = accounts
+          .filter(isPension)
+          .find(({ id }) => id === line.feeds);
+        return pension === undefined || pension.owner === line.owner;
+      }),
+    "A salary feeds a pension of the owner who earns it",
   )
   .refine(
     ({ accounts, schedule }) =>
