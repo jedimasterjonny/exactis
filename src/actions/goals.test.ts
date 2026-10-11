@@ -67,7 +67,7 @@ describe("the goal actions", () => {
       });
     });
 
-    it("refuses a name of nothing but space, no condition, a multiple below nothing, an id the dialog could not have sent, and one no goal has", async () => {
+    it("refuses a name of nothing but space, no condition, a multiple below nothing, a sum held to years, an id the dialog could not have sent, and one no goal has", async () => {
       await expect(
         saveGoal(null, { ...debtFree, name: "   " }),
       ).rejects.toThrow(z.ZodError);
@@ -78,6 +78,12 @@ describe("the goal actions", () => {
         saveGoal(null, {
           ...debtFree,
           conditions: [{ measure: "worth", of: "pounds", times: -1 }],
+        }),
+      ).rejects.toThrow(z.ZodError);
+      await expect(
+        saveGoal(null, {
+          ...debtFree,
+          conditions: [{ measure: "worth", of: "years", times: 1 }],
         }),
       ).rejects.toThrow(z.ZodError);
       await expect(saveGoal(0, debtFree)).rejects.toThrow(z.ZodError);
