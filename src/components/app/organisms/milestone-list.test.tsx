@@ -15,6 +15,7 @@ import { removeMilestone, saveMilestone } from "@/actions/milestones";
 import { Toaster } from "@/components/kit/toast";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
+import { atAge } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { refused, saved } from "@/lib/answer";
 import { laneColumns } from "@/lib/span";
@@ -221,16 +222,17 @@ describe("MilestoneList", () => {
     vi.mocked(saveMilestone).mockReturnValue(promise);
     fireEvent.click(within(form).getByRole("button", { name: "Save" }));
 
+    // Saved as the age reached in 2044, 52.
     expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(null, {
+      conditions: atAge(52),
       name: "Sabbatical",
-      year: 2040,
     });
     expect(within(form).getByRole("button", { name: "Save" })).toHaveAttribute(
       "aria-busy",
       "true",
     );
 
-    answer(saved({ id: 3, name: "Sabbatical", year: 2040 }));
+    answer(saved({ conditions: atAge(52), id: 5, name: "Sabbatical" }));
 
     await waitFor(() => {
       expect(screen.queryByRole("form")).not.toBeInTheDocument();
@@ -246,7 +248,7 @@ describe("MilestoneList", () => {
   it("opens a milestone in its row and saves a year typed and entered", async () => {
     renderList();
     vi.mocked(saveMilestone).mockResolvedValue(
-      saved({ ...downsize, year: 2061 }),
+      saved({ ...downsize, conditions: atAge(69) }),
     );
 
     pressRow("Downsize");
@@ -267,8 +269,8 @@ describe("MilestoneList", () => {
     fireEvent.submit(form);
 
     expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(downsize.id, {
+      conditions: atAge(69),
       name: "Downsize",
-      year: 2061,
     });
     await waitFor(() => {
       expect(screen.queryByRole("form")).not.toBeInTheDocument();

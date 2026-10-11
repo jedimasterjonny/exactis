@@ -3,7 +3,7 @@ import * as z from "zod";
 import type { Month } from "@/data/schedule";
 
 import { cadences } from "@/data/accounts";
-import { bases, measures } from "@/data/goals";
+import { bases, measures } from "@/data/milestones";
 import { lineGrowths } from "@/data/schedule";
 
 // The pieces the model's rules and the actions' parsing are both built
@@ -46,17 +46,12 @@ export const lineValues = {
   startsAt: tie.nullable(),
 };
 
-// What a milestone holds: the name, and the year, whole and from one up,
-// as a line's years are.
-export const milestoneValues = {
-  name: named,
-  year: z.number().int().positive(),
-};
-
-// What a condition of a goal holds: the measure, the basis it is held
-// to, and the multiple, nothing or more, so a measure may be held to
-// nothing, a liquid net worth above nothing say. An age is held to
-// years, since a year is what an age counts, and no sum is.
+// What a condition of a milestone holds: the measure, the basis it is
+// held to, and the multiple, nothing or more, so a measure may be held
+// to nothing, a liquid net worth above nothing say. An age is held to
+// years, since a year is what an age counts, and no sum is, and it is
+// whole, since the year it falls in is born plus the age and a fraction
+// of a year is no year.
 const condition = z
   .object({
     measure: z.enum(measures),
@@ -66,12 +61,26 @@ const condition = z
   .refine(
     (held) => (held.measure === "age") === (held.of === "years"),
     "An age is held to years, and nothing else is",
+  )
+  .refine(
+    (held) => held.measure !== "age" || Number.isInteger(held.times),
+    "An age is whole years",
   );
 
-// What a goal holds: the name, and a condition at least, since a goal
-// with none is reached at once.
-export const goalValues = {
-  conditions: z.array(condition).min(1, "A goal holds a condition"),
+// What a milestone holds: the name, and a condition at least, since a
+// milestone with none is reached at once. An age is a milestone's only
+// condition: one reached at an age falls in a year the plan says, and
+// one reached when conditions hold in a year the futures say, and a
+// milestone is the one or the other.
+export const milestoneValues = {
+  conditions: z
+    .array(condition)
+    .min(1, "A milestone holds a condition")
+    .refine(
+      (held) =>
+        held.length === 1 || held.every(({ measure }) => measure !== "age"),
+      "An age is a milestone's only condition",
+    ),
   name: named,
 };
 

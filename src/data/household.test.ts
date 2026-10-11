@@ -11,7 +11,6 @@ import type {
   Vintages,
 } from "@/data/cma";
 import type { ExpenseLine } from "@/data/expenses";
-import type { Goal } from "@/data/goals";
 import type { HousePrices } from "@/data/house-prices";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
@@ -31,12 +30,12 @@ import { golfValues } from "@/data/cars.fixture";
 import { derivedSet } from "@/data/cma";
 import { cma, mappings } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
-import { goals } from "@/data/goals.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
 import { homeValues } from "@/data/houses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
 import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
+import { atAge } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import { points } from "@/data/progress.fixture";
@@ -61,7 +60,6 @@ interface Inputs {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
-  readonly goals: readonly Goal[];
   readonly housePrices: HousePrices | null;
   readonly liveRates: Rates;
   readonly mappings: readonly Mapping[];
@@ -92,7 +90,6 @@ const sound: Inputs = {
   cma: { latest: cma, previous: null },
   curve,
   deductions: { dividends: 0.02, fees: 0.002 },
-  goals,
   housePrices: kept.housePrices,
   liveRates: rates,
   mappings,
@@ -297,21 +294,39 @@ const held: readonly Case[] = [
     }),
   ],
   [
-    "A goal is listed once",
-    (given): Inputs => ({ ...given, goals: [...given.goals, ...given.goals] }),
-  ],
-  [
-    "A goal holds a condition",
-    (given): Inputs => ({ ...given, goals: [{ ...goals[0], conditions: [] }] }),
+    "A milestone holds a condition",
+    (given): Inputs => ({
+      ...given,
+      milestones: [{ ...milestones[0], conditions: [] }],
+    }),
   ],
   [
     "An age is held to years, and nothing else is",
     (given): Inputs => ({
       ...given,
-      goals: [
+      milestones: [
         {
-          ...goals[0],
+          ...milestones[0],
           conditions: [{ measure: "age", of: "pounds", times: 48 }],
+        },
+      ],
+    }),
+  ],
+  [
+    "An age is whole years",
+    (given): Inputs => ({
+      ...given,
+      milestones: [{ ...milestones[0], conditions: atAge(48.5) }],
+    }),
+  ],
+  [
+    "An age is a milestone's only condition",
+    (given): Inputs => ({
+      ...given,
+      milestones: [
+        {
+          ...milestones[0],
+          conditions: [...atAge(48), ...milestones[2].conditions],
         },
       ],
     }),
@@ -372,7 +387,7 @@ const held: readonly Case[] = [
       earning(given, 1, (salary) => ({ ...salary, endsAt: 99 })),
   ],
   [
-    "A line is tied to a milestone the household lists",
+    "A line is tied to a milestone reached at an age",
     (given): Inputs => spending(given, 1, (line) => ({ ...line, startsAt: 3 })),
   ],
   [
@@ -624,7 +639,6 @@ describe("soundKept", () => {
         cma: null,
         curve: null,
         deductions: { dividends: 0.02, fees: 0.002 },
-        goals: [],
         housePrices: null,
         liveRates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
         mappings: [],
@@ -901,11 +915,8 @@ describe("soundKept", () => {
     expect(() =>
       soundKept({
         ...kept,
-        milestones: [...kept.milestones, { id: 6, name: "Late", year: 2070 }],
+        milestones: [...kept.milestones, { ...milestones[0], id: 6 }],
       }),
-    ).toThrow("A record's id is below the one the next record is given");
-    expect(() =>
-      soundKept({ ...kept, goals: [...kept.goals, { ...goals[0], id: 6 }] }),
     ).toThrow("A record's id is below the one the next record is given");
   });
 

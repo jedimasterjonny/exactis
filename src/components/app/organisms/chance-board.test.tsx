@@ -9,7 +9,10 @@ import { FuturesWorker } from "@/test/futures-worker";
 
 import { ChanceBoard } from "./chance-board";
 
-vi.mock("@/actions/goals", () => ({ removeGoal: vi.fn(), saveGoal: vi.fn() }));
+vi.mock("@/actions/milestones", () => ({
+  removeMilestone: vi.fn(),
+  saveMilestone: vi.fn(),
+}));
 
 // Born in 1992, from January 2026 over three years, so the plan runs to
 // 37 and every future is drawn in a moment; no inflation, so every
@@ -61,7 +64,6 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
-        goals={[]}
         milestones={[]}
         plan={plan}
         schedule={spending(500)}
@@ -88,7 +90,6 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[home]}
-        goals={[]}
         milestones={[]}
         plan={plan}
         schedule={spending(500)}
@@ -112,7 +113,6 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
-        goals={[]}
         milestones={[]}
         plan={plan}
         schedule={spending(500)}
@@ -146,9 +146,8 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
-        goals={[]}
         milestones={[]}
-        plan={{ ...plan, rate: 0.05, retires: 39 }}
+        plan={{ ...plan, rate: 0.05, retires: 35 }}
         schedule={spending(10000 / 12)}
         spread={{ inflation: 0.02, rate: 0.15 }}
       />,
@@ -178,14 +177,13 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
-        goals={[
+        milestones={[
           {
             conditions: [{ measure: "worth", of: "pounds", times: 30000 }],
             id: 1,
             name: "Thirty grand",
           },
         ]}
-        milestones={[]}
         plan={plan}
         schedule={spending(500)}
         spread={nothingStrays}
@@ -211,7 +209,6 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[{ ...isa, balance: 1000000, kind: "tax-deferred" }]}
-        goals={[]}
         milestones={[]}
         plan={plan}
         schedule={spending(500)}
@@ -235,7 +232,6 @@ describe("ChanceBoard", () => {
     render(
       <ChanceBoard
         accounts={[isa]}
-        goals={[]}
         milestones={[]}
         plan={plan}
         schedule={spending(1000)}

@@ -7,13 +7,12 @@ import { ChevronRight, Goal as GoalIcon, Plus, Trash2 } from "lucide-react";
 import { Fragment, useState } from "react";
 
 import type { Spread } from "@/components/app/atoms/spread-bar";
-import type { Condition, Goal, GoalValues } from "@/data/goals";
-import type { Milestone } from "@/data/milestones";
+import type { Condition, Milestone, MilestoneValues } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Future } from "@/engine/futures";
 import type { Entry } from "@/hooks/use-editor";
 
-import { removeGoal, saveGoal } from "@/actions/goals";
+import { removeMilestone, saveMilestone } from "@/actions/milestones";
 import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { FoldedLines } from "@/components/app/atoms/folded-lines";
@@ -37,8 +36,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/kit/tooltip";
-import { basisNames, conditionOf, measureNames, sums } from "@/data/goals";
-import { markersOf, yearsOf } from "@/data/milestones";
+import {
+  basisNames,
+  conditionOf,
+  markersOf,
+  measureNames,
+  sums,
+  yearsOf,
+} from "@/data/milestones";
 import { ageIn } from "@/data/plan";
 import { reachedBy, reachedIn } from "@/engine/futures";
 import { useEditor } from "@/hooks/use-editor";
@@ -73,16 +78,16 @@ interface GoalFieldsProps {
 
 interface GoalListProps {
   readonly futures: readonly Future[];
-  readonly goals: readonly Goal[];
+  readonly goals: readonly Milestone[];
   readonly milestones: readonly Milestone[];
   readonly plan: Plan;
 }
 
 interface GoalRowProps {
   readonly futures: readonly Future[];
-  readonly goal: Goal;
+  readonly goal: Milestone;
   readonly marks: readonly number[];
-  readonly onEdit: (goal: Goal) => void;
+  readonly onEdit: (goal: Milestone) => void;
   readonly plan: Plan;
 }
 
@@ -99,7 +104,7 @@ const another: Condition = { measure: "liquid", of: "debt", times: 10 };
 const basisOptions = optionsOf(basisNames, ["pounds", ...sums]);
 
 // A new goal: the first million, in net worth, unnamed.
-const blank: GoalValues = {
+const blank: MilestoneValues = {
   conditions: [{ measure: "worth", of: "pounds", times: 1000000 }],
   name: "",
 };
@@ -128,15 +133,17 @@ export function GoalList({
   plan,
 }: GoalListProps): JSX.Element {
   const marks = yearsOf(markersOf(milestones, plan));
-  const { amend, dialogOf, dismiss, entry, open } = useEditor<Draft, Goal>({
-    describe: (goal) => goal.conditions.map(conditionOf).join(" · "),
-    noun: "Goal",
-    save: async (id, draft) => saveGoal(id, valuesOf(draft)),
-  });
-  const { ask, doomed, questionOf } = useRemover<Goal>({
+  const { amend, dialogOf, dismiss, entry, open } = useEditor<Draft, Milestone>(
+    {
+      describe: (goal) => goal.conditions.map(conditionOf).join(" · "),
+      noun: "Goal",
+      save: async (id, draft) => saveMilestone(id, valuesOf(draft)),
+    },
+  );
+  const { ask, doomed, questionOf } = useRemover<Milestone>({
     describe: (goal) => goal.name,
     noun: "Goal",
-    remove: removeGoal,
+    remove: removeMilestone,
   });
 
   // The Delete a saved goal's dialog offers, which closes the dialog
@@ -152,7 +159,7 @@ export function GoalList({
         };
   }
 
-  function edit(goal: Goal): void {
+  function edit(goal: Milestone): void {
     open(draftOf(goal), goal.id);
   }
 
@@ -301,7 +308,7 @@ function ConditionRow({
 
 // A goal's values as the dialog opens on them, each condition keyed by
 // its place.
-function draftOf({ conditions, name }: GoalValues): Draft {
+function draftOf({ conditions, name }: MilestoneValues): Draft {
   return {
     conditions: conditions.map((condition, key) => ({ ...condition, key })),
     name,
@@ -503,7 +510,7 @@ function unreached(run: number): string {
 }
 
 // The draft as the store takes it, the keys left behind.
-function valuesOf({ conditions, name }: Draft): GoalValues {
+function valuesOf({ conditions, name }: Draft): MilestoneValues {
   return {
     conditions: conditions.map(({ measure, of, times }) => ({
       measure,

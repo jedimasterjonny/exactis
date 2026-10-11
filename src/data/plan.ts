@@ -231,7 +231,7 @@ export function rateFrom(account: Account, plan: Plan): number {
 // retired, as the whole of the year they reach the pension age counts
 // as reaching it, and the year before is their last working year.
 export function retirementYear(plan: Plan): number {
-  return plan.born + plan.retires;
+  return yearAt(plan.retires, plan);
 }
 
 // How many times over a sum rising at a rate a year has risen by a
@@ -275,6 +275,12 @@ export function risenWith(margin: number, plan: Priced, at: Month): number {
 export function statedSpread(rate: number, logged: number): number {
   const widening = Math.exp(logged ** 2);
   return (1 + rate) * Math.sqrt(widening * (widening - 1));
+}
+
+// The year the plan's owner reaches an age in, which ageIn reads back:
+// the whole of the year counts, as it does there.
+export function yearAt(age: number, plan: Pick<Plan, "born">): number {
+  return plan.born + age;
 }
 
 // How far a sum rising by the margin given has risen by the start of a

@@ -2,10 +2,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { Goal, Measured } from "@/data/goals";
+import type { Measured, Milestone } from "@/data/milestones";
 
 import { expenseLines } from "@/data/expenses.fixture";
-import { goals } from "@/data/goals.fixture";
+import { milestones } from "@/data/milestones.fixture";
 import { project } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
@@ -493,7 +493,7 @@ describe("readingOf", () => {
 });
 
 describe("reachedIn", () => {
-  const [firstMillion, independence] = goals;
+  const [, , firstMillion, independence] = milestones;
   const plan = { from: 2026 };
 
   // Worth £900,000 entering 2026, a million entering 2027 and £1,100,000
@@ -529,7 +529,7 @@ describe("reachedIn", () => {
 
   // From 34 in 2026, 36 is reached in 2028, whatever the future holds.
   it("reads the year an age is reached in off the future's ages", () => {
-    const atAge = (times: number): Goal => ({
+    const atAge = (times: number): Milestone => ({
       ...firstMillion,
       conditions: [{ measure: "age", of: "years", times }],
     });
@@ -545,7 +545,7 @@ describe("reachedIn", () => {
 });
 
 describe("reachedBy", () => {
-  const [firstMillion] = goals;
+  const [, , firstMillion] = milestones;
   const plan = { from: 2026 };
 
   // Ten futures, the nth reaching a million entering 2030 + n for the

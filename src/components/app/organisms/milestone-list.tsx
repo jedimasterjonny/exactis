@@ -6,7 +6,7 @@ import { cn } from "cn";
 import { ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 
-import type { Marker, Milestone, MilestoneValues } from "@/data/milestones";
+import type { Marker, Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { LineValues } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
@@ -26,7 +26,7 @@ import { TextField } from "@/components/app/molecules/text-field";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { asPaid } from "@/data/income";
-import { isTiedTo, markersOf, yearsOf } from "@/data/milestones";
+import { atAge, isTiedTo, markersOf, yearsOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
@@ -35,15 +35,23 @@ import { listed } from "@/lib/feeders";
 import { dashboard, plan as planScreen, subsectionLabel } from "@/lib/nav";
 import { laneColumns } from "@/lib/span";
 
+// What the row edits: the name, and the year, which the age the
+// milestone is reached at is read off, since the plan lays its
+// milestones out by year.
+interface Draft {
+  readonly name: string;
+  readonly year: number;
+}
+
 interface MilestoneFormProps {
   readonly canSave: boolean;
-  readonly entry: Entry<MilestoneValues>;
+  readonly entry: Entry<Draft>;
   readonly isSaving: boolean;
   readonly label: string;
-  readonly onAmend: (patch: Partial<MilestoneValues>) => void;
+  readonly onAmend: (patch: Partial<Draft>) => void;
   readonly onDelete: (() => void) | undefined;
   readonly onDismiss: () => void;
-  readonly onSave: (values: MilestoneValues) => void;
+  readonly onSave: (values: Draft) => void;
   readonly plan: Plan;
 }
 
@@ -58,7 +66,7 @@ interface MilestoneRowProps {
   readonly marker: Marker;
   readonly marks: readonly number[];
   readonly milestone: Milestone | undefined;
-  readonly onEdit: (milestone: Milestone) => void;
+  readonly onEdit: (milestone: Milestone, year: number) => void;
   readonly plan: Plan;
 }
 
@@ -114,10 +122,14 @@ export function MilestoneList({
     ...schedule.income.map((line) => asPaid(line, plan)),
     ...schedule.expenses,
   ];
-  const { amend, dialogOf, dismiss, entry, isSaving, open, save } = useEditor({
-    describe: (milestone) => `${milestone.name} · ${String(milestone.year)}`,
+  const { amend, dialogOf, dismiss, entry, isSaving, open, save } = useEditor<
+    Draft,
+    Milestone
+  >({
+    describe: (milestone, { year }) => `${milestone.name} · ${String(year)}`,
     noun: "Milestone",
-    save: saveMilestone,
+    save: async (id, { name, year }) =>
+      saveMilestone(id, { conditions: atAge(ageIn(year, plan)), name }),
   });
   const { ask, doomed, questionOf } = useRemover<Milestone>({
     describe: (milestone) => milestone.name,
@@ -125,7 +137,7 @@ export function MilestoneList({
     remove: removeMilestone,
   });
 
-  function edit({ id, name, year }: Milestone): void {
+  function edit({ id, name }: Milestone, year: number): void {
     open({ name, year }, id);
   }
 
@@ -136,7 +148,7 @@ export function MilestoneList({
   // fields fresh. The Delete it offers for a saved milestone asks once
   // the form has closed, so the question stands alone.
   function formFor(
-    current: Entry<MilestoneValues>,
+    current: Entry<Draft>,
     key: "new" | Marker["id"],
   ): JSX.Element {
     const listed = milestones.find(({ id }) => id === current.id);
@@ -244,7 +256,7 @@ function freed(tied: number): string {
 // Whether the entry is open on the milestone, which it never is on
 // retirement, since retirement is no record.
 function isOpenOn(
-  entry: Entry<MilestoneValues>,
+  entry: Entry<Draft>,
   milestone: Milestone | undefined,
 ): boolean {
   return entry.id !== null && entry.id === milestone?.id;
@@ -294,7 +306,7 @@ function MilestoneForm({
     };
   }, [onDismiss]);
 
-  function amendWith(patch: Partial<MilestoneValues>): void {
+  function amendWith(patch: Partial<Draft>): void {
     typedRef.current = { ...typedRef.current, ...patch };
     onAmend(patch);
   }
@@ -394,7 +406,7 @@ function MilestoneRow({
             ? { href: dashboard.href, lock }
             : {
                 onOpen: (): void => {
-                  onEdit(milestone);
+                  onEdit(milestone, marker.year);
                 },
               })}
         >
@@ -410,7 +422,7 @@ function MilestoneRow({
           ) : (
             <RowOpener
               onOpen={() => {
-                onEdit(milestone);
+                onEdit(milestone, marker.year);
               }}
             >
               {marker.name}

@@ -3,7 +3,6 @@ import type { Kept } from "@/data/household";
 import { accounts } from "@/data/accounts.fixture";
 import { cma, mappings } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
-import { goals } from "@/data/goals.fixture";
 import { nothingKeptIn } from "@/data/household";
 import { incomeLines } from "@/data/income.fixture";
 import { inflationOf } from "@/data/inflation";
@@ -15,8 +14,7 @@ import { allInStocks } from "@/data/rates";
 import { targets } from "@/data/targets.fixture";
 
 // The reference kit's invented plan as the store keeps it: the fixtures'
-// records, the goals it is read against, balances as of September 2026
-// and the six months of progress
+// records, balances as of September 2026 and the six months of progress
 // points before it, the house price index pulled on the day the
 // household is read, scaled from an October 2021 purchase and running to
 // July 2026, a plan to 91 whose owner
@@ -35,7 +33,6 @@ export const kept: Kept = {
   cma: { latest: cma, previous: null },
   curve,
   deductions: { dividends: 0.02, fees: 0.002 },
-  goals,
   housePrices: {
     from: { month: 9, year: 2021 },
     pulledOn: "2026-09-15",
