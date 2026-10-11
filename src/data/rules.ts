@@ -6,6 +6,7 @@
 // so the two cannot drift.
 export const rules = {
   alwaysFunded: "Only a pension is always funded",
+  belongs: "An ISA or a pension belongs to an owner the household lists",
   belowNothing: "A balance below nothing is a debt's",
   beyondLoss: "A rate loses no more than everything",
   debtEnds: "A debt's payments end",

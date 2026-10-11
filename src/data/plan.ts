@@ -127,16 +127,24 @@ export function earnerOf(
   line: { readonly owner: number },
   plan: Pick<Plan, "owners">,
 ): Owner {
-  const owner = plan.owners.find(({ id }) => id === line.owner);
-  if (owner === undefined) {
-    throw new Error(rules.earner);
-  }
-  return owner;
+  return listedOwner(plan, line.owner, rules.earner);
 }
 
 // The age the plan runs to, the age its owner reaches in its last year.
 export function endAge(plan: Plan): number {
   return ageIn(endYear(plan), plan);
+}
+
+// The owner an ISA or a pension belongs to, among those the plan
+// carries, by the id the account names. One belonging to nobody the
+// plan lists is refused in the rule's words, as the household refuses
+// the same link, since the engine has no years to draw it at or
+// allowance to draw it under.
+export function holderOf(
+  account: Pick<Account, "owner">,
+  plan: Pick<Plan, "owners">,
+): Owner {
+  return listedOwner(plan, account.owner, rules.belongs);
 }
 
 // The oldest age a plan may run to: past any life it plans for, and
@@ -333,6 +341,21 @@ export function statedSpread(rate: number, logged: number): number {
 // the whole of the year counts, as it does there.
 export function yearAt(age: number, plan: Pick<Plan, "born">): number {
   return plan.born + age;
+}
+
+// The owner the plan carries under an id, or a refusal in the words of
+// the rule the link breaks, for a record that names nobody the plan
+// lists.
+function listedOwner(
+  plan: Pick<Plan, "owners">,
+  id: number | undefined,
+  rule: string,
+): Owner {
+  const owner = plan.owners.find((listed) => listed.id === id);
+  if (owner === undefined) {
+    throw new Error(rule);
+  }
+  return owner;
 }
 
 // How far a sum rising by the margin given has risen by the start of a

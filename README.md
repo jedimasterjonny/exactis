@@ -148,10 +148,11 @@ owner retires, or an owner who earns nothing whatever the rest of the household
 earns, lands a pound a pound past £300 a month. Each month is taxed as a twelfth
 of a year, which is the year's tax exactly when its months are alike and too
 much or too little when they are not, as in the year a salary stops. So the
-projection carries each tax year, April to April, and settles it in the April
-after: the year's income tax on everything its months earned and drew from a
-pension, and its Class 4 on all their profit, less what they paid, is refunded
-into that month's money or owed out of it. Class 1 is charged a pay period at a
+projection carries each owner's tax year, April to April, and settles it in the
+April after: the owner's income tax on everything their months earned and drew
+from their pensions, and their Class 4 on all their profit, less what they paid,
+is refunded into that month's money or owed out of it, every owner's together,
+since the month's money is the household's. Class 1 is charged a pay period at a
 time, as the months charge it, and is not settled. The first tax year is the
 months of it the plan holds, against their share of each band. The bands are
 frozen until April 2031 and are held so: flat in pounds through the 2030/31 tax
@@ -195,10 +196,11 @@ then, so the lines stay where they were.
 
 A month the income does not cover is drawn out of the savings at the start of
 it, before the month's growth: cash first, then the tax-free wrapper, then the
-tax-deferred one, as income from the pension age: from the year its owner turns
-55 until the age rises in April 2028, and from the year they turn 57 after it,
-ages held as constants in the engine until the assumptions screen sets them, as
-the plan's rates are held in the store. Before the pension age a pension is
+tax-deferred one, as income from its owner's pension age: from the year the
+owner the pension belongs to turns 55 until the age rises in April 2028, and
+from the year they turn 57 after it, read off each owner's own year of birth,
+the ages held as constants in the engine until the assumptions screen sets them,
+as the plan's rates are held in the store. Before the pension age a pension is
 drawn only as the last resort, once cash and the tax-free wrapper are empty, and
 at the 55% a payment before the pension age is charged; a registered scheme will
 not normally make one, so what a year draws that way is carried on its point to
@@ -210,8 +212,11 @@ carried on its point, so the projection can say when the money runs out and the
 dashboard's chart marks that year. Cash and the tax-free wrapper give up what
 the month is short, and a pension is grossed up so that what is left of the draw
 once taxed is what the month is short: a quarter of each draw is free of tax
-until the £268,275 lump sum allowance is used up over the plan, and the rest is
-taxed as income on top of what the month earned.
+until its owner's £268,275 lump sum allowance is used up over the plan, one
+allowance each, and the rest is taxed as income on top of what its owner earned
+in the month and drew from their other pensions before it, so a second owner's
+pension is drawn under their own allowance and bands rather than from where the
+first's left off.
 
 The engine works in the pounds of each month and reads out in today's money, the
 money of the month the plan starts in. A line states its amount in today's

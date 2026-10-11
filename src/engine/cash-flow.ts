@@ -58,6 +58,17 @@ export interface CashFlow extends Taxed {
   readonly spent: readonly Spent[];
 }
 
+// What one owner's lines running in the month are taxed on: the income
+// their income tax is charged on, which a draw on a pension of theirs
+// is taxed on top of, and the self-employed profit among it that their
+// Class 4 is charged on. The projection carries each owner's tax year
+// from these, since a year is settled a person at a time.
+export interface Earned {
+  readonly owner: number;
+  readonly profit: number;
+  readonly taxable: number;
+}
+
 // A pension a salary feeds: what lands in it a month, the sacrifice
 // with the employer's NI saved on it, the line it is fed from, and what
 // that line gives up a month, which comes off the month before the
@@ -177,8 +188,11 @@ type Rooms = Map<string, number>;
 // what a draw on a pension that month is taxed on top of. Beside them
 // is the self-employed profit the month's Class 4 is charged on, since
 // Class 4 is due on the year's profit as income tax is on the year's
-// income, and the projection settles the one as it settles the other.
+// income, and the projection settles the one as it settles the other;
+// and the two apart for each owner with a line running, since the
+// projection taxes a draw and settles a year a person at a time.
 interface Taxed {
+  readonly earned: readonly Earned[];
   readonly incomeTax: number;
   readonly insurance: number;
   readonly profit: number;
@@ -496,6 +510,7 @@ export function cashFlow(
   );
   const { left, takes } = spareMoney(accounts, rest, { fed, purse });
   return {
+    earned: taxed.earned,
     expenses,
     fed,
     fixed: [...owed, ...funded, ...saved],
@@ -527,6 +542,11 @@ export function inTodaysMoney(
   const prices = pricesIn(plan, at);
   const read = (amount: number): number => amount / prices;
   return {
+    earned: flow.earned.map((entry) => ({
+      ...entry,
+      profit: read(entry.profit),
+      taxable: read(entry.taxable),
+    })),
     expenses: read(flow.expenses),
     fed: flow.fed.map((entry) => ({
       ...entry,
@@ -958,10 +978,12 @@ function taxOn(
       fed,
       reading,
     );
-  return [...Map.groupBy(lines, byOwner).values()].reduce<Taxed>(
-    (taxed, theirs) => {
+  return [...Map.groupBy(lines, ({ owner }) => owner)].reduce<Taxed>(
+    (taxed, [owner, theirs]) => {
+      const profit = ofKind(theirs, "self-employment");
       const taxable = payOf(theirs, fed, reading);
       return {
+        earned: [...taxed.earned, { owner, profit, taxable }],
         incomeTax: taxed.incomeTax + incomeTaxOn(taxable, stretch),
         insurance:
           taxed.insurance +
@@ -970,11 +992,11 @@ function taxOn(
               sum + insuranceOn(kind, ofKind(theirs, kind), stretch),
             0,
           ),
-        profit: taxed.profit + ofKind(theirs, "self-employment"),
+        profit: taxed.profit + profit,
         taxable: taxed.taxable + taxable,
       };
     },
-    { incomeTax: 0, insurance: 0, profit: 0, taxable: 0 },
+    { earned: [], incomeTax: 0, insurance: 0, profit: 0, taxable: 0 },
   );
 }
 

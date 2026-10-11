@@ -13,6 +13,7 @@ import {
   debtTermOf,
   earnerOf,
   endAge,
+  holderOf,
   inflationIn,
   loggedSpread,
   marginOf,
@@ -124,6 +125,17 @@ describe("earnerOf", () => {
     expect(earnerOf({ owner: 2 }, plan)).toBe(sam);
     expect(() => earnerOf({ owner: 3 }, plan)).toThrow(
       "An income line is earned by an owner the plan lists",
+    );
+  });
+});
+
+describe("holderOf", () => {
+  it("reads the owner a wrapper belongs to off the plan, and refuses one the plan does not list in the rule's words", () => {
+    const plan = planOf({ ...setting, owners: [...owners, sam] }, opening);
+
+    expect(holderOf({ owner: 2 }, plan)).toBe(sam);
+    expect(() => holderOf({}, plan)).toThrow(
+      "An ISA or a pension belongs to an owner the household lists",
     );
   });
 });

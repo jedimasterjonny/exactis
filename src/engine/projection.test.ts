@@ -3,13 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
+import type { Plan } from "@/data/plan";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
-import { working } from "@/data/owners.fixture";
+import { sam, working } from "@/data/owners.fixture";
 import { endYear } from "@/data/plan";
-import { drawFor, lumpSumAllowance } from "@/lib/tax";
+import { drawFor, drawOf, lumpSumAllowance } from "@/lib/tax";
 
 import type { ProjectionPoint } from "./projection";
 
@@ -42,6 +43,13 @@ const plan = {
   rate: 0.05,
   retires: 92,
 };
+
+// The plan for an owner born in the year given, written on the plan and
+// on the owner as the store writes both, so a test run past the pension
+// age moves the pension's owner there with it.
+function bornIn(born: number): Omit<Plan, "years"> {
+  return { ...plan, born, owners: [{ ...working, born }] };
+}
 
 // A point as the projection plots it from the plan above, aged by its
 // birth year and holding nothing in either wrapper, drawn early or
@@ -339,7 +347,7 @@ describe("project", () => {
       project(
         [{ ...sipp, balance: 0 }],
         { expenses: [{ ...household, amount: 4000 }], income: [earner] },
-        { ...plan, born: 1960, years: 1 },
+        { ...bornIn(1960), years: 1 },
       ),
     ).toStrictEqual([
       point(2026, { 7: 0 }, { age: 66, uncovered: 2643 }),
@@ -700,7 +708,7 @@ describe("project", () => {
       project(
         [{ ...sipp, balance: 30000 }, { ...flatIsa, balance: 2000 }, pocket],
         short,
-        { ...plan, born: 1980, years: 1 },
+        { ...bornIn(1980), years: 1 },
       ),
     ).toStrictEqual([
       point(
@@ -723,8 +731,7 @@ describe("project", () => {
   it("draws a pension as income from 55 until the pension age rises in April 2028, and from 57 after", () => {
     expect(
       project([{ ...sipp, balance: 100000 }], short, {
-        ...plan,
-        born: 1972,
+        ...bornIn(1972),
         from: 2027,
         years: 3,
       }),
@@ -749,7 +756,7 @@ describe("project", () => {
       project(
         [drawn],
         { expenses: [{ ...household, amount: 3000 }], income: [] },
-        { ...plan, born: 1960, years: 1 },
+        { ...bornIn(1960), years: 1 },
       ),
     ).toStrictEqual([
       point(2026, { 7: 100000 }, { age: 66, deferred: 100000 }),
@@ -780,7 +787,7 @@ describe("project", () => {
           expenses: [{ ...household, amount: 12570 / 12 + 850 }],
           income: [pension],
         },
-        { ...plan, born: 1960, years: 1 },
+        { ...bornIn(1960), years: 1 },
       ).at(-1)?.deferred,
     ).toBe(8000);
   });
@@ -810,7 +817,7 @@ describe("project", () => {
       project(
         [exact],
         { expenses: [{ ...household, amount: 2800 }], income: [] },
-        { ...plan, born: 1960, years: 1 },
+        { ...bornIn(1960), years: 1 },
       ).map(({ uncovered }) => uncovered),
     ).toStrictEqual([0, 0]);
   });
@@ -829,9 +836,139 @@ describe("project", () => {
       project(
         [drawn],
         { expenses: [{ ...household, amount: 100000 }], income: [] },
-        { ...plan, born: 1960, years: 2 },
+        { ...bornIn(1960), years: 2 },
       ).map(({ deferred }) => deferred),
     ).toStrictEqual([5000000, 3062765, 906032]);
+  });
+
+  // Each owner has a lump sum allowance of their own, and a draw on their
+  // pension is taxed on top of their own income. A pension of £100,000,
+  // the first owner's, listed before one of £400,000 of Sam's, both
+  // past the pension age, and £150,000 going out in January: the first
+  // gives up all it holds, £25,000 of it free and £75,000 taxed, and
+  // Sam's covers what that leaves under Sam's own whole allowance and
+  // from the foot of Sam's own bands. Both the first owner's, the second
+  // is drawn under what the first left of the one allowance and from
+  // where its draw left the bands, and gives up more.
+  it("draws each owner's pension under their own lump sum allowance, taxed on top of their own income", () => {
+    const first: Account = { ...sipp, balance: 100000 };
+    const second: Account = {
+      ...sipp,
+      balance: 400000,
+      id: 8,
+      name: "Sam's SIPP",
+      owner: sam.id,
+    };
+    const standing = {
+      allowance: lumpSumAllowance,
+      below: 0,
+      isEarly: false,
+      months: 1,
+      uprating: 1,
+    };
+    const emptied = drawOf(100000, standing);
+    const own = drawFor(150000 - emptied.net, standing);
+    const pooled = drawFor(150000 - emptied.net, {
+      ...standing,
+      allowance: lumpSumAllowance - emptied.taxFree,
+      below: emptied.taxable,
+    });
+    const once = {
+      expenses: [
+        { ...household, amount: 150000, lastMonth: 0, lastYear: 2026 },
+      ],
+      income: [],
+    };
+    const shared = {
+      ...bornIn(1960),
+      owners: [
+        { ...working, born: 1960 },
+        { ...sam, born: 1963 },
+      ],
+      years: 1,
+    };
+    const drawnTo = (accounts: readonly Account[]): readonly number[] =>
+      project(accounts, once, shared).map((point) =>
+        balanceIn(point, second.id),
+      );
+
+    expect(own.gross).toBeLessThan(pooled.gross);
+    expect(drawnTo([first, second])).toStrictEqual([
+      400000,
+      Math.round(400000 - own.gross),
+    ]);
+    expect(drawnTo([first, { ...second, owner: working.id }])).toStrictEqual([
+      400000,
+      Math.round(400000 - pooled.gross),
+    ]);
+  });
+
+  // Sam, born in 1995, reaches 57 in 2052, three years after the first
+  // owner: from 2049 a pension of Sam's is drawn early, at the charge,
+  // £2,222.22 for each £1,000 and £26,666.67 a year, for three years,
+  // and as income from 2052, where the same pension the first owner's
+  // is income throughout.
+  it("draws a pension early until its own owner reaches the pension age", () => {
+    const late = { ...plan, from: 2049, owners: [working, sam], years: 4 };
+    const spending = {
+      expenses: [{ ...household, amount: 1000, lastYear: null }],
+      income: [],
+    };
+    const earlyIn = (owner: number): readonly number[] =>
+      project([{ ...sipp, balance: 200000, owner }], spending, late).map(
+        ({ early }) => early,
+      );
+
+    expect(earlyIn(sam.id)).toStrictEqual([26667, 26667, 26667, 0, 0]);
+    expect(earlyIn(working.id)).toStrictEqual([0, 0, 0, 0, 0]);
+  });
+
+  // Read in April, so the first tax year is whole. The first owner's
+  // £36,000 salary ends with November and Sam's runs on, each leaving
+  // £2,453.30 a month after its tax and NI, which the current account
+  // takes as the spare money at no growth. The
+  // first owner's eight months paid £3,124 of income tax where the year's
+  // £24,000 owes £2,286, so £838 is refunded in April 2027 and their
+  // cash entering 2028 is £20,464.40; Sam's twenty-one alike months owe
+  // nothing more, £51,519.30; and the household's is the two together,
+  // £71,983.70, each year settled on its own. Taxed as one person's
+  // income, the first's £24,000 would have been owed at Sam's rate and
+  // the year would have owed £3,622 rather than refunding £838.
+  it("settles each owner's tax year on their own", () => {
+    const flat: Account = {
+      ...cash,
+      balance: 0,
+      contribution: { cap: null, kind: "spare" },
+    };
+    const mine = {
+      ...salary,
+      amount: 36000,
+      bonus: 0,
+      feeds: null,
+      lastMonth: 10,
+      lastYear: 2026,
+      rsu: 0,
+      sacrifice: 0,
+    };
+    const theirs = {
+      ...mine,
+      id: 9,
+      lastMonth: null,
+      lastYear: null,
+      owner: sam.id,
+    };
+    const cashIn = (income: readonly IncomeLine[]): number | undefined =>
+      project(
+        [flat],
+        { expenses: [], income },
+        { ...plan, month: 3, owners: [working, sam], years: 2 },
+      )
+        .map((point) => balanceIn(point, flat.id))
+        .at(-1);
+
+    expect(cashIn([mine])).toBe(20464);
+    expect(cashIn([theirs])).toBe(51519);
+    expect(cashIn([mine, theirs])).toBe(71984);
   });
 
   // Read in April, so the first tax year is whole. £36,000 ending in

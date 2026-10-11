@@ -573,7 +573,7 @@ export const household = z
       new Set(accounts.map(({ owner }) => owner)).isSubsetOf(
         new Set([undefined, ...owners.map(({ id }) => id)]),
       ),
-    "An ISA or a pension belongs to an owner the household lists",
+    rules.belongs,
   )
   .refine(
     ({ owners, schedule }) =>
