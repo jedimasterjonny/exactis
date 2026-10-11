@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { LineValues, Month } from "@/data/schedule";
 
@@ -1274,10 +1275,14 @@ describe("cashFlow", () => {
 
   // A £5,000 card at 22% paying £250 a month is cleared by its 26th
   // payment, which from January 2026 falls in February 2028: the sum is
-  // charged in that month and in none after it, so the card costs
-  // £6,500 rather than the £90,000 thirty years of it would. The month
-  // after, the £250 is the ISA's to take.
-  it("charges a debt's fixed sum to the month its payments clear it and no further", () => {
+  // charged whole through January 2028, and in February only the £35.72
+  // that clears it, the £35.08 the 25 payments before leave with the
+  // month's interest on it, and nothing after, so the card costs
+  // £6,285.72 rather than the £6,500 of 26 whole payments or the £90,000
+  // thirty years of it would. The £214.28 February does not pay the card
+  // is left with the rest, and the month after, the £250 is the ISA's to
+  // take.
+  it("charges a debt's fixed sum to the month its payments clear it, what clears it in that month, and no further", () => {
     const card: Account = {
       balance: -5000,
       contribution: { amount: 250, cadence: "month", kind: "fixed" },
@@ -1291,14 +1296,17 @@ describe("cashFlow", () => {
     expect(owed(held, { month: 0, year: 2026 }).fixed).toStrictEqual([
       { account: card, amount: 250 },
     ]);
-    expect(owed(held, { month: 1, year: 2028 }).fixed).toStrictEqual([
+    expect(owed(held, { month: 0, year: 2028 }).fixed).toStrictEqual([
       { account: card, amount: 250 },
     ]);
+    const [cleared] = owed(held, { month: 1, year: 2028 }).fixed;
+    expect(cleared?.account).toBe(card);
+    expect(cleared?.amount).toBeCloseTo(35.72, 2);
     expect(owed(held, { month: 2, year: 2028 }).fixed).toStrictEqual([]);
     expect(owed(held, { month: 1, year: 2028 }).spare).toStrictEqual([
       { account: spareIsa, amount: 20000 / 12, cap: 20000 },
     ]);
-    expect(owed(held, { month: 1, year: 2028 }).left).toBeCloseTo(536.63, 2);
+    expect(owed(held, { month: 1, year: 2028 }).left).toBeCloseTo(750.91, 2);
     expect(owed(held, { month: 2, year: 2028 }).left).toBeCloseTo(786.63, 2);
   });
 
@@ -1356,8 +1364,8 @@ describe("cashFlow", () => {
 
   // A debt carried on the plan rate is charged at the plan rate: at the
   // plan's five per cent £250 a month clears £5,000 with its 21st
-  // payment, September 2027, where the same payment against no interest
-  // at all would have been done in August.
+  // payment, September 2027, a payment of £231.59, where the same
+  // payment against no interest at all would have been done in August.
   it("works a debt on the plan rate out at the plan's rate", () => {
     const owing: Account = {
       balance: -5000,
@@ -1372,10 +1380,64 @@ describe("cashFlow", () => {
     expect(owed([owing], { month: 7, year: 2027 }).fixed).toStrictEqual([
       charged,
     ]);
-    expect(owed([owing], { month: 8, year: 2027 }).fixed).toStrictEqual([
-      charged,
-    ]);
+    const [last] = owed([owing], { month: 8, year: 2027 }).fixed;
+    expect(last?.account).toBe(owing);
+    expect(last?.amount).toBeCloseTo(231.59, 2);
     expect(owed([owing], { month: 9, year: 2027 }).fixed).toStrictEqual([]);
+  });
+
+  // A £12,000 loan at 10% paying £6,000 a year is paid a twelfth of it,
+  // £500, a month, and 27 of them clear it: the 26 before the last leave
+  // £440.85 owing, which the month's interest takes to £444.53, and that
+  // is charged in March 2028 rather than the £500, with nothing in
+  // April.
+  it("charges a yearly debt sum a twelfth a month, and what clears it in the month the last twelfth falls", () => {
+    const loan: Account = {
+      balance: -12000,
+      contribution: { amount: 6000, cadence: "year", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0.1 },
+      id: 6,
+      kind: "debt",
+      name: "Loan",
+    };
+    const [last] = owed([loan], { month: 2, year: 2028 }).fixed;
+
+    expect(owed([loan], { month: 1, year: 2028 }).fixed).toStrictEqual([
+      { account: loan, amount: 500 },
+    ]);
+    expect(last?.account).toBe(loan);
+    expect(last?.amount).toBeCloseTo(444.53, 2);
+    expect(owed([loan], { month: 3, year: 2028 }).fixed).toStrictEqual([]);
+  });
+
+  // The mortgage's £3,065 a month, paid as a line from the plan's first
+  // year, clears the £176,520 owed at 4.85% with its 66th payment, June
+  // 2031: the 65 before it leave £2,111.06 owing, which the month's
+  // interest takes to £2,119.59, and that is what the line costs the
+  // month rather than its £3,065, the loan saying what its last payment
+  // is as it does for a debt paying its own sum. In every other month
+  // the line costs what it states: May 2031, and July 2031 too for a
+  // line left running past the loan, which the household never leaves
+  // but a caller may. A line of £700 a month, less than the £713.44 of
+  // interest, never clears the loan and costs what it states in every
+  // month.
+  it("charges a line paying a loan what clears the loan in the month its payments do, and what it states in every other", () => {
+    const paying: ExpenseLine = {
+      ...mortgagePayment,
+      firstYear: 2026,
+      lastYear: null,
+      pays: mortgage.id,
+    };
+    const costs = (line: ExpenseLine, at: Month): number =>
+      cashFlow([mortgage], { expenses: [line], income: [] }, { at, plan })
+        .expenses;
+
+    expect(costs(paying, { month: 4, year: 2031 })).toBe(3065);
+    expect(costs(paying, { month: 5, year: 2031 })).toBeCloseTo(2119.59, 2);
+    expect(costs(paying, { month: 6, year: 2031 })).toBe(3065);
+    expect(costs({ ...paying, amount: 700 }, { month: 5, year: 2031 })).toBe(
+      700,
+    );
   });
 
   // £50 a month against £5,000 at 22% is less than the £91.67 of

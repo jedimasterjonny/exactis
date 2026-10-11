@@ -516,10 +516,11 @@ function keptOutOf(
 // and a month end both carry one: a saving or an asset paid what the
 // flow pays it and grown, and a debt charged a month's interest and paid
 // down by what the flow pays off it; with what the month paid in or off,
-// which for a debt is no more than it owed with the month's interest,
-// since the last payment is rounded up to a whole one and what it pays
-// past nothing is no debt paid off. The month is read for the year it
-// falls in, whose rate a plan carried along a path takes.
+// which for a debt is no more than it owed with the month's interest:
+// the flow charges a debt's last payment as what clears it, so the two
+// agree, and a line paying a loan on past that month pays nothing more
+// off it. The month is read for the year it falls in, whose rate a plan
+// carried along a path takes.
 function monthOf(
   { account, balance }: Held,
   flow: CashFlow,
@@ -543,9 +544,10 @@ function monthOf(
 // debt in is worked out, and the flow stops a debt's payments in the
 // month that term ends, so a debt carried here is paid down to the
 // balloon it leaves, or to nothing, in the month its payments end. It
-// is paid no more than it owes: the term is rounded up to a whole
-// month, so the last payment is more than is left, and what it pays
-// past nothing is not carried as a debt owing money back. A month that
+// is paid no more than it owes: the flow charges the last payment as
+// what clears it, and a line paying a loan on past that month pays
+// nothing more off it, so neither is carried as a debt owing money
+// back. A month that
 // pays nothing is charged nothing, which holds a balloon where the
 // payments leave it and a debt nothing pays where it opened: the plan
 // pays neither off, and a sum compounding for the rest of a lifetime is

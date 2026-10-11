@@ -6,6 +6,7 @@ import type { Owed } from "./loans";
 import {
   clearsIn,
   figureOf,
+  lastPaymentOf,
   paidUntil,
   paymentOf,
   rateOf,
@@ -81,6 +82,59 @@ describe("paymentOf", () => {
     expect(paymentOf(owed(20000, 8000), 0.06, 4)).toBeCloseTo(321.82, 2);
     expect(paymentOf(owed(20000, 8000), 0, 4)).toBe(250);
     expect(paymentOf(owed(20000, 20000), 0.06, 4)).toBeCloseTo(100, 10);
+  });
+});
+
+describe("lastPaymentOf", () => {
+  // £5,000 at 22% paying £250 a month is cleared by its 26th payment:
+  // the 25 before it leave £35.08 owing, which the month's interest
+  // takes to £35.72, and that is the last payment rather than £250.
+  // £334,670 at 4.85% paying £1,889 ends on £239.25 with its 313th, so
+  // the payments come to £589,607.25 in all, 312 whole ones and the
+  // last, which is what they clear. At no rate they come flat off the
+  // balance, so £1,250 paying £100 ends on £50 with its thirteenth.
+  it("finds what the last payment clears, less than the payment", () => {
+    const card = termOf(owed(5000), 250, 0.22) ?? 0;
+    const home = termOf(owed(334670), 1889, 0.0485) ?? 0;
+    const last = lastPaymentOf(owed(334670), {
+      payment: 1889,
+      rate: 0.0485,
+      term: home,
+    });
+
+    expect(
+      lastPaymentOf(owed(5000), { payment: 250, rate: 0.22, term: card }),
+    ).toBeCloseTo(35.72, 2);
+    expect(last).toBeCloseTo(239.25, 2);
+    expect(312 * 1889 + last).toBeCloseTo(589607.25, 2);
+    expect(
+      lastPaymentOf(owed(1250), { payment: 100, rate: 0, term: 13 / 12 }),
+    ).toBe(50);
+  });
+
+  // A PCP is paid down to its balloon: £20,000 at 6% with an £8,000
+  // balloon paying £330 a month gets there with its 47th payment, the
+  // 46 before it leaving £8,137.57 owing, which is £178.26 over the
+  // balloon once the month's interest is on it. The £321.82 that gets
+  // there in four years exactly leaves a whole payment to its last, and
+  // the whisker of rounding a worked-out term carries either side of it
+  // is held to the payment.
+  it("pays a PCP down to its balloon, and holds the last payment to the payment", () => {
+    const pcp = owed(20000, 8000);
+    const term = termOf(pcp, 330, 0.06) ?? 0;
+    const payment = paymentOf(pcp, 0.06, 4);
+
+    expect(lastPaymentOf(pcp, { payment: 330, rate: 0.06, term })).toBeCloseTo(
+      178.26,
+      2,
+    );
+    expect(lastPaymentOf(pcp, { payment, rate: 0.06, term: 4 })).toBeCloseTo(
+      payment,
+      8,
+    );
+    expect(
+      lastPaymentOf(pcp, { payment, rate: 0.06, term: 4 + 1e-12 }),
+    ).toBeCloseTo(payment, 8);
   });
 });
 
