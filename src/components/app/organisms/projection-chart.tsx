@@ -30,7 +30,7 @@ import { buttonVariants } from "@/components/kit/button";
 import { Card, CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
 import { isAsset } from "@/data/accounts";
-import { balanceIn, balanceOf, holdsAnything } from "@/engine/projection";
+import { balanceIn, holdsAnything } from "@/engine/projection";
 import { axisOf } from "@/lib/axis";
 import { listed } from "@/lib/feeders";
 import { formatAxisGbp, formatGbp } from "@/lib/money";
@@ -88,8 +88,7 @@ interface Series {
 }
 
 // The families the chart stacks, in the order they stack, the first at
-// the baseline: the pensions, then the ISAs, so the top of the two is
-// where the balance a milestone is read at stands; then cash; then what
+// the baseline: the pensions, then the ISAs, then cash; then what
 // the plan owns, a house, a car or another real asset, above them all,
 // each at its equity: what it is worth less the loans secured on it,
 // which are drawn in it rather than on their own.
@@ -158,8 +157,10 @@ const axisWidth = 57;
 // writes over the other a year apart or in the one year. Every
 // milestone is marked too, retirement among them, as a faint hairline
 // in oxide, the palette's colour for milestones, and the one the caller
-// says is chosen as a solid line with a dot on the top of the wrappers,
-// where the balance it is read at stands. A milestone's line carries no
+// says is chosen as a solid line with a dot at what the stack comes to
+// on the basis counted, the total the crosshair writes for its year, so
+// the dot moves with the toggle as the figures do rather than standing
+// on a sum neither basis reads. A milestone's line carries no
 // name: on a phone a year is a few pixels wide and a name spans more
 // than a decade, so the names are the caller's to give, as the choices
 // it sets above the plot, and the crosshair names the milestones in its
@@ -370,7 +371,7 @@ export function ProjectionChart({
                 stroke="var(--card)"
                 strokeWidth={2}
                 x={chosen.year}
-                y={balanceOf(chosen)}
+                y={totalIn(chosen, series)}
               />
             )}
             {drawsEarly !== undefined && (
@@ -586,9 +587,7 @@ function ProjectionTooltip({
       <span className="flex items-center gap-2 border-t pt-1.5">
         <span className="text-muted-foreground">{total}</span>
         <span className="ml-auto figure font-medium">
-          {formatGbp(
-            series.reduce((sum, line) => sum + valueIn(point, line), 0),
-          )}
+          {formatGbp(totalIn(point, series))}
         </span>
       </span>
       {point.early > 0 && (
@@ -688,6 +687,13 @@ function seriesOf(
     liquidity: counted((account) => !isAsset(account)),
     "net-worth": counted((account) => !isSecured(account)),
   };
+}
+
+// What the stack comes to on a point: every series drawn on the basis,
+// what is held less what is owed, which is the total under the
+// crosshair and where the chosen milestone's dot stands.
+function totalIn(point: ProjectionPoint, series: readonly Series[]): number {
+  return series.reduce((sum, line) => sum + valueIn(point, line), 0);
 }
 
 // What a series stands at on a point: what the accounts it sums hold,

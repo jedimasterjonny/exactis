@@ -863,13 +863,16 @@ describe("ProjectionChart", () => {
   });
 
   // Fifteen years from 2026. Every milestone within them is marked, the
-  // chosen one solid with a dot on the top of the stack where the
-  // balance it is read at stands, the rest faint; one past them goes
-  // undrawn. No milestone is named on the plot.
-  it("marks every milestone in the plan's years, the chosen one solid with a dot where its balance stands", () => {
+  // chosen one solid with a dot at what the stack comes to on the basis
+  // counted, the rest faint; one past them goes undrawn. No milestone is
+  // named on the plot. The wrappers hold £200,000 beside £20,000 of cash
+  // and £150,000 owed on a home worth £300,000, so the liquidity is
+  // £70,000 and the net worth £370,000, and the dot stands at each in
+  // turn where the wrappers alone would put it at £200,000.
+  it("marks every milestone in the plan's years, the chosen one solid with a dot where the basis's total stands", () => {
     const years = Array.from({ length: 15 }, (_, place) => ({
       age: 34 + place,
-      balances: { 1: 100000, 2: 100000 },
+      balances: { 1: 100000, 2: 100000, 3: 20000, 4: 300000, 5: -150000 },
       deferred: 100000,
       early: 0,
       free: 100000,
@@ -878,7 +881,7 @@ describe("ProjectionChart", () => {
     }));
     render(
       <ProjectionChart
-        accounts={held}
+        accounts={accounts}
         milestones={[
           { id: 1, name: "Kids leave home", year: 2026 },
           { id: "retirement", name: "Retirement", year: 2030 },
@@ -898,6 +901,12 @@ describe("ProjectionChart", () => {
     ).toStrictEqual(["0.35", "1"]);
     expect(dots()).toHaveLength(1);
     expect(dots()[0]).toHaveAttribute("fill", "var(--brand)");
+    expect(dots()[0]).toHaveAttribute("x", "2030");
+    expect(dots()[0]).toHaveAttribute("y", "70000");
+
+    fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
+
+    expect(dots()[0]).toHaveAttribute("y", "370000");
     expect(
       screen.queryByText(/^(Kids leave home|Retirement|Care)$/),
     ).not.toBeInTheDocument();

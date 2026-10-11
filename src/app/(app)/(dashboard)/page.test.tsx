@@ -181,7 +181,7 @@ describe("Dashboard", () => {
       ),
     ).toHaveLength(4);
     expect(screen.getByText("At Retirement")).toBeInTheDocument();
-    expect(screen.getByText("2053 · age 61")).toBeInTheDocument();
+    expect(screen.getByText("Net worth · 2053 · age 61")).toBeInTheDocument();
     expect(
       screen
         .getAllByRole("button", { pressed: false })
