@@ -299,13 +299,17 @@ describe("TargetTable", () => {
     const answer = Promise.withResolvers<Answer<readonly Mapping[]>>();
     vi.mocked(mapCategory).mockReturnValue(answer.promise);
     renderTable();
+    // Held rather than found again at each look: finding it reads every
+    // row's role, which costs more than the slice React gives the redraw
+    // between looks, and so held the class back past the second.
+    const select = selectOf("UK equity");
 
-    fireEvent.change(selectOf("UK equity"), {
+    fireEvent.change(select, {
       target: { value: "Global small cap equities" },
     });
 
     await waitFor(() => {
-      expect(selectOf("UK equity")).toHaveValue("Global small cap equities");
+      expect(select).toHaveValue("Global small cap equities");
     });
     expect(rowOf("UK equity")[3]).toHaveTextContent("7.991%");
     expect(mapCategory).toHaveBeenCalledExactlyOnceWith({
@@ -321,7 +325,7 @@ describe("TargetTable", () => {
       ).toHaveAccessibleDescription("UK equity onto Global small cap equities");
     });
     await waitFor(() => {
-      expect(selectOf("UK equity")).toHaveValue("UK large cap equities");
+      expect(select).toHaveValue("UK large cap equities");
     });
   });
 
@@ -359,14 +363,24 @@ describe("TargetTable", () => {
 
     fireEvent.change(selectOf("UK equity"), { target: { value: "UK cash" } });
 
+    // Chosen, the row is drawn again in the bonds group with its class;
+    // refused, that row goes as the stocks group has it back. The row
+    // drawn is held and watched for going, since finding the row at
+    // each look reads every row's role, which costs more than the slice
+    // React gives the redraw between looks, and so held the class back
+    // past the second.
+    const chosen = selectOf("UK equity");
+
+    expect(chosen).toHaveValue("UK cash");
     await waitFor(() => {
       expect(
         screen.getByRole("dialog", { name: "CMA class not saved" }),
       ).toHaveAccessibleDescription("The latest CMA prices no UK cash");
     });
     await waitFor(() => {
-      expect(selectOf("UK equity")).toHaveValue("UK large cap equities");
+      expect(chosen).not.toBeInTheDocument();
     });
+    expect(selectOf("UK equity")).toHaveValue("UK large cap equities");
   });
 
   it("flags a category asking for a share with no class, in the caution tone", () => {
