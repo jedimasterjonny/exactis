@@ -325,6 +325,32 @@ describe("project", () => {
     ]);
   });
 
+  // The same salary matched to seven per cent of its base lands the
+  // employer's £8,400 a year beside the £13,800, so the pension is
+  // £22,200 up on the year, while the salary itself is paid and taxed
+  // as it was.
+  it("pays the employer's match into the pension with the sacrifice", () => {
+    const fed: Account = {
+      balance: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: pension.id,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+      owner: 1,
+    };
+
+    expect(
+      project(
+        [fed],
+        { expenses: [], income: [{ ...salary, match: 0.07 }] },
+        { ...plan, years: 1 },
+      ),
+    ).toStrictEqual([
+      point(2026, { 1: 0 }),
+      point(2027, { 1: 22200 }, { deferred: 22200 }),
+    ]);
+  });
+
   // A pension is never fed in a month it could be drawn on. £5,000 a
   // month is £3,489.78 after the sacrifice and the tax on the rest, and
   // against £4,000 of spending does not cover itself, so the £500 the

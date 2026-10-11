@@ -70,11 +70,11 @@ export interface Earned {
 }
 
 // A pension a salary feeds: what lands in it a month, the sacrifice
-// with the employer's NI saved on it, the line it is fed from, and what
-// that line gives up a month, which comes off the month before the
-// month is taxed. Both are as much of the line's sacrifice as the
-// pension's allowance takes, which is all of it until the allowance is
-// full.
+// with the employer's NI saved on it and the employer's match, the line
+// it is fed from, and what that line gives up a month, which comes off
+// the month before the month is taxed, where the match comes off
+// nothing. Both are as much of the line's feed as the pension's
+// allowance takes, which is all of it until the allowance is full.
 export interface Fed extends Paid {
   readonly line: IncomeLine;
   readonly sacrificed: number;
@@ -289,13 +289,17 @@ const nanopound = 1e-9;
 // rather than a debt paid for ever. A
 // salary feeding a pension among the accounts gives up its sacrifice
 // before the month sees it, and the pension is fed the sacrifice with
-// the employer's NI saved on it, over and above whatever fixed sum the
-// pension is paid in its own right; a salary naming a pension not
-// listed is earned whole, as a line paying a loan not listed pays
-// nothing off it. A sacrifice is given up before the tax is charged,
-// since it is never paid to its owner at all, so the salary pays
-// income tax and National Insurance on what is left of it and the
-// sacrifice costs the month less than it puts in the pension. It is
+// the employer's NI saved on it and the employer's match, pound for
+// pound with the sacrifice up to the share of the base the line
+// states, over and above whatever fixed sum the pension is paid in its
+// own right; a salary naming a pension not listed is earned whole, as
+// a line paying a loan not listed pays nothing off it. A sacrifice is
+// given up before the tax is charged, since it is never paid to its
+// owner at all, so the salary pays income tax and National Insurance
+// on what is left of it and the sacrifice costs the month less than it
+// puts in the pension; the match was never the owner's, so it comes
+// off nothing and is taxed on nothing, and lands with the sacrifice
+// or not at all. It is
 // given up only while what is left of the income after the tax on it
 // still covers the expenses, the debts' payments and what a pension
 // always funded is fed and paid, a month short of them by less than a
@@ -688,14 +692,17 @@ function chargedIn(
 // all of it, and the action holds it there: a share below nothing
 // would be a feed below nothing, which the allowance's room divided by
 // would turn into the whole room fed from nothing given up, and a share
-// past the whole would give up pay the salary never paid.
+// past the whole would give up pay the salary never paid. The share
+// its employer matches is held the same way, in words of its own, since
+// a match below nothing would take back out of the pension what the
+// sacrifice put in.
 function checkLinks(
   accounts: readonly Account[],
   schedule: Schedule,
   plan: Plan,
 ): void {
   for (const line of schedule.income) {
-    const { feeds, sacrifice } = line;
+    const { feeds, match, sacrifice } = line;
     earnerOf(line, plan);
     const account = accountAt(accounts, feeds);
     if (account !== undefined && !isPension(account)) {
@@ -703,6 +710,9 @@ function checkLinks(
     }
     if (!(sacrifice >= 0 && sacrifice <= 1)) {
       throw new Error(rules.share);
+    }
+    if (!(match >= 0 && match <= 1)) {
+      throw new Error(rules.matched);
     }
   }
   for (const { pays } of schedule.expenses) {

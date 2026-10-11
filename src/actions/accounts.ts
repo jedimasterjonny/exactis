@@ -257,7 +257,9 @@ export async function removeAccount(id: number): Promise<Answer<undefined>> {
             ({ pays }) => pays === undefined || !gone.has(pays),
           ),
           income: kept.schedule.income.map((line) =>
-            line.feeds === at ? { ...line, feeds: null, sacrifice: 0 } : line,
+            line.feeds === at
+              ? { ...line, feeds: null, match: 0, sacrifice: 0 }
+              : line,
           ),
         },
       },

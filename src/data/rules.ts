@@ -18,6 +18,7 @@ export const rules = {
   feedsPension: "A salary feeds a pension alone",
   inflation: "Inflation is a rate, and prices fall by less than everything",
   listedOnce: "An account is listed once",
+  matched: "An employer matches a share of the base",
   owes: "A debt's balance is nothing or less",
   owned: "An ISA or a pension belongs to an owner, and nothing else",
   paysDebt: "A line pays a debt alone",

@@ -97,6 +97,24 @@ describe("SacrificeFields", () => {
     );
   });
 
+  // A salary matched to seven per cent of its base lands the employer's
+  // £8,400 a year beside the £13,800, and the hint says the match is in
+  // it.
+  it("says the employer's match lands with the NI saved on a matched salary", () => {
+    render(
+      <SacrificeFields
+        draft={shares}
+        feeders={[{ ...salary, match: 0.07 }]}
+        initial={shares}
+        onAmend={vi.fn<(shares: readonly Share[]) => void>()}
+      />,
+    );
+
+    expect(field("Sacrificed from Salary")).toHaveAccessibleDescription(
+      "Of its £120,000 base; £22,200 a year lands with the NI saved and the employer's match",
+    );
+  });
+
   // The dialog hands the fields a share per feeder, but the list is a
   // list: a feeder it leaves out mounts on nothing and lands nothing.
   it("takes a feeder the shares leave out as sacrificing nothing", () => {

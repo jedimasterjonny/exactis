@@ -11,7 +11,8 @@ export const listed = new Intl.ListFormat("en-GB");
 
 // What lands in the account with that id a year from every salary
 // among the lines feeding it: each salary's sacrifice with the
-// employer's NI saved on it, as the engine feeds it, stated a year
+// employer's NI saved on it and the employer's match, as the engine
+// feeds it, stated a year
 // whatever the salary's cadence, so the ledger can put one figure
 // beside the account's own. The lines are the caller's to choose: the
 // ledger hands the table the ones running in the month the plan
