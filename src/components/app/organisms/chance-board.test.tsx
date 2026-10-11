@@ -48,6 +48,16 @@ const home: Account = {
 
 const nothingStrays = { inflation: 0, rate: 0 };
 
+// The card saying what the futures come to. What the run comes to is
+// looked for in it, or in the header, rather than over the screen: the
+// worker double draws the run on the test's own thread, a look over the
+// screen reads the fan's every node and costs about as much as a slice
+// of the run, and the run is looked for at every slice, so looking over
+// the screen doubled the time the run took.
+function outcomes(): HTMLElement {
+  return screen.getByRole("region", { name: "What the futures come to" });
+}
+
 // What goes out a month, fixed in pounds, with nothing coming in.
 function spending(amount: number): Schedule {
   return {
@@ -126,16 +136,14 @@ describe("ChanceBoard", () => {
       "text-muted-foreground",
     );
     expect(
-      await screen.findByText(
+      await within(screen.getByRole("banner")).findByText(
         "1,000 futures, each the plan run again from 34 to 37",
         {},
         { timeout: 5000 },
       ),
     ).toHaveClass("text-muted-foreground");
     expect(
-      within(
-        screen.getByRole("region", { name: "What the futures come to" }),
-      ).getByRole("heading", { level: 2 }),
+      within(outcomes()).getByRole("heading", { level: 2 }),
     ).toHaveTextContent(
       "1,000 of 1,000 futures last to 37, most of them comfortably.",
     );
@@ -155,7 +163,7 @@ describe("ChanceBoard", () => {
       />,
     );
 
-    const verdict = await screen.findByRole(
+    const verdict = await within(outcomes()).findByRole(
       "heading",
       { level: 2, name: /^\d+ of 1,000 futures last to 37, / },
       { timeout: 5000 },
@@ -250,7 +258,7 @@ describe("ChanceBoard", () => {
       "Income & expenses projects the savings running out in 2028. The futures say how often the markets would carry it further.",
     );
     expect(
-      await screen.findByRole(
+      await within(outcomes()).findByRole(
         "heading",
         { level: 2, name: "0 of 1,000 futures last to 37." },
         { timeout: 5000 },
