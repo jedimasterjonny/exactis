@@ -173,9 +173,14 @@ interface Purse {
 // the year; a month read on its own settles nothing. Beside it is what
 // the cash and the ISAs hold as the month opens, the savings a pension
 // always funded may be kept paid out of, which the projection knows
-// too; a month read on its own is taken to have enough of them.
+// too; a month read on its own is taken to have enough of them. And
+// beside them are the owners who have drawn on a pension as income
+// before the month, by id, whose pension allowance is the money
+// purchase one, which only the projection knows, having drawn; a month
+// read on its own has none.
 interface Reading {
   readonly at: Month;
+  readonly drawn?: ReadonlySet<number>;
   readonly plan: Plan;
   readonly reserve?: number;
   readonly settlement?: number;
@@ -217,6 +222,10 @@ interface Taxed {
 // the month has left are held to it: the shortfall the flow reports,
 // and the one the sacrifice is dropped for.
 const nanopound = 1e-9;
+
+// The owners who have drawn on a pension as income when a month is read
+// on its own: none, since only the projection draws.
+const nobody: ReadonlySet<number> = new Set();
 
 // A month's money: the income lines running that month, as they are
 // earned, less what a salary sacrifices into its pension, less the
@@ -375,7 +384,11 @@ const nanopound = 1e-9;
 // £260,000 to a floor of £10,000 for an owner whose threshold income is
 // over £200,000 as well, each read off the month's lines twelve times
 // over, the sacrifice counted back into the threshold income and what
-// it lands into the adjusted income. A fixed sum or the spare money
+// it lands into the adjusted income; and once an owner has drawn on a
+// pension as income it is the money purchase allowance, £10,000, from
+// the month after for the rest of the plan, which the projection hands
+// the month, a draw before the pension age being a payment the rules do
+// not allow and so no such draw. A fixed sum or the spare money
 // past the room is not paid, since each is a payment the plan chooses
 // rather than one it owes, and stays in the month to pay the sums and
 // the spare money after it, and what none of them takes is left, which
@@ -669,7 +682,9 @@ function accountAt(
   return accounts.find((account) => account.id === id);
 }
 
-// A twelfth of an owner's pension allowance for the month, read off the
+// A twelfth of an owner's pension allowance for the month: the money
+// purchase allowance for an owner who has drawn on a pension as income
+// before the month, whatever their incomes, and otherwise read off the
 // month's lines twelve times over, as the tax is charged on a twelfth
 // of a year: the adjusted income is what the owner's lines pay after
 // the sacrifice with what their sacrifices land on top, which is the
@@ -686,12 +701,14 @@ function allowanceIn(
   theirs: readonly IncomeLine[],
   { fed, reading }: { readonly fed: readonly Fed[]; readonly reading: Reading },
 ): number {
+  const { drawn = nobody } = reading;
   const own = fed.filter((entry) => entry.line.owner === owner);
   const pay = payOf(theirs, fed, reading);
   const sacrificed = own.reduce((sum, entry) => sum + entry.sacrificed, 0);
   return (
     pensionAllowanceOf({
       adjusted: 12 * (pay + total(own)),
+      hasDrawn: drawn.has(owner),
       threshold: 12 * (pay + sacrificed),
     }) / 12
   );

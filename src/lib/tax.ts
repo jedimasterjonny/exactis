@@ -110,6 +110,13 @@ const leastRelievable = 3600;
 // replaced the lifetime allowance in April 2024.
 export const lumpSumAllowance = 268275;
 
+// The pension allowance of a person who has flexibly accessed a pension,
+// which every draw as income here is, for the rest of their life: the
+// money purchase annual allowance, whatever their incomes. Carrying
+// forward unused allowance is lost with it, which is not modelled since
+// carry-forward is not.
+const moneyPurchaseAllowance = 10000;
+
 // Where the pension allowance is tapered: a pound for every two of
 // adjusted income over £260,000, down to a £10,000 floor, which is
 // reached at £360,000, for a person whose threshold income is over
@@ -222,19 +229,26 @@ export function mostFixedOf(kind: AccountKind): null | number {
   return allowance === null ? null : allowance / (1 + reliefOf({ kind }));
 }
 
-// A person's pension allowance for a year, from their two incomes as
-// the law reads them: the adjusted income, everything taxable with the
-// employer's pension contributions on top, and the threshold income,
-// everything taxable with a salary sacrifice added back. Whole unless
-// both are over their figures, and then tapered by a pound for every
-// two of adjusted income over £260,000, down to the floor.
+// A person's pension allowance for a year: the money purchase one once
+// they have drawn on a pension as income, whatever they earn, and
+// otherwise one from their two incomes as the law reads them: the
+// adjusted income, everything taxable with the employer's pension
+// contributions on top, and the threshold income, everything taxable
+// with a salary sacrifice added back. Whole unless both are over their
+// figures, and then tapered by a pound for every two of adjusted income
+// over £260,000, down to the floor.
 export function pensionAllowanceOf({
   adjusted,
+  hasDrawn,
   threshold,
 }: {
   readonly adjusted: number;
+  readonly hasDrawn: boolean;
   readonly threshold: number;
 }): number {
+  if (hasDrawn) {
+    return moneyPurchaseAllowance;
+  }
   if (threshold <= taper.threshold || adjusted <= taper.adjusted) {
     return pensionAllowance;
   }

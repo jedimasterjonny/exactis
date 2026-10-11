@@ -18,12 +18,11 @@ paid once a year is spread as if paid monthly. Each allowance is held in pounds
 as the law sets it and never raised, so over a plan of decades it shrinks in
 today's money as prices rise, as it would if no government changed it again.
 
-What the law adds on top is not held. There is no carry-forward of the three
-years before, and no money purchase annual allowance, although the engine draws
-on a pension and a draw would cut the allowance to £10,000. The taper reads
-threshold income without taking off what is paid into a pension out of taxed
-money, and adjusted income without a draw on a pension in the month. And the ISA
-allowance is one figure, with no Lifetime ISA held to £4,000 within it.
+What the law adds on top is not all held. There is no carry-forward of the three
+years before, so the money purchase allowance's loss of it is moot. The taper
+reads threshold income without taking off what is paid into a pension out of
+taxed money, and adjusted income without a draw on a pension in the month. And
+the ISA allowance is one figure, with no Lifetime ISA held to £4,000 within it.
 
 Decide whether the allowance is held across the tax year rather than a month at
 a time, which would have the projection carry it as it carries the tax year; the
