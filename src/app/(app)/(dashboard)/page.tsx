@@ -5,6 +5,7 @@ import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { PlanAssumptions } from "@/components/app/organisms/plan-assumptions";
 import { ProjectionBoard } from "@/components/app/organisms/projection-board";
 import { Badge } from "@/components/kit/badge";
+import { vintageMonth } from "@/data/cma";
 import { endAge } from "@/data/plan";
 import { dashboard, sectionLabel } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
@@ -20,16 +21,26 @@ import { getHousehold } from "@/store/household";
 // with the milestones reached when conditions hold beside it, each at
 // the median year the futures reach it; and the net worth entering the
 // plan's last year, since it reads the projection the board runs as
-// the age is dragged. The badge is the reference kit's invented plan,
-// standing in until the store says what it shows. The kit's verdict and
-// its legacy tile are gone rather than standing in: nothing here grades
-// the plan but the chance of success, and nothing models an estate. It
-// reads the store from its header down, since the header is titled
-// with the age the plan runs to, so the whole of it renders behind the
-// loading screen beside it rather than the chart alone.
+// the age is dragged. The badge names the set of rates the plan runs
+// on as the store holds it, the CMA's vintage with it when that set is
+// live, since the manual method's worst failure was a plan running on
+// a set nobody knew was live. The kit's verdict and its legacy tile are
+// gone rather than standing in: nothing here grades the plan but the
+// chance of success, and nothing models an estate. It reads the store
+// from its header down, since the header is titled with the age the
+// plan runs to, so the whole of it renders behind the loading screen
+// beside it rather than the chart alone.
 export default async function Dashboard(): Promise<JSX.Element> {
-  const { accounts, milestones, plan, schedule, spread } = await getHousehold();
+  const { accounts, cma, milestones, plan, rateSet, schedule, spread } =
+    await getHousehold();
   const age = String(endAge(plan));
+  // The store refuses a household running on the CMA's rates with no CMA
+  // pulled, so a vintage is always there to name; the check on it is for
+  // the type, which does not know.
+  const rates =
+    rateSet === "cma" && cma !== null
+      ? `CMA-derived rates · ${vintageMonth(cma.latest)}`
+      : "Custom rates";
   return (
     <>
       <ScreenHeader
@@ -37,7 +48,7 @@ export default async function Dashboard(): Promise<JSX.Element> {
         label={sectionLabel(dashboard)}
         title={`${dashboard.title} ${age}`}
       >
-        <Badge variant="secondary">CMA-derived · Aug 26</Badge>
+        <Badge variant="secondary">{rates}</Badge>
         {"Figures in today's money"}
       </ScreenHeader>
       <ScreenBody>
