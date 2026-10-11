@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { blank, kept as reference } from "@/data/household.fixture";
-import { owners } from "@/data/owners.fixture";
+import { sam } from "@/data/owners.fixture";
 import { inMemory } from "@/db/memory.fixture";
 import { householdVersions } from "@/db/schema";
 
@@ -10,7 +10,8 @@ import { keepAfter, readAsOf, readLatest } from "./household";
 
 const { close, db, empty, ready } = inMemory();
 
-const named = { ...blank, next: 2, owners };
+// The household before anything is saved with a second owner added.
+const named = { ...blank, next: 3, owners: [...blank.owners, sam] };
 
 // The reference household on the CMA's rates, and a month on, with fees
 // of a quarter of a point.
