@@ -40,7 +40,7 @@ describe("Chance", () => {
       screen.getAllByText("No spread to draw the futures from"),
     ).not.toHaveLength(0);
     expect(
-      screen.getByText(/^No CMA is pulled, so there is nothing to draw/),
+      screen.getByText(/^No CMA is pulled\. Set it on Assumptions\.$/),
     ).toBeInTheDocument();
   });
 

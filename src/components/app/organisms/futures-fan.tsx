@@ -127,7 +127,7 @@ export function FuturesFan({
   );
   return (
     <SectionCard
-      caption="What the futures are worth as each year opens, in today's money: the middle future as a line, the middle half of them shaded about it and the middle four in five more faintly. Hover or step along it to read a year."
+      caption="Median, middle half and middle 80%, in today's money"
       className="min-w-0 overflow-visible"
       label={subsectionLabel(chance, 1)}
       title="Year by year"
