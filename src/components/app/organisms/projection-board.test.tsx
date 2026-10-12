@@ -8,7 +8,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 import type { Shortfall } from "@/data/cma";
@@ -28,6 +28,7 @@ import { retiring } from "@/data/income.fixture";
 import { atAge } from "@/data/milestones";
 import { retiringAt } from "@/data/plan";
 import { balanceIn, project } from "@/engine/projection";
+import { forget } from "@/hooks/use-futures";
 import { refused } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
 import { bySlot, commit, slider } from "@/test/dom";
@@ -167,6 +168,11 @@ function worthIn(held: Plan, year: number, lines: Schedule = schedule): string {
 }
 
 describe("ProjectionBoard", () => {
+  // Each test opens a page of its own, with no run kept from the last.
+  beforeEach(() => {
+    forget();
+  });
+
   // Retirement is chosen to begin with: the tile reads the net worth the
   // plan holds entering 2049, the home and the mortgage owed on it among
   // the accounts, and the age's hint the year before it. The plan runs

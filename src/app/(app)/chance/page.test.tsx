@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { accounts } from "@/data/accounts.fixture";
 import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
+import { forget } from "@/hooks/use-futures";
 import { getHousehold } from "@/store/household";
 import { FuturesWorker } from "@/test/futures-worker";
 
@@ -23,6 +24,8 @@ describe("Chance", () => {
   // jsdom has no Worker, and the chance of success draws its futures on two.
   beforeEach(() => {
     vi.stubGlobal("Worker", FuturesWorker);
+    // Each test opens a page of its own, with no run kept from the last.
+    forget();
   });
 
   it("hands the store's spread to the board, which says why there is nothing to draw", async () => {

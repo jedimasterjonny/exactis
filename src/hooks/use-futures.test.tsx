@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { Activity } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 import type { Slice } from "@/hooks/futures.worker";
@@ -10,7 +10,7 @@ import { working } from "@/data/owners.fixture";
 import { futuresOf } from "@/engine/futures";
 import { FuturesWorker } from "@/test/futures-worker";
 
-import { useFutures } from "./use-futures";
+import { forget, useFutures } from "./use-futures";
 
 // An ISA drawn £1,000 a month over three years at 5%, straying 15% a
 // year, so each future is drawn in a moment and no two alike.
@@ -77,6 +77,11 @@ function watchWorkers(): readonly Watched[] {
 }
 
 describe("useFutures", () => {
+  // Each test opens a page of its own, with no run kept from the last.
+  beforeEach(() => {
+    forget();
+  });
+
   // 24 futures are three slices, the last of four: the two workers are
   // handed the first
   // two, and the first back is handed the third while the other, with
@@ -206,6 +211,56 @@ describe("useFutures", () => {
       vi.runAllTimers();
     });
 
+    expect(started.map(({ handed }) => handed)).toStrictEqual([
+      [0, 20],
+      [10],
+      [20],
+    ]);
+    expect(result.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, run).take(30).toArray(),
+      isDone: true,
+    });
+  });
+
+  // The second screen is handed the plan in objects of its own, as a
+  // route rendered afresh is, and reads it as the plan it is.
+  it("hands a screen opened over the same plan the run another drew, starting no worker", () => {
+    const started = watchWorkers();
+    const run = { count: 5, plan, spread };
+    const { unmount } = renderHook(() => useFutures(accounts, schedule, run));
+    act(() => {
+      vi.runAllTimers();
+    });
+    unmount();
+
+    const { result } = renderHook(() =>
+      useFutures([{ ...isa }], { ...schedule }, { ...run, plan: { ...plan } }),
+    );
+
+    expect(started).toHaveLength(1);
+    expect(result.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, run).take(5).toArray(),
+      isDone: true,
+    });
+  });
+
+  // Taken down once the first two of three slices are back, the third
+  // still on its way: the next screen draws the third alone.
+  it("carries a run another screen left part way on from the slices it drew", () => {
+    const started = watchWorkers();
+    const run = { count: 30, plan, spread };
+    const { unmount } = renderHook(() => useFutures(accounts, schedule, run));
+    act(() => {
+      vi.advanceTimersByTime(took);
+    });
+    unmount();
+
+    const { result } = renderHook(() => useFutures(accounts, schedule, run));
+
+    expect(result.current.futures).toHaveLength(20);
+    act(() => {
+      vi.runAllTimers();
+    });
     expect(started.map(({ handed }) => handed)).toStrictEqual([
       [0, 20],
       [10],

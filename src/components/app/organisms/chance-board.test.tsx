@@ -6,6 +6,7 @@ import type { Schedule } from "@/engine/cash-flow";
 
 import { expenseLines } from "@/data/expenses.fixture";
 import { working } from "@/data/owners.fixture";
+import { forget } from "@/hooks/use-futures";
 import { FuturesWorker } from "@/test/futures-worker";
 
 import { ChanceBoard } from "./chance-board";
@@ -70,6 +71,8 @@ describe("ChanceBoard", () => {
   // jsdom has no Worker, and the chance of success draws its futures on two.
   beforeEach(() => {
     vi.stubGlobal("Worker", FuturesWorker);
+    // Each test opens a page of its own, with no run kept from the last.
+    forget();
   });
 
   it("says there is nothing to draw the futures at while the plan has no spread", () => {

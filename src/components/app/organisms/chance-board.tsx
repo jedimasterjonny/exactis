@@ -46,8 +46,9 @@ interface ChanceBoardProps {
 }
 
 // The chance of success: the plan run over a thousand futures of the
-// markets, drawn as the screen opens, a slice at a time, with the header
-// saying how far the run has come and the cards beneath, the first of
+// markets, drawn as the screen opens, a slice at a time, unless the
+// dashboard has drawn them already, with the header saying how far the
+// run has come and the cards beneath, the first of
 // them saying what the futures come to. Every run draws the same futures, so there is
 // nothing to run again and no button to. There is nothing to draw while
 // the plan has no spread, the CMA giving it none, or no savings for the
