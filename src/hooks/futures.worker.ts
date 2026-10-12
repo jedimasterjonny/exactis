@@ -7,13 +7,14 @@ import { futuresOf } from "@/engine/futures";
 // A slice of a run of the plan's futures, as a worker is handed one:
 // what the run is drawn over, the accounts, the lines, the plan and the
 // spread its rates carry, with the place in the run the slice starts
-// at and how many futures it holds.
+// at, how many futures it holds, and the seed the run is drawn from.
 export interface Slice {
   readonly accounts: readonly Account[];
   readonly count: number;
   readonly from: number;
   readonly plan: Plan;
   readonly schedule: Schedule;
+  readonly seed: number;
   readonly spread: Spread;
 }
 

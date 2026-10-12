@@ -94,7 +94,7 @@ export const runLength = 1000;
 // The seed a run of the futures starts from unless it is given another,
 // so every run of a plan meets the same markets and a change in what
 // they come to is the plan's.
-const defaultSeed = 2026;
+export const defaultSeed = 2026;
 
 // What a substream's seed steps by from one future to the next: the
 // golden ratio's share of 2^32, which spreads the futures' seeds as far

@@ -45,7 +45,8 @@ const schedule: Slice["schedule"] = {
 describe("futures.worker", () => {
   // The worker's scope is stood in for by the two globals it reaches:
   // the listener it adds is kept, and called as a message would call
-  // it. Five futures from the run's third are its third to its seventh.
+  // it. Five futures from the run's third are its third to its seventh,
+  // drawn from the seed the slice gives.
   it("answers a slice of a run with the futures the run holds there", async () => {
     const listeners: Listener[] = [];
     const posted = vi.fn();
@@ -56,11 +57,18 @@ describe("futures.worker", () => {
     await import("./futures.worker");
 
     for (const listener of listeners) {
-      listener({ data: { ...run, accounts, count: 5, from: 2, schedule } });
+      listener({
+        data: { ...run, accounts, count: 5, from: 2, schedule, seed: 7 },
+      });
     }
 
     expect(posted.mock.calls).toStrictEqual([
-      [futuresOf(accounts, schedule, run).take(7).toArray().slice(2)],
+      [
+        futuresOf(accounts, schedule, { ...run, seed: 7 })
+          .take(7)
+          .toArray()
+          .slice(2),
+      ],
     ]);
   });
 });

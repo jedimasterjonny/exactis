@@ -2,7 +2,7 @@
 
 import type { JSX, ReactNode } from "react";
 
-import { Dices, PiggyBank } from "lucide-react";
+import { Dices, PiggyBank, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 
 import type { Account } from "@/data/accounts";
@@ -11,6 +11,7 @@ import type { Milestone } from "@/data/milestones";
 import type { Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { Future } from "@/engine/futures";
+import type { Slot } from "@/lib/slot";
 
 import { Caution } from "@/components/app/atoms/caution";
 import { EmptyState } from "@/components/app/atoms/empty-state";
@@ -22,6 +23,7 @@ import { FuturesDrawn } from "@/components/app/organisms/futures-drawn";
 import { FuturesFan } from "@/components/app/organisms/futures-fan";
 import { FuturesOutcomes } from "@/components/app/organisms/futures-outcomes";
 import { MilestoneSpreads } from "@/components/app/organisms/milestone-spreads";
+import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { takesSpare } from "@/data/accounts";
 import { ageIn, endAge } from "@/data/plan";
@@ -33,7 +35,7 @@ import {
   runLength,
 } from "@/engine/futures";
 import { project } from "@/engine/projection";
-import { useFutures } from "@/hooks/use-futures";
+import { drawAgain, useFutures } from "@/hooks/use-futures";
 import { formatCount } from "@/lib/count";
 import { chance, sectionLabel, subsectionLabel } from "@/lib/nav";
 
@@ -49,8 +51,10 @@ interface ChanceBoardProps {
 // markets, drawn as the screen opens, a slice at a time, unless the
 // dashboard has drawn them already, with the header saying how far the
 // run has come and the cards beneath, the first of
-// them saying what the futures come to. Every run draws the same futures, so there is
-// nothing to run again and no button to. There is nothing to draw while
+// them saying what the futures come to. Every run draws the same
+// futures, so a change in what they come to is the plan's, until the
+// header's button draws them again over other markets, to see how far
+// the chance rests on the markets drawn. There is nothing to draw while
 // the plan has no spread, the CMA giving it none, or no savings for the
 // futures to grow, and the screen says which.
 export function ChanceBoard({
@@ -120,9 +124,10 @@ function AtItsRates({
 
 // The plan's futures as they come in, under a header saying how many
 // there are and over what ages, or, while they are coming in, how many
-// have; then what they come to, graded, the run fanned over the plan's
-// years, every milestone and when the run reaches it, and the count
-// beneath them. The plan at its own rates is read
+// have, beside a button to draw them again; then what they come to,
+// graded, the run fanned over the plan's years, every milestone and
+// when the run reaches it, and the count beneath them. The plan at its
+// own rates is read
 // as a future, for what it is worth at the end beside the middle future
 // and as its owner retires, which the futures that last are graded
 // against. A plan that
@@ -159,7 +164,15 @@ function Futures({
     ? `${formatCount(runLength)} futures, age ${String(ageIn(plan.from, plan))} to ${String(endAge(plan))}`
     : `Drawing ${formatCount(futures.length)} of ${formatCount(runLength)} futures…`;
   return (
-    <Screen headline={headline}>
+    <Screen
+      actions={
+        <Button onClick={drawAgain} size="sm" variant="outline">
+          <RefreshCw aria-hidden />
+          Draw again
+        </Button>
+      }
+      headline={headline}
+    >
       <AtItsRates future={asProjected} plan={plan} />
       <FuturesOutcomes
         count={runLength}
@@ -186,17 +199,24 @@ function Futures({
   );
 }
 
-// The screen's header, with the line beneath its title, over its body.
+// The screen's header, with the line beneath its title and any action
+// beside it, over its body.
 function Screen({
+  actions,
   children,
   headline,
 }: {
+  readonly actions?: Slot;
   readonly children: ReactNode;
   readonly headline: string;
 }): JSX.Element {
   return (
     <>
-      <ScreenHeader label={sectionLabel(chance)} title={chance.title}>
+      <ScreenHeader
+        actions={actions}
+        label={sectionLabel(chance)}
+        title={chance.title}
+      >
         {headline}
       </ScreenHeader>
       <ScreenBody>{children}</ScreenBody>
