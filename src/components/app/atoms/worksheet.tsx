@@ -3,10 +3,11 @@ import type { JSX } from "react";
 import { cn } from "cn";
 import { Fragment, useId } from "react";
 
-// A row of a worksheet: its name, what its figures rest on, a figure a
-// column, and whether it is a result rather than a step towards one.
+// A row of a worksheet: its name, what its figures rest on where that
+// needs saying, a figure a column, and whether it is a result rather
+// than a step towards one.
 export interface WorksheetRow {
-  readonly detail: string;
+  readonly detail?: string | undefined;
   readonly figures: readonly string[];
   readonly isResult?: boolean;
   readonly label: string;
@@ -21,7 +22,8 @@ interface WorksheetProps {
 // Figures worked out down and across at once: a column for each thing
 // worked out, headed by its name, and a row for each step, its name and
 // each figure under its column in the mono face, with what its figures
-// rest on in a line beneath that runs the table's width. A result sits
+// rest on, where a row says, in a line beneath that runs the table's
+// width. A result sits
 // under a heavier rule, its name set as a label and its figures large,
 // so the eye finds what the steps come to before reading them. It is a
 // table named as given, so a screen reader can read a figure with its
@@ -56,46 +58,60 @@ export function Worksheet({
         </thead>
         <tbody>
           {rows.map(
-            ({ detail, figures, isResult = false, label: name }, row) => (
-              <Fragment key={name}>
-                <tr
-                  className={cn("border-t", isResult && "border-foreground/30")}
-                >
-                  <th
-                    aria-describedby={`${id}-${String(row)}`}
+            ({ detail, figures, isResult = false, label: name }, row) => {
+              const pad = detail === undefined ? "pb-3" : "pb-1";
+              return (
+                <Fragment key={name}>
+                  <tr
                     className={cn(
-                      "pt-3 pb-1 text-left align-baseline font-normal",
-                      isResult && "label text-muted-foreground",
+                      "border-t",
+                      isResult && "border-foreground/30",
                     )}
-                    scope="row"
                   >
-                    {name}
-                  </th>
-                  {figures.map((figure, column) => (
-                    <td
+                    <th
+                      aria-describedby={
+                        detail === undefined
+                          ? undefined
+                          : `${id}-${String(row)}`
+                      }
                       className={cn(
-                        "pt-3 pb-1 pl-3 text-right align-baseline figure whitespace-nowrap @lg:pl-8",
-                        isResult
-                          ? "text-lg font-medium @lg:text-2xl"
-                          : "text-sm @lg:text-base",
+                        "pt-3 text-left align-baseline font-normal",
+                        pad,
+                        isResult && "label text-muted-foreground",
                       )}
-                      key={columns[column]}
+                      scope="row"
                     >
-                      {figure}
-                    </td>
-                  ))}
-                </tr>
-                <tr aria-hidden>
-                  <td
-                    className="pb-3 text-sm text-muted-foreground"
-                    colSpan={columns.length + 1}
-                    id={`${id}-${String(row)}`}
-                  >
-                    {detail}
-                  </td>
-                </tr>
-              </Fragment>
-            ),
+                      {name}
+                    </th>
+                    {figures.map((figure, column) => (
+                      <td
+                        className={cn(
+                          "pt-3 pl-3 text-right align-baseline figure whitespace-nowrap @lg:pl-8",
+                          pad,
+                          isResult
+                            ? "text-lg font-medium @lg:text-2xl"
+                            : "text-sm @lg:text-base",
+                        )}
+                        key={columns[column]}
+                      >
+                        {figure}
+                      </td>
+                    ))}
+                  </tr>
+                  {detail !== undefined && (
+                    <tr aria-hidden>
+                      <td
+                        className="pb-3 text-sm text-muted-foreground"
+                        colSpan={columns.length + 1}
+                        id={`${id}-${String(row)}`}
+                      >
+                        {detail}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            },
           )}
         </tbody>
       </table>

@@ -35,6 +35,18 @@ describe("Ledger", () => {
     );
   });
 
+  it("lays a step that says nothing its figure rests on out as its name and figure alone", () => {
+    render(
+      <Ledger
+        steps={[{ figure: "630", label: "Futures run" }]}
+        total="95%"
+        totalName="Chance of success"
+      />,
+    );
+
+    expect(screen.getByRole("listitem")).toHaveTextContent(/^Futures run630$/);
+  });
+
   it("closes on the figure the steps come to, under its name", () => {
     render(<Ledger steps={[]} total="2.95%" totalName="Derived inflation" />);
 
