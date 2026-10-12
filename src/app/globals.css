@@ -100,12 +100,16 @@
   --border: #e8eae6; /* grey-100 hairline */
   --input: #d6d9d4; /* grey-200 control border */
   --ring: #151716; /* grey-900 focus ink */
-  /* Chart series by meaning: equity, bonds, property, cash, debt */
+  /* Chart series by meaning: equity, bonds, property, cash, debt, and
+     money invested outside a wrapper. That last is slate, stacked between
+     the ISA's petrol and the cash's stone: ΔE 21.8 from the petrol, its
+     nearer neighbour, and 21.0 under deuteranopia */
   --chart-1: #163f3a;
   --chart-2: #3f7e6f;
   --chart-3: #b08540;
   --chart-4: #cfcbbf;
   --chart-5: var(--red-700); /* debt follows loss red, no longer oxide */
+  --chart-6: #536f9d;
   --radius: 0.5rem; /* controls on the lg step at 8px; the card takes xl, about 11px */
   /* Ink sidebar, identical in both themes, so the dark scope leaves it be */
   --sidebar: #151716;
@@ -164,6 +168,9 @@
   --chart-3: #d3a557;
   --chart-4: #8a867b;
   --chart-5: var(--red-300);
+  /* Lifted in chroma rather than lightness, since lighter it meets the
+     petrol: ΔE 15.8 from the stone and 14.0 under protanopia */
+  --chart-6: #436eb4;
   --brand: #d18a7f; /* oxide-300 */
   --brand-foreground: #151716;
   --positive: var(--jade-300);
