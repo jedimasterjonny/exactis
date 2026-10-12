@@ -10,7 +10,7 @@ import { working } from "@/data/owners.fixture";
 import { futuresOf } from "@/engine/futures";
 import { FuturesWorker } from "@/test/futures-worker";
 
-import { forget, useFutures } from "./use-futures";
+import { drawAgain, forget, useFutures } from "./use-futures";
 
 // An ISA drawn £1,000 a month over three years at 5%, straying 15% a
 // year, so each future is drawn in a moment and no two alike.
@@ -268,6 +268,66 @@ describe("useFutures", () => {
     ]);
     expect(result.current).toStrictEqual({
       futures: futuresOf(accounts, schedule, run).take(30).toArray(),
+      isDone: true,
+    });
+  });
+
+  // Drawn again once the first two of three slices are back, the third
+  // still on its way: what has landed is of no use, and the run starts
+  // over from the seed drawn, here 7.
+  it("draws the futures again from a seed of their own, dropping what was drawn", () => {
+    const started = watchWorkers();
+    vi.spyOn(crypto, "getRandomValues").mockReturnValue(new Uint32Array([7]));
+    const run = { count: 30, plan, spread };
+    const { result } = renderHook(() => useFutures(accounts, schedule, run));
+    act(() => {
+      vi.advanceTimersByTime(took);
+    });
+
+    act(() => {
+      drawAgain();
+    });
+
+    expect(result.current).toStrictEqual({ futures: [], isDone: false });
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(started.map(({ handed }) => handed)).toStrictEqual([
+      [0, 20],
+      [10],
+      [0, 20],
+      [10],
+    ]);
+    expect(result.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, { ...run, seed: 7 })
+        .take(30)
+        .toArray(),
+      isDone: true,
+    });
+  });
+
+  it("draws a plan changed after the futures were drawn again from the seed they were drawn from", () => {
+    watchWorkers();
+    vi.spyOn(crypto, "getRandomValues").mockReturnValue(new Uint32Array([7]));
+    const changed = { ...plan, rate: 0.08 };
+    const { rerender, result } = renderHook(
+      ({ drawnFor }) =>
+        useFutures(accounts, schedule, { count: 5, plan: drawnFor, spread }),
+      { initialProps: { drawnFor: plan } },
+    );
+    act(() => {
+      drawAgain();
+    });
+
+    rerender({ drawnFor: changed });
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(result.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, { plan: changed, seed: 7, spread })
+        .take(5)
+        .toArray(),
       isDone: true,
     });
   });

@@ -6,14 +6,18 @@ import type { Schedule } from "@/engine/cash-flow";
 import type { Future } from "@/engine/futures";
 import type { Slice } from "@/hooks/futures.worker";
 
+import { defaultSeed } from "@/engine/futures";
+
 // The run drawn last, kept past the screen that drew it: what it was
 // drawn over, written out whole so a plan handed down again in new
 // objects reads as the plan it is, the slices of it drawn so far, each
 // at the place it falls in the run, a slice not yet drawn left empty,
-// and the futures the screens have been handed of them.
+// the futures the screens have been handed of them, and the seed the
+// runs are drawn from.
 interface Kept {
   readonly for: string;
   readonly futures: readonly Future[];
+  readonly seed: number;
   readonly slices: (readonly Future[])[];
 }
 
@@ -25,8 +29,9 @@ interface Kept {
 // count between them for a frame or two, which read as a flicker.
 const handed = 200;
 
-// Nothing drawn, as a page opens with.
-const none: Kept = { for: "", futures: [], slices: [] };
+// Nothing drawn, as a page opens with, and every run drawn from the
+// seed the engine draws from.
+const none: Kept = { for: "", futures: [], seed: defaultSeed, slices: [] };
 
 // The screens reading the run kept, told when it changes.
 const listeners = new Set<() => void>();
@@ -45,6 +50,17 @@ const workers = 2;
 
 let kept = none;
 
+// Draws the futures again from a seed of their own, dropping the run
+// kept, so every screen reading it draws the plan over other markets;
+// and so does every run after it until the page is opened afresh, so a
+// plan changed since still meets the markets the one before it did. The
+// engine's seed stands behind the one drawn for the type alone, which
+// does not know that an array of one holds one.
+export function drawAgain(): void {
+  const [seed = defaultSeed] = crypto.getRandomValues(new Uint32Array(1));
+  keep({ for: "", futures: [], seed, slices: [] });
+}
+
 // Drops the run kept, as a page opening has none: for the tests, which
 // each open on a page of their own.
 export function forget(): void {
@@ -61,7 +77,8 @@ export function forget(): void {
 // every 200 ms, and the whole run the moment it is. A plan changed part
 // way drops what was drawn for the one before and starts again, and a
 // screen taken down stops the workers, hearing nothing more from them,
-// and hands over what had landed since it last handed any over.
+// and hands over what had landed since it last handed any over, unless
+// the run has been drawn again since and what landed is of no use.
 // The run is kept beyond the screen that drew it, one run, the last, so
 // a screen opened over the same plan, as the chance of success opened
 // from the dashboard is, reads the futures the other drew, carrying on
@@ -82,21 +99,23 @@ export function useFutures(
     spread,
   }: { readonly count: number; readonly plan: Plan; readonly spread: Spread },
 ): { readonly futures: readonly Future[]; readonly isDone: boolean } {
+  const drawn = useSyncExternalStore(subscribe, read, read);
+  const { seed } = drawn;
   const run = useMemo(
     () => ({
       accounts,
       count,
-      key: JSON.stringify([accounts, count, plan, schedule, spread]),
+      key: JSON.stringify([accounts, count, plan, schedule, seed, spread]),
       plan,
       schedule,
+      seed,
       spread,
     }),
-    [accounts, count, plan, schedule, spread],
+    [accounts, count, plan, schedule, seed, spread],
   );
-  const drawn = useSyncExternalStore(subscribe, read, read);
   useEffect(() => {
     if (kept.for !== run.key) {
-      keep({ for: run.key, futures: [], slices: [] });
+      keep({ for: run.key, futures: [], seed: run.seed, slices: [] });
     }
     const { slices } = kept;
     const waiting = Array.from(
@@ -111,7 +130,9 @@ export function useFutures(
     function handOver(): void {
       timer = undefined;
       lastHanded = performance.now();
-      keep({ for: run.key, futures: slices.flat(), slices });
+      if (kept.slices === slices) {
+        keep({ ...kept, futures: slices.flat() });
+      }
     }
     function hand(worker: Worker): void {
       const index = waiting.shift();
@@ -139,6 +160,7 @@ export function useFutures(
         from,
         plan: run.plan,
         schedule: run.schedule,
+        seed: run.seed,
         spread: run.spread,
       };
       worker.postMessage(posted);

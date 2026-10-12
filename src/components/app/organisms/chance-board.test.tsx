@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
@@ -97,6 +97,9 @@ describe("ChanceBoard", () => {
     expect(
       within(card).getByText("No CMA is pulled. Set it on Assumptions."),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Draw again" }),
+    ).not.toBeInTheDocument();
   });
 
   it("says there are no savings for the futures to grow while the plan holds none", () => {
@@ -149,6 +152,28 @@ describe("ChanceBoard", () => {
       "1,000 of 1,000 futures last to 37, most of them comfortably.",
     );
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("draws the futures again from the header once they are drawn", async () => {
+    render(
+      <ChanceBoard
+        accounts={[isa]}
+        milestones={[]}
+        plan={plan}
+        schedule={spending(500)}
+        spread={nothingStrays}
+      />,
+    );
+    const header = within(screen.getByRole("banner"));
+    await header.findByText(
+      "1,000 futures, age 34 to 37",
+      {},
+      { timeout: 5000 },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Draw again" }));
+
+    expect(header.getByText("Drawing 0 of 1,000 futures…")).toBeInTheDocument();
   });
 
   // £30,000 at 5% drawn £10,000 a year lasts at its rates with some
