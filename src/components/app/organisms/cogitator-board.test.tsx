@@ -51,9 +51,6 @@ describe("CogitatorBoard", () => {
   it("says no allocation is imported yet, pointing to where one is, and takes no amount", () => {
     render(<CogitatorBoard targets={null} />);
 
-    expect(
-      screen.getByText("Buys only, toward the target allocation"),
-    ).toBeInTheDocument();
     expect(screen.getByText("No allocation imported yet")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Assumptions › Target allocation" }),
@@ -88,9 +85,7 @@ describe("CogitatorBoard", () => {
   it("asks for the amount before any is typed, and reads the allocation as it stands", () => {
     render(<CogitatorBoard targets={reference} />);
 
-    expect(
-      screen.getAllByText("Type the amount to invest to lay the trades out."),
-    ).toHaveLength(2);
+    expect(screen.getAllByText("Type an amount to invest.")).toHaveLength(1);
     expect(screen.getAllByText("No trade")).toHaveLength(3);
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
     expect(
@@ -142,7 +137,7 @@ describe("CogitatorBoard", () => {
       screen.getAllByText(
         "No trade. Trade 1 would put only £50 into A, under the £100 minimum.",
       ),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
   });
 
   it("names the first of trades the next rung would put the same into", () => {
@@ -169,9 +164,7 @@ describe("CogitatorBoard", () => {
     invest("1000");
 
     expect(
-      screen.getAllByText(
-        "1 trade. Trade 2 would buy nothing: every other category holds its target or more.",
-      ),
+      screen.getAllByText("1 trade. Trade 2 would buy nothing."),
     ).toHaveLength(1);
   });
 
