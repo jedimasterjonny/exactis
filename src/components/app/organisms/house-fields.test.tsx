@@ -16,7 +16,7 @@ import { HouseFields } from "./house-fields";
 // run to August 2048.
 const home: HouseDraft = { ...homeValues, term: 22 };
 
-const workedHint = "Worked out from the other two";
+const workedHint = "Worked out";
 
 // The fields as the dialog would mount them, shown the draft and the
 // figure it worked out, with a spy where the dialog listens.
@@ -72,17 +72,15 @@ describe("HouseFields", () => {
       "mortgaged",
     );
     expect(field("Value")).toHaveValue("£416,386");
-    expect(field("Value")).toHaveAccessibleDescription(
-      "What it would sell for in September 2026",
-    );
+    expect(field("Value")).toHaveAccessibleDescription("As of September 2026");
     expect(field("Value growth")).toHaveValue("2.10%");
     expect(select("Month bought")).toHaveDisplayValue("June");
     expect(field("Year bought")).toHaveValue("2022");
     expect(field("Bought for")).toHaveValue("£380,000");
-    expect(field("Bought for")).toHaveAccessibleDescription("What it cost");
+    expect(field("Bought for")).not.toHaveAccessibleDescription();
     expect(field("Loan balance")).toHaveValue("£341,810");
     expect(field("Loan balance")).toHaveAccessibleDescription(
-      "What is owed in September 2026",
+      "As of September 2026",
     );
     expect(field("Rate")).toHaveValue("5.15%");
     expect(field("Rate")).toHaveAccessibleDescription(
@@ -92,9 +90,7 @@ describe("HouseFields", () => {
     expect(field("Monthly payment")).toHaveAccessibleDescription(workedHint);
     expect(select("Work out")).toHaveValue("payment");
     expect(select("Last payment")).toHaveDisplayValue("August");
-    expect(select("Last payment")).toHaveAccessibleDescription(
-      "When the last payment falls",
-    );
+    expect(select("Last payment")).not.toHaveAccessibleDescription();
     expect(field("Year")).toHaveValue("2048");
     expect(field("Year")).toHaveAccessibleDescription("22 years left");
 
@@ -156,7 +152,7 @@ describe("HouseFields", () => {
     expect(field("Rate")).toHaveAccessibleDescription(workedHint);
     expect(field("Rate")).not.toHaveAttribute("aria-invalid");
     expect(field("Monthly payment")).toHaveValue("£2,210");
-    expect(field("Monthly payment")).toHaveAccessibleDescription("A month");
+    expect(field("Monthly payment")).not.toHaveAccessibleDescription();
 
     rerender(null);
 
@@ -187,7 +183,7 @@ describe("HouseFields", () => {
     );
     expect(field("Year")).toHaveValue("");
     expect(field("Year")).toHaveAccessibleDescription(
-      "Never clears at this payment, so the payments run to the end of the plan",
+      "Never clears at this payment",
     );
   });
 

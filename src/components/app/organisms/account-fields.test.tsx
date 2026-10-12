@@ -121,7 +121,7 @@ describe("AccountFields", () => {
     expect(screen.getByRole("combobox", { name: "Owner" })).toHaveValue("1");
     expect(
       screen.getByRole("combobox", { name: "Owner" }),
-    ).toHaveAccessibleDescription("Whose allowance it is paid under");
+    ).not.toHaveAccessibleDescription();
 
     fireEvent.change(screen.getByRole("combobox", { name: "Owner" }), {
       target: { value: "2" },
@@ -142,9 +142,7 @@ describe("AccountFields", () => {
     const shortfall = screen.getByRole("combobox", { name: "When short" });
 
     expect(shortfall).toHaveTextContent("Always fund it");
-    expect(shortfall).toHaveAccessibleDescription(
-      "Always draws on cash and ISAs, never a pension",
-    );
+    expect(shortfall).toHaveAccessibleDescription("Drawn from cash and ISAs");
 
     fireEvent.change(shortfall, { target: { value: "month" } });
 
@@ -155,10 +153,9 @@ describe("AccountFields", () => {
     expect(onAmend).toHaveBeenLastCalledWith({ isAlwaysFunded: true });
   });
 
-  // The hint says what the answer the draft holds does, so a pension
-  // paid what the month can manage is not told where an always funded
-  // one's money comes from.
-  it("says what the answer to a month short of it does, for the one chosen", () => {
+  // Only an always funded pension is told where its money comes from,
+  // so one paid what the month can manage is told nothing.
+  it("says nothing beneath the answer to a month short of it but always funding it", () => {
     const pension: AccountValues = {
       ...isa,
       isAlwaysFunded: true,
@@ -168,7 +165,7 @@ describe("AccountFields", () => {
 
     expect(
       screen.getByRole("combobox", { name: "When short" }),
-    ).toHaveAccessibleDescription("Paid only what the month has left");
+    ).not.toHaveAccessibleDescription();
   });
 
   // A debt's balance is entered negative, which its field says; any
@@ -227,9 +224,7 @@ describe("AccountFields", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("textbox", { name: "Cap, a year" }),
-    ).toHaveAccessibleDescription(
-      "Up to the £20,000 allowance, or nothing for all of it",
-    );
+    ).toHaveAccessibleDescription("Nothing for the full £20,000 allowance");
 
     commit(screen.getByRole("textbox", { name: "Cap, a year" }), "4,000");
 
@@ -248,7 +243,7 @@ describe("AccountFields", () => {
 
     expect(
       screen.getByRole("textbox", { name: "Cap, a year" }),
-    ).toHaveAccessibleDescription("Leave at nothing for no cap");
+    ).not.toHaveAccessibleDescription();
     expect(screen.getByRole("textbox", { name: "Rate" })).toHaveValue("2.00%");
 
     commit(screen.getByRole("textbox", { name: "Rate" }), "3");
@@ -280,7 +275,7 @@ describe("AccountFields", () => {
     const choice = screen.getByRole("combobox", { name: "Contribution" });
 
     expect(choice).toHaveAccessibleDescription(
-      "Paid in on top of the salary sacrifice",
+      "On top of the salary sacrifice",
     );
     expect(
       within(choice)
@@ -290,7 +285,7 @@ describe("AccountFields", () => {
     expect(
       screen.getByRole("textbox", { name: "Amount" }),
     ).toHaveAccessibleDescription(
-      "At most £48,000 a year, the allowance with relief, less the sacrifice; nothing for none",
+      "At most £48,000 a year, before relief, less the sacrifice",
     );
   });
 
@@ -305,14 +300,10 @@ describe("AccountFields", () => {
     ).toStrictEqual(["Balance", "Growth", "What the salaries sacrifice"]);
     expect(
       screen.getByRole("combobox", { name: "Contribution" }),
-    ).toHaveAccessibleDescription(
-      "Spare money is what a month's income leaves after the expenses and every fixed sum",
-    );
+    ).not.toHaveAccessibleDescription();
     expect(
       screen.getByRole("textbox", { name: "Amount" }),
-    ).toHaveAccessibleDescription(
-      "At most £20,000 a year, the allowance; nothing for none",
-    );
+    ).toHaveAccessibleDescription("At most £20,000 a year");
   });
 
   // The most a fixed sum can be is the allowance for an ISA and four
@@ -323,9 +314,7 @@ describe("AccountFields", () => {
 
     expect(
       screen.getByRole("textbox", { name: "Amount" }),
-    ).toHaveAccessibleDescription(
-      "At most £48,000 a year, the allowance with relief; nothing for none",
-    );
+    ).toHaveAccessibleDescription("At most £48,000 a year, before relief");
   });
 
   it("asks cash's fixed sum nothing but whether there is one", () => {
@@ -333,7 +322,7 @@ describe("AccountFields", () => {
 
     expect(
       screen.getByRole("textbox", { name: "Amount" }),
-    ).toHaveAccessibleDescription("Leave at nothing for none");
+    ).not.toHaveAccessibleDescription();
   });
 
   it("offers an asset no contribution choice", () => {

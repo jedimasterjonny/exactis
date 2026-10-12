@@ -23,7 +23,7 @@ const words: LoanWords = {
   noRate: "No rate fits",
 };
 
-const workedHint = "Worked out from the other two";
+const workedHint = "Worked out";
 
 // The fields as an asset's would mount them, shown the draft and what
 // the dialog worked out, with a spy where the dialog listens.
@@ -78,7 +78,7 @@ describe("LoanFields", () => {
     expect(screen.getByRole("combobox", { name: "Ends" })).toBeEnabled();
     expect(
       screen.getByRole("combobox", { name: "Ends" }),
-    ).toHaveAccessibleDescription("When the last payment falls");
+    ).not.toHaveAccessibleDescription();
     expect(field("Year")).toHaveValue("2029");
     expect(field("Year")).toHaveAccessibleDescription("3 years left");
 
@@ -117,7 +117,7 @@ describe("LoanFields", () => {
     expect(field("Rate")).toHaveAttribute("aria-invalid", "true");
     expect(field("Rate")).toHaveAttribute("readonly");
     expect(screen.getByText("No rate fits")).toHaveClass("text-destructive");
-    expect(field("Monthly payment")).toHaveAccessibleDescription("A month");
+    expect(field("Monthly payment")).not.toHaveAccessibleDescription();
 
     commit(field("Monthly payment"), "250");
 

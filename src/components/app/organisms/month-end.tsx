@@ -324,12 +324,8 @@ function Worksheet({
         />
       </FieldRow>
       <Note>
-        Each balance opens at what the plan expected of it. A month the income
-        did not cover is not drawn from the savings here, though the projection
-        draws it, so what the plan would have drawn reads as moved. Check one
-        that matches its statement, or type what the statement says. Only the
-        balances checked are saved, each dated today; the rest keep what they
-        held and the day they were set.
+        Each balance opens at what the plan expected. Check it or type the
+        statement&apos;s figure; only checked balances are saved.
       </Note>
       {balanceGroups.map(({ holds, name }) => {
         const held = rows.filter(({ account }) => holds(account));
@@ -360,17 +356,13 @@ function Worksheet({
       <Ledger
         steps={[
           {
-            detail: `The starting net worth as of the end of ${formatMonth(monthBefore(from))}`,
+            detail: `End of ${formatMonth(monthBefore(from))}`,
             figure: formatGbp(was),
             label: "As the balances stood",
           },
+          { figure: formatGbp(paid), label: "Paid in" },
           {
-            detail: "What the plan paid into the balances checked, or off them",
-            figure: formatGbp(paid),
-            label: "Paid in",
-          },
-          {
-            detail: "Markets, interest, and whatever the plan did not expect",
+            detail: "Markets, interest and the unexpected",
             figure: pounds(moved),
             label: "Moved",
           },
