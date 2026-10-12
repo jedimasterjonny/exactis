@@ -53,16 +53,14 @@ describe("EmploymentFields", () => {
 
     expect(field("Bonus")).toHaveValue("£15,000");
     expect(field("Bonus")).toHaveAccessibleDescription(
-      "At the salary's cadence; nothing for none",
+      "At the salary's cadence",
     );
     expect(field("RSUs")).toHaveValue("£12,000");
     expect(field("RSUs")).toHaveAccessibleDescription(
       "Vesting at the salary's cadence",
     );
     expect(choice).toHaveValue("1");
-    expect(choice).toHaveAccessibleDescription(
-      "Fed by salary sacrifice, with the employer's NI saved and their match",
-    );
+    expect(choice).not.toHaveAccessibleDescription();
     expect(
       within(choice)
         .getAllByRole("option")
@@ -74,7 +72,7 @@ describe("EmploymentFields", () => {
     );
     expect(field("Employer match")).toHaveValue("0.00%");
     expect(field("Employer match")).toHaveAccessibleDescription(
-      "Pound for pound with the sacrifice, up to this share of the base",
+      "Pound for pound, up to this share of the base",
     );
 
     commit(field("Bonus"), "20,000");
@@ -239,12 +237,8 @@ describe("EmploymentFields", () => {
       "new",
     );
     expect(field("Salary sacrifice")).toHaveValue("5.00%");
-    expect(field("Pension name")).toHaveAccessibleDescription(
-      "Opened with the salary, growing at the plan rate",
-    );
-    expect(field("Pension balance")).toHaveAccessibleDescription(
-      "What it holds today; nothing for one just opened",
-    );
+    expect(field("Pension name")).not.toHaveAccessibleDescription();
+    expect(field("Pension balance")).not.toHaveAccessibleDescription();
 
     fireEvent.change(field("Pension name"), { target: { value: "Nest" } });
     commit(field("Pension balance"), "1,000");

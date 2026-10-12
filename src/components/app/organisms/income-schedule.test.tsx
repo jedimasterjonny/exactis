@@ -85,10 +85,8 @@ describe("IncomeSchedule", () => {
     expect(screen.queryByText(/£168,000 base/)).not.toBeInTheDocument();
     // The card's rule is its caption, with no note beside the card.
     expect(
-      screen.getByText(/^Pay, pensions and anything else coming in/),
-    ).toHaveTextContent(
-      "Pay stops at retirement, whatever its line says. A rise is a second line from the year it starts, not an edit to the first.",
-    );
+      screen.getByText("Pay stops at retirement. A rise is a new line."),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("paragraph")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -286,9 +284,7 @@ describe("IncomeSchedule", () => {
     const choice = within(dialog).getByRole("combobox", { name: "Pension" });
 
     expect(choice).toHaveValue("none");
-    expect(choice).toHaveAccessibleDescription(
-      "Fed by salary sacrifice, with the employer's NI saved and their match",
-    );
+    expect(choice).not.toHaveAccessibleDescription();
     expect(
       within(choice)
         .getAllByRole("option")
@@ -394,13 +390,9 @@ describe("IncomeSchedule", () => {
 
     expect(save()).toBeDisabled();
     expect(pensionName).toHaveValue("");
-    expect(pensionName).toHaveAccessibleDescription(
-      "Opened with the salary, growing at the plan rate",
-    );
+    expect(pensionName).not.toHaveAccessibleDescription();
     expect(balance).toHaveValue("£0");
-    expect(balance).toHaveAccessibleDescription(
-      "What it holds today; nothing for one just opened",
-    );
+    expect(balance).not.toHaveAccessibleDescription();
     expect(
       within(dialog).getByRole("textbox", { name: "Salary sacrifice" }),
     ).toHaveValue("0.00%");
@@ -554,11 +546,8 @@ describe("IncomeSchedule", () => {
       "open",
     );
     expect(
-      within(dialog).getByText("Never paid, since its owner retires in 2020."),
+      within(dialog).getByText("Never paid; its owner retires in 2020."),
     ).toBeInTheDocument();
-    expect(
-      within(dialog).queryByText("Runs to 2079, the last year of the plan."),
-    ).not.toBeInTheDocument();
   });
 
   // Retiring at 59, the owner retires in 2049, so a salary running with
@@ -588,13 +577,8 @@ describe("IncomeSchedule", () => {
       "open",
     );
     expect(
-      within(dialog).getByText(
-        "Paid to 2048, since pay stops when its owner retires, whatever the end says.",
-      ),
+      within(dialog).getByText("Paid to 2048, when its owner retires."),
     ).toBeInTheDocument();
-    expect(
-      within(dialog).queryByText("Runs to 2079, the last year of the plan."),
-    ).not.toBeInTheDocument();
     expect(
       within(dialog).getByText(bySlot("span-bar-fill"), { suggest: false }),
     ).toHaveStyle({ width: `${String((23 / 53) * 100)}%` });
@@ -622,14 +606,14 @@ describe("IncomeSchedule", () => {
     ).not.toBeInTheDocument();
     expect(
       within(dialog).getByRole("textbox", { name: "Years after" }),
-    ).toHaveAccessibleDescription("Runs to 2079, the year before Retirement.");
+    ).toHaveAccessibleDescription("Runs to 2079.");
     expect(within(dialog).getByText("Plan · 2026–2079")).toHaveClass("label");
     expect(
       within(dialog).getByRole("textbox", { name: "Base salary" }),
     ).toHaveValue("£0");
     expect(
       within(dialog).getByRole("textbox", { name: "Bonus" }),
-    ).toHaveAccessibleDescription("At the salary's cadence; nothing for none");
+    ).toHaveAccessibleDescription("At the salary's cadence");
     expect(
       within(dialog).getByRole("textbox", { name: "RSUs" }),
     ).toHaveAccessibleDescription("Vesting at the salary's cadence");
@@ -1042,9 +1026,7 @@ describe("IncomeSchedule", () => {
     const owner = within(dialog).getByRole("combobox", { name: "Owner" });
 
     expect(owner).toHaveValue("1");
-    expect(owner).toHaveAccessibleDescription(
-      "Taxed as theirs, and paid until they retire if earned by working",
-    );
+    expect(owner).not.toHaveAccessibleDescription();
     expect(
       within(owner)
         .getAllByRole("option")
