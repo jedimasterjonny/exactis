@@ -23,7 +23,13 @@ import { ProjectionChart } from "@/components/app/organisms/projection-chart";
 import { takesSpare } from "@/data/accounts";
 import { ageOf, measureNames, timed } from "@/data/milestones";
 import { ageIn, endAge, retirementYear, retiringAt } from "@/data/plan";
-import { endWorthOf, futureOf, markersIn, runLength } from "@/engine/futures";
+import {
+  endWorthOf,
+  futureOf,
+  markersIn,
+  reachedIn,
+  runLength,
+} from "@/engine/futures";
 import { holdsAnything, project } from "@/engine/projection";
 import { useFutures } from "@/hooks/use-futures";
 import { useSender } from "@/hooks/use-sender";
@@ -77,7 +83,8 @@ export const settle = 400;
 // year, moving as the run comes in, as the chance's fan moves it, and
 // while fewer than half the futures drawn so far reach it its chip
 // says it is coming; one fewer than half ever reach is not marked once
-// the run is drawn. There is nothing to draw while the plan has no
+// the run is drawn, and its chip gives the share that do in place of
+// a year. There is nothing to draw while the plan has no
 // spread, the CMA giving it none, or no savings for the futures to
 // grow, and then the tiles say which and the chart marks the
 // milestones the plan lays out alone.
@@ -182,21 +189,31 @@ function Board({
   const isProjecting = points.some(holdsAnything);
   // The milestones are placed by the futures drawn so far, so a chip
   // and a line move as the slices land; while the run is drawn, the
-  // ones it has yet to place are said to be coming.
-  const isDrawing = !("unrun" in run) && !run.isDone;
+  // ones it has yet to place are said to be coming, and once it is,
+  // the ones it never placed give the share of the run that reach them.
   const drawn = "unrun" in run ? [] : run.futures;
   const markers = isProjecting
     ? markersIn(drawn, milestones, drafted).filter(({ year }) =>
         points.some((point) => point.year === year),
       )
     : [];
-  const pending =
-    isProjecting && isDrawing
-      ? milestones.filter(
-          (milestone) =>
-            ageOf(milestone) === undefined &&
-            !markers.some(({ id }) => id === milestone.id),
-        )
+  const unplaced =
+    isProjecting && !("unrun" in run)
+      ? milestones
+          .filter(
+            (milestone) =>
+              ageOf(milestone) === undefined &&
+              !markers.some(({ id }) => id === milestone.id),
+          )
+          .map((milestone) => ({
+            id: milestone.id,
+            name: milestone.name,
+            reached: run.isDone
+              ? drawn.filter(
+                  (future) => reachedIn(future, milestone, drafted) !== null,
+                ).length / runLength
+              : null,
+          }))
       : [];
   const chosen =
     markers.find(({ id }) => id === choice) ??
@@ -290,8 +307,8 @@ function Board({
             <MilestoneChips
               markers={markers}
               onSelect={setChoice}
-              pending={pending}
               selected={chosen.id}
+              unplaced={unplaced}
             />
           )
         }

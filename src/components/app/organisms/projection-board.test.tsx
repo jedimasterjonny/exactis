@@ -437,7 +437,7 @@ describe("ProjectionBoard", () => {
     // retirement, since nothing is saved for the years after it.
     expect(marks()).toStrictEqual(["2040", "2053", "2059", "2053"]);
     expect(
-      screen.queryByText(bySlot("milestone-chip-pending"), { suggest: false }),
+      screen.queryByText(bySlot("milestone-chip-unplaced"), { suggest: false }),
     ).not.toBeInTheDocument();
   });
 
@@ -449,8 +449,9 @@ describe("ProjectionBoard", () => {
   // years, so the milestone at 35, in 2027, is chosen to begin with.
   // The futures are drawn by the worker stood in for jsdom's missing
   // one, and until they are the milestones the run will place are said
-  // to be coming. Each tile reads the measure its milestone is on, so
-  // the home counts in the one and not in the other.
+  // to be coming; none reaches a million, whose chip gives the share
+  // that do once they are. Each tile reads the measure its milestone is
+  // on, so the home counts in the one and not in the other.
   it("draws the futures once, says a milestone reached when conditions hold is coming, and marks it at the median once the run is drawn", async () => {
     vi.stubGlobal("Worker", FuturesWorker);
     const planned = { ...retiringAt(retiring, 92), years: 3 };
@@ -478,6 +479,11 @@ describe("ProjectionBoard", () => {
         id: 3,
         name: "Thirty liquid",
       },
+      {
+        conditions: [{ measure: "worth", of: "pounds", times: 1e6 }],
+        id: 4,
+        name: "A million",
+      },
     ];
     render(
       board(planned, spending, {
@@ -496,12 +502,12 @@ describe("ProjectionBoard", () => {
 
     expect(screen.getByText("At Ada 18")).toBeInTheDocument();
     expect(chance).toBeInTheDocument();
-    expect(screen.getAllByText("Drawing the futures…")).toHaveLength(2);
+    expect(screen.getAllByText("Drawing the futures…")).toHaveLength(3);
     expect(
       screen
-        .getAllByText(bySlot("milestone-chip-pending"), { suggest: false })
+        .getAllByText(bySlot("milestone-chip-unplaced"), { suggest: false })
         .map((chip) => chip.textContent),
-    ).toStrictEqual(["Thirty grand …", "Thirty liquid …"]);
+    ).toStrictEqual(["Thirty grand …", "Thirty liquid …", "A million …"]);
     expect(marks()).toStrictEqual(["2027"]);
 
     await waitFor(
@@ -515,8 +521,10 @@ describe("ProjectionBoard", () => {
       2,
     );
     expect(
-      screen.queryByText(bySlot("milestone-chip-pending"), { suggest: false }),
-    ).not.toBeInTheDocument();
+      screen
+        .getAllByText(bySlot("milestone-chip-unplaced"), { suggest: false })
+        .map((chip) => chip.textContent),
+    ).toStrictEqual(["A million reached in 0%"]);
     // Recharts keeps a rule where it was mounted, so the ones the run
     // adds come after the plan's own, whatever their years.
     expect(new Set(marks())).toStrictEqual(new Set(["2026", "2027"]));
@@ -586,7 +594,7 @@ describe("ProjectionBoard", () => {
     ).toBeInTheDocument();
     expect(
       screen
-        .getAllByText(bySlot("milestone-chip-pending"), { suggest: false })
+        .getAllByText(bySlot("milestone-chip-unplaced"), { suggest: false })
         .map((chip) => chip.textContent),
     ).toStrictEqual(["A million …"]);
     expect(marks()).toStrictEqual(["2026"]);
