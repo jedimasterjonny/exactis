@@ -114,14 +114,13 @@ export function MilestoneSpreads({
             Add milestone
           </Button>
         }
-        caption="Every milestone on the plan's span: one reached at an age pinned where it falls, and one reached when conditions hold where the futures reach it, from the earliest 5% to the latest 5%, the middle four in five and the middle half banded as the fan bands them and the median the dot, which the Dashboard plots; and the share of the run that reaches it at all."
         label={subsectionLabel(chance, 2)}
         title="When the milestones are reached"
       >
         {milestones.length === 0 ? (
           <CardContent>
             <EmptyState
-              description="Add a milestone, the first million or financial independence, to read the year the futures reach it by."
+              description="Add one to see when the futures reach it."
               icon={Flag}
               title="No milestones yet"
             />

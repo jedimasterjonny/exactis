@@ -50,16 +50,14 @@ describe("FuturesCount", () => {
     );
 
     const card = screen.getByRole("region", { name: "How many futures last" });
-    const panel = within(card).getByRole("region", {
-      name: "Net worth against the plan as projected",
-    });
+    const panel = within(card).getByRole("region", { name: "Net worth at 89" });
 
     expect(within(card).getByText("Sect. II.iii")).toHaveClass("label");
     expect(steps()).toStrictEqual([
-      "Futures runEach the plan run again over its own 53 years of returns and inflation1,000",
-      "Ran out of moneyA year no account could cover. The first at 69, half of them by 84−26",
-      "Kept going only by drawing a pension earlyShort before a pension can be drawn, and carried by the 55% charge, which lasts on paper only. Counted as lasting, the chance would be 97%−4",
-      "Lasted to 89Every year covered from the savings, to the plan's end970",
+      "Futures run1,000",
+      "Ran out of moneyThe first at 69, half by 84−26",
+      "Kept going only by drawing a pension early97% if counted as lasting−4",
+      "Lasted to 89970",
     ]);
     expect(within(card).getByText("Chance of success")).toHaveClass("label");
     expect(within(card).getByText("97%")).toHaveClass("figure");
@@ -67,18 +65,15 @@ describe("FuturesCount", () => {
       within(panel)
         .getAllByRole("term")
         .map(({ textContent }) => textContent),
-    ).toStrictEqual(["Projected, at 89", "Middle future, at 89"]);
+    ).toStrictEqual(["Projected", "Middle future"]);
     expect(
       within(panel)
         .getAllByRole("definition")
         .map(({ textContent }) => textContent),
     ).toStrictEqual(["£1,300,000", "£1,234,567"]);
-    expect(
-      within(card).getByText(/^± 1\.1 points is the run's own: 1,000 futures/),
-    ).toBeInTheDocument();
   });
 
-  it("says when no future ran out or needed an early draw", () => {
+  it("says nothing beside a count of none", () => {
     render(
       <FuturesCount
         count={1000}
@@ -98,10 +93,8 @@ describe("FuturesCount", () => {
 
     const [, ranOut, early] = steps();
 
-    expect(ranOut).toBe("Ran out of moneyNone ran out0");
-    expect(early).toBe(
-      "Kept going only by drawing a pension earlyNone needed to0",
-    );
+    expect(ranOut).toBe("Ran out of money0");
+    expect(early).toBe("Kept going only by drawing a pension early0");
   });
 
   it("counts the futures drawn so far while the run comes in, and says it has none before the first", () => {
@@ -115,9 +108,6 @@ describe("FuturesCount", () => {
     );
 
     expect(steps()[0]).toBe("Futures run372 of 1,000 drawn so far372");
-    expect(
-      screen.getByText("The chance firms as the rest of the futures come in."),
-    ).toBeInTheDocument();
 
     rerender(
       <FuturesCount
