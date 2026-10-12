@@ -73,9 +73,11 @@ export const settle = 400;
 // read over are drawn here, once, as the chance's screen draws them,
 // so the tiles and the chart read the one run: a milestone reached when
 // conditions hold is marked on the chart in the year by which half the
-// futures have reached it, named in a chip with that year, and until
-// the run is drawn its chip says it is coming; one fewer than half ever
-// reach is not marked. There is nothing to draw while the plan has no
+// futures drawn so far have reached it, named in a chip with that
+// year, moving as the run comes in, as the chance's fan moves it, and
+// while fewer than half the futures drawn so far reach it its chip
+// says it is coming; one fewer than half ever reach is not marked once
+// the run is drawn. There is nothing to draw while the plan has no
 // spread, the CMA giving it none, or no savings for the futures to
 // grow, and then the tiles say which and the chart marks the
 // milestones the plan lays out alone.
@@ -178,20 +180,23 @@ function Board({
     };
   }, [accounts, drafted, milestones, schedule]);
   const isProjecting = points.some(holdsAnything);
-  // The milestones are placed by the whole run once it is drawn, and by
-  // none before, so a chip and a line land once rather than drifting
-  // in as the slices do; until then the ones the run will place are
-  // said to be coming.
+  // The milestones are placed by the futures drawn so far, so a chip
+  // and a line move as the slices land; while the run is drawn, the
+  // ones it has yet to place are said to be coming.
   const isDrawing = !("unrun" in run) && !run.isDone;
-  const placed = "unrun" in run || isDrawing ? [] : run.futures;
+  const drawn = "unrun" in run ? [] : run.futures;
   const markers = isProjecting
-    ? markersIn(placed, milestones, drafted).filter(({ year }) =>
+    ? markersIn(drawn, milestones, drafted).filter(({ year }) =>
         points.some((point) => point.year === year),
       )
     : [];
   const pending =
     isProjecting && isDrawing
-      ? milestones.filter((milestone) => ageOf(milestone) === undefined)
+      ? milestones.filter(
+          (milestone) =>
+            ageOf(milestone) === undefined &&
+            !markers.some(({ id }) => id === milestone.id),
+        )
       : [];
   const chosen =
     markers.find(({ id }) => id === choice) ??

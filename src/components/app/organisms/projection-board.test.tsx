@@ -16,6 +16,7 @@ import type { Milestone } from "@/data/milestones";
 import type { Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { ProjectionPoint } from "@/engine/projection";
+import type { Slice } from "@/hooks/futures.worker";
 
 import { saveAges } from "@/actions/plan";
 import { toast } from "@/components/kit/toast";
@@ -49,6 +50,19 @@ const [, , , home, mortgage] = accounts;
 // No CMA, so no spread to draw the futures at, which is how most of
 // the board is read: the futures are the chance of success's to test.
 const short: Shortfall = { short: "No CMA is pulled" };
+
+// A worker that draws the first slice it is handed and never answers
+// another, so a run stands part way.
+class Stalled extends FuturesWorker {
+  #hasAnswered = false;
+
+  public override postMessage(slice: Slice): void {
+    if (!this.#hasAnswered) {
+      this.#hasAnswered = true;
+      super.postMessage(slice);
+    }
+  }
+}
 
 // The vertical rule recharts draws for a ReferenceLine, which carries the
 // year it stands at as an attribute. A rule has no role, label or text,
@@ -522,6 +536,60 @@ describe("ProjectionBoard", () => {
     expect(
       screen.getByText("Liquid net worth · 2026 · age 36"),
     ).toBeInTheDocument();
+  });
+
+  // The plan above, its run standing at the first two slices: every
+  // future drawn so far reaches thirty grand in 2026, so it is marked
+  // there while the rest are drawn, and none reaches a million, which
+  // is said to be coming still.
+  it("marks a milestone reached when conditions hold at the median of the futures drawn so far", async () => {
+    vi.stubGlobal("Worker", Stalled);
+    const isa: Account = {
+      balance: 30000,
+      growth: { kind: "plan" },
+      id: 1,
+      kind: "tax-free",
+      name: "ISA",
+      owner: 1,
+    };
+    render(
+      board(
+        { ...retiringAt(retiring, 90), years: 3 },
+        {
+          expenses: [{ ...expenseLines[0], amount: 500, growth: "nominal" }],
+          income: [],
+        },
+        {
+          listed: [
+            {
+              conditions: [{ measure: "worth", of: "pounds", times: 30000 }],
+              id: 1,
+              name: "Thirty grand",
+            },
+            {
+              conditions: [{ measure: "worth", of: "pounds", times: 1e6 }],
+              id: 2,
+              name: "A million",
+            },
+          ],
+          owned: [isa, home],
+          spread: { inflation: 0, rate: 0 },
+        },
+      ),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Thirty grand 2026" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Drawing 20 of 1,000 futures…"),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByText(bySlot("milestone-chip-pending"), { suggest: false })
+        .map((chip) => chip.textContent),
+    ).toStrictEqual(["A million …"]);
+    expect(marks()).toStrictEqual(["2026"]);
   });
 
   // The children leave home in 2036, when the owner is 46: the tile
