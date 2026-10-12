@@ -239,6 +239,18 @@ describe("futuresOf", () => {
     );
   });
 
+  it("draws other futures from another seed, the same on every run from it", () => {
+    const run = { plan: planned, spread: { inflation: 0.02, rate: 0.15 } };
+    const unseeded = taken([isa], run, 3);
+    const reseeded = taken([isa], { ...run, seed: 7 }, 3);
+
+    expect(taken([isa], { ...run, seed: 7 }, 3)).toStrictEqual(reseeded);
+    expect(taken([isa], { ...run, seed: 2026 }, 3)).toStrictEqual(unseeded);
+    for (const [index, future] of reseeded.entries()) {
+      expect(future).not.toStrictEqual(unseeded[index]);
+    }
+  });
+
   it("draws from any place in the run the futures the run holds there", () => {
     const run = { plan: planned, spread: { inflation: 0.02, rate: 0.15 } };
 
