@@ -5,14 +5,14 @@ import { TriangleAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/kit/alert";
 
 interface CautionProps {
-  readonly children: string;
+  readonly children?: string;
   readonly title: string;
 }
 
 // What a screen says above its regions when something it shows has
 // been set aside for something typed by hand: the warning icon, a title
-// saying what is live, and a sentence beneath saying what that costs,
-// all in the caution tone, since it is a changed assumption rather than
+// saying what is live, and a sentence beneath saying what that costs
+// where the title alone does not, all in the caution tone, since it is a changed assumption rather than
 // a fault. The loud counterpart of the note, which is muted. It stands
 // across the top of a screen's regions, so it takes the room a card's
 // edge gives rather than the registry's compact inline padding. It is
@@ -24,7 +24,9 @@ export function Caution({ children, title }: CautionProps): JSX.Element {
     <Alert className="px-4 py-3" role="note" variant="caution">
       <TriangleAlert aria-hidden />
       <AlertTitle>{title}</AlertTitle>
-      <AlertDescription>{children}</AlertDescription>
+      {children !== undefined && (
+        <AlertDescription>{children}</AlertDescription>
+      )}
     </Alert>
   );
 }

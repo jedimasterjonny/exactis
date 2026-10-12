@@ -6,10 +6,10 @@ interface LedgerProps {
   readonly totalName: string;
 }
 
-// A step of a ledger: its name, what its figure rests on, and the
-// figure.
+// A step of a ledger: its name, what its figure rests on where that
+// needs saying, and the figure.
 interface Step {
-  readonly detail: string;
+  readonly detail?: string | undefined;
   readonly figure: string;
   readonly label: string;
 }
@@ -30,7 +30,9 @@ export function Ledger({ steps, total, totalName }: LedgerProps): JSX.Element {
           >
             <span className="grid gap-1">
               <span>{label}</span>
-              <span className="text-sm text-muted-foreground">{detail}</span>
+              {detail !== undefined && (
+                <span className="text-sm text-muted-foreground">{detail}</span>
+              )}
             </span>
             <span className="figure">{figure}</span>
           </li>

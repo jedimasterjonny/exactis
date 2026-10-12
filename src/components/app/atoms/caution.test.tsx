@@ -21,4 +21,12 @@ describe("Caution", () => {
       "Custom rates are liveNothing warns you when they go stale.",
     );
   });
+
+  it("stands on its title alone when there is nothing more to say", () => {
+    render(<Caution title="The plan runs out at 70 even at its own rates" />);
+
+    expect(screen.getByRole("note")).toHaveTextContent(
+      /^The plan runs out at 70 even at its own rates$/,
+    );
+  });
 });
