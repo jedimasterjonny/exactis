@@ -142,7 +142,9 @@ describe("AccountFields", () => {
     const shortfall = screen.getByRole("combobox", { name: "When short" });
 
     expect(shortfall).toHaveTextContent("Always fund it");
-    expect(shortfall).toHaveAccessibleDescription("Drawn from cash and ISAs");
+    expect(shortfall).toHaveAccessibleDescription(
+      "Drawn from cash, GIAs and ISAs",
+    );
 
     fireEvent.change(shortfall, { target: { value: "month" } });
 
@@ -249,6 +251,34 @@ describe("AccountFields", () => {
     commit(screen.getByRole("textbox", { name: "Rate" }), "3");
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({ rate: 0.03 });
+  });
+
+  // A GIA is offered after the wrappers and before cash, and is asked
+  // what cash is asked: no owner, and a cap with no allowance beneath it.
+  it("offers a GIA between the ISA and cash, and asks it no owner and no allowance", () => {
+    renderFields({ ...isa, funding: "spare", kind: "taxable", owner: null });
+
+    expect(
+      within(screen.getByRole("combobox", { name: "Type" }))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual([
+      "Pension (tax-deferred)",
+      "ISA (tax-free)",
+      "GIA (taxable)",
+      "Cash",
+      "Real asset",
+      "Debt",
+    ]);
+    expect(screen.getByRole("combobox", { name: "Type" })).toHaveValue(
+      "taxable",
+    );
+    expect(
+      screen.queryByRole("combobox", { name: "Owner" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Cap, a year" }),
+    ).not.toHaveAccessibleDescription();
   });
 
   it("locks the treatment when given a reason, and says it", () => {

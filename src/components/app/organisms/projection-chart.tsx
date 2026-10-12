@@ -89,19 +89,21 @@ interface Series {
 }
 
 // The families the chart stacks, in the order they stack, the first at
-// the baseline: the pensions, then the ISAs, then cash; then what
-// the plan owns, a house, a car or another real asset, above them all,
+// the baseline: the pensions, then the ISAs, then the GIAs, then cash; then
+// what the plan owns, a house, a car or another real asset, above them all,
 // each at its equity: what it is worth less the loans secured on it,
 // which are drawn in it rather than on their own.
 // The wrappers keep the colours they had, and cash and the assets take
-// the palette's colours for cash and for property. The debts stack down
-// from nothing, the first listed nearest it, in the palette's reds and
+// the palette's colours for cash and for property; a GIA takes the slate
+// the palette keeps for money invested outside a wrapper. The debts stack
+// down from nothing, the first listed nearest it, in the palette's reds and
 // its orange: loss red, which the palette gives debt, then oxide, then
 // ochre, since three debts in one red would be told apart by lightness
 // alone.
 const families: readonly Family[] = [
   { hues: ["var(--chart-2)"], kinds: ["tax-deferred"] },
   { hues: ["var(--chart-1)"], kinds: ["tax-free"] },
+  { hues: ["var(--chart-6)"], kinds: ["taxable"] },
   { hues: ["var(--chart-4)"], kinds: ["cash"] },
   { hues: ["var(--chart-3)"], kinds: ["house", "car", "real-asset"] },
   {

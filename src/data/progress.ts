@@ -6,10 +6,10 @@ import { monthsBetween } from "@/lib/months";
 // end of a month, summed as the sheet they are read off sums them: the
 // pensions, the ISAs, what the property and vehicles were worth, the
 // loans secured on them and the debt secured on nothing, each whole
-// pounds, the two debts nothing or less as an account's is. Cash is
-// left out, as the sheet leaves it out, and a point carries no account
-// of its own, since the accounts a balance was summed over have come
-// and gone over the years the points span where the sums have not.
+// pounds, the two debts nothing or less as an account's is. Cash and
+// the GIAs are left out, as the sheet leaves them out, and a point carries
+// no account of its own, since the accounts a balance was summed over have
+// come and gone over the years the points span where the sums have not.
 // Beside the five it carries the house's share of what the property
 // and vehicles were worth, nothing before one was owned, so what the
 // house has been worth can be written again without the vehicles that
@@ -25,8 +25,8 @@ export interface ProgressPoint {
 }
 
 // What a point's balances come to: the five summed, the debts taking
-// away. It leaves cash out, as the point does, where the accounts
-// screen's starting net worth counts it.
+// away. It leaves cash and the GIAs out, as the point does, where the
+// accounts screen's starting net worth counts them.
 export function netWorthOf(point: ProgressPoint): number {
   return (
     point.assets + point.deferred + point.free + point.loans + point.unsecured

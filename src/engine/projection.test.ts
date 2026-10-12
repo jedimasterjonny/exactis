@@ -666,6 +666,31 @@ describe("project", () => {
     ]);
   });
 
+  // The same month with a £3,000 GIA beside them, listed first: the
+  // cash still goes first, leaving £200 for January, and the GIA then
+  // gives up January's other £800, February's £1,000 and March's, and
+  // the last £200 of it to April, before the ISA is touched. The ISA
+  // gives April's other £800 and the eight months after it, £8,800, so
+  // 20,000 − 8,800 = 11,200. The GIA is on each point by its id, in no
+  // wrapper's sum.
+  it("draws a GIA after cash and before the ISA, whatever order they are listed in", () => {
+    const gia: Account = {
+      balance: 3000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      kind: "taxable",
+      name: "GIA",
+    };
+
+    expect(
+      project([gia, flatIsa, pocket], short, { ...plan, month: 11, years: 2 }),
+    ).toStrictEqual([
+      point(2026, { 3: 1200, 6: 20000, 10: 3000 }, { free: 20000 }),
+      point(2027, { 3: 200, 6: 20000, 10: 3000 }, { free: 20000 }),
+      point(2028, { 3: 0, 6: 11200, 10: 0 }, { free: 11200 }),
+    ]);
+  });
+
   // Nothing coming in and nothing spent, and a SIPP always funded at
   // £800 a month: the £1,200 of cash and the £2,000 ISA keep it paid
   // for four months, each landing as £860, since with no earnings only

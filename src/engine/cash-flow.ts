@@ -115,7 +115,7 @@ export interface Spent {
 
 // An account paid the spare money, what it takes a month, and the most
 // it takes a year from every source: its cap held beneath the allowance
-// its kind has, or the allowance, or nothing at all for cash.
+// its kind has, or the allowance, or nothing at all for a GIA or cash.
 export interface Take extends Paid {
   readonly cap: null | number;
 }
@@ -140,9 +140,9 @@ export interface Totals {
 // it are held to, and what each pension always funded is paid of its
 // fixed sum, which is the last thing to know before the month can say
 // whether it is short. Fed the other sacrifices too, the month is asked
-// for that sum whole rather than as far as the cash and the ISAs reach,
-// since whether it can afford them is whether it pays that pension in
-// full after them, and a month with nothing in either would otherwise
+// for that sum whole rather than as far as the cash, the GIAs and the ISAs
+// reach, since whether it can afford them is whether it pays that pension
+// in full after them, and a month with nothing in any would otherwise
 // keep them by paying the pension less.
 interface Feeding {
   readonly fed: readonly Fed[];
@@ -171,8 +171,8 @@ interface Purse {
 // year before it carries what that year is refunded, or what it still
 // owes as a negative, which only the projection knows, having carried
 // the year; a month read on its own settles nothing. Beside it is what
-// the cash and the ISAs hold as the month opens, the savings a pension
-// always funded may be kept paid out of, which the projection knows
+// the cash, the GIAs and the ISAs hold as the month opens, the savings a
+// pension always funded may be kept paid out of, which the projection knows
 // too; a month read on its own is taken to have enough of them. And
 // beside them are the owners who have drawn on a pension as income
 // before the month, by id, whose pension allowance is the money
@@ -272,12 +272,12 @@ const nobody: ReadonlySet<number> = new Set();
 // kept paid all the same, since what it is paid out of taxed money is
 // relieved, and a pension an ISA is sold to keep paid holds more than
 // the ISA did: its own fixed sum is paid out of what the month has and
-// then out of what the cash and the ISAs hold, once the spending and
-// the debts' payments the month is short of have been met from them,
+// then out of what the cash, the GIAs and the ISAs hold, once the spending
+// and the debts' payments the month is short of have been met from them,
 // and never out of a pension, since one pension sold to pay another is
 // money going round in a circle, charged 55% before the pension age.
-// Once the cash and the ISAs are spent it is paid only what the month
-// has, as any other saving is. A debt's fixed sum is owed rather than
+// Once the cash, the GIAs and the ISAs are spent it is paid only what the
+// month has, as any other saving is. A debt's fixed sum is owed rather than
 // saved, so it goes out with the expenses and is drawn for as they are
 // when the month is short of it, rather than going short itself: a debt
 // short of its payments is a debt in default, which the plan does not
@@ -331,8 +331,8 @@ const nobody: ReadonlySet<number> = new Set();
 // drawdown by another name and the pension would be fed in the very
 // month a wrapper is sold to cover the spending. A salary feeding a
 // pension always funded gives up its sacrifice whatever the month has,
-// all of them or none as the rest, so long as the cash and the ISAs
-// have what the month is then short of, once the spending has been met
+// all of them or none as the rest, so long as the cash, the GIAs and the
+// ISAs have what the month is then short of, once the spending has been met
 // from them: the month is short by what it gave up too, for the
 // projection to draw. So a month that is short feeds nothing but a
 // pension always funded, pays no fixed sum but a debt's and such a

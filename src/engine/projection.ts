@@ -32,14 +32,14 @@ export interface MonthsOn {
 // age as much as by year. The first point is the balances as they are,
 // at the month the plan starts in; each after it is the year before
 // carried to its end. Each account carried is on it by its id, cash,
-// every wrapper and every house, car and other real asset, and every
-// debt below nothing, as the account holds it, so a chart can draw each
-// on its own; and each
+// every GIA, every wrapper and every house, car and other real asset, and
+// every debt below nothing, as the account holds it, so a chart can draw
+// each on its own; and each
 // wrapper's accounts are summed as well, under the name the progress
 // point gives the same balance, so a point recorded and a point
 // projected can be laid over each other, though the progress points
-// carry no cash figure. An account is rounded to the pound on its own
-// and a wrapper's sum is rounded whole, so two accounts of a kind can
+// carry no cash or GIA figure. An account is rounded to the pound on its
+// own and a wrapper's sum is rounded whole, so two accounts of a kind can
 // add to a pound either side of their wrapper. Beside them is what the
 // year could not draw
 // from anywhere, summed over its months: a point's balances are the
@@ -115,10 +115,15 @@ interface TaxYear {
 }
 
 // The kinds a month's shortfall is drawn from, in the order it draws
-// them: cash, then the tax-free wrapper, then the tax-deferred one. The
-// two before the pension are the savings a pension always funded is
-// kept paid out of, as far as they reach.
-const drawOrder: readonly AccountKind[] = ["cash", "tax-free", "tax-deferred"];
+// them: cash, then the GIA, then the tax-free wrapper, then the
+// tax-deferred one. The three before the pension are the savings a
+// pension always funded is kept paid out of, as far as they reach.
+const drawOrder: readonly AccountKind[] = [
+  "cash",
+  "taxable",
+  "tax-free",
+  "tax-deferred",
+];
 
 // A tax year the plan holds no months of yet: an owner's as April opens,
 // and one the plan has not entered.
@@ -163,20 +168,20 @@ export function isShort(point: ProjectionPoint): boolean {
 // month's cash flow pays in lands at its start and the balance grows a
 // month at its rate, and a debt is charged a month's interest and paid
 // down by what the month pays off it, each month's flow read over every
-// account as they opened the plan, and over what the cash and the ISAs
-// hold as the month opens for a pension always funded, as the projection
-// reads it, through the one month step the projection takes. What it
-// is for is a month end: the balance the plan expected each account to
-// reach by then, to be checked against its statement, and what the
+// account as they opened the plan, and over what the cash, the GIAs and the
+// ISAs hold as the month opens for a pension always funded, as the
+// projection reads it, through the one month step the projection takes.
+// What it is for is a month end: the balance the plan expected each account
+// to reach by then, to be checked against its statement, and what the
 // months were planned to pay into it, so the rest of the difference is
 // what moved it. A month the income does not cover pays nothing into
 // the savings but a pension always funded, and is not drawn on here as
 // the projection would draw on it, since a month end checks the plan
 // against the balances rather than spending them; but what that pension
-// is kept paid comes out of the cash and the ISAs, as the projection
-// takes it, since paid in and taken from nowhere it would be money the
-// plan never had, and the spending the months fell short of, though not
-// drawn, is counted off what they have to keep it paid, as the
+// is kept paid comes out of the cash, the GIAs and the ISAs, as the
+// projection takes it, since paid in and taken from nowhere it would be
+// money the plan never had, and the spending the months fell short of,
+// though not drawn, is counted off what they have to keep it paid, as the
 // projection, having drawn it, counts it, so a month end closed after a
 // long gap stops keeping the pension paid when the projection would;
 // nor is a tax year settled. No months leave every
@@ -239,10 +244,10 @@ export function monthsOn(
 // line may end in one; and the flow is read over every account, since
 // a fixed sum into any of them is money the month no longer has, and a
 // pension not listed would be fed nothing. A month the income does not
-// cover is drawn from the savings: cash first, then the tax-free
-// wrapper, then the tax-deferred one, grossed up for its tax, and before
-// the year its owner reaches the pension age for the charge on taking
-// it early, at the start of the month and before
+// cover is drawn from the savings: cash first, then the GIA, then the
+// tax-free wrapper, then the tax-deferred one, grossed up for its tax, and
+// before the year its owner reaches the pension age for the charge on
+// taking it early, at the start of the month and before
 // its growth as a payment lands, so what leaves earns nothing for the
 // month it is gone. The lump sum allowance a pension's tax-free quarter
 // comes out of is its owner's for life, one each, so what is left of
@@ -272,10 +277,10 @@ export function monthsOn(
 // nothing in the month a wrapper is drawn on. A debt's payment is made
 // in that month all the same, being owed, and is part of what the
 // wrapper is drawn for, and so is what a pension always funded is paid
-// and fed, as far as the cash and the ISAs reach once the spending is
-// met from them: the flow is handed what they hold as the month opens
-// for that, and never keeps such a pension paid past it, so no pension
-// is drawn on to pay one. What no
+// and fed, as far as the cash, the GIAs and the ISAs reach once the
+// spending is met from them: the flow is handed what they hold as the month
+// opens for that, and never keeps such a pension paid past it, so no
+// pension is drawn on to pay one. What no
 // account covered is the year's uncovered shortfall, summed over its
 // months and reported on the point the year's balances are read off, so
 // the loop reads the balances entering the year, carries it, and emits
@@ -289,8 +294,8 @@ export function monthsOn(
 // rather than plotting the twice-counted balance as its one point. A
 // held account opening below nothing is refused the same way: a
 // balance below nothing is a debt's, and no debt is held here, so a
-// wrapper, a cash account or an asset at one is a figure nothing can mean,
-// compounded deeper every month by the growth and never drawn on, the
+// wrapper, a GIA, a cash account or an asset at one is a figure nothing can
+// mean, compounded deeper every month by the growth and never drawn on, the
 // draw taking the lesser of what the account holds and what the month
 // is short under a floor of nothing. The action refuses the same
 // balance where it is saved, and a debt opening above nothing beside
@@ -441,10 +446,12 @@ function carried(balance: number, paid: number, rate: number): number {
 // allowance, what each owner is taxed on once the draws on their
 // pensions are counted, and what it drew from a pension early. The
 // kinds are drawn cash first, since it is
-// spent as it stands and grows least; then the tax-free wrapper, which
+// spent as it stands and grows least; then the GIA, since what it
+// earns is taxed and what an ISA earns is not, though the plan charges
+// a GIA nothing; then the tax-free wrapper, which
 // is reached at any age and owes nothing on the way out; then the
 // tax-deferred one. From its owner's pension age a pension is drawn as
-// income; before it, only once cash and the ISA are
+// income; before it, only once cash, the GIA and the ISA are
 // empty, as the last thing between the month and running out, and at
 // the charge on a payment the rules do not allow, 45p kept of each
 // pound, since the money can be had that way and at no other. Within a
@@ -548,8 +555,8 @@ function isReserve(account: Account): boolean {
 // What keeping the pensions always funded paid takes out of the savings
 // in a month the income does not cover it, as a month end reads one:
 // what the month is short of with those pensions paid, less what it is
-// short of with nothing kept paid out of the cash and the ISAs, taken
-// from them in the order a shortfall is drawn, the kinds as the draw
+// short of with nothing kept paid out of the cash, the GIAs and the ISAs,
+// taken from them in the order a shortfall is drawn, the kinds as the draw
 // takes them and each kind's accounts in the order listed, and counted
 // as paid off each. They held at least that as the month opened, since
 // that is as far as the flow keeps such a pension paid; the spending the
@@ -677,8 +684,8 @@ function rateOf(account: Account, plan: Plan, year: number): number {
   return rate;
 }
 
-// What the cash and the ISAs hold as a month opens, which is as far as
-// the flow keeps a pension always funded paid out of the savings.
+// What the cash, the GIAs and the ISAs hold as a month opens, which is as
+// far as the flow keeps a pension always funded paid out of the savings.
 function reserveOf(held: readonly Held[]): number {
   return held
     .filter(({ account }) => isReserve(account))

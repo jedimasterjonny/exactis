@@ -157,7 +157,7 @@ describe("Progress", () => {
     await renderProgress();
 
     expect(screen.getAllByRole("paragraph").at(-2)).toHaveTextContent(
-      "Net worth leaves cash out, as the sheet does.",
+      "Net worth leaves cash and GIAs out, as the sheet does.",
     );
     expect(screen.getAllByRole("paragraph").at(-1)).toHaveTextContent(
       "The house is as the sheet gave it, until house prices are pulled.",

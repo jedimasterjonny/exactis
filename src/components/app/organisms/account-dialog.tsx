@@ -122,8 +122,8 @@ export function AccountDialog({
   // The treatment choice: a real asset or a debt is paid only a fixed sum, so the
   // contribution choice leaves with it and an account paid the spare
   // money is paid a fixed sum instead, as it opened. The choice comes
-  // back when a wrapper or cash is chosen again, as the account opened
-  // with it, which is what the choice mounts showing. A change that
+  // back when a wrapper, a GIA or cash is chosen again, as the account
+  // opened with it, which is what the choice mounts showing. A change that
   // stays on one side leaves the choice where it is. The owner goes with
   // a treatment nobody owns and comes back with a wrapper's, as below.
   // Whether the account is always funded goes with any treatment but a

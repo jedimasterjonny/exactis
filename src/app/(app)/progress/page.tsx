@@ -46,7 +46,7 @@ export default async function Progress(): Promise<JSX.Element> {
         {year !== undefined && <ProgressYear year={year} />}
         {points.length > 1 && <ProgressChart points={points} />}
         <ProgressPoints points={points} />
-        <Note>Net worth leaves cash out, as the sheet does.</Note>
+        <Note>Net worth leaves cash and GIAs out, as the sheet does.</Note>
         <Note>{houseNoteOf(housePrices)}</Note>
       </ScreenBody>
     </>

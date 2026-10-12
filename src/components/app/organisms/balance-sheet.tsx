@@ -44,10 +44,12 @@ interface RowProps {
 }
 
 // The savings in the groups the sheet lists them under: the kinds the
-// payment order draws on one at a time, pensions, then ISAs, then cash.
+// payment order draws on one at a time, pensions, then ISAs, then GIAs,
+// then cash.
 const groups = [
   { kind: "tax-deferred", title: "Pensions · tax-deferred" },
   { kind: "tax-free", title: "ISAs · tax-free" },
+  { kind: "taxable", title: "GIAs · taxable" },
   { kind: "cash", title: "Cash" },
 ] as const;
 

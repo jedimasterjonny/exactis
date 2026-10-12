@@ -43,7 +43,7 @@ const growths = [
 ] as const;
 
 // What a pension is paid in a month that cannot pay it: what the month
-// has, or all of it, drawn from the cash and the ISAs.
+// has, or all of it, drawn from the cash, the GIAs and the ISAs.
 const shortfalls = [
   { label: "Pay what it can", value: "month" },
   { label: "Always fund it", value: "always" },
@@ -55,6 +55,7 @@ const shortfalls = [
 const kinds = optionsOf(kindLabels, [
   "tax-deferred",
   "tax-free",
+  "taxable",
   "cash",
   "real-asset",
   "debt",
@@ -64,7 +65,7 @@ const kinds = optionsOf(kindLabels, [
 // schedules' dialogs: the name and the treatment on the first row, with
 // the owner beside them for an ISA or a pension, chosen from the owners
 // the ledger hands down and held until there is one to choose, the
-// balance and, for a wrapper or cash, the contribution choice on the
+// balance and, for a wrapper, a GIA or cash, the contribution choice on the
 // second, with a pension's choice beside them of what it is paid in a
 // month that cannot pay it, what that choice asks for on the third, a
 // sum and its cadence or a cap, and on the last the growth choice, with its rate stacked
@@ -160,7 +161,11 @@ export function AccountFields({
         {isPension(draft) && (
           <SelectField
             defaultValue={initial.isAlwaysFunded ? "always" : "month"}
-            hint={draft.isAlwaysFunded ? "Drawn from cash and ISAs" : undefined}
+            hint={
+              draft.isAlwaysFunded
+                ? "Drawn from cash, GIAs and ISAs"
+                : undefined
+            }
             label="When short"
             onValueChange={(shortfall) => {
               onAmend({ isAlwaysFunded: shortfall === "always" });
