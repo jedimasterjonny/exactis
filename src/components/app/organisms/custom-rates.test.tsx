@@ -46,20 +46,16 @@ describe("CustomRates", () => {
     expect(field("Bonds growth")).toHaveValue("4.45%");
     expect(field("Inflation")).toHaveValue("2.95%");
     expect(field("Stocks share")).toHaveValue("80.00%");
-    expect(field("Stocks growth")).toHaveAccessibleDescription(
-      "Typed by hand — after fees, as none are taken off",
-    );
-    expect(field("Bonds growth")).toHaveAccessibleDescription(
-      "Typed by hand — after fees, as none are taken off",
-    );
+    expect(field("Stocks growth")).toHaveAccessibleDescription("After fees");
+    expect(field("Bonds growth")).toHaveAccessibleDescription("After fees");
     expect(field("Dividend yield")).toHaveAccessibleDescription(
-      "Added to growth — always change the pair",
+      "Added to growth",
     );
     expect(field("Inflation")).toHaveAccessibleDescription(
-      "Typed by hand — the BoE derivation below is ignored",
+      "Overrides the BoE curve",
     );
     expect(field("Stocks share")).toHaveAccessibleDescription(
-      "The rest is held in bonds, flat for life",
+      "The rest in bonds",
     );
     expect(worksheet(sheet)).toStrictEqual([
       ["Weight", "80.00%", "20.00%", "100.00%"],
@@ -70,9 +66,7 @@ describe("CustomRates", () => {
     ]);
     expect(
       screen.getByRole("rowheader", { name: "Real return" }),
-    ).toHaveAccessibleDescription(
-      "Over 2.95% inflation, compounded rather than subtracted",
-    );
+    ).toHaveAccessibleDescription("Over 2.95% inflation");
   });
 
   // 6.45% and 2% make 8.45%, 5.34% real, and the portfolio 7.65%, 4.57%

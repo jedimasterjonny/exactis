@@ -87,7 +87,7 @@ describe("RateSet", () => {
     renderSet();
 
     expect(screen.getByRole("note")).toHaveTextContent(
-      "Custom rates are live — the CMA derivation is set asideHand-typed rates do not move when you pull a new CMA or BoE curve, and nothing warns you when they go stale.",
+      "Custom rates are liveThey do not follow a new CMA or BoE curve.",
     );
   });
 
@@ -105,17 +105,13 @@ describe("RateSet", () => {
     expect(within(card).getByText("Sect. VI.i")).toHaveClass("label");
     expect(card).toHaveTextContent("Typed by hand, flat for life");
     expect(custom).toBeChecked();
-    expect(custom).toHaveAccessibleDescription(
-      "One rate per class, typed by hand, flat for life",
-    );
+    expect(custom).toHaveAccessibleDescription("Typed by hand, flat for life");
     expect(derived).not.toBeChecked();
     expect(derived).toHaveAccessibleDescription(
-      "Derived from the capital market assumptions and your target allocation",
+      "BlackRock's returns, by your target allocation",
     );
     expect(historical).toHaveAttribute("aria-disabled", "true");
-    expect(historical).toHaveAccessibleDescription(
-      "Returns replayed from history, not built yet",
-    );
+    expect(historical).toHaveAccessibleDescription("Not built yet");
   });
 
   it("lays out the rates and the split typed by hand under the custom rates, with the derivation set aside", () => {
@@ -131,9 +127,7 @@ describe("RateSet", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("region", { name: "For the CMA's rates" }),
-    ).toHaveTextContent(
-      "Set aside while the custom rates are live, and taken up as they stand when From CMA is chosen.",
-    );
+    ).toBeInTheDocument();
   });
 
   // The deductions are typed under the custom rates too, so they are
@@ -278,12 +272,10 @@ describe("RateSet", () => {
 
     expect(field("Fee drag")).toHaveValue("0.20%");
     expect(field("Fee drag")).toHaveAccessibleDescription(
-      "Fund OCFs plus platform charge, off both sleeves",
+      "Fund OCFs plus platform charge",
     );
     expect(field("Dividend yield")).toHaveValue("2.00%");
-    expect(field("Dividend yield")).toHaveAccessibleDescription(
-      "Split out of stocks' return and added back on top",
-    );
+    expect(field("Dividend yield")).not.toHaveAccessibleDescription();
   });
 
   // Fees of 0.25% take stocks to 7.79% and bonds to 4.20% at once, and
@@ -375,7 +367,7 @@ describe("RateSet", () => {
     });
 
     expect(cardOf("CMA-derived rates")).toHaveTextContent(
-      "Fees and yield last set or confirmed 3 Sep 2026",
+      "Fees and yield confirmed 3 Sep 2026",
     );
   });
 
@@ -384,9 +376,7 @@ describe("RateSet", () => {
 
     expect(
       screen.getByRole("region", { name: "For the CMA's rates" }),
-    ).toHaveTextContent(
-      "Fees and yield are not dated: they were set before the day was kept",
-    );
+    ).toHaveTextContent("Fees and yield not dated");
   });
 
   // Confirming sends nothing to change, so the store keeps both and

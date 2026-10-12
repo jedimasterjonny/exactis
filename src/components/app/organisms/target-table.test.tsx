@@ -127,7 +127,7 @@ describe("TargetTable", () => {
 
     expect(groups()).toStrictEqual([
       [
-        ["Stocks", "Blended by target, hedging included", "8.044%", "80.00%"],
+        ["Stocks", "Blended by target", "8.044%", "80.00%"],
         [
           "FTSE Global All Cap ex-UK",
           "Global ex-UK large cap equities",
@@ -145,7 +145,7 @@ describe("TargetTable", () => {
         ["FTSE 100", "UK large cap equities", "8.156%", "0.00%"],
       ],
       [
-        ["Bonds", "Blended by target, hedging included", "4.451%", "20.00%"],
+        ["Bonds", "Blended by target", "4.451%", "20.00%"],
         [
           "Global bonds, hedged",
           "Global aggregate bonds (GBP hedged)",
@@ -182,7 +182,7 @@ describe("TargetTable", () => {
     await waitFor(() => {
       expect(groups()[0]?.[0]).toStrictEqual([
         "Stocks",
-        "Blended by target, hedging included",
+        "Blended by target",
         "8.047%",
         "82.00%",
       ]);
@@ -190,7 +190,7 @@ describe("TargetTable", () => {
     expect(groups()[0]?.at(-1)?.[0]).toBe("Short-dated gilts");
     expect(groups()[1]?.[0]).toStrictEqual([
       "Bonds",
-      "Blended by target, hedging included",
+      "Blended by target",
       "4.548%",
       "18.00%",
     ]);
@@ -219,8 +219,7 @@ describe("TargetTable", () => {
       mapped: mappings.filter(({ asset }) => asset !== "UK cash"),
     });
 
-    const why =
-      "Not blended until every category asking for a share has a class";
+    const why = "Not blended until every share has a class";
 
     expect(groups().map(([head]) => head)).toStrictEqual([
       ["Stocks", why, "—", "80.00%"],
@@ -237,9 +236,7 @@ describe("TargetTable", () => {
     ).getAllByRole("cell");
 
     expect(folded).toHaveClass("unfolded:hidden");
-    expect(folded).toHaveTextContent(
-      "Stocks80.00%8.044% · Blended by target, hedging included",
-    );
+    expect(folded).toHaveTextContent("Stocks80.00%8.044% · Blended by target");
     expect(head).toHaveClass("folded:hidden");
   });
 

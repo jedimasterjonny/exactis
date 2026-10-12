@@ -78,23 +78,16 @@ describe("CmaWorksheet", () => {
     ]);
   });
 
-  it("says what each row rests on, the bonds' largest category and the curve's inflation among them", () => {
+  it("says beneath the real return the inflation it is over, and beneath no other row anything", () => {
     renderSheet();
 
     const row = (name: string): HTMLElement =>
       screen.getByRole("rowheader", { name });
 
-    expect(row("Blended 20y GBP return")).toHaveAccessibleDescription(
-      "Weighted by target allocation; Global bonds, hedged is 70.00% of bonds",
-    );
-    expect(row("Rebalancing")).toHaveAccessibleDescription(
-      "Earned yearly within each sleeve, and between them for the portfolio, over the blend of geometric returns",
-    );
-    expect(row("Return")).toHaveAccessibleDescription(
-      "What each comes to; the portfolio's is the plan rate",
-    );
+    expect(row("Blended 20y GBP return")).not.toHaveAccessibleDescription();
+    expect(row("Return")).not.toHaveAccessibleDescription();
     expect(row("Real return")).toHaveAccessibleDescription(
-      "Over 2.95% inflation, compounded rather than subtracted",
+      "Over 2.95% inflation",
     );
   });
 
@@ -146,9 +139,6 @@ describe("CmaWorksheet", () => {
       ["Dividend yield", "2.00%", "—", "2.00%"],
       ["Real return", "4.75%", "—", "4.95%"],
     ]);
-    expect(
-      screen.getByRole("rowheader", { name: "Blended 20y GBP return" }),
-    ).toHaveAccessibleDescription("Weighted by target allocation");
   });
 
   // All in bonds, stocks have no yield to pay, so the portfolio's is
@@ -181,7 +171,7 @@ describe("CmaWorksheet", () => {
     ]);
     expect(
       screen.getByRole("rowheader", { name: "Real return" }),
-    ).toHaveAccessibleDescription("Over inflation, once a BoE curve is pulled");
+    ).toHaveAccessibleDescription("Once a BoE curve is pulled");
   });
 
   // Each category under the sleeve its class blends into, in the file's
@@ -217,9 +207,6 @@ describe("CmaWorksheet", () => {
     expect(shares[4]).toHaveTextContent("0.00%");
     expect(shares[4]).toHaveClass("text-muted-foreground");
     expect(terms[4]).toHaveClass("text-muted-foreground");
-    expect(weights).toHaveTextContent(
-      "From the Target allocation tab — portfolio targets, not current holdings.",
-    );
   });
 
   // On the first of September the fees were a tenth of a point less, so
@@ -243,9 +230,6 @@ describe("CmaWorksheet", () => {
       ["Fees and yield", "−0.10pp", "0.00pp", "−0.10pp"],
       ["Now", "7.52%", "2.95%", "4.44%"],
     ]);
-    expect(
-      within(moved).getByRole("rowheader", { name: "Then" }),
-    ).toHaveAccessibleDescription("As the household stood on 1 Sep 2026");
   });
 
   // Since the first of September UK cash has gone from the vintage and
@@ -276,9 +260,7 @@ describe("CmaWorksheet", () => {
       screen.getByRole("rowheader", {
         name: "BlackRock CMA and Target allocation",
       }),
-    ).toHaveAccessibleDescription(
-      "Taken together, since the first alone derives no rates",
-    );
+    ).toBeInTheDocument();
   });
 
   it("says nothing has moved the rates where no source has changed", () => {
@@ -302,16 +284,6 @@ describe("CmaWorksheet", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("states what the figures are, as of the vintage's day", () => {
-    renderSheet();
-
-    expect(
-      screen.getByText(
-        "GBP rows, 20-year column, data as of 30 Jun 2026. Nominal down to the real return. The dividend yield moves stocks' return between growth and yield, and their total stays as it is.",
-      ),
-    ).toBeInTheDocument();
-  });
-
   it("sets the fields it is given at its head", () => {
     renderSheet({ fields: <span>The deductions</span> });
 
@@ -323,11 +295,6 @@ describe("CmaWorksheet", () => {
 
     expect(screen.getByText("No CMA pulled yet")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "GBP rows, 20-year column. Nominal down to the real return. The dividend yield moves stocks' return between growth and yield, and their total stays as it is.",
-      ),
-    ).toBeInTheDocument();
   });
 
   it("says nothing is worked out before a target allocation is imported", () => {
@@ -341,7 +308,7 @@ describe("CmaWorksheet", () => {
     renderSheet({ mappings: mappings.slice(1) });
 
     expect(screen.getByRole("note")).toHaveTextContent(
-      "The CMA cannot be blended yetFTSE Global All Cap ex-UK has no CMA class. Set it right on the Target allocation tab, and the rates are derived again.",
+      "The CMA cannot be blended yetFTSE Global All Cap ex-UK has no CMA class. Fix it on the Target allocation tab.",
     );
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
