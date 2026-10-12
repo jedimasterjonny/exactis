@@ -52,6 +52,21 @@ describe("Worksheet", () => {
     expect(screen.getAllByRole("row")).toHaveLength(4);
   });
 
+  it("draws no line beneath a row that says nothing its figures rest on", () => {
+    render(
+      <Worksheet
+        columns={["Stocks"]}
+        label="Rates"
+        rows={[{ figures: ["8.0%"], label: "Return" }]}
+      />,
+    );
+
+    expect(
+      screen.getByRole("rowheader", { name: "Return" }),
+    ).not.toHaveAccessibleDescription();
+    expect(screen.getAllByRole("row")).toHaveLength(2);
+  });
+
   it("sets a result's name as a label and its figures large, and a step's small", () => {
     renderSheet();
 
