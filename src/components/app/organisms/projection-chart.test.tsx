@@ -177,8 +177,14 @@ describe("ProjectionChart", () => {
 
   // The crosshair moves on the arrow keys as it does under the pointer,
   // and recharts moves it a frame later.
-  it("shows the year, the age, each account's figure and the total under the crosshair", async () => {
-    render(<ProjectionChart accounts={held} milestones={[]} points={points} />);
+  it("shows the year, the age, the figure of each account holding anything and the total under the crosshair", async () => {
+    render(
+      <ProjectionChart
+        accounts={[...held, sipp]}
+        milestones={[]}
+        points={points}
+      />,
+    );
 
     const chart = screen.getByRole("application");
     chart.focus();
@@ -190,6 +196,7 @@ describe("ProjectionChart", () => {
 
     expect(tooltip.getByText(pension.name)).toBeInTheDocument();
     expect(tooltip.getByText(isa.name)).toBeInTheDocument();
+    expect(tooltip.queryByText(sipp.name)).not.toBeInTheDocument();
     expect(tooltip.getByText("£462,079")).toHaveClass("figure");
     expect(tooltip.getByText("£321,452")).toHaveClass("figure");
     expect(tooltip.getByText("£783,531")).toHaveClass("figure");
