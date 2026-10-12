@@ -69,10 +69,10 @@ describe("ExpenseSchedule", () => {
     expect(screen.getByText("2052 on")).toBeInTheDocument();
     // The card's rule is its caption, with no note beside the card.
     expect(
-      screen.getByText(/^Spending and loan payments, each over the years/),
-    ).toHaveTextContent(
-      "A loan's payments are set with its asset on Accounts & assets.",
-    );
+      screen.getByText(
+        "A change is a new line. A loan's payments are set with its asset.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("paragraph")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -359,15 +359,13 @@ describe("ExpenseSchedule", () => {
 
     expect(
       within(dialog).getByRole("textbox", { name: "Years after" }),
-    ).toHaveAccessibleDescription("Runs to 2052, the year before Retirement.");
+    ).toHaveAccessibleDescription("Runs to 2052.");
 
     commit(within(dialog).getByRole("textbox", { name: "Years after" }), "3");
 
     expect(
       within(dialog).getByRole("textbox", { name: "Years after" }),
-    ).toHaveAccessibleDescription(
-      "Runs to 2055, ending 3 years after Retirement.",
-    );
+    ).toHaveAccessibleDescription("Runs to 2055.");
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 

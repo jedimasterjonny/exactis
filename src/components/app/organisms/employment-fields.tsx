@@ -96,7 +96,7 @@ export function EmploymentFields({
       <FieldRow layout="triple">
         <MoneyField
           defaultValue={initial.bonus}
-          hint="At the salary's cadence; nothing for none"
+          hint="At the salary's cadence"
           label="Bonus"
           onValueCommitted={(bonus) => {
             onAmend({ bonus });
@@ -115,15 +115,11 @@ export function EmploymentFields({
           <span aria-live="polite" className="figure font-medium">
             {`${formatGbp(yearly(totalOf(draft), draft.cadence))} a year`}
           </span>
-          <span className="text-xs text-muted-foreground">
-            Base, bonus and RSUs together
-          </span>
         </div>
       </FieldRow>
       <FieldRow layout="triple">
         <SelectField
           defaultValue={choiceOf(initial)}
-          hint="Fed by salary sacrifice, with the employer's NI saved and their match"
           label="Pension"
           onValueChange={feed}
           options={pensionChoices}
@@ -142,7 +138,7 @@ export function EmploymentFields({
             />
             <RateField
               defaultValue={initial.match}
-              hint="Pound for pound with the sacrifice, up to this share of the base"
+              hint="Pound for pound, up to this share of the base"
               label="Employer match"
               max={1}
               min={0}
@@ -157,7 +153,6 @@ export function EmploymentFields({
         <FieldRow layout="triple">
           <TextField
             defaultValue=""
-            hint="Opened with the salary, growing at the plan rate"
             label="Pension name"
             onValueChange={(name) => {
               onAmend({ opens: { ...opens, name } });
@@ -166,7 +161,6 @@ export function EmploymentFields({
           />
           <MoneyField
             defaultValue={0}
-            hint="What it holds today; nothing for one just opened"
             label="Pension balance"
             onValueCommitted={(balance) => {
               onAmend({ opens: { ...opens, balance } });
@@ -177,7 +171,7 @@ export function EmploymentFields({
             hint={
               owners.length === 0
                 ? "Add one on the accounts screen first"
-                : "Whose allowance it is paid under"
+                : undefined
             }
             isDisabled={owners.length === 0}
             label="Pension owner"

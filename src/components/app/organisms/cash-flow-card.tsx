@@ -129,7 +129,7 @@ export function CashFlowCard({
   const net = netOf(chosen);
   return (
     <SectionCard
-      caption="What a month of each year puts by, rising from the rule, or draws from the savings, hanging beneath it, in today's money, on the span the lines above are laid on. Drag along it, choose a milestone or step a year at a time to read the month line by line."
+      caption="A month of each year, put by above the rule and drawn below it, in today's money"
       label={subsectionLabel(planScreen, 4)}
       title="Year by year"
     >
@@ -208,12 +208,7 @@ function Closing({
 }): JSX.Element {
   if (isZero(left) || left > 0) {
     return (
-      <Row
-        amount={left}
-        detail="What no saving takes is left in the month, which the plan takes as spent."
-        isTotal
-        label="Left over"
-      />
+      <Row amount={left} detail="Taken as spent." isTotal label="Left over" />
     );
   }
   return (
@@ -231,7 +226,7 @@ function Closing({
 // more than comes off the month by the NI saved, and by the employer's
 // match where the salary is matched, beneath the pension's name.
 function describeFed({ amount, line }: Fed): string {
-  return `Salary sacrifice from ${line.name}, paid in as ${formatGbp(amount)} with the NI saved${line.match > 0 ? " and the employer's match" : ""}`;
+  return `Salary sacrifice from ${line.name}, landing as ${formatGbp(amount)}`;
 }
 
 // Where what the month is short by comes from, beneath the figure: the
@@ -244,12 +239,12 @@ function describeFed({ amount, line }: Fed): string {
 // ends.
 function describeShort(early: number, uncovered: number): string {
   if (uncovered > 0) {
-    return `The savings run out this year, leaving ${formatGbp(uncovered)} of it uncovered.`;
+    return `The savings run out this year, ${formatGbp(uncovered)} uncovered.`;
   }
   if (early > 0) {
-    return `The savings fall short this year, carried by an early pension draw of ${formatGbp(early)} at the 55% charge.`;
+    return `The savings fall short this year, carried by ${formatGbp(early)} drawn early from a pension at the 55% charge.`;
   }
-  return "What the month is short by is drawn from the savings, cash first.";
+  return "Drawn from the savings, cash first.";
 }
 
 // What a line is paid at, how that grows and the years it runs, "£2,130
@@ -485,7 +480,7 @@ function relieved(
     .reduce((sum, entry) => sum + entry.amount, 0);
   return isZero(claimed)
     ? how
-    : `${how}, paid in as ${formatGbp(amount + claimed)} with basic-rate relief`;
+    : `${how}, landing as ${formatGbp(amount + claimed)} with relief`;
 }
 
 // A line of the ledger: the name and, beneath it, how the money is

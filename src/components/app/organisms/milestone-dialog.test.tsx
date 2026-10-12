@@ -251,7 +251,7 @@ describe("MilestoneDialog", () => {
     expect(field("Age", dialog)).toHaveValue("48");
     expect(radio("When conditions hold")).not.toHaveAttribute("aria-disabled");
     expect(radio("When conditions hold")).toHaveAccessibleDescription(
-      "In the first year a future meets them, which the chance of success reads",
+      "Read by the chance of success",
     );
   });
 

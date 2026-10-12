@@ -178,13 +178,13 @@ export function IncomeSchedule({
             Add income line
           </Button>
         }
-        caption="Pay, pensions and anything else coming in, each over the years it is paid. Pay stops at retirement, whatever its line says. A rise is a second line from the year it starts, not an edit to the first."
+        caption="Pay stops at retirement. A rise is a new line."
         label={subsectionLabel(planScreen, 2)}
         title="What comes in"
       >
         <CardContent>
           <ScheduleRows
-            emptyDescription="Add a salary, a pension or a side line to see it scheduled here."
+            emptyDescription="Add a salary, a pension or a side line."
             emptyTitle="No income yet"
             lines={lines}
             milestones={markers}
@@ -234,7 +234,6 @@ export function IncomeSchedule({
             <FieldRow layout="pair">
               <SelectField
                 defaultValue={String(entry.initial.owner)}
-                hint="Taxed as theirs, and paid until they retire if earned by working"
                 label="Owner"
                 onValueChange={(owner) => {
                   amend(entry, { owner: Number(owner) });
@@ -335,8 +334,8 @@ function paidOf(
     line: paid,
     says:
       draft.firstYear < retirement
-        ? `Paid to ${String(retirement - 1)}, since pay stops when its owner retires, whatever the end says.`
-        : `Never paid, since its owner retires in ${String(retirement)}.`,
+        ? `Paid to ${String(retirement - 1)}, when its owner retires.`
+        : `Never paid; its owner retires in ${String(retirement)}.`,
   };
 }
 

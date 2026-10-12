@@ -114,9 +114,6 @@ describe("LineFields", () => {
     expect(
       screen.queryByRole("textbox", { name: "Last year" }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByText("Runs to 2083, the last year of the plan."),
-    ).toBeInTheDocument();
     expect(screen.getByText("The parts")).toBeInTheDocument();
     expect(screen.getByText("Plan · 2026–2083")).toHaveClass("label");
 
@@ -246,9 +243,6 @@ describe("LineFields", () => {
       "text-muted-foreground",
     );
     expect(
-      screen.queryByText("Runs to 2083, the last year of the plan."),
-    ).not.toBeInTheDocument();
-    expect(
       screen.getByText(bySlot("span-bar-fill"), { suggest: false }),
     ).toHaveStyle({
       left: `${String((4 / 57) * 100)}%`,
@@ -302,7 +296,7 @@ describe("LineFields", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("says the year a tied end falls in where its field would be, and asks the years after its milestone the last ends", () => {
+  it("asks no year of a tied end, and the years after its milestone of the last", () => {
     const { onAmend } = renderFields(tied);
 
     expect(screen.getByRole("combobox", { name: "Starts" })).toHaveValue("1");
@@ -313,15 +307,12 @@ describe("LineFields", () => {
     expect(
       screen.queryByRole("textbox", { name: "Last year" }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByText("Starts in 2040, the year of Kids leave home."),
-    ).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Years after" })).toHaveValue(
       "0",
     );
     expect(
       screen.getByRole("textbox", { name: "Years after" }),
-    ).toHaveAccessibleDescription("Runs to 2058, the year before Downsize.");
+    ).toHaveAccessibleDescription("Runs to 2058.");
 
     // Three years after the downsize in 2059 is the end of 2061.
     commit(screen.getByRole("textbox", { name: "Years after" }), "3");
@@ -347,9 +338,7 @@ describe("LineFields", () => {
 
     expect(
       screen.getByRole("textbox", { name: "Years after" }),
-    ).toHaveAccessibleDescription(
-      "Runs to 2061, ending 3 years after Downsize.",
-    );
+    ).toHaveAccessibleDescription("Runs to 2061.");
 
     commit(screen.getByRole("textbox", { name: "Years after" }), "-2");
     fireEvent.change(screen.getByRole("combobox", { name: "Ends" }), {
