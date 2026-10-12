@@ -229,6 +229,52 @@ describe("ProjectionChart", () => {
     expect(tooltip.getByText("£793,531")).toHaveClass("figure");
   });
 
+  // A GIA is stacked between the ISA and the cash in the slate kept
+  // for it, and is named under the crosshair, as the cash is not.
+  it("stacks a GIA between the ISA and the cash in its own colour, and names it under the crosshair", async () => {
+    const gia: Account = {
+      balance: 10000,
+      growth: { kind: "plan" },
+      id: 7,
+      kind: "taxable",
+      name: "Dealing account",
+    };
+    const withGia = points.map((point) => ({
+      ...point,
+      balances: { ...point.balances, 3: 300, 7: 10000 },
+    }));
+    render(
+      <ProjectionChart
+        accounts={[...held, cash, gia]}
+        milestones={[]}
+        points={withGia}
+      />,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
+
+    expect(
+      screen
+        .getAllByText(byClass("recharts-area-curve"), { suggest: false })
+        .map((curve) => curve.getAttribute("stroke")),
+    ).toStrictEqual(
+      [1, 2, 7, 3].map((id) => `var(--color-account-${String(id)})`),
+    );
+    expect(colours()).toContain(
+      "--color-account-7: color-mix(in oklab, var(--chart-6), var(--card) 0%);",
+    );
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2027 · Age 37");
+
+    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+
+    expect(tooltip.getByText(gia.name)).toBeInTheDocument();
+    expect(tooltip.getByText("£10,000")).toHaveClass("figure");
+    expect(tooltip.getByText("£793,831")).toHaveClass("figure");
+  });
+
   // Two pensions, the ISA, the current account and the home, stacked
   // family by family from the baseline, the second pension receding
   // toward the card from the first, and the mortgage stacked down from
