@@ -13,7 +13,6 @@ import { TextField } from "@/components/app/molecules/text-field";
 import { yearsOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { cadenceOptions } from "@/lib/cadence";
-import { counted } from "@/lib/count";
 import { growthLabels } from "@/lib/lines";
 import { optionsOf } from "@/lib/options";
 
@@ -64,7 +63,7 @@ const growths = optionsOf(growthLabels, [
 // after, which show the draft's, since a choice moves them as well as
 // the fields do. Each end is a choice before it is a year: a fixed
 // year, typed into the field beneath the choice, or a milestone, in
-// which case the line moves with it and the dialog says which year that
+// which case the line moves with it and the choice says which year that
 // is, and the last may run to the end of the plan instead, so it has
 // none. The choices are worded as a row names its ties, a line running
 // from one milestone until another, and the end of the plan names its
@@ -162,7 +161,7 @@ export function LineFields<TKind extends string>({
             onValueChange={startAt}
             options={[fixed, ...tied("From")]}
           />
-          {from === undefined ? (
+          {from === undefined && (
             <YearField
               hint={ageHint(draft.firstYear, plan)}
               label="First year"
@@ -171,10 +170,6 @@ export function LineFields<TKind extends string>({
               }}
               value={draft.firstYear}
             />
-          ) : (
-            <Beneath>
-              {`Starts in ${String(from.year)}, the year of ${from.name}.`}
-            </Beneath>
           )}
         </div>
         <div className="grid gap-4">
@@ -195,13 +190,6 @@ export function LineFields<TKind extends string>({
               value={draft.endsAfter}
             />
           )}
-          {until === undefined &&
-            draft.lastYear === null &&
-            paid === undefined && (
-              <Beneath>
-                {`Runs to ${String(end)}, the last year of the plan.`}
-              </Beneath>
-            )}
           {until === undefined && draft.lastYear !== null && (
             <YearField
               hint={ageHint(draft.lastYear, plan)}
@@ -267,7 +255,7 @@ function ageHint(year: number, plan: Plan): string {
 }
 
 // What stands beneath an end's choice in place of its year's field, when
-// the year is the milestone's or the plan's rather than typed.
+// pay stops before the end does.
 function Beneath({ children }: { readonly children: string }): JSX.Element {
   return <span className="text-xs text-muted-foreground">{children}</span>;
 }
@@ -291,12 +279,7 @@ function endingOf(line: LineValues): string {
 }
 
 // Where a line ending the years given after a milestone runs to: the
-// year before it for none, "Runs to 2048, the year before Retirement",
-// or that many years on, "Runs to 2051, ending 3 years after
-// Retirement".
+// year before it for none, or that many years on, "Runs to 2051".
 function runsTo(until: Marker, after: number): string {
-  const last = String(until.year - 1 + after);
-  return after === 0
-    ? `Runs to ${last}, the year before ${until.name}.`
-    : `Runs to ${last}, ending ${counted(after, "year")} after ${until.name}.`;
+  return `Runs to ${String(until.year - 1 + after)}.`;
 }

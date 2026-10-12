@@ -117,7 +117,6 @@ export function MilestoneList({
             Add milestone
           </Button>
         }
-        caption="The years the plan turns on. A line tied to one moves with it, and retirement moves with the age set on the Dashboard. A milestone reached when conditions hold has no year of its own: the Chance of success reads when the futures reach it."
         label={subsectionLabel(planScreen, 1)}
         title="Milestones"
       >

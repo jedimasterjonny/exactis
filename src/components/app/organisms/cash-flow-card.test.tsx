@@ -49,11 +49,9 @@ const schedule: Schedule = {
   income: kept.schedule.income.map(flat),
 };
 
-const spent =
-  "What no saving takes is left in the month, which the plan takes as spent.";
+const spent = "Taken as spent.";
 
-const drawn =
-  "What the month is short by is drawn from the savings, cash first.";
+const drawn = "Drawn from the savings, cash first.";
 
 // A year chosen along the strip.
 function choose(at: number): void {
@@ -108,12 +106,12 @@ describe("CashFlowCard", () => {
     ).toHaveAttribute("aria-live", "polite");
     expect(ledger()).toStrictEqual([
       "Income£12,250",
-      "Workplace pensionSalary sacrifice from Salary, paid in as £1,150 with the NI saved−£1,000",
+      "Workplace pensionSalary sacrifice from Salary, landing as £1,150−£1,000",
       "Income tax−£3,913",
       "National Insurance−£393",
       "Expenses−£3,500",
       "MortgageA fixed sum−£2,210",
-      "Workplace pensionA fixed sum, paid in as £1,543 with basic-rate relief−£1,235",
+      "Workplace pensionA fixed sum, landing as £1,543 with relief−£1,235",
       "Paid nothing this monthStocks & shares ISA and Current account£0",
       `Left over${spent}£0`,
     ]);
@@ -138,7 +136,7 @@ describe("CashFlowCard", () => {
     );
 
     expect(ledger()[1]).toBe(
-      "Workplace pensionSalary sacrifice from Salary, paid in as £1,850 with the NI saved and the employer's match−£1,000",
+      "Workplace pensionSalary sacrifice from Salary, landing as £1,850−£1,000",
     );
   });
 
@@ -313,9 +311,7 @@ describe("CashFlowCard", () => {
     );
     expect(screen.getByText("£5,000 / mo")).toHaveClass("text-destructive");
     expect(
-      screen.getByText(
-        "The savings run out this year, leaving £55,000 of it uncovered.",
-      ),
+      screen.getByText("The savings run out this year, £55,000 uncovered."),
     ).toHaveClass("text-muted-foreground");
 
     unmount();
@@ -364,7 +360,7 @@ describe("CashFlowCard", () => {
       "text-destructive",
     );
     expect(ledger().at(-1)).toBe(
-      "ShortThe savings fall short this year, carried by an early pension draw of £31,112 at the 55% charge.£3,500",
+      "ShortThe savings fall short this year, carried by £31,112 drawn early from a pension at the 55% charge.£3,500",
     );
   });
 
@@ -498,7 +494,7 @@ describe("CashFlowCard", () => {
       "Subscription£1,000 / mo · Fixed in pounds · 2026 on−£759",
     ]);
     expect(ledger().at(-1)).toBe(
-      "ShortThe savings run out this year, leaving £50,985 of it uncovered.£4,259",
+      "ShortThe savings run out this year, £50,985 uncovered.£4,259",
     );
   });
 

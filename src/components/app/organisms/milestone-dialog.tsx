@@ -193,16 +193,14 @@ export function MilestoneDialog({
         value={draft.kind}
       >
         <RadioChoice label="At an age" value="age">
-          In the year the age is reached, which a line can be tied to
+          Lines can be tied to it
         </RadioChoice>
         <RadioChoice
           isDisabled={tied > 0}
           label="When conditions hold"
           value="conditions"
         >
-          {tied === 0
-            ? "In the first year a future meets them, which the chance of success reads"
-            : heldBy(tied)}
+          {tied === 0 ? "Read by the chance of success" : heldBy(tied)}
         </RadioChoice>
       </RadioGroup>
       {draft.kind === "age" ? (

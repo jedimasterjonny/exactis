@@ -99,11 +99,6 @@ describe("MilestoneList", () => {
     expect(within(section).getAllByText("Age 59").at(-1)).toHaveClass("label");
     expect(within(section).getAllByText("Age 46")).toHaveLength(2);
     expect(within(section).getAllByText("Age 65")).toHaveLength(2);
-    expect(
-      within(section).getByText(
-        /the Chance of success reads when the futures reach it\.$/,
-      ),
-    ).toBeInTheDocument();
     // Hidden from the tree, so no query is better than the slot.
     expect(
       within(section)
