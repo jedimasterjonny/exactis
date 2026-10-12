@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { Landmark } from "lucide-react";
 import { describe, expect, it } from "vitest";
 
@@ -45,6 +45,22 @@ describe("StatTile", () => {
 
     expect(screen.getByText("%")).toHaveClass("figure");
     expect(screen.getByText("−1.15pp")).toHaveClass("text-destructive");
+  });
+
+  it("puts an action it is given in its top corner", () => {
+    render(
+      <StatTile
+        action={<button type="button">Draw again</button>}
+        label="Chance of success"
+        value="80%"
+      />,
+    );
+
+    expect(
+      within(screen.getByText(bySlot("card-action"))).getByRole("button", {
+        name: "Draw again",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("omits the footer when there is neither delta nor caption", () => {

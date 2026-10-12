@@ -4,11 +4,18 @@ import type { JSX } from "react";
 import { cn } from "cn";
 
 import type { DeltaFormat } from "@/components/app/atoms/delta-value";
+import type { Slot } from "@/lib/slot";
 
 import { DeltaValue } from "@/components/app/atoms/delta-value";
-import { Card, CardContent, CardHeader } from "@/components/kit/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+} from "@/components/kit/card";
 
 interface StatTileProps {
+  readonly action?: Slot;
   readonly caption?: string;
   readonly delta?: number;
   readonly deltaFormat?: DeltaFormat;
@@ -32,8 +39,10 @@ interface StatTileProps {
 // each one's length. A tile its screen marks as hidden on a phone is
 // left off below the breakpoint the tiles go two across at, so a phone
 // opens on the two that matter most in one row rather than four in
-// two, and on the rest of the screen sooner.
+// two, and on the rest of the screen sooner. An action the tile is
+// given sits in its top corner, the label and the figure beside it.
 export function StatTile({
+  action,
   caption,
   delta,
   deltaFormat,
@@ -68,6 +77,7 @@ export function StatTile({
             </span>
           )}
         </span>
+        {action !== undefined && <CardAction>{action}</CardAction>}
       </CardHeader>
       {(delta !== undefined || caption !== undefined) && (
         <CardContent className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
