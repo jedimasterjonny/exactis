@@ -32,6 +32,13 @@ describe("accounts", () => {
     ).toStrictEqual(["real-asset", "debt"]);
   });
 
+  it("holds a GIA as it holds cash: paid the spare money, with no allowance and no owner", () => {
+    expect(takesSpare({ kind: "taxable" })).toBe(true);
+    expect(isAsset({ kind: "taxable" })).toBe(false);
+    expect(allowanceOf("taxable")).toBeNull();
+    expect(isOwned({ kind: "taxable" })).toBe(false);
+  });
+
   it("reads a contribution and a fixed rate off an account and back", () => {
     const values = {
       balance: -176520,

@@ -35,9 +35,9 @@ grossed up for its tax and each tax year is settled in the April after it, so
 what is spare is after tax. What a pension is worth is not: the chart sums a
 pension and an ISA as if worth the same, the pension gross of what taking it out
 would cost. And the draw order is the one that was right before tax, cash, then
-the ISA, then the pension, where filling the personal allowance from the pension
-before the ISA is touched pays less over a life; with draws taxed, the engine
-can now weigh the two, and does not.
+the GIA, then the ISA, then the pension, where filling the personal allowance
+from the pension before the ISA is touched pays less over a life; with draws
+taxed, the engine can now weigh the two, and does not.
 
 Smaller gaps sit beside those. The employer's NI is credited at the full rate on
 the whole sacrifice, ignoring the threshold and what the scheme passes on, and
@@ -48,16 +48,19 @@ allowance is withdrawn against, which between £100,000 and £125,140 is worth
 another 20%; and it claims relief after 75, when relief stops. The employee's NI
 runs past the State Pension age, when it stops, and a bonus is spread over the
 year as the line pays it, where paid in one month most of it would meet the 2%
-rate. Cash interest is not taxed. The bands are those outside Scotland. From
-April 2031 every band rises with prices together, where the law raises the
-personal allowance and the basic rate band and leaves the £100,000 the allowance
-is withdrawn from where it is. A draw before the pension age is charged a flat
-55% however small against the pension, and the lump sum allowance is taken to be
-whole when the plan opens. The pension age is read off the year its owner was
-born and not the day, so the whole of the year an age is reached counts as
-reaching it, and a protected pension age some schemes give is not held. A refund
-a month has no account to take goes where any money the month leaves goes, which
-is nowhere the projection counts.
+rate. Cash interest is not taxed, and nor is a GIA: neither the dividends it is
+paid each year nor the gain a draw realises, which would need what it cost held
+beside what it is worth, and an owner for the allowances and bands it is charged
+under. The bands are those outside Scotland. From April 2031 every band rises
+with prices together, where the law raises the personal allowance and the basic
+rate band and leaves the £100,000 the allowance is withdrawn from where it is. A
+draw before the pension age is charged a flat 55% however small against the
+pension, and the lump sum allowance is taken to be whole when the plan opens.
+The pension age is read off the year its owner was born and not the day, so the
+whole of the year an age is reached counts as reaching it, and a protected
+pension age some schemes give is not held. A refund a month has no account to
+take goes where any money the month leaves goes, which is nowhere the projection
+counts.
 
 Decide what a pension is worth beside an ISA once the tax on taking it out is
 counted, and the order the plan draws in, so the projection's two lines and its

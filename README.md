@@ -132,9 +132,10 @@ A pension can be marked always funded, for a pension worth keeping paid when the
 month cannot, since what it is paid out of taxed money is relieved. It is paid
 after the debts and before every other saving: what the salaries feeding it
 sacrifice is given up, and its own fixed sum paid, out of what the month has and
-then out of the cash and the ISAs, once they have met whatever spending the
-month is short of. It is never paid out of a pension, and once the cash and the
-ISAs are spent it is paid what the month has, as any other saving is.
+then out of the cash, the GIAs and the ISAs, once they have met whatever
+spending the month is short of. It is never paid out of a pension, and once the
+cash, the GIAs and the ISAs are spent it is paid what the month has, as any
+other saving is.
 
 The income is taxed as the UK outside Scotland taxes it for 2026/27, the rates
 held in `src/lib/tax.ts`, and it is taxed owner by owner, since tax is charged
@@ -229,28 +230,30 @@ refused. Deleting a milestone fixes each end tied to it in the year it falls in
 then, so the lines stay where they were.
 
 A month the income does not cover is drawn out of the savings at the start of
-it, before the month's growth: cash first, then the tax-free wrapper, then the
+it, before the month's growth: cash first, then the GIA, since what it earns is
+taxed and what an ISA earns is not, then the tax-free wrapper, then the
 tax-deferred one, as income from its owner's pension age: from the year the
 owner the pension belongs to turns 55 until the age rises in April 2028, and
 from the year they turn 57 after it, read off each owner's own year of birth,
 the ages held as constants in the engine until the assumptions screen sets them,
 as the plan's rates are held in the store. Before the pension age a pension is
-drawn only as the last resort, once cash and the tax-free wrapper are empty, and
-at the 55% a payment before the pension age is charged; a registered scheme will
-not normally make one, so what a year draws that way is carried on its point to
-be marked rather than counted on: the dashboard's chart marks the year, and the
-plan screen's year book draws it in the loss tone as it draws a year the money
-runs out in, saying beneath the month what was drawn early. Each account is
-drawn to nothing and no lower, and what a year could not draw from anywhere is
-carried on its point, so the projection can say when the money runs out and the
-dashboard's chart marks that year. Cash and the tax-free wrapper give up what
-the month is short, and a pension is grossed up so that what is left of the draw
-once taxed is what the month is short: a quarter of each draw is free of tax
-until its owner's £268,275 lump sum allowance is used up over the plan, one
-allowance each, and the rest is taxed as income on top of what its owner earned
-in the month and drew from their other pensions before it, so a second owner's
-pension is drawn under their own allowance and bands rather than from where the
-first's left off.
+drawn only as the last resort, once cash, the GIA and the tax-free wrapper are
+empty, and at the 55% a payment before the pension age is charged; a registered
+scheme will not normally make one, so what a year draws that way is carried on
+its point to be marked rather than counted on: the dashboard's chart marks the
+year, and the plan screen's year book draws it in the loss tone as it draws a
+year the money runs out in, saying beneath the month what was drawn early. Each
+account is drawn to nothing and no lower, and what a year could not draw from
+anywhere is carried on its point, so the projection can say when the money runs
+out and the dashboard's chart marks that year. Cash, the GIA and the tax-free
+wrapper give up what the month is short, a GIA charged no tax on what its draw
+realises, and a pension is grossed up so that what is left of the draw once
+taxed is what the month is short: a quarter of each draw is free of tax until
+its owner's £268,275 lump sum allowance is used up over the plan, one allowance
+each, and the rest is taxed as income on top of what its owner earned in the
+month and drew from their other pensions before it, so a second owner's pension
+is drawn under their own allowance and bands rather than from where the first's
+left off.
 
 The engine works in the pounds of each month and reads out in today's money, the
 money of the month the plan starts in. A line states its amount in today's

@@ -1,6 +1,6 @@
 import type { Month } from "@/data/schedule";
 
-// An account is a balance the plan grows: a tax wrapper, a cash account, a
+// An account is a balance the plan grows: a wrapper, a GIA, a cash account, a
 // real asset, or the loan against one. Balances are whole pounds, a debt's
 // negative, formatted where they are rendered; a rate is a fraction, so
 // 0.021 is 2.10%. The id is the account's identity, so an edit writes back
@@ -98,7 +98,8 @@ export interface Share {
 // contribution, up to a cap a year. The spare money goes to the accounts
 // that take it in the order they are listed, each taking up to its cap
 // and passing the rest on. A cap of null is the account's own allowance,
-// which for cash is none, and a cap above the allowance is held to it.
+// which for a GIA or cash is none, and a cap above the allowance is held
+// to it.
 type Contribution =
   | {
       readonly amount: number;
@@ -138,6 +139,7 @@ export const accountKinds = [
   "real-asset",
   "tax-deferred",
   "tax-free",
+  "taxable",
 ] as const;
 
 export const cadences = ["month", "year"] as const;
@@ -148,7 +150,7 @@ export const growthKinds = ["fixed", "plan"] as const;
 
 // What each kind is called, beside an asset on the balance sheet and in
 // the dialog's choice, so the two cannot drift from each other: a
-// wrapper by what it is, with the treatment its tax takes.
+// wrapper or a GIA by what it is, with the treatment its tax takes.
 export const kindLabels: Record<AccountKind, string> = {
   car: "Car",
   cash: "Cash",
@@ -157,6 +159,7 @@ export const kindLabels: Record<AccountKind, string> = {
   "real-asset": "Real asset",
   "tax-deferred": "Pension (tax-deferred)",
   "tax-free": "ISA (tax-free)",
+  taxable: "GIA (taxable)",
 };
 
 // The most a year's payments into a person's pensions, from every
@@ -164,9 +167,9 @@ export const kindLabels: Record<AccountKind, string> = {
 export const pensionAllowance = 60000;
 
 // The most the kind may be paid a year, as the UK sets it: £20,000 into
-// an ISA and £60,000 into a pension. Cash has no allowance, and a house,
-// a car, a real asset or a debt is paid only a fixed sum, so none has
-// one either.
+// an ISA and £60,000 into a pension. A GIA and cash have no allowance,
+// and a house, a car, a real asset or a debt is paid only a fixed sum, so
+// none has one either.
 export function allowanceOf(kind: AccountKind): null | number {
   switch (kind) {
     case "car":
@@ -174,6 +177,7 @@ export function allowanceOf(kind: AccountKind): null | number {
     case "debt":
     case "house":
     case "real-asset":
+    case "taxable":
       return null;
     case "tax-deferred":
       return pensionAllowance;
@@ -186,7 +190,7 @@ export function allowanceOf(kind: AccountKind): null | number {
 // held beneath its kind's allowance, since a cap says how much of the
 // allowance the account may use and not that it has more than the law
 // gives it; the allowance when no cap is typed; and no limit at all for
-// cash with no cap.
+// a GIA or cash with no cap.
 export function capOf(kind: AccountKind, cap: null | number): null | number {
   const allowance = allowanceOf(kind);
   if (cap === null || allowance === null) {
@@ -212,8 +216,10 @@ export function isAsset(account: { readonly kind: AccountKind }): boolean {
 
 // An ISA or a pension belongs to one owner, since an allowance is a
 // person's and neither can be held jointly: the kinds with an allowance
-// are the kinds with an owner. Cash, an asset and a debt belong to
-// nobody here, since nothing the plan works out reads whose they are.
+// are the kinds with an owner. A GIA, cash, an asset and a debt belong
+// to nobody here, since nothing the plan works out reads whose they are:
+// a GIA's gains and dividends are taxed as its owner's, but the plan
+// charges a GIA no tax, as it charges cash none on its interest.
 export function isOwned(account: { readonly kind: AccountKind }): boolean {
   return allowanceOf(account.kind) !== null;
 }
@@ -225,8 +231,8 @@ export function isPension(account: { readonly kind: AccountKind }): boolean {
   return account.kind === "tax-deferred";
 }
 
-// A wrapper or cash may be paid the spare money. An asset or a debt is
-// paid a fixed sum or nothing: the spare money goes into savings.
+// A wrapper, a GIA or cash may be paid the spare money. An asset or a
+// debt is paid a fixed sum or nothing: the spare money goes into savings.
 export function takesSpare(account: { readonly kind: AccountKind }): boolean {
   return account.kind !== "debt" && !isAsset(account);
 }

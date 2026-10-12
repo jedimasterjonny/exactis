@@ -84,6 +84,32 @@ describe("BalanceSheet", () => {
     }
   });
 
+  // A GIA is grouped on its own, after the ISAs and before the cash,
+  // and numbered in the order of payment as every saving is.
+  it("groups a GIA on its own between the ISAs and the cash", () => {
+    const gia: Account = {
+      balance: 9000,
+      growth: { kind: "plan" },
+      id: 7,
+      kind: "taxable",
+      name: "Dealing account",
+    };
+    renderSheet({ savings: [pension, isa, cash, gia] });
+
+    expect(
+      screen
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent)
+        .slice(0, 4),
+    ).toStrictEqual([
+      "Pensions · tax-deferred£391,640",
+      "ISAs · tax-free£271,930",
+      "GIAs · taxable£9,000",
+      "Cash£16,900",
+    ]);
+    expect(rowsOf("GIAs · taxable")).toStrictEqual(["4Dealing account£9,000"]);
+  });
+
   // A saving alone has no order to be placed in, and a group the
   // savings hold none of is left out.
   it("numbers nothing for a saving alone, and draws no group for a kind with none", () => {
