@@ -61,7 +61,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
   if (points.length === 0) {
     return (
       <EmptyState
-        description="A point is the balances as the Home Accounts sheet sums them at the end of a month, loaded into the store."
+        description="Month-ends come from the Home Accounts sheet."
         icon={History}
         title="No points yet"
       />
@@ -78,7 +78,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
   const newest = years.toReversed();
   return (
     <SectionCard
-      caption="What each year moved net worth by, balance by balance: what added to the right of the rule and what took away to the left, every year on one scale. Open a year to read its months."
+      caption="Added right of the rule, taken away left"
       className="pb-0"
       label={subsectionLabel(progress, 2)}
       title="Year by year"

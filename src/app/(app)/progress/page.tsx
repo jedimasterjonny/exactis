@@ -12,7 +12,6 @@ import { ProgressPoints } from "@/components/app/organisms/progress-points";
 import { ProgressYear } from "@/components/app/organisms/progress-year";
 import { indexedAs } from "@/data/house-prices";
 import { latestYearOf } from "@/data/progress";
-import { balanceNames } from "@/lib/balances";
 import { counted } from "@/lib/count";
 import { formatDay, formatMonthShort, monthsBetween } from "@/lib/months";
 import { progress, sectionLabel } from "@/lib/nav";
@@ -47,10 +46,7 @@ export default async function Progress(): Promise<JSX.Element> {
         {year !== undefined && <ProgressYear year={year} />}
         {points.length > 1 && <ProgressChart points={points} />}
         <ProgressPoints points={points} />
-        <Note>
-          Net worth is a point&apos;s five balances summed; cash is left out, as
-          the sheet leaves it out.
-        </Note>
+        <Note>Net worth leaves cash out, as the sheet does.</Note>
         <Note>{houseNoteOf(housePrices)}</Note>
       </ScreenBody>
     </>
@@ -60,14 +56,13 @@ export default async function Progress(): Promise<JSX.Element> {
 // What the house in the property and vehicles is held at, as the foot
 // says it: the index for the house from the month it was bought in,
 // since a house held before it is the sheet's, to the month the index
-// ran to, rolled forward after, and the day it was pulled; or the
-// sheet's figures before an index is pulled, with what pulling one
-// does.
+// ran to, and the day it was pulled; or the sheet's figures before an
+// index is pulled.
 function houseNoteOf(housePrices: HousePrices | null): string {
   if (housePrices === null) {
-    return `${balanceNames.assets} holds the house as the sheet gave it; pull the UK House Price Index to hold it at the index for ${indexedAs} from the month it was bought.`;
+    return "The house is as the sheet gave it, until house prices are pulled.";
   }
-  return `${balanceNames.assets} holds the house since ${formatMonthShort(housePrices.from)} at the UK House Price Index for ${indexedAs}, to ${formatMonthShort(housePrices.to)} and rolled forward after; pulled ${formatDay(housePrices.pulledOn)}.`;
+  return `The house is at the UK House Price Index for ${indexedAs} from ${formatMonthShort(housePrices.from)} to ${formatMonthShort(housePrices.to)}, pulled ${formatDay(housePrices.pulledOn)}.`;
 }
 
 // What the points span, as the header says it: how many, from the

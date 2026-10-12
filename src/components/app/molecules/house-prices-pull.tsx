@@ -25,7 +25,7 @@ export function HousePricesPull(): JSX.Element {
     send(pullHousePrices, {
       failure: "House prices not pulled",
       success: (pulled) => ({
-        description: `${pulled.name} now ${formatGbp(pulled.worth)}; index to ${formatMonthShort(pulled.to)}, the months after rolled forward from it`,
+        description: `${pulled.name} now ${formatGbp(pulled.worth)}, indexed to ${formatMonthShort(pulled.to)}`,
         title: "House prices pulled",
       }),
     });

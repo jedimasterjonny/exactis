@@ -157,20 +157,20 @@ describe("Progress", () => {
     await renderProgress();
 
     expect(screen.getAllByRole("paragraph").at(-2)).toHaveTextContent(
-      "Net worth is a point's five balances summed; cash is left out, as the sheet leaves it out.",
+      "Net worth leaves cash out, as the sheet does.",
     );
     expect(screen.getAllByRole("paragraph").at(-1)).toHaveTextContent(
-      "Property & vehicles holds the house as the sheet gave it; pull the UK House Price Index to hold it at the index for a detached house in Shropshire from the month it was bought.",
+      "The house is as the sheet gave it, until house prices are pulled.",
     );
   });
 
-  // The fixture's index was pulled on 15 September 2026, from an October
-  // 2021 purchase to July.
+  // The fixture's index was pulled on 15 September 2026, from an
+  // October 2021 purchase to July.
   it("says from which month the house is held at the index and to which, and when the index was pulled", async () => {
     await renderProgress(points, reference.housePrices);
 
     expect(screen.getAllByRole("paragraph").at(-1)).toHaveTextContent(
-      "Property & vehicles holds the house since Oct 2021 at the UK House Price Index for a detached house in Shropshire, to Jul 2026 and rolled forward after; pulled 15 Sep 2026.",
+      "The house is at the UK House Price Index for a detached house in Shropshire from Oct 2021 to Jul 2026, pulled 15 Sep 2026.",
     );
   });
 });

@@ -97,7 +97,7 @@ export function ProgressChart({ points }: ProgressChartProps): JSX.Element {
   );
   return (
     <SectionCard
-      caption="What each balance stood at as each month ended, what is held stacked up from nothing and what is owed down from it, with net worth drawn between, and a month not kept drawn between the months either side. Hover or step along it to read a month."
+      caption="Held above the rule, owed below, net worth between"
       className="min-w-0 overflow-visible"
       label={subsectionLabel(progress, 1)}
       title="Month by month"
@@ -268,9 +268,7 @@ function RowTooltip({
       <span className="grid gap-0.5">
         <span className="font-medium">{formatMonthShort(month)}</span>
         {!isKept && (
-          <span className="text-muted-foreground">
-            Not kept, drawn between the months either side
-          </span>
+          <span className="text-muted-foreground">Not kept, filled in</span>
         )}
       </span>
       {[
