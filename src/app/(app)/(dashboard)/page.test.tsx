@@ -9,6 +9,7 @@ import { soundKept } from "@/data/household";
 import { blank, kept } from "@/data/household.fixture";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
+import { forget } from "@/hooks/use-futures";
 import { getHousehold } from "@/store/household";
 import { FuturesWorker } from "@/test/futures-worker";
 
@@ -34,6 +35,8 @@ describe("Dashboard", () => {
     vi.mocked(getHousehold).mockResolvedValue(household);
     // jsdom has no Worker, and the chance of success draws its futures on two.
     vi.stubGlobal("Worker", FuturesWorker);
+    // Each test opens a page of its own, with no run kept from the last.
+    forget();
   });
 
   it("opens with the dashboard header, titled with the age the plan runs to", async () => {

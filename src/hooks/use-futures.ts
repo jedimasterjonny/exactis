@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { Plan, Spread } from "@/data/plan";
@@ -6,18 +6,14 @@ import type { Schedule } from "@/engine/cash-flow";
 import type { Future } from "@/engine/futures";
 import type { Slice } from "@/hooks/futures.worker";
 
-// The futures drawn so far for the plan they were drawn for, which a
-// plan changed since leaves behind.
-interface Drawn {
-  readonly for: unknown;
+// The run drawn last, kept past the screen that drew it: what it was
+// drawn over, written out whole so a plan handed down again in new
+// objects reads as the plan it is, the slices of it drawn so far, each
+// at the place it falls in the run, a slice not yet drawn left empty,
+// and the futures the screens have been handed of them.
+interface Kept {
+  readonly for: string;
   readonly futures: readonly Future[];
-}
-
-// A run as far as it has been drawn: the plan it is drawn for, and the
-// slices of it drawn so far, each at the place it falls in the run, a
-// slice not yet drawn left empty.
-interface Progress {
-  readonly for: unknown;
   readonly slices: (readonly Future[])[];
 }
 
@@ -28,6 +24,12 @@ interface Progress {
 // of each other, and handed each as it landed the screen showed the
 // count between them for a frame or two, which read as a flicker.
 const handed = 200;
+
+// Nothing drawn, as a page opens with.
+const none: Kept = { for: "", futures: [], slices: [] };
+
+// The screens reading the run kept, told when it changes.
+const listeners = new Set<() => void>();
 
 // How many futures a worker is handed at a time: few enough that slices
 // land many times between the screen's hand-overs, so the count rises
@@ -41,6 +43,14 @@ const slice = 10;
 // How many workers draw a run between them.
 const workers = 2;
 
+let kept = none;
+
+// Drops the run kept, as a page opening has none: for the tests, which
+// each open on a page of their own.
+export function forget(): void {
+  kept = none;
+}
+
 // The plan's futures as they are drawn, the count given of them, by two
 // workers off the page's thread, so the page stays to hand and the run
 // takes half the time one thread would: the futures drawn so far, in
@@ -50,10 +60,15 @@ const workers = 2;
 // hold the run up. The screen is handed what has come back at most
 // every 200 ms, and the whole run the moment it is. A plan changed part
 // way drops what was drawn for the one before and starts again, and a
-// screen taken down stops the workers, hearing nothing more from them. A screen hidden and shown again, as
-// Next hides a route navigated away from rather than taking it down,
-// carries on from the slices drawn while it was shown, or is done if
-// they were all, rather than drawing a run it has again.
+// screen taken down stops the workers, hearing nothing more from them,
+// and hands over what had landed since it last handed any over.
+// The run is kept beyond the screen that drew it, one run, the last, so
+// a screen opened over the same plan, as the chance of success opened
+// from the dashboard is, reads the futures the other drew, carrying on
+// from the slices drawn if it was left part way, rather than drawing
+// them again; and so does a screen hidden and shown again, as Next
+// hides a route navigated away from rather than taking it down. Every
+// screen reading the run is handed the same futures as they land.
 //
 // ponytail: two workers; one a core, from
 // navigator.hardwareConcurrency, would take a run to the cores' share,
@@ -68,17 +83,22 @@ export function useFutures(
   }: { readonly count: number; readonly plan: Plan; readonly spread: Spread },
 ): { readonly futures: readonly Future[]; readonly isDone: boolean } {
   const run = useMemo(
-    () => ({ accounts, count, plan, schedule, spread }),
+    () => ({
+      accounts,
+      count,
+      key: JSON.stringify([accounts, count, plan, schedule, spread]),
+      plan,
+      schedule,
+      spread,
+    }),
     [accounts, count, plan, schedule, spread],
   );
-  const [drawn, setDrawn] = useState<Drawn>({ for: null, futures: [] });
-  const progressRef = useRef<null | Progress>(null);
+  const drawn = useSyncExternalStore(subscribe, read, read);
   useEffect(() => {
-    const kept = progressRef.current;
-    const current: Progress =
-      kept?.for === run ? kept : { for: run, slices: [] };
-    progressRef.current = current;
-    const { slices } = current;
+    if (kept.for !== run.key) {
+      keep({ for: run.key, futures: [], slices: [] });
+    }
+    const { slices } = kept;
     const waiting = Array.from(
       { length: Math.ceil(run.count / slice) },
       (_, index) => index,
@@ -91,7 +111,7 @@ export function useFutures(
     function handOver(): void {
       timer = undefined;
       lastHanded = performance.now();
-      setDrawn({ for: run, futures: slices.flat() });
+      keep({ for: run.key, futures: slices.flat(), slices });
     }
     function hand(worker: Worker): void {
       const index = waiting.shift();
@@ -127,13 +147,39 @@ export function useFutures(
       hand(worker);
     }
     return (): void => {
-      clearTimeout(timer);
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        handOver();
+      }
       for (const worker of pool) {
         worker.onmessage = null;
         worker.terminate();
       }
     };
   }, [run]);
-  const futures = drawn.for === run ? drawn.futures : [];
+  const futures = drawn.for === run.key ? drawn.futures : [];
   return { futures, isDone: futures.length >= count };
+}
+
+// Keeps the run given, telling every screen reading it.
+function keep(next: Kept): void {
+  kept = next;
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+// The run kept, as a screen reads it: on the server too, which keeps
+// none, since it draws nothing, and so as a page is hydrated, which has
+// drawn nothing yet.
+function read(): Kept {
+  return kept;
+}
+
+// Tells the listener given when the run kept changes, until it unsubscribes.
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return (): void => {
+    listeners.delete(listener);
+  };
 }
