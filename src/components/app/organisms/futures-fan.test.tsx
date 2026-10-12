@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Future } from "@/engine/futures";
 
 import { working } from "@/data/owners.fixture";
+import { bySlot } from "@/test/dom";
 
 import { FuturesFan } from "./futures-fan";
 
@@ -113,8 +114,8 @@ describe("FuturesFan", () => {
   });
 
   // The plan's own milestone in 2027 comes before the one the futures
-  // place there.
-  it("marks a milestone reached when conditions hold in the year half the futures have reached it by, and not one fewer than half ever reach", () => {
+  // place there; three in ten reach twenty grand.
+  it("marks a milestone reached when conditions hold in the year half the futures have reached it by, and gives one fewer than half reach the share that do", () => {
     render(
       <FuturesFan
         futures={futures}
@@ -123,15 +124,34 @@ describe("FuturesFan", () => {
       />,
     );
 
+    const group = screen.getByRole("group", { name: "Milestones" });
+
     expect(marks().map((mark) => mark.getAttribute("x"))).toStrictEqual([
       "2027",
       "2027",
     ]);
     expect(
-      within(screen.getByRole("group", { name: "Milestones" }))
+      within(group)
         .getAllByRole("button")
         .map(({ textContent }) => textContent),
     ).toStrictEqual(["Ada 18 2027", "Ten grand 2027"]);
+    expect(
+      within(group).getByText(bySlot("milestone-chip-unplaced"), {
+        suggest: false,
+      }),
+    ).toHaveTextContent("Twenty grand reached in 30%");
+  });
+
+  // Before the first futures there is nothing to read a share off, and
+  // a milestone reached when conditions hold is said to be coming.
+  it("says a milestone reached when conditions hold is coming before the first futures are in", () => {
+    render(<FuturesFan futures={[]} milestones={reached} plan={plan} />);
+
+    expect(
+      screen
+        .getAllByText(bySlot("milestone-chip-unplaced"), { suggest: false })
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual(["Ten grand …", "Twenty grand …"]);
   });
 
   it("draws the milestone chosen solid until it is chosen again", () => {
