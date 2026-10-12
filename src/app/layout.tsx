@@ -21,10 +21,7 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
 });
 
-export const metadata: Metadata = {
-  description: "A Next.js skeleton.",
-  title: "exactis",
-};
+export const metadata: Metadata = { title: "exactis" };
 
 export default function RootLayout({
   children,
