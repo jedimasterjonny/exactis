@@ -1,15 +1,17 @@
 import type { JSX } from "react";
 
-import { Flag } from "lucide-react";
+import { Flag, RefreshCw } from "lucide-react";
 
 import type { Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Future } from "@/engine/futures";
 
+import { RowAction } from "@/components/app/atoms/row-action";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ageOf } from "@/data/milestones";
 import { ageIn, endAge } from "@/data/plan";
 import { reachedBy, reachedIn, readingOf, runLength } from "@/engine/futures";
+import { drawAgain } from "@/hooks/use-futures";
 import { formatCount } from "@/lib/count";
 import { formatWholePercent } from "@/lib/money";
 
@@ -76,12 +78,14 @@ export function ChanceTile({
     <>
       {isDone ? (
         <StatTile
+          action={<DrawAgain />}
           caption={`Of ${formatCount(runLength)} futures, lasting to ${String(endAge(plan))}`}
           label={label}
           value={formatWholePercent(readingOf(futures).chance)}
         />
       ) : (
         <StatTile
+          action={<DrawAgain />}
           caption={`Drawing ${formatCount(futures.length)} of ${formatCount(runLength)} futures…`}
           label={label}
           value="…"
@@ -100,6 +104,19 @@ export function ChanceTile({
   );
 }
 
+// The button in the corner of every tile the run is read on, drawing
+// the futures again as the chance's screen does from its header. A
+// tile saying why there is nothing to draw has none.
+function DrawAgain(): JSX.Element {
+  return (
+    <RowAction
+      icon={RefreshCw}
+      name="Draw the futures again"
+      onClick={drawAgain}
+    />
+  );
+}
+
 // A milestone's tile: the age reached in the year by which half the
 // futures have reached it, the year beneath, or a dash with the share
 // of the run that reaches it at all where fewer than half ever do; and
@@ -113,6 +130,7 @@ function ReachedTile({
   if (!isDone) {
     return (
       <StatTile
+        action={<DrawAgain />}
         caption="Drawing the futures…"
         icon={Flag}
         label={milestone.name}
@@ -127,6 +145,7 @@ function ReachedTile({
     ).length;
     return (
       <StatTile
+        action={<DrawAgain />}
         caption={`Reached in ${formatWholePercent(reached / runLength)} of ${formatCount(runLength)} futures`}
         icon={Flag}
         label={milestone.name}
@@ -136,6 +155,7 @@ function ReachedTile({
   }
   return (
     <StatTile
+      action={<DrawAgain />}
       caption={`Median of ${formatCount(runLength)} futures · ${String(median)}`}
       icon={Flag}
       label={milestone.name}

@@ -1,13 +1,16 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Milestone } from "@/data/milestones";
 import type { Future } from "@/engine/futures";
 
 import { atAge } from "@/data/milestones";
 import { working } from "@/data/owners.fixture";
+import { drawAgain } from "@/hooks/use-futures";
 
 import { ChanceTile } from "./chance-tile";
+
+vi.mock("@/hooks/use-futures", () => ({ drawAgain: vi.fn() }));
 
 // Born in 1990, from January 2026 over three years, so the plan runs to
 // 39.
@@ -83,6 +86,27 @@ describe("ChanceTile", () => {
     expect(screen.getByText("Drawing 3 of 1,000 futures…")).toBeInTheDocument();
     expect(screen.getAllByText("Drawing the futures…")).toHaveLength(2);
     expect(screen.queryByText("Ada 18")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "Draw the futures again" }),
+    ).toHaveLength(3);
+  });
+
+  it("draws the futures again from the corner of every tile the run is read on", () => {
+    render(
+      <ChanceTile
+        milestones={milestones}
+        plan={plan}
+        run={{ futures, isDone: true }}
+      />,
+    );
+
+    for (const button of screen.getAllByRole("button", {
+      name: "Draw the futures again",
+    })) {
+      fireEvent.click(button);
+    }
+
+    expect(drawAgain).toHaveBeenCalledTimes(3);
   });
 
   // Worth £30,000 as it opens, every future reaches that much at once,
@@ -122,5 +146,6 @@ describe("ChanceTile", () => {
       screen.getAllByText("No spread to draw the futures from"),
     ).toHaveLength(3);
     expect(screen.getByText("Forty grand")).toHaveClass("label");
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });
