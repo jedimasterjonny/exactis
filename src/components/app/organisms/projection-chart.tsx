@@ -524,9 +524,10 @@ function Placeholder({ children }: { readonly children: string }): JSX.Element {
 }
 
 // The year under the crosshair, the age reached that year and the
-// milestones falling in it, and each account's figure, from the top of
-// the stack down as the plot reads, what is held and then what is
-// owed, with what they come to beneath, named for the basis they are
+// milestones falling in it, and the figure of each account that holds
+// or owes anything that year, from the top of the stack down as the
+// plot reads, what is held and then what is owed, with what they come
+// to beneath, named for the basis they are
 // counted on, and under that, for a
 // year that drew on a pension early, what
 // it drew so, and for a year that came up short, what it could not
@@ -570,20 +571,22 @@ function ProjectionTooltip({
       </span>
       {[
         ...series.filter(({ isOwed }) => !isOwed).reverse(),
-        ...series.filter((line) => line.isOwed && valueIn(point, line) !== 0),
-      ].map((line) => (
-        <span className="flex items-center gap-2" key={line.key}>
-          <span
-            aria-hidden
-            className="h-0.5 w-3 rounded-full"
-            style={{ backgroundColor: `var(--color-${line.key})` }}
-          />
-          <span className="text-muted-foreground">{line.name}</span>
-          <span className="ml-auto figure font-medium">
-            {formatGbp(valueIn(point, line))}
+        ...series.filter(({ isOwed }) => isOwed),
+      ]
+        .filter((line) => valueIn(point, line) !== 0)
+        .map((line) => (
+          <span className="flex items-center gap-2" key={line.key}>
+            <span
+              aria-hidden
+              className="h-0.5 w-3 rounded-full"
+              style={{ backgroundColor: `var(--color-${line.key})` }}
+            />
+            <span className="text-muted-foreground">{line.name}</span>
+            <span className="ml-auto figure font-medium">
+              {formatGbp(valueIn(point, line))}
+            </span>
           </span>
-        </span>
-      ))}
+        ))}
       <span className="flex items-center gap-2 border-t pt-1.5">
         <span className="text-muted-foreground">{total}</span>
         <span className="ml-auto figure font-medium">
