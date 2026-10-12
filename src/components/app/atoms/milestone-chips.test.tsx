@@ -57,13 +57,13 @@ describe("MilestoneChips", () => {
       <MilestoneChips
         markers={markers}
         onSelect={vi.fn<(tie: Tie) => void>()}
-        pending={[{ id: 3, name: "First million" }]}
         selected="retirement"
+        unplaced={[{ id: 3, name: "First million", reached: null }]}
       />,
     );
 
     const group = screen.getByRole("group", { name: "Milestones" });
-    const chip = within(group).getByText(bySlot("milestone-chip-pending"), {
+    const chip = within(group).getByText(bySlot("milestone-chip-unplaced"), {
       suggest: false,
     });
 
@@ -71,6 +71,27 @@ describe("MilestoneChips", () => {
     expect(chip).toHaveTextContent("First million …");
     expect(chip).toHaveClass("border-dashed", "text-muted-foreground");
     expect(within(chip).getByText("…")).toHaveClass("max-sm:hidden");
+  });
+
+  it("follows the chips with a milestone too few futures reach, dashed, with the share that do for its year and no press", () => {
+    render(
+      <MilestoneChips
+        markers={markers}
+        onSelect={vi.fn<(tie: Tie) => void>()}
+        selected="retirement"
+        unplaced={[{ id: 3, name: "First million", reached: 0.12 }]}
+      />,
+    );
+
+    const group = screen.getByRole("group", { name: "Milestones" });
+    const chip = within(group).getByText(bySlot("milestone-chip-unplaced"), {
+      suggest: false,
+    });
+
+    expect(within(group).getAllByRole("button")).toHaveLength(2);
+    expect(chip).toHaveTextContent("First million reached in 12%");
+    expect(chip).toHaveClass("border-dashed", "text-muted-foreground");
+    expect(within(chip).getByText("reached in")).toHaveClass("sr-only");
   });
 
   it("reports the milestone a chip chooses", () => {
