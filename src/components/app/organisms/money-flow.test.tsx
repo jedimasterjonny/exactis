@@ -117,11 +117,11 @@ describe("MoneyFlow", () => {
     expect(within(flow).getByText("Sect. II.ii")).toHaveClass("label");
     expect(
       within(flow).getByText(
-        "Debts are always paid first. Savings are then paid in this order, and drawn on in it one kind at a time.",
+        "Debts first, then savings in this order, which draws follow too",
       ),
     ).toBeInTheDocument();
     expect(within(flow).getAllByRole("paragraph")[0]).toHaveTextContent(
-      "£484 a month is spare in September 2026, once tax, the expenses, the loans' payments and any fixed sums are met, and the savings take it in this order.",
+      "£484 a month spare in September 2026, after tax, expenses and fixed payments.",
     );
     expect(steps()).toStrictEqual([
       "1Workplace pension£4,350 / moMe · £1,380 salary sacrifice from Salary + £2,376 fixed sum + £594 tax relief£52,200 of the £60,000 allowance a year",
@@ -130,9 +130,7 @@ describe("MoneyFlow", () => {
     ]);
     expect(within(flow).getByText("Left over")).toHaveClass("label");
     expect(within(flow).getByText("£484 / mo")).toHaveClass("figure");
-    expect(said()).toContain(
-      "What no saving takes is left in the month, which the plan takes as spent.",
-    );
+    expect(said()).toContain("Taken as spent.");
   });
 
   // A salary matched to six per cent of its base lands the employer's
@@ -234,12 +232,10 @@ describe("MoneyFlow", () => {
     });
 
     expect(screen.getAllByRole("paragraph")[0]).toHaveTextContent(
-      "Nothing is spare in September 2026 once tax, the expenses, the loans' payments and any fixed sums are met.",
+      "Nothing spare in September 2026, after tax, expenses and fixed payments.",
     );
     expect(screen.getByText("Short")).toHaveClass("label");
-    expect(said()).toContain(
-      "What the month is short by is drawn from the savings, cash first.",
-    );
+    expect(said()).toContain("Drawn from the savings, cash first.");
   });
 
   it("draws nothing for no savings, and no reorder for one", () => {

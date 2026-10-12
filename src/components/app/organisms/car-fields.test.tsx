@@ -16,9 +16,9 @@ import { CarFields } from "./car-fields";
 // three years run to August 2029.
 const golf: CarDraft = { ...golfValues, term: 3 };
 
-const refinanced = "Refinanced on the same terms when the agreement ends";
+const refinanced = "Refinanced on the same terms at the end";
 
-const workedHint = "Worked out from the other two";
+const workedHint = "Worked out";
 
 // What the dialog shows the fields: which figure it worked out, what it
 // came to, and the years the payments run in all, which is 4.9 for the
@@ -83,9 +83,7 @@ describe("CarFields", () => {
       "pcp",
     );
     expect(field("Value")).toHaveValue("£18,000");
-    expect(field("Value")).toHaveAccessibleDescription(
-      "What it would sell for in September 2026",
-    );
+    expect(field("Value")).toHaveAccessibleDescription("As of September 2026");
     expect(field("Depreciation")).toHaveValue("15.00%");
     expect(field("Balance owed")).toHaveValue("£14,000");
     expect(field("Rate")).toHaveValue("7.90%");
@@ -95,14 +93,12 @@ describe("CarFields", () => {
     expect(field("Monthly payment")).toHaveValue("£290");
     expect(field("Monthly payment")).toHaveAccessibleDescription(workedHint);
     expect(select("Agreement ends")).toHaveDisplayValue("August");
-    expect(select("Agreement ends")).toHaveAccessibleDescription(
-      "When the last payment falls",
-    );
+    expect(select("Agreement ends")).not.toHaveAccessibleDescription();
     expect(field("Year")).toHaveValue("2029");
     expect(field("Year")).toHaveAccessibleDescription("3 years left");
     expect(field("Balloon")).toHaveValue("£6,000");
     expect(field("Balloon")).toHaveAccessibleDescription(
-      `${refinanced}, so the payments run 4.9 years in all`,
+      `${refinanced}, 4.9 years in all`,
     );
 
     fireEvent.change(field("Name"), { target: { value: "Polo" } });
@@ -151,7 +147,7 @@ describe("CarFields", () => {
     expect(field("Rate")).toHaveAccessibleDescription(workedHint);
     expect(field("Rate")).not.toHaveAttribute("aria-invalid");
     expect(field("Monthly payment")).toHaveValue("£290");
-    expect(field("Monthly payment")).toHaveAccessibleDescription("A month");
+    expect(field("Monthly payment")).not.toHaveAccessibleDescription();
 
     rerender(null);
 
@@ -181,7 +177,7 @@ describe("CarFields", () => {
     );
     expect(field("Year")).toHaveValue("");
     expect(field("Year")).toHaveAccessibleDescription(
-      "Never reaches the balloon at this payment, so the payments run to the end of the plan",
+      "Never reaches the balloon at this payment",
     );
     expect(field("Balloon")).toHaveAccessibleDescription(refinanced);
   });
@@ -204,7 +200,7 @@ describe("CarFields", () => {
     rerender(null);
 
     expect(field("Year")).toHaveAccessibleDescription(
-      "Never clears at this payment, so the payments run to the end of the plan",
+      "Never clears at this payment",
     );
   });
 

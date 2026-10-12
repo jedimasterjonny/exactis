@@ -205,7 +205,7 @@ describe("AccountDialog", () => {
     ).not.toBeInTheDocument();
     expect(field("Cap, a year", dialog)).toHaveValue("£0");
     expect(field("Cap, a year", dialog)).toHaveAccessibleDescription(
-      "Up to the £20,000 allowance, or nothing for all of it",
+      "Nothing for the full £20,000 allowance",
     );
 
     commit(field("Cap, a year", dialog), "9,000");
@@ -335,9 +335,7 @@ describe("AccountDialog", () => {
     const treatment = choice(openDialog(), "Type");
 
     expect(treatment).toBeDisabled();
-    expect(treatment).toHaveAccessibleDescription(
-      "Fed by Salary; set the pension to none on the salary to change it",
-    );
+    expect(treatment).toHaveAccessibleDescription("Fed by Salary");
   });
 
   // Nothing can feed an account the store has not given an id yet, and a
@@ -368,23 +366,23 @@ describe("AccountDialog", () => {
     const dialog = openDialog();
 
     expect(choice(dialog, "Contribution")).toHaveAccessibleDescription(
-      "Paid in on top of the salary sacrifice",
+      "On top of the salary sacrifice",
     );
     expect(field("Sacrificed from Salary", dialog)).toHaveValue("12.00%");
     expect(field("Sacrificed from Salary", dialog)).toHaveAccessibleDescription(
-      "Of its £120,000 base; £16,560 a year lands with the NI saved",
+      "Of its £120,000 base, landing as £16,560 a year",
     );
     expect(field("Sacrificed from Second job", dialog)).toHaveValue("12.00%");
 
     commit(field("Sacrificed from Salary", dialog), "8");
 
     expect(field("Sacrificed from Salary", dialog)).toHaveAccessibleDescription(
-      "Of its £120,000 base; £11,040 a year lands with the NI saved",
+      "Of its £120,000 base, landing as £11,040 a year",
     );
     expect(
       field("Sacrificed from Second job", dialog),
     ).toHaveAccessibleDescription(
-      "Of its £120,000 base; £16,560 a year lands with the NI saved",
+      "Of its £120,000 base, landing as £16,560 a year",
     );
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
@@ -439,9 +437,9 @@ describe("AccountDialog", () => {
     expect(
       within(openDialog()).queryByRole("textbox", { name: /^Sacrificed from/ }),
     ).not.toBeInTheDocument();
-    expect(choice(openDialog(), "Contribution")).toHaveAccessibleDescription(
-      "Spare money is what a month's income leaves after the expenses and every fixed sum",
-    );
+    expect(
+      choice(openDialog(), "Contribution"),
+    ).not.toHaveAccessibleDescription();
   });
 
   it("keeps a refused save open and says why", async () => {

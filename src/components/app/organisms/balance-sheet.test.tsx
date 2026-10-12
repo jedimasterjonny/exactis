@@ -265,7 +265,7 @@ describe("BalanceSheet", () => {
       "No pension, ISA or savings account yet",
     ]);
     expect(rowsOf("Property & vehicles")).toStrictEqual([
-      "Nothing owned outright or on finance yet",
+      "No house or car yet",
     ]);
   });
 

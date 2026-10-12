@@ -49,14 +49,6 @@ const shortfalls = [
   { label: "Always fund it", value: "always" },
 ] as const;
 
-// What the hint beneath the choice says of whichever is chosen. It said
-// where an always funded pension's money comes from whatever the choice,
-// so beneath "Pay what it can" it described the other answer.
-const shortfallHints = {
-  always: "Always draws on cash and ISAs, never a pension",
-  month: "Paid only what the month has left",
-} as const;
-
 // The types the dialog offers, in the order the reference's offers
 // them: a house and a car are left out, since each is written from a
 // dialog of its own.
@@ -84,8 +76,8 @@ const kinds = optionsOf(kindLabels, [
 // from the rest, since each changes more of the draft than its own
 // value and the ledger decides what. The treatment is locked when the
 // ledger gives a reason, which it does for a pension a salary feeds,
-// since the store refuses to make one anything else and the reason
-// says how to unlink it. The slot beside the growth is where the dialog
+// since the store refuses to make one anything else, and the reason
+// names the salaries. The slot beside the growth is where the dialog
 // puts what the salaries sacrifice into such a pension: the growth
 // row's other cell was the one cell the rows left empty, and the rate
 // stacks under the growth rather than taking it, so a fed pension's
@@ -93,10 +85,7 @@ const kinds = optionsOf(kindLabels, [
 // as it was. A fed pension's own contribution is paid on top of the
 // sacrifice, and the choice and the sum say so, since a fixed sum of
 // nothing beside what a salary lands would otherwise read as nothing
-// paid in at all; the amount says a sum of nothing is none, which for a
-// fed pension is the usual case, rather than the choice, whose longer
-// words were cut off in the narrow cell it has beside the owner. The
-// balance says a debt's is negative only while the
+// paid in at all. The balance says a debt's is negative only while the
 // treatment is a debt, where it is the one thing to know about the
 // figure; beneath a pension's it was a line about something else.
 export function AccountFields({
@@ -137,7 +126,7 @@ export function AccountFields({
             hint={
               owners.length === 0
                 ? "Add one in the owners section first"
-                : "Whose allowance it is paid under"
+                : undefined
             }
             isDisabled={owners.length === 0}
             label="Owner"
@@ -160,11 +149,7 @@ export function AccountFields({
         {takesSpare(draft) && (
           <SelectField
             defaultValue={initial.funding}
-            hint={
-              isFed
-                ? "Paid in on top of the salary sacrifice"
-                : "Spare money is what a month's income leaves after the expenses and every fixed sum"
-            }
+            hint={isFed ? "On top of the salary sacrifice" : undefined}
             label="Contribution"
             onValueChange={(funding) => {
               onFundingChange(funding);
@@ -175,7 +160,7 @@ export function AccountFields({
         {isPension(draft) && (
           <SelectField
             defaultValue={initial.isAlwaysFunded ? "always" : "month"}
-            hint={shortfallHints[draft.isAlwaysFunded ? "always" : "month"]}
+            hint={draft.isAlwaysFunded ? "Drawn from cash and ISAs" : undefined}
             label="When short"
             onValueChange={(shortfall) => {
               onAmend({ isAlwaysFunded: shortfall === "always" });
@@ -225,7 +210,6 @@ export function AccountFields({
           {draft.kind !== "debt" && (
             <SelectField
               defaultValue={initial.growth}
-              hint="The plan rate is set on the assumptions screen"
               label="Growth"
               onValueChange={(growth) => {
                 onAmend({ growth, rate: initial.rate });
@@ -250,31 +234,28 @@ export function AccountFields({
   );
 }
 
-// What the amount field says a sum of nothing means, and for an ISA or a
-// pension the most it can be a year and still land within the
-// allowance, which the save holds to: a pension's four fifths of it,
-// the rest being the relief. A fed pension's sum is on top of what the
-// salaries sacrifice, which the allowance holds too, month by month,
-// and nothing is as usual for one as for any other.
-function amountHint(kind: AccountKind, isFed: boolean): string {
+// What the amount field says for an ISA or a pension: the most it can
+// be a year and still land within the allowance, which the save holds
+// to, a pension's four fifths of it, the rest being the relief. A fed
+// pension's sum is on top of what the salaries sacrifice, which the
+// allowance holds too, month by month.
+function amountHint(kind: AccountKind, isFed: boolean): string | undefined {
   const most = mostFixedOf(kind);
   if (most === null) {
-    return "Leave at nothing for none";
+    return undefined;
   }
   const limit =
     most === allowanceOf(kind)
-      ? `At most ${formatGbp(most)} a year, the allowance`
-      : `At most ${formatGbp(most)} a year, the allowance with relief`;
-  return isFed
-    ? `${limit}, less the sacrifice; nothing for none`
-    : `${limit}; nothing for none`;
+      ? `At most ${formatGbp(most)} a year`
+      : `At most ${formatGbp(most)} a year, before relief`;
+  return isFed ? `${limit}, less the sacrifice` : limit;
 }
 
-// What the cap field says a cap of nothing means: the kind's allowance,
-// which a cap can only lower, or no cap at all for cash.
-function capHint(kind: AccountKind): string {
+// What the cap field says a cap of nothing means for an ISA or a
+// pension: the kind's allowance, which a cap can only lower.
+function capHint(kind: AccountKind): string | undefined {
   const allowance = allowanceOf(kind);
   return allowance === null
-    ? "Leave at nothing for no cap"
-    : `Up to the ${formatGbp(allowance)} allowance, or nothing for all of it`;
+    ? undefined
+    : `Nothing for the full ${formatGbp(allowance)} allowance`;
 }

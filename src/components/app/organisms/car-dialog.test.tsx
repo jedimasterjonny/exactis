@@ -34,7 +34,7 @@ vi.mock("@/actions/accounts", () => ({ saveCar: vi.fn() }));
 // three years.
 const car: Secured = { asset: golf, loan: finance };
 
-const workedHint = "Worked out from the other two";
+const workedHint = "Worked out";
 
 // The dialog as the ledger mounts it, on a new car or one to edit, with
 // spies where the ledger listens. Save reports through the toast
@@ -112,7 +112,7 @@ describe("CarDialog", () => {
       workedHint,
     );
     expect(field("Balloon", dialog)).toHaveAccessibleDescription(
-      "Refinanced on the same terms when the agreement ends, so the payments run 4.9 years in all",
+      "Refinanced on the same terms at the end, 4.9 years in all",
     );
 
     // The store's answer is held back, so the save can be seen in flight.
@@ -267,9 +267,7 @@ describe("CarDialog", () => {
 
     expect(field("Rate", dialog)).toHaveValue("7.92%");
     expect(field("Rate", dialog)).toHaveAccessibleDescription(workedHint);
-    expect(field("Monthly payment", dialog)).toHaveAccessibleDescription(
-      "A month",
-    );
+    expect(field("Monthly payment", dialog)).not.toHaveAccessibleDescription();
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
 
     commit(field("Monthly payment", dialog), "200");
@@ -315,10 +313,10 @@ describe("CarDialog", () => {
     expect(ends).toHaveDisplayValue("—");
     expect(ends).toHaveAccessibleDescription("Never, at this payment");
     expect(field("Year", dialog)).toHaveAccessibleDescription(
-      "Never reaches the balloon at this payment, so the payments run to the end of the plan",
+      "Never reaches the balloon at this payment",
     );
     expect(field("Balloon", dialog)).toHaveAccessibleDescription(
-      "Refinanced on the same terms when the agreement ends",
+      "Refinanced on the same terms at the end",
     );
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
 

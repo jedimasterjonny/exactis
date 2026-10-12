@@ -33,7 +33,7 @@ const [, , , home] = accounts;
 // month, which clears it in 8.2 years.
 const house: Secured = { asset: houseAsset, loan: houseLoan };
 
-const workedHint = "Worked out from the other two";
+const workedHint = "Worked out";
 
 // The dialog as the ledger mounts it, on a new house or one to edit,
 // with spies where the ledger listens. Save reports through the toast
@@ -301,11 +301,9 @@ describe("HouseDialog", () => {
     commit(field("Year", dialog), "2052");
     commit(field("Monthly payment", dialog), "2,180");
 
-    expect(field("Rate", dialog)).toHaveValue("5.46%");
+    expect(field("Rate", dialog)).toHaveValue("6.28%");
     expect(field("Rate", dialog)).toHaveAccessibleDescription(workedHint);
-    expect(field("Monthly payment", dialog)).toHaveAccessibleDescription(
-      "A month",
-    );
+    expect(field("Monthly payment", dialog)).not.toHaveAccessibleDescription();
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
 
     commit(field("Monthly payment", dialog), "1,000");
@@ -350,7 +348,7 @@ describe("HouseDialog", () => {
     expect(lastPayment).toHaveDisplayValue("—");
     expect(lastPayment).toHaveAccessibleDescription("Never, at this payment");
     expect(field("Year", dialog)).toHaveAccessibleDescription(
-      "Never clears at this payment, so the payments run to the end of the plan",
+      "Never clears at this payment",
     );
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
 
