@@ -203,12 +203,38 @@ describe("ProjectionChart", () => {
     expect(tooltip.getByText("Liquidity")).toBeInTheDocument();
   });
 
+  // Cash is given no line of its own under the crosshair, but is still
+  // counted in what the accounts come to.
+  it("leaves cash out of the figures under the crosshair and counts it in the total", async () => {
+    const withCash = points.map((point) => ({
+      ...point,
+      balances: { ...point.balances, 3: 10000 },
+    }));
+    render(
+      <ProjectionChart
+        accounts={[...held, cash]}
+        milestones={[]}
+        points={withCash}
+      />,
+    );
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2027 · Age 37");
+
+    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+
+    expect(tooltip.queryByText(cash.name)).not.toBeInTheDocument();
+    expect(tooltip.getByText("£793,531")).toHaveClass("figure");
+  });
+
   // Two pensions, the ISA, the current account and the home, stacked
   // family by family from the baseline, the second pension receding
   // toward the card from the first, and the mortgage stacked down from
-  // nothing in loss red, each named under the crosshair from the top of
-  // the stack down, over the net worth they come to, which counts the
-  // home.
+  // nothing in loss red, each but the current account named under the
+  // crosshair from the top of the stack down, over the net worth they
+  // come to, which counts the home and the current account.
   it("draws each account on its own, family by family, and names each under the crosshair", async () => {
     const listed = [...accounts, sipp];
     const years = [2026, 2027].map((year, place) => ({
@@ -259,7 +285,6 @@ describe("ProjectionChart", () => {
         .map((name) => name.textContent),
     ).toStrictEqual([
       home.name,
-      cash.name,
       isa.name,
       sipp.name,
       pension.name,
