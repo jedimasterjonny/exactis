@@ -82,34 +82,17 @@ describe("InflationSource", () => {
     expect(rates[2]).not.toHaveClass("text-muted-foreground");
     expect(terms[0]).toHaveClass("text-muted-foreground");
     expect(rates[3]).toHaveClass("text-muted-foreground");
-    expect(panel).toHaveTextContent(
-      "The 20-year point is the one derived from.",
-    );
   });
 
-  it("says no curve has been pulled before one is, what one is for, and offers the pull", () => {
+  it("says no curve has been pulled before one is, and offers the pull", () => {
     renderSource(null);
 
     expect(screen.getByText("No curve pulled yet")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Pull the latest curve to derive inflation from the gilt market, as a check on the rate the plan is set to.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Pull the latest curve.")).toBeInTheDocument();
     expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Pull latest curve" }),
     ).toBeEnabled();
-  });
-
-  it("states the check every curve passes before it is kept", () => {
-    renderSource(null);
-
-    expect(
-      screen.getByText(
-        /^Nominal − real = implied is checked on every maturity/,
-      ),
-    ).toBeInTheDocument();
   });
 
   // The page is drawn again from the store's curve, which the toast

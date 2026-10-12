@@ -14,7 +14,7 @@ import { Ledger } from "@/components/app/atoms/ledger";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
-import { CardContent, CardFooter } from "@/components/kit/card";
+import { CardContent } from "@/components/kit/card";
 import {
   horizon,
   inflationOf,
@@ -44,9 +44,7 @@ interface InflationSourceProps {
 // protection, with the derived rate closing the ledger. Beside them the
 // curve at each maturity it is read at, the horizon's point in the
 // foreground, since it is the one derived from. Before a curve has been
-// pulled there are no steps to lay out, and the card says so. The
-// footer states the check a curve passes before it is kept, since that
-// is what the figures rest on.
+// pulled there are no steps to lay out, and the card says so.
 export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
   const { isSending: isPulling, send } = useSender();
 
@@ -80,7 +78,7 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
       <CardContent>
         {curve === null ? (
           <EmptyState
-            description="Pull the latest curve to derive inflation from the gilt market, as a check on the rate the plan is set to."
+            description="Pull the latest curve."
             icon={Landmark}
             title="No curve pulled yet"
           />
@@ -88,10 +86,6 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
           <Derivation curve={curve} />
         )}
       </CardContent>
-      <CardFooter className="text-sm text-muted-foreground">
-        Nominal − real = implied is checked on every maturity before the curve
-        is used; a mis-parse shows up immediately.
-      </CardFooter>
     </SectionCard>
   );
 }
@@ -99,7 +93,7 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
 // The curve at each maturity it is read at, on a sunken panel headed as
 // a region of its own: drawn, with the inflation derived from it across
 // it, then listed, the horizon's point in the foreground and the rest
-// muted, and the source beneath.
+// muted.
 function ByMaturity({
   curve,
   derived,
@@ -128,9 +122,6 @@ function ByMaturity({
           );
         })}
       </dl>
-      <p className="text-sm text-muted-foreground">
-        {`Source: Bank of England implied inflation (gilt) curve. The ${String(horizon)}-year point is the one derived from.`}
-      </p>
     </section>
   );
 }

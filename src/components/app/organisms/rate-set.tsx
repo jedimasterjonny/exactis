@@ -70,7 +70,7 @@ const runsOn: Record<Chosen, string> = {
 // The two deductions the CMA's returns are taken down by, the fee drag
 // and the dividend yield, are typed in the card under either set: at the
 // head of the worksheet under the CMA's, and beneath the rates typed
-// under those, set aside and saying so, so they can be made ready
+// under those, under a heading of their own, so they can be made ready
 // before the CMA's are chosen rather than taken up as they stood. Each
 // is saved as the focus leaves it, alone, and one typed back to what it
 // was is not sent; what they come to follows it at once while the store
@@ -82,8 +82,8 @@ const runsOn: Record<Chosen, string> = {
 //
 // The header's meta line says what the figures come from: the vintage
 // and the day its data are as of, and how far it moved stocks' return
-// from the vintage before, once there is one; or that the rates are
-// typed.
+// from the vintage before, once there is one. The typed rates have none,
+// since their choice already says they are typed.
 export function RateSet({
   allocation,
   before,
@@ -165,7 +165,7 @@ export function RateSet({
     <div className="grid gap-4">
       <FieldRow layout="pair">
         <RateField
-          hint="Fund OCFs plus platform charge, off both sleeves"
+          hint="Fund OCFs plus platform charge"
           label="Fee drag"
           min={0}
           onValueCommitted={(value) => {
@@ -174,7 +174,6 @@ export function RateSet({
           value={shown.fees}
         />
         <RateField
-          hint="Split out of stocks' return and added back on top"
           label="Dividend yield"
           min={0}
           onValueCommitted={(value) => {
@@ -186,8 +185,8 @@ export function RateSet({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           {shown.setOn === undefined
-            ? "Fees and yield are not dated: they were set before the day was kept"
-            : `Fees and yield last set or confirmed ${formatDay(shown.setOn)}`}
+            ? "Fees and yield not dated"
+            : `Fees and yield confirmed ${formatDay(shown.setOn)}`}
         </p>
         <Button
           disabled={isSending}
@@ -207,9 +206,8 @@ export function RateSet({
   return (
     <>
       {chosen === "custom" && (
-        <Caution title="Custom rates are live — the CMA derivation is set aside">
-          Hand-typed rates do not move when you pull a new CMA or BoE curve, and
-          nothing warns you when they go stale.
+        <Caution title="Custom rates are live">
+          They do not follow a new CMA or BoE curve.
         </Caution>
       )}
       <SectionCard
@@ -219,11 +217,7 @@ export function RateSet({
             Pull CMA workbook
           </Button>
         }
-        caption={
-          chosen === "custom"
-            ? "Typed by hand, flat for life"
-            : sourceOf(cma, targets, mappings)
-        }
+        {...(chosen === "cma" && { caption: sourceOf(cma, targets, mappings) })}
         controls={
           <RadioGroup
             aria-label="Rate set"
@@ -232,14 +226,13 @@ export function RateSet({
             value={chosen}
           >
             <RadioChoice label="From CMA" value="cma">
-              Derived from the capital market assumptions and your target
-              allocation
+              BlackRock&apos;s returns, by your target allocation
             </RadioChoice>
             <RadioChoice label="Custom" value="custom">
-              One rate per class, typed by hand, flat for life
+              Typed by hand, flat for life
             </RadioChoice>
             <RadioChoice isDisabled label="Historical" value="historical">
-              Returns replayed from history, not built yet
+              Not built yet
             </RadioChoice>
           </RadioGroup>
         }
@@ -267,10 +260,6 @@ export function RateSet({
                 <h3 className="label text-muted-foreground" id={asideId}>
                   For the CMA&apos;s rates
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Set aside while the custom rates are live, and taken up as
-                  they stand when From CMA is chosen.
-                </p>
                 {fields}
               </section>
             </CardContent>
