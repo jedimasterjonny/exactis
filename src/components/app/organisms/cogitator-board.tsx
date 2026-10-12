@@ -69,9 +69,10 @@ const unimplemented = "No fund assigned";
 // leaves the allocation and how much nearer it brings it than one
 // fewer, with the rung recommended flagged and those past it muted,
 // since another trade past it is not worth placing, which the card's
-// caption says in pounds; then where the recommended trades leave each
-// category against its target. Before the amount is typed the tiles
-// and the ladder say so, and the ledger reads as the allocation stands.
+// caption says in pounds once one is recommended; then where the
+// recommended trades leave each category against its target. Before
+// the amount is typed the tile says so, and the ledger reads as the
+// allocation stands.
 // There is nothing to lay out until an allocation is imported, until
 // what it holds has been read, which an older import has not, and
 // while no category has both a fund and a share to fill, and the
@@ -99,9 +100,7 @@ export function CogitatorBoard({ targets }: CogitatorBoardProps): JSX.Element {
         label={sectionLabel(cogitator)}
         title={cogitator.title}
       >
-        {targets === null ? (
-          "Buys only, toward the target allocation"
-        ) : (
+        {targets === null ? undefined : (
           <>
             <Badge variant="secondary">
               <FolderSync aria-hidden />
@@ -114,21 +113,21 @@ export function CogitatorBoard({ targets }: CogitatorBoardProps): JSX.Element {
       <ScreenBody>
         {targets === null && (
           <Unready
-            description="Import a Portfolio Performance file to read the targets and what each category holds."
+            description="Import a Portfolio Performance file."
             icon={ChartPie}
             title="No allocation imported yet"
           />
         )}
         {targets !== null && held === 0 && (
           <Unready
-            description="Reload the Portfolio Performance file to read what each category holds, which an older import did not."
+            description="Reload the Portfolio Performance file."
             icon={FolderSync}
             title="Nothing held yet"
           />
         )}
         {targets !== null && held > 0 && !isReady && (
           <Unready
-            description="No category has both a fund assigned and a share of the whole to fill."
+            description="No category has both a fund and a target."
             icon={Ban}
             title="Nothing to buy toward"
           />
@@ -159,17 +158,16 @@ function nameOf(rung: Rung): string {
 // Why the rung recommended is the one: before an amount is typed, that
 // it is to be; otherwise the count, and what the rung above would do,
 // put less than the minimum into one category, named with the pounds,
-// or buy nothing at all, every other category holding its target or
-// more.
+// or buy nothing at all.
 function reasonOf({ recommended, rungs }: Ladder, amount: number): string {
   if (amount <= 0) {
-    return "Type the amount to invest to lay the trades out.";
+    return "Type an amount to invest.";
   }
   const opening =
     recommended.count === 0 ? "No trade" : counted(recommended.count, "trade");
   const next = rungs.find((rung) => rung.count === recommended.count + 1);
   if (next === undefined) {
-    return `${opening}. Trade ${String(recommended.count + 1)} would buy nothing: every other category holds its target or more.`;
+    return `${opening}. Trade ${String(recommended.count + 1)} would buy nothing.`;
   }
   const least = next.trades.reduce((smallest, trade) =>
     trade.pounds < smallest.pounds ? trade : smallest,
@@ -231,7 +229,7 @@ function Trades({
         )}
       </TileGrid>
       <SectionCard
-        caption={reason}
+        {...(recommended.count > 0 && { caption: reason })}
         label={subsectionLabel(cogitator, 1)}
         title="How many trades"
       >
@@ -288,7 +286,7 @@ function Trades({
           </TableBody>
         </Table>
         <CardFooter className="text-sm text-muted-foreground">
-          {`Off target is the root mean square of every category's gap from its target. A trade is worth placing for ${formatGbp(minimumTrade)} or more, so the rung recommended is the last whose smallest trade is.`}
+          {`Off target is the root mean square of the gaps from target. Each trade is at least ${formatGbp(minimumTrade)}.`}
         </CardFooter>
       </SectionCard>
       <SectionCard
