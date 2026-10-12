@@ -38,9 +38,7 @@ describe("ScreenError", () => {
     draw(fromServer("Minified React error #441"));
 
     expect(
-      screen.getByText(
-        "The server could not draw it. Its log gives the reason under 3546086354.",
-      ),
+      screen.getByText("See the server log under 3546086354."),
     ).toBeInTheDocument();
   });
 

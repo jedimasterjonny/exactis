@@ -52,6 +52,6 @@ function reasonFor(error: unknown): string {
     error instanceof Error &&
     "digest" in error &&
     typeof error.digest === "string"
-    ? `The server could not draw it. Its log gives the reason under ${error.digest}.`
+    ? `See the server log under ${error.digest}.`
     : reasonOf(error);
 }
