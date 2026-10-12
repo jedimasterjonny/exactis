@@ -117,13 +117,13 @@ describe("ProgressChart", () => {
     fireEvent.keyDown(chart, { key: "ArrowRight" });
     fireEvent.keyDown(chart, { key: "ArrowRight" });
 
-    expect(
-      await screen.findByText("Not kept, drawn between the months either side"),
-    ).toHaveClass("text-muted-foreground");
+    expect(await screen.findByText("Not kept, filled in")).toHaveClass(
+      "text-muted-foreground",
+    );
     expect(screen.getByRole("status")).toHaveTextContent(
       [
         "Mar 2025",
-        "Not kept, drawn between the months either side",
+        "Not kept, filled in",
         "Property & vehicles£300,000",
         "ISAs£50,000",
         "Pensions£104,000",

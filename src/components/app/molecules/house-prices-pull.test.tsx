@@ -45,9 +45,7 @@ describe("HousePricesPull", () => {
     await waitFor(() => {
       expect(
         screen.getByRole("dialog", { name: "House prices pulled" }),
-      ).toHaveAccessibleDescription(
-        "Home now £416,424; index to Jul 2026, the months after rolled forward from it",
-      );
+      ).toHaveAccessibleDescription("Home now £416,424, indexed to Jul 2026");
     });
     // The toast lands before the transition ends, so the pull frees a
     // beat after it.
