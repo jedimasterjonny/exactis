@@ -62,7 +62,7 @@ export function ChanceBoard({
   if ("short" in spread) {
     return (
       <Unrun
-        description={`${spread.short}, so there is nothing to draw the futures at. The CMA is pulled and mapped on Assumptions.`}
+        description={`${spread.short}. Set it on Assumptions.`}
         headline="No spread to draw the futures from"
         icon={Dices}
       />
@@ -71,7 +71,7 @@ export function ChanceBoard({
   if (!accounts.some(takesSpare)) {
     return (
       <Unrun
-        description="Add a pension, an ISA or a savings account on Accounts & assets. The futures draw their returns on what the savings hold."
+        description="Add a pension, an ISA or a savings account on Accounts & assets."
         headline="No savings for the futures to grow"
         icon={PiggyBank}
       />
@@ -104,18 +104,14 @@ function AtItsRates({
     return (
       <Caution
         title={`The plan runs out at ${String(ageIn(future.ranOut, plan))} even at its own rates`}
-      >
-        {`Income & expenses projects the savings running out in ${String(future.ranOut)}. The futures say how often the markets would carry it further.`}
-      </Caution>
+      />
     );
   }
   if (future.fell !== null) {
     return (
       <Caution
         title={`The plan lasts at its own rates only by drawing a pension early, at ${String(ageIn(future.fell, plan))}`}
-      >
-        {`Income & expenses projects the savings carried from ${String(future.fell)} by a pension drawn before it can be, at the 55% charge. The futures count a draw like that as falling short.`}
-      </Caution>
+      />
     );
   }
   return null;
@@ -159,7 +155,7 @@ function Futures({
     [asProjected, plan],
   );
   const headline = isDone
-    ? `${formatCount(runLength)} futures, each the plan run again from ${String(ageIn(plan.from, plan))} to ${String(endAge(plan))}`
+    ? `${formatCount(runLength)} futures, age ${String(ageIn(plan.from, plan))} to ${String(endAge(plan))}`
     : `Drawing ${formatCount(futures.length)} of ${formatCount(runLength)} futures…`;
   return (
     <Screen headline={headline}>
@@ -184,7 +180,7 @@ function Futures({
         projected={projected.middle}
         reading={reading}
       />
-      <FuturesDrawn count={runLength} plan={plan} spread={spread} />
+      <FuturesDrawn plan={plan} spread={spread} />
     </Screen>
   );
 }

@@ -92,9 +92,7 @@ describe("ChanceBoard", () => {
       screen.getAllByText("No spread to draw the futures from"),
     ).toHaveLength(2);
     expect(
-      within(card).getByText(
-        "No CMA is pulled, so there is nothing to draw the futures at. The CMA is pulled and mapped on Assumptions.",
-      ),
+      within(card).getByText("No CMA is pulled. Set it on Assumptions."),
     ).toBeInTheDocument();
   });
 
@@ -137,7 +135,7 @@ describe("ChanceBoard", () => {
     );
     expect(
       await within(screen.getByRole("banner")).findByText(
-        "1,000 futures, each the plan run again from 34 to 37",
+        "1,000 futures, age 34 to 37",
         {},
         { timeout: 5000 },
       ),
@@ -229,10 +227,7 @@ describe("ChanceBoard", () => {
     const caution = screen.getByRole("note");
 
     expect(caution).toHaveTextContent(
-      "The plan lasts at its own rates only by drawing a pension early, at 34",
-    );
-    expect(caution).toHaveTextContent(
-      "Income & expenses projects the savings carried from 2026 by a pension drawn before it can be, at the 55% charge. The futures count a draw like that as falling short.",
+      /^The plan lasts at its own rates only by drawing a pension early, at 34$/,
     );
   });
 
@@ -252,10 +247,7 @@ describe("ChanceBoard", () => {
     const caution = screen.getByRole("note");
 
     expect(caution).toHaveTextContent(
-      "The plan runs out at 36 even at its own rates",
-    );
-    expect(caution).toHaveTextContent(
-      "Income & expenses projects the savings running out in 2028. The futures say how often the markets would carry it further.",
+      /^The plan runs out at 36 even at its own rates$/,
     );
     expect(
       await within(outcomes()).findByRole(

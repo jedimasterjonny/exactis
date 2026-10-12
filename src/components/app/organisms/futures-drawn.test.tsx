@@ -25,7 +25,6 @@ describe("FuturesDrawn", () => {
   it("sets out the rates the futures are drawn about, how far a year strays, and a year one in ten either side", () => {
     render(
       <FuturesDrawn
-        count={1000}
         plan={plan}
         spread={{
           inflation: loggedSpread(0.03, 0.02),
@@ -52,16 +51,6 @@ describe("FuturesDrawn", () => {
       "Strays by, a year14.00%2.00%",
       "Low year, one in ten−9.33%0.47%",
       "High year, one in ten26.27%5.59%",
-    ]);
-    expect(
-      within(card)
-        .getAllByRole("definition")
-        .map(({ textContent }) => textContent),
-    ).toStrictEqual([
-      "1,000, each the plan run again",
-      "A year at a time, log-normal, prices apart from returns",
-      "The same futures, so a change is the plan's",
-      "With no year short, and no pension drawn early",
     ]);
   });
 });
