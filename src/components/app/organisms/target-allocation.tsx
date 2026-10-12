@@ -6,7 +6,6 @@ import {
   ChartPie,
   Crosshair,
   Download,
-  FolderSync,
   RefreshCw,
   WandSparkles,
 } from "lucide-react";
@@ -20,7 +19,6 @@ import { importTargets, mapByName } from "@/actions/targets";
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { TargetTable } from "@/components/app/organisms/target-table";
-import { Badge } from "@/components/kit/badge";
 import { Button, buttonVariants } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";
 import { suggestedMappings } from "@/data/class-table";
@@ -55,8 +53,8 @@ const splitSaid = `${formatWholePercent(split.stocks)} equity and ${formatWholeP
 // The assumptions screen's target allocation: the categories Portfolio
 // Performance's Asset Allocation taxonomy holds, the share of the whole
 // it sets each, and the class of the latest CMA each is mapped onto,
-// which the rates derived from the CMA are blended from. The header says
-// the day the targets were imported, and imports them again from a file
+// which the rates derived from the CMA are blended from. The header
+// imports them again from a file
 // chosen on this device, Portfolio Performance's own file as it saves
 // it. The file is read here in the browser rather than sent, since it
 // holds every holding and transaction beside the taxonomy, so the
@@ -68,8 +66,8 @@ const splitSaid = `${formatWholePercent(split.stocks)} equity and ${formatWholeP
 // said why under a toast, and nothing is kept. The picker is emptied as soon
 // as a file is taken from it, so the same file chosen again, saved
 // since, is read again. Before anything is imported there is no table
-// to lay out, and the card says so. The footer states how a target is
-// worked out and the check the targets pass before they are kept.
+// to lay out, and the card says so. The footer says what leaves the
+// file, since it holds more than the store is sent.
 //
 // The header also retargets the allocation from LifeStrategy 80%
 // Equity, from a file chosen the same way: what the fund holds is
@@ -142,7 +140,7 @@ export function TargetAllocation({
     sendMapping(mapByName, {
       failure: "Classes not mapped",
       success: (mapped) => ({
-        description: `${String(mapped.length)} ${mapped.length === 1 ? "category" : "categories"} mapped onto the class its name suggests`,
+        description: `${String(mapped.length)} ${mapped.length === 1 ? "category" : "categories"} mapped`,
         title: "Classes mapped by name",
       }),
     });
@@ -199,12 +197,6 @@ export function TargetAllocation({
     <SectionCard
       actions={
         <>
-          {targets !== null && (
-            <Badge variant="secondary">
-              <FolderSync aria-hidden />
-              {`Imported ${formatDay(targets.importedOn)}`}
-            </Badge>
-          )}
           {suggested > 0 && (
             <Button
               isBusy={isMapping}
@@ -266,7 +258,7 @@ export function TargetAllocation({
       {targets === null ? (
         <CardContent>
           <EmptyState
-            description={`Import a Portfolio Performance file to read the target allocation set in its ${taxonomy} taxonomy.`}
+            description="Import a Portfolio Performance file."
             icon={ChartPie}
             title="No allocation imported yet"
           />
@@ -279,7 +271,8 @@ export function TargetAllocation({
         />
       )}
       <CardFooter className="text-sm text-muted-foreground">
-        {`A target is its class's weight times the weights of the classes above it in the ${taxonomy} taxonomy, and the targets are checked to add up to 100% before they are kept. The file is read in the browser, and only the targets and what each category holds leave it; the holdings, prices and transactions they are worked out from do not. Each category blends at the 20-year GBP return of its CMA class. Retargeting from ${fund.name} gives each category the share of the fund its own fund holds, at ${splitSaid}, writes the weights into the file and imports it; the file can then be downloaded and saved over the original.`}
+        The file is read in the browser. Only the targets and what each category
+        holds leave it.
       </CardFooter>
     </SectionCard>
   );

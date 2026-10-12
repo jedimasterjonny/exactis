@@ -266,7 +266,7 @@ export function TargetTable({
 }
 
 // What a group's row says of its return: that a sleeve's is blended by
-// the targets with its hedging included, or why it is not blended yet;
+// the targets, or why it is not blended yet;
 // and for the group not blended, why its categories are not.
 function detailOf(
   group: "none" | Sleeve,
@@ -277,8 +277,8 @@ function detailOf(
     return cma === null ? "No CMA pulled yet" : "No class the vintage prices";
   }
   return isBlended
-    ? "Blended by target, hedging included"
-    : "Not blended until every category asking for a share has a class";
+    ? "Blended by target"
+    : "Not blended until every share has a class";
 }
 
 // The categories in the groups the table lays them out in, each with

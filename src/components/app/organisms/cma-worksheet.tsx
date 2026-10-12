@@ -24,7 +24,7 @@ import { Caution } from "@/components/app/atoms/caution";
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { Note } from "@/components/app/atoms/note";
 import { Worksheet } from "@/components/app/atoms/worksheet";
-import { CardContent, CardFooter } from "@/components/kit/card";
+import { CardContent } from "@/components/kit/card";
 import { blendsOf, cmaRates, rebalancingOf, riskOf } from "@/data/cma";
 import { inflationOf } from "@/data/inflation";
 import { movesBetween } from "@/data/moves";
@@ -50,16 +50,12 @@ const headings: Record<Sleeve, string> = { bonds: "Bonds", stocks: "Stocks" };
 // The worksheet's columns: each sleeve, then the portfolio they make.
 const columns = [headings.stocks, headings.bonds, "Portfolio"] as const;
 
-// What each source is named as, and what a change of it was, in the
-// rows of what moved the rates.
-const sourceRows: Record<Source, { detail: string; label: string }> = {
-  cma: { detail: "A vintage pulled since", label: "BlackRock CMA" },
-  curve: { detail: "A curve pulled since", label: "BoE curve" },
-  deductions: { detail: "Typed again since", label: "Fees and yield" },
-  targets: {
-    detail: "Imported or mapped again since",
-    label: "Target allocation",
-  },
+// What each source is named as in the rows of what moved the rates.
+const sourceNames: Record<Source, string> = {
+  cma: "BlackRock CMA",
+  curve: "BoE curve",
+  deductions: "Fees and yield",
+  targets: "Target allocation",
 };
 
 // The body of the rates card while the CMA-derived rates are live: the
@@ -103,7 +99,6 @@ const sourceRows: Record<Source, { detail: string; label: string }> = {
 // Before a vintage is pulled, or a target allocation imported on its
 // tab, there is nothing to work out, and the body says so; while the
 // vintage makes no blend, it says what is missing in the caution tone.
-// The footer states what the figures are.
 export function CmaWorksheet({
   before,
   cma,
@@ -129,14 +124,14 @@ export function CmaWorksheet({
         {fields}
         {cma === null && (
           <EmptyState
-            description="Pull BlackRock's workbook to blend its 20-year GBP returns by your target allocation."
+            description="Pull BlackRock's workbook."
             icon={Sheet}
             title="No CMA pulled yet"
           />
         )}
         {cma !== null && targets === null && (
           <EmptyState
-            description="Import a target allocation on its tab to weight the CMA's returns by."
+            description="Import one on the Target allocation tab."
             icon={ChartPie}
             title="No allocation imported yet"
           />
@@ -154,17 +149,8 @@ export function CmaWorksheet({
           <Moved moves={moves} since={before.savedOn} />
         )}
       </CardContent>
-      <CardFooter className="text-sm text-muted-foreground">
-        {`${cma === null ? "GBP rows, 20-year column" : asOf(cma)}. Nominal down to the real return. The dividend yield moves stocks' return between growth and yield, and their total stays as it is.`}
-      </CardFooter>
     </>
   );
-}
-
-// Which figures of the latest vintage the card reads, and the day
-// they are as of.
-function asOf({ latest }: Vintages): string {
-  return `GBP rows, 20-year column, data as of ${formatDay(latest.asOf)}`;
 }
 
 // The latest vintage worked out by the target allocation, with the
@@ -187,7 +173,7 @@ function Blended({
   if ("short" in blends) {
     return (
       <Caution title="The CMA cannot be blended yet">
-        {`${blends.short}. Set it right on the Target allocation tab, and the rates are derived again.`}
+        {`${blends.short}. Fix it on the Target allocation tab.`}
       </Caution>
     );
   }
@@ -201,19 +187,6 @@ function Blended({
       <Weights cma={cma} mappings={mappings} targets={targets} />
     </>
   );
-}
-
-// What the bonds' blend rests on: the category weighing most in it and
-// how much, or nothing for a sleeve nothing blends into.
-function largestOf({ parts }: Blend): string {
-  return parts
-    .toSorted((one, other) => other.weight - one.weight)
-    .slice(0, 1)
-    .map(
-      ({ category, weight }) =>
-        `; ${category.name} is ${formatPercent(weight)} of bonds`,
-    )
-    .join("");
 }
 
 // What moved the rates since the day given, as a worksheet that adds up
@@ -243,25 +216,12 @@ function Moved({
           columns={["Plan rate", "Inflation", "Real return"]}
           label="What moved the rates, worked out"
           rows={[
-            {
-              detail: `As the household stood on ${day}`,
-              figures: percents(moves.before),
-              label: "Then",
-            },
+            { figures: percents(moves.before), label: "Then" },
             ...moves.steps.map(({ by, sources }) => ({
-              detail:
-                sources.length > 1
-                  ? "Taken together, since the first alone derives no rates"
-                  : sources.map((one) => sourceRows[one].detail).join(""),
               figures: points(by),
-              label: listed.format(sources.map((one) => sourceRows[one].label)),
+              label: listed.format(sources.map((one) => sourceNames[one])),
             })),
-            {
-              detail: "What the sources come to today",
-              figures: percents(moves.now),
-              isResult: true,
-              label: "Now",
-            },
+            { figures: percents(moves.now), isResult: true, label: "Now" },
           ]}
         />
       )}
@@ -320,7 +280,6 @@ function rowsOf(
     blend === stocks && blend.parts.length > 0;
   return [
     {
-      detail: "The target allocation's split between the sleeves",
       figures: figuresOf(
         formatPercent,
         {
@@ -333,7 +292,6 @@ function rowsOf(
       label: "Target weight",
     },
     {
-      detail: `Weighted by target allocation${largestOf(bonds)}`,
       figures: figuresOf(
         formatCurveRate,
         weighted(({ rate }) => rate),
@@ -343,7 +301,6 @@ function rowsOf(
     ...(isHedged(stocks) || isHedged(bonds)
       ? [
           {
-            detail: "Carried from US to UK cash, 20y point",
             figures: figuresOf(
               formatPoints,
               weighted(({ hedging }) => hedging),
@@ -354,7 +311,6 @@ function rowsOf(
         ]
       : []),
     {
-      detail: "Typed above, off both sleeves alike",
       figures: figuresOf(
         formatPoints,
         weighted(() => -deductions.fees),
@@ -365,33 +321,25 @@ function rowsOf(
       ? []
       : [
           {
-            detail:
-              "Earned yearly within each sleeve, and between them for the portfolio, over the blend of geometric returns",
             figures: figuresOf(formatPoints, rebalancing),
             label: "Rebalancing",
           },
         ]),
     {
-      detail: "What each comes to; the portfolio's is the plan rate",
       figures: figuresOf(formatPercent, results.nominal),
       isResult: true,
       label: "Return",
     },
+    { figures: figuresOf(formatPercent, results.growth), label: "Growth" },
     {
-      detail: "The return less the yield, the growth the plan takes",
-      figures: figuresOf(formatPercent, results.growth),
-      label: "Growth",
-    },
-    {
-      detail: "Typed above, paid on top of the growth",
       figures: figuresOf(formatPercent, results.yield, isYielding),
       label: "Dividend yield",
     },
     {
       detail:
         inflation === null
-          ? "Over inflation, once a BoE curve is pulled"
-          : `Over ${formatPercent(inflation)} inflation, compounded rather than subtracted`,
+          ? "Once a BoE curve is pulled"
+          : `Over ${formatPercent(inflation)} inflation`,
       figures:
         inflation === null
           ? ["—", "—", "—"]
@@ -405,7 +353,7 @@ function rowsOf(
 // Every category's share of the whole, on a sunken panel headed as a
 // region of its own beneath the worksheet, split by the sleeve it blends
 // into, the one its class in the latest vintage is priced in: a share of
-// nothing muted, and where the shares come from beneath. A sleeve to a
+// nothing muted. A sleeve to a
 // column where the screen is wide enough, and where it is wider still,
 // stocks take two of three columns and run down both, since that is
 // where a portfolio's categories are, so the panel is as tall as half of
@@ -472,10 +420,6 @@ function Weights({
           </div>
         ))}
       </div>
-      <p className="text-sm text-muted-foreground">
-        From the Target allocation tab — portfolio targets, not current
-        holdings.
-      </p>
     </section>
   );
 }

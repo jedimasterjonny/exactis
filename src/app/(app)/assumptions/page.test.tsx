@@ -149,7 +149,7 @@ describe("Assumptions", () => {
 
     expect(
       screen.getByRole("region", { name: "Target allocation" }),
-    ).toHaveTextContent("Imported 7 Sep 2026");
+    ).toHaveTextContent("Reload from Portfolio Performance");
     expect(
       screen.getAllByRole("combobox", { name: "CMA class for UK equity" })[0],
     ).toHaveValue("UK large cap equities");

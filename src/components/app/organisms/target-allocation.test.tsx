@@ -94,15 +94,12 @@ function retargetWith(file: File): void {
 }
 
 describe("TargetAllocation", () => {
-  it("heads the card as the screen's fifth, saying when the targets were imported", () => {
+  it("heads the card as the screen's fifth, offering to reload the targets", () => {
     renderCard();
 
     const card = screen.getByRole("region", { name: "Target allocation" });
 
     expect(within(card).getByText("Sect. VI.iii")).toHaveClass("label");
-    expect(within(card).getByText("Imported 7 Sep 2026")).not.toHaveClass(
-      "label",
-    );
     expect(
       within(card).getByRole("button", {
         name: "Reload from Portfolio Performance",
@@ -131,27 +128,22 @@ describe("TargetAllocation", () => {
 
     expect(screen.getByText("No allocation imported yet")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Import a Portfolio Performance file to read the target allocation set in its Asset Allocation taxonomy.",
-      ),
+      screen.getByText("Import a Portfolio Performance file."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.queryByText(/^Imported/)).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Import from Portfolio Performance" }),
     ).toBeEnabled();
   });
 
-  it("states how a target is worked out and the check the targets pass", () => {
+  it("says what of the file leaves the browser", () => {
     renderCard(null);
 
     expect(
       screen.getByText(
-        /^A target is its class's weight times the weights of the classes above it in the Asset Allocation taxonomy, and the targets are checked to add up to 100%/,
+        "The file is read in the browser. Only the targets and what each category holds leave it.",
       ),
-    ).toHaveTextContent(
-      "only the targets and what each category holds leave it; the holdings, prices and transactions they are worked out from do not. Each category blends at the 20-year GBP return of its CMA class.",
-    );
+    ).toBeInTheDocument();
   });
 
   it("opens the file picker, which takes a Portfolio Performance file", () => {
@@ -251,14 +243,9 @@ describe("TargetAllocation", () => {
     ).toBeEnabled();
   });
 
-  it("states what retargeting does", () => {
+  it("offers no retargeted file to download before one is retargeted", () => {
     renderCard(null);
 
-    expect(
-      screen.getByText(/^A target is its class's weight/),
-    ).toHaveTextContent(
-      "Retargeting from LifeStrategy 80% Equity gives each category the share of the fund its own fund holds, at 90% equity and 10% bonds, writes the weights into the file and imports it; the file can then be downloaded and saved over the original.",
-    );
     expect(
       screen.queryByRole("link", { name: "Download the retargeted file" }),
     ).not.toBeInTheDocument();
@@ -474,9 +461,7 @@ describe("TargetAllocation", () => {
     await waitFor(() => {
       expect(
         screen.getByRole("dialog", { name: "Classes mapped by name" }),
-      ).toHaveAccessibleDescription(
-        "1 category mapped onto the class its name suggests",
-      );
+      ).toHaveAccessibleDescription("1 category mapped");
     });
   });
 
@@ -493,9 +478,7 @@ describe("TargetAllocation", () => {
     await waitFor(() => {
       expect(
         screen.getByRole("dialog", { name: "Classes mapped by name" }),
-      ).toHaveAccessibleDescription(
-        "8 categories mapped onto the class its name suggests",
-      );
+      ).toHaveAccessibleDescription("8 categories mapped");
     });
   });
 

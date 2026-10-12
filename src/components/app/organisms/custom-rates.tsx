@@ -101,7 +101,7 @@ export function CustomRates({
       <div className="grid gap-6">
         <FieldRow layout="pair">
           <RateField
-            hint="Typed by hand — after fees, as none are taken off"
+            hint="After fees"
             label="Stocks growth"
             min={-1}
             onValueCommitted={(value) => {
@@ -110,7 +110,7 @@ export function CustomRates({
             value={shownRates.stocks}
           />
           <RateField
-            hint="Added to growth — always change the pair"
+            hint="Added to growth"
             label="Dividend yield"
             min={0}
             onValueCommitted={(value) => {
@@ -121,7 +121,7 @@ export function CustomRates({
         </FieldRow>
         <FieldRow layout="pair">
           <RateField
-            hint="Typed by hand — after fees, as none are taken off"
+            hint="After fees"
             label="Bonds growth"
             min={-1}
             onValueCommitted={(value) => {
@@ -130,7 +130,7 @@ export function CustomRates({
             value={shownRates.bonds}
           />
           <RateField
-            hint="Typed by hand — the BoE derivation below is ignored"
+            hint="Overrides the BoE curve"
             label="Inflation"
             onValueCommitted={(value) => {
               saveRate("inflation", value);
@@ -140,7 +140,7 @@ export function CustomRates({
         </FieldRow>
         <FieldRow layout="pair">
           <RateField
-            hint="The rest is held in bonds, flat for life"
+            hint="The rest in bonds"
             label="Stocks share"
             max={1}
             min={0}
@@ -154,7 +154,6 @@ export function CustomRates({
         label="Custom rates, worked out"
         rows={[
           {
-            detail: "The split typed above",
             figures: figuresOf({
               bonds: 1 - shownSplit.stocks,
               portfolio: 1,
@@ -163,18 +162,12 @@ export function CustomRates({
             label: "Weight",
           },
           {
-            detail: "Growth and yield added; the portfolio's is the plan rate",
             figures: figuresOf(results.nominal),
             isResult: true,
             label: "Return",
           },
+          { figures: figuresOf(results.growth), label: "Growth" },
           {
-            detail: "Typed above",
-            figures: figuresOf(results.growth),
-            label: "Growth",
-          },
-          {
-            detail: "Typed above, paid on top of the growth",
             figures: [
               formatPercent(results.yield.stocks),
               "—",
@@ -183,7 +176,7 @@ export function CustomRates({
             label: "Dividend yield",
           },
           {
-            detail: `Over ${formatPercent(shownRates.inflation)} inflation, compounded rather than subtracted`,
+            detail: `Over ${formatPercent(shownRates.inflation)} inflation`,
             figures: figuresOf(results.real),
             isResult: true,
             label: "Real return",
