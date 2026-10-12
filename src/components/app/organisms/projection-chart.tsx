@@ -71,7 +71,7 @@ interface ProjectionChartProps {
 // What the chart draws for an account: the ids of the accounts it sums,
 // the account's own and, for a house, a car or another real asset, each
 // loan secured on it, so it stands at its equity; the account's name;
-// whether it is a debt; the colour it is drawn in, and the key that
+// whether it is cash or a debt; the colour it is drawn in, and the key that
 // colour is written under. The colour is named once: the container
 // writes it into --color-<key> within its own scope, and everything
 // drawn for the series, the tooltip's key included, reads it back from
@@ -81,6 +81,7 @@ interface ProjectionChartProps {
 interface Series {
   readonly color: string;
   readonly ids: readonly number[];
+  readonly isCash: boolean;
   readonly isOwed: boolean;
   readonly key: string;
   readonly name: string;
@@ -524,10 +525,10 @@ function Placeholder({ children }: { readonly children: string }): JSX.Element {
 }
 
 // The year under the crosshair, the age reached that year and the
-// milestones falling in it, and the figure of each account that holds
-// or owes anything that year, from the top of the stack down as the
-// plot reads, what is held and then what is owed, with what they come
-// to beneath, named for the basis they are
+// milestones falling in it, and the figure of each account other than
+// cash that holds or owes anything that year, from the top of the stack
+// down as the plot reads, what is held and then what is owed, with what
+// they come to beneath, cash among them, named for the basis they are
 // counted on, and under that, for a
 // year that drew on a pension early, what
 // it drew so, and for a year that came up short, what it could not
@@ -573,7 +574,7 @@ function ProjectionTooltip({
         ...series.filter(({ isOwed }) => !isOwed).reverse(),
         ...series.filter(({ isOwed }) => isOwed),
       ]
-        .filter((line) => valueIn(point, line) !== 0)
+        .filter((line) => !line.isCash && valueIn(point, line) !== 0)
         .map((line) => (
           <span className="flex items-center gap-2" key={line.key}>
             <span
@@ -674,6 +675,7 @@ function seriesOf(
         const series: Series = {
           color: `color-mix(in oklab, ${hueAt(hues, place)}, var(--card) ${String(Math.min(Math.floor(place / hues.length), 2) * 30)}%)`,
           ids,
+          isCash: kind === "cash",
           isOwed: kind === "debt",
           key: `account-${String(id)}`,
           name,
