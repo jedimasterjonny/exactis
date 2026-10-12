@@ -24,8 +24,9 @@ import { MilestoneChips } from "@/components/app/atoms/milestone-chips";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
+import { ageOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
-import { markersIn, yearsIn } from "@/engine/futures";
+import { markersIn, reachedIn, yearsIn } from "@/engine/futures";
 import { axisOf } from "@/lib/axis";
 import { listed } from "@/lib/feeders";
 import { formatAxisGbp, formatGbp, formatWholePercent } from "@/lib/money";
@@ -101,7 +102,9 @@ const tenths = ({ bottomTenth, topTenth }: FutureYear): number[] => [
 // at an age where the plan lays it, and one reached when conditions
 // hold in the year by which half the futures drawn so far have reached
 // it, moving as the run comes in, as the lanes beneath read it, and
-// not drawn while fewer than half have. The pounds on
+// not drawn while fewer than half have, its chip dashed and giving the
+// share of the futures drawn so far that reach it in place of a year,
+// or an ellipsis before the first are in. The pounds on
 // the axis reach below nothing only as far as the bottom of the fan
 // does, as a plan whose debts outweigh it can, on the dashboard's scale.
 // The years are read off the run once for each run and plan, rather
@@ -120,6 +123,22 @@ export function FuturesFan({
   const markers = markersIn(futures, milestones, plan).filter(
     (marker) => marker.year >= plan.from && marker.year <= end,
   );
+  const unplaced = milestones
+    .filter(
+      (milestone) =>
+        ageOf(milestone) === undefined &&
+        !markers.some(({ id }) => id === milestone.id),
+    )
+    .map((milestone) => ({
+      id: milestone.id,
+      name: milestone.name,
+      reached:
+        futures.length === 0
+          ? null
+          : futures.filter(
+              (future) => reachedIn(future, milestone, plan) !== null,
+            ).length / futures.length,
+    }));
   const years = useMemo(() => yearsIn(futures, plan), [futures, plan]);
   const axis = axisOf(
     Math.min(0, ...years.map(({ bottomTenth }) => bottomTenth)),
@@ -217,13 +236,14 @@ export function FuturesFan({
             </ChartContainer>
           </div>
         )}
-        {markers.length > 0 && (
+        {(markers.length > 0 || unplaced.length > 0) && (
           <MilestoneChips
             markers={markers}
             onSelect={(tie) => {
               setChosen(tie === chosen ? undefined : tie);
             }}
             selected={chosen}
+            unplaced={unplaced}
           />
         )}
       </CardContent>
