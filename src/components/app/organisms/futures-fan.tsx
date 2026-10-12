@@ -54,7 +54,9 @@ const axisWidth = 57;
 // and held to the card's width, in a column that grows no wider than the
 // card. A box given a ratio and a floor widens to keep the ratio, and a
 // column sized to what it holds widened with it, so on a phone the floor
-// took the plot nearly three times past the card's edge.
+// took the plot nearly three times past the card's edge. The chart fills
+// the box rather than being it, as the progress chart's does, and for
+// the same reason.
 const plotBox = "aspect-[3/1] min-h-72 w-full";
 
 // What the band of the middle half spans in a year, as recharts reads a
@@ -141,77 +143,79 @@ export function FuturesFan({
             Drawing the first futures…
           </p>
         ) : (
-          <ChartContainer className={plotBox} config={{}}>
-            <ComposedChart
-              data={years}
-              margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
-              title="What the futures are worth as each year opens"
-            >
-              <CartesianGrid vertical={false} />
-              <XAxis
-                axisLine={false}
-                dataKey="year"
-                minTickGap={40}
-                tickLine={false}
-                tickMargin={8}
-              />
-              <YAxis
-                axisLine={false}
-                domain={axis.domain}
-                tickFormatter={formatAxisGbp}
-                tickLine={false}
-                ticks={axis.ticks}
-                width={axisWidth}
-              />
-              <ChartTooltip
-                content={(props) => (
-                  <FanTooltip
-                    {...props}
-                    markers={markers}
-                    plan={plan}
-                    run={futures.length}
-                    years={years}
-                  />
-                )}
-              />
-              <Area
-                activeDot={false}
-                dataKey={tenths}
-                fill="var(--chart-2)"
-                fillOpacity={0.2}
-                isAnimationActive={false}
-                stroke="none"
-                type="monotone"
-              />
-              <Area
-                activeDot={false}
-                dataKey={quarters}
-                fill="var(--chart-2)"
-                fillOpacity={0.35}
-                isAnimationActive={false}
-                stroke="none"
-                type="monotone"
-              />
-              <Line
-                activeDot={{ r: 4, stroke: "var(--card)", strokeWidth: 2 }}
-                dataKey="middle"
-                dot={false}
-                isAnimationActive={false}
-                stroke="var(--chart-1)"
-                strokeWidth={2}
-                type="monotone"
-              />
-              {markers.map((marker) => (
-                <ReferenceLine
-                  key={marker.id}
-                  stroke="var(--brand)"
-                  strokeOpacity={marker.id === chosen ? 1 : 0.35}
-                  strokeWidth={marker.id === chosen ? 1.5 : 1}
-                  x={marker.year}
+          <div className={cn("flex flex-col", plotBox)}>
+            <ChartContainer className="aspect-auto min-h-0 flex-1" config={{}}>
+              <ComposedChart
+                data={years}
+                margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
+                title="What the futures are worth as each year opens"
+              >
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  axisLine={false}
+                  dataKey="year"
+                  minTickGap={40}
+                  tickLine={false}
+                  tickMargin={8}
                 />
-              ))}
-            </ComposedChart>
-          </ChartContainer>
+                <YAxis
+                  axisLine={false}
+                  domain={axis.domain}
+                  tickFormatter={formatAxisGbp}
+                  tickLine={false}
+                  ticks={axis.ticks}
+                  width={axisWidth}
+                />
+                <ChartTooltip
+                  content={(props) => (
+                    <FanTooltip
+                      {...props}
+                      markers={markers}
+                      plan={plan}
+                      run={futures.length}
+                      years={years}
+                    />
+                  )}
+                />
+                <Area
+                  activeDot={false}
+                  dataKey={tenths}
+                  fill="var(--chart-2)"
+                  fillOpacity={0.2}
+                  isAnimationActive={false}
+                  stroke="none"
+                  type="monotone"
+                />
+                <Area
+                  activeDot={false}
+                  dataKey={quarters}
+                  fill="var(--chart-2)"
+                  fillOpacity={0.35}
+                  isAnimationActive={false}
+                  stroke="none"
+                  type="monotone"
+                />
+                <Line
+                  activeDot={{ r: 4, stroke: "var(--card)", strokeWidth: 2 }}
+                  dataKey="middle"
+                  dot={false}
+                  isAnimationActive={false}
+                  stroke="var(--chart-1)"
+                  strokeWidth={2}
+                  type="monotone"
+                />
+                {markers.map((marker) => (
+                  <ReferenceLine
+                    key={marker.id}
+                    stroke="var(--brand)"
+                    strokeOpacity={marker.id === chosen ? 1 : 0.35}
+                    strokeWidth={marker.id === chosen ? 1.5 : 1}
+                    x={marker.year}
+                  />
+                ))}
+              </ComposedChart>
+            </ChartContainer>
+          </div>
         )}
         {markers.length > 0 && (
           <MilestoneChips
