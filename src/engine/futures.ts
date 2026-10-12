@@ -91,9 +91,10 @@ interface Run {
 // they say the same chance.
 export const runLength = 1000;
 
-// The seed every run of the futures starts from, so every run of a plan
-// meets the same markets and a change in what they come to is the plan's.
-const seed = 2026;
+// The seed a run of the futures starts from unless it is given another,
+// so every run of a plan meets the same markets and a change in what
+// they come to is the plan's.
+const defaultSeed = 2026;
 
 // What a substream's seed steps by from one future to the next: the
 // golden ratio's share of 2^32, which spreads the futures' seeds as far
@@ -144,7 +145,8 @@ export function futureOf(points: readonly ProjectionPoint[], run: Run): Future {
 // in the run given, its first unless another is, each the plan carried
 // along its own path, drawn as pathOf draws one at the spread given.
 // Future by future the draws come from a stream of their own, seeded by
-// where the future falls in the run, so a run of a thousand starts with
+// where the future falls in the run, counted on from the seed given, or
+// from the one every run starts from, so a run of a thousand starts with
 // the hundred a run of a hundred is, a run drawn from its fiftieth is
 // the rest of the run drawn from its first, and the futures do not
 // depend on how many are taken or by whom.
@@ -154,8 +156,14 @@ export function* futuresOf(
   {
     from = 0,
     plan,
+    seed = defaultSeed,
     spread,
-  }: { readonly from?: number; readonly plan: Plan; readonly spread: Spread },
+  }: {
+    readonly from?: number;
+    readonly plan: Plan;
+    readonly seed?: number;
+    readonly spread: Spread;
+  },
 ): Generator<Future, never, undefined> {
   for (let future = from; ; future += 1) {
     const path = pathOf(plan, spread, normalsFrom(seed + future * step));
