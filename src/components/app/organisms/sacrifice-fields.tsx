@@ -60,11 +60,10 @@ export function SacrificeFields({
 }
 
 // What the share lands in the pension a year, with the employer's NI
-// saved on it, and the employer's match where the salary is matched, as
-// the accounts' table states it.
+// saved on it and the employer's match where the salary is matched.
 function landsOf(line: IncomeLine, sacrifice: number): string {
   const lands = yearly(contributionOf({ ...line, sacrifice }), line.cadence);
-  return `Of its ${formatGbp(line.amount)} base; ${formatGbp(lands)} a year lands with the NI saved${line.match > 0 ? " and the employer's match" : ""}`;
+  return `Of its ${formatGbp(line.amount)} base, landing as ${formatGbp(lands)} a year`;
 }
 
 // The share held for the line, and none for a line the shares leave

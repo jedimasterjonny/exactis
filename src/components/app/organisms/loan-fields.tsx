@@ -51,7 +51,7 @@ interface LoanFieldsProps {
 }
 
 // The hint under the one figure the dialog works out rather than takes.
-const workedHint = "Worked out from the other two";
+const workedHint = "Worked out";
 
 // The three figures any two of which fix the third, as the choice of
 // which is worked out offers them.
@@ -120,7 +120,7 @@ export function LoanFields({
     <>
       <FieldRow layout="pair">
         <MoneyField
-          hint={`What is owed in ${formatMonth({ month: plan.month, year: plan.from })}`}
+          hint={`As of ${formatMonth({ month: plan.month, year: plan.from })}`}
           label={words.balance}
           min={0}
           onValueCommitted={(balance) => {
@@ -130,7 +130,6 @@ export function LoanFields({
         />
         <SelectField
           defaultValue={opened}
-          hint="From the other two"
           label="Work out"
           onValueChange={onWork}
           options={workings}
@@ -138,7 +137,7 @@ export function LoanFields({
       </FieldRow>
       <FieldRow layout="pair">
         <MoneyField
-          hint={worked === "payment" ? workedHint : "A month"}
+          hint={worked === "payment" ? workedHint : undefined}
           isReadOnly={worked === "payment"}
           label="Monthly payment"
           min={0}
@@ -187,12 +186,14 @@ export function LoanFields({
   );
 }
 
-// What the month field says beneath itself: that the end was worked
-// out, that the payment never reaches one, or what it is when it is
-// picked.
-function endHint(worked: LoanFigure, figure: null | number): string {
+// What the month field says beneath itself when the end is worked out:
+// that it was, or that the payment never reaches one.
+function endHint(
+  worked: LoanFigure,
+  figure: null | number,
+): string | undefined {
   if (worked !== "term") {
-    return "When the last payment falls";
+    return undefined;
   }
   return figure === null ? "Never, at this payment" : workedHint;
 }

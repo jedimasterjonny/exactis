@@ -43,8 +43,7 @@ const statusOptions = optionsOf(statusLabels, statuses);
 const words: LoanWords = {
   balance: "Loan balance",
   end: "Last payment",
-  never:
-    "Never clears at this payment, so the payments run to the end of the plan",
+  never: "Never clears at this payment",
   noRate: "No rate clears the balance over the term",
 };
 
@@ -92,7 +91,7 @@ export function HouseFields({
       <FieldRow layout="pair">
         <MoneyField
           defaultValue={initial.value}
-          hint={`What it would sell for in ${formatMonth({ month: plan.month, year: plan.from })}`}
+          hint={`As of ${formatMonth({ month: plan.month, year: plan.from })}`}
           label="Value"
           onValueCommitted={(value) => {
             onAmend({ value });
@@ -136,7 +135,6 @@ export function HouseFields({
         />
         <MoneyField
           defaultValue={initial.bought.price}
-          hint="What it cost"
           label="Bought for"
           min={0}
           onValueCommitted={(price) => {

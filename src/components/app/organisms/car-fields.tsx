@@ -81,7 +81,7 @@ export function CarFields({
       <FieldRow layout="pair">
         <MoneyField
           defaultValue={initial.value}
-          hint={`What it would sell for in ${formatMonth({ month: plan.month, year: plan.from })}`}
+          hint={`As of ${formatMonth({ month: plan.month, year: plan.from })}`}
           label="Value"
           onValueCommitted={(value) => {
             onAmend({ value });
@@ -128,10 +128,10 @@ export function CarFields({
 // refinanced on the same terms when the agreement ends, and how long the
 // payments then run in all, when they clear it.
 function balloonHint(clears: null | number): string {
-  const refinanced = "Refinanced on the same terms when the agreement ends";
+  const refinanced = "Refinanced on the same terms at the end";
   return clears === null
     ? refinanced
-    : `${refinanced}, so the payments run ${years.format(clears)} years in all`;
+    : `${refinanced}, ${years.format(clears)} years in all`;
 }
 
 // What the car calls the loan's fields: the finance is owed and has
@@ -145,8 +145,8 @@ function wordsOf(agreement: Agreement): LoanWords {
     balance: "Balance owed",
     end: isPcp ? "Agreement ends" : "Last payment",
     never: isPcp
-      ? "Never reaches the balloon at this payment, so the payments run to the end of the plan"
-      : "Never clears at this payment, so the payments run to the end of the plan",
+      ? "Never reaches the balloon at this payment"
+      : "Never clears at this payment",
     noRate: "No rate reaches the balloon over the term",
   };
 }

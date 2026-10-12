@@ -88,13 +88,7 @@ describe("OwnerList", () => {
     expect(within(dialog).getByText("New owner")).toHaveClass("text-brand");
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(field("Born", dialog)).toHaveValue("1990");
-    expect(field("Born", dialog)).toHaveAccessibleDescription(
-      "The year, which every age is read against",
-    );
     expect(field("Retires at", dialog)).toHaveValue("59");
-    expect(field("Retires at", dialog)).toHaveAccessibleDescription(
-      "From which nothing is earned by working",
-    );
 
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: " Me " },

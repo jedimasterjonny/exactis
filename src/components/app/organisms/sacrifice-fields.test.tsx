@@ -54,11 +54,11 @@ describe("SacrificeFields", () => {
 
     expect(field("Sacrificed from Salary")).toHaveValue("10.00%");
     expect(field("Sacrificed from Salary")).toHaveAccessibleDescription(
-      "Of its £120,000 base; £13,800 a year lands with the NI saved",
+      "Of its £120,000 base, landing as £13,800 a year",
     );
     expect(field("Sacrificed from Salary step-up")).toHaveValue("5.00%");
     expect(field("Sacrificed from Salary step-up")).toHaveAccessibleDescription(
-      "Of its £14,000 base; £9,660 a year lands with the NI saved",
+      "Of its £14,000 base, landing as £9,660 a year",
     );
   });
 
@@ -93,14 +93,13 @@ describe("SacrificeFields", () => {
 
     expect(field("Sacrificed from Salary")).toHaveValue("10.00%");
     expect(field("Sacrificed from Salary")).toHaveAccessibleDescription(
-      "Of its £120,000 base; £6,900 a year lands with the NI saved",
+      "Of its £120,000 base, landing as £6,900 a year",
     );
   });
 
   // A salary matched to seven per cent of its base lands the employer's
-  // £8,400 a year beside the £13,800, and the hint says the match is in
-  // it.
-  it("says the employer's match lands with the NI saved on a matched salary", () => {
+  // £8,400 a year beside the £13,800, and the hint counts it in.
+  it("counts the employer's match in what a matched salary lands", () => {
     render(
       <SacrificeFields
         draft={shares}
@@ -111,7 +110,7 @@ describe("SacrificeFields", () => {
     );
 
     expect(field("Sacrificed from Salary")).toHaveAccessibleDescription(
-      "Of its £120,000 base; £22,200 a year lands with the NI saved and the employer's match",
+      "Of its £120,000 base, landing as £22,200 a year",
     );
   });
 
@@ -122,7 +121,7 @@ describe("SacrificeFields", () => {
 
     expect(field("Sacrificed from Salary step-up")).toHaveValue("0.00%");
     expect(field("Sacrificed from Salary step-up")).toHaveAccessibleDescription(
-      "Of its £14,000 base; £0 a year lands with the NI saved",
+      "Of its £14,000 base, landing as £0 a year",
     );
   });
 });

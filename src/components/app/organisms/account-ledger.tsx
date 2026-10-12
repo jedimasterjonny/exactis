@@ -215,7 +215,7 @@ export function AccountLedger({
             </Button>
           </>
         }
-        caption={`Savings grow at the plan rate, ${formatPercent(plan.rate)}, unless they say otherwise, under one allocation applied pro rata to every account.`}
+        caption={`Savings grow at the plan rate, ${formatPercent(plan.rate)}, unless set otherwise`}
         label={subsectionLabel(accountsAndAssets, 1)}
         title="Balance sheet"
       >

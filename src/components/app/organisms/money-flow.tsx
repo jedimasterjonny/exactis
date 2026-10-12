@@ -158,15 +158,15 @@ export function MoneyFlow({
           </Button>
         ) : undefined
       }
-      caption="Debts are always paid first. Savings are then paid in this order, and drawn on in it one kind at a time."
+      caption="Debts first, then savings in this order, which draws follow too"
       label={label}
       title="Where the month's money goes"
     >
       <CardContent className="grid gap-4">
         <p className="text-sm">
           {spare > penny
-            ? `${formatGbp(spare)} a month is spare in ${month}, once tax, the expenses, the loans' payments and any fixed sums are met, and the savings take it in this order.`
-            : `Nothing is spare in ${month} once tax, the expenses, the loans' payments and any fixed sums are met.`}
+            ? `${formatGbp(spare)} a month spare in ${month}, after tax, expenses and fixed payments.`
+            : `Nothing spare in ${month}, after tax, expenses and fixed payments.`}
         </p>
         <ol className="divide-y border-y">
           {savings.map((account, index) => {
@@ -231,8 +231,8 @@ export function MoneyFlow({
         </p>
         <p className="text-xs text-muted-foreground">
           {flow.left < -penny
-            ? "What the month is short by is drawn from the savings, cash first."
-            : "What no saving takes is left in the month, which the plan takes as spent."}
+            ? "Drawn from the savings, cash first."
+            : "Taken as spent."}
         </p>
         <p aria-live="polite" className="sr-only">
           {said}

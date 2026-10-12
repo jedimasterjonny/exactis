@@ -145,7 +145,6 @@ export function OwnerList({
           <FieldRow layout="pair">
             <YearField
               defaultValue={entry.initial.born}
-              hint="The year, which every age is read against"
               label="Born"
               onValueCommitted={(born) => {
                 amend(entry, { born });
@@ -153,7 +152,6 @@ export function OwnerList({
             />
             <AgeField
               hasSlider={false}
-              hint="From which nothing is earned by working"
               label="Retires at"
               max={oldestAge}
               min={0}

@@ -119,7 +119,7 @@ describe("AccountLedger", () => {
     expect(within(sheet()).getByText("Sect. III.i")).toHaveClass("label");
     expect(
       within(sheet()).getByText(
-        "Savings grow at the plan rate, 5.00%, unless they say otherwise, under one allocation applied pro rata to every account.",
+        "Savings grow at the plan rate, 5.00%, unless set otherwise",
       ),
     ).toBeInTheDocument();
     expect(
@@ -602,9 +602,7 @@ describe("AccountLedger", () => {
     ).toHaveValue("£0");
     expect(
       within(dialog).getByRole("textbox", { name: "Cap, a year" }),
-    ).toHaveAccessibleDescription(
-      "Up to the £20,000 allowance, or nothing for all of it",
-    );
+    ).toHaveAccessibleDescription("Nothing for the full £20,000 allowance");
 
     commit(
       within(dialog).getByRole("textbox", { name: "Cap, a year" }),
@@ -652,7 +650,7 @@ describe("AccountLedger", () => {
     ).toHaveValue("spare");
     expect(
       within(dialog).getByRole("textbox", { name: "Cap, a year" }),
-    ).toHaveAccessibleDescription("Leave at nothing for no cap");
+    ).not.toHaveAccessibleDescription();
 
     fireEvent.change(
       within(dialog).getByRole("combobox", { name: "Contribution" }),
@@ -1141,9 +1139,7 @@ describe("AccountLedger", () => {
     });
 
     expect(treatment).toBeDisabled();
-    expect(treatment).toHaveAccessibleDescription(
-      "Fed by Salary; set the pension to none on the salary to change it",
-    );
+    expect(treatment).toHaveAccessibleDescription("Fed by Salary");
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     treatment = within(openRow("Stocks & shares ISA")).getByRole("combobox", {

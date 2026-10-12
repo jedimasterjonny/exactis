@@ -259,7 +259,7 @@ function grownBy(current: Entry<Draft>, kind: AccountKind): Partial<Draft> {
 
 // Why the treatment of the account being edited is held, if it is: a
 // pension a salary feeds stays a pension until the salary is unlinked,
-// which the reason says, naming the salaries. An account nothing feeds
+// and the reason names the salaries. An account nothing feeds
 // is held to nothing, and a new one is fed by nothing, since the store
 // has not given it an id yet: the dialog answers for it rather than
 // asking the feeders, since a line feeding no pension holds null where
@@ -267,7 +267,7 @@ function grownBy(current: Entry<Draft>, kind: AccountKind): Partial<Draft> {
 function kindLockOf(feeders: readonly IncomeLine[]): string | undefined {
   return feeders.length === 0
     ? undefined
-    : `Fed by ${listed.format(feeders.map((line) => line.name))}; set the pension to none on the salary to change it`;
+    : `Fed by ${listed.format(feeders.map((line) => line.name))}`;
 }
 
 // The entry the dialog mounts open on: the account as it is, under its

@@ -99,9 +99,9 @@ describe("MonthEnd", () => {
     );
     expect(within(sheet).getByText("0 of 5 checked")).toBeInTheDocument();
     expect(ledger(sheet)).toStrictEqual([
-      "As the balances stoodThe starting net worth as of the end of August 2026£950,771",
-      "Paid inWhat the plan paid into the balances checked, or off them£0",
-      "MovedMarkets, interest, and whatever the plan did not expect£0",
+      "As the balances stoodEnd of August 2026£950,771",
+      "Paid in£0",
+      "MovedMarkets, interest and the unexpected£0",
     ]);
   });
 
@@ -138,8 +138,8 @@ describe("MonthEnd", () => {
     );
     expect(within(sheet).getByText("2 of 5 checked")).toBeInTheDocument();
     expect(ledger(sheet).slice(1)).toStrictEqual([
-      "Paid inWhat the plan paid into the balances checked, or off them£6,193",
-      "MovedMarkets, interest, and whatever the plan did not expect£913",
+      "Paid in£6,193",
+      "MovedMarkets, interest and the unexpected£913",
     ]);
     expect(
       within(sheet).getByText(

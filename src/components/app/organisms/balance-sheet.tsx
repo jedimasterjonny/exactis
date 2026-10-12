@@ -81,7 +81,7 @@ export function BalanceSheet({
   if (savings.length === 0 && assets.length === 0 && debts.length === 0) {
     return (
       <EmptyState
-        description="Add a pension, an ISA, a house or a car to see what the plan starts from."
+        description="Add an account, a house or a car."
         icon={Scale}
         title="Nothing on the balance sheet yet"
       />
@@ -146,9 +146,7 @@ export function BalanceSheet({
             </Heading>
           </div>
           <ul className="divide-y">
-            {assets.length === 0 && (
-              <None>Nothing owned outright or on finance yet</None>
-            )}
+            {assets.length === 0 && <None>No house or car yet</None>}
             {assets.map((pair) => (
               <li
                 className="grid unfolded:grid-cols-2 unfolded:gap-x-12"
