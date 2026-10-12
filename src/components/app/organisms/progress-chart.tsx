@@ -48,7 +48,10 @@ type RowTooltipProps = TooltipContentProps & { readonly rows: readonly Row[] };
 const axisWidth = 57;
 
 // The plot's box, as the fan's: three times as wide as it is tall, down
-// to a floor, held to the card's width.
+// to a floor, held to the card's width. The chart fills the box as the
+// dashboard's does rather than being it, since Safari reads the chart's
+// full height off the ratio rather than the floor, and on a phone drew
+// it a third of the card's width tall over an empty floor.
 const plotBox = "aspect-[3/1] min-h-72 w-full";
 
 // The balances the chart stacks down from nothing, the rest stacking up.
@@ -100,90 +103,92 @@ export function ProgressChart({ points }: ProgressChartProps): JSX.Element {
       title="Month by month"
     >
       <CardContent className="grid grid-cols-1">
-        <ChartContainer className={plotBox} config={{}}>
-          <ComposedChart
-            data={rows}
-            margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
-            stackOffset="sign"
-            title="What each balance stood at as each month ended"
-          >
-            <defs>
-              {series.map(({ key }) => (
-                <linearGradient
-                  id={washOf(key)}
+        <div className={cn("flex flex-col", plotBox)}>
+          <ChartContainer className="aspect-auto min-h-0 flex-1" config={{}}>
+            <ComposedChart
+              data={rows}
+              margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
+              stackOffset="sign"
+              title="What each balance stood at as each month ended"
+            >
+              <defs>
+                {series.map(({ key }) => (
+                  <linearGradient
+                    id={washOf(key)}
+                    key={key}
+                    x1="0"
+                    x2="0"
+                    y1={owed.includes(key) ? "1" : "0"}
+                    y2={owed.includes(key) ? "0" : "1"}
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor={balanceColors[key]}
+                      stopOpacity={0.35}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor={balanceColors[key]}
+                      stopOpacity={0.05}
+                    />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid vertical={false} />
+              <XAxis
+                axisLine={false}
+                dataKey="at"
+                domain={["dataMin", "dataMax"]}
+                minTickGap={24}
+                tickFormatter={labelOf}
+                tickLine={false}
+                tickMargin={8}
+                ticks={(januaries.length > 0 ? januaries : rows).map(
+                  ({ at }) => at,
+                )}
+                type="number"
+              />
+              <YAxis
+                axisLine={false}
+                domain={axis.domain}
+                tickFormatter={formatAxisGbp}
+                tickLine={false}
+                ticks={axis.ticks}
+                width={axisWidth}
+              />
+              <ChartTooltip
+                content={(props) => <RowTooltip {...props} rows={rows} />}
+              />
+              {series.map(({ key, valueAt }) => (
+                <Area
+                  activeDot={false}
+                  dataKey={valueAt}
+                  fill={`url(#${washOf(key)})`}
+                  isAnimationActive={false}
                   key={key}
-                  x1="0"
-                  x2="0"
-                  y1={owed.includes(key) ? "1" : "0"}
-                  y2={owed.includes(key) ? "0" : "1"}
-                >
-                  <stop
-                    offset="0%"
-                    stopColor={balanceColors[key]}
-                    stopOpacity={0.35}
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor={balanceColors[key]}
-                    stopOpacity={0.05}
-                  />
-                </linearGradient>
+                  stackId="balances"
+                  stroke={balanceColors[key]}
+                  strokeWidth={1.5}
+                  type="monotone"
+                />
               ))}
-            </defs>
-            <CartesianGrid vertical={false} />
-            <XAxis
-              axisLine={false}
-              dataKey="at"
-              domain={["dataMin", "dataMax"]}
-              minTickGap={24}
-              tickFormatter={labelOf}
-              tickLine={false}
-              tickMargin={8}
-              ticks={(januaries.length > 0 ? januaries : rows).map(
-                ({ at }) => at,
-              )}
-              type="number"
-            />
-            <YAxis
-              axisLine={false}
-              domain={axis.domain}
-              tickFormatter={formatAxisGbp}
-              tickLine={false}
-              ticks={axis.ticks}
-              width={axisWidth}
-            />
-            <ChartTooltip
-              content={(props) => <RowTooltip {...props} rows={rows} />}
-            />
-            {series.map(({ key, valueAt }) => (
-              <Area
-                activeDot={false}
-                dataKey={valueAt}
-                fill={`url(#${washOf(key)})`}
+              <Line
+                activeDot={{
+                  fill: "var(--foreground)",
+                  r: 4,
+                  stroke: "var(--card)",
+                  strokeWidth: 2,
+                }}
+                dataKey={worthAt}
+                dot={false}
                 isAnimationActive={false}
-                key={key}
-                stackId="balances"
-                stroke={balanceColors[key]}
-                strokeWidth={1.5}
+                stroke="var(--foreground)"
+                strokeWidth={2}
                 type="monotone"
               />
-            ))}
-            <Line
-              activeDot={{
-                fill: "var(--foreground)",
-                r: 4,
-                stroke: "var(--card)",
-                strokeWidth: 2,
-              }}
-              dataKey={worthAt}
-              dot={false}
-              isAnimationActive={false}
-              stroke="var(--foreground)"
-              strokeWidth={2}
-              type="monotone"
-            />
-          </ComposedChart>
-        </ChartContainer>
+            </ComposedChart>
+          </ChartContainer>
+        </div>
       </CardContent>
     </SectionCard>
   );
