@@ -157,10 +157,10 @@ describe("Progress", () => {
     await renderProgress();
 
     expect(screen.getAllByRole("paragraph").at(-2)).toHaveTextContent(
-      "Net worth is a point's five balances summed; cash is left out, as the sheet leaves it out.",
+      "Net worth leaves cash out, as the sheet does.",
     );
     expect(screen.getAllByRole("paragraph").at(-1)).toHaveTextContent(
-      "Property & vehicles holds the house as the sheet gave it; pull the UK House Price Index to hold it at the index for a detached house in Dorset from the month it was bought.",
+      "The house is as the sheet gave it, until house prices are pulled.",
     );
   });
 
@@ -170,7 +170,7 @@ describe("Progress", () => {
     await renderProgress(points, reference.housePrices);
 
     expect(screen.getAllByRole("paragraph").at(-1)).toHaveTextContent(
-      "Property & vehicles holds the house since Jun 2022 at the UK House Price Index for a detached house in Dorset, to Jul 2026 and rolled forward after; pulled 15 Sep 2026.",
+      "The house is at the UK House Price Index for a detached house in Dorset from Jun 2022 to Jul 2026, pulled 15 Sep 2026.",
     );
   });
 });

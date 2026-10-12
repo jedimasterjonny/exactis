@@ -164,9 +164,7 @@ describe("ProgressPoints", () => {
     expect(screen.queryByRole("region")).not.toBeInTheDocument();
     expect(screen.getByText("No points yet")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "A point is the balances as the Household Finances sheet sums them at the end of a month, loaded into the store.",
-      ),
+      screen.getByText("Month-ends come from the Household Finances sheet."),
     ).toBeInTheDocument();
   });
 });
