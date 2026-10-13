@@ -1,13 +1,13 @@
 import type { JSX } from "react";
 
-import { History } from "lucide-react";
+import { cn } from "cn";
+import { ChevronDown, History } from "lucide-react";
 
 import type { Move, ProgressPoint } from "@/data/progress";
 
 import { DeltaValue } from "@/components/app/atoms/delta-value";
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { SegmentBar } from "@/components/app/atoms/segment-bar";
-import { FoldedCell } from "@/components/app/molecules/folded-cell";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import {
   Accordion,
@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/kit/table";
 import { balances, movesOf, netWorthOf, sumOf, yearsOf } from "@/data/progress";
-import { balanceNames, partsOf } from "@/lib/balances";
+import { balanceNames, balanceTones, partsOf } from "@/lib/balances";
 import { counted } from "@/lib/count";
 import { formatGbp } from "@/lib/money";
 import { formatMonthShort } from "@/lib/months";
@@ -55,8 +55,10 @@ interface Scale {
 // to the months beneath. A year opens to its months,
 // newest first, each balance as it was read and net worth beside them,
 // a debt below nothing as an account's is; a narrow table folds each
-// month to its net worth over its balances. A household keeping no
-// point yet draws what would fill the card rather than an empty one.
+// month to what net worth moved by since the point before it and where
+// it ended, a tap opening it to its balances a line apiece, each by a
+// dot in its tone. A household keeping no point yet draws what would
+// fill the card rather than an empty one.
 export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
   if (points.length === 0) {
     return (
@@ -124,21 +126,45 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {kept.toReversed().map((point) => (
+                  {monthsOf(from, kept).map(({ move, point }) => (
                     <TableRow key={point.month.month}>
-                      <FoldedCell
-                        figure={formatGbp(netWorthOf(point))}
-                        name={formatMonthShort(point.month)}
-                      >
-                        <span>
-                          {balances
-                            .map(
-                              (key) =>
-                                `${balanceNames[key]} ${formatGbp(point[key])}`,
-                            )
-                            .join(" · ")}
-                        </span>
-                      </FoldedCell>
+                      <TableCell className="p-0 whitespace-normal unfolded:hidden">
+                        <details className="group">
+                          <summary className="flex cursor-pointer items-baseline gap-3 px-4 py-3 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
+                            <span className="flex-1 font-medium">
+                              {formatMonthShort(point.month)}
+                            </span>
+                            {move !== undefined && <DeltaValue value={move} />}
+                            <span className="figure font-medium">
+                              {formatGbp(netWorthOf(point))}
+                            </span>
+                            <ChevronDown
+                              aria-hidden
+                              className="size-4 self-center text-muted-foreground group-open:rotate-180"
+                            />
+                          </summary>
+                          <ul className="grid gap-1 px-4 pb-3 text-xs text-muted-foreground">
+                            {balances.map((key) => (
+                              <li className="flex items-center gap-3" key={key}>
+                                <span
+                                  aria-hidden
+                                  className={cn(
+                                    "size-2 rounded-full",
+                                    balanceTones[key],
+                                  )}
+                                />
+                                <span className="flex-1">
+                                  {balanceNames[key]}
+                                </span>
+                                <span className="figure">
+                                  {formatGbp(point[key])}
+                                </span>
+                                <span className="size-4" />
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      </TableCell>
                       <TableCell className="folded:hidden">
                         {formatMonthShort(point.month)}
                       </TableCell>
@@ -163,6 +189,26 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
       </Accordion>
     </SectionCard>
   );
+}
+
+// A year's months, newest first, each with what net worth moved by from
+// the point before it, the year's first from the point the year is read
+// from, unless the year is read from that month itself, as the first
+// year is, which then has no move to give.
+function monthsOf(
+  from: ProgressPoint,
+  points: readonly ProgressPoint[],
+): { move: number | undefined; point: ProgressPoint }[] {
+  return points
+    .map((point, index) => {
+      const prior = points[index - 1] ?? from;
+      return {
+        move:
+          prior === point ? undefined : netWorthOf(point) - netWorthOf(prior),
+        point,
+      };
+    })
+    .toReversed();
 }
 
 // A year's moves as a bar across a rule: what took away to its left,
