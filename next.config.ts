@@ -85,6 +85,15 @@ const nextConfig: NextConfig = {
     browserToTerminal: true,
     fetches: { fullUrl: true, hmrRefreshes: true },
   },
+  // Stated because from 16.4 an unset value warns on stderr whenever
+  // cacheComponents is on, and e2e fails on anything next start writes
+  // there. false is the prefetching this app has always had. true is not
+  // ready: it prerenders a per-session App Shell for each route, and
+  // iron-session reads Date.now() inside it to check the seal's expiry, so
+  // the server logs a blocking-prerender-current-time error for every
+  // signed-in route. The next major removes the option and turns this on,
+  // so the session check has to leave the prerender before then.
+  partialPrefetching: false,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   reactCompiler: {
