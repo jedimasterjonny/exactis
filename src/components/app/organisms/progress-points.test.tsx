@@ -105,16 +105,58 @@ describe("ProgressPoints", () => {
     ]);
   });
 
-  it("folds a month to its net worth over its balances for a narrow table", () => {
+  it("folds a month to its move and net worth for a narrow table, a tap opening it to its balances a line apiece", () => {
     render(<ProgressPoints points={points} />);
 
-    const [, first] = within(screen.getByRole("table")).getAllByRole("row");
+    const [first] = within(screen.getByRole("table")).getAllByRole("group");
+    const month = first ?? document.body;
 
+    expect(month).toHaveTextContent(/^Mar 2025\+£2,000£260,000/v);
+    expect(month).not.toHaveAttribute("open");
+
+    fireEvent.click(within(month).getByText("Mar 2025"));
+
+    expect(month).toHaveAttribute("open");
     expect(
-      within(first ?? document.body).getAllByRole("cell")[0],
-    ).toHaveTextContent(
-      "Mar 2025£260,000Pensions £108,000 · ISAs £54,000 · Property & vehicles £296,000 · Secured loans −£196,000 · Other debts −£2,000",
-    );
+      within(month)
+        .getAllByRole("listitem")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual([
+      "Pensions£108,000",
+      "ISAs£54,000",
+      "Property & vehicles£296,000",
+      "Secured loans−£196,000",
+      "Other debts−£2,000",
+    ]);
+  });
+
+  // January 2025 is read from December 2024, the year before's last,
+  // and November 2024 is the first point kept, so it has nothing before
+  // it to move from.
+  it("moves a folded month on from the point before it, the year's first from the year before's last", () => {
+    render(<ProgressPoints points={points} />);
+
+    const movesOfTable = (): (null | string)[] =>
+      within(screen.getByRole("table"))
+        .getAllByRole("group")
+        .map(
+          (month) =>
+            within(month).getByText(/^\w{3} \d{4}$/v).parentElement
+              ?.textContent ?? null,
+        );
+
+    expect(movesOfTable()).toStrictEqual([
+      "Mar 2025+£2,000£260,000",
+      "Feb 2025+£3,000£258,000",
+      "Jan 2025+£2,500£255,000",
+    ]);
+
+    fireEvent.click(yearRow("2024"));
+
+    expect(movesOfTable()).toStrictEqual([
+      "Dec 2024+£3,500£252,500",
+      "Nov 2024£249,000",
+    ]);
   });
 
   it("opens a year to its months, closing the year open before it", () => {
