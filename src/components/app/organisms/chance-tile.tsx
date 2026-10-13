@@ -45,10 +45,11 @@ const label = "Chance of success";
 // beside it a tile for each milestone reached when conditions hold,
 // the age reached in the year by which half the futures have reached
 // it, the median alone, since a tile is one figure and the spread
-// either side is read on the chance of success. While they are drawn,
-// how many have been; and a dash, saying why, while there is nothing
-// to draw them at. The run is the board's, which draws it once for the
-// tiles and the chart alike.
+// either side is read on the chance of success, and left off a phone,
+// which keeps its row for the two the plan is steered by. While they
+// are drawn, how many have been; and a dash, saying why, while there
+// is nothing to draw them at. The run is the board's, which draws it
+// once for the tiles and the chart alike.
 export function ChanceTile({
   milestones,
   plan,
@@ -65,6 +66,7 @@ export function ChanceTile({
           <StatTile
             caption={run.unrun}
             icon={Flag}
+            isHiddenOnPhone
             key={milestone.id}
             label={milestone.name}
             value="—"
@@ -133,6 +135,7 @@ function ReachedTile({
         action={<DrawAgain />}
         caption="Drawing the futures…"
         icon={Flag}
+        isHiddenOnPhone
         label={milestone.name}
         value="…"
       />
@@ -148,6 +151,7 @@ function ReachedTile({
         action={<DrawAgain />}
         caption={`Reached in ${formatWholePercent(reached / runLength)} of ${formatCount(runLength)} futures`}
         icon={Flag}
+        isHiddenOnPhone
         label={milestone.name}
         value="—"
       />
@@ -158,6 +162,7 @@ function ReachedTile({
       action={<DrawAgain />}
       caption={`Median of ${formatCount(runLength)} futures · ${String(median)}`}
       icon={Flag}
+      isHiddenOnPhone
       label={milestone.name}
       unit="yrs"
       value={String(ageIn(median, plan))}
