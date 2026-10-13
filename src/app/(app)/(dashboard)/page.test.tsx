@@ -165,6 +165,9 @@ describe("Dashboard", () => {
     expect(tileOf("At Retirement")).not.toHaveClass("max-sm:hidden");
     expect(tileOf("Chance of success")).not.toHaveClass("max-sm:hidden");
     expect(tileOf("Net worth at 91")).toHaveClass("max-sm:hidden");
+    for (const { name } of milestones.slice(2)) {
+      expect(tileOf(name)).toHaveClass("max-sm:hidden");
+    }
   });
 
   // The chart counts the plan's liquidity to begin with, so it draws
