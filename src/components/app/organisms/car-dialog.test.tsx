@@ -126,6 +126,7 @@ describe("CarDialog", () => {
       balance: 14000,
       balloon: 6000,
       depreciation: 0.15,
+      floor: 0,
       name: "Golf",
       payment: 290,
       rate: 0.079,
@@ -165,6 +166,10 @@ describe("CarDialog", () => {
     ).toHaveValue("pcp");
     expect(field("Value", dialog)).toHaveValue("£18,000");
     expect(field("Depreciation", dialog)).toHaveValue("15.00%");
+    expect(field("Floor", dialog)).toHaveValue("£0");
+    expect(field("Floor", dialog)).toHaveAccessibleDescription(
+      "Today's money, £0 for none",
+    );
     expect(field("Balance owed", dialog)).toHaveValue("£14,000");
     expect(field("Rate", dialog)).toHaveValue("7.90%");
     expect(field("Monthly payment", dialog)).toHaveValue("£290");
@@ -179,6 +184,7 @@ describe("CarDialog", () => {
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
 
     commit(field("Value", dialog), "16,000");
+    commit(field("Floor", dialog), "3,000");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -189,6 +195,7 @@ describe("CarDialog", () => {
       balance: 14000,
       balloon: 6000,
       depreciation: 0.15,
+      floor: 3000,
       name: "Golf",
       payment: 290,
       rate: 0.079,
@@ -225,6 +232,7 @@ describe("CarDialog", () => {
       balance: 14000,
       balloon: 0,
       depreciation: 0.15,
+      floor: 0,
       name: "Golf",
       payment: 438,
       rate: 0.079,
@@ -330,6 +338,7 @@ describe("CarDialog", () => {
       balance: 14000,
       balloon: 6000,
       depreciation: 0,
+      floor: 0,
       name: "Golf",
       payment: 90,
       rate: 0.079,
@@ -411,6 +420,7 @@ describe("CarDialog", () => {
       balance: 0,
       balloon: 0,
       depreciation: 0.2,
+      floor: 0,
       name: "Polo",
       payment: 0,
       rate: 0,

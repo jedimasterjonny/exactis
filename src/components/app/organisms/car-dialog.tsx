@@ -36,14 +36,15 @@ interface Draft extends CarDraft {
 }
 
 // A new car: on a PCP, since that is the case with the most to work out,
-// worth nothing and owing nothing yet, over a term of four years at no
-// rate, working out the payment from the rate and the term until another
-// figure is chosen.
+// worth nothing with no floor and owing nothing yet, over a term of
+// four years at no rate, working out the payment from the rate and the
+// term until another figure is chosen.
 const blank: Draft = {
   agreement: "pcp",
   balance: 0,
   balloon: 0,
   depreciation: 0,
+  floor: 0,
   isHeld: false,
   name: "",
   payment: 0,
@@ -178,6 +179,7 @@ function valuesOf(draft: CarDraft, out: WorkedOut): CarValues {
       balance: draft.balance,
       balloon: draft.agreement === "pcp" ? draft.balloon : 0,
       depreciation: draft.depreciation,
+      floor: draft.floor,
       name: draft.name.trim(),
       payment: draft.payment,
       rate: draft.rate,
