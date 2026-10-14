@@ -287,7 +287,7 @@ const held: readonly Case[] = [
       changed(given, 5, (mortgage) => ({ ...mortgage, secures: 99 })),
   ],
   [
-    "An asset has one loan secured on it",
+    "Only a house has more than one loan secured on it",
     (given): Inputs => {
       const secured = changed(given, 5, (mortgage) => ({
         ...mortgage,
@@ -678,6 +678,26 @@ describe("household", () => {
     expect(() =>
       project(interestOnly.accounts, interestOnly.schedule, interestOnly.plan),
     ).not.toThrow();
+  });
+
+  // A mortgage in two sub-accounts is two loans on the one house, each
+  // paid down at its own rate.
+  it("keeps a house with more than one loan secured on it", () => {
+    const house = changed(sound, 4, (home) => ({
+      ...home,
+      bought: homeValues.bought,
+      kind: "house",
+    }));
+    const secured = changed(house, 5, (mortgage) => ({
+      ...mortgage,
+      secures: 4,
+    }));
+    const parted = {
+      ...secured,
+      accounts: [...secured.accounts, { ...account(secured, 5), id: 6 }],
+    };
+
+    expect(household.safeParse(parted).success).toBe(true);
   });
 
   // The children leaving home in 2036 have moved past the salary's last
