@@ -11,7 +11,7 @@ import {
 
 import type { PartDraft } from "./houses";
 
-import { derive, houseOf, isSound, toRecords } from "./houses";
+import { derive, houseOf, isSound, mortgageOn, toRecords } from "./houses";
 
 const draft: PartDraft = { ...homePart, key: 0, term: 26 };
 
@@ -45,6 +45,24 @@ describe("isSound", () => {
       false,
     );
     expect(isSound({ ...home, parts: [], status: "outright" })).toBe(true);
+  });
+});
+
+describe("mortgageOn", () => {
+  it("draws a house's loans as one mortgage only when there is more than one", () => {
+    const parted = {
+      asset: house,
+      loans: [houseLoan, { ...houseLoan, id: 6 }],
+    };
+
+    expect(mortgageOn(parted)).toStrictEqual({
+      ids: new Set([5, 6]),
+      name: "Home mortgage",
+    });
+    expect(mortgageOn({ ...parted, loans: [houseLoan] })).toBeNull();
+    expect(
+      mortgageOn({ ...parted, asset: { ...house, kind: "car" } }),
+    ).toBeNull();
   });
 });
 

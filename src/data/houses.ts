@@ -33,6 +33,14 @@ export interface HouseValues {
   readonly value: number;
 }
 
+// A mortgage held in more than one sub-account, as it is drawn wherever
+// its sub-accounts are drawn as one: its name, and the ids of the loans
+// its sub-accounts are.
+export interface Mortgage {
+  readonly ids: ReadonlySet<number>;
+  readonly name: string;
+}
+
 // A sub-account of a mortgage, which a lender may hold a mortgage in
 // several of, each owing its own balance at its own rate: what is owed,
 // whole pounds and positive, the rate it is charged at, a fraction as
@@ -109,6 +117,16 @@ export function isSound(house: HouseValues): boolean {
   );
 }
 
+// The one mortgage the loans secured on an asset are drawn as, which
+// they are for a house carrying more than one, so every screen drawing
+// them as one reads the one rule; or none, for one loan alone, which is
+// drawn as the loan it is.
+export function mortgageOn({ asset, loans }: Secured): Mortgage | null {
+  return asset.kind === "house" && loans.length > 1
+    ? { ids: new Set(loans.map(({ id }) => id)), name: mortgageOf(asset.name) }
+    : null;
+}
+
 // The purchase a house opens on before one is typed: the month the
 // plan starts in, for nothing, which holds the save until what it cost
 // is typed.
@@ -141,11 +159,18 @@ export function toRecords(
           balloon: 0,
           name:
             house.parts.length === 1
-              ? `${house.name} mortgage`
-              : `${house.name} mortgage ${String(place + 1)}`,
+              ? mortgageOf(house.name)
+              : `${mortgageOf(house.name)} ${String(place + 1)}`,
         })),
     plan,
   );
+}
+
+// What a house's mortgage is called, whole: the name its one
+// sub-account takes, and the one a mortgage in several is drawn under
+// wherever its sub-accounts are drawn as one.
+function mortgageOf(house: string): string {
+  return `${house} mortgage`;
 }
 
 // What a mortgage's payments are over: the balance, which they clear,
