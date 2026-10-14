@@ -25,7 +25,7 @@ function renderSheet(
 ): void {
   render(
     <BalanceSheet
-      assets={[{ asset: home, loan: null }]}
+      assets={[{ asset: home, loans: [] }]}
       debts={[mortgage]}
       expenses={[]}
       onAddDebt={vi.fn<() => void>()}
@@ -168,9 +168,9 @@ describe("BalanceSheet", () => {
   it("draws each asset level with the loan on it, with the equity it holds and when the loan clears", () => {
     renderSheet({
       assets: [
-        { asset: house, loan: houseLoan },
-        { asset: golf, loan: golfPcp },
-        { asset: { ...home, id: 8 }, loan: null },
+        { asset: house, loans: [houseLoan] },
+        { asset: golf, loans: [golfPcp] },
+        { asset: { ...home, id: 8 }, loans: [] },
       ],
       debts: [],
       expenses: [
@@ -203,16 +203,16 @@ describe("BalanceSheet", () => {
   it("says an asset worth nothing holds none of its value, what an asset is paid of its own and the plan's rate by name", () => {
     renderSheet({
       assets: [
-        { asset: { ...golf, balance: 0 }, loan: golfPcp },
+        { asset: { ...golf, balance: 0 }, loans: [golfPcp] },
         {
           asset: {
             ...home,
             contribution: { amount: 1200, cadence: "year", kind: "fixed" },
             growth: { kind: "fixed", rate: 0 },
           },
-          loan: null,
+          loans: [],
         },
-        { asset: { ...home, growth: { kind: "plan" }, id: 8 }, loan: null },
+        { asset: { ...home, growth: { kind: "plan" }, id: 8 }, loans: [] },
       ],
     });
 
@@ -266,7 +266,7 @@ describe("BalanceSheet", () => {
     const onAddDebt = vi.fn<() => void>();
     const onEdit = vi.fn<(account: Account) => void>();
     renderSheet({
-      assets: [{ asset: house, loan: houseLoan }],
+      assets: [{ asset: house, loans: [houseLoan] }],
       debts: [],
       onAddDebt,
       onEdit,

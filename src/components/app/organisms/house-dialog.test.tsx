@@ -31,7 +31,7 @@ const [, , , home] = accounts;
 // The fixture's home as a house, with its mortgage secured on it: worth
 // £416,386 growing at 2.1%, owing £182,940 at 5.15% and paying £2,210 a
 // month, which clears it in 8.5 years.
-const house: Secured = { asset: houseAsset, loan: houseLoan };
+const house: Secured = { asset: houseAsset, loans: [houseLoan] };
 
 const workedHint = "Worked out";
 
@@ -272,7 +272,7 @@ describe("HouseDialog", () => {
   });
 
   it("opens a house owned outright with no loan fields", () => {
-    renderDialog({ house: { ...house, loan: null } });
+    renderDialog({ house: { ...house, loans: [] } });
     const dialog = openDialog();
 
     expect(

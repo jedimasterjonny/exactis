@@ -161,7 +161,7 @@ function openingOf(car: null | Secured): Entry<Draft> {
     ...carOf(car),
     isHeld: false,
     term: blank.term,
-    worked: workedOn(car.loan !== null),
+    worked: workedOn(car.loans.length > 0),
   };
   return { draft, id: car.asset.id, initial: draft };
 }

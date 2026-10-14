@@ -86,16 +86,16 @@ describe("carOf", () => {
   // is; a loan with no balloon is a loan, and no loan is a car owned
   // outright.
   it("reads a car's values back off its records", () => {
-    expect(carOf({ asset, loan: pcp })).toStrictEqual(golf);
-    expect(carOf({ asset, loan })).toStrictEqual(financed);
-    expect(carOf({ asset, loan: null })).toStrictEqual(outright);
+    expect(carOf({ asset, loans: [pcp] })).toStrictEqual(golf);
+    expect(carOf({ asset, loans: [loan] })).toStrictEqual(financed);
+    expect(carOf({ asset, loans: [] })).toStrictEqual(outright);
   });
 
   it("reads a car that loses nothing as losing nothing, not a negative nothing", () => {
     expect(
       carOf({
         asset: { ...asset, growth: { kind: "fixed", rate: 0 } },
-        loan: null,
+        loans: [],
       }).depreciation,
     ).toBe(0);
   });
@@ -118,7 +118,7 @@ describe("toRecords", () => {
         owner: null,
         rate: -0.15,
       },
-      loan: null,
+      loans: [],
     });
   });
 
@@ -126,41 +126,45 @@ describe("toRecords", () => {
   // household is read, so the line is saved from the plan's first year
   // and open-ended.
   it("writes a car on a PCP with the finance against it, left owing the balloon, and its payments from the plan's first year, their end left to the finance", () => {
-    const { asset: written, loan } = toRecords(golf, plan);
+    const { asset: written, loans } = toRecords(golf, plan);
 
     expect(written.name).toBe("Golf");
-    expect(loan).toStrictEqual({
-      account: {
-        balance: -14000,
-        balloon: 6000,
-        cadence: "month",
-        cap: 0,
-        contribution: 290,
-        funding: "fixed",
-        growth: "fixed",
-        isAlwaysFunded: false,
-        kind: "debt",
-        name: "Golf PCP",
-        owner: null,
-        rate: 0.079,
+    expect(loans).toStrictEqual([
+      {
+        account: {
+          balance: -14000,
+          balloon: 6000,
+          cadence: "month",
+          cap: 0,
+          contribution: 290,
+          funding: "fixed",
+          growth: "fixed",
+          isAlwaysFunded: false,
+          kind: "debt",
+          name: "Golf PCP",
+          owner: null,
+          rate: 0.079,
+        },
+        line: {
+          amount: 290,
+          cadence: "month",
+          endsAfter: 0,
+          endsAt: null,
+          firstYear: 2026,
+          growth: "nominal",
+          lastMonth: null,
+          lastYear: null,
+          name: "Golf PCP",
+          startsAt: null,
+        },
       },
-      line: {
-        amount: 290,
-        cadence: "month",
-        endsAfter: 0,
-        endsAt: null,
-        firstYear: 2026,
-        growth: "nominal",
-        lastMonth: null,
-        lastYear: null,
-        name: "Golf PCP",
-        startsAt: null,
-      },
-    });
+    ]);
   });
 
   it("writes a car on a loan with no balloon, named for the loan", () => {
-    const { loan } = toRecords(financed, plan);
+    const {
+      loans: [loan],
+    } = toRecords(financed, plan);
 
     expect(loan?.account.balloon).toBe(0);
     expect(loan?.account.name).toBe("Golf loan");

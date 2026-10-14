@@ -233,8 +233,8 @@ export async function placeAccountsInOrder(
 }
 
 // Deletes the account with that id, and what cannot stand without it: a
-// house takes the loan secured on it and that loan's payments, and a
-// loan takes its payments; a salary feeding the account stops, and is
+// house takes the loans secured on it and their payments, and a loan
+// takes its payments; a salary feeding the account stops, and is
 // left earned whole, giving up nothing. All of it goes together or none
 // of it does. Checked as a save is.
 export async function removeAccount(id: number): Promise<Answer<undefined>> {
@@ -360,6 +360,41 @@ function dated(account: Account, listed: Account | undefined): Account {
     : { ...account, setOn: listed.setOn };
 }
 
+// A loan secured on an asset and the line of its payments, written over
+// the loan the asset had in its place, which keeps its id, and so does
+// the line paying it; what is added takes the next, the loan before its
+// line.
+function loanIn(
+  kept: Kept,
+  { account, line: paying }: SecuredRecords["loans"][number],
+  {
+    loan,
+    secures,
+  }: { readonly loan: Account | undefined; readonly secures: number },
+): Kept {
+  const { accounts, next, schedule } = kept;
+  const debt = dated(
+    { ...toAccount(account, loan?.id ?? next), secures },
+    loan,
+  );
+  const afterDebt = loan === undefined ? next + 1 : next;
+  const line = schedule.expenses.find(({ pays }) => pays === debt.id);
+  const payments = { ...paying, id: line?.id ?? afterDebt, pays: debt.id };
+  return {
+    ...kept,
+    accounts:
+      loan === undefined ? [...accounts, debt] : replaced(accounts, debt),
+    next: line === undefined ? afterDebt + 1 : afterDebt,
+    schedule: {
+      ...schedule,
+      expenses:
+        line === undefined
+          ? [...schedule.expenses, payments]
+          : replaced(schedule.expenses, payments),
+    },
+  };
+}
+
 // The shares written over the salaries' own, each against the line it
 // names, which has to be one feeding the account: a share written
 // against a line feeding another, or none, would land elsewhere or
@@ -381,68 +416,39 @@ function sacrificed(
   );
 }
 
-// An asset and the loan secured on it, written: the asset as a new
+// An asset and the loans secured on it, written: the asset as a new
 // account when the id is null and over the one with that id otherwise,
-// and hands back the asset's account. An edit finds the loan by the
-// asset and the line by the loan, writes over what is there and adds
-// what is not, and an asset with no loan against it now sends its loan
-// and the loan's line away. The whole lands together or not at all.
+// and hands back the asset's account. An edit finds the loans by the
+// asset and writes each over the one in its place, in the order they
+// are listed, adding what is not there, and sends the loans past the
+// last away with their lines; an asset with no loan against it now
+// sends every loan away. The whole lands together or not at all.
 function securedIn(
   { kept }: Held,
   at: null | number,
-  { asset, loan: secured }: SecuredRecords,
+  { asset, loans }: SecuredRecords,
 ): { readonly kept: Kept; readonly result: Account } {
   const entered = writtenIn(kept, at, asset);
-  const { accounts, next, schedule } = entered.kept;
-  const loan = accounts.find(({ secures }) => secures === entered.result.id);
-  if (secured === null) {
-    return {
-      kept:
-        loan === undefined
-          ? entered.kept
-          : {
-              ...entered.kept,
-              accounts: accounts.filter((account) => account !== loan),
-              schedule: {
-                ...schedule,
-                expenses: schedule.expenses.filter(
-                  ({ pays }) => pays !== loan.id,
-                ),
-              },
-            },
-      result: entered.result,
-    };
-  }
-  // A loan the asset had keeps its id, and so does the line paying it;
-  // what is added takes the next, the loan before its line.
-  const debt = dated(
-    {
-      ...toAccount(secured.account, loan?.id ?? next),
-      secures: entered.result.id,
+  const { accounts, schedule } = entered.kept;
+  const secures = entered.result.id;
+  const had = accounts.filter((account) => account.secures === secures);
+  const gone = new Set(had.slice(loans.length).map(({ id }) => id));
+  const left: Kept = {
+    ...entered.kept,
+    accounts: accounts.filter(({ id }) => !gone.has(id)),
+    schedule: {
+      ...schedule,
+      expenses: schedule.expenses.filter(
+        ({ pays }) => pays === undefined || !gone.has(pays),
+      ),
     },
-    loan,
-  );
-  const afterDebt = loan === undefined ? next + 1 : next;
-  const line = schedule.expenses.find(({ pays }) => pays === debt.id);
-  const payments = {
-    ...secured.line,
-    id: line?.id ?? afterDebt,
-    pays: debt.id,
   };
   return {
-    kept: {
-      ...entered.kept,
-      accounts:
-        loan === undefined ? [...accounts, debt] : replaced(accounts, debt),
-      next: line === undefined ? afterDebt + 1 : afterDebt,
-      schedule: {
-        ...schedule,
-        expenses:
-          line === undefined
-            ? [...schedule.expenses, payments]
-            : replaced(schedule.expenses, payments),
-      },
-    },
+    kept: loans.reduce(
+      (written, borrowing, place) =>
+        loanIn(written, borrowing, { loan: had[place], secures }),
+      left,
+    ),
     result: entered.result,
   };
 }
