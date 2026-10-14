@@ -23,12 +23,14 @@ export interface HouseDraft<TPart extends PartDraft = PartDraft> extends Omit<
 // A house is a real asset and, while it is mortgaged, the loans against
 // it and the payments that clear them: records the store holds apart,
 // written together from one dialog. The values are what the dialog takes:
-// the house's worth now and the rate it grows at, when it was bought
-// and what it cost, and for a mortgaged house the sub-accounts the
-// mortgage is held in, one at least, in the order they are listed. A
-// house owned outright has none.
+// the house's worth now, the rate it grows at and the ceiling it grows
+// no higher than, whole pounds of today's money and nothing for none,
+// when it was bought and what it cost, and for a mortgaged house the
+// sub-accounts the mortgage is held in, one at least, in the order they
+// are listed. A house owned outright has none.
 export interface HouseValues {
   readonly bought: Purchase;
+  readonly ceiling: number;
   readonly growth: number;
   readonly name: string;
   readonly parts: readonly Part[];
@@ -123,12 +125,13 @@ export function drawnAsMortgages<TItem>(
 }
 
 // The values a house's records hold, for the dialog to open on: the
-// house's balance is its value and its rate its growth, its purchase
-// is as kept, or the one a house opens on before it is typed, and each
-// loan is a sub-account, its balance owed, so it comes back positive,
-// its rate the sub-account's and its contribution the payment, a month
-// as the records lay it. A house with no loan against it is owned
-// outright and owes nothing.
+// house's balance is its value and its rate its growth, its limit its
+// ceiling, nothing where it has none, its purchase is as kept, or the
+// one a house opens on before it is typed, and each loan is a
+// sub-account, its balance owed, so it comes back positive, its rate
+// the sub-account's and its contribution the payment, a month as the
+// records lay it. A house with no loan against it is owned outright and
+// owes nothing.
 export function houseOf(
   { asset, loans }: Secured,
   plan: PlanMonth,
@@ -136,6 +139,7 @@ export function houseOf(
   const held = toValues(asset);
   return {
     bought: asset.bought ?? openingPurchase(plan),
+    ceiling: asset.limit ?? 0,
     growth: held.rate,
     name: held.name,
     parts: loans
@@ -153,11 +157,14 @@ export function houseOf(
 // A house the store would take: named, bought for something, and if
 // mortgaged held in a sub-account at least, each owing something,
 // paying something and charged a rate no lower than nothing. The save
-// button holds until it is one.
+// button holds until it is one, and while a ceiling sits below what the
+// house is worth, more likely a slip than a fall the engine would bring
+// the house straight down to.
 export function isSound(house: HouseValues): boolean {
   return (
     house.name.trim() !== "" &&
     house.bought.price > 0 &&
+    (house.ceiling === 0 || house.ceiling >= house.value) &&
     (house.status === "outright" ||
       (house.parts.length > 0 && house.parts.every(owes)))
   );
@@ -214,11 +221,12 @@ export function openingPurchase(plan: PlanMonth): Purchase {
 }
 
 // The records a house is written as: an asset of its own kind growing
-// at its own fixed rate, carrying when it was bought, and for a
-// mortgaged house each sub-account and its payments, as every secured
-// asset's loans are written, none leaving a balloon standing. Both are
-// named for the house, and a mortgage in more than one sub-account
-// names each by its place, so the month end can tell them apart.
+// at its own fixed rate, held to its ceiling if it has one and carrying
+// when it was bought, and for a mortgaged house each sub-account and
+// its payments, as every secured asset's loans are written, none
+// leaving a balloon standing. Both are named for the house, and a
+// mortgage in more than one sub-account names each by its place, so the
+// month end can tell them apart.
 export function toRecords(
   house: HouseValues,
   plan: { readonly from: number },
@@ -227,6 +235,7 @@ export function toRecords(
     {
       bought: house.bought,
       kind: "house",
+      ...(house.ceiling > 0 && { limit: house.ceiling }),
       name: house.name,
       rate: house.growth,
       value: house.value,

@@ -557,14 +557,15 @@ describe("the account actions", () => {
       expect(
         await saveHouse(6, {
           ...house,
+          ceiling: 600000,
           parts: [{ ...homePart, payment: 3000 }],
           value: 450000,
         }),
-      ).toStrictEqual(saved({ ...home, balance: 450000 }));
+      ).toStrictEqual(saved({ ...home, balance: 450000, limit: 600000 }));
       expect(await latest()).toMatchObject({
         accounts: [
           ...kept.accounts,
-          { ...home, balance: 450000 },
+          { ...home, balance: 450000, limit: 600000 },
           { ...mortgage, contribution: { amount: 3000 } },
         ],
         next: 9,

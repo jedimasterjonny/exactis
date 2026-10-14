@@ -246,9 +246,10 @@ export function takesSpare(account: { readonly kind: AccountKind }): boolean {
 // account's own allowance, and a growth choice becomes the account's
 // growth with the rate only where it applies. The purchase is beside
 // the values rather than among them, since only the house dialog asks
-// it and no flat form carries it: a house hands one, and it is kept.
+// it and no flat form carries it: a house hands one, and it is kept. So
+// is a limit, which only an asset's dialog asks.
 export function toAccount(
-  values: AccountValues & Pick<Account, "bought">,
+  values: AccountValues & Pick<Account, "bought" | "limit">,
   id: number,
 ): Account {
   const contribution = contributionOf(values);
@@ -264,6 +265,7 @@ export function toAccount(
     id,
     ...(values.isAlwaysFunded && { isAlwaysFunded: true }),
     kind: values.kind,
+    ...(values.limit !== undefined && { limit: values.limit }),
     name: values.name,
     ...(values.owner !== null && { owner: values.owner }),
   };

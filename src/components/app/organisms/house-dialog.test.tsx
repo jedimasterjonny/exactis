@@ -132,6 +132,7 @@ describe("HouseDialog", () => {
 
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(null, {
       bought: { month: { month: 8, year: 2026 }, price: 380000 },
+      ceiling: 0,
       growth: 0,
       name: "Home",
       parts: [{ balance: 341810, payment: 2166, rate: 0.0515 }],
@@ -172,6 +173,10 @@ describe("HouseDialog", () => {
     ).toHaveValue("mortgaged");
     expect(field("Value", dialog)).toHaveValue("£416,386");
     expect(field("Value growth", dialog)).toHaveValue("2.10%");
+    expect(field("Ceiling", dialog)).toHaveValue("£0");
+    expect(field("Ceiling", dialog)).toHaveAccessibleDescription(
+      "Today's money, £0 for none",
+    );
     expect(
       within(dialog).getByRole("combobox", { name: "Month bought" }),
     ).toHaveDisplayValue("June");
@@ -190,6 +195,7 @@ describe("HouseDialog", () => {
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
 
     commit(field("Value", dialog), "420,000");
+    commit(field("Ceiling", dialog), "600,000");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -197,6 +203,7 @@ describe("HouseDialog", () => {
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
       bought: { month: { month: 5, year: 2022 }, price: 380000 },
+      ceiling: 600000,
       growth: 0.021,
       name: "Home",
       parts: [{ balance: 182940, payment: 2210, rate: 0.0515 }],
@@ -268,6 +275,7 @@ describe("HouseDialog", () => {
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
       bought: { month: { month: 5, year: 2022 }, price: 380000 },
+      ceiling: 0,
       growth: 0.021,
       name: "Home",
       parts: [{ balance: 182940, payment: 2210, rate: 0.0515 }],
@@ -366,6 +374,7 @@ describe("HouseDialog", () => {
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(null, {
       bought: { month: { month: 8, year: 2026 }, price: 380000 },
+      ceiling: 0,
       growth: 0,
       name: "Home",
       parts: [{ balance: 341810, payment: 1000, rate: 0.0515 }],
@@ -448,6 +457,7 @@ describe("HouseDialog", () => {
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
       bought: { month: { month: 5, year: 2022 }, price: 380000 },
+      ceiling: 0,
       growth: 0.021,
       name: "Home",
       parts: [
@@ -547,6 +557,7 @@ describe("HouseDialog", () => {
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(null, {
       bought: { month: { month: 5, year: 2022 }, price: 230000 },
+      ceiling: 0,
       growth: 0.02,
       name: "Flat",
       parts: [],
