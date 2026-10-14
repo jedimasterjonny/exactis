@@ -45,19 +45,14 @@ export function kept({
   }
 }
 
-// Whether a patch of a secured asset's draft moves what its loan's
-// figures are worked out from: what is owed, the balloon, any of the
-// three figures, or whether there is a loan at all and of what kind.
+// Whether a patch of a secured asset's draft, or of a sub-account of a
+// house's, moves what its loan's figures are worked out from: what is
+// owed, the balloon, any of the three figures, or whether a car is
+// financed at all and on what agreement.
 export function movesLoan(patch: object): boolean {
-  return [
-    "agreement",
-    "balance",
-    "balloon",
-    "payment",
-    "rate",
-    "status",
-    "term",
-  ].some((key) => key in patch);
+  return ["agreement", "balance", "balloon", "payment", "rate", "term"].some(
+    (key) => key in patch,
+  );
 }
 
 // A secured asset's values as its draft saves them: nothing owed, paid

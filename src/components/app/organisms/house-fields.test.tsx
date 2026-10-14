@@ -1,71 +1,87 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import type { JSX } from "react";
+
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { HouseDraft } from "@/data/houses";
+import type { LoanDraft } from "@/components/app/organisms/loan-fields";
+import type { HouseDraft, HouseValues, PartDraft } from "@/data/houses";
 import type { LoanFigure } from "@/lib/figures";
 
-import { homeValues } from "@/data/houses.fixture";
+import { homePart, homeValues } from "@/data/houses.fixture";
 import { plan } from "@/data/income.fixture";
 import { commit, field, select } from "@/test/dom";
 
 import { HouseFields } from "./house-fields";
 
-// The reference kit's house as a draft: £341,810 owed at 5.15%, £2,210 a
-// month, over the 22 years its form says are left. The end of the term
-// is counted from the fixture plan's September 2026, so the 22 years
-// run to August 2048.
-const home: HouseDraft = { ...homeValues, term: 22 };
+// The reference kit's mortgage as a sub-account's draft: £341,810 owed
+// at 5.15%, £2,210 a month, over the 22 years its form says are left.
+// The end of the term is counted from the fixture plan's September
+// 2026, so the 22 years run to August 2048.
+const part: PartDraft = { ...homePart, key: 0, term: 22 };
+
+// The reference kit's house as a draft, its mortgage in that one
+// sub-account.
+const home: HouseDraft = { ...homeValues, parts: [part] };
 
 const workedHint = "Worked out";
 
+// The spies the fields report to, where the dialog listens.
+interface Spies {
+  readonly onAdd: ReturnType<typeof vi.fn<() => void>>;
+  readonly onAmend: ReturnType<
+    typeof vi.fn<(patch: Partial<Omit<HouseValues, "parts">>) => void>
+  >;
+  readonly onAmendPart: ReturnType<
+    typeof vi.fn<(key: number, patch: Partial<LoanDraft>) => void>
+  >;
+  readonly onRemove: ReturnType<typeof vi.fn<(key: number) => void>>;
+  readonly onWork: ReturnType<
+    typeof vi.fn<(key: number, worked: LoanFigure) => void>
+  >;
+}
+
 // The fields as the dialog would mount them, shown the draft and the
-// figure it worked out, with a spy where the dialog listens.
+// figure each sub-account worked out, with a spy where the dialog
+// listens.
 function renderFields(
   draft: HouseDraft,
   worked: LoanFigure,
   figure: null | number,
-): {
-  readonly onAmend: ReturnType<
-    typeof vi.fn<(patch: Partial<HouseDraft>) => void>
-  >;
-  readonly onWork: ReturnType<typeof vi.fn<(worked: LoanFigure) => void>>;
-  readonly rerender: (figure: null | number) => void;
-} {
-  const onAmend = vi.fn<(patch: Partial<HouseDraft>) => void>();
-  const onWork = vi.fn<(worked: LoanFigure) => void>();
-  const view = render(
+): Spies & { readonly rerender: (figure: null | number) => void } {
+  const spies: Spies = {
+    onAdd: vi.fn<() => void>(),
+    onAmend: vi.fn<(patch: Partial<Omit<HouseValues, "parts">>) => void>(),
+    onAmendPart: vi.fn<(key: number, patch: Partial<LoanDraft>) => void>(),
+    onRemove: vi.fn<(key: number) => void>(),
+    onWork: vi.fn<(key: number, worked: LoanFigure) => void>(),
+  };
+  const fields = (shown: null | number): JSX.Element => (
     <HouseFields
-      draft={draft}
-      figure={figure}
+      {...spies}
+      draft={{
+        ...draft,
+        parts: draft.parts.map((each) => ({ ...each, figure: shown, worked })),
+      }}
       initial={draft}
-      onAmend={onAmend}
-      onWork={onWork}
       plan={plan}
-      worked={worked}
-    />,
+    />
   );
+  const view = render(fields(figure));
   return {
-    onAmend,
-    onWork,
+    ...spies,
     rerender: (next): void => {
-      view.rerender(
-        <HouseFields
-          draft={draft}
-          figure={next}
-          initial={draft}
-          onAmend={onAmend}
-          onWork={onWork}
-          plan={plan}
-          worked={worked}
-        />,
-      );
+      view.rerender(fields(next));
     },
   };
 }
 
 describe("HouseFields", () => {
   it("mounts every field on the draft, shows the worked-out payment by value and reports each change", () => {
-    const { onAmend, onWork } = renderFields(home, "payment", 2166);
+    const { onAmend, onAmendPart, onWork } = renderFields(
+      home,
+      "payment",
+      2166,
+    );
 
     expect(field("Name")).toHaveValue("Home");
     expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue(
@@ -93,6 +109,12 @@ describe("HouseFields", () => {
     expect(select("Last payment")).not.toHaveAccessibleDescription();
     expect(field("Year")).toHaveValue("2048");
     expect(field("Year")).toHaveAccessibleDescription("22 years left");
+    expect(
+      screen.queryByRole("group", { name: /^Sub-account/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Remove/ }),
+    ).not.toBeInTheDocument();
 
     fireEvent.change(field("Name"), { target: { value: "Flat" } });
     commit(field("Value"), "420,000");
@@ -116,19 +138,21 @@ describe("HouseFields", () => {
       { bought: { month: { month: 7, year: 2022 }, price: 380000 } },
       { bought: { month: { month: 5, year: 2021 }, price: 380000 } },
       { bought: { month: { month: 5, year: 2022 }, price: 400000 } },
-      { balance: 300000 },
-      { rate: 0.045 },
-      { term: 21.5 },
-      { term: 21 },
       { status: "outright" },
     ]);
-    expect(onWork).toHaveBeenCalledExactlyOnceWith("rate");
+    expect(onAmendPart.mock.calls).toStrictEqual([
+      [0, { balance: 300000 }],
+      [0, { rate: 0.045 }],
+      [0, { term: 21.5 }],
+      [0, { term: 21 }],
+    ]);
+    expect(onWork).toHaveBeenCalledExactlyOnceWith(0, "rate");
   });
 
   // The fixture plan starts in September 2026, so a house is bought in
   // 2026 at the latest.
   it("holds what is owed, paid and bought for at nothing or above, and the year bought between the first and the plan's", () => {
-    const { onAmend } = renderFields(home, "rate", 0.0537);
+    const { onAmend, onAmendPart } = renderFields(home, "rate", 0.0537);
 
     commit(field("Loan balance"), "-300,000");
     commit(field("Monthly payment"), "-2,000");
@@ -136,9 +160,11 @@ describe("HouseFields", () => {
     commit(field("Year bought"), "0");
     commit(field("Year bought"), "2030");
 
+    expect(onAmendPart.mock.calls).toStrictEqual([
+      [0, { balance: 0 }],
+      [0, { payment: 0 }],
+    ]);
     expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
-      { balance: 0 },
-      { payment: 0 },
       { bought: { month: { month: 5, year: 2022 }, price: 0 } },
       { bought: { month: { month: 5, year: 1 }, price: 380000 } },
       { bought: { month: { month: 5, year: 2026 }, price: 380000 } },
@@ -187,6 +213,42 @@ describe("HouseFields", () => {
     );
   });
 
+  // Two sub-accounts repeat the loan's fields, so each is named by its
+  // place and reports under its own key, the key it was given rather
+  // than its place.
+  it("lays out each sub-account under its name, reports each by its key, and adds and removes them", () => {
+    const { onAdd, onAmendPart, onRemove, onWork } = renderFields(
+      {
+        ...home,
+        parts: [part, { ...part, balance: 60000, key: 3, rate: 0.039 }],
+      },
+      "term",
+      20,
+    );
+    const first = screen.getByRole("group", { name: "Sub-account 1" });
+    const second = screen.getByRole("group", { name: "Sub-account 2" });
+
+    expect(field("Loan balance", first)).toHaveValue("£341,810");
+    expect(field("Rate", first)).toHaveValue("5.15%");
+    expect(field("Loan balance", second)).toHaveValue("£60,000");
+    expect(field("Rate", second)).toHaveValue("3.90%");
+
+    commit(field("Loan balance", second), "55,000");
+    fireEvent.change(
+      within(second).getByRole("combobox", { name: "Work out" }),
+      { target: { value: "payment" } },
+    );
+    fireEvent.click(
+      within(second).getByRole("button", { name: "Remove sub-account 2" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add sub-account" }));
+
+    expect(onAmendPart).toHaveBeenCalledExactlyOnceWith(3, { balance: 55000 });
+    expect(onWork).toHaveBeenCalledExactlyOnceWith(3, "payment");
+    expect(onRemove).toHaveBeenCalledExactlyOnceWith(3);
+    expect(onAdd).toHaveBeenCalledOnce();
+  });
+
   it("shows no loan fields for a house owned outright", () => {
     renderFields({ ...home, status: "outright" }, "payment", 0);
 
@@ -208,6 +270,9 @@ describe("HouseFields", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("textbox", { name: "Year" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Add sub-account" }),
     ).not.toBeInTheDocument();
   });
 });

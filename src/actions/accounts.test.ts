@@ -8,7 +8,7 @@ import type { Month } from "@/data/schedule";
 
 import { golfPcp, golfValues, golf as owned } from "@/data/cars.fixture";
 import { kept, today } from "@/data/household.fixture";
-import { homeValues } from "@/data/houses.fixture";
+import { homePart, homeValues } from "@/data/houses.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -79,13 +79,17 @@ const owing = {
 // against £341,810 owed at 5.15%.
 const house = { ...homeValues, name: " Home " };
 
-const outright = {
+const outright = { ...house, parts: [], status: "outright" } as const;
+
+// The same mortgage in two sub-accounts: £241,810 of it as above, and
+// £100,000 at 4.2% paying £540 a month.
+const parted = {
   ...house,
-  balance: 0,
-  payment: 0,
-  rate: 0,
-  status: "outright",
-} as const;
+  parts: [
+    { ...homePart, balance: 241810 },
+    { balance: 100000, payment: 540, rate: 0.042 },
+  ],
+};
 
 // The records the house is held as, given the ids a new one takes: the
 // house, the loan owing £341,810 secured on it, and the line of its
@@ -551,7 +555,11 @@ describe("the account actions", () => {
       await saveHouse(null, house);
 
       expect(
-        await saveHouse(6, { ...house, payment: 3000, value: 450000 }),
+        await saveHouse(6, {
+          ...house,
+          parts: [{ ...homePart, payment: 3000 }],
+          value: 450000,
+        }),
       ).toStrictEqual(saved({ ...home, balance: 450000 }));
       expect(await latest()).toMatchObject({
         accounts: [
@@ -624,15 +632,56 @@ describe("the account actions", () => {
       });
     });
 
+    // Each sub-account is a loan of its own, paid by a line of its own,
+    // the loans taking the next ids before their lines and named by
+    // their places.
+    it("writes a mortgage in sub-accounts as a loan each, secured on the house, with the payments of each", async () => {
+      expect(await saveHouse(null, parted)).toStrictEqual(saved(home));
+      expect(await latest()).toMatchObject({
+        accounts: [
+          ...kept.accounts,
+          home,
+          { ...mortgage, balance: -241810, name: "Home mortgage 1" },
+          {
+            balance: -100000,
+            contribution: { amount: 540 },
+            growth: { rate: 0.042 },
+            id: 9,
+            name: "Home mortgage 2",
+            secures: 6,
+          },
+        ],
+        next: 11,
+        schedule: {
+          expenses: [
+            ...kept.schedule.expenses,
+            { ...payments, name: "Home mortgage 1" },
+            { amount: 540, id: 10, name: "Home mortgage 2", pays: 9 },
+          ],
+        },
+      });
+    });
+
+    // The sub-accounts are matched by place, so the first keeps its
+    // records and the one past the last goes with its payments.
+    it("writes over the sub-accounts in their places, and sends those past the last away with their payments", async () => {
+      await saveHouse(null, parted);
+      await saveHouse(6, house);
+
+      expect(await latest()).toMatchObject({
+        accounts: [...kept.accounts, home, mortgage],
+        next: 11,
+        schedule: { expenses: [...kept.schedule.expenses, payments] },
+      });
+    });
+
     // £750 a month only meets the interest on £200,000 at 4.5%, so the
     // line runs to the end of the plan and carries it, and the loan's own
     // sum is never charged.
     it("keeps a mortgage whose payment only meets its interest, paid through an open-ended line", async () => {
       await saveHouse(null, {
         ...house,
-        balance: 200000,
-        payment: 750,
-        rate: 0.045,
+        parts: [{ balance: 200000, payment: 750, rate: 0.045 }],
       });
 
       expect(await latest()).toMatchObject({
@@ -658,10 +707,11 @@ describe("the account actions", () => {
         { ...house, bought: { ...house.bought, price: 0 } },
         { ...house, value: 0.5 },
         { ...house, growth: -1.5 },
-        { ...house, rate: -0.01 },
-        { ...house, balance: 0 },
-        { ...house, payment: 0 },
-        { ...outright, payment: 2210 },
+        { ...house, parts: [] },
+        { ...house, parts: [{ ...homePart, rate: -0.01 }] },
+        { ...house, parts: [{ ...homePart, balance: 0 }] },
+        { ...parted, parts: [homePart, { ...homePart, payment: 0 }] },
+        { ...outright, parts: [homePart] },
       ] as const) {
         await expect(saveHouse(null, draft)).rejects.toThrow(z.ZodError);
       }

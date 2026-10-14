@@ -71,28 +71,30 @@ const car = z
 // What a house may carry, checked against the model's own list and its
 // own soundness so the two cannot drift: the figures whole and never
 // negative, the house's growth no lower than losing everything, as an
-// account's rate is, the mortgage's rate no lower than nothing, a
-// mortgaged house owing and paying something, a house owned outright
-// owing, paying and charged nothing, since the form zeroes what its
-// status hides, the month it was bought in and the price, which its
+// account's rate is, each sub-account's rate no lower than nothing, a
+// mortgaged house held in a sub-account at least, each owing and paying
+// something, a house owned outright in none, since the form drops what
+// its status hides, the month it was bought in and the price, which its
 // soundness holds to something, and the name as typed less the space
 // around it.
 const house = z
   .object({
-    balance: pounds,
     bought: z.object({ month, price: pounds }),
     growth: z.number().min(-1),
     name: named,
-    payment: pounds,
-    rate: z.number().nonnegative(),
+    parts: z.array(
+      z.object({
+        balance: pounds,
+        payment: pounds,
+        rate: z.number().nonnegative(),
+      }),
+    ),
     status: z.enum(statuses),
     value: pounds,
   })
   .refine(isSound)
   .refine(
-    (draft) =>
-      draft.status === "mortgaged" ||
-      (draft.balance === 0 && draft.payment === 0 && draft.rate === 0),
+    (draft) => draft.status === "mortgaged" || draft.parts.length === 0,
   ) satisfies z.ZodType<HouseValues>;
 
 // What a save may carry, checked against the model's own lists so the
@@ -329,9 +331,9 @@ export async function saveCar(
 
 // Writes a house as the records it is, a new one when the id is null
 // and over the house with that id otherwise: the house's own account,
-// and for a mortgaged house the loan secured on it and the line of its
-// payments, so the mortgage appears among the accounts and its payments
-// among the expenses with no more asked of the form, and hands back the
+// and for a mortgaged house the loan each sub-account is and the line of
+// its payments, so the mortgage appears among the accounts and its
+// payments among the expenses with no more asked of the form, and hands back the
 // house's own account. Checked as a save is, the payments laid from the
 // month the plan starts in, the one after the balances' month.
 export async function saveHouse(

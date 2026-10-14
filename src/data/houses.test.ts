@@ -2,13 +2,18 @@
 import { describe, expect, it } from "vitest";
 
 import { accounts } from "@/data/accounts.fixture";
-import { homeValues as home, house, houseLoan } from "@/data/houses.fixture";
+import {
+  homeValues as home,
+  homePart,
+  house,
+  houseLoan,
+} from "@/data/houses.fixture";
 
-import type { HouseDraft } from "./houses";
+import type { PartDraft } from "./houses";
 
 import { derive, houseOf, isSound, toRecords } from "./houses";
 
-const draft: HouseDraft = { ...home, term: 22 };
+const draft: PartDraft = { ...homePart, key: 0, term: 22 };
 
 // The plan read in September 2026, so eight months of the year are gone.
 const plan = { from: 2026, month: 8 };
@@ -22,45 +27,67 @@ describe("derive", () => {
 });
 
 describe("isSound", () => {
-  it("wants a name, a price it was bought for, and a mortgage that owes and pays something at a rate no lower than nothing", () => {
+  it("wants a name, a price it was bought for, and a mortgage in a sub-account at least, each owing and paying something at a rate no lower than nothing", () => {
     expect(isSound(home)).toBe(true);
+    expect(isSound({ ...home, parts: [homePart, homePart] })).toBe(true);
     expect(isSound({ ...home, name: "  " })).toBe(false);
     expect(isSound({ ...home, bought: { ...home.bought, price: 0 } })).toBe(
       false,
     );
-    expect(isSound({ ...home, balance: 0 })).toBe(false);
-    expect(isSound({ ...home, payment: 0 })).toBe(false);
-    expect(isSound({ ...home, rate: -0.01 })).toBe(false);
+    expect(isSound({ ...home, parts: [] })).toBe(false);
+    expect(isSound({ ...home, parts: [{ ...homePart, balance: 0 }] })).toBe(
+      false,
+    );
     expect(
-      isSound({ ...home, balance: 0, payment: 0, status: "outright" }),
-    ).toBe(true);
+      isSound({ ...home, parts: [homePart, { ...homePart, payment: 0 }] }),
+    ).toBe(false);
+    expect(isSound({ ...home, parts: [{ ...homePart, rate: -0.01 }] })).toBe(
+      false,
+    );
+    expect(isSound({ ...home, parts: [], status: "outright" })).toBe(true);
   });
 });
 
 describe("houseOf", () => {
   // The fixture's home as a house, with its mortgage secured on it: the
   // loan's £182,940 owed comes back positive and its £2,210 a month is
-  // the payment; without the loan the house is owned outright.
+  // the payment; a second loan is a second sub-account, after the first;
+  // without a loan the house is owned outright.
   it("reads a house's values back off its records", () => {
     const pair = { asset: house, loans: [houseLoan] };
+    const owed = { balance: 182940, payment: 2210, rate: 0.0515 };
 
     expect(houseOf(pair, plan)).toStrictEqual({
-      balance: 182940,
       bought: { month: { month: 5, year: 2022 }, price: 380000 },
       growth: 0.021,
       name: "Home",
-      payment: 2210,
-      rate: 0.0515,
+      parts: [owed],
       status: "mortgaged",
       value: 416386,
     });
+    expect(
+      houseOf(
+        {
+          ...pair,
+          loans: [
+            houseLoan,
+            {
+              ...houseLoan,
+              balance: -60000,
+              contribution: { amount: 400, cadence: "month", kind: "fixed" },
+              growth: { kind: "fixed", rate: 0.039 },
+              id: 6,
+            },
+          ],
+        },
+        plan,
+      ).parts,
+    ).toStrictEqual([owed, { balance: 60000, payment: 400, rate: 0.039 }]);
     expect(houseOf({ ...pair, loans: [] }, plan)).toStrictEqual({
-      balance: 0,
       bought: { month: { month: 5, year: 2022 }, price: 380000 },
       growth: 0.021,
       name: "Home",
-      payment: 0,
-      rate: 0,
+      parts: [],
       status: "outright",
       value: 416386,
     });
@@ -83,10 +110,7 @@ describe("houseOf", () => {
 describe("toRecords", () => {
   it("writes a house owned outright as a real asset growing at its own rate", () => {
     expect(
-      toRecords(
-        { ...home, balance: 0, payment: 0, rate: 0, status: "outright" },
-        plan,
-      ),
+      toRecords({ ...home, parts: [], status: "outright" }, plan),
     ).toStrictEqual({
       asset: {
         balance: 416386,
@@ -143,6 +167,31 @@ describe("toRecords", () => {
           startsAt: null,
         },
       },
+    ]);
+  });
+
+  // Each sub-account is a loan of its own with its own payments, named
+  // by its place so the month end can tell them apart.
+  it("writes a mortgage in sub-accounts as a loan each, in their order, numbered", () => {
+    const { loans } = toRecords(
+      {
+        ...home,
+        parts: [homePart, { balance: 60000, payment: 400, rate: 0.039 }],
+      },
+      plan,
+    );
+
+    expect(
+      loans.map(({ account, line }) => [
+        account.name,
+        account.balance,
+        account.rate,
+        line.name,
+        line.amount,
+      ]),
+    ).toStrictEqual([
+      ["Home mortgage 1", -341810, 0.0515, "Home mortgage 1", 2210],
+      ["Home mortgage 2", -60000, 0.039, "Home mortgage 2", 400],
     ]);
   });
 });
