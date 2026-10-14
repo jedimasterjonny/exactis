@@ -1,5 +1,6 @@
 import "server-only";
 import { sealData, unsealData } from "iron-session";
+import { io } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -26,8 +27,13 @@ export async function endSession(): Promise<void> {
 }
 
 // Whether the request carries a session, read from the request's own
-// cookies.
+// cookies. Unsealing reads the clock to check the seal's expiry, and a
+// prerender may not: cookies() no longer stops one that Partial
+// Prefetching runs per session, so io() does, and everything after the
+// check waits for the request as before. In a request or an action it
+// resolves at once.
 export async function hasSession(): Promise<boolean> {
+  await io();
   return holdsSession((await cookies()).get(sessionCookie)?.value);
 }
 
