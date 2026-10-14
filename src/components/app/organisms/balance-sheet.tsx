@@ -90,7 +90,7 @@ export function BalanceSheet({
     );
   }
 
-  const loans = assets.flatMap(({ loan }) => (loan === null ? [] : [loan]));
+  const loans = assets.flatMap(({ loans: secured }) => secured);
   const saved = balanceOf(savings);
   const worth = sumOf(assets, ({ asset }) => asset.balance);
   const secured = balanceOf(loans);
@@ -157,19 +157,22 @@ export function BalanceSheet({
                 <div className="relative py-3">
                   <AssetLines onEdit={onEdit} pair={pair} />
                 </div>
-                {pair.loan !== null && (
-                  <div className="relative py-3 folded:pt-0 folded:pl-4">
+                {pair.loans.map((loan) => (
+                  <div
+                    className="relative py-3 folded:pt-0 folded:pl-4"
+                    key={loan.id}
+                  >
                     <FoldedLines
-                      figure={formatGbp(pair.loan.balance)}
-                      name={pair.loan.name}
+                      figure={formatGbp(loan.balance)}
+                      name={loan.name}
                       onOpen={() => {
                         onEdit(pair.asset);
                       }}
                     >
-                      <span>{loanOf(pair.loan, expenses)}</span>
+                      <span>{loanOf(loan, expenses)}</span>
                     </FoldedLines>
                   </div>
-                )}
+                ))}
               </li>
             ))}
           </ul>
@@ -235,7 +238,7 @@ function aboutOf(
 }
 
 // An asset's lines: what it is and how its value moves, then the equity
-// it holds once the loan on it is paid, as a bar of its value and in
+// it holds once the loans on it are paid, as a bar of its value and in
 // words, so the bar is never the only thing saying it, and what is paid
 // into it of its own, which only an asset the account dialog writes may
 // take.
@@ -262,7 +265,7 @@ function AssetLines({
       }}
     >
       <span>{`${kindLabels[asset.kind]} · ${growthOf(asset)}`}</span>
-      {pair.loan !== null && (
+      {pair.loans.length > 0 && (
         <>
           <ShareBar className="my-1 h-1.5 w-full" share={share} />
           <span>{`${formatGbp(equity)} equity, ${part} of its value`}</span>

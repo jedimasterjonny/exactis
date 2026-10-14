@@ -56,11 +56,11 @@ export function derive(draft: HouseDraft, figure: LoanFigure): null | number {
 // lay it. A house with no loan against it is owned outright and owes
 // nothing.
 export function houseOf(
-  { asset, loan }: Secured,
+  { asset, loans: [loan] }: Secured,
   plan: PlanMonth,
 ): HouseValues {
   const held = toValues(asset);
-  const owed = loan === null ? null : toValues(loan);
+  const owed = loan === undefined ? null : toValues(loan);
   return {
     balance: owed === null ? 0 : negated(owed.balance),
     bought: asset.bought ?? openingPurchase(plan),
@@ -109,14 +109,16 @@ export function toRecords(
       value: house.value,
     },
     house.status === "outright"
-      ? null
-      : {
-          balance: house.balance,
-          balloon: 0,
-          name: `${house.name} mortgage`,
-          payment: house.payment,
-          rate: house.rate,
-        },
+      ? []
+      : [
+          {
+            balance: house.balance,
+            balloon: 0,
+            name: `${house.name} mortgage`,
+            payment: house.payment,
+            rate: house.rate,
+          },
+        ],
     plan,
   );
 }

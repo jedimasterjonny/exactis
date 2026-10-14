@@ -42,7 +42,7 @@ describe("houseOf", () => {
   // loan's £176,520 owed comes back positive and its £2,180 a month is
   // the payment; without the loan the house is owned outright.
   it("reads a house's values back off its records", () => {
-    const pair = { asset: house, loan: houseLoan };
+    const pair = { asset: house, loans: [houseLoan] };
 
     expect(houseOf(pair, plan)).toStrictEqual({
       balance: 176520,
@@ -54,7 +54,7 @@ describe("houseOf", () => {
       status: "mortgaged",
       value: 397512,
     });
-    expect(houseOf({ ...pair, loan: null }, plan)).toStrictEqual({
+    expect(houseOf({ ...pair, loans: [] }, plan)).toStrictEqual({
       balance: 0,
       bought: { month: { month: 9, year: 2021 }, price: 380000 },
       growth: 0.021,
@@ -74,7 +74,7 @@ describe("houseOf", () => {
     const [, , , unbought] = accounts;
 
     expect(
-      houseOf({ asset: { ...unbought, kind: "house" }, loan: null }, plan)
+      houseOf({ asset: { ...unbought, kind: "house" }, loans: [] }, plan)
         .bought,
     ).toStrictEqual({ month: { month: 8, year: 2026 }, price: 0 });
   });
@@ -103,7 +103,7 @@ describe("toRecords", () => {
         owner: null,
         rate: 0.021,
       },
-      loan: null,
+      loans: [],
     });
   });
 
@@ -111,36 +111,38 @@ describe("toRecords", () => {
   // household is read, so the line is saved from the plan's first year
   // and open-ended.
   it("writes a mortgaged house with the loan against it and its payments from the plan's first year, their end left to the loan", () => {
-    const { asset, loan } = toRecords(home, plan);
+    const { asset, loans } = toRecords(home, plan);
 
     expect(asset.name).toBe("Home");
-    expect(loan).toStrictEqual({
-      account: {
-        balance: -334670,
-        balloon: 0,
-        cadence: "month",
-        cap: 0,
-        contribution: 2180,
-        funding: "fixed",
-        growth: "fixed",
-        isAlwaysFunded: false,
-        kind: "debt",
-        name: "Home mortgage",
-        owner: null,
-        rate: 0.0485,
+    expect(loans).toStrictEqual([
+      {
+        account: {
+          balance: -334670,
+          balloon: 0,
+          cadence: "month",
+          cap: 0,
+          contribution: 2180,
+          funding: "fixed",
+          growth: "fixed",
+          isAlwaysFunded: false,
+          kind: "debt",
+          name: "Home mortgage",
+          owner: null,
+          rate: 0.0485,
+        },
+        line: {
+          amount: 2180,
+          cadence: "month",
+          endsAfter: 0,
+          endsAt: null,
+          firstYear: 2026,
+          growth: "nominal",
+          lastMonth: null,
+          lastYear: null,
+          name: "Home mortgage",
+          startsAt: null,
+        },
       },
-      line: {
-        amount: 2180,
-        cadence: "month",
-        endsAfter: 0,
-        endsAt: null,
-        firstYear: 2026,
-        growth: "nominal",
-        lastMonth: null,
-        lastYear: null,
-        name: "Home mortgage",
-        startsAt: null,
-      },
-    });
+    ]);
   });
 });

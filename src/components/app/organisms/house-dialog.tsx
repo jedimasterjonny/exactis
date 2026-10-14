@@ -153,7 +153,7 @@ function openingOf(house: null | Secured, plan: PlanMonth): Entry<Draft> {
     ...houseOf(house, plan),
     isHeld: false,
     term: blank.term,
-    worked: workedOn(house.loan !== null),
+    worked: workedOn(house.loans.length > 0),
   };
   return { draft, id: house.asset.id, initial: draft };
 }

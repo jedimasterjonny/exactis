@@ -1098,7 +1098,7 @@ describe("a line paying a loan", () => {
   // its balances as of the month given, and the line as the household
   // reads it.
   function paymentsOf(
-    { asset, loan }: SecuredRecords,
+    { asset, loans: [loan] }: SecuredRecords,
     asOf: Month = august,
   ): ExpenseLine | undefined {
     const { household: read } = soundKept({
@@ -1106,7 +1106,7 @@ describe("a line paying a loan", () => {
       accounts: [
         ...kept.accounts,
         toAccount(asset, 6),
-        ...(loan === null
+        ...(loan === undefined
           ? []
           : [{ ...toAccount(loan.account, 7), secures: 6 }]),
       ],
@@ -1116,7 +1116,7 @@ describe("a line paying a loan", () => {
         ...kept.schedule,
         expenses: [
           ...kept.schedule.expenses,
-          ...(loan === null ? [] : [{ ...loan.line, id: 8, pays: 7 }]),
+          ...(loan === undefined ? [] : [{ ...loan.line, id: 8, pays: 7 }]),
         ],
       },
     });
@@ -1202,18 +1202,15 @@ describe("a line paying a loan", () => {
   // The loan says when its payments run, so a tie saved on the line is
   // read as none.
   it("ties a loan's payments to no milestone", () => {
-    const { loan, ...records } = toHouseRecords(homeValues, { from: 2026 });
+    const { loans, ...records } = toHouseRecords(homeValues, { from: 2026 });
 
     expect(
       paymentsOf({
         ...records,
-        loan:
-          loan === null
-            ? null
-            : {
-                ...loan,
-                line: { ...loan.line, endsAfter: 3, endsAt: 1, startsAt: 2 },
-              },
+        loans: loans.map((loan) => ({
+          ...loan,
+          line: { ...loan.line, endsAfter: 3, endsAt: 1, startsAt: 2 },
+        })),
       }),
     ).toMatchObject({
       endsAfter: 0,

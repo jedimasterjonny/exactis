@@ -6,23 +6,24 @@ import type {
 } from "@/data/accounts";
 import type { LineValues } from "@/data/schedule";
 
-// An asset and the loan secured on it, as the store holds them: two
-// accounts the loan links, or the asset alone when it is owned
-// outright. A house and a car are the same shape here, which is why
-// this is one type and not one per asset: the names differed, the
-// members never did, so nothing was ever kept from standing for
-// anything else.
+// An asset and the loans secured on it, as the store holds them: the
+// asset and every account linking to it, in the order the accounts are
+// listed, or the asset alone when it is owned outright. A house and a
+// car are the same shape here, which is why this is one type and not
+// one per asset: the names differed, the members never did, so nothing
+// was ever kept from standing for anything else.
 export interface Secured {
   readonly asset: Account;
-  readonly loan: Account | null;
+  readonly loans: readonly Account[];
 }
 
 // What an asset's model lays out to be written together: the asset,
-// with when it was bought where it is a house, and the loan secured on
-// it with its payments, or none for an asset owned outright.
+// with when it was bought where it is a house, and the loans secured on
+// it with their payments, in the order they are listed, or none for an
+// asset owned outright.
 export interface SecuredRecords {
   readonly asset: AccountValues & Pick<Account, "bought">;
-  readonly loan: Borrowing | null;
+  readonly loans: readonly Borrowing[];
 }
 
 // The asset as its model hands it to be written: its own kind, its
@@ -67,7 +68,7 @@ export function owes(loan: Omit<Loan, "balloon" | "name">): boolean {
 // The records an asset is written as, whatever the asset. It is an
 // account of its own kind at its own fixed rate, since the plan rate is
 // the wrappers'; it is paid nothing, so its cadence is the one a
-// contribution of nothing reads back as. A loan against it is a debt
+// contribution of nothing reads back as. Each loan against it is a debt
 // owing the balance, charged the rate as its growth, paid the payment
 // a month as its contribution, which is what the ledger shows against
 // it, and left owing the balloon, and its payments are a debt line of
@@ -81,7 +82,7 @@ export function owes(loan: Omit<Loan, "balloon" | "name">): boolean {
 // purchase goes with it, beside the values.
 export function securedRecords(
   asset: Asset,
-  loan: Loan | null,
+  loans: readonly Loan[],
   plan: { readonly from: number },
 ): SecuredRecords {
   const held: SecuredRecords["asset"] = {
@@ -99,12 +100,9 @@ export function securedRecords(
     owner: null,
     rate: asset.rate,
   };
-  if (loan === null) {
-    return { asset: held, loan: null };
-  }
   return {
     asset: held,
-    loan: {
+    loans: loans.map((loan) => ({
       account: {
         balance: -loan.balance,
         balloon: loan.balloon,
@@ -131,6 +129,6 @@ export function securedRecords(
         name: loan.name,
         startsAt: null,
       },
-    },
+    })),
   };
 }

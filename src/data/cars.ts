@@ -49,10 +49,10 @@ export const agreements = ["pcp", "loan", "outright"] as const;
 // finance's, its contribution the payment, a month as the records lay
 // it, and its balloon the agreement's, which says whether the agreement
 // is a PCP or a loan. A car with no loan against it is owned outright
-// and owes nothing.
-export function carOf({ asset, loan }: Secured): CarValues {
+// and owes nothing; the store holds a car to one.
+export function carOf({ asset, loans: [loan] }: Secured): CarValues {
   const held = toValues(asset);
-  const owed = loan === null ? null : toValues(loan);
+  const owed = loan === undefined ? null : toValues(loan);
   return {
     agreement: agreementOf(owed),
     balance: owed === null ? 0 : negated(owed.balance),
@@ -118,14 +118,16 @@ export function toRecords(
       value: car.value,
     },
     car.agreement === "outright"
-      ? null
-      : {
-          balance: car.balance,
-          balloon: car.balloon,
-          name: `${car.name} ${car.agreement === "pcp" ? "PCP" : "loan"}`,
-          payment: car.payment,
-          rate: car.rate,
-        },
+      ? []
+      : [
+          {
+            balance: car.balance,
+            balloon: car.balloon,
+            name: `${car.name} ${car.agreement === "pcp" ? "PCP" : "loan"}`,
+            payment: car.payment,
+            rate: car.rate,
+          },
+        ],
     plan,
   );
 }

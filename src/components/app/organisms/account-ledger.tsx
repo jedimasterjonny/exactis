@@ -108,10 +108,10 @@ export function AccountLedger({
   // has no place in the order to set.
   const assets = order
     .filter(isAsset)
-    .map((asset) => securedFor(asset, order) ?? { asset, loan: null });
+    .map((asset) => securedFor(asset, order) ?? { asset, loans: [] });
   const paid = order.filter((account) => !isAsset(account));
   const paired = new Set(
-    assets.flatMap(({ loan }) => (loan === null ? [] : [loan.id])),
+    assets.flatMap(({ loans }) => loans.map(({ id }) => id)),
   );
   const held = paid.filter((account) => !paired.has(account.id));
   const savings = held.filter((account) => account.kind !== "debt");
@@ -134,7 +134,7 @@ export function AccountLedger({
   }
 
   // A dialog's Delete asks about the account the dialog is open on, or
-  // for a house or a car its own account, which takes the loan with it. Whichever dialog it was closes first, so the
+  // for a house or a car its own account, which takes its loans with it. Whichever dialog it was closes first, so the
   // question stands alone and a cancel lands back on the screen rather
   // than on the draft of what was nearly deleted.
   function drop(account: Account): void {
@@ -291,8 +291,8 @@ export function AccountLedger({
 // in plain words: a pension takes the sacrifice of every salary feeding
 // it, which is paid as salary from then on, since the store stops the
 // salaries before the pension goes and the share typed against each is
-// lost with it; a house or a car takes the loan secured on it and that
-// loan's payments; and any other account, or an asset with no loan,
+// lost with it; a house or a car takes the loans secured on it and
+// their payments; and any other account, or an asset with no loan,
 // goes alone, taking its balance off the sheet for good.
 function goesWith(
   account: Account,
@@ -303,12 +303,12 @@ function goesWith(
   if (feeders.length > 0) {
     return `${listed.format(feeders)} ${feeders.length === 1 ? "stops" : "stop"} sacrificing into it, and ${feeders.length === 1 ? "pays that share" : "pay those shares"} as salary instead.`;
   }
-  const loan = securedFor(account, accounts)?.loan ?? null;
-  if (loan === null) {
+  const loans = securedFor(account, accounts)?.loans ?? [];
+  if (loans.length === 0) {
     return `Its ${formatGbp(account.balance)} leaves the balance sheet, and it cannot be brought back.`;
   }
   const what = account.kind === "house" ? "mortgage" : "finance";
-  return `Its ${what}, ${loan.name}, and the payments go with it.`;
+  return `Its ${what}, ${listed.format(loans.map(({ name }) => name))}, and the payments go with it.`;
 }
 
 // Whether an account is an asset with a dialog of its own, which edits
@@ -317,13 +317,12 @@ function hasDialog(account: Account): boolean {
   return account.kind === "car" || account.kind === "house";
 }
 
-// The pair a house or a car is, with the loan secured on it when there
-// is one, which its dialog edits as one and its row shows as one; any
-// other account is part of none, and so is a loan secured on an asset
-// with no dialog, or on one not listed, which is listed and opens as the
-// account it is. A loan secured on a house or a car is never asked
-// about, since it has no row of its own to ask from: the store holds an
-// asset to one loan, so every such loan is on its asset's row.
+// What a house or a car is, with the loans secured on it, which its
+// dialog edits as one and its row shows as one; any other account is
+// part of none, and so is a loan secured on an asset with no dialog, or
+// on one not listed, which is listed and opens as the account it is. A
+// loan secured on a house or a car is never asked about, since it has
+// no row of its own to ask from: every such loan is on its asset's row.
 function securedFor(
   account: Account,
   accounts: readonly Account[],
@@ -331,7 +330,7 @@ function securedFor(
   return hasDialog(account)
     ? {
         asset: account,
-        loan: accounts.find((a) => a.secures === account.id) ?? null,
+        loans: accounts.filter((a) => a.secures === account.id),
       }
     : null;
 }

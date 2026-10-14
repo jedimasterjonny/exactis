@@ -10,11 +10,11 @@ export function balanceOf(accounts: readonly Account[]): number {
   return sumOf(accounts, ({ balance }) => balance);
 }
 
-// What an asset is worth to the plan once the loan secured on it is
+// What an asset is worth to the plan once the loans secured on it are
 // paid: its value less what is owed, all of it for one owned outright.
-// A loan above the value leaves the equity below nothing.
-export function equityOf({ asset, loan }: Secured): number {
-  return asset.balance + (loan?.balance ?? 0);
+// Loans above the value leave the equity below nothing.
+export function equityOf({ asset, loans }: Secured): number {
+  return asset.balance + balanceOf(loans);
 }
 
 // A month's worth of money as the ledger writes it, "£1,275 / mo".
