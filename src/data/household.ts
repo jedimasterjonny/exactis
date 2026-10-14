@@ -611,8 +611,14 @@ export const household = z
   )
   .refine(
     ({ accounts }) =>
-      isHeldOnce(accounts.map(({ secures }) => secures ?? null)),
-    "An asset has one loan secured on it",
+      isHeldOnce(
+        accounts.map(({ secures }) =>
+          accounts.find(({ id }) => id === secures)?.kind === "house"
+            ? null
+            : (secures ?? null),
+        ),
+      ),
+    "Only a house has more than one loan secured on it",
   )
   .refine(
     ({ accounts, schedule }) =>
