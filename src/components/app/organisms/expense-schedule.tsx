@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { Plus } from "lucide-react";
 
 import type { Summary } from "@/components/app/organisms/schedule-rows";
+import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
@@ -19,6 +20,7 @@ import { LineFields } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
+import { drawnAsMortgages, mortgageLine } from "@/data/houses";
 import { markersOf } from "@/data/milestones";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
@@ -35,6 +37,7 @@ import {
 type Draft = LineValues;
 
 interface ExpenseScheduleProps {
+  readonly accounts: readonly Account[];
   readonly lines: readonly ExpenseLine[];
   readonly milestones: readonly Milestone[];
   readonly plan: Plan;
@@ -51,14 +54,22 @@ interface ExpenseScheduleProps {
 // offers a Delete that asks through the confirm dialog before the line
 // goes, as the income schedule's does, and holds while a save is on its
 // way. Its lines are laid out by the milestones the page hands down, as
-// the income schedule's are. The card takes the next numeral off the
-// screen's after the income card's.
+// the income schedule's are, and the lines paying a mortgage held in more
+// than one sub-account are drawn as the one line of the mortgage, which
+// the accounts the page hands down say. The card takes the next numeral
+// off the screen's after the income card's.
 export function ExpenseSchedule({
+  accounts,
   lines,
   milestones,
   plan,
 }: ExpenseScheduleProps): JSX.Element {
   const markers = markersOf(milestones, plan);
+  const drawn = drawnAsMortgages(lines, accounts, {
+    debtOf: ({ pays }) => pays,
+    merged: (paying, mortgage) =>
+      mortgageLine(paying, mortgage, { month: plan.month, year: plan.from }),
+  });
   const { amend, dialogOf, dismiss, entry, open } = useEditor({
     describe: (line) => `${line.name} · ${spanOf(line)}`,
     noun: "Expense line",
@@ -113,7 +124,7 @@ export function ExpenseSchedule({
           <ScheduleRows
             emptyDescription="Add spending, childcare or a loan's payments."
             emptyTitle="No expenses yet"
-            lines={lines}
+            lines={drawn}
             milestones={markers}
             onEdit={edit}
             plan={plan}
