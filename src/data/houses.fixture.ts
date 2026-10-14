@@ -1,21 +1,23 @@
 import type { Account } from "@/data/accounts";
-import type { HouseValues } from "@/data/houses";
+import type { HouseValues, Part } from "@/data/houses";
 
 import { accounts } from "@/data/accounts.fixture";
 
 const [, , , home, mortgage] = accounts;
 
+// The reference kit's mortgage as one sub-account: £334,670 owed at
+// 4.85% and £2,180 paid a month, which clears it in 20.0 years. For
+// tests.
+export const homePart: Part = { balance: 334670, payment: 2180, rate: 0.0485 };
+
 // The reference kit's house as its dialog takes it: bought in October
-// for £380,000, worth £397,512, growing at 2.1%, with £334,670 owed on
-// it at 4.85% and £2,180 paid a month, which clears it in 20.0 years.
-// For tests.
+// for £380,000, worth £397,512, growing at 2.1%, with the mortgage above
+// against it. For tests.
 export const homeValues: HouseValues = {
-  balance: 334670,
   bought: { month: { month: 9, year: 2021 }, price: 380000 },
   growth: 0.021,
   name: "Home",
-  payment: 2180,
-  rate: 0.0485,
+  parts: [homePart],
   status: "mortgaged",
   value: 397512,
 };

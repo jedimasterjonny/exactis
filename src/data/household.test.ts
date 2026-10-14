@@ -31,7 +31,7 @@ import { derivedSet } from "@/data/cma";
 import { cma, mappings } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
-import { homeValues } from "@/data/houses.fixture";
+import { homePart, homeValues } from "@/data/houses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
 import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
@@ -1159,7 +1159,7 @@ describe("a line paying a loan", () => {
   // end of February, whatever year the line was saved from.
   it("counts the payments from the month after the one the balances are as of, so the end moves with it", () => {
     const flat = toHouseRecords(
-      { ...homeValues, balance: 114000, payment: 1000, rate: 0 },
+      { ...homeValues, parts: [{ balance: 114000, payment: 1000, rate: 0 }] },
       { from: 2026 },
     );
 
@@ -1183,7 +1183,7 @@ describe("a line paying a loan", () => {
   // it starts.
   it("runs a cleared loan's payments in no month of the plan", () => {
     const cleared = toHouseRecords(
-      { ...homeValues, balance: 0 },
+      { ...homeValues, parts: [{ ...homePart, balance: 0 }] },
       { from: 2026 },
     );
 
@@ -1244,7 +1244,10 @@ describe("a line paying a loan", () => {
   it("runs payments that never clear the loan to the end of the plan", () => {
     expect(
       paymentsOf(
-        toHouseRecords({ ...homeValues, payment: 1000 }, { from: 2026 }),
+        toHouseRecords(
+          { ...homeValues, parts: [{ ...homePart, payment: 1000 }] },
+          { from: 2026 },
+        ),
       ),
     ).toMatchObject({ lastMonth: null, lastYear: null });
   });
