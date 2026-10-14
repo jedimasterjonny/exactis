@@ -15,7 +15,9 @@ import { Ledger } from "@/components/app/atoms/ledger";
 import { ShareBar } from "@/components/app/atoms/share-bar";
 import { Button } from "@/components/kit/button";
 import { kindLabels } from "@/data/accounts";
+import { mortgageOn } from "@/data/houses";
 import { fixedMonthly } from "@/lib/cadence";
+import { counted } from "@/lib/count";
 import { balanceOf, equityOf, formatMonthly, sumOf } from "@/lib/ledger";
 import { formatGbp, formatPercent, negated } from "@/lib/money";
 import { monthName } from "@/lib/months";
@@ -62,7 +64,9 @@ const groups = [
 // kinds. Each asset is drawn level with the loan secured on it, so the
 // house and its mortgage read as one entry across the fold, and the
 // other debts, secured on nothing with a row, head the right-hand page
-// beside the savings, with the button that adds one. While the sheet is
+// beside the savings, with the button that adds one. A mortgage held in
+// more than one sub-account is drawn as the one mortgage it is, with
+// each sub-account beneath it. While the sheet is
 // too narrow for two pages, as on a phone, the pages stack and a loan
 // sits beneath its asset. Every row opens the account it is, a loan
 // the asset it is secured on, and the dialog it opens is where it is
@@ -157,22 +161,17 @@ export function BalanceSheet({
                 <div className="relative py-3">
                   <AssetLines onEdit={onEdit} pair={pair} />
                 </div>
-                {pair.loans.map((loan) => (
-                  <div
-                    className="relative py-3 folded:pt-0 folded:pl-4"
-                    key={loan.id}
-                  >
-                    <FoldedLines
-                      figure={formatGbp(loan.balance)}
-                      name={loan.name}
+                {pair.loans.length > 0 && (
+                  <div className="relative py-3 folded:pt-0 folded:pl-4">
+                    <SecuredLines
+                      expenses={expenses}
                       onOpen={() => {
                         onEdit(pair.asset);
                       }}
-                    >
-                      <span>{loanOf(loan, expenses)}</span>
-                    </FoldedLines>
+                      pair={pair}
+                    />
                   </div>
-                ))}
+                )}
               </li>
             ))}
           </ul>
@@ -394,5 +393,58 @@ function Row({ account, children, onEdit, place }: RowProps): JSX.Element {
         </FoldedLines>
       </div>
     </li>
+  );
+}
+
+// What is secured on an asset, level with it, opening the asset: each
+// loan, with what it is charged, paid and when it clears; or a mortgage
+// held in more than one sub-account as the one mortgage it is, owing
+// them all and paying a month what those still owing pay, with each
+// sub-account beneath it as one loan alone would be said.
+function SecuredLines({
+  expenses,
+  onOpen,
+  pair,
+}: {
+  readonly expenses: readonly ExpenseLine[];
+  readonly onOpen: () => void;
+  readonly pair: Secured;
+}): JSX.Element {
+  const { loans } = pair;
+  const mortgage = mortgageOn(pair);
+  if (mortgage === null) {
+    return (
+      <>
+        {loans.map((loan) => (
+          <FoldedLines
+            figure={formatGbp(loan.balance)}
+            key={loan.id}
+            name={loan.name}
+            onOpen={onOpen}
+          >
+            <span>{loanOf(loan, expenses)}</span>
+          </FoldedLines>
+        ))}
+      </>
+    );
+  }
+  const owing = loans.filter(({ balance }) => balance < 0);
+  return (
+    <FoldedLines
+      figure={formatGbp(balanceOf(loans))}
+      name={mortgage.name}
+      onOpen={onOpen}
+    >
+      <span>{`${formatMonthly(sumOf(owing, fixedMonthly))} in ${counted(loans.length, "sub-account")}`}</span>
+      <ul className="mt-1 grid gap-1 border-l pl-3">
+        {loans.map((loan) => (
+          <li key={loan.id}>
+            <FoldedLines figure={formatGbp(loan.balance)} name={loan.name}>
+              <span>{loanOf(loan, expenses)}</span>
+            </FoldedLines>
+          </li>
+        ))}
+      </ul>
+    </FoldedLines>
   );
 }
