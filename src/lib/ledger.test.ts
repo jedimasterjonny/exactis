@@ -18,10 +18,10 @@ describe("balanceOf", () => {
 
 describe("equityOf", () => {
   it("takes what is owed off the value, and holds all of one owned outright", () => {
-    expect(equityOf({ asset: home, loan: mortgage })).toBe(416386 - 182940);
-    expect(equityOf({ asset: home, loan: null })).toBe(416386);
+    expect(equityOf({ asset: home, loans: [mortgage] })).toBe(416386 - 182940);
+    expect(equityOf({ asset: home, loans: [] })).toBe(416386);
     expect(
-      equityOf({ asset: home, loan: { ...mortgage, balance: -500000 } }),
+      equityOf({ asset: home, loans: [{ ...mortgage, balance: -500000 }] }),
     ).toBe(416386 - 500000);
   });
 });

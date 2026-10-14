@@ -32,7 +32,7 @@ vi.mock("@/actions/accounts", () => ({ saveCar: vi.fn() }));
 // The Golf with the finance secured on it: £14,000 owed at 7.9%,
 // paying £290 a month towards a £6,000 balloon, which it reaches in
 // three years.
-const car: Secured = { asset: golf, loan: finance };
+const car: Secured = { asset: golf, loans: [finance] };
 
 const workedHint = "Worked out";
 
@@ -204,7 +204,7 @@ describe("CarDialog", () => {
   it("opens a car on a loan as the loan it is, and saves it with its loan", async () => {
     const onSaved = vi.fn<() => void>();
     saved(golf);
-    renderDialog({ car: { ...car, loan }, onSaved });
+    renderDialog({ car: { ...car, loans: [loan] }, onSaved });
     const dialog = openDialog();
 
     expect(
@@ -236,7 +236,7 @@ describe("CarDialog", () => {
   });
 
   it("opens a car owned outright with no finance fields", () => {
-    renderDialog({ car: { ...car, loan: null } });
+    renderDialog({ car: { ...car, loans: [] } });
     const dialog = openDialog();
 
     expect(
