@@ -12,7 +12,9 @@ import type { Answer } from "@/lib/answer";
 
 import { removeExpenseLine, saveExpenseLine } from "@/actions/schedule";
 import { Toaster } from "@/components/kit/toast";
+import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
+import { house, houseLoan } from "@/data/houses.fixture";
 import { plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { saved as accepted } from "@/lib/answer";
@@ -30,7 +32,12 @@ const [, , mortgagePayment, retirement] = expenseLines;
 // Save reports through the toast manager, which needs its Toaster mounted.
 function renderSchedule(lines: readonly ExpenseLine[] = expenseLines): void {
   render(
-    <ExpenseSchedule lines={lines} milestones={milestones} plan={plan} />,
+    <ExpenseSchedule
+      accounts={accounts}
+      lines={lines}
+      milestones={milestones}
+      plan={plan}
+    />,
     { wrapper: Toaster },
   );
 }
@@ -78,7 +85,14 @@ describe("ExpenseSchedule", () => {
   });
 
   it("draws the empty state for none", () => {
-    render(<ExpenseSchedule lines={[]} milestones={milestones} plan={plan} />);
+    render(
+      <ExpenseSchedule
+        accounts={accounts}
+        lines={[]}
+        milestones={milestones}
+        plan={plan}
+      />,
+    );
 
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
     expect(screen.getByText("No expenses yet")).toBeInTheDocument();
@@ -288,6 +302,7 @@ describe("ExpenseSchedule", () => {
   it("locks a line that is a loan's payments", () => {
     render(
       <ExpenseSchedule
+        accounts={accounts}
         lines={[retirement, { ...mortgagePayment, pays: 5 }]}
         milestones={milestones}
         plan={plan}
@@ -321,6 +336,56 @@ describe("ExpenseSchedule", () => {
     ).toHaveLength(2);
   });
 
+  // The lines paying a mortgage's two sub-accounts are drawn as the one
+  // line of the mortgage, paying both, to the end of the one that runs
+  // longer, where the first's line stood; a mortgage in one sub-account
+  // is drawn as its own line.
+  it("draws the lines paying a mortgage held in sub-accounts as the mortgage's one line", () => {
+    const parted = [
+      house,
+      { ...houseLoan, name: "Home mortgage 1" },
+      { ...houseLoan, id: 6, name: "Home mortgage 2" },
+    ];
+    render(
+      <ExpenseSchedule
+        accounts={parted}
+        lines={[
+          {
+            ...mortgagePayment,
+            amount: 2210,
+            firstYear: 2026,
+            lastMonth: 5,
+            lastYear: 2047,
+            name: "Home mortgage 1",
+            pays: 5,
+          },
+          retirement,
+          {
+            ...mortgagePayment,
+            amount: 400,
+            firstYear: 2026,
+            id: 6,
+            lastMonth: 2,
+            lastYear: 2052,
+            name: "Home mortgage 2",
+            pays: 6,
+          },
+        ]}
+        milestones={milestones}
+        plan={plan}
+      />,
+      { wrapper: Toaster },
+    );
+
+    expect(
+      screen.getAllByRole("listitem").map((row) => row.textContent),
+    ).toStrictEqual([
+      "Home mortgage£2,610 / moLoan · Fixed in pounds2026–Mar 2052 · Age 36–62Home mortgageLoan£2,610 / moFixed in pounds2026–Mar 2052Age 36–62",
+      "Retirement living£60,000 / yrRises with inflation2048 on · Age 58–89Retirement living£60,000 / yrRises with inflation2048 onAge 58–89",
+    ]);
+    expect(screen.queryByText(/^Home mortgage \d/)).not.toBeInTheDocument();
+  });
+
   // With its owner retiring at 59, the plan's retirement falls in 2049,
   // so a line ending at it runs to 2048, as the dialog says beneath the
   // choice, and one ending three years after it runs to 2051, as the
@@ -328,6 +393,7 @@ describe("ExpenseSchedule", () => {
   it("ties a new line's end to years after a milestone and saves the tie with the year it gives", async () => {
     render(
       <ExpenseSchedule
+        accounts={accounts}
         lines={expenseLines}
         milestones={milestones}
         plan={retiring}

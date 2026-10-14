@@ -8,6 +8,7 @@ import type { Schedule } from "@/engine/cash-flow";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
+import { house, houseLoan } from "@/data/houses.fixture";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { bySlot } from "@/test/dom";
@@ -450,6 +451,66 @@ describe("CashFlowCard", () => {
       "Mortgage payment£3,201 / mo · Fixed in pounds · 2036–2060−£3,201",
       "Retirement living£60,000 / yr · Fixed in pounds · 2048 on−£5,000",
     ]);
+  });
+
+  // A mortgage in two sub-accounts pays both in 2026, listed as the one
+  // line of the mortgage; by 2040 the first has cleared and the second
+  // pays alone, still under the mortgage's name.
+  it("lists the lines paying a mortgage held in sub-accounts as the mortgage's one line", () => {
+    const paying = {
+      ...household,
+      firstYear: 2026,
+      growth: "nominal",
+      pays: 5,
+    } as const;
+    render(
+      <CashFlowCard
+        accounts={[
+          house,
+          houseLoan,
+          {
+            ...houseLoan,
+            balance: -60000,
+            contribution: { amount: 400, cadence: "month", kind: "fixed" },
+            growth: { kind: "fixed", rate: 0.039 },
+            id: 6,
+          },
+        ]}
+        milestones={[]}
+        plan={plan}
+        schedule={{
+          expenses: [
+            { ...paying, amount: 2210, lastMonth: 5, lastYear: 2035 },
+            {
+              ...paying,
+              amount: 400,
+              id: 9,
+              lastMonth: 2,
+              lastYear: 2044,
+              pays: 6,
+            },
+          ],
+          income: [],
+        }}
+      />,
+    );
+    // The one line the month pays, which there has to be only one of.
+    const line = (): null | string =>
+      within(screen.getByRole("region", { name: /^Expenses/ })).getByRole(
+        "listitem",
+      ).textContent;
+
+    fireEvent.click(screen.getByRole("button", { name: /^Expenses/ }));
+
+    expect(line()).toBe(
+      "Home mortgage£2,610 / mo · Fixed in pounds · 2026–Mar 2044−£2,610",
+    );
+
+    choose(2040);
+
+    expect(line()).toBe(
+      "Home mortgage£400 / mo · Fixed in pounds · 2026–Mar 2044−£400",
+    );
   });
 
   // At 3% a year, prices have risen 1.03 to the power of nine and a

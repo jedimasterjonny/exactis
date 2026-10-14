@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import type { LineValues } from "@/data/schedule";
+
 import { accounts } from "@/data/accounts.fixture";
 import {
   homeValues as home,
@@ -11,7 +13,15 @@ import {
 
 import type { PartDraft } from "./houses";
 
-import { derive, houseOf, isSound, mortgageOn, toRecords } from "./houses";
+import {
+  derive,
+  drawnAsMortgages,
+  houseOf,
+  isSound,
+  mortgageLine,
+  mortgageOn,
+  toRecords,
+} from "./houses";
 
 const draft: PartDraft = { ...homePart, key: 0, term: 22 };
 
@@ -63,6 +73,99 @@ describe("mortgageOn", () => {
     expect(
       mortgageOn({ ...parted, asset: { ...house, kind: "car" } }),
     ).toBeNull();
+  });
+});
+
+describe("drawnAsMortgages", () => {
+  // The home's mortgage in two sub-accounts, 5 and 6, and a car's loan,
+  // 8, on a car, 7, alone.
+  const held = [
+    house,
+    houseLoan,
+    { ...houseLoan, id: 6 },
+    { ...house, id: 7, kind: "car" as const },
+    { ...houseLoan, id: 8, secures: 7 },
+  ];
+  const drawing = {
+    debtOf: (debt: number | undefined): number | undefined => debt,
+    merged: (together: readonly (number | undefined)[]): number =>
+      together.reduce<number>((sum, debt) => sum + (debt ?? 0) * 10, 0),
+  };
+
+  it("merges what is against a mortgage's sub-accounts in the place of the first, and leaves every other as it is", () => {
+    expect(
+      drawnAsMortgages([1, 6, 8, 5, undefined], held, drawing),
+    ).toStrictEqual([1, 110, 8, undefined]);
+  });
+
+  it("leaves what is against a mortgage in one sub-account as it is", () => {
+    expect(
+      drawnAsMortgages(
+        [5],
+        held.filter(({ id }) => id !== 6),
+        drawing,
+      ),
+    ).toStrictEqual([5]);
+  });
+});
+
+describe("mortgageLine", () => {
+  const mortgage = { ids: new Set([5, 6]), name: "Home mortgage" };
+  const line: LineValues = {
+    amount: 2210,
+    cadence: "month",
+    endsAfter: 0,
+    endsAt: null,
+    firstYear: 2026,
+    growth: "nominal",
+    lastMonth: 5,
+    lastYear: 2035,
+    name: "Home mortgage 1",
+    startsAt: null,
+  };
+  const start = { month: plan.month, year: plan.from };
+
+  // A year with no month runs through its December, so it outlasts
+  // June; no year at all outlasts every one.
+  it("pays what the lines pay together, from the first's start to the end of the longest", () => {
+    const through = { ...line, amount: 400, lastMonth: null };
+
+    expect(mortgageLine([line, through], mortgage, start)).toStrictEqual({
+      ...line,
+      amount: 2610,
+      lastMonth: null,
+      lastYear: 2035,
+      name: "Home mortgage",
+    });
+    expect(mortgageLine([through, line], mortgage, start)).toMatchObject({
+      amount: 2610,
+      lastMonth: null,
+      lastYear: 2035,
+    });
+    expect(
+      mortgageLine(
+        [line, { ...line, lastYear: null }, { ...line, lastYear: 2050 }],
+        mortgage,
+        start,
+      ),
+    ).toMatchObject({ amount: 6630, lastYear: null });
+  });
+
+  // A sub-account cleared before the plan's September 2026 has its line
+  // end in August, starting the year before where the plan starts in
+  // January, and is paid nothing in the plan; with every one cleared,
+  // the mortgage is drawn from them all.
+  it("counts nothing a sub-account cleared before the plan pays, unless every one has", () => {
+    const cleared = { ...line, firstYear: 2025, lastMonth: 7, lastYear: 2026 };
+    const paying = { ...line, amount: 400, lastYear: 2044 };
+
+    expect(mortgageLine([cleared, paying], mortgage, start)).toStrictEqual({
+      ...paying,
+      name: "Home mortgage",
+    });
+    expect(
+      mortgageLine([cleared, { ...cleared, amount: 400 }], mortgage, start),
+    ).toStrictEqual({ ...cleared, amount: 2610, name: "Home mortgage" });
   });
 });
 

@@ -34,7 +34,8 @@ import { getHousehold } from "@/store/household";
 // milestones take both schedules, to say which lines are tied to each,
 // and each schedule takes the milestones, to name them and offer them;
 // the income schedule takes the accounts too, for the pension a salary
-// may feed, and the owners, for the one a salary opens to belong to.
+// may feed, and the owners, for the one a salary opens to belong to, and
+// the expense schedule the accounts, for the mortgage a line pays.
 // The header says what the plan comes to, which is read off every card
 // beneath it, so it is the page's rather than any card's. The plan is
 // read beside the rest, from the same version of the household.
@@ -59,6 +60,7 @@ export default async function Plan(): Promise<JSX.Element> {
           plan={plan}
         />
         <ExpenseSchedule
+          accounts={accounts}
           lines={schedule.expenses}
           milestones={milestones}
           plan={plan}

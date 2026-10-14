@@ -26,12 +26,14 @@ import {
   AccordionTrigger,
 } from "@/components/kit/accordion";
 import { CardContent } from "@/components/kit/card";
+import { drawnAsMortgages, mortgageLine } from "@/data/houses";
 import { markersOf, yearsOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { cashFlow, inTodaysMoney, totalsOf } from "@/engine/cash-flow";
 import { isShort, project } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { listed } from "@/lib/feeders";
+import { sumOf } from "@/lib/ledger";
 import { growthLabels, spanOf } from "@/lib/lines";
 import { formatGbp } from "@/lib/money";
 import { monthName } from "@/lib/months";
@@ -347,8 +349,10 @@ function isZero(amount: number): boolean {
 // in, then what a salary sacrifices into its pension, under the
 // pension's name with the salary it is fed from and what lands with the
 // NI saved, then the income tax and the National Insurance on what is
-// left of it, then the expenses, opening into the lines behind them, and
-// every account paid, each under its name with how it is paid and a
+// left of it, then the expenses, opening into the lines behind them, the
+// lines paying a mortgage held in more than one sub-account as the one
+// line of the mortgage, paying what they pay together, and every
+// account paid, each under its name with how it is paid and a
 // pension with what lands once the basic rate is claimed back on it, the
 // accounts the month pays nothing named together on one line rather
 // than a column of nothings burying the ones it pays, and what is left
@@ -366,6 +370,20 @@ function MonthLedger({ book, onYear, year }: LedgerProps): JSX.Element {
     .filter((marker) => marker.year === year)
     .map(({ name }) => name);
   const unpaid = [...flow.fixed, ...flow.spare].filter((paid) => !isPaid(paid));
+  const spent = drawnAsMortgages(flow.spent, accounts, {
+    debtOf: ({ line }) => line.pays,
+    merged: (paying, mortgage) => {
+      const [{ line }, ...rest] = paying;
+      return {
+        amount: sumOf(paying, ({ amount }) => amount),
+        line: mortgageLine(
+          [line, ...rest.map((entry) => entry.line)],
+          mortgage,
+          { month: plan.month, year: plan.from },
+        ),
+      };
+    },
+  });
   const inYear = points.filter((point) => point.year === year);
   return (
     <div className="grid gap-3 rounded-md bg-muted/50 p-3">
@@ -407,7 +425,7 @@ function MonthLedger({ book, onYear, year }: LedgerProps): JSX.Element {
         ))}
         <Row amount={-flow.incomeTax} label="Income tax" />
         <Row amount={-flow.insurance} label="National Insurance" />
-        <Expenses amount={flow.expenses} spent={flow.spent} />
+        <Expenses amount={flow.expenses} spent={spent} />
         {flow.fixed.filter(isPaid).map((paid) => (
           <Row
             amount={-paid.amount}

@@ -1,10 +1,13 @@
-import type { Purchase } from "@/data/accounts";
+import type { Account, Purchase } from "@/data/accounts";
+import type { LineValues, Month } from "@/data/schedule";
 import type { Secured, SecuredRecords } from "@/data/secured";
 import type { LoanFigure } from "@/lib/figures";
 import type { Owed, PlanMonth } from "@/lib/loans";
 
 import { toValues } from "@/data/accounts";
 import { owes, securedRecords } from "@/data/secured";
+import { sumOf } from "@/lib/ledger";
+import { runsIn } from "@/lib/lines";
 import { figureOf } from "@/lib/loans";
 import { negated } from "@/lib/money";
 
@@ -66,6 +69,17 @@ export interface PartDraft extends Part {
 
 export type Status = (typeof statuses)[number];
 
+// How items are drawn against debts: the debt each is against, if any,
+// and what the items against one mortgage's sub-accounts are drawn as
+// together.
+interface Drawing<TItem> {
+  readonly debtOf: (item: TItem) => number | undefined;
+  readonly merged: (
+    together: readonly [TItem, ...TItem[]],
+    mortgage: Mortgage,
+  ) => TItem;
+}
+
 // The choices as a list, so the action's schema and the dialog's select
 // take the same words the type does and cannot drift from them.
 export const statuses = ["mortgaged", "outright"] as const;
@@ -74,6 +88,38 @@ export const statuses = ["mortgaged", "outright"] as const;
 // owes, as the loan maths works out any loan's.
 export function derive(part: PartDraft, figure: LoanFigure): null | number {
   return figureOf(figure, owedOn(part), part);
+}
+
+// Items drawn against debts, as they are drawn: those against the
+// sub-accounts of a mortgage held in more than one merged into one, in
+// the place of the first, and every other as it is.
+export function drawnAsMortgages<TItem>(
+  items: readonly TItem[],
+  accounts: readonly Account[],
+  { debtOf, merged }: Drawing<TItem>,
+): TItem[] {
+  const mortgages = accounts
+    .map((asset) =>
+      mortgageOn({
+        asset,
+        loans: accounts.filter(({ secures }) => secures === asset.id),
+      }),
+    )
+    .filter((mortgage) => mortgage !== null);
+  const against = (item: TItem): Mortgage | undefined => {
+    const debt = debtOf(item);
+    return mortgages.find(({ ids }) => debt !== undefined && ids.has(debt));
+  };
+  return items.flatMap((item) => {
+    const mortgage = against(item);
+    if (mortgage === undefined) {
+      return [item];
+    }
+    const together = items.filter((other) => against(other) === mortgage);
+    return together[0] === item
+      ? [merged([item, ...together.slice(1)], mortgage)]
+      : [];
+  });
 }
 
 // The values a house's records hold, for the dialog to open on: the
@@ -115,6 +161,39 @@ export function isSound(house: HouseValues): boolean {
     (house.status === "outright" ||
       (house.parts.length > 0 && house.parts.every(owes)))
   );
+}
+
+// The lines paying a mortgage's sub-accounts as the one line they are
+// drawn as from the month a plan starts in: under the mortgage's name,
+// paying what those still paid then pay together, from the start of the
+// first of them to the end of whichever runs longest, an open-ended one
+// longest of all. A sub-account cleared before the plan is paid nothing
+// in it, so its line counts for nothing, unless none is paid at all,
+// when the mortgage is drawn from every line, as one held in a single
+// sub-account cleared is drawn as its line.
+export function mortgageLine<TLine extends LineValues>(
+  lines: readonly [TLine, ...TLine[]],
+  { name }: Mortgage,
+  start: Month,
+): TLine {
+  const [paid, ...more] = lines.filter((line) => runsIn(line, start));
+  const counted = paid === undefined ? lines : [paid, ...more];
+  const [first] = counted;
+  const { lastMonth, lastYear } = counted.reduce(
+    (longest, line) =>
+      longest.lastYear !== null &&
+      runsIn(line, { month: longest.lastMonth ?? 11, year: longest.lastYear })
+        ? line
+        : longest,
+    first,
+  );
+  return {
+    ...first,
+    amount: sumOf(counted, ({ amount }) => amount),
+    lastMonth,
+    lastYear,
+    name,
+  };
 }
 
 // The one mortgage the loans secured on an asset are drawn as, which
