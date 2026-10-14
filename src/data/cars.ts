@@ -22,17 +22,19 @@ export interface CarDraft extends CarValues {
 // A car is a real asset and, while it is financed, the loan against it
 // and the payments on it: three records the store holds apart, written
 // together from one dialog. The values are what the dialog takes: the
-// car's worth now and the rate it loses value at, a fraction a year as
-// every rate is, and for a financed car what is owed, whole pounds and
-// positive, the rate it is charged at, what is paid a month, whole
-// pounds, and on a PCP the balloon, the final payment the agreement puts
-// off to its end, which a loan leaves at nothing. A car owned outright
-// owes and pays nothing.
+// car's worth now, the rate it loses value at, a fraction a year as
+// every rate is, and the floor it loses value no lower than, whole
+// pounds of today's money and nothing for none, and for a financed car
+// what is owed, whole pounds and positive, the rate it is charged at,
+// what is paid a month, whole pounds, and on a PCP the balloon, the
+// final payment the agreement puts off to its end, which a loan leaves
+// at nothing. A car owned outright owes and pays nothing.
 export interface CarValues {
   readonly agreement: Agreement;
   readonly balance: number;
   readonly balloon: number;
   readonly depreciation: number;
+  readonly floor: number;
   readonly name: string;
   readonly payment: number;
   readonly rate: number;
@@ -44,12 +46,13 @@ export interface CarValues {
 export const agreements = ["pcp", "loan", "outright"] as const;
 
 // The values a car's records hold, for the dialog to open on: the car's
-// balance is its value and its rate, negated, its depreciation, and the
-// loan's balance is owed, so it comes back positive, its rate is the
-// finance's, its contribution the payment, a month as the records lay
-// it, and its balloon the agreement's, which says whether the agreement
-// is a PCP or a loan. A car with no loan against it is owned outright
-// and owes nothing; the store holds a car to one.
+// balance is its value, its rate, negated, its depreciation and its
+// limit its floor, nothing where it has none, and the loan's balance is
+// owed, so it comes back positive, its rate is the finance's, its
+// contribution the payment, a month as the records lay it, and its
+// balloon the agreement's, which says whether the agreement is a PCP or
+// a loan. A car with no loan against it is owned outright and owes
+// nothing; the store holds a car to one.
 export function carOf({ asset, loans: [loan] }: Secured): CarValues {
   const held = toValues(asset);
   const owed = loan === undefined ? null : toValues(loan);
@@ -58,6 +61,7 @@ export function carOf({ asset, loans: [loan] }: Secured): CarValues {
     balance: owed === null ? 0 : negated(owed.balance),
     balloon: owed === null ? 0 : owed.balloon,
     depreciation: negated(held.rate),
+    floor: asset.limit ?? 0,
     name: held.name,
     payment: owed === null ? 0 : owed.contribution,
     rate: owed === null ? 0 : owed.rate,
@@ -84,9 +88,11 @@ export function derive(draft: CarDraft, figure: LoanFigure): null | number {
 // paying something and charged a rate no lower than nothing; a PCP
 // owing more than a balloon of something, since an agreement that has
 // reached its balloon is refinanced as a loan, and a loan no balloon at
-// all. The save button holds until it is one.
+// all. The save button holds until it is one, and while a floor sits
+// above what the car is worth, more likely a slip than a rise the
+// engine would lift the car straight up to.
 export function isSound(car: CarValues): boolean {
-  if (car.name.trim() === "") {
+  if (car.name.trim() === "" || car.floor > car.value) {
     return false;
   }
   switch (car.agreement) {
@@ -100,12 +106,12 @@ export function isSound(car: CarValues): boolean {
 }
 
 // The records a car is written as: an asset of its own kind losing
-// value at its own fixed rate, and for a financed car the finance and
-// its payments, as every secured asset's are written. The finance is
-// left owing the balloon, and on a PCP its payments run past the
-// agreement's end, since the balloon is refinanced on the same terms
-// until the whole balance clears. Both are named for the car and the
-// agreement it is on.
+// value at its own fixed rate, held to its floor if it has one, and for
+// a financed car the finance and its payments, as every secured asset's
+// are written. The finance is left owing the balloon, and on a PCP its
+// payments run past the agreement's end, since the balloon is
+// refinanced on the same terms until the whole balance clears. Both are
+// named for the car and the agreement it is on.
 export function toRecords(
   car: CarValues,
   plan: { readonly from: number },
@@ -113,6 +119,7 @@ export function toRecords(
   return securedRecords(
     {
       kind: "car",
+      ...(car.floor > 0 && { limit: car.floor }),
       name: car.name,
       rate: negated(car.depreciation),
       value: car.value,

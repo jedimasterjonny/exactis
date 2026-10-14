@@ -1,17 +1,18 @@
 import type { Account } from "@/data/accounts";
 import type { CarValues } from "@/data/cars";
 
-// A Golf worth £18,000 and losing 15% a year, with £14,000 owed on it
-// at 7.9% on a PCP paying £290 a month towards a £6,000 balloon, which
-// it reaches in three years and, carried on, clears in 4.9: as its
-// dialog takes it, and as the store holds it under the ids after the
-// reference household's, the car and the finance secured on it. For
-// tests.
+// A Golf worth £18,000 and losing 15% a year with no floor, with
+// £14,000 owed on it at 7.9% on a PCP paying £290 a month towards a
+// £6,000 balloon, which it reaches in three years and, carried on,
+// clears in 4.9: as its dialog takes it, and as the store holds it
+// under the ids after the reference household's, the car and the
+// finance secured on it. For tests.
 export const golfValues: CarValues = {
   agreement: "pcp",
   balance: 14000,
   balloon: 6000,
   depreciation: 0.15,
+  floor: 0,
   name: "Golf",
   payment: 290,
   rate: 0.079,

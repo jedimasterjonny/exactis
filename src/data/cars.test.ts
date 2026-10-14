@@ -78,17 +78,25 @@ describe("isSound", () => {
     expect(isSound({ ...golf, balloon: 14000 })).toBe(false);
     expect(isSound({ ...financed, balloon: 6000 })).toBe(false);
   });
+
+  it("wants a floor no higher than what the car is worth", () => {
+    expect(isSound({ ...golf, floor: golf.value })).toBe(true);
+    expect(isSound({ ...golf, floor: golf.value + 1 })).toBe(false);
+  });
 });
 
 describe("carOf", () => {
   // The loan's £14,000 owed comes back positive, its £6,000 balloon says
   // it is a PCP, and the car's rate comes back as the depreciation it
   // is; a loan with no balloon is a loan, and no loan is a car owned
-  // outright.
+  // outright; and its limit is its floor, nothing where it has none.
   it("reads a car's values back off its records", () => {
     expect(carOf({ asset, loans: [pcp] })).toStrictEqual(golf);
     expect(carOf({ asset, loans: [loan] })).toStrictEqual(financed);
     expect(carOf({ asset, loans: [] })).toStrictEqual(outright);
+    expect(carOf({ asset: { ...asset, limit: 3000 }, loans: [] }).floor).toBe(
+      3000,
+    );
   });
 
   it("reads a car that loses nothing as losing nothing, not a negative nothing", () => {
@@ -102,7 +110,7 @@ describe("carOf", () => {
 });
 
 describe("toRecords", () => {
-  it("writes a car owned outright as a real asset losing value at its own rate", () => {
+  it("writes a car owned outright as a real asset losing value at its own rate, held to its floor if it has one", () => {
     expect(toRecords(outright, plan)).toStrictEqual({
       asset: {
         balance: 18000,
@@ -120,6 +128,9 @@ describe("toRecords", () => {
       },
       loans: [],
     });
+    expect(toRecords({ ...outright, floor: 3000 }, plan).asset.limit).toBe(
+      3000,
+    );
   });
 
   // Its payments' end is the finance's to say, worked out when the

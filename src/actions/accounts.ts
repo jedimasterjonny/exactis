@@ -40,19 +40,20 @@ import { amend } from "@/store/household";
 
 // What a car may carry, checked against the model's own list and its
 // own soundness so the two cannot drift: the figures whole and never
-// negative, the depreciation no more than losing everything, since
-// below that a year's growth is not a number, the finance's rate no
-// lower than nothing, a financed car owing and paying something, a PCP
-// owing more than a balloon of something and a loan no balloon, a car
-// owned outright owing, paying and charged nothing, since the form
-// zeroes what its agreement hides, and the name as typed less the space
-// around it.
+// negative, the floor among them, the depreciation no more than losing
+// everything, since below that a year's growth is not a number, the
+// finance's rate no lower than nothing, a financed car owing and paying
+// something, a PCP owing more than a balloon of something and a loan no
+// balloon, a car owned outright owing, paying and charged nothing,
+// since the form zeroes what its agreement hides, and the name as typed
+// less the space around it.
 const car = z
   .object({
     agreement: z.enum(agreements),
     balance: pounds,
     balloon: pounds,
     depreciation: z.number().max(1),
+    floor: pounds,
     name: named,
     payment: pounds,
     rate: z.number().nonnegative(),
