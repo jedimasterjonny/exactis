@@ -70,16 +70,17 @@ const car = z
 
 // What a house may carry, checked against the model's own list and its
 // own soundness so the two cannot drift: the figures whole and never
-// negative, the house's growth no lower than losing everything, as an
-// account's rate is, each sub-account's rate no lower than nothing, a
-// mortgaged house held in a sub-account at least, each owing and paying
-// something, a house owned outright in none, since the form drops what
-// its status hides, the month it was bought in and the price, which its
-// soundness holds to something, and the name as typed less the space
-// around it.
+// negative, the ceiling among them, the house's growth no lower than
+// losing everything, as an account's rate is, each sub-account's rate
+// no lower than nothing, a mortgaged house held in a sub-account at
+// least, each owing and paying something, a house owned outright in
+// none, since the form drops what its status hides, the month it was
+// bought in and the price, which its soundness holds to something, and
+// the name as typed less the space around it.
 const house = z
   .object({
     bought: z.object({ month, price: pounds }),
+    ceiling: pounds,
     growth: z.number().min(-1),
     name: named,
     parts: z.array(
@@ -459,11 +460,12 @@ function securedIn(
 // id is null, else written over the one with that id in its place,
 // keeping the asset a loan is secured on, since what an account
 // secures is not among the values a save sends, carrying the purchase
-// a house sends beside its values, and dated as below.
+// a house and the limit an asset sends beside its values, and dated as
+// below.
 function writtenIn(
   kept: Kept,
   at: null | number,
-  values: AccountValues & Pick<Account, "bought">,
+  values: AccountValues & Pick<Account, "bought" | "limit">,
 ): { readonly kept: Kept; readonly result: Account } {
   const {
     next,

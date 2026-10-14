@@ -104,9 +104,10 @@ describe("accounts", () => {
     });
   });
 
-  // The purchase is the house dialog's alone, handed beside the values
-  // rather than among them, so the values read back carry none.
-  it("keeps a purchase handed beside the values, and writes none where none is", () => {
+  // The purchase is the house dialog's alone, and a limit an asset
+  // dialog's, each handed beside the values rather than among them, so
+  // the values read back carry neither.
+  it("keeps a purchase or a limit handed beside the values, and writes none where none is", () => {
     const bought = { month: { month: 5, year: 2022 }, price: 380000 };
     const values = { ...toValues(accounts[3]), kind: "house" } as const;
 
@@ -114,6 +115,11 @@ describe("accounts", () => {
       ...accounts[3],
       bought,
       kind: "house",
+    });
+    expect(toAccount({ ...values, limit: 600000 }, 4)).toStrictEqual({
+      ...accounts[3],
+      kind: "house",
+      limit: 600000,
     });
     expect(toAccount(values, 4)).toStrictEqual({
       ...accounts[3],

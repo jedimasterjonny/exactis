@@ -56,7 +56,8 @@ const words: LoanWords = {
 };
 
 // The fields the house dialog takes: the name and the status on the first
-// row, what the house is worth and the rate it grows at on the second,
+// row, what the house is worth, the rate it grows at and the ceiling it
+// grows no higher than on the second,
 // the month and the year it was bought in and what it cost on the
 // third, and for a mortgaged house the loan fields every secured loan
 // takes beneath them, in the house's words, once for each sub-account,
@@ -102,7 +103,7 @@ export function HouseFields({
           options={statusOptions}
         />
       </FieldRow>
-      <FieldRow layout="pair">
+      <FieldRow layout="triple">
         <MoneyField
           defaultValue={initial.value}
           hint={`As of ${formatMonth({ month: plan.month, year: plan.from })}`}
@@ -117,6 +118,15 @@ export function HouseFields({
           label="Value growth"
           onValueCommitted={(growth) => {
             onAmend({ growth });
+          }}
+        />
+        <MoneyField
+          defaultValue={initial.ceiling}
+          hint="Today's money, £0 for none"
+          label="Ceiling"
+          min={0}
+          onValueCommitted={(ceiling) => {
+            onAmend({ ceiling });
           }}
         />
       </FieldRow>

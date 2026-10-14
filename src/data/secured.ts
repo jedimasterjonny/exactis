@@ -18,21 +18,22 @@ export interface Secured {
 }
 
 // What an asset's model lays out to be written together: the asset,
-// with when it was bought where it is a house, and the loans secured on
-// it with their payments, in the order they are listed, or none for an
-// asset owned outright.
+// with when it was bought where it is a house and the limit it is held
+// to where it has one, and the loans secured on it with their payments,
+// in the order they are listed, or none for an asset owned outright.
 export interface SecuredRecords {
-  readonly asset: AccountValues & Pick<Account, "bought">;
+  readonly asset: AccountValues & Pick<Account, "bought" | "limit">;
   readonly loans: readonly Borrowing[];
 }
 
 // The asset as its model hands it to be written: its own kind, its
 // name, what it is worth, the rate it grows at, below nothing for one
-// that loses value, and for a house when it was bought and what it
-// cost.
+// that loses value, for a house when it was bought and what it cost,
+// and the limit it is held to, if any.
 interface Asset {
   readonly bought?: Purchase;
   readonly kind: Extract<AccountKind, "car" | "house">;
+  readonly limit?: number;
   readonly name: string;
   readonly rate: number;
   readonly value: number;
@@ -79,7 +80,7 @@ export function owes(loan: Omit<Loan, "balloon" | "name">): boolean {
 // of. The engine counts the payment once, as the line, since it leaves
 // the contribution of a loan a line pays out of the month's fixed sums.
 // Both are named as the asset's model names the loan. A house's
-// purchase goes with it, beside the values.
+// purchase goes with it, beside the values, and so does a limit.
 export function securedRecords(
   asset: Asset,
   loans: readonly Loan[],
@@ -96,6 +97,7 @@ export function securedRecords(
     growth: "fixed",
     isAlwaysFunded: false,
     kind: asset.kind,
+    ...(asset.limit !== undefined && { limit: asset.limit }),
     name: asset.name,
     owner: null,
     rate: asset.rate,
