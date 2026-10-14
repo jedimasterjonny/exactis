@@ -30,6 +30,7 @@ import { buttonVariants } from "@/components/kit/button";
 import { Card, CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
 import { isAsset } from "@/data/accounts";
+import { drawnAsMortgages } from "@/data/houses";
 import { balanceIn, holdsAnything } from "@/engine/projection";
 import { axisOf } from "@/lib/axis";
 import { listed } from "@/lib/feeders";
@@ -650,7 +651,9 @@ function scaleOf(
 // account of its kind, so neither what else the plan holds nor the
 // basis it is counted on ever recolours it. On liquidity a house, a car
 // or another real asset is left out, and every debt is drawn, the loans
-// on them among them; on the net worth each asset is drawn at its
+// on them among them, a mortgage held in more than one sub-account as
+// the one mortgage, in the place and the colour of its first; on the
+// net worth each asset is drawn at its
 // equity, and a loan secured on it is drawn in it rather than among the
 // debts. A loan is drawn in the asset it names only when the plan lists
 // that asset; one naming an asset the plan does not list is a debt like
@@ -691,7 +694,26 @@ function seriesOf(
       .filter(({ account }) => isCounted(account))
       .map(({ series }) => series);
   return {
-    liquidity: counted((account) => !isAsset(account)),
+    liquidity: drawnAsMortgages(
+      drawn.filter(({ account }) => !isAsset(account)),
+      accounts,
+      {
+        debtOf: ({ account }) => account.id,
+        merged: (owing, mortgage) => {
+          const [{ account, series }] = owing;
+          const ids = owing.flatMap((each) => each.series.ids);
+          return {
+            account,
+            series: {
+              ...series,
+              ids,
+              name: mortgage.name,
+              valueAt: (point) => valueIn(point, { ids }),
+            },
+          };
+        },
+      },
+    ).map(({ series }) => series),
     "net-worth": counted((account) => !isSecured(account)),
   };
 }

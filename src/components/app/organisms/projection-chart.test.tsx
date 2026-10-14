@@ -167,6 +167,13 @@ const pounds = (): string[] =>
     .map((tick) => tick.textContent)
     .filter((tick) => tick.includes("£"));
 
+// The names under the crosshair of the ISA, and of a flat and what is
+// secured on it, in the order they are drawn.
+const flatNames = (): (null | string)[] =>
+  within(screen.getByText(bySlot("projection-tooltip")))
+    .getAllByText(/^(Stocks|Flat)/)
+    .map((name) => name.textContent);
+
 describe("ProjectionChart", () => {
   it("plots the years with no legend, leaving the series to the crosshair to name", () => {
     render(<ProjectionChart accounts={held} milestones={[]} points={points} />);
@@ -526,27 +533,78 @@ describe("ProjectionChart", () => {
     await screen.findByText("2027 · Age 35");
     const tooltip = (): HTMLElement =>
       screen.getByText(bySlot("projection-tooltip"));
-    const named = (): (null | string)[] =>
-      within(tooltip())
-        .getAllByText(/^(Stocks|Flat)/)
-        .map((name) => name.textContent);
 
     expect(screen.getByRole("switch", { name: "Liquidity" })).not.toBeChecked();
-    expect(named()).toStrictEqual([isa.name, loan.name]);
+    expect(flatNames()).toStrictEqual([isa.name, loan.name]);
     expect(within(tooltip()).getByText("Liquidity")).toBeInTheDocument();
     expect(within(tooltip()).getByText("£50,000")).toHaveClass("figure");
 
     fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
 
     expect(screen.getByRole("switch", { name: "Net worth" })).toBeChecked();
-    expect(named()).toStrictEqual([flat.name, isa.name]);
+    expect(flatNames()).toStrictEqual([flat.name, isa.name]);
     expect(within(tooltip()).getByText("£300,000")).toHaveClass("figure");
     expect(within(tooltip()).getByText("Net worth")).toBeInTheDocument();
     expect(within(tooltip()).getByText("£550,000")).toHaveClass("figure");
 
     fireEvent.click(screen.getByRole("switch", { name: "Net worth" }));
 
-    expect(named()).toStrictEqual([isa.name, loan.name]);
+    expect(flatNames()).toStrictEqual([isa.name, loan.name]);
+  });
+
+  // The flat's mortgage held in two sub-accounts, owing £150,000 and
+  // £50,000, is drawn on the liquidity as the one mortgage owing both,
+  // named for the flat; on the net worth both are drawn in the flat.
+  it("draws a mortgage held in sub-accounts as the one mortgage on the liquidity", async () => {
+    const flat: Account = {
+      balance: 500000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      kind: "house",
+      name: "Flat",
+    };
+    const first: Account = {
+      ...mortgage,
+      id: 11,
+      name: "Flat mortgage 1",
+      secures: flat.id,
+    };
+    const years = [2026, 2027].map((year, place) => ({
+      age: 34 + place,
+      balances: { 2: 250000, 10: 500000, 11: -150000, 12: -50000 },
+      deferred: 0,
+      early: 0,
+      free: 250000,
+      uncovered: 0,
+      year,
+    }));
+    render(
+      <ProjectionChart
+        accounts={[
+          isa,
+          flat,
+          first,
+          { ...first, id: 12, name: "Flat mortgage 2" },
+        ]}
+        milestones={[]}
+        points={years}
+      />,
+    );
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2027 · Age 35");
+    const tooltip = (): HTMLElement =>
+      screen.getByText(bySlot("projection-tooltip"));
+
+    expect(flatNames()).toStrictEqual([isa.name, "Flat mortgage"]);
+    expect(within(tooltip()).getByText("−£200,000")).toHaveClass("figure");
+    expect(within(tooltip()).getByText("£50,000")).toHaveClass("figure");
+
+    fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
+
+    expect(flatNames()).toStrictEqual([flat.name, isa.name]);
+    expect(within(tooltip()).getByText("£300,000")).toHaveClass("figure");
   });
 
   // A column both bases draw is handed the one dataKey on either, so
