@@ -38,16 +38,17 @@ const agreementOptions = optionsOf(agreementLabels, agreements);
 const years = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 });
 
 // The fields the car dialog takes: the name and the agreement on the
-// first row, what the car is worth and the rate it loses value at on
-// the second, for a financed car the loan fields every secured loan
-// takes beneath them, in the car's words, and on a PCP the balloon on
-// the last row, under what becomes of it. The first four are
-// uncontrolled, mount with the car as it opened and report each change
-// to the dialog, whose draft mirrors them. The balloon is shown by
-// value, since the field comes and goes with the agreement and has to
-// come back showing what was typed, and is held at nothing or above,
-// since a sum below nothing is no balloon and the store would refuse
-// it. A car owned outright shows no finance fields at all.
+// first row, what the car is worth, the rate it loses value at and the
+// floor it loses value no lower than on the second, for a financed car
+// the loan fields every secured loan takes beneath them, in the car's
+// words, and on a PCP the balloon on the last row, under what becomes
+// of it. The first five are uncontrolled, mount with the car as it
+// opened and report each change to the dialog, whose draft mirrors
+// them. The balloon is shown by value, since the field comes and goes
+// with the agreement and has to come back showing what was typed, and
+// is held at nothing or above, since a sum below nothing is no balloon
+// and the store would refuse it. A car owned outright shows no finance
+// fields at all.
 export function CarFields({
   clears,
   draft,
@@ -78,7 +79,7 @@ export function CarFields({
           options={agreementOptions}
         />
       </FieldRow>
-      <FieldRow layout="pair">
+      <FieldRow layout="triple">
         <MoneyField
           defaultValue={initial.value}
           hint={`As of ${formatMonth({ month: plan.month, year: plan.from })}`}
@@ -93,6 +94,15 @@ export function CarFields({
           label="Depreciation"
           onValueCommitted={(depreciation) => {
             onAmend({ depreciation });
+          }}
+        />
+        <MoneyField
+          defaultValue={initial.floor}
+          hint="Today's money, £0 for none"
+          label="Floor"
+          min={0}
+          onValueCommitted={(floor) => {
+            onAmend({ floor });
           }}
         />
       </FieldRow>

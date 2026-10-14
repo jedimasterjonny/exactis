@@ -746,11 +746,15 @@ describe("the account actions", () => {
     it("writes over a car and the finance secured on it, and sends the finance away when the car is owned outright now", async () => {
       await saveCar(null, golf);
 
-      expect(await saveCar(6, { ...golf, value: 17000 })).toStrictEqual(
-        saved({ ...car, balance: 17000 }),
-      );
+      expect(
+        await saveCar(6, { ...golf, floor: 3000, value: 17000 }),
+      ).toStrictEqual(saved({ ...car, balance: 17000, limit: 3000 }));
       expect(await latest()).toMatchObject({
-        accounts: [...kept.accounts, { ...car, balance: 17000 }, finance],
+        accounts: [
+          ...kept.accounts,
+          { ...car, balance: 17000, limit: 3000 },
+          finance,
+        ],
         next: 9,
       });
 
