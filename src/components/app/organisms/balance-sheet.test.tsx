@@ -197,6 +197,77 @@ describe("BalanceSheet", () => {
     expect(rowsOf("Other debts")).toStrictEqual(["None"]);
   });
 
+  // A mortgage in two sub-accounts is drawn as the one mortgage, owing
+  // and paying both, with each beneath it saying what it is charged,
+  // paid and when its payments clear it; the mortgage opens the house,
+  // and a sub-account opens nothing of its own.
+  it("draws a mortgage in sub-accounts as the one mortgage, with each beneath it", () => {
+    const onEdit = vi.fn<(account: Account) => void>();
+    const further: Account = {
+      ...houseLoan,
+      balance: -60000,
+      contribution: { amount: 400, cadence: "month", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0.039 },
+      id: 9,
+      name: "Home mortgage 2",
+    };
+    renderSheet({
+      assets: [
+        {
+          asset: house,
+          loans: [{ ...houseLoan, name: "Home mortgage 1" }, further],
+        },
+      ],
+      debts: [],
+      expenses: [
+        { ...household, lastMonth: 6, lastYear: 2035, pays: 5 },
+        { ...household, id: 9, lastMonth: 11, lastYear: 2043, pays: 9 },
+      ],
+      onEdit,
+    });
+
+    expect(rowsOf("Property & vehicles")).toStrictEqual([
+      "Home£416,386House · grows 2.10% a year£173,446 equity, 42% of its valueHome mortgage−£242,940£2,610 / mo in 2 sub-accountsHome mortgage 1−£182,940at 5.15% · £2,210 / mo · to Jul 2035Home mortgage 2−£60,000at 3.90% · £400 / mo · to Dec 2043",
+      "Home mortgage 1−£182,940at 5.15% · £2,210 / mo · to Jul 2035",
+      "Home mortgage 2−£60,000at 3.90% · £400 / mo · to Dec 2043",
+    ]);
+    expect(
+      screen.getByRole("heading", { name: /^Secured on them/ }),
+    ).toHaveTextContent("−£242,940");
+    expect(
+      screen.queryByRole("button", { name: "Home mortgage 1" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Home mortgage" }));
+
+    expect(onEdit).toHaveBeenCalledExactlyOnceWith(house);
+  });
+
+  // A sub-account cleared at the month end owes nothing and is paid
+  // nothing more, whatever sum it still carries, so the mortgage pays
+  // what the other does.
+  it("pays a month only what a mortgage's sub-accounts still owing pay", () => {
+    renderSheet({
+      assets: [
+        {
+          asset: house,
+          loans: [
+            { ...houseLoan, balance: 0, name: "Home mortgage 1" },
+            {
+              ...houseLoan,
+              contribution: { amount: 400, cadence: "month", kind: "fixed" },
+              id: 9,
+              name: "Home mortgage 2",
+            },
+          ],
+        },
+      ],
+      debts: [],
+    });
+
+    expect(screen.getByText("£400 / mo in 2 sub-accounts")).toBeInTheDocument();
+  });
+
   // A car worth nothing holds no share of its value, an asset paid a
   // sum of its own says so, and a real asset the account dialog wrote
   // may grow at the plan's rate.
