@@ -1,11 +1,17 @@
 import type { JSX } from "react";
 
-import type { LoanWords } from "@/components/app/organisms/loan-fields";
-import type { HouseDraft, Status } from "@/data/houses";
-import type { LoanFigure } from "@/lib/figures";
+import { Plus, Trash2 } from "lucide-react";
+
+import type {
+  LoanDraft,
+  LoanWords,
+} from "@/components/app/organisms/loan-fields";
+import type { HouseDraft, HouseValues, PartDraft, Status } from "@/data/houses";
+import type { LoanFigure, WorkedOut } from "@/lib/figures";
 import type { PlanMonth } from "@/lib/loans";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
+import { RowAction } from "@/components/app/atoms/row-action";
 import {
   MoneyField,
   RateField,
@@ -15,18 +21,20 @@ import { MonthField } from "@/components/app/molecules/month-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { LoanFields } from "@/components/app/organisms/loan-fields";
+import { Button } from "@/components/kit/button";
 import { statuses } from "@/data/houses";
 import { formatMonth } from "@/lib/months";
 import { optionsOf } from "@/lib/options";
 
 interface HouseFieldsProps {
-  readonly draft: HouseDraft;
-  readonly figure: null | number;
+  readonly draft: HouseDraft<PartDraft & WorkedOut>;
   readonly initial: HouseDraft;
-  readonly onAmend: (patch: Partial<HouseDraft>) => void;
-  readonly onWork: (worked: LoanFigure) => void;
+  readonly onAdd: () => void;
+  readonly onAmend: (patch: Partial<Omit<HouseValues, "parts">>) => void;
+  readonly onAmendPart: (key: number, patch: Partial<LoanDraft>) => void;
+  readonly onRemove: (key: number) => void;
+  readonly onWork: (key: number, worked: LoanFigure) => void;
   readonly plan: PlanMonth;
-  readonly worked: LoanFigure;
 }
 
 // What each status is called in the dialog's choice.
@@ -51,7 +59,11 @@ const words: LoanWords = {
 // row, what the house is worth and the rate it grows at on the second,
 // the month and the year it was bought in and what it cost on the
 // third, and for a mortgaged house the loan fields every secured loan
-// takes beneath them, in the house's words. The year bought is held
+// takes beneath them, in the house's words, once for each sub-account,
+// each showing the figure worked out of it, with a press adding another
+// beneath them all. A mortgage in more than one sub-account names each
+// by its place, over its fields, with the press that removes it, so
+// the fields repeated are told apart and the last cannot be removed. The year bought is held
 // between the first year there is and the year the plan starts in,
 // since a house is bought in a year that has begun and the store takes
 // none before the first. The typed fields are uncontrolled, mount with
@@ -61,13 +73,15 @@ const words: LoanWords = {
 // loan fields at all.
 export function HouseFields({
   draft,
-  figure,
   initial,
+  onAdd,
   onAmend,
+  onAmendPart,
+  onRemove,
   onWork,
   plan,
-  worked,
 }: HouseFieldsProps): JSX.Element {
+  const isParted = draft.parts.length > 1;
   return (
     <div className="grid gap-4">
       <FieldRow layout="named">
@@ -143,15 +157,51 @@ export function HouseFields({
         />
       </FieldRow>
       {draft.status === "mortgaged" && (
-        <LoanFields
-          draft={draft}
-          figure={figure}
-          onAmend={onAmend}
-          onWork={onWork}
-          plan={plan}
-          words={words}
-          worked={worked}
-        />
+        <>
+          {draft.parts.map((part, place) => {
+            const name = `Sub-account ${String(place + 1)}`;
+            return (
+              <div
+                className="grid gap-4"
+                key={part.key}
+                {...(isParted && { "aria-label": name, role: "group" })}
+              >
+                {isParted && (
+                  <div className="flex items-center justify-between gap-4 border-t pt-3">
+                    <p className="label text-muted-foreground">{name}</p>
+                    <RowAction
+                      icon={Trash2}
+                      name={`Remove ${name.toLowerCase()}`}
+                      onClick={() => {
+                        onRemove(part.key);
+                      }}
+                      tone="destructive"
+                    />
+                  </div>
+                )}
+                <LoanFields
+                  draft={part}
+                  figure={part.figure}
+                  onAmend={(patch) => {
+                    onAmendPart(part.key, patch);
+                  }}
+                  onWork={(next) => {
+                    onWork(part.key, next);
+                  }}
+                  plan={plan}
+                  words={words}
+                  worked={part.worked}
+                />
+              </div>
+            );
+          })}
+          <div>
+            <Button onClick={onAdd} size="sm" variant="outline">
+              <Plus aria-hidden />
+              Add sub-account
+            </Button>
+          </div>
+        </>
       )}
     </div>
   );

@@ -33,6 +33,17 @@ const [, , , home] = accounts;
 // month, which clears it in 8.5 years.
 const house: Secured = { asset: houseAsset, loans: [houseLoan] };
 
+// A second sub-account against it: £60,000 owed at 3.9%, paying £400 a
+// month, which clears it in 17.2 years.
+const further: Account = {
+  ...houseLoan,
+  balance: -60000,
+  contribution: { amount: 400, cadence: "month", kind: "fixed" },
+  growth: { kind: "fixed", rate: 0.039 },
+  id: 6,
+  name: "Home mortgage 2",
+};
+
 const workedHint = "Worked out";
 
 // The dialog as the ledger mounts it, on a new house or one to edit,
@@ -120,12 +131,10 @@ describe("HouseDialog", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(null, {
-      balance: 341810,
       bought: { month: { month: 8, year: 2026 }, price: 380000 },
       growth: 0,
       name: "Home",
-      payment: 2166,
-      rate: 0.0515,
+      parts: [{ balance: 341810, payment: 2166, rate: 0.0515 }],
       status: "mortgaged",
       value: 416386,
     });
@@ -187,12 +196,10 @@ describe("HouseDialog", () => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
-      balance: 182940,
       bought: { month: { month: 5, year: 2022 }, price: 380000 },
       growth: 0.021,
       name: "Home",
-      payment: 2210,
-      rate: 0.0515,
+      parts: [{ balance: 182940, payment: 2210, rate: 0.0515 }],
       status: "mortgaged",
       value: 420000,
     });
@@ -260,12 +267,10 @@ describe("HouseDialog", () => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
-      balance: 182940,
       bought: { month: { month: 5, year: 2022 }, price: 380000 },
       growth: 0.021,
       name: "Home",
-      payment: 2210,
-      rate: 0.0515,
+      parts: [{ balance: 182940, payment: 2210, rate: 0.0515 }],
       status: "mortgaged",
       value: 416386,
     });
@@ -360,12 +365,10 @@ describe("HouseDialog", () => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(null, {
-      balance: 341810,
       bought: { month: { month: 8, year: 2026 }, price: 380000 },
       growth: 0,
       name: "Home",
-      payment: 1000,
-      rate: 0.0515,
+      parts: [{ balance: 341810, payment: 1000, rate: 0.0515 }],
       status: "mortgaged",
       value: 0,
     });
@@ -397,6 +400,114 @@ describe("HouseDialog", () => {
 
     expect(lastPayment).toBeDisabled();
     expect(field("Rate", dialog)).not.toHaveAttribute("readonly");
+  });
+
+  // A house owned outright opens with a sub-account standing by, so
+  // choosing to mortgage it shows the loan's fields at once, working the
+  // payment out as a new house does.
+  it("shows a house owned outright the loan's fields as soon as it is mortgaged", () => {
+    renderDialog({ house: { ...house, loans: [] } });
+    const dialog = openDialog();
+
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Status" }), {
+      target: { value: "mortgaged" },
+    });
+
+    expect(field("Loan balance", dialog)).toHaveValue("£0");
+    expect(
+      within(dialog).getByRole("combobox", { name: "Work out" }),
+    ).toHaveValue("payment");
+    expect(field("Year", dialog)).toHaveAccessibleDescription("25 years left");
+    expect(
+      within(dialog).queryByRole("group", { name: /^Sub-account/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  // Each sub-account opens on its own records with its own term worked
+  // out, and an edit to one writes back in its place alone.
+  it("opens a mortgage in sub-accounts each with its term worked out, and writes an edit to one back in its place", async () => {
+    const onSaved = vi.fn<() => void>();
+    saved(houseAsset);
+    renderDialog({ house: { ...house, loans: [houseLoan, further] }, onSaved });
+    const dialog = openDialog();
+    const first = within(dialog).getByRole("group", { name: "Sub-account 1" });
+    const second = within(dialog).getByRole("group", { name: "Sub-account 2" });
+
+    expect(field("Loan balance", first)).toHaveValue("£182,940");
+    expect(field("Year", first)).toHaveAccessibleDescription("8.5 years left");
+    expect(field("Loan balance", second)).toHaveValue("£60,000");
+    expect(field("Year", second)).toHaveAccessibleDescription(
+      "17.2 years left",
+    );
+
+    commit(field("Monthly payment", second), "500");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
+      bought: { month: { month: 5, year: 2022 }, price: 380000 },
+      growth: 0.021,
+      name: "Home",
+      parts: [
+        { balance: 182940, payment: 2210, rate: 0.0515 },
+        { balance: 60000, payment: 500, rate: 0.039 },
+      ],
+      status: "mortgaged",
+      value: 416386,
+    });
+  });
+
+  // A sub-account added owes nothing yet, so the save holds until it owes
+  // something, its payment worked out over the twenty-five years a new
+  // one opens on: £60,000 at 3.9% is £313 a month. One taken away goes
+  // from the save, and the one left keeps what was typed into it.
+  it("adds a sub-account working out its payment, holding the save until it owes something, and takes one away", async () => {
+    const onSaved = vi.fn<() => void>();
+    saved(houseAsset);
+    renderDialog({ house, onSaved });
+    const dialog = openDialog();
+    const add = within(dialog).getByRole("button", { name: "Add sub-account" });
+
+    fireEvent.click(add);
+    const added = within(dialog).getByRole("group", { name: "Sub-account 2" });
+
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(
+      within(added).getByRole("combobox", { name: "Work out" }),
+    ).toHaveValue("payment");
+
+    commit(field("Loan balance", added), "60,000");
+    commit(field("Rate", added), "3.9");
+
+    expect(field("Monthly payment", added)).toHaveValue("£313");
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
+
+    fireEvent.click(add);
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Remove sub-account 3" }),
+    );
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Remove sub-account 1" }),
+    );
+
+    expect(
+      within(dialog).queryByRole("group", { name: /^Sub-account/ }),
+    ).not.toBeInTheDocument();
+    expect(field("Loan balance", dialog)).toHaveValue("£60,000");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(
+      home.id,
+      expect.objectContaining({
+        parts: [{ balance: 60000, payment: 313, rate: 0.039 }],
+      }),
+    );
   });
 
   // A house is bought for something, so the save holds until the price
@@ -435,12 +546,10 @@ describe("HouseDialog", () => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(null, {
-      balance: 0,
       bought: { month: { month: 5, year: 2022 }, price: 230000 },
       growth: 0.02,
       name: "Flat",
-      payment: 0,
-      rate: 0,
+      parts: [],
       status: "outright",
       value: 250000,
     });
