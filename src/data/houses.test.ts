@@ -56,6 +56,11 @@ describe("isSound", () => {
     );
     expect(isSound({ ...home, parts: [], status: "outright" })).toBe(true);
   });
+
+  it("wants a ceiling, if the house has one, no lower than what it is worth", () => {
+    expect(isSound({ ...home, ceiling: home.value })).toBe(true);
+    expect(isSound({ ...home, ceiling: home.value - 1 })).toBe(false);
+  });
 });
 
 describe("mortgageOn", () => {
@@ -173,13 +178,15 @@ describe("houseOf", () => {
   // The fixture's home as a house, with its mortgage secured on it: the
   // loan's £176,520 owed comes back positive and its £2,180 a month is
   // the payment; a second loan is a second sub-account, after the first;
-  // without a loan the house is owned outright.
+  // without a loan the house is owned outright; and its limit is its
+  // ceiling, nothing where it has none.
   it("reads a house's values back off its records", () => {
     const pair = { asset: house, loans: [houseLoan] };
     const owed = { balance: 176520, payment: 2180, rate: 0.0485 };
 
     expect(houseOf(pair, plan)).toStrictEqual({
       bought: { month: { month: 9, year: 2021 }, price: 380000 },
+      ceiling: 0,
       growth: 0.021,
       name: "Home",
       parts: [owed],
@@ -206,12 +213,16 @@ describe("houseOf", () => {
     ).toStrictEqual([owed, { balance: 60000, payment: 400, rate: 0.039 }]);
     expect(houseOf({ ...pair, loans: [] }, plan)).toStrictEqual({
       bought: { month: { month: 9, year: 2021 }, price: 380000 },
+      ceiling: 0,
       growth: 0.021,
       name: "Home",
       parts: [],
       status: "outright",
       value: 397512,
     });
+    expect(
+      houseOf({ ...pair, asset: { ...house, limit: 600000 } }, plan).ceiling,
+    ).toBe(600000);
   });
 
   // The household holds a house to carrying its purchase, so a record
@@ -229,7 +240,7 @@ describe("houseOf", () => {
 });
 
 describe("toRecords", () => {
-  it("writes a house owned outright as a real asset growing at its own rate", () => {
+  it("writes a house owned outright as a real asset growing at its own rate, held to its ceiling if it has one", () => {
     expect(
       toRecords({ ...home, parts: [], status: "outright" }, plan),
     ).toStrictEqual({
@@ -250,6 +261,9 @@ describe("toRecords", () => {
       },
       loans: [],
     });
+    expect(toRecords({ ...home, ceiling: 600000 }, plan).asset.limit).toBe(
+      600000,
+    );
   });
 
   // Its payments' end is the loan's to say, worked out when the

@@ -54,10 +54,11 @@ const blankPart = {
 } as const satisfies Omit<Working, "key">;
 
 // A new house: mortgaged, since that is the case with something to work
-// out, worth nothing and held in one new sub-account. When it was
-// bought is the plan's to say, since a house opens on the plan's month
-// before one is typed.
+// out, worth nothing, with no ceiling and held in one new sub-account.
+// When it was bought is the plan's to say, since a house opens on the
+// plan's month before one is typed.
 const blank = {
+  ceiling: 0,
   growth: 0,
   name: "",
   parts: [{ ...blankPart, key: 0 }],
@@ -233,6 +234,7 @@ function workedOut(draft: Draft): {
   const parts = draft.parts.map((part) => ({ ...part, ...outOf(part) }));
   const values: HouseValues = {
     bought: draft.bought,
+    ceiling: draft.ceiling,
     growth: draft.growth,
     name: draft.name.trim(),
     parts: isMortgaged

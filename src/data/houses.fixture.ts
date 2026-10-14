@@ -11,10 +11,11 @@ const [, , , home, mortgage] = accounts;
 export const homePart: Part = { balance: 334670, payment: 2180, rate: 0.0485 };
 
 // The reference kit's house as its dialog takes it: bought in October
-// for £380,000, worth £397,512, growing at 2.1%, with the mortgage above
-// against it. For tests.
+// 2021 for £380,000, worth £397,512, growing at 2.1% with no ceiling, with
+// the mortgage above against it. For tests.
 export const homeValues: HouseValues = {
   bought: { month: { month: 9, year: 2021 }, price: 380000 },
+  ceiling: 0,
   growth: 0.021,
   name: "Home",
   parts: [homePart],
