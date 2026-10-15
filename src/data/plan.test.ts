@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
 
+import { atAge } from "@/data/milestones";
 import { owners, sam } from "@/data/owners.fixture";
 import { allInStocks, openingRates, planRate } from "@/data/rates";
 import { allocation, rates } from "@/data/rates.fixture";
@@ -20,7 +21,6 @@ import {
   planOf,
   pricesIn,
   rateIn,
-  retiringAt,
   risenBy,
   risenWith,
   statedSpread,
@@ -125,13 +125,26 @@ describe("planOf", () => {
   it("is the first listed owner's, and nobody's is refused", () => {
     expect(
       planOf(
-        { ...setting, owners: [{ ...sam, retires: 65 }, ...owners] },
+        { ...setting, owners: [{ ...sam, retirement: atAge(65) }, ...owners] },
         opening,
       ),
     ).toMatchObject({ born: 1993, retires: 65, years: 56 });
     expect(() => planOf({ ...setting, owners: [] }, opening)).toThrow(
       "A plan is somebody's",
     );
+  });
+
+  // Twenty-five years of expenses, in liquid net worth, which no year of
+  // the plan to 89 can say before a run reaches it.
+  it("lays a retirement reached when conditions hold past the plan's end", () => {
+    const retirement = [
+      { measure: "liquid", of: "expenses", times: 25 },
+    ] as const;
+
+    expect(
+      planOf({ ...setting, owners: [{ ...owners[0], retirement }] }, opening)
+        .retires,
+    ).toBe(90);
   });
 
   // Born in 1990, a plan to 30 has run its course by 2026, and runs no
@@ -163,18 +176,6 @@ describe("holderOf", () => {
     expect(() => holderOf({}, plan)).toThrow(
       "An ISA or a pension belongs to an owner the household lists",
     );
-  });
-});
-
-describe("retiringAt", () => {
-  it("moves the plan's retirement age and its owner's together, leaving the rest", () => {
-    const plan = planOf({ ...setting, owners: [...owners, sam] }, opening);
-
-    expect(retiringAt(plan, 65)).toStrictEqual({
-      ...plan,
-      owners: [{ ...owners[0], retires: 65 }, sam],
-      retires: 65,
-    });
   });
 });
 

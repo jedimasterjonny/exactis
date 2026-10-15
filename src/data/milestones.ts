@@ -1,7 +1,9 @@
+import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
 import type { LineValues, Tie } from "@/data/schedule";
 
 import { retirementYear, yearAt } from "@/data/plan";
+import { rules } from "@/data/rules";
 import { formatGbp } from "@/lib/money";
 
 // One condition of a milestone: a measure of a year of the plan is at
@@ -170,6 +172,38 @@ export function markersOf(
   return [retirement, ...fixed].sort(
     (first, second) => first.year - second.year,
   );
+}
+
+// The year an owner the plan carries retires in: the year they reach
+// the age, for a retirement reached at an age, and for the plan's owner
+// one reached when conditions hold, the year the plan lays it out in.
+// Only the plan's owner retires when conditions hold, so anyone else's
+// retirement on conditions is refused in the rule's words, as the model
+// refuses to keep one.
+export function retirementYearOf(owner: Owner, plan: Plan): number {
+  const age = ageOf({ conditions: owner.retirement });
+  if (age !== undefined) {
+    return yearAt(age, owner);
+  }
+  if (owner.id !== plan.owners[0]?.id) {
+    throw new Error(rules.retiresAtAge);
+  }
+  return retirementYear(plan);
+}
+
+// The plan with its owner retiring at the age given, as the dashboard
+// drags it: written on the plan, which the Retirement milestone and the
+// slider read, and on the first listed owner, as their retirement's one
+// condition, whose plan it is and whose lines the engine stops by their
+// own years, so the two cannot drift apart.
+export function retiringAt(plan: Plan, retires: number): Plan {
+  return {
+    ...plan,
+    owners: plan.owners.map((owner, index) =>
+      index === 0 ? { ...owner, retirement: atAge(retires) } : owner,
+    ),
+    retires,
+  };
 }
 
 // A line as its ties make it: an end tied to a milestone read off it,

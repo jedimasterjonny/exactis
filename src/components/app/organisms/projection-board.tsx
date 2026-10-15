@@ -21,8 +21,8 @@ import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ChanceTile } from "@/components/app/organisms/chance-tile";
 import { ProjectionChart } from "@/components/app/organisms/projection-chart";
 import { takesSpare } from "@/data/accounts";
-import { ageOf, measureNames, timed } from "@/data/milestones";
-import { ageIn, endAge, retirementYear, retiringAt } from "@/data/plan";
+import { ageOf, measureNames, retiringAt, timed } from "@/data/milestones";
+import { ageIn, endAge, retirementYear } from "@/data/plan";
 import {
   endWorthOf,
   futureOf,

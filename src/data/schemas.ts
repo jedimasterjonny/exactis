@@ -67,32 +67,35 @@ const condition = z
     "An age is whole years",
   );
 
-// What a milestone holds: the name, and a condition at least, since a
+// What a milestone is reached on: a condition at least, since a
 // milestone with none is reached at once. An age is a milestone's only
 // condition: one reached at an age falls in a year the plan says, and
 // one reached when conditions hold in a year the futures say, and a
-// milestone is the one or the other.
-export const milestoneValues = {
-  conditions: z
-    .array(condition)
-    .min(1, "A milestone holds a condition")
-    .refine(
-      (held) =>
-        held.length === 1 || held.every(({ measure }) => measure !== "age"),
-      "An age is a milestone's only condition",
-    ),
-  name: named,
-};
+// milestone is the one or the other. Retirement is a milestone, and is
+// reached on the same.
+const conditions = z
+  .array(condition)
+  .min(1, "A milestone holds a condition")
+  .refine(
+    (held) =>
+      held.length === 1 || held.every(({ measure }) => measure !== "age"),
+    "An age is a milestone's only condition",
+  );
+
+// What a milestone holds: the name, and what it is reached on.
+export const milestoneValues = { conditions, name: named };
 
 // What an owner holds: the name, the year they were born, whole, since
 // the plan reads an age off it and a fraction of a year is no year, and
-// the age they retire at, whole and nothing or more. That the first
-// listed owner retires no later than the plan ends is the household's
-// to hold, since the plan's end is kept beside the owners.
+// what they retire on, as a milestone is reached, an age being whole
+// years and nothing or more. Who may retire on what, and that the
+// first listed owner retires no later than the plan ends, are the
+// household's to hold, since the order of the owners and the plan's end
+// are kept beside them.
 export const ownerValues = {
   born: z.number().int(),
   name: named,
-  retires: z.number().int().nonnegative(),
+  retirement: conditions,
 };
 
 // What a category of the target allocation holds, as the file gave it:
