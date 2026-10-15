@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { incomeLines, retiring } from "@/data/income.fixture";
+import { owners, sam } from "@/data/owners.fixture";
 
 import type { Measured } from "./milestones";
 
@@ -12,6 +13,8 @@ import {
   isReached,
   isTiedTo,
   markersOf,
+  retirementYearOf,
+  retiringAt,
   timed,
   untied,
   yearsOf,
@@ -127,6 +130,41 @@ describe("isTiedTo", () => {
     expect(isTiedTo({ ...salary, startsAt: 1 }, 1)).toBe(true);
     expect(isTiedTo({ ...salary, startsAt: 1 }, 2)).toBe(false);
     expect(isTiedTo(salary, "retirement")).toBe(false);
+  });
+});
+
+describe("retirementYearOf", () => {
+  // Retiring at 59 the owner retires in 2049, and Sam, born three years
+  // later, in 2052. The plan's owner retiring on financial independence
+  // retires where the plan lays it, which for a plan to 89 is past its
+  // end until a run says otherwise.
+  it("reads an age off an owner's retirement, and the plan's year for its owner retiring when conditions hold, refusing anyone else's", () => {
+    const plan = { ...retiring, owners: [owners[0], sam] };
+    const onConditions = independence.conditions;
+
+    expect(retirementYearOf(owners[0], plan)).toBe(2049);
+    expect(retirementYearOf(sam, plan)).toBe(2052);
+    expect(
+      retirementYearOf(
+        { ...owners[0], retirement: onConditions },
+        { ...plan, retires: 90 },
+      ),
+    ).toBe(2080);
+    expect(() =>
+      retirementYearOf({ ...sam, retirement: onConditions }, plan),
+    ).toThrow("Only the plan's owner retires when conditions hold");
+  });
+});
+
+describe("retiringAt", () => {
+  it("moves the plan's retirement age and its owner's together, leaving the rest", () => {
+    const plan = { ...retiring, owners: [owners[0], sam] };
+
+    expect(retiringAt(plan, 65)).toStrictEqual({
+      ...plan,
+      owners: [{ ...owners[0], retirement: atAge(65) }, sam],
+      retires: 65,
+    });
   });
 });
 

@@ -1,3 +1,7 @@
+import type { Condition } from "@/data/milestones";
+
+import { atAge } from "@/data/milestones";
+
 // An owner is one of the people the plan is for, whose ISAs and
 // pensions are paid under their own allowances. The id is the owner's
 // identity, handed out by the store, so an account names its owner
@@ -11,12 +15,14 @@ export interface Owner extends OwnerValues {
 
 // The owner as its dialog holds it, which is the owner less its id: the
 // name the accounts screen lists an owner by, the year they were born,
-// which turns a year of the plan into an age of theirs, and the age
-// they retire at, from which they earn nothing by working.
+// which turns a year of the plan into an age of theirs, and their
+// retirement, from which they earn nothing by working, held as a
+// milestone's conditions are: one on the age, for a retirement reached
+// at an age.
 export interface OwnerValues {
   readonly born: number;
   readonly name: string;
-  readonly retires: number;
+  readonly retirement: readonly Condition[];
 }
 
 // The owner a household opens with, before anyone is named: "Me", born
@@ -26,5 +32,5 @@ export interface OwnerValues {
 export const openingOwner: OwnerValues = {
   born: 1990,
   name: "Me",
-  retires: 59,
+  retirement: atAge(59),
 };

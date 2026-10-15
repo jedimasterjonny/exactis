@@ -2,6 +2,7 @@ import type { AccountValues } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
 import type { LineValues } from "@/data/schedule";
 
+import { retirementYearOf } from "@/data/milestones";
 import { earnerOf, retirementYear } from "@/data/plan";
 
 export type IncomeKind = (typeof incomeKinds)[number];
@@ -96,7 +97,7 @@ export function asPaid<TLine extends IncomeLineValues>(
   line: TLine,
   plan: Plan,
 ): TLine {
-  const retirement = retirementYear(earnerOf(line, plan));
+  const retirement = retirementYearOf(earnerOf(line, plan), plan);
   if (
     !isEarned(line) ||
     (line.lastYear !== null && line.lastYear < retirement)

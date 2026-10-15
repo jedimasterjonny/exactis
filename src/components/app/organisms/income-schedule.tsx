@@ -25,7 +25,7 @@ import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { isPension } from "@/data/accounts";
 import { asPaid, isOpeningSound, totalOf } from "@/data/income";
-import { markersOf } from "@/data/milestones";
+import { markersOf, retirementYearOf } from "@/data/milestones";
 import { earnerOf, retirementYear } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
@@ -326,7 +326,7 @@ function paidOf(
   plan: Plan,
 ): undefined | { readonly line: Draft; readonly says: string } {
   const paid = asPaid(draft, plan);
-  const retirement = retirementYear(earnerOf(draft, plan));
+  const retirement = retirementYearOf(earnerOf(draft, plan), plan);
   if (paid === draft) {
     return undefined;
   }

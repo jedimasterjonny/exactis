@@ -5,6 +5,7 @@ import * as z from "zod";
 
 import { cma } from "@/data/cma.fixture";
 import { blank, kept as reference, today } from "@/data/household.fixture";
+import { atAge } from "@/data/milestones";
 import { owners, sam } from "@/data/owners.fixture";
 import { allocation, rates } from "@/data/rates.fixture";
 import { targetsUnder } from "@/data/targets.fixture";
@@ -39,7 +40,7 @@ standUp(memory, { today });
 // The household before anything is saved, its one owner retiring at the
 // age given.
 function retiringAt(retires: number): typeof blank {
-  return { ...blank, owners: [{ ...me, retires }] };
+  return { ...blank, owners: [{ ...me, retirement: atAge(retires) }] };
 }
 
 describe("saveAges", () => {
@@ -68,7 +69,7 @@ describe("saveAges", () => {
       saved({ ends: 89, retires: 50 }),
     );
     expect(await readLatest(db)).toMatchObject({
-      household: { owners: [{ ...me, retires: 50 }, sam] },
+      household: { owners: [{ ...me, retirement: atAge(50) }, sam] },
       version: 3,
     });
   });
