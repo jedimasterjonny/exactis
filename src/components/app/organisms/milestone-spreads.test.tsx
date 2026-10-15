@@ -20,7 +20,7 @@ import { milestones } from "@/data/milestones.fixture";
 import { working } from "@/data/owners.fixture";
 import { saved } from "@/lib/answer";
 import { placed } from "@/lib/span";
-import { bySlot, field, openEntry, openRow } from "@/test/dom";
+import { bySlot, field, openEntry, openRow, pressRow } from "@/test/dom";
 
 import { MilestoneSpreads } from "./milestone-spreads";
 
@@ -169,9 +169,13 @@ describe("MilestoneSpreads", () => {
     // The share is written once a row, in its columns, for the two
     // reached when conditions hold alone.
     expect(within(card).getAllByText("reach it")).toHaveLength(2);
+    // Four points on the first million's bar and one on independence's,
+    // where every share is reached at once, each bar drawn twice.
     expect(
-      within(card).getAllByRole("button", { name: /^When the futures reach/ }),
-    ).toHaveLength(4);
+      within(card).getAllByRole("button", {
+        name: /^(First million|Financial independence), /,
+      }),
+    ).toHaveLength(10);
     // Three milestones' years rule each of the eight tracks.
     expect(
       within(card).getAllByText(bySlot("pin-bar-mark"), { suggest: false }),
@@ -214,27 +218,88 @@ describe("MilestoneSpreads", () => {
     expect(screen.getByText("Median …")).toBeInTheDocument();
   });
 
-  // The bar is a button named for the milestone, folded and in its
-  // columns, and either says the same on hover or focus.
-  it("says on the bar, hovered or focused, the year and age the run reaches a milestone by at each share", async () => {
+  // Each year a share is reached by is a point on the bar, a button
+  // named for the milestone and its shares, folded and in its columns,
+  // the shares reached in the same year together and those never
+  // reached with no point; either says the same on hover or focus.
+  it("says at each point on the bar, hovered or focused, the year and age the run reaches a milestone by at its shares", async () => {
     renderList();
 
-    const triggers = screen.getAllByRole("button", {
-      name: "When the futures reach First million",
-    });
-    expect(triggers).toHaveLength(2);
+    const named = [
+      "First million, Earliest 5% · Earliest 10%: 2030 · age 40",
+      "First million, Earliest 25%: 2032 · age 42",
+      "First million, Median: 2034 · age 44",
+      "First million, Latest 25%: 2037 · age 47",
+    ];
+    const points = screen.getAllByRole("button", { name: /^First million, / });
+    expect(
+      points.map((point) => point.getAttribute("aria-label")),
+    ).toStrictEqual([...named, ...named]);
+    expect(points[0]).toHaveStyle({ left: `${String(placed(2030, plan))}%` });
+    // Each is held to the gap to its nearest point, so none covers
+    // another's where the years fall close: two years for the first
+    // three and three for the last.
+    const years = (count: number): string =>
+      placed(plan.from + count, plan).toFixed(6);
+    expect(
+      points
+        .slice(0, 4)
+        .map(({ style }) => Number.parseFloat(style.maxWidth).toFixed(6)),
+    ).toStrictEqual([2, 2, 2, 3].map(years));
 
     // Focus moved by the keyboard opens it, as a pointer's hover does;
     // the focus is real, since the tooltip asks whether it is visible.
+    const median = screen.getAllByRole("button", {
+      name: "First million, Median: 2034 · age 44",
+    });
     act(() => {
-      triggers[0]?.focus();
+      median[0]?.focus();
     });
 
     expect(
       await screen.findByText(bySlot("tooltip-content"), { suggest: false }),
-    ).toHaveTextContent(
-      "Earliest 5%2030 · age 40Earliest 10%2030 · age 40Earliest 25%2032 · age 42Median2034 · age 44Latest 25%2037 · age 47Latest 10%neverLatest 5%never",
+    ).toHaveTextContent("Median2034 · age 44");
+  });
+
+  // A point is kept while its year moves as more of the run is drawn,
+  // so one hovered or focused stays so rather than being drawn anew.
+  it("keeps a point on the bar while its year moves", () => {
+    // The same run a year later, each future worth what it was a year
+    // before.
+    const later = futures.map(({ measured, ...future }) => ({
+      ...future,
+      measured: measured.map((year, offset) => ({
+        ...year,
+        liquid: measured[offset - 1]?.liquid ?? 0,
+        worth: measured[offset - 1]?.worth ?? 0,
+      })),
+    }));
+    const { rerender } = render(
+      <MilestoneSpreads
+        futures={futures}
+        milestones={reached}
+        plan={plan}
+        schedule={nothing}
+      />,
     );
+    const [median] = screen.getAllByRole("button", {
+      name: "First million, Median: 2034 · age 44",
+    });
+
+    rerender(
+      <MilestoneSpreads
+        futures={later}
+        milestones={reached}
+        plan={plan}
+        schedule={nothing}
+      />,
+    );
+
+    expect(
+      screen.getAllByRole("button", {
+        name: "First million, Median: 2035 · age 45",
+      })[0],
+    ).toBe(median);
   });
 
   it("draws the empty state for none", () => {
@@ -308,6 +373,17 @@ describe("MilestoneSpreads", () => {
 
     expect(screen.getByRole("radio", { name: "At an age" })).toBeChecked();
     expect(field("Age", dialog)).toHaveValue("46");
+  });
+
+  // A point on a bar opens its row when pressed, as the rest of the bar
+  // lets a press through to do.
+  it("opens a milestone from a point on its bar", () => {
+    renderList(milestones);
+
+    pressRow("First million, Median: 2034 · age 44");
+    const dialog = screen.getByRole("dialog", { name: "First million" });
+
+    expect(field("At least", dialog)).toHaveValue("£1,000,000");
   });
 
   // A saved milestone's dialog is where it is deleted from: the Delete
