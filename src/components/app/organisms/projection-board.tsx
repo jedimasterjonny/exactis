@@ -29,7 +29,7 @@ import {
   retiringAt,
   timed,
 } from "@/data/milestones";
-import { ageIn, endAge } from "@/data/plan";
+import { ageIn, endAge, endYear } from "@/data/plan";
 import {
   endWorthOf,
   futureOf,
@@ -186,7 +186,8 @@ function Board({
   // chance's screen reads the plan at its own rates, by the one function.
   // A retirement on conditions has no age to drag, and is projected as
   // the plan holds it; the plan it is laid out by is the one retiring
-  // where the run reached it.
+  // where the run reached it, or past its end where the run never did,
+  // as the plan screen lays it out.
   const drafted = useMemo(
     () => (retiresOn(plan) === undefined ? retiringAt(plan, retires) : plan),
     [plan, retires],
@@ -202,7 +203,7 @@ function Board({
     const run = { accounts, plan: drafted, schedule: lines };
     const future = futureOf(projection, run);
     return {
-      laid: carriedBy(run, future.retired).plan,
+      laid: carriedBy(run, future.retired ?? endYear(drafted) + 1).plan,
       points: projection,
       projected: future,
     };

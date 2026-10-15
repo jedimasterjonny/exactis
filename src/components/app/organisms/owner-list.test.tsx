@@ -160,6 +160,9 @@ describe("OwnerList", () => {
     expect(
       within(dialog).queryByRole("textbox", { name: "Retires at" }),
     ).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("paragraph")).toHaveTextContent(
+      "Retires when conditions hold, set among the milestones on Income & expenses",
+    );
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 

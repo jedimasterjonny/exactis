@@ -2,11 +2,11 @@
 
 import * as z from "zod";
 
-import type { Milestone, MilestoneValues } from "@/data/milestones";
+import type { Condition, Milestone, MilestoneValues } from "@/data/milestones";
 import type { Answer } from "@/lib/answer";
 
 import { untied } from "@/data/milestones";
-import { milestoneValues, recordId, target } from "@/data/schemas";
+import { milestoneValues, ownerValues, recordId, target } from "@/data/schemas";
 import { found, removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
@@ -50,8 +50,8 @@ export async function removeMilestone(id: number): Promise<Answer<undefined>> {
 // household's next id, else over the one with that id, and hands back
 // the milestone as the household now has it. An action answers a POST
 // from anywhere, so it checks the session for itself and parses what it
-// was sent rather than trusting the dialog. Retirement is written by
-// the dashboard's age rather than here, and no id names it.
+// was sent rather than trusting the dialog. Retirement is no record and
+// no id names it; it is written by saveRetirement.
 export async function saveMilestone(
   id: null | number,
   draft: MilestoneValues,
@@ -71,4 +71,27 @@ export async function saveMilestone(
     );
     return { kept: { ...kept, milestones: records, next }, result: milestone };
   });
+}
+
+// Writes what the plan's owner retires on, the first listed owner,
+// whose plan it is, and hands it back as the plan lays it out among the
+// milestones: named Retirement, reached on what was sent. An action
+// answers a POST from anywhere, so it checks the session for itself and
+// parses what it was sent, as an owner's retirement is parsed, rather
+// than trusting the dialog. The household holds a retirement at an age
+// to the plan's end, in its words.
+export async function saveRetirement(
+  conditions: readonly Condition[],
+): Promise<Answer<MilestoneValues>> {
+  await requireSession();
+  const parsed = ownerValues.retirement.parse(conditions);
+  return amend(({ kept }) => ({
+    kept: {
+      ...kept,
+      owners: kept.owners.map((owner, index) =>
+        index === 0 ? { ...owner, retirement: parsed } : owner,
+      ),
+    },
+    result: { conditions: parsed, name: "Retirement" },
+  }));
 }

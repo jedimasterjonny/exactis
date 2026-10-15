@@ -33,7 +33,7 @@ import {
 } from "@/data/accounts";
 import { derivedSet, openingDeductions, sleeves, spreadOf } from "@/data/cma";
 import { incomeKinds } from "@/data/income";
-import { ageOf, timed } from "@/data/milestones";
+import { ageOf, retiresOn, timed } from "@/data/milestones";
 import { openingOwner } from "@/data/owners";
 import {
   ageIn,
@@ -313,20 +313,15 @@ const owner = z.object({
 }) satisfies z.ZodType<Owner>;
 
 // The owners, one at least, since the plan is the first listed owner's
-// and a household with none has no plan to make, each retiring at an
-// age: anyone but the plan's owner in the rule's words, since the
-// engine refuses the same, and the plan's owner as well until the
-// screens can lay out a retirement reached when conditions hold.
+// and a household with none has no plan to make, and anyone but the
+// plan's owner retiring at an age, in the rule's words, since the
+// engine refuses the same.
 const owners = z
   .array(owner)
   .min(1, rules.somebodys)
   .refine(
     (listed) => listed.slice(1).every(isRetiringAtAge),
     rules.retiresAtAge,
-  )
-  .refine(
-    (listed) => listed.slice(0, 1).every(isRetiringAtAge),
-    "The plan's owner retires at an age",
   );
 
 // A progress point as the model lays it: each sum whole pounds, the
@@ -577,7 +572,8 @@ const glide = z
 // year of a glide path as for life, prices
 // falling by less than everything, the owners it carries for the
 // engine, one at least, and the ages the plan action holds,
-// its owner retiring no later than it ends and it ending by the oldest
+// its owner retiring no later than it ends, where they retire at an age
+// rather than past its end on conditions, and it ending by the oldest
 // age a plan may run to. That it ends after
 // the age its owner has reached is the save's to hold and not the
 // plan's, since the owner outlives a stored end age without anything
@@ -595,7 +591,7 @@ const plan = z
     years: z.number().int().nonnegative(),
   })
   .refine(
-    (plan) => plan.retires <= endAge(plan),
+    (plan) => retiresOn(plan) !== undefined || plan.retires <= endAge(plan),
     "A plan's owner retires no later than it ends",
   )
   .refine(
