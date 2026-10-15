@@ -7,7 +7,7 @@ import { ChevronRight, Flag, Plus } from "lucide-react";
 import { useState } from "react";
 
 import type { Spread } from "@/components/app/atoms/spread-bar";
-import type { Milestone } from "@/data/milestones";
+import type { Marker, Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { Future } from "@/engine/futures";
@@ -29,7 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/kit/tooltip";
 import { ageOf, conditionOf, markersOf, yearsOf } from "@/data/milestones";
-import { ageIn, yearAt } from "@/data/plan";
+import { ageIn, endYear, yearAt } from "@/data/plan";
 import { reachedBy, reachedIn } from "@/engine/futures";
 import { formatWholePercent } from "@/lib/money";
 import { chance, subsectionLabel } from "@/lib/nav";
@@ -43,23 +43,26 @@ interface MilestoneSpreadsProps {
 }
 
 // A year named on a milestone's bar: one a share of the run reaches the
-// milestone by, null where that many never do.
+// milestone by, null where that many never do, or one a milestone is
+// reached at an age in, with what tells it from every other.
 interface Named {
+  readonly id: number | string;
   readonly name: string;
   readonly year: null | number;
 }
 
 interface PinnedRowProps {
-  readonly marks: readonly number[];
+  readonly markers: readonly Marker[];
   readonly milestone: Milestone;
   readonly onEdit: (milestone: Milestone) => void;
   readonly plan: Plan;
   readonly year: number;
 }
 
-// A point on a milestone's bar: a year the run reaches it by, and the
-// shares that reach it by then, keyed by them rather than the year,
-// which moves while the run comes in.
+// A point on a milestone's bar: a year in the plan's span, and what is
+// named in it, the shares of the run that reach the milestone by then
+// and the milestones reached at an age then, keyed by what they are
+// rather than the year, which moves while the run comes in.
 interface Point {
   readonly key: string;
   readonly names: readonly string[];
@@ -77,7 +80,7 @@ interface PointedBarProps {
 
 interface SpreadRowProps {
   readonly futures: readonly Future[];
-  readonly marks: readonly number[];
+  readonly markers: readonly Marker[];
   readonly milestone: Milestone;
   readonly onEdit: (milestone: Milestone) => void;
   readonly plan: Plan;
@@ -100,14 +103,15 @@ const lane =
 // from the earliest 5% to the latest 5% on the bar, hovered or focused,
 // all read over the futures drawn so far while the run comes in. The
 // lanes are ruled at the milestones reached at an age, so a median is
-// read against retirement. A milestone is added from the card's button
-// and edited from its row, in the dialog the plan screen opens too,
-// opened on conditions here, since that is what this card reads, and
-// handed the schedules as there, since a milestone reached at an age
-// can be edited and deleted from here too. A save goes to the store
-// and comes back with the page re-read, which draws the run again. A
-// phone folds each lane into lines, as the plan screen's fold, with the
-// bar the row's width.
+// read against retirement, and a rule hovered or focused names its
+// milestone, with the year and the age. A milestone is added from the
+// card's button and edited from its row, in the dialog the plan screen
+// opens too, opened on conditions here, since that is what this card
+// reads, and handed the schedules as there, since a milestone reached
+// at an age can be edited and deleted from here too. A save goes to the
+// store and comes back with the page re-read, which draws the run
+// again. A phone folds each lane into lines, as the plan screen's fold,
+// with the bar the row's width.
 export function MilestoneSpreads({
   futures,
   milestones,
@@ -115,7 +119,7 @@ export function MilestoneSpreads({
   schedule,
 }: MilestoneSpreadsProps): JSX.Element {
   const [opened, setOpened] = useState<"new" | Milestone | null>(null);
-  const marks = yearsOf(markersOf(milestones, plan));
+  const markers = markersOf(milestones, plan);
   const pinned = milestones
     .flatMap((milestone) => {
       const age = ageOf(milestone);
@@ -159,7 +163,7 @@ export function MilestoneSpreads({
               {pinned.map(({ milestone, year }) => (
                 <PinnedRow
                   key={milestone.id}
-                  marks={marks}
+                  markers={markers}
                   milestone={milestone}
                   onEdit={setOpened}
                   plan={plan}
@@ -170,7 +174,7 @@ export function MilestoneSpreads({
                 <SpreadRow
                   futures={futures}
                   key={milestone.id}
-                  marks={marks}
+                  markers={markers}
                   milestone={milestone}
                   onEdit={setOpened}
                   plan={plan}
@@ -201,10 +205,10 @@ export function MilestoneSpreads({
 // its name, which opens it, over a pin where it falls on the plan's
 // span, with the year over the age reached in it beside, as the plan
 // screen pins it; the share's column is empty, since every future
-// reaches it in that year, and the pin says nothing on hover, since the
-// year beside it is all there is to say.
+// reaches it in that year. The bar's rules are hovered or focused as
+// every bar's are, the pin over its own.
 function PinnedRow({
-  marks,
+  markers,
   milestone,
   onEdit,
   plan,
@@ -214,18 +218,27 @@ function PinnedRow({
   function open(): void {
     onEdit(milestone);
   }
-  const bar = <PinBar marks={marks} plan={plan} year={year} />;
+  const bar = (
+    <PointedBar
+      name={milestone.name}
+      onOpen={open}
+      plan={plan}
+      points={pointsOf(markers, plan)}
+    >
+      <PinBar marks={yearsOf(markers)} plan={plan} year={year} />
+    </PointedBar>
+  );
   return (
     <li className={cn(lane, laneColumns)}>
       <div className="unfolded:hidden">
         <FoldedLines figure={String(year)} name={milestone.name} onOpen={open}>
-          <div className="pointer-events-none my-1">{bar}</div>
+          <div className="my-1">{bar}</div>
           <span>{age}</span>
         </FoldedLines>
       </div>
       <div className="grid min-w-0 gap-2 folded:hidden">
         <RowOpener onOpen={open}>{milestone.name}</RowOpener>
-        <div className="pointer-events-none">{bar}</div>
+        {bar}
       </div>
       <YearAge age={age} className="col-start-3 folded:hidden" year={year} />
       <span className="inline-flex size-7 items-center justify-center folded:hidden">
@@ -236,12 +249,12 @@ function PinnedRow({
 }
 
 // A bar with its points over it, each a button where its year falls,
-// named for the row's milestone and what is named there, which opens a
-// tooltip above it on hover or focus with those names over the year and
-// the age, and opens the row when pressed, as the rest of the bar lets
-// a press through to do. A point is no wider than the gap to the
-// nearest, so where years fall close on a narrow bar no point's target
-// covers another's.
+// named for the row's milestone, unless it names it already, and what
+// is named there, which opens a tooltip above it on hover or focus with
+// those names over the year and the age, and opens the row when
+// pressed, as the rest of the bar lets a press through to do. A point
+// is no wider than the gap to the nearest, so where years fall close on
+// a narrow bar no point's target covers another's.
 function PointedBar({
   children,
   className,
@@ -256,6 +269,9 @@ function PointedBar({
       {points.map(({ key, names, year }, index) => {
         const named = names.join(" · ");
         const reach = `${String(year)} · age ${String(ageIn(year, plan))}`;
+        const label = names.includes(name)
+          ? `${named}: ${reach}`
+          : `${name}, ${named}: ${reach}`;
         const at = placed(year, plan);
         const gap = Math.min(
           ...[points[index - 1], points[index + 1]].map((other) =>
@@ -265,7 +281,7 @@ function PointedBar({
         return (
           <Tooltip key={key}>
             <TooltipTrigger
-              aria-label={`${name}, ${named}: ${reach}`}
+              aria-label={label}
               className="pointer-events-auto absolute top-1/2 size-4 -translate-1/2 rounded-full focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden"
               delay={150}
               onClick={onOpen}
@@ -284,18 +300,27 @@ function PointedBar({
   );
 }
 
-// The points on a bar, from the years named on it, which come in
-// order: those reached in the same year are one point, since they fall
-// on the bar together, and a year that is null, where that many never
-// reach the milestone, has none, since the bar draws it nowhere.
-function pointsOf(named: readonly Named[]): readonly Point[] {
-  const drawn = named.flatMap(({ name, year }) =>
-    year === null ? [] : [{ name, year }],
+// The points on a bar, from the years named on it: those reached in
+// the same year are one point, since they fall on the bar together, a
+// share named before a milestone, and a year that is null, where that
+// many never reach a milestone, or outside the plan's span has none,
+// since the bar draws it nowhere or at the span's edge among whatever
+// else falls past it.
+function pointsOf(named: readonly Named[], plan: Plan): readonly Point[] {
+  const inSpan = named
+    .flatMap(({ id, name, year }) =>
+      year === null || year < plan.from || year > endYear(plan)
+        ? []
+        : [{ id, name, year }],
+    )
+    .toSorted((first, second) => first.year - second.year);
+  return [...Map.groupBy(inSpan, ({ year }) => year)].map(
+    ([year, entries]) => ({
+      key: entries.map(({ id }) => String(id)).join(),
+      names: entries.map(({ name }) => name),
+      year,
+    }),
   );
-  return [...Map.groupBy(drawn, ({ year }) => year)].map(([year, entries]) => {
-    const names = entries.map(({ name }) => name);
-    return { key: names.join(), names, year };
-  });
 }
 
 // The years a run reaches a milestone by at the shares the bar draws,
@@ -311,7 +336,7 @@ function sharesOf({ ends, inner, median, outer }: Spread): readonly Named[] {
     ["Latest 10%", outer[1]],
     ["Latest 5%", ends[1]],
   ];
-  return listed.map(([name, year]) => ({ name, year }));
+  return listed.map(([name, year]) => ({ id: name, name, year }));
 }
 
 // The row of a milestone reached when conditions hold, drawn in its
@@ -321,13 +346,13 @@ function sharesOf({ ends, inner, median, outer }: Spread): readonly Named[] {
 // that reaches it at all, labelled, and the year by which half have,
 // with the age beneath, a dash where half never do and an ellipsis
 // before any future is drawn. The year and age at each share are read
-// on the bar, its point hovered or focused, since seven of them written
-// beneath each bar crowded the card. Folded, the
+// on the bar, its point hovered or focused, as its rules are, since
+// seven of them written beneath each bar crowded the card. Folded, the
 // share is the figure beside the name and the median a line of its own,
 // since the columns that held them fold away.
 function SpreadRow({
   futures,
-  marks,
+  markers,
   milestone,
   onEdit,
   plan,
@@ -360,9 +385,9 @@ function SpreadRow({
       name={milestone.name}
       onOpen={open}
       plan={plan}
-      points={pointsOf(sharesOf(spread))}
+      points={pointsOf([...sharesOf(spread), ...markers], plan)}
     >
-      <SpreadBar marks={marks} plan={plan} spread={spread} />
+      <SpreadBar marks={yearsOf(markers)} plan={plan} spread={spread} />
     </PointedBar>
   );
   return (

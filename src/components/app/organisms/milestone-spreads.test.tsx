@@ -130,9 +130,10 @@ describe("MilestoneSpreads", () => {
   // The children leave home at 46, in 2036, ten of the plan's eleven
   // years in, and the downsize at 65 falls past the plan's end, so its
   // pin is held to the edge; the two come before the rest, pinned with
-  // the year and the age beside and nothing to read on hover, and rule
-  // every bar.
-  it("pins each milestone reached at an age where it falls, first, with no share and nothing on the bar", () => {
+  // the year and the age beside, and rule every bar, where the rule in
+  // the plan's span says what it marks on hover or focus and those past
+  // its end, drawn at the edge together, say nothing.
+  it("pins each milestone reached at an age where it falls, first, with no share, and names the rules on every bar", () => {
     renderList(milestones);
 
     const card = screen.getByRole("region", {
@@ -169,13 +170,35 @@ describe("MilestoneSpreads", () => {
     // The share is written once a row, in its columns, for the two
     // reached when conditions hold alone.
     expect(within(card).getAllByText("reach it")).toHaveLength(2);
-    // Four points on the first million's bar and one on independence's,
-    // where every share is reached at once, each bar drawn twice.
+    // A point for the children leaving home on every bar, each drawn
+    // twice, the pin's own among them and not named for its row again,
+    // and none for the downsize or retirement past the span.
+    expect(
+      within(card)
+        .getAllByRole("button", { name: /Kids leave home: / })
+        .map((point) => point.getAttribute("aria-label")),
+    ).toStrictEqual(
+      [
+        "",
+        "",
+        "Downsize, ",
+        "Downsize, ",
+        "First million, ",
+        "First million, ",
+        "Financial independence, ",
+        "Financial independence, ",
+      ].map((row) => `${row}Kids leave home: 2036 · age 46`),
+    );
+    expect(
+      within(card).queryAllByRole("button", { name: /(Downsize|Retirement):/ }),
+    ).toStrictEqual([]);
+    // Beside it, four points on the first million's bar and one on
+    // independence's, where every share is reached at once.
     expect(
       within(card).getAllByRole("button", {
         name: /^(First million|Financial independence), /,
       }),
-    ).toHaveLength(10);
+    ).toHaveLength(14);
     // Three milestones' years rule each of the eight tracks.
     expect(
       within(card).getAllByText(bySlot("pin-bar-mark"), { suggest: false }),
@@ -376,7 +399,7 @@ describe("MilestoneSpreads", () => {
   });
 
   // A point on a bar opens its row when pressed, as the rest of the bar
-  // lets a press through to do.
+  // lets a press through to do, the pin's own among them.
   it("opens a milestone from a point on its bar", () => {
     renderList(milestones);
 
@@ -384,6 +407,13 @@ describe("MilestoneSpreads", () => {
     const dialog = screen.getByRole("dialog", { name: "First million" });
 
     expect(field("At least", dialog)).toHaveValue("£1,000,000");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    pressRow("Kids leave home: 2036 · age 46");
+
+    expect(
+      field("Age", screen.getByRole("dialog", { name: "Kids leave home" })),
+    ).toHaveValue("46");
   });
 
   // A saved milestone's dialog is where it is deleted from: the Delete
