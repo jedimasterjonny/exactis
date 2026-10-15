@@ -19,13 +19,13 @@ import {
   sacrificeOf,
   totalOf,
 } from "@/data/income";
+import { retirementYearOf } from "@/data/milestones";
 import {
   debtTermOf,
   earnerOf,
   marginOf,
   pricesIn,
   rateFrom,
-  retirementYear,
   risenWith,
 } from "@/data/plan";
 import { rules } from "@/data/rules";
@@ -448,7 +448,7 @@ export function cashFlow(
     (line) =>
       runsIn(line, at) &&
       (!isEarned(line) ||
-        at.year < retirementYear(earnerOf(line, reading.plan))),
+        at.year < retirementYearOf(earnerOf(line, reading.plan), reading.plan)),
   );
   const income = payOf(running, [], reading);
   const feedingInto = (isFed: (account: Account) => boolean): readonly Fed[] =>

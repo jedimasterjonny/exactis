@@ -20,6 +20,7 @@ import { SectionCard } from "@/components/app/molecules/section-card";
 import { TextField } from "@/components/app/molecules/text-field";
 import { Button } from "@/components/kit/button";
 import { Table, TableBody, TableCell, TableRow } from "@/components/kit/table";
+import { ageOf, atAge } from "@/data/milestones";
 import { openingOwner } from "@/data/owners";
 import { oldestAge } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
@@ -42,7 +43,10 @@ const blank: OwnerValues = { ...openingOwner, name: "" };
 // header adding another. An owner is a name, the year they were born
 // and the age they retire at, so its dialog is the name over the two
 // years side by side, the age typed with no slider, since it is set on
-// purpose here and dragged on the dashboard; the section holds its own
+// purpose here and dragged on the dashboard, and written as their
+// retirement's one condition; an owner retiring when conditions hold
+// has no age to type, and the dialog keeps what they retire on as it
+// is. The section holds its own
 // dialog and question rather than handing them up to the ledger, as
 // the payment order holds its reordering. The rows are the store's, handed down by
 // the page, and a save or a deletion comes back with the page re-read.
@@ -70,6 +74,8 @@ export function OwnerList({
     noun: "Owner",
     remove: removeOwner,
   });
+  const retires =
+    entry === null ? undefined : ageOf({ conditions: entry.draft.retirement });
 
   return (
     <>
@@ -115,8 +121,8 @@ export function OwnerList({
                       })}
                       name={owner.name}
                       onDelete={ask}
-                      onEdit={({ born, id, name, retires }) => {
-                        open({ born, name, retires }, id);
+                      onEdit={({ born, id, name, retirement }) => {
+                        open({ born, name, retirement }, id);
                       }}
                       row={owner}
                     />
@@ -150,16 +156,18 @@ export function OwnerList({
                 amend(entry, { born });
               }}
             />
-            <AgeField
-              hasSlider={false}
-              label="Retires at"
-              max={oldestAge}
-              min={0}
-              onValueCommitted={(retires) => {
-                amend(entry, { retires });
-              }}
-              value={entry.draft.retires}
-            />
+            {retires !== undefined && (
+              <AgeField
+                hasSlider={false}
+                label="Retires at"
+                max={oldestAge}
+                min={0}
+                onValueCommitted={(age) => {
+                  amend(entry, { retirement: atAge(age) });
+                }}
+                value={retires}
+              />
+            )}
           </FieldRow>
         </EditDialog>
       )}

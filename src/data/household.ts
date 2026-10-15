@@ -313,8 +313,21 @@ const owner = z.object({
 }) satisfies z.ZodType<Owner>;
 
 // The owners, one at least, since the plan is the first listed owner's
-// and a household with none has no plan to make.
-const owners = z.array(owner).min(1, rules.somebodys);
+// and a household with none has no plan to make, each retiring at an
+// age: anyone but the plan's owner in the rule's words, since the
+// engine refuses the same, and the plan's owner as well until the
+// screens can lay out a retirement reached when conditions hold.
+const owners = z
+  .array(owner)
+  .min(1, rules.somebodys)
+  .refine(
+    (listed) => listed.slice(1).every(isRetiringAtAge),
+    rules.retiresAtAge,
+  )
+  .refine(
+    (listed) => listed.slice(0, 1).every(isRetiringAtAge),
+    "The plan's owner retires at an age",
+  );
 
 // A progress point as the model lays it: each sum whole pounds, the
 // three balances nothing or more and the two debts nothing or less, in
@@ -812,7 +825,8 @@ const kept = z
     targets: targets.nullable(),
   })
   .refine(
-    ({ ages, owners }) => (owners[0]?.retires ?? 0) <= ages.ends,
+    ({ ages, owners }) =>
+      (ageOf({ conditions: owners[0]?.retirement ?? [] }) ?? 0) <= ages.ends,
     "A plan's owner retires no later than it ends",
   )
   .refine(
@@ -1071,6 +1085,12 @@ function isInOrder(line: {
 
 function isListedOnce(records: readonly { readonly id: number }[]): boolean {
   return new Set(records.map((record) => record.id)).size === records.length;
+}
+
+// Whether an owner retires at an age, their retirement's one condition
+// on it.
+function isRetiringAtAge({ retirement }: Owner): boolean {
+  return ageOf({ conditions: retirement }) !== undefined;
 }
 
 // The rates and the split the plan runs on: those typed, or those the

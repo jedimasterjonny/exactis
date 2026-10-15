@@ -7,6 +7,7 @@ import type { PlanAges } from "@/data/plan";
 import type { Allocation, Anchor, Rates, RateSet } from "@/data/rates";
 import type { Answer } from "@/lib/answer";
 
+import { atAge } from "@/data/milestones";
 import { ageIn, oldestAge } from "@/data/plan";
 import { rateSets } from "@/data/rates";
 import { Refusal } from "@/lib/answer";
@@ -68,7 +69,9 @@ export async function removeAnchor(age: number): Promise<Answer<undefined>> {
 // Writes the plan's ages, the ones sent over the ones the household
 // has, and hands back the ages as it now has them: the end age with the
 // plan, and the retirement age on the first listed owner, whose plan it
-// is, so the dashboard moves their retirement and nobody else's. An
+// is, as their retirement's one condition, so the dashboard moves their
+// retirement and nobody else's, and an end age saved alone leaves what
+// they retire on as it was. An
 // action answers a POST from anywhere, so it checks the session for
 // itself and parses what it was sent rather than trusting the form. An
 // end age sent is held to a plan that runs: past the age its owner has
@@ -105,7 +108,9 @@ export async function saveAges(
         ...kept,
         ages: { ends: ages.ends },
         owners: kept.owners.map((owner, index) =>
-          index === 0 ? { ...owner, retires: ages.retires } : owner,
+          index === 0 && parsed.retires !== undefined
+            ? { ...owner, retirement: atAge(parsed.retires) }
+            : owner,
         ),
       },
       result: ages,

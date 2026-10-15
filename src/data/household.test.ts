@@ -800,13 +800,13 @@ describe("soundKept", () => {
         liveRates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
         mappings: [],
         milestones: [],
-        owners: [{ born: 1992, id: 1, name: "Me", retires: 61 }],
+        owners: [{ born: 1992, id: 1, name: "Me", retirement: atAge(61) }],
         plan: {
           born: 1992,
           from: 2026,
           inflation: 0.02,
           month: 9,
-          owners: [{ born: 1992, id: 1, name: "Me", retires: 61 }],
+          owners: [{ born: 1992, id: 1, name: "Me", retirement: atAge(61) }],
           rate: 0.05,
           retires: 61,
           years: 57,
@@ -1241,11 +1241,13 @@ describe("soundKept", () => {
       "A plan's owner retires no later than it ends",
     );
     expect(() =>
-      soundKept({ ...kept, owners: [{ ...owners[0], retires: 92 }] }),
+      soundKept({ ...kept, owners: [{ ...owners[0], retirement: atAge(92) }] }),
     ).toThrow("A plan's owner retires no later than it ends");
     expect(
-      soundKept({ ...kept, owners: [...owners, { ...sam, retires: 92 }] })
-        .household.plan.retires,
+      soundKept({
+        ...kept,
+        owners: [...owners, { ...sam, retirement: atAge(92) }],
+      }).household.plan.retires,
     ).toBe(61);
     expect(() => soundKept({ ...kept, ages: { ends: 121 } })).toThrow(
       "A plan ends by 120",

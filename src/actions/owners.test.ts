@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
 import { blank, kept } from "@/data/household.fixture";
+import { atAge } from "@/data/milestones";
 import { sam } from "@/data/owners.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -26,7 +27,7 @@ const partner = { ...sam, id: 6, name: "Partner" };
 const shared = { ...kept, next: 7, owners: [...kept.owners, partner] };
 
 // A third, born in 2020 and retiring at 68.
-const kid = { born: 2020, name: "Kid", retires: 68 };
+const kid = { born: 2020, name: "Kid", retirement: atAge(68) };
 
 describe("the owner actions", () => {
   standUp(memory, { seed: shared });
@@ -52,12 +53,17 @@ describe("the owner actions", () => {
 
     it("writes over the owner with the id, in its place", async () => {
       expect(
-        await saveOwner(1, { born: 1988, name: "Jo", retires: 60 }),
-      ).toStrictEqual(saved({ born: 1988, id: 1, name: "Jo", retires: 60 }));
+        await saveOwner(1, { born: 1988, name: "Jo", retirement: atAge(60) }),
+      ).toStrictEqual(
+        saved({ born: 1988, id: 1, name: "Jo", retirement: atAge(60) }),
+      );
       expect(await readLatest(db)).toMatchObject({
         household: {
           next: 7,
-          owners: [{ born: 1988, id: 1, name: "Jo", retires: 60 }, partner],
+          owners: [
+            { born: 1988, id: 1, name: "Jo", retirement: atAge(60) },
+            partner,
+          ],
         },
       });
     });
@@ -65,26 +71,44 @@ describe("the owner actions", () => {
     // The plan is the first listed owner's, and it ends at 91.
     it("holds the first listed owner to retiring no later than the plan ends, in the household's words", async () => {
       await expect(
-        saveOwner(1, { ...kid, retires: 92 }),
+        saveOwner(1, { ...kid, retirement: atAge(92) }),
       ).resolves.toStrictEqual(
         refused("A plan's owner retires no later than it ends"),
       );
-      expect(await saveOwner(6, { ...kid, retires: 92 })).toStrictEqual(
-        saved({ ...kid, id: 6, retires: 92 }),
-      );
+      expect(
+        await saveOwner(6, { ...kid, retirement: atAge(92) }),
+      ).toStrictEqual(saved({ ...kid, id: 6, retirement: atAge(92) }));
     });
 
-    it("refuses a name of nothing but space, a year or an age that is not whole, an age below nothing, an id the list could not have sent, and one no owner has", async () => {
+    // Twenty-five years of expenses, in liquid net worth.
+    it("holds every owner to retiring at an age, anyone but the plan's owner in the rule's words", async () => {
+      const retirement = [
+        { measure: "liquid", of: "expenses", times: 25 },
+      ] as const;
+
+      await expect(saveOwner(6, { ...kid, retirement })).resolves.toStrictEqual(
+        refused("Only the plan's owner retires when conditions hold"),
+      );
+      await expect(saveOwner(1, { ...kid, retirement })).resolves.toStrictEqual(
+        refused("The plan's owner retires at an age"),
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+
+    it("refuses a name of nothing but space, a year or an age that is not whole, an age below nothing, a retirement on nothing, an id the list could not have sent, and one no owner has", async () => {
       await expect(saveOwner(null, { ...kid, name: "   " })).rejects.toThrow(
         z.ZodError,
       );
       await expect(saveOwner(null, { ...kid, born: 2020.5 })).rejects.toThrow(
         z.ZodError,
       );
-      await expect(saveOwner(null, { ...kid, retires: 67.5 })).rejects.toThrow(
-        z.ZodError,
-      );
-      await expect(saveOwner(null, { ...kid, retires: -1 })).rejects.toThrow(
+      await expect(
+        saveOwner(null, { ...kid, retirement: atAge(67.5) }),
+      ).rejects.toThrow(z.ZodError);
+      await expect(
+        saveOwner(null, { ...kid, retirement: atAge(-1) }),
+      ).rejects.toThrow(z.ZodError);
+      await expect(saveOwner(null, { ...kid, retirement: [] })).rejects.toThrow(
         z.ZodError,
       );
       await expect(saveOwner(0, kid)).rejects.toThrow(z.ZodError);

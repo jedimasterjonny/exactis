@@ -1,8 +1,8 @@
 import type { IncomeLine } from "@/data/income";
 import type { Plan } from "@/data/plan";
 
+import { retiringAt } from "@/data/milestones";
 import { working } from "@/data/owners.fixture";
-import { retiringAt } from "@/data/plan";
 
 // The reference kit's invented schedule: four income lines, in the order
 // the reference lists them, with the ids a store would have given them,

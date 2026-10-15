@@ -15,6 +15,7 @@ import { removeOwner, saveOwner } from "@/actions/owners";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { atAge } from "@/data/milestones";
 import { owners, sam } from "@/data/owners.fixture";
 import { saved } from "@/lib/answer";
 import { commit, field } from "@/test/dom";
@@ -100,7 +101,7 @@ describe("OwnerList", () => {
     expect(saveOwner).toHaveBeenCalledExactlyOnceWith(null, {
       born: 1988,
       name: "Me",
-      retires: 60,
+      retirement: atAge(60),
     });
     await waitFor(() => {
       expect(
@@ -135,12 +136,42 @@ describe("OwnerList", () => {
     expect(saveOwner).toHaveBeenCalledExactlyOnceWith(sam.id, {
       born: sam.born,
       name: "Samira",
-      retires: sam.retires,
+      retirement: sam.retirement,
     });
     await waitFor(() => {
       expect(
         screen.getByRole("dialog", { name: "Owner updated" }),
       ).toHaveAccessibleDescription("Samira");
+    });
+  });
+
+  // Retiring on twenty-five years of expenses, in liquid net worth.
+  it("offers no age to an owner retiring when conditions hold, and keeps what they retire on", async () => {
+    const retirement = [
+      { measure: "liquid", of: "expenses", times: 25 },
+    ] as const;
+    renderList([{ ...me, retirement }]);
+    vi.mocked(saveOwner).mockResolvedValue(saved({ ...me, retirement }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Me" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Me" });
+
+    expect(
+      within(dialog).queryByRole("textbox", { name: "Retires at" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(me.id, {
+      born: me.born,
+      name: me.name,
+      retirement,
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Owner updated" }),
+      ).toBeInTheDocument();
     });
   });
 

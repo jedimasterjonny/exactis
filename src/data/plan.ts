@@ -29,7 +29,10 @@ export interface Path {
 // date gives it, so the first year runs from there rather than from its
 // start; how many years it runs forward; the year the
 // plan's owner was born, which turns a year into an age; and the age
-// they retire at, from which they earn nothing by working. The plan's
+// they retire at, from which they earn nothing by working, as the plan
+// is laid out: the age of a retirement reached at an age, and one past
+// the plan's end for a retirement reached when conditions hold, which
+// no year of the plan can say until a run of it does. The plan's
 // owner is the first listed, whose years these are; and every owner
 // the household lists is carried with it, since the engine taxes each
 // owner's income on its own, stops it when they retire and draws their
@@ -228,12 +231,15 @@ export function marginOf(line: {
 // opens on the balances the month after and pays nothing into a month
 // the statements already hold. It runs to the age it is set to run to,
 // for the first listed owner, whose plan it is: born in their year,
-// retiring at their age, growing at the rate the rates given make with
-// the savings split as the allocation given splits them and what
-// rebalancing earns over it, and taking the rates' inflation: what the
-// projection runs on and what the plan screen lays its lines over. The
-// rates, the split and the rebalancing are taken together, as the
-// household keeps them. A plan whose age is already
+// retiring at the age of their retirement's one condition where it is
+// reached at an age, read as the milestones read one, since they read
+// the plan and this cannot read them, and past the plan's end where it
+// is reached when conditions hold, growing at the rate the rates given
+// make with the savings split as the allocation given splits them and
+// what rebalancing earns over it, and taking the rates' inflation:
+// what the projection runs on and what the plan screen lays its lines
+// over. The rates, the split and the rebalancing are taken together,
+// as the household keeps them. A plan whose age is already
 // reached runs no years forward rather than a count below nothing. A
 // household with no owner has no plan to make, and the store refuses to
 // keep one, so a caller handing one here has skipped the model.
@@ -254,6 +260,7 @@ export function planOf(
   if (owner === undefined) {
     throw new Error(rules.somebodys);
   }
+  const [only, ...rest] = owner.retirement;
   return {
     born: owner.born,
     from: start.year,
@@ -261,7 +268,8 @@ export function planOf(
     month: start.month,
     owners,
     rate: planRate(rates, allocation, rebalancing),
-    retires: owner.retires,
+    retires:
+      rest.length === 0 && only?.measure === "age" ? only.times : ages.ends + 1,
     years: Math.max(0, owner.born + ages.ends - start.year),
   };
 }
@@ -303,29 +311,14 @@ export function rateIn(
   );
 }
 
-// The year the plan's owner retires in, the first in which they earn
-// nothing by working, or any owner's, since an owner holds the same two
-// years. The plan holds the year they were born and not
+// The year the plan's owner retires in as the plan lays it out, the
+// first in which they earn nothing by working. The plan holds the year
+// they were born and not
 // the day, so the whole of the year they reach the age counts as
 // retired, as the whole of the year they reach the pension age counts
 // as reaching it, and the year before is their last working year.
 export function retirementYear(plan: Pick<Plan, "born" | "retires">): number {
   return yearAt(plan.retires, plan);
-}
-
-// The plan with its owner retiring at the age given, as the dashboard
-// drags it: written on the plan, which the Retirement milestone and the
-// slider read, and on the first listed owner, whose plan it is and
-// whose lines the engine stops by their own years, so the two cannot
-// drift apart.
-export function retiringAt(plan: Plan, retires: number): Plan {
-  return {
-    ...plan,
-    owners: plan.owners.map((owner, index) =>
-      index === 0 ? { ...owner, retires } : owner,
-    ),
-    retires,
-  };
 }
 
 // How many times over a sum rising at a rate a year has risen by a

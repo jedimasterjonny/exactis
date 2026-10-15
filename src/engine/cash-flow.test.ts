@@ -9,8 +9,8 @@ import type { LineValues, Month } from "@/data/schedule";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { retiringAt } from "@/data/milestones";
 import { sam, working } from "@/data/owners.fixture";
-import { retiringAt } from "@/data/plan";
 
 import type { CashFlow, Schedule } from "./cash-flow";
 
