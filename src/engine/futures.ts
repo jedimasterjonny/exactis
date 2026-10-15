@@ -243,7 +243,7 @@ export function markersIn(
   const retired =
     retiresOn(plan) === undefined
       ? null
-      : byShare(
+      : yearBy(
           futures.map(({ retired }) => retired),
           0.5,
         );
@@ -353,7 +353,7 @@ export function reachedBy(
     share,
   }: { readonly plan: Pick<Plan, "from">; readonly share: number },
 ): null | number {
-  return byShare(
+  return yearBy(
     futures.map((future) => reachedIn(future, milestone, plan)),
     share,
   );
@@ -404,6 +404,17 @@ export function readingOf(futures: readonly Future[]): Reading {
   };
 }
 
+// The year by which the share given of a run has got somewhere, from the
+// year each future got there in, or null for one that never did, and
+// null where fewer than the share ever do.
+export function yearBy(
+  reached: readonly (null | number)[],
+  share: number,
+): null | number {
+  const years = sorted(reached.flatMap((year) => year ?? []));
+  return years[Math.ceil(share * reached.length) - 1] ?? null;
+}
+
 // A run of futures year by year over the plan's years, from the one it
 // starts in to the one it ends in. A year a future holds no point for,
 // as a run of none holds none, reads as worth nothing.
@@ -430,17 +441,6 @@ export function yearsIn(
       year,
     };
   });
-}
-
-// The year by which the share given of a run has got somewhere, from the
-// year each future got there in, or null for one that never did, and
-// null where fewer than the share ever do.
-function byShare(
-  reached: readonly (null | number)[],
-  share: number,
-): null | number {
-  const years = sorted(reached.flatMap((year) => year ?? []));
-  return years[Math.ceil(share * reached.length) - 1] ?? null;
 }
 
 function sorted(values: readonly number[]): readonly number[] {

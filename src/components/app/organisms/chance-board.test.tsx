@@ -285,4 +285,44 @@ describe("ChanceBoard", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  // £30,000 drawn £6,000 a year lasts, but never makes ten million, so
+  // an owner retiring on it never retires, at the plan's own rates or in
+  // any future where nothing strays, and none of them lasts.
+  it("says before the count that the plan never reaches its retirement's conditions at its own rates, and counts the futures that never retire", async () => {
+    render(
+      <ChanceBoard
+        accounts={[isa]}
+        milestones={[]}
+        plan={{
+          ...plan,
+          owners: [
+            {
+              ...working,
+              retirement: [{ measure: "worth", of: "pounds", times: 10000000 }],
+            },
+          ],
+          retires: 40,
+        }}
+        schedule={spending(500)}
+        spread={nothingStrays}
+      />,
+    );
+
+    expect(screen.getByRole("note")).toHaveTextContent(
+      /^The plan never reaches its retirement's conditions at its own rates$/,
+    );
+    expect(
+      await within(outcomes()).findByRole(
+        "heading",
+        { level: 2, name: "0 of 1,000 futures last to 39." },
+        { timeout: 5000 },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole("region", { name: "How many futures last" }),
+      ).getByText("Never retired"),
+    ).toBeInTheDocument();
+  });
 });

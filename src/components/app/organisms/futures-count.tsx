@@ -8,6 +8,7 @@ import type { Reading } from "@/engine/futures";
 import { Ledger } from "@/components/app/atoms/ledger";
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { CardContent } from "@/components/kit/card";
+import { retiresOn } from "@/data/milestones";
 import { ageIn, endAge } from "@/data/plan";
 import { formatCount } from "@/lib/count";
 import { formatGbp, formatWholePercent } from "@/lib/money";
@@ -21,9 +22,10 @@ interface FuturesCountProps {
 }
 
 // The chance of success counted down as a ledger is: the futures run,
-// less those that ran out of money and those kept going only by drawing
-// a pension early, leaving those that lasted, whose share of the run is
-// the chance. The ran out say when the first did and by when half of
+// less those that ran out of money, those kept going only by drawing a
+// pension early and, for an owner retiring on conditions, those in which
+// they never retired, leaving those that lasted, whose share of the run
+// is the chance. The ran out say when the first did and by when half of
 // them had, and the early draws what the chance would be counted as
 // lasting, so the judgement that they fail shows. Beside it, what the
 // middle future is worth at the plan's end against what the plan is
@@ -74,6 +76,14 @@ export function FuturesCount({
                   figure: lessBy(reading.early),
                   label: "Kept going only by drawing a pension early",
                 },
+                ...(retiresOn(plan) === undefined
+                  ? []
+                  : [
+                      {
+                        figure: lessBy(reading.unretired),
+                        label: "Never retired",
+                      },
+                    ]),
                 {
                   figure: formatCount(reading.lasted),
                   label: `Lasted to ${String(endAge(plan))}`,

@@ -94,10 +94,11 @@ export function ChanceBoard({
 }
 
 // What the plan comes to at its own rates, where it falls short at them:
-// running out, said with the year it does, or lasting only by drawing a
-// pension before it can be drawn, which the futures count as falling
-// short, said so the chance is not read as the markets' doing alone.
-// Nothing where the plan lasts at its own rates.
+// running out, said with the year it does, lasting only by drawing a
+// pension before it can be drawn, or never reaching the conditions its
+// owner retires on, each of which the futures count as falling short,
+// said so the chance is not read as the markets' doing alone. Nothing
+// where the plan lasts at its own rates.
 function AtItsRates({
   future,
   plan,
@@ -117,6 +118,11 @@ function AtItsRates({
       <Caution
         title={`The plan lasts at its own rates only by drawing a pension early, at ${String(ageIn(future.fell, plan))}`}
       />
+    );
+  }
+  if (future.retired === null) {
+    return (
+      <Caution title="The plan never reaches its retirement's conditions at its own rates" />
     );
   }
   return null;
