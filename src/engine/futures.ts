@@ -6,15 +6,18 @@ import type {
   MilestoneValues,
 } from "@/data/milestones";
 import type { Path, Plan, Spread } from "@/data/plan";
-import type { Month } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
-import type { ProjectionPoint } from "@/engine/projection";
+import type { ProjectionPoint, Run } from "@/engine/projection";
 
-import { isAsset } from "@/data/accounts";
-import { ageOf, isReached, markersOf } from "@/data/milestones";
-import { ageIn, endYear, pricesIn, retirementYear } from "@/data/plan";
-import { spentIn } from "@/engine/cash-flow";
-import { balanceIn, isShort, project } from "@/engine/projection";
+import { ageOf, isReached, markersOf, retiresOn } from "@/data/milestones";
+import { endYear } from "@/data/plan";
+import {
+  carriedBy,
+  isShort,
+  measuredOf,
+  project,
+  retirementIn,
+} from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
 // One future the plan was run over, as the chance of success reads it:
@@ -26,13 +29,19 @@ import { normalsFrom } from "@/lib/random";
 // entering it and in today's money as the projection's points are: what the
 // plan is worth, every account it holds less every debt it owes, a
 // house or a car at its value less the loan on it, as the dashboard
-// counts net worth, and the rest beside it. A future that falls short
-// by drawing early has not lasted: the 55% the draw is charged keeps
-// the plan going only on paper, which is why the projection marks it.
+// counts net worth, and the rest beside it, the lines tied to
+// retirement running as they did; and the year the plan's owner
+// retired in, or null for a future in which their retirement on
+// conditions is never reached. A future that falls short by drawing
+// early has not lasted: the 55% the draw is charged keeps the plan
+// going only on paper, which is why the projection marks it. Nor has
+// one whose owner never retires, which lasts only by working to the
+// end.
 export interface Future {
   readonly fell: null | number;
   readonly measured: readonly Measured[];
   readonly ranOut: null | number;
+  readonly retired: null | number;
 }
 
 // A year of a run of futures, as the chance of success lays the run on
@@ -56,10 +65,10 @@ export type Outcome =
   "almost" | "barely" | "comfortable" | "early" | "middle" | "surplus";
 
 // What a run of futures comes to, as the chance of success reads it:
-// how many were run; how many lasted, ran out of money, or were kept
-// going only by drawing a pension early, the three adding up to the
-// run; the share that lasted, which is the chance, and how far the run
-// alone may have it wrong, the half-width of the range 19 runs in 20
+// how many were run; how many lasted, ran out of money, were kept going
+// only by drawing a pension early, or never retired, the four adding up
+// to the run; the share that lasted, which is the chance, and how far
+// the run alone may have it wrong, the half-width of the range 19 runs in 20
 // would put it in, never nothing; the year the first ran out and the year by which
 // half of those had, none where none did; and what the middle future is
 // worth entering the plan's last year, its net worth, half worth less and
@@ -74,15 +83,7 @@ export interface Reading {
   readonly middle: number;
   readonly ranOut: number;
   readonly run: number;
-}
-
-// What a future is measured over: the accounts, the schedule and the
-// plan its points were projected from, the path it was carried along
-// among them, so a year's expenses are read in that future's money.
-interface Run {
-  readonly accounts: readonly Account[];
-  readonly plan: Plan;
-  readonly schedule: Schedule;
+  readonly unretired: number;
 }
 
 // How many futures a run draws: enough to pin the chance to within two
@@ -124,20 +125,25 @@ export function endWorthOf({ measured }: Pick<Future, "measured">): number {
 
 // A projection read as a future, over what it was run over: the year
 // it first fell short, by running out or by drawing a pension early,
-// the year it first ran out, and each year measured from the month it
-// opens with, the plan's month for the first. What a future drawn is
-// read as, and what the plan at its own rates is read as beside them.
+// the year it first ran out, the year its owner retired in, and each
+// year measured from the month it opens with, the plan's month for the
+// first, over the lines as the run carried them once it had placed the
+// retirement. What a future drawn is read as, and what the plan at its
+// own rates is read as beside them.
 export function futureOf(points: readonly ProjectionPoint[], run: Run): Future {
+  const retired = retirementIn(points, run);
+  const ran = carriedBy(run, retired);
   return {
     fell: points.find(isShort)?.year ?? null,
     measured: points.map((point, offset) =>
       measuredOf(
         point,
         { month: offset === 0 ? run.plan.month : 0, year: point.year },
-        run,
+        ran,
       ),
     ),
     ranOut: points.find(({ uncovered }) => uncovered > 0)?.year ?? null,
+    retired,
   };
 }
 
@@ -192,13 +198,16 @@ export function* futuresOf(
 // only the bridge to a pension. A retirement already begun counts from
 // the plan's start, where the futures are drawn from, and a plan ending
 // before its owner retires has no retirement to divide, so its own years
-// are divided instead. The fifths are worked out in whole years, so a
+// are divided instead, as are those of a plan whose owner retires on
+// conditions its own rates never reach. Retirement falls where the plan
+// at its own rates retires, which for one on conditions is where that
+// run reached them. The fifths are worked out in whole years, so a
 // fifth that lands on a year starts there rather than a rounding step
 // after it. The worth at a retirement outside the plan's years is read
 // at the nearer end of them.
 export function gradingOf(projected: Future, plan: Plan): Grading {
   const end = endYear(plan);
-  const retired = retirementYear(plan);
+  const retired = projected.retired ?? end;
   const opens = retired < end ? Math.max(retired, plan.from) : plan.from;
   const span = Math.max(1, end - opens);
   const at = Math.min(
@@ -223,13 +232,25 @@ export function gradingOf(projected: Future, plan: Plan): Grading {
 // them, as markersOf lays them out, and those reached when conditions
 // hold each in the year by which half the futures have reached it, the
 // median, left out where fewer ever do, as every one is over a run of
-// none. In the order their years come, two in the one year keeping the
-// order they are given in, the plan's before the futures'.
+// none, retirement on conditions among them, by the year each future
+// retired in. In the order their years come, two in the one year
+// keeping the order they are given in, the plan's before the futures'.
 export function markersIn(
   futures: readonly Future[],
   milestones: readonly Milestone[],
   plan: Plan,
 ): readonly Marker[] {
+  const retired =
+    retiresOn(plan) === undefined
+      ? null
+      : byShare(
+          futures.map(({ retired }) => retired),
+          0.5,
+        );
+  const retirement: Marker[] =
+    retired === null
+      ? []
+      : [{ id: "retirement", name: "Retirement", year: retired }];
   const reached = milestones.flatMap(({ conditions, id, name }) => {
     if (ageOf({ conditions }) !== undefined) {
       return [];
@@ -237,19 +258,23 @@ export function markersIn(
     const year = reachedBy(futures, { conditions }, { plan, share: 0.5 });
     return year === null ? [] : [{ id, name, year }];
   });
-  return [...markersOf(milestones, plan), ...reached].sort(
+  return [...markersOf(milestones, plan), ...retirement, ...reached].sort(
     (first, second) => first.year - second.year,
   );
 }
 
 // A run of futures graded on the lines given, counted. A future kept
 // going only by drawing a pension early is graded by when it first did,
-// as it is counted as falling short then.
+// as it is counted as falling short then, and one whose owner never
+// retired fell short before retirement, and early.
 export function outcomesOf(
   futures: readonly Future[],
   grading: Grading,
 ): Readonly<Record<Outcome, number>> {
-  function outcomeOf({ fell, measured }: Future): Outcome {
+  function outcomeOf({ fell, measured, retired }: Future): Outcome {
+    if (fell === null && retired === null) {
+      return "early";
+    }
     if (fell === null) {
       const left = endWorthOf({ measured });
       if (left > grading.surplus) {
@@ -328,10 +353,10 @@ export function reachedBy(
     share,
   }: { readonly plan: Pick<Plan, "from">; readonly share: number },
 ): null | number {
-  const years = sorted(
-    futures.flatMap((future) => reachedIn(future, milestone, plan) ?? []),
+  return byShare(
+    futures.map((future) => reachedIn(future, milestone, plan)),
+    share,
   );
-  return years[Math.ceil(share * futures.length) - 1] ?? null;
 }
 
 // The year a future first reaches the milestone in, the first its
@@ -359,12 +384,15 @@ export function reachedIn(
 // futures cannot say for certain.
 export function readingOf(futures: readonly Future[]): Reading {
   const run = futures.length;
-  const lasted = futures.filter(({ fell }) => fell === null).length;
+  const unretired = futures.filter(
+    ({ fell, retired }) => fell === null && retired === null,
+  ).length;
+  const lasted = futures.filter(({ fell }) => fell === null).length - unretired;
   const ranOutIn = sorted(futures.flatMap(({ ranOut }) => ranOut ?? []));
   const chance = lasted / Math.max(run, 1);
   return {
     chance,
-    early: run - lasted - ranOutIn.length,
+    early: run - lasted - unretired - ranOutIn.length,
     firstRanOut: ranOutIn[0] ?? null,
     halfRanOut: ranOutIn[Math.floor((ranOutIn.length - 1) / 2)] ?? null,
     lasted,
@@ -372,6 +400,7 @@ export function readingOf(futures: readonly Future[]): Reading {
     middle: sorted(futures.map(endWorthOf))[Math.floor(run / 2)] ?? 0,
     ranOut: ranOutIn.length,
     run,
+    unretired,
   };
 }
 
@@ -403,36 +432,15 @@ export function yearsIn(
   });
 }
 
-// A year of a projection as a milestone measures it, from the month it
-// opens with: the age the plan's owner reaches in it, and every sum whole
-// pounds of today's money: what every account comes to, which is the
-// plan's net worth; what it owes, every debt's balance turned to a sum
-// owed, nothing where it owes nothing rather than nothing with a sign;
-// what it is worth less the property and vehicles; and twelve of what
-// the expense lines running in the month cost it, read in today's
-// money at how far prices have risen by then along the future's path.
-function measuredOf(
-  point: ProjectionPoint,
-  at: Month,
-  { accounts, plan, schedule }: Run,
-): Measured {
-  const sum = (held: readonly Account[]): number =>
-    held.reduce((total, { id }) => total + balanceIn(point, id), 0);
-  const worth = sum(accounts);
-  return {
-    age: ageIn(at.year, plan),
-    debt: 0 - sum(accounts.filter(({ kind }) => kind === "debt")),
-    expenses: Math.round(
-      (12 *
-        spentIn(accounts, schedule, { at, plan }).reduce(
-          (total, { amount }) => total + amount,
-          0,
-        )) /
-        pricesIn(plan, at),
-    ),
-    liquid: worth - sum(accounts.filter(isAsset)),
-    worth,
-  };
+// The year by which the share given of a run has got somewhere, from the
+// year each future got there in, or null for one that never did, and
+// null where fewer than the share ever do.
+function byShare(
+  reached: readonly (null | number)[],
+  share: number,
+): null | number {
+  const years = sorted(reached.flatMap((year) => year ?? []));
+  return years[Math.ceil(share * reached.length) - 1] ?? null;
 }
 
 function sorted(values: readonly number[]): readonly number[] {

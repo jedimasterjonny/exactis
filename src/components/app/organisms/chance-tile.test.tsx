@@ -37,6 +37,7 @@ const futures = Array.from({ length: 10 }, (_, nth): Future => ({
     worth: 30000,
   })),
   ranOut: nth < 8 ? null : 2028,
+  retired: 2080,
 }));
 
 // Thirty grand, which every future reaches at once; forty, which none

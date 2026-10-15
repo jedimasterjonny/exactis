@@ -65,6 +65,7 @@ const futures = Array.from({ length: 10 }, (_, nth): Future => ({
     return { age: 36 + offset, debt: 0, expenses: 0, liquid: worth, worth };
   }),
   ranOut: null,
+  retired: 2080,
 }));
 
 // Where each row's median dot sits on the span, folded and unfolded, a
