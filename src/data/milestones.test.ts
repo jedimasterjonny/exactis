@@ -14,6 +14,7 @@ import {
   isTiedTo,
   markersOf,
   retirementYearOf,
+  retiresOn,
   retiringAt,
   timed,
   untied,
@@ -120,6 +121,15 @@ describe("markersOf", () => {
       { id: 5, name: "Sabbatical", year: 2049 },
     ]);
   });
+
+  it("leaves out retirement reached when conditions hold, which only a run of the plan places", () => {
+    expect(
+      markersOf([kidsLeave], {
+        ...retiring,
+        owners: [{ ...owners[0], retirement: independence.conditions }],
+      }),
+    ).toStrictEqual([{ id: 1, name: "Kids leave home", year: 2036 }]);
+  });
 });
 
 describe("isTiedTo", () => {
@@ -130,6 +140,18 @@ describe("isTiedTo", () => {
     expect(isTiedTo({ ...salary, startsAt: 1 }, 1)).toBe(true);
     expect(isTiedTo({ ...salary, startsAt: 1 }, 2)).toBe(false);
     expect(isTiedTo(salary, "retirement")).toBe(false);
+  });
+});
+
+describe("retiresOn", () => {
+  it("reads what the plan's owner retires on where it is conditions, and nothing where it is an age or there is no owner", () => {
+    expect(
+      retiresOn({
+        owners: [{ ...owners[0], retirement: independence.conditions }],
+      }),
+    ).toStrictEqual(independence.conditions);
+    expect(retiresOn(retiring)).toBeUndefined();
+    expect(retiresOn({ owners: [] })).toBeUndefined();
   });
 });
 

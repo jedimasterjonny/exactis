@@ -1,12 +1,21 @@
 import type { Account, AccountKind } from "@/data/accounts";
+import type { Condition, Measured } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 import type { CashFlow, Earned, Paid, Schedule } from "@/engine/cash-flow";
 
-import { isPension } from "@/data/accounts";
-import { ageIn, holderOf, pricesIn, rateFrom, rateIn } from "@/data/plan";
+import { isAsset, isPension } from "@/data/accounts";
+import { isReached, retiresOn, retiringAt, timed } from "@/data/milestones";
+import {
+  ageIn,
+  holderOf,
+  pricesIn,
+  rateFrom,
+  rateIn,
+  retirementYear,
+} from "@/data/plan";
 import { rules } from "@/data/rules";
-import { cashFlow } from "@/engine/cash-flow";
+import { cashFlow, spentIn } from "@/engine/cash-flow";
 import { isOnOrBefore, monthAfter } from "@/lib/months";
 import {
   april,
@@ -72,6 +81,15 @@ export interface ProjectionPoint {
   readonly free: number;
   readonly uncovered: number;
   readonly year: number;
+}
+
+// What a year is measured over: the accounts, the schedule and the plan
+// its points were projected from, the path it was carried along among
+// them, so a year's expenses are read in that future's money.
+export interface Run {
+  readonly accounts: readonly Account[];
+  readonly plan: Plan;
+  readonly schedule: Schedule;
 }
 
 // The month a shortfall is drawn in, as the draw reads it: what is left
@@ -145,8 +163,34 @@ const pensionAge = {
 // What an account holds on a point, or owes as a negative, and nothing
 // for an account the projection did not carry, since a point holds
 // every account it was run over and a reader may hold others.
-export function balanceIn(point: ProjectionPoint, id: number): number {
+export function balanceIn(
+  point: Pick<ProjectionPoint, "balances">,
+  id: number,
+): number {
   return point.balances[id] ?? 0;
+}
+
+// A run as it is carried once the plan's owner has retired in the year
+// given, or before they have, for none: the plan retiring them at the
+// age they reach in it, and every line tied to retirement read off it,
+// starting there or ending the year before; and before then the lines
+// read off the plan as given, which lays a retirement on conditions
+// past its end, so a line starting at it has not started and one ending
+// at it runs on. A plan retiring at an age is carried as it is given.
+export function carriedBy(run: Run, year: null | number): Run {
+  if (retiresOn(run.plan) === undefined) {
+    return run;
+  }
+  const plan =
+    year === null ? run.plan : retiringAt(run.plan, ageIn(year, run.plan));
+  return {
+    accounts: run.accounts,
+    plan,
+    schedule: {
+      expenses: run.schedule.expenses.map((line) => timed(line, [], plan)),
+      income: run.schedule.income.map((line) => timed(line, [], plan)),
+    },
+  };
 }
 
 // Whether a point holds or owes anything at all, in any account.
@@ -161,6 +205,38 @@ export function holdsAnything(point: ProjectionPoint): boolean {
 // as falling short.
 export function isShort(point: ProjectionPoint): boolean {
   return point.early > 0 || point.uncovered > 0;
+}
+
+// A year of a projection as a milestone measures it, from the month it
+// opens with: the age the plan's owner reaches in it, and every sum whole
+// pounds of today's money: what every account comes to, which is the
+// plan's net worth; what it owes, every debt's balance turned to a sum
+// owed, nothing where it owes nothing rather than nothing with a sign;
+// what it is worth less the property and vehicles; and twelve of what
+// the expense lines running in the month cost it, read in today's
+// money at how far prices have risen by then along the future's path.
+export function measuredOf(
+  point: Pick<ProjectionPoint, "balances">,
+  at: Month,
+  { accounts, plan, schedule }: Run,
+): Measured {
+  const sum = (held: readonly Account[]): number =>
+    held.reduce((total, { id }) => total + balanceIn(point, id), 0);
+  const worth = sum(accounts);
+  return {
+    age: ageIn(at.year, plan),
+    debt: 0 - sum(accounts.filter(({ kind }) => kind === "debt")),
+    expenses: Math.round(
+      (12 *
+        spentIn(accounts, schedule, { at, plan }).reduce(
+          (total, { amount }) => total + amount,
+          0,
+        )) /
+        pricesIn(plan, at),
+    ),
+    liquid: worth - sum(accounts.filter(isAsset)),
+    worth,
+  };
 }
 
 // Each account carried the months given on from the one the plan
@@ -306,7 +382,14 @@ export function monthsOn(
 // plan lists is refused beside them, as the household refuses it, since
 // there is no age to draw it at and no allowance to draw it under; read
 // before any month, as the flow reads its links, rather than in the
-// first month a draw reaches it.
+// first month a draw reaches it. A plan whose owner retires when
+// conditions hold is retired in the first year whose opening holds them,
+// read off the balances entering it as its point has them and a year's
+// expenses as they would be were the owner to retire then, since which
+// year it is depends on how the run has gone: until then they earn, a
+// line starting at retirement has not started and one ending at it
+// runs on, and from then the year is carried as a plan retiring at the
+// age they reach in it.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -333,19 +416,27 @@ export function project(
   let allowances: ReadonlyMap<number, number> = new Map();
   let drawn: ReadonlySet<number> = new Set();
   let taxYears: ReadonlyMap<number, TaxYear> = new Map();
+  const run = { accounts, plan, schedule };
+  const conditions = retiresOn(plan);
+  let carried = carriedBy(run, null);
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
     const age = ageIn(year, plan);
-    const prices = pricesIn(plan, {
-      month: offset === 0 ? plan.month : 0,
-      year,
-    });
+    const opens = { month: offset === 0 ? plan.month : 0, year };
+    const prices = pricesIn(plan, opens);
     const balances = Object.fromEntries(
       [...held, ...owing].map(({ account, balance }) => [
         account.id,
         Math.round(balance / prices),
       ]),
     );
+    if (
+      conditions !== undefined &&
+      carried.plan === plan &&
+      isRetiring({ balances }, opens, { conditions, run })
+    ) {
+      carried = carriedBy(run, year);
+    }
     const deferred = total(held, "tax-deferred", prices);
     const free = total(held, "tax-free", prices);
     let early = 0;
@@ -369,10 +460,10 @@ export function project(
         if (month === april) {
           taxYears = new Map();
         }
-        const flow = cashFlow(accounts, schedule, {
+        const flow = cashFlow(accounts, carried.schedule, {
           at,
           drawn,
-          plan,
+          plan: carried.plan,
           reserve: reserveOf(held),
           settlement,
         });
@@ -381,7 +472,7 @@ export function project(
           at,
           drawn,
           earned: flow.earned,
-          plan,
+          plan: carried.plan,
           uprating: stretch.uprating,
         });
         const risen = pricesIn(plan, at);
@@ -411,11 +502,11 @@ export function project(
         uncovered += draw.uncovered / risen;
         held = draw.held.map((account) => ({
           account: account.account,
-          balance: monthOf(account, flow, { at, plan }).balance,
+          balance: monthOf(account, flow, { at, plan: carried.plan }).balance,
         }));
         owing = owing.map((account) => ({
           account: account.account,
-          balance: monthOf(account, flow, { at, plan }).balance,
+          balance: monthOf(account, flow, { at, plan: carried.plan }).balance,
         }));
       }
     }
@@ -429,6 +520,30 @@ export function project(
       year,
     };
   });
+}
+
+// The year the plan's owner retires in over a run of it, from the
+// points it was projected to: the year the plan lays out for one
+// retiring at an age, and for one retiring when conditions hold the
+// first whose opening the conditions hold for, as the projection read
+// them, or null for a run in which they never do.
+export function retirementIn(
+  points: readonly ProjectionPoint[],
+  run: Run,
+): null | number {
+  const conditions = retiresOn(run.plan);
+  if (conditions === undefined) {
+    return retirementYear(run.plan);
+  }
+  return (
+    points.find((point, offset) =>
+      isRetiring(
+        point,
+        { month: offset === 0 ? run.plan.month : 0, year: point.year },
+        { conditions, run },
+      ),
+    )?.year ?? null
+  );
 }
 
 // A month: what is paid in lands at the start of it, and the balance
@@ -561,6 +676,33 @@ function isBeforePensionAge(age: number, { month, year }: Month): boolean {
 // pension sold to pay another is money going round in a circle.
 function isReserve(account: Account): boolean {
   return drawOrder.includes(account.kind) && !isPension(account);
+}
+
+// Whether the plan's owner retires on the conditions given in a year,
+// from its opening balances and month: whether they hold for the year
+// measured as if the owner retired in it, a year's expenses read off
+// the lines tied to retirement as they would run then, so the spending
+// they would retire to is what twenty-five years of expenses is
+// twenty-five years of.
+function isRetiring(
+  point: Pick<ProjectionPoint, "balances">,
+  at: Month,
+  {
+    conditions,
+    run,
+  }: { readonly conditions: readonly Condition[]; readonly run: Run },
+): boolean {
+  const asIf = { ...run.plan, retires: ageIn(at.year, run.plan) };
+  return isReached(
+    { conditions },
+    measuredOf(point, at, {
+      ...run,
+      schedule: {
+        expenses: run.schedule.expenses.map((line) => timed(line, [], asIf)),
+        income: run.schedule.income,
+      },
+    }),
+  );
 }
 
 // What keeping the pensions always funded paid takes out of the savings

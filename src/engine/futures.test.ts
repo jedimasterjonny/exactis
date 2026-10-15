@@ -13,6 +13,7 @@ import { normalsFrom } from "@/lib/random";
 import type { Future } from "./futures";
 
 import {
+  futureOf,
   futuresOf,
   gradingOf,
   markersIn,
@@ -215,6 +216,7 @@ describe("futuresOf", () => {
           }),
         ),
         ranOut: 2028,
+        retired: 2080,
       })),
     );
   });
@@ -313,6 +315,81 @@ describe("futuresOf", () => {
   });
 });
 
+describe("futureOf", () => {
+  // From 36 in 2026 over two years, at no growth and no inflation, with
+  // £100,000 in an ISA and nothing coming in: £2,000 a month spent
+  // until retirement and £1,000 after it, each line tied there.
+  const plan = {
+    born: 1990,
+    from: 2026,
+    inflation: 0,
+    month: 0,
+    owners: [working],
+    rate: 0,
+    retires: 39,
+    years: 2,
+  };
+  const isa: Account = {
+    balance: 100000,
+    growth: { kind: "fixed", rate: 0 },
+    id: 1,
+    kind: "tax-free",
+    name: "ISA",
+    owner: 1,
+  };
+  const [line] = expenseLines;
+  const lines = {
+    expenses: [
+      { ...line, amount: 2000, endsAt: "retirement", lastYear: 2028 },
+      {
+        ...line,
+        amount: 1000,
+        firstYear: 2029,
+        id: 2,
+        lastYear: null,
+        startsAt: "retirement",
+      },
+    ],
+    income: [],
+  } as const;
+
+  // The owner retiring on the plan's net worth.
+  function retiringOn(pounds: number): typeof plan {
+    return {
+      ...plan,
+      owners: [
+        {
+          ...working,
+          retirement: [{ measure: "worth", of: "pounds", times: pounds }],
+        },
+      ],
+    };
+  }
+
+  function futureFor(planned: typeof plan): Future {
+    const run = { accounts: [isa], plan: planned, schedule: lines };
+    return futureOf(project([isa], lines, planned), run);
+  }
+
+  // Any net worth at all is reached as the plan opens, so the owner
+  // retires at once and every year spends what retirement does; ten
+  // million never is, and every year spends what work does.
+  it("reads the year the owner retired in and measures each year by the lines as the run carried them", () => {
+    const retired = futureFor(retiringOn(0));
+    const toTheEnd = futureFor(retiringOn(10000000));
+
+    expect(retired.retired).toBe(2026);
+    expect(retired.measured.map(({ expenses }) => expenses)).toStrictEqual([
+      12000, 12000, 12000,
+    ]);
+    expect(toTheEnd.retired).toBeNull();
+    expect(toTheEnd.measured.map(({ expenses }) => expenses)).toStrictEqual([
+      24000, 24000, 24000,
+    ]);
+    expect(futureFor(plan).retired).toBe(2029);
+  });
+});
+
 describe("gradingOf", () => {
   // Born in 1970 and retiring at 60, in 2030, the fifth of the plan's
   // years; the plan ends in 2036, so retirement runs six years, its two
@@ -337,6 +414,7 @@ describe("gradingOf", () => {
       40000,
     ]),
     ranOut: null,
+    retired: 2030,
   };
 
   // Over fifteen years of retirement the fifths land on whole years, six
@@ -355,19 +433,27 @@ describe("gradingOf", () => {
     });
   });
 
-  // Retiring at 80 is past the plan's end, so its own ten years are
-  // divided, two fifths in by 2030 and four by 2034, and its worth read
-  // at its last year, £40,000. Retiring in 2010 is before its start, so
-  // retirement counts from 2026, with the same fifths, and its worth is
-  // read at its first year, £50,000.
-  it("divides the plan's own years where it ends before retiring, and counts a retirement begun from its start", () => {
-    expect(gradingOf(projected, { ...plan, retires: 80 })).toStrictEqual({
+  // Retiring at 80, in 2050, is past the plan's end, so its own ten years
+  // are divided, two fifths in by 2030 and four by 2034, and its worth
+  // read at its last year, £40,000, as they are where its retirement on
+  // conditions is never reached at its own rates. Retiring in 2010 is
+  // before its start, so retirement counts from 2026, with the same
+  // fifths, and its worth is read at its first year, £50,000.
+  it("divides the plan's own years where it ends before retiring or never retires, and counts a retirement begun from its start", () => {
+    const pastTheEnd = {
       almost: 2034,
       comfortable: 20000,
       middle: 2030,
       surplus: 120000,
-    });
-    expect(gradingOf(projected, { ...plan, born: 1950 })).toStrictEqual({
+    };
+
+    expect(gradingOf({ ...projected, retired: 2050 }, plan)).toStrictEqual(
+      pastTheEnd,
+    );
+    expect(gradingOf({ ...projected, retired: null }, plan)).toStrictEqual(
+      pastTheEnd,
+    );
+    expect(gradingOf({ ...projected, retired: 2010 }, plan)).toStrictEqual({
       almost: 2034,
       comfortable: 25000,
       middle: 2030,
@@ -417,11 +503,16 @@ describe("outcomesOf", () => {
   };
 
   function lasting(left: number): Future {
-    return { fell: null, measured: worthOf([0, left]), ranOut: null };
+    return {
+      fell: null,
+      measured: worthOf([0, left]),
+      ranOut: null,
+      retired: 2030,
+    };
   }
 
   function short(fell: number, ranOut: null | number = fell): Future {
-    return { fell, measured: worthOf([0, 0]), ranOut };
+    return { fell, measured: worthOf([0, 0]), ranOut, retired: 2030 };
   }
 
   // More than £300,000 is a large surplus, £300,000 itself and down to
@@ -460,6 +551,14 @@ describe("outcomesOf", () => {
       outcomesOf([{ ...lasting(0), measured: [] }], grading),
     ).toMatchObject({ barely: 1 });
   });
+
+  // Never retiring, a future leaving a large surplus fell short before
+  // retirement all the same.
+  it("grades a future whose owner never retired as falling short early", () => {
+    expect(
+      outcomesOf([{ ...lasting(1000000), retired: null }], grading),
+    ).toMatchObject({ early: 1, surplus: 0 });
+  });
 });
 
 describe("readingOf", () => {
@@ -470,7 +569,7 @@ describe("readingOf", () => {
     ranOut: null | number,
     end: number,
   ): Future {
-    return { fell, measured: worthOf([100000, end]), ranOut };
+    return { fell, measured: worthOf([100000, end]), ranOut, retired: 2030 };
   }
 
   // Ten futures: seven last; one runs out in 2060, one draws a pension
@@ -506,6 +605,27 @@ describe("readingOf", () => {
       middle: 500000,
       ranOut: 2,
       run: 10,
+      unretired: 0,
+    });
+  });
+
+  // Of four futures, one lasts, one runs out, and two never see their
+  // owner retire: one of them working to the end, which is no lasting,
+  // and one drawing a pension early first, which is counted as that.
+  it("counts a future whose owner never retired apart, as falling short", () => {
+    expect(
+      readingOf([
+        future(null, null, 100000),
+        future(2040, 2040, 0),
+        { ...future(null, null, 900000), retired: null },
+        { ...future(2045, null, 0), retired: null },
+      ]),
+    ).toMatchObject({
+      chance: 0.25,
+      early: 1,
+      lasted: 1,
+      ranOut: 1,
+      unretired: 1,
     });
   });
 
@@ -516,6 +636,7 @@ describe("readingOf", () => {
       fell: null,
       measured: worthOf([1]),
       ranOut: null,
+      retired: 2030,
     }));
 
     expect(readingOf(lasting).margin).toBeCloseTo(0.0019134, 6);
@@ -532,10 +653,12 @@ describe("readingOf", () => {
       middle: 0,
       ranOut: 0,
       run: 0,
+      unretired: 0,
     });
-    expect(readingOf([{ fell: null, measured: [], ranOut: null }]).middle).toBe(
-      0,
-    );
+    expect(
+      readingOf([{ fell: null, measured: [], ranOut: null, retired: 2030 }])
+        .middle,
+    ).toBe(0);
   });
 });
 
@@ -551,6 +674,7 @@ describe("reachedIn", () => {
       fell: null,
       measured: worthOf([900000, 1000000, 1100000]),
       ranOut: null,
+      retired: null,
     };
 
     expect(reachedIn(future, firstMillion, plan)).toBe(2027);
@@ -567,7 +691,12 @@ describe("reachedIn", () => {
   it("reads the first year it holds, whatever the years after it do", () => {
     expect(
       reachedIn(
-        { fell: null, measured: worthOf([0, 1000000, 0]), ranOut: null },
+        {
+          fell: null,
+          measured: worthOf([0, 1000000, 0]),
+          ranOut: null,
+          retired: null,
+        },
         firstMillion,
         plan,
       ),
@@ -584,6 +713,7 @@ describe("reachedIn", () => {
       fell: null,
       measured: worthOf([0, 0, 0]),
       ranOut: null,
+      retired: null,
     };
 
     expect(reachedIn(future, atAge(38), plan)).toBe(2028);
@@ -604,6 +734,7 @@ const reaching = Array.from({ length: 10 }, (_, nth): Future => ({
     ),
   ),
   ranOut: null,
+  retired: nth < 8 ? 2030 + nth : null,
 }));
 
 describe("reachedBy", () => {
@@ -663,6 +794,33 @@ describe("markersIn", () => {
       retirement,
     ]);
   });
+
+  // Retiring on financial independence, the owner retires in 2030 + n
+  // in the nth future for the first eight and never in the last two, so
+  // half have by 2034; and over the same futures given another one, a
+  // future in which they retire, fewer than half have by any year.
+  it("places a retirement on conditions in the year by which half the futures retired, and leaves it out where fewer ever do", () => {
+    const [, , , independence] = milestones;
+    const onConditions = {
+      ...planned,
+      owners: [{ ...owners[0], retirement: independence.conditions }],
+      retires: 48,
+    };
+
+    expect(markersIn(reaching, [kidsLeave], onConditions)).toStrictEqual([
+      { ...retirement, year: 2034 },
+      { id: 1, name: "Kids leave home", year: 2036 },
+    ]);
+    expect(
+      markersIn(
+        reaching.map((future, nth) =>
+          nth < 6 ? { ...future, retired: null } : future,
+        ),
+        [],
+        onConditions,
+      ),
+    ).toStrictEqual([]);
+  });
 });
 
 describe("yearsIn", () => {
@@ -679,6 +837,7 @@ describe("yearsIn", () => {
       fell: [2027, 2028, 2027][nth] ?? null,
       measured: worthOf([1000 * nth, 2000 * nth, 3000 * nth]),
       ranOut: [2027, 2028][nth] ?? null,
+      retired: 2080,
     }));
 
     expect(yearsIn(futures, span)).toStrictEqual([
@@ -721,9 +880,10 @@ describe("yearsIn", () => {
       [2028, 0],
     ]);
     expect(
-      yearsIn([{ fell: null, measured: [], ranOut: null }], span).map(
-        ({ middle }) => middle,
-      ),
+      yearsIn(
+        [{ fell: null, measured: [], ranOut: null, retired: 2080 }],
+        span,
+      ).map(({ middle }) => middle),
     ).toStrictEqual([0, 0, 0]);
   });
 });

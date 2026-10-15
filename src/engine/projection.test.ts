@@ -8,6 +8,7 @@ import type { Plan } from "@/data/plan";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { retiringAt, timed } from "@/data/milestones";
 import { sam, working } from "@/data/owners.fixture";
 import { endYear } from "@/data/plan";
 import { drawFor, drawOf, lumpSumAllowance } from "@/lib/tax";
@@ -21,6 +22,7 @@ import {
   isShort,
   monthsOn,
   project,
+  retirementIn,
 } from "./projection";
 
 const [pension, isa, cash, home, mortgage] = accounts;
@@ -1599,6 +1601,130 @@ describe("project", () => {
         },
       }),
     ).toStrictEqual(project(accounts, lines, atItsRates));
+  });
+});
+
+// A plan of ten years from 36, at no growth and no inflation, whose
+// owner retires once the cash comes to twenty-five years of what they
+// would spend retired. A salary of £120,000 leaves £6,346.45 a month
+// once taxed, and £2,000 of it is spent until retirement, when the
+// spending drops to £1,000. So £250,000 of cash opens 2026 short of the
+// £300,000 that twenty-five years of retired spending comes to, and
+// some £52,000 saved over the year opens 2027 past it, though nowhere
+// near twenty-five years of the £24,000 spent working.
+describe("retiring when conditions hold", () => {
+  const onConditions = {
+    ...plan,
+    owners: [
+      {
+        ...working,
+        retirement: [{ measure: "liquid", of: "expenses", times: 25 }],
+      },
+    ],
+    retires: 47,
+    years: 10,
+  } as const satisfies Plan;
+  const saving: Account = {
+    ...pocket,
+    balance: 250000,
+    contribution: { cap: null, kind: "spare" },
+    growth: { kind: "fixed", rate: 0 },
+  };
+  const lines = {
+    expenses: [
+      {
+        ...household,
+        amount: 2000,
+        endsAt: "retirement",
+        lastYear: 2035,
+        name: "Working",
+      },
+      {
+        ...household,
+        amount: 1000,
+        firstYear: 2036,
+        id: 2,
+        lastYear: null,
+        name: "Retired",
+        startsAt: "retirement",
+      },
+    ],
+    income: [
+      {
+        ...salary,
+        amount: 120000,
+        bonus: 0,
+        endsAt: "retirement",
+        feeds: null,
+        lastYear: 2035,
+        rsu: 0,
+        sacrifice: 0,
+      },
+    ],
+  } as const;
+
+  // The plan run as if it had been set to retire at the age given, its
+  // lines tied to retirement read off it.
+  function retiringFixed(age: number): ProjectionPoint[] {
+    const fixed = retiringAt(onConditions, age);
+    return project(
+      [saving],
+      {
+        expenses: lines.expenses.map((line) => timed(line, [], fixed)),
+        income: lines.income.map((line) => timed(line, [], fixed)),
+      },
+      fixed,
+    );
+  }
+
+  it("retires in the first year the conditions hold as it opens, reading the spending it would retire to, and runs on as a plan retiring then", () => {
+    const points = project([saving], lines, onConditions);
+
+    expect(
+      retirementIn(points, {
+        accounts: [saving],
+        plan: onConditions,
+        schedule: lines,
+      }),
+    ).toBe(2027);
+    expect(points).toStrictEqual(retiringFixed(37));
+    expect(points).not.toStrictEqual(retiringFixed(47));
+    expect(points[1]?.balances[saving.id]).toBeGreaterThan(300000);
+  });
+
+  // A hundred years of retired spending is £1,200,000, which ten years
+  // of saving never reach, so the owner works to the end, the spending
+  // starting at retirement never starting.
+  it("works on to the end where the conditions never hold", () => {
+    const never = {
+      ...onConditions,
+      owners: [
+        {
+          ...working,
+          retirement: [{ measure: "liquid", of: "expenses", times: 100 }],
+        },
+      ],
+    } as const satisfies Plan;
+    const points = project([saving], lines, never);
+
+    expect(
+      retirementIn(points, {
+        accounts: [saving],
+        plan: never,
+        schedule: lines,
+      }),
+    ).toBeNull();
+    expect(points).toStrictEqual(retiringFixed(47));
+  });
+
+  it("reads the year a plan retiring at an age lays out", () => {
+    expect(
+      retirementIn([], {
+        accounts: [],
+        plan: retiringAt(onConditions, 59),
+        schedule: lines,
+      }),
+    ).toBe(2049);
   });
 });
 
