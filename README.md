@@ -271,7 +271,10 @@ a time by how far they had risen by that month, so the chart and its tiles are
 in today's money. The plan screen's month is read the same way, so a line rising
 with inflation reads at what it states in whichever year is shown, and what an
 account is paid reads at what it is worth then; the cap it is paid to is shown
-as it is stated, as the line is.
+as it is stated, as the line is. A house's ceiling and a car's floor are stated
+in today's money, as a line is, since what a house tops out at or a car is
+scrapped for rises with every other price: the engine holds the asset to its
+limit risen to the month, so one held there reads at it on every point.
 
 The dashboard reads the accounts, the lines, the milestones and the plan from
 the store and hands them to the browser, which runs the engine itself, so a save

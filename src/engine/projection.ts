@@ -7,7 +7,7 @@ import { isPension } from "@/data/accounts";
 import { ageIn, holderOf, pricesIn, rateFrom } from "@/data/plan";
 import { rules } from "@/data/rules";
 import { cashFlow } from "@/engine/cash-flow";
-import { isOnOrBefore } from "@/lib/months";
+import { isOnOrBefore, monthAfter } from "@/lib/months";
 import {
   april,
   drawFor,
@@ -232,7 +232,8 @@ export function monthsOn(
 // carried at all, since no point follows it. Each account is carried on
 // its own and the year sums them by wrapper. A house, a car or another
 // real asset is carried as a saving is, paid what the flow pays it and
-// grown at its own rate, below nothing for one that loses value, and is
+// grown at its own rate, below nothing for one that loses value, a
+// house held to its ceiling and a car to its floor, and is
 // never drawn on: the plan sells nothing it lives in or drives to cover
 // a month. A debt is carried apart from them, paid down a month at a
 // time by what the flow pays off it, as the loan maths reads a month,
@@ -534,6 +535,16 @@ function drawnFrom(
   };
 }
 
+// What an asset's month leaves it worth once held to its limit, risen
+// from today's money to the pounds of the month's close, which is where
+// the next point reads it, so an asset held there reads at its limit:
+// a house is worth no more than its ceiling and a car no less than its
+// floor. One opening past its limit is brought to it in the first
+// month, since the limit is what was typed for it.
+function heldTo({ kind }: Account, grown: number, limit: number): number {
+  return kind === "car" ? Math.max(grown, limit) : Math.min(grown, limit);
+}
+
 // Whether a month falls before the pension age, when a pension can be
 // had only as a payment the rules do not allow: before 55 until the age
 // rises in April 2028, and before 57 from then. An owner holds the year
@@ -589,7 +600,7 @@ function keptOutOf(
 // the flow charges a debt's last payment as what clears it, so the two
 // agree, and a line paying a loan on past that month pays nothing more
 // off it. The month is read for the year it falls in, whose rate a plan
-// carried along a path takes.
+// carried along a path takes. A house or a car is held to its limit.
 function monthOf(
   { account, balance }: Held,
   flow: CashFlow,
@@ -598,7 +609,18 @@ function monthOf(
   const rate = rateOf(account, plan, at.year);
   if (account.kind !== "debt") {
     const paid = paidIn(account, flow);
-    return { balance: carried(balance, paid, rate), paid };
+    const grown = carried(balance, paid, rate);
+    return {
+      balance:
+        account.limit === undefined
+          ? grown
+          : heldTo(
+              account,
+              grown,
+              account.limit * pricesIn(plan, monthAfter(at)),
+            ),
+      paid,
+    };
   }
   const off = paidOff(account, flow);
   return {

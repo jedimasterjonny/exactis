@@ -214,6 +214,48 @@ describe("project", () => {
     ).toStrictEqual({ 9: 2200 });
   });
 
+  // At 10% inflation a car halving each year is 10,000 after one, 9,091
+  // of today's money, then reaches its floor of 8,000 and is held there
+  // in today's money; a house growing 20% is 600,000 after one, 545,455,
+  // then held at its ceiling of 550,000. One opening past its limit is
+  // brought to it from the first year on.
+  it("holds a house to its ceiling and a car to its floor, in today's money", () => {
+    const car: Account = {
+      balance: 20000,
+      growth: { kind: "fixed", rate: -0.5 },
+      id: 8,
+      kind: "car",
+      limit: 8000,
+      name: "Car",
+    };
+    const house: Account = {
+      balance: 500000,
+      growth: { kind: "fixed", rate: 0.2 },
+      id: 9,
+      kind: "house",
+      limit: 550000,
+      name: "House",
+    };
+
+    expect(
+      project(
+        [
+          car,
+          house,
+          { ...car, balance: 5000, id: 10 },
+          { ...house, balance: 700000, id: 11 },
+        ],
+        { expenses: [], income: [] },
+        { ...plan, inflation: 0.1, years: 3 },
+      ).map(({ balances }) => balances),
+    ).toStrictEqual([
+      { 8: 20000, 9: 500000, 10: 5000, 11: 700000 },
+      { 8: 9091, 9: 545455, 10: 8000, 11: 550000 },
+      { 8: 8000, 9: 550000, 10: 8000, 11: 550000 },
+      { 8: 8000, 9: 550000, 10: 8000, 11: 550000 },
+    ]);
+  });
+
   // 306,064.13 from the ISA and 10,000 × 1.02 = 10,200 from an account
   // with nothing paid in, each on the point by its id beside their sum.
   it("grows an account on a fixed rate at its own and sums the accounts", () => {
