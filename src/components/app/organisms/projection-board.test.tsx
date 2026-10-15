@@ -26,6 +26,8 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
 import { retiring } from "@/data/income.fixture";
 import { atAge, retiringAt } from "@/data/milestones";
+import { working } from "@/data/owners.fixture";
+import { futureOf } from "@/engine/futures";
 import { balanceIn, project } from "@/engine/projection";
 import { forget } from "@/hooks/use-futures";
 import { refused } from "@/lib/answer";
@@ -644,6 +646,65 @@ describe("ProjectionBoard", () => {
 
     expect(screen.getByText("At Kids leave home")).toBeInTheDocument();
     expect(project).not.toHaveBeenCalled();
+  });
+
+  // Retiring on twenty-five years of expenses in liquid net worth, the
+  // plan at its own rates reaches it entering 2044, at 52: retirement is
+  // chosen there and read on liquid net worth, and with no age to drag,
+  // the row says what it is reached on. Ten thousand years of expenses
+  // it never reaches, so there is no milestone to choose and the tile
+  // says so.
+  it("marks a retirement on conditions where the plan at its own rates reaches them, and says what it is reached on in the age's place", () => {
+    const onConditions = (times: number): Plan => ({
+      ...retiring,
+      owners: [
+        {
+          ...working,
+          retirement: [{ measure: "liquid", of: "expenses", times }],
+        },
+      ],
+      retires: 92,
+    });
+    const reached = onConditions(25);
+    const { measured } = futureOf(project(accounts, schedule, reached), {
+      accounts,
+      plan: reached,
+      schedule,
+    });
+    const { rerender } = render(board(reached));
+
+    expect(screen.getByText("At Retirement")).toBeInTheDocument();
+    expect(
+      screen.getByText("Liquid net worth · 2044 · age 52"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(formatGbp(measured[2044 - 2026]?.liquid ?? 0)),
+    ).toHaveClass("figure");
+    expect(
+      within(screen.getByRole("group", { name: "Milestones" })).getByRole(
+        "button",
+        { name: "Retirement 2044", pressed: true },
+      ),
+    ).toBeInTheDocument();
+    expect(marks()).toStrictEqual(["2044"]);
+    expect(
+      screen.queryByRole("textbox", { name: "Retirement age" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("paragraph").map((line) => line.textContent),
+    ).toStrictEqual(["Retirement · Liquid net worth ≥ 25 years of expenses"]);
+
+    rerender(board(onConditions(10000)));
+
+    const [tile] = screen.getAllByText(
+      (_content, element) => element?.getAttribute("data-tone") === "inverse",
+      { suggest: false },
+    );
+
+    expect(tile).toHaveTextContent(
+      /^Retirement—yrsNot retired by the plan's end$/,
+    );
+    expect(marks()).toStrictEqual([]);
   });
 
   // Born in 1992 and retiring at 28, the owner retired in 2020, before
