@@ -12,6 +12,7 @@ import type { Plan } from "@/data/plan";
 import { saveAges } from "@/actions/plan";
 import { Toaster } from "@/components/kit/toast";
 import { plan, retiring } from "@/data/income.fixture";
+import { working } from "@/data/owners.fixture";
 import { refused, saved } from "@/lib/answer";
 import { commit } from "@/test/dom";
 
@@ -74,6 +75,28 @@ describe("PlanAssumptions", () => {
   // 35, the first age it has a year to project.
   it("holds the age past the one already reached when retirement is past too", () => {
     renderAssumptions({ ...plan, retires: 30 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Assumptions" }));
+    typeAge("20");
+
+    expect(
+      screen.getByRole("dialog", { name: "Projected to age 35" }),
+    ).toBeInTheDocument();
+  });
+
+  // Retiring on twenty-five years of expenses, laid out past the plan's
+  // end, the owner holds the end age to nothing but a year to project.
+  it("holds the age past the one already reached alone when retirement is on conditions", () => {
+    renderAssumptions({
+      ...plan,
+      owners: [
+        {
+          ...working,
+          retirement: [{ measure: "liquid", of: "expenses", times: 25 }],
+        },
+      ],
+      retires: 92,
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Assumptions" }));
     typeAge("20");

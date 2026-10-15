@@ -1,20 +1,18 @@
 "use client";
 
-import type { Route } from "next";
 import type { JSX } from "react";
 
 import { cn } from "cn";
 import { ChevronRight, Plus } from "lucide-react";
 import { useState } from "react";
 
-import type { Marker, Milestone } from "@/data/milestones";
+import type { Condition, Marker, Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { LineValues } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
 
 import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { PinBar } from "@/components/app/atoms/pin-bar";
-import { RowLock } from "@/components/app/atoms/row-lock";
 import { RowOpener } from "@/components/app/atoms/row-opener";
 import { SpanRuler } from "@/components/app/atoms/span-ruler";
 import { YearAge } from "@/components/app/atoms/year-age";
@@ -23,15 +21,22 @@ import { MilestoneDialog } from "@/components/app/organisms/milestone-dialog";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { asPaid } from "@/data/income";
-import { ageOf, conditionOf, markersOf, yearsOf } from "@/data/milestones";
-import { ageIn } from "@/data/plan";
+import {
+  ageOf,
+  atAge,
+  conditionOf,
+  markersOf,
+  yearsOf,
+} from "@/data/milestones";
+import { ageIn, endYear } from "@/data/plan";
 import { counted } from "@/lib/count";
 import { listed } from "@/lib/feeders";
-import { dashboard, plan as planScreen, subsectionLabel } from "@/lib/nav";
+import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 import { laneColumns } from "@/lib/span";
 
 interface MilestoneListProps {
   readonly milestones: readonly Milestone[];
+  readonly onConditions: readonly Condition[] | undefined;
   readonly plan: Plan;
   readonly schedule: Schedule;
 }
@@ -40,19 +45,10 @@ interface MilestoneRowProps {
   readonly detail: string | undefined;
   readonly marks: readonly number[];
   readonly name: string;
-  readonly opens: Opens;
+  readonly onOpen: () => void;
   readonly plan: Plan;
   readonly year: number | undefined;
 }
-
-// What a row opens: the screen a milestone held here is set on, which
-// is retirement's dashboard, or the dialog a milestone listed here is
-// edited in.
-type Opens = { readonly href: Route } | { readonly onOpen: () => void };
-
-// Why retirement's row is held here: it is set on another screen, and
-// moves when it is, so the row links there.
-const retirementLock = `Set by the retirement age on the ${dashboard.label}`;
 
 // The plan screen's first card: the years the plan turns on, retirement
 // among them, in the order they come, and after them the milestones
@@ -79,8 +75,12 @@ const retirementLock = `Set by the retirement age on the ${dashboard.label}`;
 // reached is a choice and conditions are more than a row holds; the
 // dialog is handed the schedules, so it can hold a milestone lines are
 // tied to at its age and say, before deleting one, what becomes of
-// them. Retirement draws a lock in place of the chevron, since it is set
-// on the dashboard, as the caption says, and its name links there.
+// them. Retirement opens in the same dialog, as the plan's owner's,
+// reached at an age, which the dashboard drags too, or when conditions
+// hold, which the screen is told since the plan it is handed is laid
+// out at the year its own rates reach them: its row says what it is
+// reached on beside the lines tied to it, and pins that year, or draws
+// no pin where the plan never reaches them.
 // The span is ruled in decades above the rows, in the pins' column, and
 // every pin's track carries a faint rule at each milestone, as every
 // line's bar beneath does, so the three cards read as lanes on the one
@@ -90,10 +90,13 @@ const retirementLock = `Set by the retirement age on the ${dashboard.label}`;
 // the ruler runs the row's width as the pins do.
 export function MilestoneList({
   milestones,
+  onConditions,
   plan,
   schedule,
 }: MilestoneListProps): JSX.Element {
-  const [opened, setOpened] = useState<"new" | Milestone | null>(null);
+  const [opened, setOpened] = useState<"new" | "retirement" | Milestone | null>(
+    null,
+  );
   const markers = markersOf(milestones, plan);
   const marks = yearsOf(markers);
   const paid = [
@@ -103,6 +106,8 @@ export function MilestoneList({
   const reached = milestones.filter(
     (milestone) => ageOf(milestone) === undefined,
   );
+  const retirement = { retirement: onConditions ?? atAge(plan.retires) };
+  const openedOn = opened === "retirement" ? retirement : opened;
   return (
     <>
       <SectionCard
@@ -127,23 +132,31 @@ export function MilestoneList({
           <ul className="@container divide-y">
             {markers.map((marker) => {
               const milestone = milestones.find(({ id }) => id === marker.id);
+              const isOnConditions =
+                milestone === undefined && onConditions !== undefined;
+              const ties = tiesAt(marker, paid);
               return (
                 <MilestoneRow
-                  detail={tiesAt(marker, paid)}
+                  detail={
+                    isOnConditions
+                      ? [
+                          ...onConditions.map(conditionOf),
+                          ...(ties === undefined ? [] : [ties]),
+                        ].join(" · ")
+                      : ties
+                  }
                   key={marker.id}
                   marks={marks}
                   name={marker.name}
-                  opens={
-                    milestone === undefined
-                      ? { href: dashboard.href }
-                      : {
-                          onOpen: (): void => {
-                            setOpened(milestone);
-                          },
-                        }
-                  }
+                  onOpen={() => {
+                    setOpened(milestone ?? "retirement");
+                  }}
                   plan={plan}
-                  year={marker.year}
+                  year={
+                    isOnConditions && marker.year > endYear(plan)
+                      ? undefined
+                      : marker.year
+                  }
                 />
               );
             })}
@@ -153,10 +166,8 @@ export function MilestoneList({
                 key={milestone.id}
                 marks={marks}
                 name={milestone.name}
-                opens={{
-                  onOpen: (): void => {
-                    setOpened(milestone);
-                  },
+                onOpen={() => {
+                  setOpened(milestone);
                 }}
                 plan={plan}
                 year={undefined}
@@ -167,8 +178,8 @@ export function MilestoneList({
       </SectionCard>
       {opened !== null && (
         <MilestoneDialog
-          key={opened === "new" ? opened : opened.id}
-          milestone={opened === "new" ? null : opened}
+          key={typeof opened === "string" ? opened : opened.id}
+          milestone={openedOn === "new" ? null : openedOn}
           onClose={() => {
             setOpened(null);
           }}
@@ -193,23 +204,19 @@ function endingAfter(lines: readonly LineValues[], after: number): string {
 // when conditions hold, what they are. A row with a year pins it on the
 // span and writes the year over the age reached in it; one without
 // draws no pin and a dash where the year would be, since when it is
-// reached is the futures' to say. A saved milestone opens from anywhere
-// on it, either way, with a chevron at its end; retirement draws its
-// lock in the chevron's place instead, and links to the dashboard,
-// where it is set.
+// reached is the futures' to say. A milestone opens from anywhere on
+// it, either way, with a chevron at its end.
 function MilestoneRow({
   detail,
   marks,
   name,
-  opens,
+  onOpen,
   plan,
   year,
 }: MilestoneRowProps): JSX.Element {
   const age =
     year === undefined ? "When reached" : `Age ${String(ageIn(year, plan))}`;
   const figure = year === undefined ? "—" : String(year);
-  const lock =
-    "href" in opens ? <RowLock reason={retirementLock} /> : undefined;
   const bar =
     year === undefined ? undefined : (
       <PinBar marks={marks} plan={plan} year={year} />
@@ -226,9 +233,7 @@ function MilestoneRow({
           figure={figure}
           isFigureMuted={year === undefined}
           name={name}
-          {...("href" in opens
-            ? { href: opens.href, lock }
-            : { onOpen: opens.onOpen })}
+          onOpen={onOpen}
         >
           {detail !== undefined && <span>{detail}</span>}
           {bar !== undefined && (
@@ -239,11 +244,7 @@ function MilestoneRow({
       </div>
       <div className="grid min-w-0 gap-2 folded:hidden">
         <div className="flex flex-wrap items-baseline gap-2">
-          {"href" in opens ? (
-            <RowOpener href={opens.href}>{name}</RowOpener>
-          ) : (
-            <RowOpener onOpen={opens.onOpen}>{name}</RowOpener>
-          )}
+          <RowOpener onOpen={onOpen}>{name}</RowOpener>
           {detail !== undefined && (
             <span className="text-xs text-muted-foreground">{detail}</span>
           )}
@@ -252,9 +253,7 @@ function MilestoneRow({
       </div>
       <YearAge age={age} className="col-start-3 folded:hidden" year={figure} />
       <span className="inline-flex size-7 items-center justify-center folded:hidden">
-        {lock ?? (
-          <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
-        )}
+        <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
       </span>
     </li>
   );

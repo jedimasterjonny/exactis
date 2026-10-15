@@ -13,7 +13,11 @@ import type { Milestone } from "@/data/milestones";
 import type { Schedule } from "@/engine/cash-flow";
 import type { Answer } from "@/lib/answer";
 
-import { removeMilestone, saveMilestone } from "@/actions/milestones";
+import {
+  removeMilestone,
+  saveMilestone,
+  saveRetirement,
+} from "@/actions/milestones";
 import { Toaster } from "@/components/kit/toast";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
@@ -27,6 +31,7 @@ import { MilestoneDialog } from "./milestone-dialog";
 vi.mock("@/actions/milestones", () => ({
   removeMilestone: vi.fn(),
   saveMilestone: vi.fn(),
+  saveRetirement: vi.fn(),
 }));
 
 const [kidsLeave, downsize, firstMillion, independence] = milestones;
@@ -431,6 +436,78 @@ describe("MilestoneDialog", () => {
     expect(
       screen.getByRole("dialog", { name: "Kids leave home" }),
     ).toBeVisible();
+  });
+
+  // Retiring at 61, in 2053: retirement opens on its age, named and
+  // with nothing to type a name into or delete, its conditions standing
+  // by at twenty-five years of expenses, and saved onto the owner as
+  // those conditions once chosen.
+  it("edits retirement, on its age or on conditions, with no name and no Delete, and saves it onto the owner", async () => {
+    const onClose = vi.fn<() => void>();
+    renderDialog({
+      milestone: { retirement: atAge(61) },
+      onClose,
+      schedule: threeTied,
+    });
+    const dialog = screen.getByRole("dialog", { name: "Retirement" });
+
+    expect(within(dialog).getByText("Edit retirement")).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("textbox", { name: "Name" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
+    expect(radio("At an age")).toBeChecked();
+    expect(radio("At an age")).toHaveAccessibleDescription(
+      "Dragged on the dashboard too",
+    );
+    expect(field("Age", dialog)).toHaveValue("61");
+
+    fireEvent.click(radio("When conditions hold"));
+
+    expect(radio("When conditions hold")).toHaveAccessibleDescription(
+      "Each future retires once they first hold",
+    );
+    expect(field("At least", dialog)).toHaveValue("25");
+
+    vi.mocked(saveRetirement).mockResolvedValue(
+      saved({
+        conditions: [{ measure: "liquid", of: "expenses", times: 25 }],
+        name: "Retirement",
+      }),
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(saveRetirement).toHaveBeenCalledExactlyOnceWith([
+      { measure: "liquid", of: "expenses", times: 25 },
+    ]);
+    expect(saveMilestone).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+    expect(
+      screen.getByRole("dialog", { name: "Retirement updated" }),
+    ).toHaveAccessibleDescription(
+      "Retirement · Liquid net worth ≥ 25 years of expenses",
+    );
+  });
+
+  // Retiring on financial independence, the age stands by at the age
+  // the plan lays retirement out at, held to its end.
+  it("opens retirement on its conditions, its age standing by where the plan lays it out", () => {
+    renderDialog({
+      milestone: { retirement: independence.conditions },
+      plan: { ...retiring, retires: 92 },
+    });
+    const dialog = screen.getByRole("dialog", { name: "Retirement" });
+
+    expect(radio("When conditions hold")).toBeChecked();
+    expect(within(dialog).getAllByRole("combobox")).toHaveLength(4);
+
+    fireEvent.click(radio("At an age"));
+
+    expect(field("Age", dialog)).toHaveValue("91");
   });
 
   it("tells the caller on Cancel, saving nothing", () => {

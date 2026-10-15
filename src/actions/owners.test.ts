@@ -81,7 +81,7 @@ describe("the owner actions", () => {
     });
 
     // Twenty-five years of expenses, in liquid net worth.
-    it("holds every owner to retiring at an age, anyone but the plan's owner in the rule's words", async () => {
+    it("lets the plan's owner alone retire when conditions hold, refusing anyone else in the rule's words", async () => {
       const retirement = [
         { measure: "liquid", of: "expenses", times: 25 },
       ] as const;
@@ -89,10 +89,10 @@ describe("the owner actions", () => {
       await expect(saveOwner(6, { ...kid, retirement })).resolves.toStrictEqual(
         refused("Only the plan's owner retires when conditions hold"),
       );
-      await expect(saveOwner(1, { ...kid, retirement })).resolves.toStrictEqual(
-        refused("The plan's owner retires at an age"),
-      );
       expect(await readLatest(db)).toMatchObject({ version: 1 });
+      expect(await saveOwner(1, { ...kid, retirement })).toStrictEqual(
+        saved({ ...kid, id: 1, retirement }),
+      );
     });
 
     it("refuses a name of nothing but space, a year or an age that is not whole, an age below nothing, a retirement on nothing, an id the list could not have sent, and one no owner has", async () => {

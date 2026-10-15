@@ -9,13 +9,14 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { atAge } from "@/data/milestones";
+import { sam } from "@/data/owners.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
-import { removeMilestone, saveMilestone } from "./milestones";
+import { removeMilestone, saveMilestone, saveRetirement } from "./milestones";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -215,6 +216,66 @@ describe("the milestone actions", () => {
       await expect(removeMilestone(99)).resolves.toStrictEqual(
         refused("No milestone has the id"),
       );
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+  });
+
+  describe("saveRetirement", () => {
+    // Twenty-five years of expenses, in liquid net worth.
+    const onConditions = [
+      { measure: "liquid", of: "expenses", times: 25 },
+    ] as const;
+
+    it("writes nothing without a session", async () => {
+      vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+      await expect(saveRetirement(onConditions)).rejects.toThrow("redirected");
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+
+    it("writes what the plan's owner retires on, and hands it back as retirement among the milestones", async () => {
+      expect(await saveRetirement(onConditions)).toStrictEqual(
+        saved({ conditions: onConditions, name: "Retirement" }),
+      );
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          owners: [{ ...kept.owners[0], retirement: onConditions }],
+        },
+        version: 2,
+      });
+      expect(refresh).toHaveBeenCalledOnce();
+
+      expect(await saveRetirement(atAge(62))).toStrictEqual(
+        saved({ conditions: atAge(62), name: "Retirement" }),
+      );
+    });
+
+    // Sam is listed after the plan's owner, so retires as before.
+    it("writes onto the plan's owner and nobody else", async () => {
+      await keepAfter(db, 1, {
+        ...kept,
+        next: 7,
+        owners: [...kept.owners, { ...sam, id: 6 }],
+      });
+
+      await saveRetirement(onConditions);
+
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          owners: [
+            { ...kept.owners[0], retirement: onConditions },
+            { ...sam, id: 6 },
+          ],
+        },
+      });
+    });
+
+    // The plan runs to 91.
+    it("holds a retirement at an age to the plan's end, in the household's words, and refuses no condition", async () => {
+      await expect(saveRetirement(atAge(92))).resolves.toStrictEqual(
+        refused("A plan's owner retires no later than it ends"),
+      );
+      await expect(saveRetirement([])).rejects.toThrow(z.ZodError);
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
   });

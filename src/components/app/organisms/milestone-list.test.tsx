@@ -7,14 +7,15 @@ import {
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Milestone } from "@/data/milestones";
+import type { Condition, Milestone } from "@/data/milestones";
+import type { Plan } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 
 import { removeMilestone, saveMilestone } from "@/actions/milestones";
 import { Toaster } from "@/components/kit/toast";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
-import { atAge } from "@/data/milestones";
+import { atAge, retiringAt } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { saved } from "@/lib/answer";
 import { laneColumns } from "@/lib/span";
@@ -25,9 +26,10 @@ import { MilestoneList } from "./milestone-list";
 vi.mock("@/actions/milestones", () => ({
   removeMilestone: vi.fn(),
   saveMilestone: vi.fn(),
+  saveRetirement: vi.fn(),
 }));
 
-const [kidsLeave, downsize] = milestones;
+const [kidsLeave, downsize, , independence] = milestones;
 const [salary, stepUp] = incomeLines;
 const [household, childcare, mortgage] = expenseLines;
 
@@ -54,9 +56,21 @@ const tied = {
 function renderList(
   listed: readonly Milestone[] = milestones,
   schedule: Schedule = tied,
+  {
+    onConditions,
+    plan = retiring,
+  }: {
+    readonly onConditions?: readonly Condition[];
+    readonly plan?: Plan;
+  } = {},
 ): void {
   render(
-    <MilestoneList milestones={listed} plan={retiring} schedule={schedule} />,
+    <MilestoneList
+      milestones={listed}
+      onConditions={onConditions}
+      plan={plan}
+      schedule={schedule}
+    />,
     { wrapper: Toaster },
   );
 }
@@ -151,32 +165,73 @@ describe("MilestoneList", () => {
     ).toHaveLength(6);
   });
 
-  // A milestone the household lists opens from its name, in its columns
-  // and on its folded lines, with a chevron at the row's end. Retirement
-  // is set on the dashboard, so its row draws a lock in the chevron's
-  // place, in both, and links there.
-  it("opens each listed milestone from its name, and gives retirement a lock in its chevron's place", () => {
+  // A milestone opens from its name, in its columns and on its folded
+  // lines, with a chevron at the row's end, retirement among them.
+  it("opens each milestone from its name, retirement among them", () => {
     renderList();
 
     expect(screen.getAllByRole("button", { name: "Downsize" })).toHaveLength(2);
     expect(
       screen.getAllByRole("button", { name: "First million" }),
     ).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Retirement" })).toHaveLength(
+      2,
+    );
     expect(
       screen.queryByRole("button", { name: /^(Edit|Delete) / }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  // Retiring at 61, retirement opens on its age, and is saved onto the
+  // owner rather than among the records.
+  it("opens retirement in the milestone dialog, on its age", () => {
+    renderList();
+
+    openRow("Retirement");
+
+    const dialog = screen.getByRole("dialog", { name: "Retirement" });
+
+    expect(field("Age", dialog)).toHaveValue("61");
+  });
+
+  // Retiring on financial independence, laid out where the plan at its
+  // own rates reaches it, retiring at 52 in 2044: the row says what it is
+  // reached on beside the lines tied to it and pins that year, and opens
+  // on the conditions. Where the plan never reaches them, laid past its
+  // end, the row draws no pin and no year.
+  it("lists retirement on conditions where the plan reaches them, saying what they are, and opens on them", () => {
+    renderList(milestones, tied, {
+      onConditions: independence.conditions,
+      plan: retiringAt(retiring, 52),
+    });
+
     expect(
-      screen.getAllByRole("img", {
-        name: "Set by the retirement age on the Dashboard",
-      }),
+      screen.getAllByText(
+        "Liquid net worth ≥ 25 years of expenses · Liquid net worth ≥ 10 times the debt · Ends Salary, Salary step-up and Household",
+      ),
     ).toHaveLength(2);
+    expect(screen.getAllByText("2044")).toHaveLength(2);
+
+    openRow("Retirement");
+
     expect(
-      screen.queryByRole("button", { name: "Retirement" }),
-    ).not.toBeInTheDocument();
-    // Its name links to the dashboard, where it is set.
-    for (const link of screen.getAllByRole("link", { name: "Retirement" })) {
-      expect(link).toHaveAttribute("href", "/");
-    }
+      screen.getByRole("radio", { name: "When conditions hold" }),
+    ).toBeChecked();
+  });
+
+  it("draws no pin or year for retirement on conditions the plan never reaches", () => {
+    renderList(
+      [],
+      { expenses: [], income: [] },
+      { onConditions: independence.conditions, plan: retiringAt(retiring, 92) },
+    );
+
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getAllByText("When reached")).toHaveLength(2);
+    expect(
+      screen.queryAllByText(bySlot("pin-bar-pin"), { suggest: false }),
+    ).toHaveLength(0);
   });
 
   // Each says it twice, in its columns and on its folded lines, and the
@@ -211,7 +266,9 @@ describe("MilestoneList", () => {
     renderList([], { expenses: [], income: [] });
 
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
-    expect(screen.getAllByRole("link", { name: "Retirement" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Retirement" })).toHaveLength(
+      2,
+    );
   });
 
   // The dialog opens on a milestone reached at an age, and closes once
