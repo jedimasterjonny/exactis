@@ -268,6 +268,20 @@ const held: readonly Case[] = [
       changed(given, 4, (home) => ({ ...home, bought: homeValues.bought })),
   ],
   [
+    "Only a house or a car is held to a limit",
+    (given): Inputs => changed(given, 4, (home) => ({ ...home, limit: 1 })),
+  ],
+  [
+    "Too small: expected number to be >0",
+    (given): Inputs =>
+      changed(given, 4, (home) => ({
+        ...home,
+        bought: homeValues.bought,
+        kind: "house",
+        limit: 0,
+      })),
+  ],
+  [
     "A house was bought for something",
     (given): Inputs =>
       changed(given, 4, (home) => ({

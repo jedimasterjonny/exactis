@@ -148,10 +148,11 @@ const purchase = z.object({
 // pension and on nothing else,
 // a fixed sum within its allowance on its own, a rate no lower than
 // losing everything, a link to an asset only on the loan secured on
-// it, a purchase on a house and on nothing else, and the mark of an
-// account always funded only on a pension. A contribution, a balloon,
-// an owner, a link, the mark and the day its balance was set are
-// absent rather than nothing, as the model has them.
+// it, a purchase on a house and on nothing else, a limit of something
+// on a house or a car alone, and the mark of an account always funded
+// only on a pension. A contribution, a balloon, a limit, an owner, a
+// link, the mark and the day its balance was set are absent rather
+// than nothing, as the model has them.
 const account = z
   .object({
     balance: z.number().int(),
@@ -180,6 +181,7 @@ const account = z
     id: recordId,
     isAlwaysFunded: z.literal(true).exactOptional(),
     kind: z.enum(accountKinds),
+    limit: z.number().int().positive().exactOptional(),
     name: named,
     owner: recordId.exactOptional(),
     secures: recordId.exactOptional(),
@@ -212,6 +214,13 @@ const account = z
   .refine(
     (account) => (account.kind === "house") === (account.bought !== undefined),
     "A house carries when it was bought, and nothing else does",
+  )
+  .refine(
+    (account) =>
+      account.limit === undefined ||
+      account.kind === "car" ||
+      account.kind === "house",
+    "Only a house or a car is held to a limit",
   )
   .refine(
     (account) => account.isAlwaysFunded === undefined || isPension(account),
