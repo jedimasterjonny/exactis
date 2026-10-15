@@ -26,6 +26,7 @@ import { CardContent } from "@/components/kit/card";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/kit/tooltip";
 import { ageOf, conditionOf, markersOf, yearsOf } from "@/data/milestones";
@@ -104,14 +105,15 @@ const lane =
 // all read over the futures drawn so far while the run comes in. The
 // lanes are ruled at the milestones reached at an age, so a median is
 // read against retirement, and a rule hovered or focused names its
-// milestone, with the year and the age. A milestone is added from the
-// card's button and edited from its row, in the dialog the plan screen
-// opens too, opened on conditions here, since that is what this card
-// reads, and handed the schedules as there, since a milestone reached
-// at an age can be edited and deleted from here too. A save goes to the
-// store and comes back with the page re-read, which draws the run
-// again. A phone folds each lane into lines, as the plan screen's fold,
-// with the bar the row's width.
+// milestone, with the year and the age, the next along opening at once
+// once one is open. A milestone is added from the card's button and
+// edited from its row, in the dialog the plan screen opens too, opened
+// on conditions here, since that is what this card reads, and handed
+// the schedules as there, since a milestone reached at an age can be
+// edited and deleted from here too. A save goes to the store and comes
+// back with the page re-read, which draws the run again. A phone folds
+// each lane into lines, as the plan screen's fold, with the bar the
+// row's width.
 export function MilestoneSpreads({
   futures,
   milestones,
@@ -159,28 +161,30 @@ export function MilestoneSpreads({
             <div className={cn("grid gap-4 folded:grid-cols-1", laneColumns)}>
               <SpanRuler plan={plan} />
             </div>
-            <ul className="@container divide-y">
-              {pinned.map(({ milestone, year }) => (
-                <PinnedRow
-                  key={milestone.id}
-                  markers={markers}
-                  milestone={milestone}
-                  onEdit={setOpened}
-                  plan={plan}
-                  year={year}
-                />
-              ))}
-              {reached.map((milestone) => (
-                <SpreadRow
-                  futures={futures}
-                  key={milestone.id}
-                  markers={markers}
-                  milestone={milestone}
-                  onEdit={setOpened}
-                  plan={plan}
-                />
-              ))}
-            </ul>
+            <TooltipProvider>
+              <ul className="@container divide-y">
+                {pinned.map(({ milestone, year }) => (
+                  <PinnedRow
+                    key={milestone.id}
+                    markers={markers}
+                    milestone={milestone}
+                    onEdit={setOpened}
+                    plan={plan}
+                    year={year}
+                  />
+                ))}
+                {reached.map((milestone) => (
+                  <SpreadRow
+                    futures={futures}
+                    key={milestone.id}
+                    markers={markers}
+                    milestone={milestone}
+                    onEdit={setOpened}
+                    plan={plan}
+                  />
+                ))}
+              </ul>
+            </TooltipProvider>
           </CardContent>
         )}
       </SectionCard>
