@@ -13,7 +13,10 @@ import type { Month } from "@/data/schedule";
 // end, so the car it is on opens as the PCP it is; any other account
 // carries none. A house carries when it was bought and what it cost,
 // from which what it has been worth since is read off the house price
-// index; any other account carries none. An ISA or a pension carries
+// index; any other account carries none. A house may carry a ceiling
+// its worth rises no higher than, and a car a floor it falls no lower
+// than, each a limit in whole pounds of today's money; any other
+// account carries none. An ISA or a pension carries
 // the id of the owner it belongs to, whose allowance it is paid under;
 // any other account carries none. A pension may be always funded, so
 // what it is paid, its own sum and what the salaries feeding it
@@ -31,6 +34,7 @@ export interface Account {
   readonly id: number;
   readonly isAlwaysFunded?: true;
   readonly kind: AccountKind;
+  readonly limit?: number;
   readonly name: string;
   readonly owner?: number;
   readonly secures?: number;
