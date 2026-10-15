@@ -35,6 +35,7 @@ const futures = Array.from({ length: 10 }, (_, nth): Future => ({
     worth,
   })),
   ranOut: [2027, 2028][nth] ?? null,
+  retired: 2084,
 }));
 
 // One milestone in the plan's years, at 35 in 2027, and one past them,

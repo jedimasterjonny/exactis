@@ -154,22 +154,22 @@ export function isTiedTo(line: LineValues, tie: Tie): boolean {
 // in: retirement, in the year the plan's owner retires in, and those the
 // household lists that are reached at an age, each in the year the age
 // is reached. One reached when conditions hold falls in no year the
-// plan can say, so it is not among them. Two in the one year keep the
-// order they are given in, retirement first.
+// plan can say, so it is not among them, and nor is retirement reached
+// so. Two in the one year keep the order they are given in, retirement
+// first.
 export function markersOf(
   milestones: readonly Milestone[],
   plan: Plan,
 ): readonly Marker[] {
-  const retirement: Marker = {
-    id: "retirement",
-    name: "Retirement",
-    year: retirementYear(plan),
-  };
+  const retirement: Marker[] =
+    retiresOn(plan) === undefined
+      ? [{ id: "retirement", name: "Retirement", year: retirementYear(plan) }]
+      : [];
   const fixed = milestones.flatMap(({ id, name, ...milestone }) => {
     const year = yearOf(milestone, plan);
     return year === undefined ? [] : [{ id, name, year }];
   });
-  return [retirement, ...fixed].sort(
+  return [...retirement, ...fixed].sort(
     (first, second) => first.year - second.year,
   );
 }
@@ -189,6 +189,21 @@ export function retirementYearOf(owner: Owner, plan: Plan): number {
     throw new Error(rules.retiresAtAge);
   }
   return retirementYear(plan);
+}
+
+// What the plan's owner retires on, where it is conditions, or none
+// where they retire at an age, or the plan has no owner to retire: a
+// retirement reached at an age falls in the year the plan lays it out
+// in, and one reached when conditions hold only a run of the plan can
+// place.
+export function retiresOn(
+  plan: Pick<Plan, "owners">,
+): readonly Condition[] | undefined {
+  const [owner] = plan.owners;
+  return owner === undefined ||
+    ageOf({ conditions: owner.retirement }) !== undefined
+    ? undefined
+    : owner.retirement;
 }
 
 // The plan with its owner retiring at the age given, as the dashboard

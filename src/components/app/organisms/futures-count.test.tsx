@@ -32,6 +32,7 @@ const reading: Reading = {
   middle: 1234567,
   ranOut: 26,
   run: 1000,
+  unretired: 0,
 };
 
 function steps(): string[] {
