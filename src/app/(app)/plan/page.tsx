@@ -11,9 +11,10 @@ import { CashFlowCard } from "@/components/app/organisms/cash-flow-card";
 import { ExpenseSchedule } from "@/components/app/organisms/expense-schedule";
 import { IncomeSchedule } from "@/components/app/organisms/income-schedule";
 import { MilestoneList } from "@/components/app/organisms/milestone-list";
+import { retiresOn } from "@/data/milestones";
 import { endAge, endYear } from "@/data/plan";
 import { cashFlow, inTodaysMoney, totalsOf } from "@/engine/cash-flow";
-import { isShort, project } from "@/engine/projection";
+import { isShort, laidOut, project } from "@/engine/projection";
 import { formatGbp } from "@/lib/money";
 import { plan as planScreen, sectionLabel } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
@@ -38,9 +39,19 @@ import { getHousehold } from "@/store/household";
 // the expense schedule the accounts, for the mortgage a line pays.
 // The header says what the plan comes to, which is read off every card
 // beneath it, so it is the page's rather than any card's. The plan is
-// read beside the rest, from the same version of the household.
+// read beside the rest, from the same version of the household, and
+// laid out as its own projection has it, so a retirement on conditions
+// falls where the plan at its own rates reaches them and every card and
+// dialog reads the one year; the milestones are told what it is reached
+// on, which the plan laid out no longer says.
 export default async function Plan(): Promise<JSX.Element> {
-  const { accounts, milestones, owners, plan, schedule } = await getHousehold();
+  const household = await getHousehold();
+  const { accounts, milestones, owners } = household;
+  const { plan, schedule } = laidOut(
+    accounts,
+    household.schedule,
+    household.plan,
+  );
   return (
     <>
       <ScreenHeader label={sectionLabel(planScreen)} title={planScreen.title}>
@@ -49,6 +60,7 @@ export default async function Plan(): Promise<JSX.Element> {
       <ScreenBody>
         <MilestoneList
           milestones={milestones}
+          onConditions={retiresOn(household.plan)}
           plan={plan}
           schedule={schedule}
         />

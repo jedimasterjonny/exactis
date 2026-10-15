@@ -20,6 +20,7 @@ import {
   balanceIn,
   holdsAnything,
   isShort,
+  laidOut,
   monthsOn,
   project,
   retirementIn,
@@ -1715,6 +1716,44 @@ describe("retiring when conditions hold", () => {
       }),
     ).toBeNull();
     expect(points).toStrictEqual(retiringFixed(47));
+  });
+
+  // The plan as a screen lays it out: retiring at 37, where its own run
+  // reaches the conditions, or at 47, past its end, where it never does,
+  // each line tied to retirement read off that age; and as it is for a
+  // plan retiring at an age.
+  it("lays a plan retiring on conditions out at the age its own run reaches them, or past its end", () => {
+    const never = {
+      ...onConditions,
+      owners: [
+        {
+          ...working,
+          retirement: [{ measure: "liquid", of: "expenses", times: 100 }],
+        },
+      ],
+    } as const satisfies Plan;
+    const atAge = (plan: Plan, age: number): ReturnType<typeof laidOut> => {
+      const fixed = retiringAt(plan, age);
+      return {
+        accounts: [saving],
+        plan: fixed,
+        schedule: {
+          expenses: lines.expenses.map((line) => timed(line, [], fixed)),
+          income: lines.income.map((line) => timed(line, [], fixed)),
+        },
+      };
+    };
+    const fixed = retiringAt(onConditions, 59);
+
+    expect(laidOut([saving], lines, onConditions)).toStrictEqual(
+      atAge(onConditions, 37),
+    );
+    expect(laidOut([saving], lines, never)).toStrictEqual(atAge(never, 47));
+    expect(laidOut([saving], lines, fixed)).toStrictEqual({
+      accounts: [saving],
+      plan: fixed,
+      schedule: lines,
+    });
   });
 
   it("reads the year a plan retiring at an age lays out", () => {

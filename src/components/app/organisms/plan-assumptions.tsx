@@ -11,6 +11,7 @@ import { saveAges } from "@/actions/plan";
 import { AgeField } from "@/components/app/molecules/age-field";
 import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { Button } from "@/components/kit/button";
+import { retiresOn } from "@/data/milestones";
 import { ageIn, endAge, oldestAge } from "@/data/plan";
 import { useSender } from "@/hooks/use-sender";
 
@@ -25,7 +26,8 @@ interface PlanAssumptionsProps {
 // saying what the plan will be projected to. The age runs from the year
 // after the one its owner has reached, or from the age they retire at
 // if that is later, since a save is held to a plan with a year to
-// project and a retirement within it, to the oldest age a plan may run
+// project and a retirement within it, where they retire at an age
+// rather than on conditions, to the oldest age a plan may run
 // to, a typed age outside them held to the nearer. The dialog holds a draft, the
 // age as it opened or as typed since, or nothing while it is closed, so
 // the draft doubles as the dialog's open state, and nothing reaches the
@@ -78,7 +80,10 @@ export function PlanAssumptions({ plan }: PlanAssumptionsProps): JSX.Element {
             hint={`Runs to ${String(plan.born + ends)}`}
             label="Plan end age"
             max={oldestAge}
-            min={Math.max(plan.retires, ageIn(plan.from, plan) + 1)}
+            min={Math.max(
+              retiresOn(plan) === undefined ? plan.retires : 0,
+              ageIn(plan.from, plan) + 1,
+            )}
             onValueCommitted={setEnds}
             value={ends}
           />

@@ -10,7 +10,11 @@ import type { Plan } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { Entry } from "@/hooks/use-editor";
 
-import { removeMilestone, saveMilestone } from "@/actions/milestones";
+import {
+  removeMilestone,
+  saveMilestone,
+  saveRetirement,
+} from "@/actions/milestones";
 import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
 import { RadioChoice } from "@/components/app/atoms/radio-choice";
 import { RowAction } from "@/components/app/atoms/row-action";
@@ -74,10 +78,16 @@ type Kind = "age" | "conditions";
 
 interface MilestoneDialogProps {
   readonly kind?: Kind;
-  readonly milestone: Milestone | null;
+  readonly milestone: Milestone | null | Retirement;
   readonly onClose: () => void;
   readonly plan: Plan;
   readonly schedule: Schedule;
+}
+
+// The plan's owner's retirement, as the dialog opens on it: what they
+// retire on.
+interface Retirement {
+  readonly retirement: readonly Condition[];
 }
 
 // A condition added beneath the first: ten times the debt, in liquid
@@ -96,6 +106,13 @@ const firstMillion: readonly Condition[] = [
 ];
 
 const measureOptions = optionsOf(measureNames, sums);
+
+// The conditions retirement opens on before any is typed: twenty-five
+// years of expenses, in liquid net worth, the rule of thumb a
+// withdrawal of 4% a year makes.
+const twentyFiveYears: readonly Condition[] = [
+  { measure: "liquid", of: "expenses", times: 25 },
+];
 
 // The dialog a milestone is entered or edited in, from the plan
 // screen's list and from the chance of success alike, since the two
@@ -122,6 +139,11 @@ const measureOptions = optionsOf(measureNames, sums);
 // Delete, which closes it and asks through the confirm dialog before
 // the milestone goes, saying what becomes of those lines; a new
 // milestone has nothing yet to delete and is offered none.
+// Retirement is edited here too, from the plan screen's list, as the
+// plan's owner's: named Retirement, with no name to type and nothing to
+// delete, and saved onto the owner rather than among the records. It
+// is never held to its age by the lines tied to it, since a run moves
+// them with a retirement on conditions year by year.
 export function MilestoneDialog({
   kind = "age",
   milestone,
@@ -129,12 +151,17 @@ export function MilestoneDialog({
   plan,
   schedule,
 }: MilestoneDialogProps): JSX.Element | null {
-  const { amend, dialogOf, entry } = useMountedEditor<Draft, Milestone>({
+  const isRetirement = milestone !== null && "retirement" in milestone;
+  const record = isRetirement ? null : milestone;
+  const { amend, dialogOf, entry } = useMountedEditor<Draft, MilestoneValues>({
     describe: (saved) => describeOf(saved, plan),
-    noun: "Milestone",
+    noun: isRetirement ? "Retirement" : "Milestone",
     onSaved: onClose,
     opening: openingOf(milestone, kind, plan),
-    save: async (id, draft) => saveMilestone(id, valuesOf(draft)),
+    save: async (id, draft) =>
+      isRetirement
+        ? saveRetirement(valuesOf(draft).conditions)
+        : saveMilestone(id, valuesOf(draft)),
   });
   const { ask, doomed, questionOf } = useRemover<Milestone>({
     describe: ({ name }) => name,
@@ -143,10 +170,10 @@ export function MilestoneDialog({
     remove: removeMilestone,
   });
   const tied =
-    milestone === null
+    record === null
       ? 0
       : [...schedule.income, ...schedule.expenses].filter((line) =>
-          isTiedTo(line, milestone.id),
+          isTiedTo(line, record.id),
         ).length;
   if (doomed !== null) {
     return (
@@ -165,23 +192,25 @@ export function MilestoneDialog({
       canSave={draft.name.trim() !== ""}
       isWide
       onDelete={
-        milestone === null
+        record === null
           ? undefined
           : (): void => {
-              ask(milestone);
+              ask(record);
             }
       }
       onDismiss={onClose}
       title={draft.name.trim() || "Untitled milestone"}
     >
-      <TextField
-        defaultValue={entry.initial.name}
-        label="Name"
-        onValueChange={(name) => {
-          amend(entry, { name });
-        }}
-        placeholder="Kids leave home, first million…"
-      />
+      {!isRetirement && (
+        <TextField
+          defaultValue={entry.initial.name}
+          label="Name"
+          onValueChange={(name) => {
+            amend(entry, { name });
+          }}
+          placeholder="Kids leave home, first million…"
+        />
+      )}
       <RadioGroup
         aria-label="Reached"
         className="grid gap-4 sm:grid-cols-2"
@@ -193,14 +222,16 @@ export function MilestoneDialog({
         value={draft.kind}
       >
         <RadioChoice label="At an age" value="age">
-          Lines can be tied to it
+          {isRetirement
+            ? "Dragged on the dashboard too"
+            : "Lines can be tied to it"}
         </RadioChoice>
         <RadioChoice
           isDisabled={tied > 0}
           label="When conditions hold"
           value="conditions"
         >
-          {tied === 0 ? "Read by the chance of success" : heldBy(tied)}
+          {reachedOf(isRetirement, tied)}
         </RadioChoice>
       </RadioGroup>
       {draft.kind === "age" ? (
@@ -353,7 +384,7 @@ function ConditionRow({
 // What the toast says of the milestone saved: its name, then the year
 // it is reached in for one reached at an age, or its conditions in
 // words.
-function describeOf(saved: Milestone, plan: Plan): string {
+function describeOf(saved: MilestoneValues, plan: Plan): string {
   const age = ageOf(saved);
   const when =
     age === undefined
@@ -389,14 +420,30 @@ function keyed(conditions: readonly Condition[]): Keyed[] {
 // The entry the dialog mounts open on: a new milestone under no id,
 // unnamed, reached as the caller says, at the age reached ten years
 // into the plan, or at its end if that is sooner, as a new expense
-// line runs for, and at the first million; or the milestone under its
+// line runs for, and at the first million; the milestone under its
 // id, reached as it is, with the other way's fields standing by at
-// those opening values.
+// those opening values; or retirement, named so, reached as the owner
+// retires, its age standing by at the age the plan lays it out at, held
+// to the plan's end, and its conditions at twenty-five years of
+// expenses. Retirement is no record and is opened under nought, which
+// no record's id is, so it is edited rather than added.
 function openingOf(
-  milestone: Milestone | null,
+  milestone: Milestone | null | Retirement,
   kind: Kind,
   plan: Plan,
 ): Entry<Draft> {
+  if (milestone !== null && "retirement" in milestone) {
+    const age = ageOf({ conditions: milestone.retirement });
+    const draft: Draft = {
+      age: age ?? Math.min(plan.retires, endAge(plan)),
+      conditions: keyed(
+        age === undefined ? milestone.retirement : twentyFiveYears,
+      ),
+      kind: age === undefined ? "conditions" : "age",
+      name: "Retirement",
+    };
+    return { draft, id: 0, initial: draft };
+  }
   const tenYearsIn = ageIn(Math.min(plan.from + 10, endYear(plan)), plan);
   if (milestone === null) {
     const draft: Draft = {
@@ -415,6 +462,17 @@ function openingOf(
     name: milestone.name,
   };
   return { draft, id: milestone.id, initial: draft };
+}
+
+// What the choice of conditions says beneath it: for retirement, that
+// each future retires when they first hold; for a milestone, that the
+// chance of success reads it, or why it is held while lines are tied to
+// it, which retirement never is, since its lines move with each future.
+function reachedOf(isRetirement: boolean, tied: number): string {
+  if (isRetirement) {
+    return "Each future retires once they first hold";
+  }
+  return tied === 0 ? "Read by the chance of success" : heldBy(tied);
 }
 
 // The draft as the store takes it: the one condition on the age, or the

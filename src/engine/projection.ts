@@ -8,6 +8,7 @@ import { isAsset, isPension } from "@/data/accounts";
 import { isReached, retiresOn, retiringAt, timed } from "@/data/milestones";
 import {
   ageIn,
+  endYear,
   holderOf,
   pricesIn,
   rateFrom,
@@ -205,6 +206,27 @@ export function holdsAnything(point: ProjectionPoint): boolean {
 // as falling short.
 export function isShort(point: ProjectionPoint): boolean {
   return point.early > 0 || point.uncovered > 0;
+}
+
+// The plan and its lines as a screen lays them out: as they are, for an
+// owner retiring at an age, and for one retiring on conditions as the
+// plan at its own rates carries them once it reaches the conditions,
+// retiring at the age they reach them, or past its end where they never
+// do, so every line tied to retirement and every figure read off the
+// plan falls where its own projection has them. What the plan screen,
+// the accounts screen and their dialogs read, since each lays the plan
+// out by year; the futures place it a run at a time instead.
+export function laidOut(
+  accounts: readonly Account[],
+  schedule: Schedule,
+  plan: Plan,
+): Run {
+  const run = { accounts, plan, schedule };
+  if (retiresOn(plan) === undefined) {
+    return run;
+  }
+  const retired = retirementIn(project(accounts, schedule, plan), run);
+  return carriedBy(run, retired ?? endYear(plan) + 1);
 }
 
 // A year of a projection as a milestone measures it, from the month it

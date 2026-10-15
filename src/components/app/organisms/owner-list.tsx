@@ -26,6 +26,7 @@ import { oldestAge } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { listed } from "@/lib/feeders";
+import { plan as planScreen } from "@/lib/nav";
 
 interface OwnerListProps {
   readonly accounts: readonly Account[];
@@ -45,8 +46,8 @@ const blank: OwnerValues = { ...openingOwner, name: "" };
 // years side by side, the age typed with no slider, since it is set on
 // purpose here and dragged on the dashboard, and written as their
 // retirement's one condition; an owner retiring when conditions hold
-// has no age to type, and the dialog keeps what they retire on as it
-// is. The section holds its own
+// has no age to type, the dialog saying where it is set in its place,
+// and keeps what they retire on as it is. The section holds its own
 // dialog and question rather than handing them up to the ledger, as
 // the payment order holds its reordering. The rows are the store's, handed down by
 // the page, and a save or a deletion comes back with the page re-read.
@@ -156,7 +157,11 @@ export function OwnerList({
                 amend(entry, { born });
               }}
             />
-            {retires !== undefined && (
+            {retires === undefined ? (
+              <p className="text-sm text-muted-foreground">
+                {`Retires when conditions hold, set among the milestones on ${planScreen.label}`}
+              </p>
+            ) : (
               <AgeField
                 hasSlider={false}
                 label="Retires at"

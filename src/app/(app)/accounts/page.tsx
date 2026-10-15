@@ -5,6 +5,7 @@ import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { AccountLedger } from "@/components/app/organisms/account-ledger";
 import { MonthEnd } from "@/components/app/organisms/month-end";
+import { laidOut } from "@/engine/projection";
 import { balanceOf } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
 import { formatMonth, monthBefore, thisMonth, today } from "@/lib/months";
@@ -21,7 +22,9 @@ import { getHousehold } from "@/store/household";
 // renders behind the loading screen beside it and the rest of the shell
 // does not wait for any of them. The plan is read beside them, for the
 // month the ledger counts the salaries in, which is the month the plan
-// starts in, and the rate the savings grow at. The header is the
+// starts in, and the rate the savings grow at, laid out as its own
+// projection has it, so an owner already past the conditions they
+// retire on earns no salary in that month. The header is the
 // page's, as the plan screen's is, since it reads that month and what
 // the balances come to and nothing else: it says the starting net worth
 // and the month the balances are as of, the one before the plan starts
@@ -33,7 +36,13 @@ import { getHousehold } from "@/store/household";
 // balances are, as the assumptions screen's opens on how fresh its
 // sources are. The day and the month are read once on the server.
 export default async function Accounts(): Promise<JSX.Element> {
-  const { accounts, owners, plan, schedule } = await getHousehold();
+  const household = await getHousehold();
+  const { accounts, owners } = household;
+  const { plan, schedule } = laidOut(
+    accounts,
+    household.schedule,
+    household.plan,
+  );
   const day = today();
   return (
     <>
