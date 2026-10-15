@@ -336,6 +336,58 @@ describe("MilestoneSpreads", () => {
     expect(screen.getByText("No milestones yet")).toBeInTheDocument();
   });
 
+  // Retiring on financial independence, the owner retires in 2030 + n in
+  // the nth future for the first eight and never in the last two, so four
+  // in five retire, half by 2034, at 42. With no milestone listed the
+  // card lays retirement out alone, and it is set on the plan screen, so
+  // its row links there with a lock in the chevron's place.
+  it("lays a retirement on conditions out by the year each future retired in, linking to the plan screen, where it is set", () => {
+    const [, , , independence] = milestones;
+    render(
+      <MilestoneSpreads
+        futures={futures.map((future, nth) => ({
+          ...future,
+          retired: nth < 8 ? 2030 + nth : null,
+        }))}
+        milestones={[]}
+        plan={{
+          ...plan,
+          owners: [{ ...working, retirement: independence.conditions }],
+        }}
+        schedule={nothing}
+      />,
+      { wrapper: Toaster },
+    );
+
+    const card = screen.getByRole("region", {
+      name: "When the milestones are reached",
+    });
+
+    expect(
+      within(card).queryByText("No milestones yet"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(card).getAllByText(
+        "Liquid net worth ≥ 25 years of expenses · Liquid net worth ≥ 10 times the debt",
+      ),
+    ).toHaveLength(2);
+    expect(within(card).getAllByText("80%")).toHaveLength(2);
+    expect(within(card).getByText("Median 2034 · age 42")).toBeInTheDocument();
+    expect(
+      within(card).getAllByRole("img", {
+        name: "Set among the milestones on Income & expenses",
+      }),
+    ).toHaveLength(2);
+    for (const link of within(card).getAllByRole("link", {
+      name: "Retirement",
+    })) {
+      expect(link).toHaveAttribute("href", "/plan");
+    }
+    expect(
+      within(card).getAllByRole("link", { name: "Retirement" }),
+    ).toHaveLength(2);
+  });
+
   // The dialog opens on conditions, since that is what this card reads,
   // and closes once the store has it.
   it("adds a milestone from the dialog, opened on conditions, and closes it once saved", async () => {
