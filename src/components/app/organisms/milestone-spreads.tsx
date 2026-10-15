@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import type { JSX, ReactNode } from "react";
 
 import { cn } from "cn";
@@ -7,7 +8,7 @@ import { ChevronRight, Flag, Plus } from "lucide-react";
 import { useState } from "react";
 
 import type { Spread } from "@/components/app/atoms/spread-bar";
-import type { Marker, Milestone } from "@/data/milestones";
+import type { Condition, Marker, Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { Future } from "@/engine/futures";
@@ -15,6 +16,7 @@ import type { Future } from "@/engine/futures";
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { PinBar } from "@/components/app/atoms/pin-bar";
+import { RowLock } from "@/components/app/atoms/row-lock";
 import { RowOpener } from "@/components/app/atoms/row-opener";
 import { SpanRuler } from "@/components/app/atoms/span-ruler";
 import { SpreadBar } from "@/components/app/atoms/spread-bar";
@@ -29,11 +31,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/kit/tooltip";
-import { ageOf, conditionOf, markersOf, yearsOf } from "@/data/milestones";
+import {
+  ageOf,
+  conditionOf,
+  markersOf,
+  retiresOn,
+  yearsOf,
+} from "@/data/milestones";
 import { ageIn, endYear, yearAt } from "@/data/plan";
-import { reachedBy, reachedIn } from "@/engine/futures";
+import { reachedIn, yearBy } from "@/engine/futures";
 import { formatWholePercent } from "@/lib/money";
-import { chance, subsectionLabel } from "@/lib/nav";
+import { chance, plan as planScreen, subsectionLabel } from "@/lib/nav";
 import { laneColumns, placed } from "@/lib/span";
 
 interface MilestoneSpreadsProps {
@@ -51,6 +59,10 @@ interface Named {
   readonly name: string;
   readonly year: null | number;
 }
+
+// What a row opens: the dialog a milestone listed here is edited in, or
+// the screen retirement is set on.
+type Opens = { readonly href: Route } | { readonly onOpen: () => void };
 
 interface PinnedRowProps {
   readonly markers: readonly Marker[];
@@ -74,18 +86,23 @@ interface PointedBarProps {
   readonly children: ReactNode;
   readonly className?: string;
   readonly name: string;
-  readonly onOpen: () => void;
+  readonly onOpen?: (() => void) | undefined;
   readonly plan: Plan;
   readonly points: readonly Point[];
 }
 
 interface SpreadRowProps {
-  readonly futures: readonly Future[];
+  readonly conditions: readonly Condition[];
   readonly markers: readonly Marker[];
-  readonly milestone: Milestone;
-  readonly onEdit: (milestone: Milestone) => void;
+  readonly name: string;
+  readonly opens: Opens;
   readonly plan: Plan;
+  readonly reached: readonly (null | number)[];
 }
+
+// Why retirement's row is held here: it is set among the milestones on
+// the plan screen, and the row links there.
+const retirementLock = `Set among the milestones on ${planScreen.label}`;
 
 // The lane every row is laid in: the schedules' columns, folded into
 // one on a phone.
@@ -97,7 +114,8 @@ const lane =
 // at an age first, in the order their years come, each its name over a
 // pin where it falls, with the year and the age beside, as the plan
 // screen pins it, since the plan says when it falls and the futures
-// have nothing to add; then those reached when conditions hold, each
+// have nothing to add; then those reached when conditions hold,
+// retirement first where it is reached so, each
 // its name over its conditions in words, over where the futures reach
 // it, the fan on its side, with the share of the run that reaches it at
 // all and the median year beside, and the year and age at each share
@@ -113,7 +131,8 @@ const lane =
 // edited and deleted from here too. A save goes to the store and comes
 // back with the page re-read, which draws the run again. A phone folds
 // each lane into lines, as the plan screen's fold, with the bar the
-// row's width.
+// row's width. A household listing no milestone and retiring at an age
+// has nothing to lay out, and says so.
 export function MilestoneSpreads({
   futures,
   milestones,
@@ -131,6 +150,7 @@ export function MilestoneSpreads({
   const reached = milestones.filter(
     (milestone) => ageOf(milestone) === undefined,
   );
+  const retirement = retiresOn(plan);
   return (
     <>
       <SectionCard
@@ -148,7 +168,7 @@ export function MilestoneSpreads({
         label={subsectionLabel(chance, 2)}
         title="When the milestones are reached"
       >
-        {milestones.length === 0 ? (
+        {milestones.length === 0 && retirement === undefined ? (
           <CardContent>
             <EmptyState
               description="Add one to see when the futures reach it."
@@ -173,14 +193,31 @@ export function MilestoneSpreads({
                     year={year}
                   />
                 ))}
+                {retirement !== undefined && (
+                  <SpreadRow
+                    conditions={retirement}
+                    markers={markers}
+                    name="Retirement"
+                    opens={{ href: planScreen.href }}
+                    plan={plan}
+                    reached={futures.map(({ retired }) => retired)}
+                  />
+                )}
                 {reached.map((milestone) => (
                   <SpreadRow
-                    futures={futures}
+                    conditions={milestone.conditions}
                     key={milestone.id}
                     markers={markers}
-                    milestone={milestone}
-                    onEdit={setOpened}
+                    name={milestone.name}
+                    opens={{
+                      onOpen: (): void => {
+                        setOpened(milestone);
+                      },
+                    }}
                     plan={plan}
+                    reached={futures.map((future) =>
+                      reachedIn(future, milestone, plan),
+                    )}
                   />
                 ))}
               </ul>
@@ -256,7 +293,8 @@ function PinnedRow({
 // named for the row's milestone, unless it names it already, and what
 // is named there, which opens a tooltip above it on hover or focus with
 // those names over the year and the age, and opens the row when
-// pressed, as the rest of the bar lets a press through to do. A point
+// pressed, as the rest of the bar lets a press through to do, where the
+// row opens a dialog rather than linking to another screen. A point
 // is no wider than the gap to the nearest, so where years fall close on
 // a narrow bar no point's target covers another's.
 function PointedBar({
@@ -353,41 +391,45 @@ function sharesOf({ ends, inner, median, outer }: Spread): readonly Named[] {
 // on the bar, its point hovered or focused, as its rules are, since
 // seven of them written beneath each bar crowded the card. Folded, the
 // share is the figure beside the name and the median a line of its own,
-// since the columns that held them fold away.
+// since the columns that held them fold away. Retirement on conditions
+// is such a row, read off the year each future retired in, and set
+// among the milestones on the plan screen, so its row links there with
+// a lock in the chevron's place.
 function SpreadRow({
-  futures,
+  conditions,
   markers,
-  milestone,
-  onEdit,
+  name,
+  opens,
   plan,
+  reached,
 }: SpreadRowProps): JSX.Element {
-  const run = futures.length;
-  const reached = futures.filter(
-    (future) => reachedIn(future, milestone, plan) !== null,
-  ).length;
-  const reaching = run === 0 ? "…" : formatWholePercent(reached / run);
-  const yearBy = (share: number): null | number =>
-    reachedBy(futures, milestone, { plan, share });
+  const run = reached.length;
+  const reaching =
+    run === 0
+      ? "…"
+      : formatWholePercent(
+          reached.filter((year) => year !== null).length / run,
+        );
+  const by = (share: number): null | number => yearBy(reached, share);
   const spread: Spread = {
-    ends: [yearBy(0.05), yearBy(0.95)],
-    inner: [yearBy(0.25), yearBy(0.75)],
-    median: yearBy(0.5),
-    outer: [yearBy(0.1), yearBy(0.9)],
+    ends: [by(0.05), by(0.95)],
+    inner: [by(0.25), by(0.75)],
+    median: by(0.5),
+    outer: [by(0.1), by(0.9)],
   };
-  const conditions = milestone.conditions.map(conditionOf).join(" · ");
+  const said = conditions.map(conditionOf).join(" · ");
   const year = spread.median ?? unreached(run);
   const age =
     spread.median === null
       ? ""
       : ` · age ${String(ageIn(spread.median, plan))}`;
-  function open(): void {
-    onEdit(milestone);
-  }
+  const lock =
+    "href" in opens ? <RowLock reason={retirementLock} /> : undefined;
   const bar = (
     <PointedBar
       className="py-2"
-      name={milestone.name}
-      onOpen={open}
+      name={name}
+      onOpen={"onOpen" in opens ? opens.onOpen : undefined}
       plan={plan}
       points={pointsOf([...sharesOf(spread), ...markers], plan)}
     >
@@ -397,16 +439,26 @@ function SpreadRow({
   return (
     <li className={cn(lane, laneColumns)}>
       <div className="unfolded:hidden">
-        <FoldedLines figure={reaching} name={milestone.name} onOpen={open}>
-          <span>{conditions}</span>
+        <FoldedLines
+          figure={reaching}
+          name={name}
+          {...("href" in opens
+            ? { href: opens.href, lock }
+            : { onOpen: opens.onOpen })}
+        >
+          <span>{said}</span>
           <span>{`Median ${String(year)}${age}`}</span>
           {bar}
         </FoldedLines>
       </div>
       <div className="grid min-w-0 gap-2 folded:hidden">
         <div className="grid gap-1">
-          <RowOpener onOpen={open}>{milestone.name}</RowOpener>
-          <span className="text-xs text-muted-foreground">{conditions}</span>
+          {"href" in opens ? (
+            <RowOpener href={opens.href}>{name}</RowOpener>
+          ) : (
+            <RowOpener onOpen={opens.onOpen}>{name}</RowOpener>
+          )}
+          <span className="text-xs text-muted-foreground">{said}</span>
         </div>
         {bar}
       </div>
@@ -416,7 +468,9 @@ function SpreadRow({
       </span>
       <YearAge age={`Median${age}`} className="folded:hidden" year={year} />
       <span className="inline-flex size-7 items-center justify-center folded:hidden">
-        <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
+        {lock ?? (
+          <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
+        )}
       </span>
     </li>
   );

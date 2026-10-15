@@ -74,6 +74,35 @@ describe("FuturesCount", () => {
     ).toStrictEqual(["£1,300,000", "£1,234,567"]);
   });
 
+  // Retiring on twenty-five years of expenses, 30 of the thousand never
+  // retire, and so do not last.
+  it("counts the futures whose owner never retired out, for an owner retiring on conditions", () => {
+    render(
+      <FuturesCount
+        count={1000}
+        plan={{
+          ...plan,
+          owners: [
+            {
+              ...owners[0],
+              retirement: [{ measure: "liquid", of: "expenses", times: 25 }],
+            },
+          ],
+        }}
+        projected={1300000}
+        reading={{ ...reading, chance: 0.94, lasted: 940, unretired: 30 }}
+      />,
+    );
+
+    expect(steps()).toStrictEqual([
+      "Futures run1,000",
+      "Ran out of moneyThe first at 69, half by 84−26",
+      "Kept going only by drawing a pension early94% if counted as lasting−4",
+      "Never retired−30",
+      "Lasted to 89940",
+    ]);
+  });
+
   it("says nothing beside a count of none", () => {
     render(
       <FuturesCount
