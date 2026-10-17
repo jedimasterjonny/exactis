@@ -8,7 +8,10 @@ import type { LineValues, Month } from "@/data/schedule";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
-import { incomeLines } from "@/data/income.fixture";
+import {
+  incomeLines,
+  statePension as statePensionLine,
+} from "@/data/income.fixture";
 import { retiringAt } from "@/data/milestones";
 import { sam, working } from "@/data/owners.fixture";
 
@@ -23,7 +26,7 @@ const [salary, stepUp, consulting, statePension] = [
   flat(incomeLines[0]),
   flat(incomeLines[1]),
   flat(incomeLines[2]),
-  flat(incomeLines[3]),
+  flat(statePensionLine),
 ] as const;
 const [household, childcare, mortgagePayment, retirement, care] = [
   flat(expenseLines[0]),
@@ -151,10 +154,10 @@ describe("cashFlow", () => {
 
   // Every kind of income is taxed together, and each pays its National
   // Insurance apart. £36,000 and £12,000 of salary, £24,000 of
-  // consulting, the £23,400 state pension and £6,000 of other income are
-  // £101,400 a year, £1,400 past £100,000, so the income tax is £27,432
-  // and 60% of the £1,400, £28,272, which is £2,356 a month. The two
-  // salaries are one job's pay, so Class 1 is 8% of the £35,430 of
+  // consulting, the £12,548 State Pension and £16,852 of other income
+  // are £101,400 a year, £1,400 past £100,000, so the income tax is
+  // £27,432 and 60% of the £1,400, £28,272, which is £2,356 a month. The
+  // two salaries are one job's pay, so Class 1 is 8% of the £35,430 of
   // £48,000 over the threshold, £2,834.40, where taken apart the
   // £12,000 would sit under it and the two would pay only the £1,874.40
   // on the other; the consulting pays Class 4, 6% of £11,430, £685.80;
@@ -170,7 +173,7 @@ describe("cashFlow", () => {
           { ...plain, amount: 12000, id: 5 },
           { ...consulting, firstYear: 2026 },
           { ...statePension, firstYear: 2026 },
-          { ...plain, amount: 6000, id: 6, kind: "other" },
+          { ...plain, amount: 16852, id: 6, kind: "other" },
         ],
       },
       { at: { month: 0, year: 2026 }, plan },
@@ -187,9 +190,9 @@ describe("cashFlow", () => {
   // earns nothing by working from 2053, though the salary and the
   // consulting both run on for good by their lines. December 2052 is
   // earned whole: the £5,000 salary, feeding the pension, the £2,000 of
-  // consulting, the £1,950 state pension and £500 of other income.
-  // January 2053 is the state pension and the other income alone, with
-  // nothing fed and no profit for Class 4 to be charged on.
+  // consulting, a twelfth of the £12,548 State Pension and £500 of other
+  // income. January 2053 is the State Pension and the other income
+  // alone, with nothing fed and no profit for Class 4 to be charged on.
   it("stops a salary and a self-employed profit at the retirement age, whatever their lines say, and runs the rest on", () => {
     const retiring = retiringAt(plan, 61);
     const working = { ...lean, lastYear: null };
@@ -212,10 +215,10 @@ describe("cashFlow", () => {
       plan: retiring,
     });
 
-    expect(last.income).toBe(9450);
+    expect(last.income).toBeCloseTo(7500 + 12548 / 12, 10);
     expect(last.fed.map((entry) => entry.line)).toStrictEqual([working]);
     expect(last.profit).toBe(2000);
-    expect(first.income).toBe(2450);
+    expect(first.income).toBeCloseTo(500 + 12548 / 12, 10);
     expect(first.fed).toStrictEqual([]);
     expect(first.profit).toBe(0);
   });
@@ -687,8 +690,8 @@ describe("cashFlow", () => {
   // household and the childcare; 2053 the consulting's £2,000 a month
   // against the mortgage payment and the retirement living's £58,000 a
   // year, since the salaries ended in 2052, the childcare in 2039 and
-  // the household in 2051; and 2083, the plan's last year, the state
-  // pension alone against the two open-ended lines.
+  // the household in 2051; and 2083, the plan's last year, a twelfth of
+  // the State Pension alone against the two open-ended lines.
   it("runs a line from its first year to its last, or to the end when it has none", () => {
     const [, , , ...none] = accounts;
     const earlier = cashFlow(none, schedule, {
@@ -708,7 +711,7 @@ describe("cashFlow", () => {
     expect(earlier.expenses).toBe(4590);
     expect(later.income).toBe(2000);
     expect(later.expenses).toBeCloseTo(3065 + 58000 / 12, 10);
-    expect(last.income).toBe(1950);
+    expect(last.income).toBeCloseTo(12548 / 12, 10);
     expect(last.expenses).toBeCloseTo(7416.67, 2);
     expect([salary, stepUp, consulting, statePension]).toHaveLength(4);
     expect([

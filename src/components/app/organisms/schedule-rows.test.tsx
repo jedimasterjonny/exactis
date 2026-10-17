@@ -4,7 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { IncomeLine } from "@/data/income";
 
 import { totalOf } from "@/data/income";
-import { incomeLines, plan, retiring } from "@/data/income.fixture";
+import {
+  incomeLines,
+  plan,
+  retiring,
+  statePension,
+} from "@/data/income.fixture";
 import { markersOf } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { laneColumns } from "@/lib/span";
@@ -14,7 +19,7 @@ import type { Summary } from "./schedule-rows";
 
 import { ScheduleRows } from "./schedule-rows";
 
-const [salary, , consulting, statePension] = incomeLines;
+const [salary, , consulting] = incomeLines;
 
 // What a schedule might say of a line: its kind as the badge, with a tone
 // for one of them, the parts summed, and a detail for the line paid in
@@ -23,7 +28,7 @@ function summarise(line: IncomeLine): Summary {
   return {
     badge: {
       label: line.kind,
-      variant: line.kind === "pension" ? "caution" : "secondary",
+      variant: line.kind === "state-pension" ? "caution" : "secondary",
     },
     ...(line.bonus > 0 && { detail: "Paid in parts" }),
     total: totalOf(line),
@@ -36,7 +41,7 @@ describe("ScheduleRows", () => {
       <ScheduleRows
         emptyDescription="Add one."
         emptyTitle="Nothing yet"
-        lines={incomeLines}
+        lines={[...incomeLines, statePension]}
         milestones={[]}
         onEdit={vi.fn<(line: IncomeLine) => void>()}
         plan={plan}
@@ -45,7 +50,7 @@ describe("ScheduleRows", () => {
       />,
     );
 
-    expect(screen.getAllByRole("listitem")).toHaveLength(incomeLines.length);
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
     // Every row is drawn in its columns and again in its folded lines,
     // only one of which is on screen at any width, so the name and the
     // detail are found twice, the columns' copy after the lines'.
@@ -53,7 +58,7 @@ describe("ScheduleRows", () => {
       expect(name).toHaveClass("font-medium");
     }
     expect(screen.getAllByText("employment")).toHaveLength(2);
-    expect(screen.getByText("pension")).toHaveAttribute(
+    expect(screen.getByText("state-pension")).toHaveAttribute(
       "data-variant",
       "caution",
     );
@@ -299,7 +304,7 @@ describe("ScheduleRows", () => {
         side="income"
         summarise={(line) => ({
           ...summarise(line),
-          ...(line.kind === "pension" && {
+          ...(line.kind === "state-pension" && {
             lock: { at: "/accounts", reason: "Set by the state" },
           }),
         })}
@@ -317,9 +322,11 @@ describe("ScheduleRows", () => {
       expect(lock).toHaveClass("text-muted-foreground");
     }
     expect(
-      screen.queryByRole("button", { name: "State pension" }),
+      screen.queryByRole("button", { name: "State pension · Me" }),
     ).not.toBeInTheDocument();
-    for (const link of screen.getAllByRole("link", { name: "State pension" })) {
+    for (const link of screen.getAllByRole("link", {
+      name: "State pension · Me",
+    })) {
       expect(link).toHaveAttribute("href", "/accounts");
     }
     expect(onEdit).not.toHaveBeenCalled();

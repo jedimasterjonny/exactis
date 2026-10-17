@@ -14,7 +14,7 @@ import type { Owner } from "@/data/owners";
 import { removeOwner, saveOwner } from "@/actions/owners";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
-import { incomeLines } from "@/data/income.fixture";
+import { incomeLines, statePension } from "@/data/income.fixture";
 import { atAge } from "@/data/milestones";
 import { owners, sam } from "@/data/owners.fixture";
 import { saved } from "@/lib/answer";
@@ -298,12 +298,7 @@ describe("OwnerList", () => {
   // The household pays Sam a State Pension on the years they hold, which
   // goes with them and can be given to nobody else.
   it("neither names an owner's State Pension nor holds their bin for it", () => {
-    const [, , , statePension] = incomeLines;
-    renderList(
-      [me, sam],
-      [],
-      [{ ...statePension, kind: "state-pension", owner: sam.id }],
-    );
+    renderList([me, sam], [], [{ ...statePension, owner: sam.id }]);
 
     expect(screen.queryByText(/^Earns/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete Sam" })).toBeEnabled();

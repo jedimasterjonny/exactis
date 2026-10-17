@@ -200,8 +200,8 @@ describe("the schedule actions", () => {
         version: 2,
       });
 
-      expect(await saveIncomeLine(19, opening)).toStrictEqual(
-        saved({ ...lineOf(opening, 19), feeds: 22 }),
+      expect(await saveIncomeLine(18, opening)).toStrictEqual(
+        saved({ ...lineOf(opening, 18), feeds: 22 }),
       );
       expect(await readLatest(db)).toMatchObject({
         household: {
@@ -213,15 +213,15 @@ describe("the schedule actions", () => {
 
     it("writes over the line with the id, open-ended, in its place", async () => {
       expect(
-        await saveIncomeLine(19, { ...values, lastYear: null }),
-      ).toStrictEqual(saved(lineOf({ ...values, lastYear: null }, 19)));
+        await saveIncomeLine(18, { ...values, lastYear: null }),
+      ).toStrictEqual(saved(lineOf({ ...values, lastYear: null }, 18)));
       expect(await readLatest(db)).toMatchObject({
         household: {
           next: 20,
           schedule: {
             income: kept.schedule.income.with(
-              3,
-              lineOf({ ...values, lastYear: null }, 19),
+              2,
+              lineOf({ ...values, lastYear: null }, 18),
             ),
           },
         },
@@ -367,15 +367,15 @@ describe("the schedule actions", () => {
     it("deletes nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(removeIncomeLine(19)).rejects.toThrow("redirected");
+      await expect(removeIncomeLine(18)).rejects.toThrow("redirected");
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
 
     it("deletes the line with the id and draws the page again", async () => {
-      await removeIncomeLine(19);
+      await removeIncomeLine(18);
 
       expect(await readLatest(db)).toMatchObject({
-        household: { schedule: { income: kept.schedule.income.slice(0, 3) } },
+        household: { schedule: { income: kept.schedule.income.slice(0, 2) } },
         version: 2,
       });
       expect(refresh).toHaveBeenCalledOnce();

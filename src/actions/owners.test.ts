@@ -55,13 +55,25 @@ describe("the owner actions", () => {
       expect(
         await saveOwner(1, { born: 1988, name: "Jo", retirement: atAge(60) }),
       ).toStrictEqual(
-        saved({ born: 1988, id: 1, name: "Jo", retirement: atAge(60) }),
+        saved({
+          born: 1988,
+          id: 1,
+          name: "Jo",
+          qualifyingYears: 35,
+          retirement: atAge(60),
+        }),
       );
       expect(await readLatest(db)).toMatchObject({
         household: {
           next: 21,
           owners: [
-            { born: 1988, id: 1, name: "Jo", retirement: atAge(60) },
+            {
+              born: 1988,
+              id: 1,
+              name: "Jo",
+              qualifyingYears: 35,
+              retirement: atAge(60),
+            },
             partner,
           ],
         },
@@ -119,7 +131,7 @@ describe("the owner actions", () => {
       );
       expect(await readLatest(db)).toMatchObject({ version: 1 });
       expect(await saveOwner(1, { ...kid, retirement })).toStrictEqual(
-        saved({ ...kid, id: 1, retirement }),
+        saved({ ...kid, id: 1, qualifyingYears: 35, retirement }),
       );
     });
 
@@ -172,14 +184,14 @@ describe("the owner actions", () => {
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
 
-    // The state pension earned by the partner, who holds no account.
+    // The consulting, earned by the partner, who holds no account.
     it("refuses to delete an owner who earns an income line, and writes nothing", async () => {
       await keepAfter(db, 1, {
         ...shared,
         schedule: {
           ...shared.schedule,
           income: shared.schedule.income.map((line) =>
-            line.id === 19 ? { ...line, owner: 20 } : line,
+            line.id === 18 ? { ...line, owner: 20 } : line,
           ),
         },
       });

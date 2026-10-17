@@ -4,8 +4,9 @@ import type { Plan } from "@/data/plan";
 import { retiringAt } from "@/data/milestones";
 import { working } from "@/data/owners.fixture";
 
-// The reference kit's invented schedule: four income lines, in the order
-// the reference lists them, with the ids a store would have given them,
+// The reference kit's invented schedule: three income lines, in the
+// order the reference lists them, with the ids a store would have given
+// them,
 // each the first owner's, the salary paid in parts that sum to the
 // reference's figure and sacrificing 12% of its base into the
 // reference's workplace pension, which is the first of the accounts
@@ -13,7 +14,9 @@ import { working } from "@/data/owners.fixture";
 // 2026 to 2083 for that owner, born in 1992 and retiring at 92, past
 // its end, with prices held level, so every line pays what it states in
 // every year. For tests, since the screen reads the store. A
-// tuple, so a test reading a line by its place gets a line.
+// tuple, so a test reading a line by its place gets a line. The State
+// Pension is not among them, since the household pays it on the
+// owner's qualifying years rather than keeps a line of it.
 export const incomeLines = [
   {
     amount: 120000,
@@ -75,27 +78,32 @@ export const incomeLines = [
     sacrifice: 0,
     startsAt: null,
   },
-  {
-    amount: 23400,
-    bonus: 0,
-    cadence: "year",
-    endsAfter: 0,
-    endsAt: null,
-    feeds: null,
-    firstYear: 2060,
-    growth: "inflation",
-    id: 19,
-    kind: "pension",
-    lastMonth: null,
-    lastYear: null,
-    match: 0,
-    name: "State pension",
-    owner: 1,
-    rsu: 0,
-    sacrifice: 0,
-    startsAt: null,
-  },
 ] as const satisfies readonly IncomeLine[];
+
+// The line the household lays to pay that owner the State Pension their
+// 35 qualifying years earn: the full £12,548 a year from 2060, the year
+// they reach 68, under their id and named for them. For tests reading
+// a line of its kind.
+export const statePension = {
+  amount: 12548,
+  bonus: 0,
+  cadence: "year",
+  endsAfter: 0,
+  endsAt: null,
+  feeds: null,
+  firstYear: 2060,
+  growth: "inflation",
+  id: 1,
+  kind: "state-pension",
+  lastMonth: null,
+  lastYear: null,
+  match: 0,
+  name: "State pension · Me",
+  owner: 1,
+  rsu: 0,
+  sacrifice: 0,
+  startsAt: null,
+} as const satisfies IncomeLine;
 
 export const plan: Plan = {
   born: 1992,

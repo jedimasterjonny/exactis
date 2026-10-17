@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { owners } from "@/data/owners.fixture";
+import { statePension } from "@/data/income.fixture";
+import { owners, sam } from "@/data/owners.fixture";
 
 import {
   statePensionAge,
@@ -71,8 +72,14 @@ describe("statePensionLines", () => {
     ]);
   });
 
+  // The income fixture holds the line the household lays for the owners
+  // fixture's one, on their 35 years.
+  it("pays the full amount on 35 years, as the income fixture holds it", () => {
+    expect(statePensionLines(me)).toStrictEqual([statePension]);
+  });
+
   it("pays an owner with too few years, or none typed, no line", () => {
     expect(statePensionLines({ ...me, qualifyingYears: 9 })).toStrictEqual([]);
-    expect(statePensionLines(me)).toStrictEqual([]);
+    expect(statePensionLines(sam)).toStrictEqual([]);
   });
 });

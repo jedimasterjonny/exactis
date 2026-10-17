@@ -13,7 +13,12 @@ import type { Answer } from "@/lib/answer";
 import { removeIncomeLine, saveIncomeLine } from "@/actions/schedule";
 import { Toaster } from "@/components/kit/toast";
 import { accounts, sipp } from "@/data/accounts.fixture";
-import { incomeLines, plan, retiring } from "@/data/income.fixture";
+import {
+  incomeLines,
+  plan,
+  retiring,
+  statePension,
+} from "@/data/income.fixture";
 import { retiringAt } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { owners, sam } from "@/data/owners.fixture";
@@ -28,7 +33,16 @@ vi.mock("@/actions/schedule", () => ({
   saveIncomeLine: vi.fn(),
 }));
 
-const [salary, , , statePension] = incomeLines;
+const [salary] = incomeLines;
+
+// A private pension typed as a line: £23,400 a year from 2060, when its
+// owner is 68, rising with inflation and running to the end of the plan.
+const annuity: IncomeLine = {
+  ...statePension,
+  amount: 23400,
+  kind: "pension",
+  name: "Annuity",
+};
 const [pension] = accounts;
 
 // Save reports through the toast manager, which needs its Toaster
@@ -95,15 +109,7 @@ describe("IncomeSchedule", () => {
   // and is locked here, its name linking there and the reason where its
   // chevron would be.
   it("locks a State Pension, linking to the screen its years are typed on", () => {
-    renderSchedule([
-      salary,
-      {
-        ...statePension,
-        id: 5,
-        kind: "state-pension",
-        name: "State pension · Me",
-      },
-    ]);
+    renderSchedule([salary, statePension]);
 
     expect(
       screen.queryByRole("button", { name: "State pension · Me" }),
@@ -181,7 +187,9 @@ describe("IncomeSchedule", () => {
     renderSchedule();
 
     fireEvent.click(
-      within(openRow("State pension")).getByRole("button", { name: "Delete" }),
+      within(openRow("Part-time consulting")).getByRole("button", {
+        name: "Delete",
+      }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
@@ -820,16 +828,16 @@ describe("IncomeSchedule", () => {
   });
 
   it("opens an open-ended line as it is, ends it in a year and writes the edit back", async () => {
-    renderSchedule();
-    saved({ ...statePension, lastYear: 2070 });
+    renderSchedule([...incomeLines, annuity]);
+    saved({ ...annuity, lastYear: 2070 });
 
-    const dialog = openRow("State pension");
+    const dialog = openRow("Annuity");
 
     expect(within(dialog).getByText("Edit income line")).toHaveClass(
       "text-brand",
     );
     expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue(
-      "State pension",
+      "Annuity",
     );
     expect(
       within(dialog).getByRole("combobox", { name: "Category" }),
@@ -872,13 +880,13 @@ describe("IncomeSchedule", () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByRole("dialog", { name: "State pension" }),
+        screen.queryByRole("dialog", { name: "Annuity" }),
       ).not.toBeInTheDocument();
     });
     expect(
       screen.getByRole("dialog", { name: "Income line updated" }),
-    ).toHaveAccessibleDescription("State pension · 2060–2070");
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(19, {
+    ).toHaveAccessibleDescription("Annuity · 2060–2070");
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(annuity.id, {
       amount: 23400,
       bonus: 0,
       cadence: "year",
@@ -891,7 +899,7 @@ describe("IncomeSchedule", () => {
       lastMonth: null,
       lastYear: 2070,
       match: 0,
-      name: "State pension",
+      name: "Annuity",
       opens: null,
       owner: 1,
       rsu: 0,

@@ -40,7 +40,13 @@ standUp(memory, { today });
 // The household before anything is saved, its one owner retiring at the
 // age given.
 function retiringAt(retires: number): typeof blank {
-  return { ...blank, owners: [{ ...me, retirement: atAge(retires) }] };
+  return {
+    ...blank,
+    owners: blank.owners.map((owner) => ({
+      ...owner,
+      retirement: atAge(retires),
+    })),
+  };
 }
 
 describe("saveAges", () => {

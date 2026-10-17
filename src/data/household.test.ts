@@ -38,7 +38,7 @@ import {
   houseLoan,
   move,
 } from "@/data/houses.fixture";
-import { incomeLines, retiring } from "@/data/income.fixture";
+import { incomeLines, retiring, statePension } from "@/data/income.fixture";
 import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
 import { atAge } from "@/data/milestones";
@@ -188,7 +188,7 @@ const thrown: readonly Thrown[] = [
     "An income line is earned by an owner the plan lists",
     "An income line is earned by an owner the plan lists",
     (given): Inputs =>
-      earning(given, 19, (pension) => ({ ...pension, owner: 2 })),
+      earning(given, 18, (consulting) => ({ ...consulting, owner: 2 })),
   ],
   [
     "An ISA or a pension belongs to an owner the household lists",
@@ -250,7 +250,11 @@ const thrown: readonly Thrown[] = [
     "A tax is charged on nothing or more",
     "Too small: expected number to be >=0",
     (given): Inputs =>
-      earning(given, 19, (pension) => ({ ...pension, amount: -1000 })),
+      earning(given, 18, (consulting) => ({
+        ...consulting,
+        amount: -1000,
+        kind: "other",
+      })),
   ],
   [
     "A tax is charged on nothing or more",
@@ -515,12 +519,16 @@ const held: readonly Case[] = [
   [
     "A line ends in a month only of a year it ends in",
     (given): Inputs =>
-      earning(given, 19, (pension) => ({ ...pension, lastMonth: 3 })),
+      earning(given, 18, (consulting) => ({
+        ...consulting,
+        lastMonth: 3,
+        lastYear: null,
+      })),
   ],
   [
     "A bonus, RSUs and a pension are a salary's alone",
     (given): Inputs =>
-      earning(given, 19, (pension) => ({ ...pension, bonus: 100 })),
+      earning(given, 18, (consulting) => ({ ...consulting, bonus: 100 })),
   ],
   [
     "A salary gives up a share, and is matched one, only into a pension it feeds",
@@ -1372,9 +1380,9 @@ describe("soundKept", () => {
     );
   });
 
-  // The partner, born in 1995, reaches 68 in 2063, and thirty years earn
-  // £10,755 a year; the plan's owner has no years typed, and nine would
-  // earn nothing.
+  // The plan's owner, born in 1992, holds the full 35 years and reaches
+  // 68 in 2060; the partner, born in 1995, reaches 68 in 2063, and thirty
+  // years earn £10,755 a year, where nine would earn nothing.
   it("pays each owner whose qualifying years earn one a State Pension from their State Pension age, after the lines kept", () => {
     const partner = { ...sam, id: 20, qualifyingYears: 30 };
     const { household: read } = soundKept({
@@ -1385,6 +1393,7 @@ describe("soundKept", () => {
 
     expect(read.schedule.income).toStrictEqual([
       ...incomeLines,
+      statePension,
       expect.objectContaining({
         amount: 10755,
         firstYear: 2063,
@@ -1400,20 +1409,19 @@ describe("soundKept", () => {
         next: 21,
         owners: [...owners, { ...partner, qualifyingYears: 9 }],
       }).household.schedule.income,
-    ).toStrictEqual(incomeLines);
+    ).toStrictEqual([...incomeLines, statePension]);
   });
 
-  // The fixture's typed state pension is a pension; kept as the State
-  // Pension, the household would pay it beside the one it makes.
+  // The line the household makes, kept, would be paid beside the one it
+  // makes again on the owner's years.
   it("refuses an income line kept as the State Pension, in its words", () => {
     expect(() =>
       soundKept({
         ...kept,
+        next: 21,
         schedule: {
           ...kept.schedule,
-          income: incomeLines.map((line) =>
-            line.id === 19 ? { ...line, kind: "state-pension" } : line,
-          ),
+          income: [...incomeLines, { ...statePension, id: 20 }],
         },
       }),
     ).toThrow(

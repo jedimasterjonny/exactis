@@ -13,9 +13,9 @@ import {
   toPension,
   totalOf,
 } from "./income";
-import { incomeLines, retiring } from "./income.fixture";
+import { incomeLines, retiring, statePension } from "./income.fixture";
 
-const [salary, stepUp, consulting, statePension] = incomeLines;
+const [salary, stepUp, consulting] = incomeLines;
 
 // Retiring at 61, the owner retires in 2053, so 2052 is the last year
 // a salary or a profit is paid in.
@@ -92,7 +92,7 @@ describe("asPaid", () => {
 describe("totalOf", () => {
   it("sums an employment line's base, bonus and RSUs, and leaves another line's amount as it is", () => {
     expect(totalOf(salary)).toBe(144000);
-    expect(totalOf(statePension)).toBe(23400);
+    expect(totalOf(statePension)).toBe(12548);
   });
 });
 

@@ -4,10 +4,11 @@ import { atAge } from "@/data/milestones";
 
 // The owner the accounts fixture's wrappers belong to, with the id a
 // store would have given it: born in 1992 and retiring at 61, the ages
-// the reference plan runs on. For tests. A tuple, so a test reading the
+// the reference plan runs on, with the 35 qualifying years that earn
+// the full State Pension. For tests. A tuple, so a test reading the
 // owner by its place gets one.
 export const owners = [
-  { born: 1992, id: 1, name: "Me", retirement: atAge(61) },
+  { born: 1992, id: 1, name: "Me", qualifyingYears: 35, retirement: atAge(61) },
 ] as const satisfies readonly Owner[];
 
 // A second owner, holding nothing, three years younger and retiring at
