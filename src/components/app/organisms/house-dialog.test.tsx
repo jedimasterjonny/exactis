@@ -646,7 +646,7 @@ describe("HouseDialog", () => {
       ceiling: 0,
       growth: 0.021,
       move: {
-        at: 1,
+        at: 7,
         ceiling: 800000,
         loanToValue: 0.9,
         price: 700000,

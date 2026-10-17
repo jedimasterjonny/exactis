@@ -175,7 +175,7 @@ describe("BalanceSheet", () => {
       debts: [],
       expenses: [
         { ...household, lastMonth: 2, lastYear: 2044, pays: 5 },
-        { ...household, id: 9, lastMonth: null, pays: 7 },
+        { ...household, id: 9, lastMonth: null, pays: 21 },
       ],
     });
 

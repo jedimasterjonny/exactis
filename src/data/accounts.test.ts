@@ -221,11 +221,11 @@ describe("isAlwaysFunded", () => {
     const [pension] = accounts;
     const values = { ...toValues(pension), isAlwaysFunded: true };
 
-    expect(toAccount(values, 1)).toStrictEqual({
+    expect(toAccount(values, 6)).toStrictEqual({
       ...pension,
       isAlwaysFunded: true,
     });
-    expect(toValues(toAccount(values, 1))).toStrictEqual(values);
+    expect(toValues(toAccount(values, 6))).toStrictEqual(values);
     expect(toValues(pension).isAlwaysFunded).toBe(false);
     expect(
       toAccount({ ...values, isAlwaysFunded: false }, 1),

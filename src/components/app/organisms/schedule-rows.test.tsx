@@ -431,12 +431,12 @@ describe("ScheduleRows", () => {
           {
             ...consulting,
             endsAfter: 1,
-            endsAt: 2,
+            endsAt: 8,
             firstYear: 2053,
             lastYear: 2058,
             startsAt: "retirement",
           },
-          { ...statePension, firstYear: 2060, startsAt: 2 },
+          { ...statePension, firstYear: 2060, startsAt: 8 },
           {
             ...consulting,
             firstYear: 2053,

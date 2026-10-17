@@ -138,7 +138,7 @@ const thrown: readonly Thrown[] = [
     "An account is listed once",
     (given): Inputs => ({
       ...given,
-      accounts: [...given.accounts, account(given, 1)],
+      accounts: [...given.accounts, account(given, 6)],
     }),
   ],
   [
@@ -188,7 +188,7 @@ const thrown: readonly Thrown[] = [
     "An income line is earned by an owner the plan lists",
     "An income line is earned by an owner the plan lists",
     (given): Inputs =>
-      earning(given, 4, (pension) => ({ ...pension, owner: 2 })),
+      earning(given, 19, (pension) => ({ ...pension, owner: 2 })),
   ],
   [
     "An ISA or a pension belongs to an owner the household lists",
@@ -206,24 +206,25 @@ const thrown: readonly Thrown[] = [
   [
     "A salary feeds a pension alone",
     "A salary feeds a pension alone",
-    (given): Inputs => earning(given, 1, (salary) => ({ ...salary, feeds: 2 })),
+    (given): Inputs =>
+      earning(given, 16, (salary) => ({ ...salary, feeds: 2 })),
   ],
   [
     "A salary gives up a share of its base",
     "A salary gives up a share of its base",
     (given): Inputs =>
-      earning(given, 1, (salary) => ({ ...salary, sacrifice: 1.5 })),
+      earning(given, 16, (salary) => ({ ...salary, sacrifice: 1.5 })),
   ],
   [
     "An employer matches a share of the base",
     "An employer matches a share of the base",
     (given): Inputs =>
-      earning(given, 1, (salary) => ({ ...salary, match: 1.5 })),
+      earning(given, 16, (salary) => ({ ...salary, match: 1.5 })),
   ],
   [
     "A line pays a debt alone",
     "A line pays a debt alone",
-    (given): Inputs => spending(given, 1, (line) => ({ ...line, pays: 2 })),
+    (given): Inputs => spending(given, 11, (line) => ({ ...line, pays: 2 })),
   ],
   [
     "A debt's payments end",
@@ -249,7 +250,7 @@ const thrown: readonly Thrown[] = [
     "A tax is charged on nothing or more",
     "Too small: expected number to be >=0",
     (given): Inputs =>
-      earning(given, 4, (pension) => ({ ...pension, amount: -1000 })),
+      earning(given, 19, (pension) => ({ ...pension, amount: -1000 })),
   ],
   [
     "A tax is charged on nothing or more",
@@ -349,7 +350,7 @@ const held: readonly Case[] = [
   ],
   [
     "A move is at a milestone the household lists, reached at an age",
-    (given): Inputs => moved(given, { ...move, at: 3 }),
+    (given): Inputs => moved(given, { ...move, at: 9 }),
   ],
   [
     "A move is at a milestone the household lists, reached at an age",
@@ -374,14 +375,14 @@ const held: readonly Case[] = [
       }));
       return {
         ...secured,
-        accounts: [...secured.accounts, { ...account(secured, 5), id: 6 }],
+        accounts: [...secured.accounts, { ...account(secured, 5), id: 20 }],
       };
     },
   ],
   [
     "A salary feeds a pension of the owner who earns it",
     (given): Inputs => ({
-      ...earning(given, 1, (salary) => ({ ...salary, owner: sam.id })),
+      ...earning(given, 16, (salary) => ({ ...salary, owner: sam.id })),
       owners: [...given.owners, sam],
       plan: { ...given.plan, owners: [...given.plan.owners, sam] },
     }),
@@ -461,18 +462,18 @@ const held: readonly Case[] = [
   [
     "A salary feeds a pension alone",
     (given): Inputs =>
-      earning(given, 1, (salary) => ({ ...salary, feeds: 99 })),
+      earning(given, 16, (salary) => ({ ...salary, feeds: 99 })),
   ],
   [
     "A line pays a debt alone",
-    (given): Inputs => spending(given, 1, (line) => ({ ...line, pays: 99 })),
+    (given): Inputs => spending(given, 11, (line) => ({ ...line, pays: 99 })),
   ],
   [
     "A debt is paid by one line",
     (given): Inputs =>
       spending(
-        spending(given, 1, (line) => ({ ...line, pays: 5 })),
-        2,
+        spending(given, 11, (line) => ({ ...line, pays: 5 })),
+        12,
         (line) => ({ ...line, pays: 5 }),
       ),
   ],
@@ -489,46 +490,47 @@ const held: readonly Case[] = [
   [
     "A line paying a debt pays something",
     (given): Inputs =>
-      spending(given, 1, (line) => ({ ...line, amount: 0, pays: 5 })),
+      spending(given, 11, (line) => ({ ...line, amount: 0, pays: 5 })),
   ],
   [
     "A line ends no earlier than it starts",
     (given): Inputs =>
-      spending(given, 1, (line) => ({ ...line, lastYear: 2025 })),
+      spending(given, 11, (line) => ({ ...line, lastYear: 2025 })),
   ],
   [
     "A line is tied to a milestone the household lists",
     (given): Inputs =>
-      earning(given, 1, (salary) => ({ ...salary, endsAt: 99 })),
+      earning(given, 16, (salary) => ({ ...salary, endsAt: 99 })),
   ],
   [
     "A line is tied to a milestone reached at an age",
-    (given): Inputs => spending(given, 1, (line) => ({ ...line, startsAt: 3 })),
+    (given): Inputs =>
+      spending(given, 11, (line) => ({ ...line, startsAt: 9 })),
   ],
   [
     "A line ends years after a milestone only",
     (given): Inputs =>
-      spending(given, 1, (line) => ({ ...line, endsAfter: 2 })),
+      spending(given, 11, (line) => ({ ...line, endsAfter: 2 })),
   ],
   [
     "A line ends in a month only of a year it ends in",
     (given): Inputs =>
-      earning(given, 4, (pension) => ({ ...pension, lastMonth: 3 })),
+      earning(given, 19, (pension) => ({ ...pension, lastMonth: 3 })),
   ],
   [
     "A bonus, RSUs and a pension are a salary's alone",
     (given): Inputs =>
-      earning(given, 4, (pension) => ({ ...pension, bonus: 100 })),
+      earning(given, 19, (pension) => ({ ...pension, bonus: 100 })),
   ],
   [
     "A salary gives up a share, and is matched one, only into a pension it feeds",
     (given): Inputs =>
-      earning(given, 2, (salary) => ({ ...salary, sacrifice: 0.12 })),
+      earning(given, 17, (salary) => ({ ...salary, sacrifice: 0.12 })),
   ],
   [
     "A salary gives up a share, and is matched one, only into a pension it feeds",
     (given): Inputs =>
-      earning(given, 2, (salary) => ({ ...salary, match: 0.06 })),
+      earning(given, 17, (salary) => ({ ...salary, match: 0.06 })),
   ],
   [
     "A plan's owner retires no later than it ends",
@@ -771,7 +773,7 @@ describe("household", () => {
   // A house's or a car's loan is paid through its line, which carries its
   // own end, so the loan's own sum is never charged and need not clear.
   it("keeps a debt whose own sum never clears it while a line pays it", () => {
-    const interestOnly = spending(paying(sound, 5, 700), 1, (line) => ({
+    const interestOnly = spending(paying(sound, 5, 700), 11, (line) => ({
       ...line,
       pays: 5,
     }));
@@ -796,7 +798,7 @@ describe("household", () => {
     }));
     const parted = {
       ...secured,
-      accounts: [...secured.accounts, { ...account(secured, 5), id: 6 }],
+      accounts: [...secured.accounts, { ...account(secured, 5), id: 20 }],
     };
 
     expect(household.safeParse(parted).success).toBe(true);
@@ -806,7 +808,7 @@ describe("household", () => {
   // mortgage already on it, or moves borrowing nothing while owned
   // outright.
   it("keeps a house moving at a milestone reached at an age", () => {
-    const outright = housed(sound, { at: 2, price: 300000, year: 2059 });
+    const outright = housed(sound, { at: 8, price: 300000, year: 2059 });
 
     expect(household.safeParse(moved(sound)).success).toBe(true);
     expect(household.safeParse(outright).success).toBe(true);
@@ -816,11 +818,11 @@ describe("household", () => {
   // year, which is its own; a tied end moves with its milestone, and the
   // move is not refused over a line it leaves running no years.
   it("keeps a line whose milestone has moved past its other end, running no years", () => {
-    const passed = earning(sound, 1, (salary) => ({
+    const passed = earning(sound, 16, (salary) => ({
       ...salary,
       firstYear: 2040,
       lastYear: 2030,
-      startsAt: 1,
+      startsAt: 7,
     }));
 
     expect(household.safeParse(passed).success).toBe(true);
@@ -895,7 +897,7 @@ describe("soundKept", () => {
     const { household: read } = soundKept({
       ...kept,
       schedule: {
-        expenses: [{ ...household, endsAt: 2, lastYear: 2040 }, ...expenses],
+        expenses: [{ ...household, endsAt: 8, lastYear: 2040 }, ...expenses],
         income: [
           { ...salary, endsAt: "retirement", lastYear: 2060 },
           ...income,
@@ -910,7 +912,7 @@ describe("soundKept", () => {
     });
     expect(read.schedule.expenses[0]).toStrictEqual({
       ...household,
-      endsAt: 2,
+      endsAt: 8,
       lastYear: 2058,
     });
   });
@@ -1310,9 +1312,20 @@ describe("soundKept", () => {
     expect(() =>
       soundKept({
         ...kept,
-        milestones: [...kept.milestones, { ...milestones[0], id: 6 }],
+        milestones: [...kept.milestones, { ...milestones[0], id: 20 }],
       }),
     ).toThrow("A record's id is below the one the next record is given");
+  });
+
+  // A line the household lays for a record takes that record's id, so
+  // no two records hold one, whatever their kinds.
+  it("refuses a record whose id another record holds, whatever its kind", () => {
+    expect(() =>
+      soundKept({
+        ...kept,
+        milestones: [...kept.milestones, { ...milestones[0], id: 1 }],
+      }),
+    ).toThrow(/^A record's id is held by no other record$/);
   });
 
   // The first listed owner's retirement is the plan's; a second owner
@@ -1327,7 +1340,8 @@ describe("soundKept", () => {
     expect(
       soundKept({
         ...kept,
-        owners: [...owners, { ...sam, retirement: atAge(92) }],
+        next: 21,
+        owners: [...owners, { ...sam, id: 20, retirement: atAge(92) }],
       }).household.plan.retires,
     ).toBe(61);
     expect(() => soundKept({ ...kept, ages: { ends: 121 } })).toThrow(
@@ -1341,13 +1355,13 @@ describe("soundKept", () => {
   it("keeps an owner's qualifying years as typed, or none, and refuses years that are not whole or are below nothing", () => {
     const withPartner = (qualifyingYears: number): Kept => ({
       ...kept,
-      next: 7,
-      owners: [...owners, { ...sam, id: 6, qualifyingYears }],
+      next: 21,
+      owners: [...owners, { ...sam, id: 20, qualifyingYears }],
     });
 
     expect(soundKept(withPartner(30)).household.owners).toStrictEqual([
       ...owners,
-      { ...sam, id: 6, qualifyingYears: 30 },
+      { ...sam, id: 20, qualifyingYears: 30 },
     ]);
     expect(soundKept(kept).household.owners).toStrictEqual(owners);
     expect(() => soundKept(withPartner(30.5))).toThrow(
@@ -1418,7 +1432,7 @@ describe("a line paying a loan", () => {
   const august = { month: 7, year: 2026 };
 
   // The reference household with the records an asset is saved as added
-  // under the next ids, the asset 6, its loan 7 and the line paying it 8,
+  // under the next ids, the asset 20, its loan 21 and the line paying it 22,
   // its balances as of the month given, and the line as the household
   // reads it.
   function paymentsOf(
@@ -1429,25 +1443,25 @@ describe("a line paying a loan", () => {
       ...kept,
       accounts: [
         ...kept.accounts,
-        toAccount(asset, 6),
+        toAccount(asset, 20),
         ...(loan === undefined
           ? []
-          : [{ ...toAccount(loan.account, 7), secures: 6 }]),
+          : [{ ...toAccount(loan.account, 21), secures: 20 }]),
       ],
       asOf,
-      next: 9,
+      next: 23,
       schedule: {
         ...kept.schedule,
         expenses: [
           ...kept.schedule.expenses,
-          ...(loan === undefined ? [] : [{ ...loan.line, id: 8, pays: 7 }]),
+          ...(loan === undefined ? [] : [{ ...loan.line, id: 22, pays: 21 }]),
         ],
       },
     });
     expect(read.schedule.expenses.slice(0, 5)).toStrictEqual(
       kept.schedule.expenses,
     );
-    return read.schedule.expenses.find(({ id }) => id === 8);
+    return read.schedule.expenses.find(({ id }) => id === 22);
   }
 
   // The loan clears in 20.0 years from September 2026, in September 2046.
@@ -1533,7 +1547,7 @@ describe("a line paying a loan", () => {
         ...records,
         loans: loans.map((loan) => ({
           ...loan,
-          line: { ...loan.line, endsAfter: 3, endsAt: 1, startsAt: 2 },
+          line: { ...loan.line, endsAfter: 3, endsAt: 7, startsAt: 8 },
         })),
       }),
     ).toMatchObject({

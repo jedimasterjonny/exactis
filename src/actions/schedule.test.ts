@@ -104,12 +104,12 @@ describe("the schedule actions", () => {
 
     it("adds a new line with the name trimmed, given the next id, and draws the page again", async () => {
       expect(await saveIncomeLine(null, values)).toStrictEqual(
-        saved(lineOf(values, 6)),
+        saved(lineOf(values, 20)),
       );
       expect(await readLatest(db)).toMatchObject({
         household: {
-          next: 7,
-          schedule: { income: [...kept.schedule.income, lineOf(values, 6)] },
+          next: 21,
+          schedule: { income: [...kept.schedule.income, lineOf(values, 20)] },
         },
         version: 2,
       });
@@ -125,24 +125,24 @@ describe("the schedule actions", () => {
       } as const;
 
       expect(await saveIncomeLine(null, employment)).toStrictEqual(
-        saved(lineOf(employment, 6)),
+        saved(lineOf(employment, 20)),
       );
     });
 
     it("takes the pension an employment line feeds and the share of its base it sacrifices, the whole of it included", async () => {
       const sacrificing = {
         ...values,
-        feeds: 1,
+        feeds: 6,
         kind: "employment",
         sacrifice: 0.12,
       } as const;
 
       expect(await saveIncomeLine(null, sacrificing)).toStrictEqual(
-        saved(lineOf(sacrificing, 6)),
+        saved(lineOf(sacrificing, 20)),
       );
       expect(
         await saveIncomeLine(null, { ...sacrificing, sacrifice: 1 }),
-      ).toStrictEqual(saved(lineOf({ ...sacrificing, sacrifice: 1 }, 7)));
+      ).toStrictEqual(saved(lineOf({ ...sacrificing, sacrifice: 1 }, 21)));
     });
 
     // The ISA, the current account, and an id no account has.
@@ -184,44 +184,44 @@ describe("the schedule actions", () => {
       });
 
       expect(await saveIncomeLine(null, opening)).toStrictEqual(
-        saved({ ...lineOf(opening, 7), feeds: 6 }),
+        saved({ ...lineOf(opening, 21), feeds: 20 }),
       );
       expect(await readLatest(db)).toMatchObject({
         household: {
-          accounts: [...kept.accounts, aviva(6)],
-          next: 8,
+          accounts: [...kept.accounts, aviva(20)],
+          next: 22,
           schedule: {
             income: [
               ...kept.schedule.income,
-              { ...lineOf(opening, 7), feeds: 6 },
+              { ...lineOf(opening, 21), feeds: 20 },
             ],
           },
         },
         version: 2,
       });
 
-      expect(await saveIncomeLine(4, opening)).toStrictEqual(
-        saved({ ...lineOf(opening, 4), feeds: 8 }),
+      expect(await saveIncomeLine(19, opening)).toStrictEqual(
+        saved({ ...lineOf(opening, 19), feeds: 22 }),
       );
       expect(await readLatest(db)).toMatchObject({
         household: {
-          accounts: [...kept.accounts, aviva(6), aviva(8)],
-          next: 9,
+          accounts: [...kept.accounts, aviva(20), aviva(22)],
+          next: 23,
         },
       });
     });
 
     it("writes over the line with the id, open-ended, in its place", async () => {
       expect(
-        await saveIncomeLine(4, { ...values, lastYear: null }),
-      ).toStrictEqual(saved(lineOf({ ...values, lastYear: null }, 4)));
+        await saveIncomeLine(19, { ...values, lastYear: null }),
+      ).toStrictEqual(saved(lineOf({ ...values, lastYear: null }, 19)));
       expect(await readLatest(db)).toMatchObject({
         household: {
-          next: 6,
+          next: 20,
           schedule: {
             income: kept.schedule.income.with(
               3,
-              lineOf({ ...values, lastYear: null }, 4),
+              lineOf({ ...values, lastYear: null }, 19),
             ),
           },
         },
@@ -286,7 +286,7 @@ describe("the schedule actions", () => {
           "A bonus, RSUs and a pension are a salary's alone",
         ],
         [
-          { ...values, feeds: 1 },
+          { ...values, feeds: 6 },
           "A bonus, RSUs and a pension are a salary's alone",
         ],
         [
@@ -313,17 +313,17 @@ describe("the schedule actions", () => {
     it("deletes nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(removeExpenseLine(2)).rejects.toThrow("redirected");
+      await expect(removeExpenseLine(12)).rejects.toThrow("redirected");
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
 
     it("deletes the line with the id and draws the page again", async () => {
-      await removeExpenseLine(2);
+      await removeExpenseLine(12);
 
       expect(await readLatest(db)).toMatchObject({
         household: {
           schedule: {
-            expenses: kept.schedule.expenses.filter(({ id }) => id !== 2),
+            expenses: kept.schedule.expenses.filter(({ id }) => id !== 12),
           },
         },
         version: 2,
@@ -347,12 +347,12 @@ describe("the schedule actions", () => {
         schedule: {
           ...kept.schedule,
           expenses: kept.schedule.expenses.map((line) =>
-            line.id === 3 ? { ...line, pays: 5 } : line,
+            line.id === 13 ? { ...line, pays: 5 } : line,
           ),
         },
       });
 
-      await expect(removeExpenseLine(3)).resolves.toStrictEqual(
+      await expect(removeExpenseLine(13)).resolves.toStrictEqual(
         refused("A loan's payments go with the asset it is on"),
       );
       expect(await readLatest(db)).toMatchObject({ version: 2 });
@@ -363,12 +363,12 @@ describe("the schedule actions", () => {
     it("deletes nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(removeIncomeLine(4)).rejects.toThrow("redirected");
+      await expect(removeIncomeLine(19)).rejects.toThrow("redirected");
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
 
     it("deletes the line with the id and draws the page again", async () => {
-      await removeIncomeLine(4);
+      await removeIncomeLine(19);
 
       expect(await readLatest(db)).toMatchObject({
         household: { schedule: { income: kept.schedule.income.slice(0, 3) } },
@@ -397,14 +397,14 @@ describe("the schedule actions", () => {
     });
 
     it("adds a new line with the name trimmed, given the next id, and draws the page again", async () => {
-      const written = { ...expense, id: 6, name: "Nursery" };
+      const written = { ...expense, id: 20, name: "Nursery" };
 
       expect(await saveExpenseLine(null, expense)).toStrictEqual(
         saved(written),
       );
       expect(await readLatest(db)).toMatchObject({
         household: {
-          next: 7,
+          next: 21,
           schedule: {
             expenses: [...kept.schedule.expenses, written],
             income: kept.schedule.income,
@@ -419,19 +419,19 @@ describe("the schedule actions", () => {
       expect(
         await saveExpenseLine(null, { ...expense, lastMonth: 2 }),
       ).toStrictEqual(
-        saved({ ...expense, id: 6, lastMonth: 2, name: "Nursery" }),
+        saved({ ...expense, id: 20, lastMonth: 2, name: "Nursery" }),
       );
     });
 
     it("writes over the line with the id, open-ended, in its place", async () => {
-      const written = { ...expense, id: 4, lastYear: null, name: "Nursery" };
+      const written = { ...expense, id: 14, lastYear: null, name: "Nursery" };
 
       expect(
-        await saveExpenseLine(4, { ...expense, lastYear: null }),
+        await saveExpenseLine(14, { ...expense, lastYear: null }),
       ).toStrictEqual(saved(written));
       expect(await readLatest(db)).toMatchObject({
         household: {
-          next: 6,
+          next: 20,
           schedule: { expenses: kept.schedule.expenses.with(3, written) },
         },
       });
@@ -444,13 +444,13 @@ describe("the schedule actions", () => {
         schedule: {
           ...kept.schedule,
           expenses: kept.schedule.expenses.map((line) =>
-            line.id === 3 ? { ...line, pays: 5 } : line,
+            line.id === 13 ? { ...line, pays: 5 } : line,
           ),
         },
       });
 
-      expect(await saveExpenseLine(3, expense)).toStrictEqual(
-        saved({ ...expense, id: 3, name: "Nursery", pays: 5 }),
+      expect(await saveExpenseLine(13, expense)).toStrictEqual(
+        saved({ ...expense, id: 13, name: "Nursery", pays: 5 }),
       );
     });
 
@@ -474,18 +474,18 @@ describe("the schedule actions", () => {
     // Two years after the children leave home, the nursery runs to the
     // end of 2041.
     it("ties a line's end some years after a milestone", async () => {
-      const draft = { ...expense, endsAfter: 2, endsAt: 1, lastYear: 2041 };
+      const draft = { ...expense, endsAfter: 2, endsAt: 7, lastYear: 2041 };
 
       expect(await saveExpenseLine(null, draft)).toStrictEqual(
-        saved({ ...draft, id: 6, name: "Nursery" }),
+        saved({ ...draft, id: 20, name: "Nursery" }),
       );
     });
 
     it("ties a line to a milestone, keeping the years it gives, and refuses one tied out of order", async () => {
-      const written = { ...expense, endsAt: 1, id: 6, name: "Nursery" };
+      const written = { ...expense, endsAt: 7, id: 20, name: "Nursery" };
 
       expect(
-        await saveExpenseLine(null, { ...expense, endsAt: 1 }),
+        await saveExpenseLine(null, { ...expense, endsAt: 7 }),
       ).toStrictEqual(saved(written));
       expect(await readLatest(db)).toMatchObject({
         household: {
@@ -494,7 +494,7 @@ describe("the schedule actions", () => {
         version: 2,
       });
       await expect(
-        saveExpenseLine(null, { ...expense, startsAt: 2 }),
+        saveExpenseLine(null, { ...expense, startsAt: 8 }),
       ).resolves.toStrictEqual(
         refused("A line ends no earlier than it starts"),
       );

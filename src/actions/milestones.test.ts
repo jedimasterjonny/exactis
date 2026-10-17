@@ -57,11 +57,11 @@ describe("the milestone actions", () => {
     it("adds a new milestone with the name trimmed, given the next id, and draws the page again", async () => {
       expect(
         await saveMilestone(null, { ...sabbatical, name: "  Sabbatical  " }),
-      ).toStrictEqual(saved({ ...sabbatical, id: 6 }));
+      ).toStrictEqual(saved({ ...sabbatical, id: 20 }));
       expect(await readLatest(db)).toMatchObject({
         household: {
-          milestones: [...kept.milestones, { ...sabbatical, id: 6 }],
-          next: 7,
+          milestones: [...kept.milestones, { ...sabbatical, id: 20 }],
+          next: 21,
         },
         version: 2,
       });
@@ -70,10 +70,12 @@ describe("the milestone actions", () => {
 
     it("adds one reached when conditions hold the same way", async () => {
       expect(await saveMilestone(null, debtFree)).toStrictEqual(
-        saved({ ...debtFree, id: 6 }),
+        saved({ ...debtFree, id: 20 }),
       );
       expect(await readLatest(db)).toMatchObject({
-        household: { milestones: [...kept.milestones, { ...debtFree, id: 6 }] },
+        household: {
+          milestones: [...kept.milestones, { ...debtFree, id: 20 }],
+        },
       });
     });
 
@@ -84,25 +86,25 @@ describe("the milestone actions", () => {
       };
 
       expect(
-        await saveMilestone(1, {
+        await saveMilestone(7, {
           conditions: atAge(51),
           name: "Kids leave home",
         }),
       ).toStrictEqual(
-        saved({ conditions: atAge(51), id: 1, name: "Kids leave home" }),
+        saved({ conditions: atAge(51), id: 7, name: "Kids leave home" }),
       );
-      expect(await saveMilestone(3, twoMillion)).toStrictEqual(
-        saved({ ...twoMillion, id: 3 }),
+      expect(await saveMilestone(9, twoMillion)).toStrictEqual(
+        saved({ ...twoMillion, id: 9 }),
       );
       expect(await readLatest(db)).toMatchObject({
         household: {
           milestones: [
             { ...kidsLeave, conditions: atAge(51) },
             downsize,
-            { ...twoMillion, id: 3 },
+            { ...twoMillion, id: 9 },
             independence,
           ],
-          next: 6,
+          next: 20,
         },
         version: 3,
       });
@@ -148,7 +150,7 @@ describe("the milestone actions", () => {
     it("deletes nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(removeMilestone(2)).rejects.toThrow("redirected");
+      await expect(removeMilestone(8)).rejects.toThrow("redirected");
       expect(await readLatest(db)).toMatchObject({ version: 1 });
     });
 
@@ -160,16 +162,16 @@ describe("the milestone actions", () => {
       await keepAfter(db, 1, {
         ...kept,
         schedule: {
-          expenses: kept.schedule.expenses.with(1, { ...childcare, endsAt: 1 }),
+          expenses: kept.schedule.expenses.with(1, { ...childcare, endsAt: 7 }),
           income: kept.schedule.income.with(1, {
             ...stepUp,
             endsAt: "retirement",
-            startsAt: 1,
+            startsAt: 7,
           }),
         },
       });
 
-      await removeMilestone(1);
+      await removeMilestone(7);
 
       expect(await readLatest(db)).toMatchObject({
         household: {
@@ -193,7 +195,7 @@ describe("the milestone actions", () => {
     });
 
     it("deletes the milestone with the id and draws the page again", async () => {
-      expect(await removeMilestone(2)).toStrictEqual(saved(undefined));
+      expect(await removeMilestone(8)).toStrictEqual(saved(undefined));
       expect(await readLatest(db)).toMatchObject({
         household: { milestones: [kidsLeave, firstMillion, independence] },
         version: 2,
@@ -202,7 +204,7 @@ describe("the milestone actions", () => {
     });
 
     it("deletes one reached when conditions hold, which no line is tied to, and leaves every line as it is", async () => {
-      expect(await removeMilestone(3)).toStrictEqual(saved(undefined));
+      expect(await removeMilestone(9)).toStrictEqual(saved(undefined));
       expect(await readLatest(db)).toMatchObject({
         household: {
           milestones: [kidsLeave, downsize, independence],
@@ -218,7 +220,7 @@ describe("the milestone actions", () => {
         accounts: [...kept.accounts.slice(0, 3), { ...house, move }, houseLoan],
       });
 
-      await expect(removeMilestone(1)).resolves.toStrictEqual(
+      await expect(removeMilestone(7)).resolves.toStrictEqual(
         refused("A milestone a house moves at stays"),
       );
       expect(await readLatest(db)).toMatchObject({ version: 2 });
@@ -267,8 +269,8 @@ describe("the milestone actions", () => {
     it("writes onto the plan's owner and nobody else", async () => {
       await keepAfter(db, 1, {
         ...kept,
-        next: 7,
-        owners: [...kept.owners, { ...sam, id: 6 }],
+        next: 21,
+        owners: [...kept.owners, { ...sam, id: 20 }],
       });
 
       await saveRetirement(onConditions);
@@ -277,7 +279,7 @@ describe("the milestone actions", () => {
         household: {
           owners: [
             { ...kept.owners[0], retirement: onConditions },
-            { ...sam, id: 6 },
+            { ...sam, id: 20 },
           ],
         },
       });

@@ -837,7 +837,10 @@ const sources = z.object({
 // own, the end age the plan action holds it to, the first listed owner
 // retiring no later than it, since the plan is theirs and the chart can
 // mark a retirement only within it, and every record's id below the one
-// the next is given. Every save writes the household as read here, and
+// the next is given and held by no other record, owner, account,
+// milestone or line, since a line the household lays for a record takes
+// that record's id, as the line paying a move's mortgage takes its
+// loan's. Every save writes the household as read here, and
 // only the latest version is read whole, so nothing is defaulted: a
 // version kept in a shape since changed is refused rather than read,
 // and the store holding one is emptied. An older version is read only
@@ -878,15 +881,12 @@ const kept = z
     "A plan's owner retires no later than it ends",
   )
   .refine(
-    ({ accounts, milestones, next, owners, schedule }) =>
-      [
-        ...accounts,
-        ...milestones,
-        ...owners,
-        ...schedule.expenses,
-        ...schedule.income,
-      ].every((record) => record.id < next),
+    (kept) => recordsIn(kept).every((record) => record.id < kept.next),
     "A record's id is below the one the next record is given",
+  )
+  .refine(
+    (kept) => isListedOnce(recordsIn(kept)),
+    "A record's id is held by no other record",
   ) satisfies z.ZodType<Kept>;
 
 // Holds a change that can be made only under the rates typed: one that
@@ -1242,6 +1242,25 @@ function paidOver(
     lastYear: end?.year ?? null,
     startsAt: null,
   };
+}
+
+// Every record a kept household lists by an id the store hands out:
+// its accounts, milestones, owners and lines.
+function recordsIn({
+  accounts,
+  milestones,
+  owners,
+  schedule,
+}: Pick<Kept, "accounts" | "milestones" | "owners" | "schedule">): readonly {
+  readonly id: number;
+}[] {
+  return [
+    ...accounts,
+    ...milestones,
+    ...owners,
+    ...schedule.expenses,
+    ...schedule.income,
+  ];
 }
 
 function refusalOf(error: z.ZodError): Refusal {

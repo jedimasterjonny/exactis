@@ -42,7 +42,7 @@ const held: readonly Account[] = [pension, isa];
 const points = [
   {
     age: 34,
-    balances: { 1: 391640, 2: 271930 },
+    balances: { 2: 271930, 6: 391640 },
     deferred: 391640,
     early: 0,
     free: 271930,
@@ -51,7 +51,7 @@ const points = [
   },
   {
     age: 35,
-    balances: { 1: 438308, 2: 305483 },
+    balances: { 2: 305483, 6: 438308 },
     deferred: 438308,
     early: 0,
     free: 305483,
@@ -60,7 +60,7 @@ const points = [
   },
   {
     age: 36,
-    balances: { 1: 487309, 2: 340714 },
+    balances: { 2: 340714, 6: 487309 },
     deferred: 487309,
     early: 0,
     free: 340714,
@@ -74,7 +74,7 @@ const points = [
 const shortPoints = [
   {
     age: 34,
-    balances: { 1: 391640, 2: 271930 },
+    balances: { 2: 271930, 6: 391640 },
     deferred: 391640,
     early: 0,
     free: 271930,
@@ -83,7 +83,7 @@ const shortPoints = [
   },
   {
     age: 35,
-    balances: { 1: 41209, 2: 0 },
+    balances: { 2: 0, 6: 41209 },
     deferred: 41209,
     early: 0,
     free: 0,
@@ -92,7 +92,7 @@ const shortPoints = [
   },
   {
     age: 36,
-    balances: { 1: 0, 2: 0 },
+    balances: { 2: 0, 6: 0 },
     deferred: 0,
     early: 0,
     free: 0,
@@ -106,7 +106,7 @@ const shortPoints = [
 const earlyPoints = [
   {
     age: 34,
-    balances: { 1: 391640, 2: 271930 },
+    balances: { 2: 271930, 6: 391640 },
     deferred: 391640,
     early: 0,
     free: 271930,
@@ -115,7 +115,7 @@ const earlyPoints = [
   },
   {
     age: 35,
-    balances: { 1: 41209, 2: 0 },
+    balances: { 2: 0, 6: 41209 },
     deferred: 41209,
     early: 26667,
     free: 0,
@@ -124,7 +124,7 @@ const earlyPoints = [
   },
   {
     age: 36,
-    balances: { 1: 0, 2: 0 },
+    balances: { 2: 0, 6: 0 },
     deferred: 0,
     early: 0,
     free: 0,
@@ -264,7 +264,7 @@ describe("ProjectionChart", () => {
         .getAllByText(byClass("recharts-area-curve"), { suggest: false })
         .map((curve) => curve.getAttribute("stroke")),
     ).toStrictEqual(
-      [1, 2, 7, 3].map((id) => `var(--color-account-${String(id)})`),
+      [6, 2, 7, 3].map((id) => `var(--color-account-${String(id)})`),
     );
     expect(colours()).toContain(
       "--color-account-7: color-mix(in oklab, var(--chart-6), var(--card) 0%);",
@@ -292,7 +292,7 @@ describe("ProjectionChart", () => {
     const listed = [...accounts, sipp];
     const years = [2026, 2027].map((year, place) => ({
       age: 34 + place,
-      balances: { 1: 1000, 2: 2000, 3: 300, 4: 400000, 5: -180000, 6: 600 },
+      balances: { 2: 2000, 3: 300, 4: 400000, 5: -180000, 6: 1000, 20: 600 },
       deferred: 1600,
       early: 0,
       free: 2000,
@@ -310,13 +310,13 @@ describe("ProjectionChart", () => {
         .getAllByText(byClass("recharts-area-curve"), { suggest: false })
         .map((curve) => curve.getAttribute("stroke")),
     ).toStrictEqual(
-      [1, 6, 2, 3, 4, 5].map((id) => `var(--color-account-${String(id)})`),
+      [6, 20, 2, 3, 4, 5].map((id) => `var(--color-account-${String(id)})`),
     );
     expect(colours()).toContain(
-      "--color-account-1: color-mix(in oklab, var(--chart-2), var(--card) 0%);",
+      "--color-account-6: color-mix(in oklab, var(--chart-2), var(--card) 0%);",
     );
     expect(colours()).toContain(
-      "--color-account-6: color-mix(in oklab, var(--chart-2), var(--card) 30%);",
+      "--color-account-20: color-mix(in oklab, var(--chart-2), var(--card) 30%);",
     );
     expect(colours()).toContain(
       "--color-account-4: color-mix(in oklab, var(--chart-3), var(--card) 0%);",
@@ -676,7 +676,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={listed}
         milestones={[]}
-        points={plan({ 1: 1000000, 5: -100000 })}
+        points={plan({ 5: -100000, 6: 1000000 })}
       />,
     );
 
@@ -686,7 +686,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={listed}
         milestones={[]}
-        points={plan({ 1: 1000000, 5: -600000 })}
+        points={plan({ 5: -600000, 6: 1000000 })}
       />,
     );
 
@@ -704,7 +704,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={listed}
         milestones={[]}
-        points={plan({ 1: 0, 5: -188000 })}
+        points={plan({ 5: -188000, 6: 0 })}
       />,
     );
 
@@ -960,7 +960,7 @@ describe("ProjectionChart", () => {
         points={[
           {
             age: 34,
-            balances: { 1: 0, 2: 0 },
+            balances: { 2: 0, 6: 0 },
             deferred: 0,
             early: 0,
             free: 0,
@@ -969,7 +969,7 @@ describe("ProjectionChart", () => {
           },
           {
             age: 35,
-            balances: { 1: 0, 2: 0 },
+            balances: { 2: 0, 6: 0 },
             deferred: 0,
             early: 0,
             free: 0,
@@ -1008,7 +1008,7 @@ describe("ProjectionChart", () => {
   it("marks every milestone in the plan's years, the chosen one solid with a dot where the basis's total stands", () => {
     const years = Array.from({ length: 15 }, (_, place) => ({
       age: 34 + place,
-      balances: { 1: 100000, 2: 100000, 3: 20000, 4: 300000, 5: -150000 },
+      balances: { 2: 100000, 3: 20000, 4: 300000, 5: -150000, 6: 100000 },
       deferred: 100000,
       early: 0,
       free: 100000,

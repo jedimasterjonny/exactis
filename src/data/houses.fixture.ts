@@ -40,7 +40,7 @@ export const houseLoan: Account = { ...mortgage, secures: home.id };
 // home leaves and a mortgage of up to 90% of the price at 4.5% over 25
 // years. For tests.
 export const move: Move = {
-  at: 1,
+  at: 7,
   ceiling: 800000,
   mortgage: { loanToValue: 0.9, rate: 0.045, term: 25 },
   price: 650000,

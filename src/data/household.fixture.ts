@@ -42,7 +42,7 @@ export const kept: Kept = {
   },
   mappings,
   milestones,
-  next: 6,
+  next: 20,
   owners,
   points,
   rates: {

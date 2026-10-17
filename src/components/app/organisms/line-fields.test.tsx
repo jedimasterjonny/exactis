@@ -43,10 +43,10 @@ const markers = markersOf(milestones, plan);
 // A line from the children leaving home to the year before the downsize.
 const tied: Line = {
   ...salary,
-  endsAt: 2,
+  endsAt: 8,
   firstYear: 2040,
   lastYear: 2058,
-  startsAt: 1,
+  startsAt: 7,
 };
 
 // The fields as a dialog would mount them, opened on a line and shown
@@ -212,7 +212,7 @@ describe("LineFields", () => {
     );
 
     fireEvent.change(screen.getByRole("combobox", { name: "Starts" }), {
-      target: { value: "1" },
+      target: { value: "7" },
     });
     fireEvent.change(screen.getByRole("combobox", { name: "Ends" }), {
       target: { value: "retirement" },
@@ -224,7 +224,7 @@ describe("LineFields", () => {
     // A line tied to end at a milestone runs to the year before it, the
     // whole of that year.
     expect(onAmend.mock.calls).toStrictEqual([
-      [{ firstYear: 2040, startsAt: 1 }],
+      [{ firstYear: 2040, startsAt: 7 }],
       [{ endsAt: "retirement", lastMonth: null, lastYear: 2083 }],
       [{ startsAt: null }],
     ]);
@@ -299,8 +299,8 @@ describe("LineFields", () => {
   it("asks no year of a tied end, and the years after its milestone of the last", () => {
     const { onAmend } = renderFields(tied);
 
-    expect(screen.getByRole("combobox", { name: "Starts" })).toHaveValue("1");
-    expect(screen.getByRole("combobox", { name: "Ends" })).toHaveValue("2");
+    expect(screen.getByRole("combobox", { name: "Starts" })).toHaveValue("7");
+    expect(screen.getByRole("combobox", { name: "Ends" })).toHaveValue("8");
     expect(
       screen.queryByRole("textbox", { name: "First year" }),
     ).not.toBeInTheDocument();

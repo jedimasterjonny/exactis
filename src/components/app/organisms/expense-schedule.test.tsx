@@ -175,7 +175,7 @@ describe("ExpenseSchedule", () => {
         endsAt: null,
         firstYear: 2031,
         growth: "inflation-plus-2",
-        id: 6,
+        id: 20,
         lastMonth: null,
         lastYear: 2039,
         name: "Nursery",
@@ -221,7 +221,7 @@ describe("ExpenseSchedule", () => {
     });
     fireEvent.click(within(question).getByRole("button", { name: "Delete" }));
 
-    expect(removeExpenseLine).toHaveBeenCalledExactlyOnceWith(2);
+    expect(removeExpenseLine).toHaveBeenCalledExactlyOnceWith(12);
     expect(
       within(question).getByRole("button", { name: "Delete" }),
     ).toHaveAttribute("aria-busy", "true");
@@ -282,7 +282,7 @@ describe("ExpenseSchedule", () => {
     expect(
       screen.getByRole("dialog", { name: "Expense line updated" }),
     ).toHaveAccessibleDescription("Retirement living · 2052 on");
-    expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(4, {
+    expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(14, {
       amount: 65000,
       cadence: "year",
       endsAfter: 0,
@@ -407,7 +407,7 @@ describe("ExpenseSchedule", () => {
       endsAt: "retirement",
       firstYear: 2026,
       growth: "inflation",
-      id: 6,
+      id: 20,
       lastMonth: null,
       lastYear: 2055,
       name: "Household",

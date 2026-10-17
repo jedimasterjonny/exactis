@@ -299,7 +299,7 @@ describe("AccountLedger", () => {
         balance: 4000,
         contribution: { amount: 333, cadence: "month", kind: "fixed" },
         growth: { kind: "fixed", rate: 0.03 },
-        id: 6,
+        id: 20,
         kind: "tax-free",
         name: "Lifetime ISA",
       }),
@@ -320,7 +320,7 @@ describe("AccountLedger", () => {
     saved({
       balance: 12500,
       growth: { kind: "plan" },
-      id: 6,
+      id: 20,
       kind: "real-asset",
       name: "Car",
     });
@@ -375,7 +375,7 @@ describe("AccountLedger", () => {
   it("adds a house from the sheet and closes on the save", async () => {
     renderLedger();
     vi.mocked(saveHouse).mockResolvedValue(
-      accepted({ ...home, id: 6, name: "Flat" }),
+      accepted({ ...home, id: 20, name: "Flat" }),
     );
 
     fireEvent.click(within(sheet()).getByRole("button", { name: "Add house" }));
@@ -567,7 +567,7 @@ describe("AccountLedger", () => {
     expect(
       screen.getByRole("dialog", { name: "Account updated" }),
     ).toHaveAccessibleDescription("Workplace pension");
-    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(1, {
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(6, {
       balance: 391640,
       balloon: 0,
       cadence: "year",
@@ -797,7 +797,7 @@ describe("AccountLedger", () => {
       ]);
     });
     expect(placeAccountsInOrder).toHaveBeenCalledExactlyOnceWith([
-      2, 1, 3, 4, 5,
+      2, 6, 3, 4, 5,
     ]);
 
     answer(accepted(undefined));
@@ -824,7 +824,7 @@ describe("AccountLedger", () => {
 
     await waitFor(() => {
       expect(placeAccountsInOrder).toHaveBeenCalledExactlyOnceWith([
-        1, 3, 2, 4, 5,
+        6, 3, 2, 4, 5,
       ]);
     });
   });

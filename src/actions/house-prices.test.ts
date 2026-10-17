@@ -197,8 +197,8 @@ describe("pullHousePrices", () => {
     const fetch = registrySends(new Response(file));
     await keepAfter(db, 0, {
       ...withHouse,
-      accounts: [...withHouse.accounts, { ...house, id: 6, name: "Flat" }],
-      next: 7,
+      accounts: [...withHouse.accounts, { ...house, id: 20, name: "Flat" }],
+      next: 21,
     });
 
     expect(await pullHousePrices()).toStrictEqual(

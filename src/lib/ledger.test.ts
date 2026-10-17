@@ -28,7 +28,7 @@ describe("equityOf", () => {
 
 describe("sumOf", () => {
   it("sums a figure down a list, and a list of nothing to nothing", () => {
-    expect(sumOf(accounts, ({ id }) => id)).toBe(1 + 2 + 3 + 4 + 5);
+    expect(sumOf(accounts, ({ id }) => id)).toBe(6 + 2 + 3 + 4 + 5);
     expect(sumOf([], () => 1)).toBe(0);
   });
 });

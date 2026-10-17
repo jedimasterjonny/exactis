@@ -11,17 +11,17 @@ import type { Milestone } from "@/data/milestones";
 export const milestones = [
   {
     conditions: [{ measure: "age", of: "years", times: 48 }],
-    id: 1,
+    id: 7,
     name: "Kids leave home",
   },
   {
     conditions: [{ measure: "age", of: "years", times: 67 }],
-    id: 2,
+    id: 8,
     name: "Downsize",
   },
   {
     conditions: [{ measure: "worth", of: "pounds", times: 1000000 }],
-    id: 3,
+    id: 9,
     name: "First million",
   },
   {
@@ -29,7 +29,7 @@ export const milestones = [
       { measure: "liquid", of: "expenses", times: 25 },
       { measure: "liquid", of: "debt", times: 10 },
     ],
-    id: 4,
+    id: 10,
     name: "Financial independence",
   },
 ] as const satisfies readonly Milestone[];
