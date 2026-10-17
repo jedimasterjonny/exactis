@@ -16,6 +16,15 @@ export interface Allocation {
   readonly stocks: number;
 }
 
+// A point the glide path is drawn through: an age, and the share of the
+// savings held in bonds at it, a fraction of the whole, the rest held
+// in stocks. Bonds rather than stocks, since a glide path is set by
+// how much it holds away from them.
+export interface Anchor {
+  readonly age: number;
+  readonly bonds: number;
+}
+
 // A set of rates the plan can run on, typed by hand or derived from the
 // capital market assumptions, one to a class and flat for life, each a
 // fraction a year as every rate is: what stocks grow at in price, the

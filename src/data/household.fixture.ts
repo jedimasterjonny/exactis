@@ -23,9 +23,9 @@ import { targets } from "@/data/targets.fixture";
 // vintage before it, the rates it ran on before
 // there were rates to type, 5% for stocks and bonds alike and the
 // curve's inflation, live, with everything in stocks, 0.20% of fees and
-// a 2% yield to deduct from a CMA's returns, the reference target
-// allocation with its categories mapped onto August's classes, and the
-// next id past every one of theirs. For tests.
+// a 2% yield to deduct from a CMA's returns, no glide path, the
+// reference target allocation with its categories mapped onto August's
+// classes, and the next id past every one of theirs. For tests.
 export const kept: Kept = {
   accounts,
   ages: { ends: 89 },
@@ -34,6 +34,7 @@ export const kept: Kept = {
   cma: { latest: cma, previous: null },
   curve,
   deductions: { dividends: 0.02, fees: 0.002 },
+  glide: [],
   housePrices: {
     from: { month: 5, year: 2022 },
     pulledOn: "2026-09-15",
