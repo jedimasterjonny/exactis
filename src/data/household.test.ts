@@ -50,6 +50,8 @@ import { allocation, rates } from "@/data/rates.fixture";
 import { targets, targetsUnder } from "@/data/targets.fixture";
 import { project } from "@/engine/projection";
 
+import type { Kept } from "./household";
+
 import {
   holdWhileLive,
   household,
@@ -1330,6 +1332,29 @@ describe("soundKept", () => {
     ).toBe(61);
     expect(() => soundKept({ ...kept, ages: { ends: 121 } })).toThrow(
       "A plan ends by 120",
+    );
+  });
+
+  // A household kept before there were qualifying years holds an owner
+  // with none, which reads as it was. The partner is given the next id,
+  // as a store would give it.
+  it("keeps an owner's qualifying years as typed, or none, and refuses years that are not whole or are below nothing", () => {
+    const withPartner = (qualifyingYears: number): Kept => ({
+      ...kept,
+      next: 7,
+      owners: [...owners, { ...sam, id: 6, qualifyingYears }],
+    });
+
+    expect(soundKept(withPartner(30)).household.owners).toStrictEqual([
+      ...owners,
+      { ...sam, id: 6, qualifyingYears: 30 },
+    ]);
+    expect(soundKept(kept).household.owners).toStrictEqual(owners);
+    expect(() => soundKept(withPartner(30.5))).toThrow(
+      "Invalid input: expected int, received number",
+    );
+    expect(() => soundKept(withPartner(-1))).toThrow(
+      "Too small: expected number to be >=0",
     );
   });
 
