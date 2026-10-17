@@ -3,7 +3,7 @@ import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeKind, IncomeLine } from "@/data/income";
 import type { Plan } from "@/data/plan";
 import type { LineValues, Month } from "@/data/schedule";
-import type { Figures, Owed } from "@/lib/loans";
+import type { Figures, Owed, PlanMonth } from "@/lib/loans";
 
 import {
   allowanceOf,
@@ -620,7 +620,8 @@ export function inTodaysMoney(
 // maths says its payments clear the loan it costs what clears it and no
 // more, as a debt's own fixed sum does, worked out as the household
 // works out where such a line ends: over the whole balance, a PCP's
-// balloon refinanced on the same terms. In every other month it runs in
+// balloon refinanced on the same terms, from the month its payments
+// start in. In every other month it runs in
 // it costs what it states, and so does one paying a loan its payments
 // never clear, which has no such month.
 export function spentIn(
@@ -643,8 +644,11 @@ export function spentIn(
         amount:
           term === null
             ? amount
-            : (chargedIn(owed, { payment: amount, rate, term }, reading) ??
-              amount),
+            : (chargedIn(
+                owed,
+                { payment: amount, rate, term },
+                { at: reading.at, plan: paidFrom(line, reading.plan) },
+              ) ?? amount),
         line,
       };
     });
@@ -728,13 +732,14 @@ function byOwner(line: IncomeLine): string {
 // rather than a payment whole; and nothing at all, null rather than
 // nought, after it, as a line that has ended costs nothing. The last
 // payment falls in the month paidUntil counts to from the month the
-// plan starts in, which is the test runsIn makes of a line's last year
-// and month, made here of the month the loan maths gives rather than of
-// one anybody typed.
+// payments start in, the plan's own for every loan but one a move takes
+// out, which is the test runsIn makes of a line's last year and month,
+// made here of the month the loan maths gives rather than of one
+// anybody typed.
 function chargedIn(
   owed: Owed,
   figures: Figures,
-  { at, plan }: Pick<Reading, "at" | "plan">,
+  { at, plan }: { readonly at: Month; readonly plan: PlanMonth },
 ): null | number {
   const left = monthsBetween(at, paidUntil(figures.term, plan));
   if (left < 0) {
@@ -905,6 +910,16 @@ function monthlyOf(
     monthly(amount, line.cadence) *
     (margin === null ? 1 : risenWith(margin, plan, at))
   );
+}
+
+// The month a line paying a loan makes its first payment in, which the
+// loan maths counts the term from: the month the plan starts in, for a
+// line paying from the plan's start, as every line paying a loan the
+// household lists is read to; and for one starting in a later year, as
+// the mortgage a move takes out does, the January of that year, the
+// month the move is made in.
+function paidFrom(line: ExpenseLine, plan: PlanMonth): PlanMonth {
+  return line.firstYear > plan.from ? { from: line.firstYear, month: 0 } : plan;
 }
 
 // The most an account may be paid out of taxed money for what lands in

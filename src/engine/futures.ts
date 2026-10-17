@@ -15,6 +15,7 @@ import {
   carriedBy,
   isShort,
   measuredOf,
+  movedYears,
   project,
   retirementIn,
 } from "@/engine/projection";
@@ -127,21 +128,21 @@ export function endWorthOf({ measured }: Pick<Future, "measured">): number {
 // it first fell short, by running out or by drawing a pension early,
 // the year it first ran out, the year its owner retired in, and each
 // year measured from the month it opens with, the plan's month for the
-// first, over the lines as the run carried them once it had placed the
-// retirement. What a future drawn is read as, and what the plan at its
-// own rates is read as beside them.
+// first, on the balances entering it as any move that year leaves
+// them and over the lines as the run carried them once it had placed
+// the retirement and made any move, each run carried once however many
+// years it carries. What a future drawn is read as, and what the plan
+// at its own rates is read as beside them.
 export function futureOf(points: readonly ProjectionPoint[], run: Run): Future {
   const retired = retirementIn(points, run);
-  const ran = carriedBy(run, retired);
+  const ran = new Map<Run, Run>();
   return {
     fell: points.find(isShort)?.year ?? null,
-    measured: points.map((point, offset) =>
-      measuredOf(
-        point,
-        { month: offset === 0 ? run.plan.month : 0, year: point.year },
-        ran,
-      ),
-    ),
+    measured: movedYears(points, run).map(({ at, balances, run: moved }) => {
+      const carried = ran.get(moved) ?? carriedBy(moved, retired);
+      ran.set(moved, carried);
+      return measuredOf({ balances }, at, carried);
+    }),
     ranOut: points.find(({ uncovered }) => uncovered > 0)?.year ?? null,
     retired,
   };

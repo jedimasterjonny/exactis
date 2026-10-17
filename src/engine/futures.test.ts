@@ -388,6 +388,50 @@ describe("futureOf", () => {
     ]);
     expect(futureFor(plan).retired).toBe(2029);
   });
+
+  // A home worth £400,000 owing £108,000 as 2027 opens moves to one
+  // costing £500,000 and £15,000 of duty, borrowing the £223,000 the
+  // sale leaves short at £1,858.33 a month: a year's expenses are the
+  // old mortgage's £12,000 until then and the new one's £22,300 from
+  // the year it is taken out.
+  it("measures each year from a move over the mortgage it took out", () => {
+    const house: Account = {
+      balance: 400000,
+      bought: { month: { month: 9, year: 2021 }, price: 380000 },
+      growth: { kind: "fixed", rate: 0 },
+      id: 2,
+      kind: "house",
+      move: {
+        at: 1,
+        mortgage: { loanToValue: 0.9, rate: 0, term: 10 },
+        price: 500000,
+        year: 2027,
+      },
+      name: "Home",
+    };
+    const loan: Account = {
+      balance: -120000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 3,
+      kind: "debt",
+      name: "Home mortgage",
+      secures: house.id,
+    };
+    const accounts = [isa, house, loan];
+    const paying = {
+      expenses: [{ ...line, amount: 1000, lastYear: null, pays: loan.id }],
+      income: [],
+    };
+    const future = futureOf(project(accounts, paying, plan), {
+      accounts,
+      plan,
+      schedule: paying,
+    });
+
+    expect(future.measured.map(({ expenses }) => expenses)).toStrictEqual([
+      12000, 22300, 22300,
+    ]);
+  });
 });
 
 describe("gradingOf", () => {
