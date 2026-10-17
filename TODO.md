@@ -82,3 +82,19 @@ savings, the car or both.
 Decide what the plan does with a balloon when the payments end, and whether a
 debt nothing pays is charged its rate, so every debt the plan carries ends the
 way the model says it does.
+
+## Moves
+
+A move sells the home and buys the next as its milestone's year opens, putting
+everything the sale leaves into the purchase, borrowing the rest up to the
+move's loan to value, and charging the stamp duty a home mover in England pays.
+Nothing else a move costs is charged: no agent's or solicitor's fees, no survey
+or removals, and no early repayment charge on a fixed rate the sale clears. What
+the sale leaves over lands in the first cash account, and in a household with
+none it is counted nowhere. A move is at a milestone reached at an age, a house
+moves once, and a move borrows only on a loan already secured on the house, so a
+home owned outright today buys the next out of the sale and the savings alone.
+
+Decide whether a move charges its costs, as a share of each price or a sum
+typed, and whether a house may move more than once, downsizing after a move up;
+the rest are limits to lift as a plan needs them.

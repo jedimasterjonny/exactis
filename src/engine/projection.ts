@@ -1,4 +1,5 @@
-import type { Account, AccountKind } from "@/data/accounts";
+import type { Account, AccountKind, Move } from "@/data/accounts";
+import type { ExpenseLine } from "@/data/expenses";
 import type { Condition, Measured } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
@@ -14,9 +15,11 @@ import {
   rateFrom,
   rateIn,
   retirementYear,
+  risenBy,
 } from "@/data/plan";
 import { rules } from "@/data/rules";
 import { cashFlow, spentIn } from "@/engine/cash-flow";
+import { clearsIn, paymentOf } from "@/lib/loans";
 import { isOnOrBefore, monthAfter } from "@/lib/months";
 import {
   april,
@@ -25,6 +28,7 @@ import {
   incomeTaxOn,
   insuranceOn,
   lumpSumAllowance,
+  stampDutyOn,
   upratingIn,
 } from "@/lib/tax";
 
@@ -93,6 +97,10 @@ export interface Run {
   readonly schedule: Schedule;
 }
 
+// The mortgage a move takes out, and the loan on the house it is
+// carried in.
+type Borrowing = NonNullable<Move["mortgage"]> & { readonly loan: Account };
+
 // The month a shortfall is drawn in, as the draw reads it: what is left
 // of each owner's lump sum allowance, by the owner's id, an owner not
 // yet entered having the whole of it; the owners who have drawn on a
@@ -118,6 +126,28 @@ interface Drawing {
 interface Held {
   readonly account: Account;
   readonly balance: number;
+}
+
+// What a year's moves come to as it opens: the run as carried from
+// then, each moved house and each loan on it as the moves leave them,
+// in the year's pounds, by the account's id, the point's balances as
+// they leave them, in today's money, and what the sales leave once the
+// purchases are paid, below nothing for what the savings must find.
+interface Moved {
+  readonly balances: Readonly<Record<number, number>>;
+  readonly cash: number;
+  readonly held: ReadonlyMap<number, Held>;
+  readonly run: Run;
+}
+
+// A year of a projection as its moves carry it: the month it opens
+// with, the balances entering it as its moves leave them, in today's
+// money, which is what the year is measured by, and the run as carried
+// through it.
+interface MovedYear {
+  readonly at: Month;
+  readonly balances: Readonly<Record<number, number>>;
+  readonly run: Run;
 }
 
 // One owner's tax year as the projection has carried it so far: how
@@ -321,6 +351,27 @@ export function monthsOn(
   return reached;
 }
 
+// A projection's years as its moves carry them: for each point, the
+// month its year opens with, the plan's own for the first, the balances
+// as the year's moves leave them, and the run as carried through the
+// year, the run as given until a house moves and moved from the year it
+// does, all read off the point entering that year, as the projection
+// read it. So a reader holding only the points measures the year of a
+// move after it, and a year after a move over the mortgage the move
+// took out.
+export function movedYears(
+  points: readonly ProjectionPoint[],
+  run: Run,
+): readonly MovedYear[] {
+  let moved = run;
+  return points.map((point, offset) => {
+    const at = { month: offset === 0 ? run.plan.month : 0, year: point.year };
+    const moving = movesIn(moved, point, at);
+    moved = moving.run;
+    return { at, balances: moving.balances, run: moved };
+  });
+}
+
 // The plan's years, the first holding the balances as they are and each
 // after it the year before carried to its end, a month at a time: what
 // the account is paid that month, then a month's growth at its rate, a
@@ -411,7 +462,14 @@ export function monthsOn(
 // year it is depends on how the run has gone: until then they earn, a
 // line starting at retirement has not started and one ending at it
 // runs on, and from then the year is carried as a plan retiring at the
-// age they reach in it.
+// age they reach in it. A house moving in a year is moved as the year
+// opens, after its point is read and before its owner's retirement is,
+// so the year is measured as it will be carried, on the balances as the
+// move leaves them: the sale and the purchase as movesIn lays them,
+// what the sale leaves over landing in the first cash account, and what
+// it leaves short taken out of the year's first month as a settlement
+// is, so that month pays nothing into the savings and draws it as any
+// shortfall is drawn.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -438,9 +496,10 @@ export function project(
   let allowances: ReadonlyMap<number, number> = new Map();
   let drawn: ReadonlySet<number> = new Set();
   let taxYears: ReadonlyMap<number, TaxYear> = new Map();
-  const run = { accounts, plan, schedule };
+  let moved: Run = { accounts, plan, schedule };
+  let retired: null | number = null;
   const conditions = retiresOn(plan);
-  let carried = carriedBy(run, null);
+  let carried = carriedBy(moved, retired);
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
     const age = ageIn(year, plan);
@@ -452,12 +511,25 @@ export function project(
         Math.round(balance / prices),
       ]),
     );
+    const moving = movesIn(moved, { balances }, opens);
+    let due = 0;
+    if (moving.run !== moved) {
+      moved = moving.run;
+      carried = carriedBy(moved, retired);
+      held = landed(
+        held.map((entry) => moving.held.get(entry.account.id) ?? entry),
+        moving.cash,
+      );
+      owing = owing.map((entry) => moving.held.get(entry.account.id) ?? entry);
+      due = Math.max(0, -moving.cash);
+    }
     if (
       conditions !== undefined &&
-      carried.plan === plan &&
-      isRetiring({ balances }, opens, { conditions, run })
+      retired === null &&
+      isRetiring(moving, opens, { conditions, run: moved })
     ) {
-      carried = carriedBy(run, year);
+      retired = year;
+      carried = carriedBy(moved, year);
     }
     const deferred = total(held, "tax-deferred", prices);
     const free = total(held, "tax-free", prices);
@@ -482,12 +554,12 @@ export function project(
         if (month === april) {
           taxYears = new Map();
         }
-        const flow = cashFlow(accounts, carried.schedule, {
+        const flow = cashFlow(carried.accounts, carried.schedule, {
           at,
           drawn,
           plan: carried.plan,
           reserve: reserveOf(held),
-          settlement,
+          settlement: settlement - due,
         });
         const draw = drawnFrom(held, Math.max(0, -flow.left), {
           allowances,
@@ -500,6 +572,7 @@ export function project(
         const risen = pricesIn(plan, at);
         allowances = draw.allowances;
         drawn = draw.drawn;
+        due = 0;
         early += draw.early / risen;
         taxYears = new Map(
           plan.owners.map(({ id }) => {
@@ -548,7 +621,8 @@ export function project(
 // points it was projected to: the year the plan lays out for one
 // retiring at an age, and for one retiring when conditions hold the
 // first whose opening the conditions hold for, as the projection read
-// them, or null for a run in which they never do.
+// them over the run and the balances its moves carried, or null for a
+// run in which they never do.
 export function retirementIn(
   points: readonly ProjectionPoint[],
   run: Run,
@@ -558,14 +632,29 @@ export function retirementIn(
     return retirementYear(run.plan);
   }
   return (
-    points.find((point, offset) =>
-      isRetiring(
-        point,
-        { month: offset === 0 ? run.plan.month : 0, year: point.year },
-        { conditions, run },
-      ),
-    )?.year ?? null
+    movedYears(points, run).find(({ at, balances, run: moved }) =>
+      isRetiring({ balances }, at, { conditions, run: moved }),
+    )?.at.year ?? null
   );
+}
+
+// The loan a move borrows on and the mortgage it takes, or none for a
+// move borrowing nothing: the first loan secured on the house, which
+// carries the mortgage on through the move, as the screens draw it. A
+// move borrowing on a house with no loan on it is refused in the
+// rule's words, as the household refuses it.
+function borrowingOn(
+  loans: readonly Account[],
+  { mortgage }: Move,
+): Borrowing | null {
+  if (mortgage === undefined) {
+    return null;
+  }
+  const [loan] = loans;
+  if (loan === undefined) {
+    throw new Error(rules.borrowsOnLoan);
+  }
+  return { ...mortgage, loan };
 }
 
 // A month: what is paid in lands at the start of it, and the balance
@@ -756,6 +845,19 @@ function keptOutOf(
   return taken;
 }
 
+// The savings with what a move leaves over landed in the first cash
+// account as its year opens, to be spent or drawn on as cash is. A
+// household holding no cash account has nowhere it is counted, as a
+// refund no account takes has none.
+function landed(held: readonly Held[], cash: number): readonly Held[] {
+  const into = held.find(({ account }) => account.kind === "cash");
+  return held.map((entry) =>
+    entry === into
+      ? { ...entry, balance: entry.balance + Math.max(0, cash) }
+      : entry,
+  );
+}
+
 // An account carried a month on the month's cash flow, as the projection
 // and a month end both carry one: a saving or an asset paid what the
 // flow pays it and grown, and a debt charged a month's interest and paid
@@ -790,6 +892,155 @@ function monthOf(
   return {
     balance: paidDown(balance, off, rate),
     paid: Math.min(off, Math.max(0, -balance * (1 + rate / 12))),
+  };
+}
+
+// Each house moving in the year a month opens, moved as it opens. The
+// house is sold at what the point entering the year has it worth, and
+// every loan on it is cleared out of the sale at what the point has it
+// owing, read off the point rather than off the balances carried, which
+// differ from it by the rounding to the pound, so that a reader holding
+// only the points places the move as the projection did. The next is
+// bought at its price, risen at the house's own growth to the month
+// and held to its ceiling in the month's pounds, as the house will be,
+// with the stamp duty on that. Everything the sale leaves goes into
+// the purchase and the mortgage borrows the rest, up to the share of
+// the price its loan to value allows, so what the sale leaves over, or
+// short, is the cash; a mortgage borrowing nothing owes nothing rather
+// than nothing with a sign. The house is held to the move's ceiling from
+// then, or to none, a limit no worth reaches. The mortgage is carried
+// in the first loan on the house at its rate, paid by the line
+// newMortgageLine lays; every other loan on the house owes nothing, and
+// every line paying one stops. The point's balances are left as the
+// moves leave them, each moved house and loan at what it is then, and
+// what the sales leave over or short on the first cash account, as
+// landing it or drawing it leaves the savings in sum, or nowhere for a
+// household holding none, as landed has it. Each loan carries what it owes from then
+// as its balance, as the flow reads a loan's, so a fixed sum of its own
+// the line stood in for finds nothing left to pay.
+function movesIn(
+  run: Run,
+  point: Pick<ProjectionPoint, "balances">,
+  at: Month,
+): Moved {
+  const { plan } = run;
+  const prices = pricesIn(plan, at);
+  const worth = (id: number): number => balanceIn(point, id) * prices;
+  const moved = run.accounts.reduce<Omit<Moved, "balances">>(
+    (moved, house) => {
+      const { move } = house;
+      if (move?.year !== at.year) {
+        return moved;
+      }
+      const loans = moved.run.accounts.filter(
+        ({ secures }) => secures === house.id,
+      );
+      const borrowing = borrowingOn(loans, move);
+      const proceeds =
+        worth(house.id) + loans.reduce((sum, { id }) => sum + worth(id), 0);
+      const price = Math.min(
+        move.price * risenBy(rateFrom(house, plan), plan, at),
+        (move.ceiling ?? Number.POSITIVE_INFINITY) * prices,
+      );
+      const duty = stampDutyOn(price);
+      const borrowed =
+        borrowing === null
+          ? 0
+          : Math.min(
+              borrowing.loanToValue * price,
+              Math.max(0, price + duty - proceeds),
+            );
+      const settled = new Map(
+        [
+          {
+            account: {
+              ...house,
+              limit: move.ceiling ?? Number.POSITIVE_INFINITY,
+            },
+            balance: price,
+          },
+          ...loans.map((loan) =>
+            loan === borrowing?.loan
+              ? {
+                  account: {
+                    ...loan,
+                    balance: 0 - borrowed,
+                    growth: { kind: "fixed" as const, rate: borrowing.rate },
+                  },
+                  balance: 0 - borrowed,
+                }
+              : { account: { ...loan, balance: 0 }, balance: 0 },
+          ),
+        ].map((entry) => [entry.account.id, entry]),
+      );
+      const cleared = new Set(loans.map(({ id }) => id));
+      return {
+        cash: moved.cash + proceeds - price - duty + borrowed,
+        held: new Map([...moved.held, ...settled]),
+        run: {
+          accounts: moved.run.accounts.map(
+            (account) => settled.get(account.id)?.account ?? account,
+          ),
+          plan: moved.run.plan,
+          schedule: {
+            expenses: [
+              ...moved.run.schedule.expenses.filter(
+                ({ pays }) => pays === undefined || !cleared.has(pays),
+              ),
+              ...(borrowing === null || borrowed === 0
+                ? []
+                : [newMortgageLine(borrowing, borrowed, at)]),
+            ],
+            income: moved.run.schedule.income,
+          },
+        },
+      };
+    },
+    { cash: 0, held: new Map(), run },
+  );
+  const into = run.accounts.find(({ kind }) => kind === "cash");
+  return {
+    ...moved,
+    balances: {
+      ...point.balances,
+      ...Object.fromEntries(
+        [...moved.held].map(([id, { balance }]) => [
+          id,
+          Math.round(balance / prices),
+        ]),
+      ),
+      ...(into !== undefined && {
+        [into.id]: balanceIn(point, into.id) + Math.round(moved.cash / prices),
+      }),
+    },
+  };
+}
+
+// The line paying the mortgage a move takes out: the payment that
+// clears what it borrowed at its rate over its term, a month, fixed in
+// nominal terms as a loan's is, from the month the move is made in to
+// the one its last payment falls in, under the loan's name and its
+// id, which no line holds, since the store hands ids out across every
+// record.
+function newMortgageLine(
+  { loan, rate, term }: Borrowing,
+  borrowed: number,
+  at: Month,
+): ExpenseLine {
+  const last = clearsIn(term, { from: at.year, month: at.month });
+  return {
+    amount: paymentOf({ balance: borrowed, balloon: 0 }, rate, term),
+    cadence: "month",
+    endsAfter: 0,
+    endsAt: null,
+    firstYear: at.year,
+    growth: "nominal",
+    id: loan.id,
+    lastMonth: last.month,
+    lastYear: last.year,
+    name: loan.name,
+    pays: loan.id,
+    startsAt: null,
   };
 }
 
