@@ -17,6 +17,7 @@ import { formatPercent } from "@/lib/money";
 
 interface CustomRatesProps {
   readonly allocation: Allocation;
+  readonly hasGlide: boolean;
   readonly rates: Rates;
 }
 
@@ -42,8 +43,14 @@ interface CustomRatesProps {
 // toast gives no plan rate, since a save of the split still on its way
 // ahead of it would make one worked out here wrong, and the split's
 // none for the same reason the other way about.
+//
+// While the glide path sets the split, the split given is the one it
+// holds now, read-only, saying so, since one typed would be set aside;
+// what they come to is worked out at it, so the portfolio's return is
+// the plan rate the plan grows at now.
 export function CustomRates({
   allocation,
+  hasGlide,
   rates,
 }: CustomRatesProps): JSX.Element {
   const [shownRates, showRates] = useOptimistic(
@@ -140,7 +147,8 @@ export function CustomRates({
         </FieldRow>
         <FieldRow layout="pair">
           <RateField
-            hint="The rest in bonds"
+            hint={hasGlide ? "Set by the glide path" : "The rest in bonds"}
+            isReadOnly={hasGlide}
             label="Stocks share"
             max={1}
             min={0}

@@ -6,6 +6,7 @@ import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { ScreenTabs } from "@/components/app/atoms/screen-tabs";
 import { SourceDates } from "@/components/app/atoms/source-dates";
+import { GlidePath } from "@/components/app/organisms/glide-path";
 import { InflationSource } from "@/components/app/organisms/inflation-source";
 import { RateSet } from "@/components/app/organisms/rate-set";
 import { TargetAllocation } from "@/components/app/organisms/target-allocation";
@@ -21,18 +22,20 @@ const setNames: Record<Chosen, string> = {
 };
 
 // The assumptions the plan runs on, under a strip saying how old each
-// source they rest on is, in two tabs, the CMA's rates set beside the
+// source they rest on is, in three tabs, the CMA's rates set beside the
 // household's sources as they stood thirty days before, to say what has
 // moved them since. The two are read together, and the sources then are
 // handed on only while the CMA's rates are live, which is the only time
 // the card reads them. The first holds the
 // rates: the set the plan runs on and the rates in it, the CMA-derived
 // ones worked out from their sources or the ones and the split typed by
-// hand, and beneath them the inflation source, over the curve last
+// hand, the split shown as the glide path holds it now while it sets
+// one, and beneath them the inflation source, over the curve last
 // pulled from the Bank, which the derived rates take and the rates typed
 // by hand set aside. The second holds the target
 // allocation last imported from Portfolio Performance, with the class
-// of the latest CMA each category is mapped onto. The header says what
+// of the latest CMA each category is mapped onto. The third holds the
+// glide path, the bond share by age it sets. The header says what
 // the plan grows at and what its prices rise by, made from the rates
 // live, and which set those are, so the screen answers its question
 // before a card is read, whichever tab is open. The page reads the
@@ -45,14 +48,17 @@ export default async function Assumptions(): Promise<JSX.Element> {
       cma,
       curve,
       deductions,
+      glide,
       mappings,
       plan,
       rates,
       rateSet,
+      split,
       targets,
     },
     before,
   ] = await Promise.all([getHousehold(), getSourcesDaysAgo(30)]);
+  const hasGlide = glide.length > 0;
   return (
     <>
       <ScreenHeader label={sectionLabel(assumptions)} title={assumptions.title}>
@@ -72,11 +78,12 @@ export default async function Assumptions(): Promise<JSX.Element> {
               children: (
                 <>
                   <RateSet
-                    allocation={allocation}
+                    allocation={hasGlide ? split : allocation}
                     before={rateSet === "cma" ? before : null}
                     cma={cma}
                     curve={curve}
                     deductions={deductions}
+                    hasGlide={hasGlide}
                     mappings={mappings}
                     rates={rates}
                     rateSet={rateSet}
@@ -96,6 +103,10 @@ export default async function Assumptions(): Promise<JSX.Element> {
                 />
               ),
               label: "Target allocation",
+            },
+            {
+              children: <GlidePath glide={glide} plan={plan} split={split} />,
+              label: "Glide path",
             },
           ]}
         />

@@ -296,6 +296,19 @@ export function derivedSet(
   };
 }
 
+// The two blends held in the shares of a split rather than the target
+// allocation's, each sleeve blended as it was within itself, as the plan
+// holds them along a glide path.
+export function heldAt(
+  { bonds, stocks }: { readonly bonds: Blend; readonly stocks: Blend },
+  { stocks: share }: Allocation,
+): { readonly bonds: Blend; readonly stocks: Blend } {
+  return {
+    bonds: { ...bonds, share: 1 - share },
+    stocks: { ...stocks, share },
+  };
+}
+
 // What rebalancing yearly to the target allocation's weights earns over
 // a blend of the classes' returns, for each sleeve and the portfolio,
 // each a fraction a year: half the gap between the classes' variances in
@@ -543,18 +556,6 @@ function blendOf(
       0,
     ),
     share,
-  };
-}
-
-// The two blends held in the shares of a split rather than the target
-// allocation's, each sleeve blended as it was within itself.
-function heldAt(
-  { bonds, stocks }: { readonly bonds: Blend; readonly stocks: Blend },
-  { stocks: share }: Allocation,
-): { readonly bonds: Blend; readonly stocks: Blend } {
-  return {
-    bonds: { ...bonds, share: 1 - share },
-    stocks: { ...stocks, share },
   };
 }
 

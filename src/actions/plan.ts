@@ -4,7 +4,7 @@ import * as z from "zod";
 
 import type { Deductions } from "@/data/cma";
 import type { PlanAges } from "@/data/plan";
-import type { Allocation, Rates, RateSet } from "@/data/rates";
+import type { Allocation, Anchor, Rates, RateSet } from "@/data/rates";
 import type { Answer } from "@/lib/answer";
 
 import { ageIn, oldestAge } from "@/data/plan";
@@ -44,6 +44,26 @@ const deductionsPatch = z.object({
 
 // What a save of the split carries: the share in stocks.
 const split = z.object({ stocks: z.number() });
+
+// What a save of an anchor of the glide path carries: an age, and the
+// share in bonds at it.
+const anchor = z.object({ age: z.number(), bonds: z.number() });
+
+// Deletes the anchor of the glide path at the age given, and hands
+// back nothing. An action answers a POST from anywhere, so it checks the
+// session for itself and parses what it was sent rather than trusting
+// the form. An age no anchor is at is refused, since the anchor it named
+// has gone since the screen was drawn, and so is a path left that the
+// plan cannot run on under the rates live; a refusal is in the rule's
+// words, since the screen says so under a toast.
+export async function removeAnchor(age: number): Promise<Answer<undefined>> {
+  await requireSession();
+  const at = z.number().parse(age);
+  return amend(({ kept }) => ({
+    kept: { ...kept, glide: othersThan(kept.glide, at) },
+    result: undefined,
+  }));
+}
 
 // Writes the plan's ages, the ones sent over the ones the household
 // has, and hands back the ages as it now has them: the end age with the
@@ -111,6 +131,37 @@ export async function saveAllocation(
   }));
 }
 
+// Writes an anchor of the glide path, in place of the one at the age it
+// was saved at, which an edit can move it from, or beside the rest for a
+// new one, the path kept youngest first, and hands it back as written.
+// The anchor is sent alone and laid over the path as the store holds
+// it, so an anchor added or changed on another tab since this screen was
+// drawn is kept rather than written over. An action answers a POST from
+// anywhere, so it checks the session for itself and parses what it was
+// sent rather than trusting the form. An age saved at that no anchor is
+// at is refused, since the anchor it named has gone since; and each
+// anchor is held to its rules by the household, an age to one anchor
+// among them, and so is the plan the path makes, under the rates live;
+// a refusal is in the rule's words, since the screen says so under a
+// toast.
+export async function saveAnchor(
+  savedAt: null | number,
+  draft: Anchor,
+): Promise<Answer<Anchor>> {
+  await requireSession();
+  const at = z.number().nullable().parse(savedAt);
+  const written = anchor.parse(draft);
+  return amend(({ kept }) => ({
+    kept: {
+      ...kept,
+      glide: [...othersThan(kept.glide, at), written].toSorted(
+        (first, second) => first.age - second.age,
+      ),
+    },
+    result: written,
+  }));
+}
+
 // Writes what comes off the CMA's returns to derive the rates, the
 // deductions sent over the ones the household has, dated today, and
 // hands back the deductions as it now has them. Sent neither, it keeps
@@ -159,4 +210,14 @@ export async function saveRateSet(set: RateSet): Promise<Answer<RateSet>> {
   await requireSession();
   const rateSet = z.enum(rateSets).parse(set);
   return amend(({ kept }) => ({ kept: { ...kept, rateSet }, result: rateSet }));
+}
+
+// The glide path without the anchor at the age given, or as it is given
+// none. An age no anchor is at is refused, since the anchor a screen
+// named by it has gone since the screen was drawn.
+function othersThan(glide: readonly Anchor[], at: null | number): Anchor[] {
+  if (at !== null && !glide.some(({ age }) => age === at)) {
+    throw new Refusal("No anchor is at that age");
+  }
+  return glide.filter(({ age }) => age !== at);
 }

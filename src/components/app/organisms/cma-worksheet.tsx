@@ -17,7 +17,7 @@ import type {
 } from "@/data/cma";
 import type { Curve } from "@/data/inflation";
 import type { Before, Moves, Source } from "@/data/moves";
-import type { Across } from "@/data/rates";
+import type { Across, Allocation } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 
 import { Caution } from "@/components/app/atoms/caution";
@@ -25,7 +25,7 @@ import { EmptyState } from "@/components/app/atoms/empty-state";
 import { Note } from "@/components/app/atoms/note";
 import { Worksheet } from "@/components/app/atoms/worksheet";
 import { CardContent } from "@/components/kit/card";
-import { blendsOf, cmaRates, rebalancingOf, riskOf } from "@/data/cma";
+import { blendsOf, cmaRates, heldAt, rebalancingOf, riskOf } from "@/data/cma";
 import { inflationOf } from "@/data/inflation";
 import { movesBetween } from "@/data/moves";
 import { resultsOf } from "@/data/rates";
@@ -40,6 +40,7 @@ interface CmaWorksheetProps {
   readonly deductions: Deductions;
   readonly fields: ReactNode;
   readonly mappings: readonly Mapping[];
+  readonly split: Allocation | null;
   readonly targets: null | Targets;
 }
 
@@ -96,6 +97,15 @@ const sourceNames: Record<Source, string> = {
 // taken on the way leaves none, there is nothing to compare, and the
 // section is left out.
 //
+// While a glide path sets the split, the split given is the one it
+// holds now, and the worksheet holds the sleeves in it rather than in
+// the target allocation's shares, as the plan does: the weights, the
+// portfolio's figures and the rebalancing between the sleeves are its,
+// each sleeve still blended from the target allocation within itself,
+// so the portfolio's return is the plan rate the plan grows at now.
+// Each category's share of the whole is scaled with its sleeve's, and
+// what moved the rates is read at the same split.
+//
 // Before a vintage is pulled, or a target allocation imported on its
 // tab, there is nothing to work out, and the body says so; while the
 // vintage makes no blend, it says what is missing in the caution tone.
@@ -106,18 +116,17 @@ export function CmaWorksheet({
   deductions,
   fields,
   mappings,
+  split,
   targets,
 }: CmaWorksheetProps): JSX.Element {
   const moves =
     before === null
       ? null
-      : movesBetween(before.sources, {
-          cma,
-          curve,
-          deductions,
-          mappings,
-          targets,
-        });
+      : movesBetween(
+          before.sources,
+          { cma, curve, deductions, mappings, targets },
+          split,
+        );
   return (
     <>
       <CardContent className="grid gap-8">
@@ -142,6 +151,7 @@ export function CmaWorksheet({
             curve={curve}
             deductions={deductions}
             mappings={mappings}
+            split={split}
             targets={targets}
           />
         )}
@@ -153,20 +163,22 @@ export function CmaWorksheet({
   );
 }
 
-// The latest vintage worked out by the target allocation, with the
-// weights it is worked out by beneath, or what keeps it from being
-// blended.
+// The latest vintage worked out by the target allocation, held in the
+// glide path's split now where one is given, with the weights it is
+// worked out by beneath, or what keeps it from being blended.
 function Blended({
   cma,
   curve,
   deductions,
   mappings,
+  split,
   targets,
 }: {
   readonly cma: Cma;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
   readonly mappings: readonly Mapping[];
+  readonly split: Allocation | null;
   readonly targets: Targets;
 }): JSX.Element {
   const blends = blendsOf(cma, targets, mappings);
@@ -177,14 +189,28 @@ function Blended({
       </Caution>
     );
   }
+  const held = split === null ? blends : heldAt(blends, split);
+  const scaleOf = (sleeve: Sleeve): number =>
+    blends[sleeve].share === 0 ? 0 : held[sleeve].share / blends[sleeve].share;
   return (
     <>
       <Worksheet
         columns={columns}
         label="CMA-derived rates, worked out"
-        rows={rowsOf(blends, { cma, curve, deductions })}
+        rows={rowsOf(held, {
+          cma,
+          curve,
+          deductions,
+          weight: split === null ? "Target weight" : "Glide path weight",
+        })}
       />
-      <Weights cma={cma} mappings={mappings} targets={targets} />
+      <Weights
+        cma={cma}
+        heading={split === null ? "Target weights" : "Glide path weights"}
+        mappings={mappings}
+        scale={{ bonds: scaleOf("bonds"), stocks: scaleOf("stocks") }}
+        targets={targets}
+      />
     </>
   );
 }
@@ -229,10 +255,11 @@ function Moved({
   );
 }
 
-// The worksheet's rows, from the target weights to the real return.
-// Each sleeve's figure is dashed where nothing blends into it, and the
-// portfolio's is the sleeves' in the shares the target allocation holds,
-// which leaves out the sleeve that holds none. The hedging row is there
+// The worksheet's rows, from the weights to the real return, the
+// weights named as the caller names them. Each sleeve's figure is
+// dashed where nothing blends into it, and the portfolio's is the
+// sleeves' in the shares the blends are held in, which leaves out the
+// sleeve that holds none. The hedging row is there
 // only while a class is hedged to sterling, and dashed for a sleeve with
 // none hedged. The rebalancing row is there only while the vintage gives
 // the risk it is worked from, and without it the return is the blend
@@ -245,10 +272,12 @@ function rowsOf(
     cma,
     curve,
     deductions,
+    weight,
   }: {
     readonly cma: Cma;
     readonly curve: Curve | null;
     readonly deductions: Deductions;
+    readonly weight: string;
   },
 ): readonly WorksheetRow[] {
   const { bonds, stocks } = blends;
@@ -289,7 +318,7 @@ function rowsOf(
         },
         () => true,
       ),
-      label: "Target weight",
+      label: weight,
     },
     {
       figures: figuresOf(
@@ -352,8 +381,9 @@ function rowsOf(
 
 // Every category's share of the whole, on a sunken panel headed as a
 // region of its own beneath the worksheet, split by the sleeve it blends
-// into, the one its class in the latest vintage is priced in: a share of
-// nothing muted. A sleeve to a
+// into, the one its class in the latest vintage is priced in, and scaled
+// by how far its sleeve is held above or below the target allocation's
+// share of it, as a glide path holds it: a share of nothing muted. A sleeve to a
 // column where the screen is wide enough, and where it is wider still,
 // stocks take two of three columns and run down both, since that is
 // where a portfolio's categories are, so the panel is as tall as half of
@@ -363,11 +393,15 @@ function rowsOf(
 // out of both.
 function Weights({
   cma,
+  heading,
   mappings,
+  scale,
   targets,
 }: {
   readonly cma: Cma;
+  readonly heading: string;
   readonly mappings: readonly Mapping[];
+  readonly scale: Readonly<Record<Sleeve, number>>;
   readonly targets: Targets;
 }): JSX.Element {
   const id = useId();
@@ -382,7 +416,7 @@ function Weights({
       className="grid gap-4 rounded-lg bg-muted p-5"
     >
       <h3 className="label text-muted-foreground" id={id}>
-        Target weights
+        {heading}
       </h3>
       <div className="grid gap-6 lg:grid-cols-2 lg:gap-8 xl:grid-cols-3">
         {(["stocks", "bonds"] as const).map((sleeve) => (
@@ -411,7 +445,7 @@ function Weights({
                     >
                       <dt className={tone}>{name}</dt>
                       <dd className={cn("figure", tone)}>
-                        {formatPercent(share)}
+                        {formatPercent(share * scale[sleeve])}
                       </dd>
                     </div>
                   );

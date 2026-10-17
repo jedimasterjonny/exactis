@@ -66,6 +66,7 @@ describe("the household store", () => {
       rates: openingRates,
       rateSet: "custom",
       schedule: { expenses: [], income: [] },
+      split: allInStocks,
       spread: { short: "No CMA is pulled" },
       targets: null,
     });
@@ -101,6 +102,7 @@ describe("the household store", () => {
       rates: reference.rates,
       rateSet: reference.rateSet,
       schedule: reference.schedule,
+      split: reference.allocation,
       spread: spreadOf(reference, typed(reference)),
       targets: reference.targets,
     });

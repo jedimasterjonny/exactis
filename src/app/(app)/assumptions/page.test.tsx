@@ -38,7 +38,9 @@ vi.mock("@/actions/targets", () => ({
   mapCategory: vi.fn(),
 }));
 vi.mock("@/actions/plan", () => ({
+  removeAnchor: vi.fn(),
   saveAllocation: vi.fn(),
+  saveAnchor: vi.fn(),
   saveDeductions: vi.fn(),
   saveRates: vi.fn(),
   saveRateSet: vi.fn(),
@@ -157,6 +159,45 @@ describe("Assumptions", () => {
       screen.queryByRole("region", { name: "Custom rates" }),
     ).not.toBeInTheDocument();
     expect(screen.getByText(/^Plan rate .+ custom rates$/)).toBeInTheDocument();
+  });
+
+  // At 34 the glide path holds fifteen points of bonds, as it does to 52,
+  // rising to 40 by 60, which falls in 2052.
+  it("hands the glide path to its card in the third tab, and the split it holds now to the rates typed, read-only", async () => {
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      glide: [
+        { age: 52, bonds: 0.15 },
+        { age: 60, bonds: 0.4 },
+      ],
+      split: { stocks: 0.9 },
+    });
+
+    render(await Assumptions());
+
+    expect(screen.getByRole("textbox", { name: "Stocks share" })).toHaveValue(
+      "90.00%",
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Stocks share" }),
+    ).toHaveAttribute("readonly");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Glide path" }));
+
+    expect(
+      screen.getByRole("row", { name: "60 2052 40.00%" }),
+    ).toBeInTheDocument();
+  });
+
+  it("hands the rates typed the split typed while there is no glide path", async () => {
+    render(await Assumptions());
+
+    expect(screen.getByRole("textbox", { name: "Stocks share" })).toHaveValue(
+      "80.00%",
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Stocks share" }),
+    ).not.toHaveAttribute("readonly");
   });
 
   // A tab left is kept rather than drawn afresh, so the import is still

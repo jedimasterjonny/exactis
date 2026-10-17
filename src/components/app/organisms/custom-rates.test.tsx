@@ -28,9 +28,15 @@ const sheet = "Custom rates, worked out";
 function renderRates(
   given: Partial<ComponentProps<typeof CustomRates>> = {},
 ): void {
-  render(<CustomRates allocation={allocation} rates={rates} {...given} />, {
-    wrapper: Toaster,
-  });
+  render(
+    <CustomRates
+      allocation={allocation}
+      hasGlide={false}
+      rates={rates}
+      {...given}
+    />,
+    { wrapper: Toaster },
+  );
 }
 
 describe("CustomRates", () => {
@@ -219,6 +225,17 @@ describe("CustomRates", () => {
         screen.getByRole("dialog", { name: "Allocation saved" }),
       ).toBeInTheDocument();
     });
+  });
+
+  // The glide path holds 85/15 now: four fifths of nothing typed here.
+  it("shows the split the glide path holds now read-only, saying so, while it sets one", () => {
+    renderRates({ allocation: { stocks: 0.85 }, hasGlide: true });
+
+    expect(field("Stocks share")).toHaveAttribute("readonly");
+    expect(field("Stocks share")).toHaveValue("85.00%");
+    expect(field("Stocks share")).toHaveAccessibleDescription(
+      "Set by the glide path",
+    );
   });
 
   it("sends nothing for a share typed back to what it was", () => {

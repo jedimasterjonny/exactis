@@ -79,6 +79,7 @@ interface Inputs {
     readonly expenses: readonly ExpenseLine[];
     readonly income: readonly IncomeLine[];
   };
+  readonly split: Allocation;
   readonly spread: Shortfall | Spread;
   readonly targets: null | Targets;
 }
@@ -110,6 +111,7 @@ const sound: Inputs = {
   rates,
   rateSet: "custom",
   schedule: { expenses: expenseLines, income: incomeLines },
+  split: allocation,
   spread: { inflation: 0.02, rate: 0.14 },
   targets,
 };
@@ -813,6 +815,7 @@ describe("soundKept", () => {
         rates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
         rateSet: "custom",
         schedule: { expenses: [], income: [] },
+        split: { stocks: 1 },
         spread: { short: "No CMA is pulled" },
         targets: null,
       },
@@ -1005,6 +1008,9 @@ describe("soundKept", () => {
     });
     expect(read.rates).toStrictEqual(kept.rates);
     expect(read.allocation).toStrictEqual(kept.allocation);
+    expect(read.split).toStrictEqual(
+      "short" in derived ? null : derived.allocation,
+    );
     expect(read.plan.inflation).toBe(inflationOf(curve).rate);
     expect(read.plan.rate).toBeCloseTo(
       planRate(
@@ -1043,6 +1049,9 @@ describe("soundKept", () => {
 
     expect(plan.byYear).toHaveLength(57);
     expect(plan.rate).toBeCloseTo(at(0.85), 15);
+    expect(
+      soundKept({ ...kept, allocation, glide, rates }).household.split,
+    ).toStrictEqual({ stocks: 0.85 });
     expect(plan.byYear?.[0]).toBeCloseTo(at(0.85), 15);
     expect(plan.byYear?.[22]).toBeCloseTo(at(0.725), 15);
     expect(plan.byYear?.[26]).toBeCloseTo(at(0.6), 15);
