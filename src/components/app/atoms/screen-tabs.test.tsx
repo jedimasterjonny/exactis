@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import { ScreenTabs } from "./screen-tabs";
 
-function renderTabs(): void {
+function renderTabs(open?: string): void {
   render(
     <ScreenTabs
+      open={open}
       tabs={[
         { children: <p>The rates</p>, label: "Rates" },
         { children: <p>The targets</p>, label: "Target allocation" },
@@ -27,6 +28,26 @@ describe("ScreenTabs", () => {
     );
     expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
     expect(screen.getByRole("tabpanel")).toHaveTextContent("The rates");
+  });
+
+  // The address names a tab by its label in lower case with a hyphen for
+  // each space.
+  it("opens on the tab the address names", () => {
+    renderTabs("target-allocation");
+
+    expect(
+      screen.getByRole("tab", { name: "Target allocation" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("The targets");
+  });
+
+  it("opens on the first tab where the address names one the screen does not have", () => {
+    renderTabs("glide-path");
+
+    expect(screen.getByRole("tab", { name: "Rates" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   // The panel left is kept in the document, hidden, rather than drawn

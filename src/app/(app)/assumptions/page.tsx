@@ -38,10 +38,15 @@ const setNames: Record<Chosen, string> = {
 // glide path, the bond share by age it sets. The header says what
 // the plan grows at and what its prices rise by, made from the rates
 // live, and which set those are, so the screen answers its question
-// before a card is read, whichever tab is open. The page reads the
-// store, which reads the session first, so it renders behind the
-// loading screen beside it.
-export default async function Assumptions(): Promise<JSX.Element> {
+// before a card is read, whichever tab is open. The tab the address
+// names, as ?tab=glide-path does, is the one open as the screen opens.
+// The page reads the store, which reads the session first, so it
+// renders behind the loading screen beside it.
+export default async function Assumptions({
+  searchParams,
+}: Readonly<{
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}>): Promise<JSX.Element> {
   const [
     {
       allocation,
@@ -57,7 +62,8 @@ export default async function Assumptions(): Promise<JSX.Element> {
       targets,
     },
     before,
-  ] = await Promise.all([getHousehold(), getSourcesDaysAgo(30)]);
+    { tab },
+  ] = await Promise.all([getHousehold(), getSourcesDaysAgo(30), searchParams]);
   const hasGlide = glide.length > 0;
   return (
     <>
@@ -73,6 +79,7 @@ export default async function Assumptions(): Promise<JSX.Element> {
           today={today()}
         />
         <ScreenTabs
+          open={typeof tab === "string" ? tab : undefined}
           tabs={[
             {
               children: (
