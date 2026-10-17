@@ -64,6 +64,13 @@ const household: Household = {
   targets,
 };
 
+// The page as Next renders it at /assumptions, under the query given.
+async function page(
+  searchParams: Record<string, string> = {},
+): ReturnType<typeof Assumptions> {
+  return Assumptions({ searchParams: Promise.resolve(searchParams) });
+}
+
 describe("Assumptions", () => {
   beforeEach(() => {
     vi.mocked(getHousehold).mockResolvedValue(household);
@@ -76,7 +83,7 @@ describe("Assumptions", () => {
       plan: { ...retiring, inflation: 0.0295, rate: 0.0725 },
     });
 
-    render(await Assumptions());
+    render(await page());
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Plan assumptions",
@@ -104,7 +111,7 @@ describe("Assumptions", () => {
 
   // The page reads the day from the clock, so the ages are left unread.
   it("says above the tabs when each source was brought in, from the store's sources", async () => {
-    render(await Assumptions());
+    render(await page());
 
     const [vintage, curveDay, imported, deductions] =
       screen.getAllByRole("definition");
@@ -122,7 +129,7 @@ describe("Assumptions", () => {
       curve: null,
     });
 
-    render(await Assumptions());
+    render(await page());
 
     expect(screen.getByText("No curve pulled yet")).toBeInTheDocument();
 
@@ -137,7 +144,7 @@ describe("Assumptions", () => {
   });
 
   it("opens on the rates, and hands the store's target allocation, the latest CMA and the mappings to its card in the tab beside them", async () => {
-    render(await Assumptions());
+    render(await page());
 
     expect(screen.getByRole("tab", { name: "Rates" })).toHaveAttribute(
       "aria-selected",
@@ -173,7 +180,7 @@ describe("Assumptions", () => {
       split: { stocks: 0.9 },
     });
 
-    render(await Assumptions());
+    render(await page());
 
     expect(screen.getByRole("textbox", { name: "Stocks share" })).toHaveValue(
       "90.00%",
@@ -189,8 +196,19 @@ describe("Assumptions", () => {
     ).toBeInTheDocument();
   });
 
+  // A link to the glide path names its tab in the address, and the
+  // screen opens on it rather than on the rates.
+  it("opens on the tab the address names", async () => {
+    render(await page({ tab: "glide-path" }));
+
+    expect(screen.getByRole("tab", { name: "Glide path" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
   it("hands the rates typed the split typed while there is no glide path", async () => {
-    render(await Assumptions());
+    render(await page());
 
     expect(screen.getByRole("textbox", { name: "Stocks share" })).toHaveValue(
       "80.00%",
@@ -206,7 +224,7 @@ describe("Assumptions", () => {
   it("keeps an import held while the rates are open", async () => {
     const answer = Promise.withResolvers<Answer<Targets>>();
     vi.mocked(importTargets).mockReturnValue(answer.promise);
-    render(await Assumptions(), { wrapper: Toaster });
+    render(await page(), { wrapper: Toaster });
 
     fireEvent.click(screen.getByRole("tab", { name: "Target allocation" }));
     fireEvent.change(screen.getByLabelText("Portfolio Performance file"), {
@@ -250,7 +268,7 @@ describe("Assumptions", () => {
       rateSet: "cma",
     });
 
-    render(await Assumptions());
+    render(await page());
 
     expect(
       screen.getByText("Plan rate 7.52% · inflation 2.95% · CMA-derived rates"),
@@ -297,7 +315,7 @@ describe("Assumptions", () => {
       },
     });
 
-    render(await Assumptions());
+    render(await page());
 
     expect(getSourcesDaysAgo).toHaveBeenCalledExactlyOnceWith(30);
     expect(
