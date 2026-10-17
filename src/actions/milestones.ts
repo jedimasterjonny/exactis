@@ -7,6 +7,7 @@ import type { Answer } from "@/lib/answer";
 
 import { untied } from "@/data/milestones";
 import { milestoneValues, ownerValues, recordId, target } from "@/data/schemas";
+import { Refusal } from "@/lib/answer";
 import { found, removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
@@ -20,14 +21,19 @@ const values = z.object(milestoneValues) satisfies z.ZodType<MilestoneValues>;
 // each end tied to it fixed in the year it falls in now, so the lines
 // stay where they were rather than the household refusing a tie to a
 // milestone it no longer lists; nothing is tied to one reached when
-// conditions hold, so nothing else moves with it. Checked as a save
-// is. Retirement is no record, so no id names it and it cannot be
-// deleted.
+// conditions hold, so nothing else moves with it. A milestone a house
+// moves at stays, since a move has no year of its own to be fixed in,
+// and is refused in words that say so rather than the household's.
+// Checked as a save is. Retirement is no record, so no id names it and
+// it cannot be deleted.
 export async function removeMilestone(id: number): Promise<Answer<undefined>> {
   await requireSession();
   const at = recordId.parse(id);
   return amend(({ household, kept }) => {
     const milestone = found(kept.milestones, at, "milestone");
+    if (kept.accounts.some(({ move }) => move?.at === at)) {
+      throw new Refusal("A milestone a house moves at stays");
+    }
     return {
       kept: {
         ...kept,

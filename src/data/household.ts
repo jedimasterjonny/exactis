@@ -1,6 +1,6 @@
 import * as z from "zod";
 
-import type { Account } from "@/data/accounts";
+import type { Account, Move } from "@/data/accounts";
 import type {
   Asset,
   Cma,
@@ -33,7 +33,7 @@ import {
 } from "@/data/accounts";
 import { derivedSet, openingDeductions, sleeves, spreadOf } from "@/data/cma";
 import { incomeKinds } from "@/data/income";
-import { ageOf, retiresOn, timed } from "@/data/milestones";
+import { ageOf, moving, retiresOn, timed } from "@/data/milestones";
 import { openingOwner } from "@/data/owners";
 import {
   ageIn,
@@ -169,6 +169,28 @@ const purchase = z.object({
   price: z.number().int().positive("A house was bought for something"),
 });
 
+// A move as the model lays it: at a milestone, by its id, in a year,
+// whole; the next house bought for something and held to a ceiling of
+// something or to none; and a mortgage borrowing a share of the price
+// above nothing and no more than all of it, at a rate no lower than
+// nothing, as any loan's, over whole years, one at least.
+const move = z.object({
+  at: recordId,
+  ceiling: z.number().int().positive().exactOptional(),
+  mortgage: z
+    .object({
+      loanToValue: z
+        .number()
+        .gt(0, "A mortgage borrows a share of the price")
+        .max(1, "A mortgage borrows a share of the price"),
+      rate: z.number().min(0, "A loan is charged nothing or more"),
+      term: z.number().int().positive("A mortgage runs a year at least"),
+    })
+    .exactOptional(),
+  price: z.number().int().positive("A move buys a house for something"),
+  year: z.number().int(),
+}) satisfies z.ZodType<Move>;
+
 // An account as the model lays it, with what the account save holds
 // it to and what the engine refuses of one account alone: a balance
 // below nothing only on a debt and above it never on one, the spare
@@ -177,10 +199,11 @@ const purchase = z.object({
 // a fixed sum within its allowance on its own, a rate no lower than
 // losing everything, a link to an asset only on the loan secured on
 // it, a purchase on a house and on nothing else, a limit of something
-// on a house or a car alone, and the mark of an account always funded
-// only on a pension. A contribution, a balloon, a limit, an owner, a
-// link, the mark and the day its balance was set are absent rather
-// than nothing, as the model has them.
+// on a house or a car alone, a move on a house alone, and the mark of
+// an account always funded only on a pension. A contribution, a
+// balloon, a limit, a move, an owner, a link, the mark and the day its
+// balance was set are absent rather than nothing, as the model has
+// them.
 const account = z
   .object({
     balance: z.number().int(),
@@ -210,6 +233,7 @@ const account = z
     isAlwaysFunded: z.literal(true).exactOptional(),
     kind: z.enum(accountKinds),
     limit: z.number().int().positive().exactOptional(),
+    move: move.exactOptional(),
     name: named,
     owner: recordId.exactOptional(),
     secures: recordId.exactOptional(),
@@ -249,6 +273,10 @@ const account = z
       account.kind === "car" ||
       account.kind === "house",
     "Only a house or a car is held to a limit",
+  )
+  .refine(
+    (account) => account.move === undefined || account.kind === "house",
+    "Only a house moves",
   )
   .refine(
     (account) => account.isAlwaysFunded === undefined || isPension(account),
@@ -607,9 +635,12 @@ const plan = z
 // loan the asset it is secured on, a salary the pension it feeds, which
 // is that owner's, since a sacrifice is an employer's contribution to
 // the employee's own pension, a payments line the debt it pays and a
-// line the milestone it is tied to, which is reached at an age, since one
-// reached when conditions hold falls in a year that depends on the
-// lines, in the engine's words where the engine refuses the same link.
+// line or a move the milestone it is tied to, which is reached at an
+// age, since one reached when conditions hold falls in a year that
+// depends on the lines, in the engine's words where the engine refuses
+// the same link. A move borrows on a loan already secured on the house,
+// which carries the mortgage on through it, since it is the loan the
+// screens draw.
 // An asset has
 // one loan and a debt one line paying it, since the house and car
 // dialogs read the one they find. And a debt paying its own fixed sum,
@@ -747,6 +778,27 @@ export const household = z
         ),
       ),
     "A line is tied to a milestone reached at an age",
+  )
+  .refine(
+    ({ accounts, milestones }) =>
+      accounts.every(
+        ({ move }) =>
+          move === undefined ||
+          milestones.some(
+            (milestone) =>
+              milestone.id === move.at && ageOf(milestone) !== undefined,
+          ),
+      ),
+    "A move is at a milestone the household lists, reached at an age",
+  )
+  .refine(
+    ({ accounts }) =>
+      accounts.every(
+        ({ id, move }) =>
+          move?.mortgage === undefined ||
+          accounts.some(({ secures }) => secures === id),
+      ),
+    rules.borrowsOnLoan,
   )
   .refine(
     ({ accounts, plan, schedule }) =>
@@ -1019,14 +1071,16 @@ function glidedOf(
 
 // The whole a kept household makes, its plan running from the month
 // after the one its balances are as of on the rates and the split live,
-// for the first listed owner, each line's tied ends read off the
-// milestones they are tied to, and each line paying a loan running as
-// the loan's payments do.
+// for the first listed owner, each line's tied ends and each move's
+// year read off the milestones they are tied to, and each line paying a
+// loan running as the loan's payments do.
 function householdOf(kept: Kept): Household {
   const live = liveOf(kept);
   const { plan, split, spread } = glidedOf(kept, planOf(kept, live), live);
   return {
-    accounts: kept.accounts,
+    accounts: kept.accounts.map((account) =>
+      moving(account, kept.milestones, plan),
+    ),
     allocation: kept.allocation,
     cma: kept.cma,
     curve: kept.curve,

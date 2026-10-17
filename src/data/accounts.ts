@@ -16,7 +16,9 @@ import type { Month } from "@/data/schedule";
 // index; any other account carries none. A house may carry a ceiling
 // its worth rises no higher than, and a car a floor it falls no lower
 // than, each a limit in whole pounds of today's money; any other
-// account carries none. An ISA or a pension carries
+// account carries none. A house may carry a move, the home sold and the
+// next bought at a milestone; any other account carries none. An ISA
+// or a pension carries
 // the id of the owner it belongs to, whose allowance it is paid under;
 // any other account carries none. A pension may be always funded, so
 // what it is paid, its own sum and what the salaries feeding it
@@ -35,6 +37,7 @@ export interface Account {
   readonly isAlwaysFunded?: true;
   readonly kind: AccountKind;
   readonly limit?: number;
+  readonly move?: Move;
   readonly name: string;
   readonly owner?: number;
   readonly secures?: number;
@@ -81,6 +84,30 @@ export interface AccountValues {
 export type Cadence = (typeof cadences)[number];
 
 export type Funding = (typeof fundings)[number];
+
+// A move of home: the house sold as a milestone's year opens and the
+// next one bought, the one primary residence for another. It is at a
+// milestone reached at an age, by its id, and the year beside the tie
+// is the one the milestone gives, read off it as a line's tied end is.
+// The next house costs the price, whole pounds of what it would cost
+// today, risen at the home's own growth to the move, and is held to
+// the ceiling, whole pounds of today's money, or to none. It is bought
+// with everything the sale leaves once the loans on the home are
+// cleared, and a mortgage borrows the rest, up to the share of the
+// price the loan to value allows, a fraction as every rate is, at its
+// rate over its term in whole years; a move with no mortgage borrows
+// nothing.
+export interface Move {
+  readonly at: number;
+  readonly ceiling?: number;
+  readonly mortgage?: {
+    readonly loanToValue: number;
+    readonly rate: number;
+    readonly term: number;
+  };
+  readonly price: number;
+  readonly year: number;
+}
 
 // When a house was bought, the month, and what it cost, whole pounds,
 // which is what it was worth that month and what its worth every month
