@@ -12,6 +12,7 @@ import {
   pensionAllowanceOf,
   reliefOf,
   relievableOn,
+  stampDutyOn,
   upratingIn,
 } from "./tax";
 
@@ -441,6 +442,17 @@ describe("isWithinAllowance", () => {
         owner: null,
       }),
     ).toBe(true);
+  });
+});
+
+describe("stampDutyOn", () => {
+  // £650,000 pays 2% of £125,000 and 5% of £400,000, £22,500; £2
+  // million pays £2,500, £33,750, £57,500 and 12% of £500,000, £153,750,
+  // as GOV.UK's calculator charges a home mover.
+  it("charges each band's rate on the slice of the price within it", () => {
+    expect(stampDutyOn(125000)).toBe(0);
+    expect(stampDutyOn(650000)).toBeCloseTo(22500, 6);
+    expect(stampDutyOn(2000000)).toBeCloseTo(153750, 6);
   });
 });
 
