@@ -7,6 +7,7 @@ import type { MilestoneValues } from "@/data/milestones";
 
 import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
+import { house, houseLoan, move } from "@/data/houses.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { atAge } from "@/data/milestones";
 import { sam } from "@/data/owners.fixture";
@@ -209,6 +210,18 @@ describe("the milestone actions", () => {
         },
         version: 2,
       });
+    });
+
+    it("refuses to delete a milestone a house moves at, and deletes nothing", async () => {
+      await keepAfter(db, 1, {
+        ...kept,
+        accounts: [...kept.accounts.slice(0, 3), { ...house, move }, houseLoan],
+      });
+
+      await expect(removeMilestone(1)).resolves.toStrictEqual(
+        refused("A milestone a house moves at stays"),
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 2 });
     });
 
     it("refuses an id the row could not have sent, and one no milestone has", async () => {

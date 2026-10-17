@@ -32,9 +32,10 @@ interface House {
 // house has nothing to revalue, and one listing two has houses the
 // points cannot tell apart, so each is refused before anything is asked
 // for. The house is read again with the household the pull is kept
-// over, and one changed since, as a save while the index was on its way
-// would change it, is refused rather than revalued from a purchase it
-// no longer holds. A Registry that does not answer, or answers with
+// over, read as the household reads it, its move's year off its
+// milestone, as it was read first, and one changed since, as a save
+// while the index was on its way would change it, is refused rather
+// than revalued from a purchase it no longer holds. A Registry that does not answer, or answers with
 // anything but its index, is refused, with the status it answered when
 // it did, so a block reads apart from an outage; so is an answer no
 // index can be read from, in the reader's words, and one running to a
@@ -54,8 +55,8 @@ export async function pullHousePrices(): Promise<Answer<Pulled>> {
   if (typeof sent === "string") {
     return refused(sent);
   }
-  return amend(({ kept }) => {
-    if (JSON.stringify(houseIn(kept.accounts)) !== JSON.stringify(asked)) {
+  return amend(({ household, kept }) => {
+    if (JSON.stringify(houseIn(household.accounts)) !== JSON.stringify(asked)) {
       throw new Refusal(
         "The house changed while its prices were pulled, so nothing was kept; pull them again",
       );

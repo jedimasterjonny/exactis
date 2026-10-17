@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readIndex, revalued, worthIn } from "@/data/house-prices";
 import { quoted, registryAnswer } from "@/data/house-prices.fixture";
 import { kept, today } from "@/data/household.fixture";
-import { homeValues, house, houseLoan } from "@/data/houses.fixture";
+import { homeValues, house, houseLoan, move } from "@/data/houses.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
@@ -129,6 +129,33 @@ describe("pullHousePrices", () => {
     expect(await readLatest(db)).toStrictEqual({
       household: corrected,
       version: 2,
+    });
+  });
+
+  // The children leave home in 2036, but the house was saved moving in
+  // 2040, as it would be had the milestone moved since: the pull reads
+  // the house as the household does both times, keeps over it, and
+  // writes it back with the year its milestone gives.
+  it("keeps the pull over a house whose move was saved with a year its milestone has moved from", async () => {
+    registrySends(new Response(file));
+    await keepAfter(db, 0, {
+      ...withHouse,
+      accounts: [
+        ...kept.accounts.slice(0, 3),
+        { ...house, move: { ...move, year: 2040 } },
+        houseLoan,
+      ],
+    });
+
+    expect(await pullHousePrices()).toMatchObject(
+      saved({ name: "Home", worth: 368003 }),
+    );
+    expect((await readLatest(db))?.household).toMatchObject({
+      accounts: [
+        ...kept.accounts.slice(0, 3),
+        { ...house, balance: 368003, move },
+        houseLoan,
+      ],
     });
   });
 

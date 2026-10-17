@@ -1,4 +1,4 @@
-import type { Account } from "@/data/accounts";
+import type { Account, Move } from "@/data/accounts";
 import type { HouseValues, Part } from "@/data/houses";
 
 import { accounts } from "@/data/accounts.fixture";
@@ -33,3 +33,15 @@ export const house: Account = {
 };
 
 export const houseLoan: Account = { ...mortgage, secures: home.id };
+
+// A move up as the children leave home, at 46, to a house costing
+// £650,000 today, held to a ceiling of £800,000, bought with what the
+// home leaves and a mortgage of up to 90% of the price at 4.5% over 25
+// years. For tests.
+export const move: Move = {
+  at: 1,
+  ceiling: 800000,
+  mortgage: { loanToValue: 0.9, rate: 0.045, term: 25 },
+  price: 650000,
+  year: 2036,
+};
