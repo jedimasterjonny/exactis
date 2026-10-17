@@ -127,6 +127,11 @@ const sound: Inputs = {
 // left out, since the projection counts the months and no input can.
 const thrown: readonly Thrown[] = [
   [
+    "A move borrows on a loan already secured on the house",
+    "A move borrows on a loan already secured on the house",
+    (given): Inputs => housed(given, move),
+  ],
+  [
     "An account is listed once",
     "An account is listed once",
     (given): Inputs => ({
@@ -347,10 +352,6 @@ const held: readonly Case[] = [
   [
     "A move is at a milestone the household lists, reached at an age",
     (given): Inputs => moved(given, { ...move, at: 99 }),
-  ],
-  [
-    "A move borrows on a loan already secured on the house",
-    (given): Inputs => housed(given, move),
   ],
   [
     "A loan is secured on an asset the household lists",

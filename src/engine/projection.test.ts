@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
 import type { Plan } from "@/data/plan";
 
@@ -13,7 +14,7 @@ import { sam, working } from "@/data/owners.fixture";
 import { endYear } from "@/data/plan";
 import { drawFor, drawOf, lumpSumAllowance } from "@/lib/tax";
 
-import type { ProjectionPoint } from "./projection";
+import type { ProjectionPoint, Run } from "./projection";
 
 import { cashFlow } from "./cash-flow";
 import {
@@ -22,6 +23,7 @@ import {
   isShort,
   laidOut,
   monthsOn,
+  movedYears,
   project,
   retirementIn,
 } from "./projection";
@@ -1613,6 +1615,256 @@ describe("project", () => {
 // £300,000 that twenty-five years of retired spending comes to, and
 // some £52,000 saved over the year opens 2027 past it, though nowhere
 // near twenty-five years of the £24,000 spent working.
+describe("moving home", () => {
+  // A house worth £400,000 and owing £120,000 at no interest, paid £1,000
+  // a month by its line, with £100,000 of cash the payments are drawn
+  // from, nothing earned and nothing growing: so in 2028, as the move
+  // opens it, the house is worth £400,000, owes £96,000 and leaves
+  // £304,000 on its sale, and the cash holds £76,000. The next house
+  // costs £500,000, whose stamp duty is £15,000.
+  const moving = { ...plan, years: 3 };
+  const savings: Account = { ...pocket, balance: 100000 };
+  const move = {
+    at: 1,
+    mortgage: { loanToValue: 0.9, rate: 0, term: 10 },
+    price: 500000,
+    year: 2028,
+  };
+  const house: Account = {
+    balance: 400000,
+    bought: { month: { month: 5, year: 2022 }, price: 380000 },
+    growth: { kind: "fixed", rate: 0 },
+    id: 4,
+    kind: "house",
+    move,
+    name: "Home",
+  };
+  const loan: Account = {
+    balance: -120000,
+    contribution: { amount: 1000, cadence: "month", kind: "fixed" },
+    growth: { kind: "fixed", rate: 0 },
+    id: 5,
+    kind: "debt",
+    name: "Home mortgage",
+    secures: 4,
+  };
+  const paying: ExpenseLine = {
+    ...household,
+    amount: 1000,
+    growth: "nominal",
+    id: 9,
+    lastYear: null,
+    name: "Home mortgage",
+    pays: loan.id,
+  };
+  const lines = { expenses: [paying], income: [] };
+
+  // The sale's £304,000 goes in whole, so the mortgage borrows the
+  // £211,000 the £515,000 still wants, under 90% of the price, and the
+  // cash is untouched by the move. The new mortgage is paid £1,758.33
+  // a month over its ten years, £21,100 in 2028, and the old line
+  // stops: the cash ends 2028 at £54,900. A debt on nothing the move
+  // sells stays where it opened.
+  it("sells the home, clears its mortgage, and buys the next with all the sale leaves, borrowing the rest", () => {
+    const family: Account = {
+      balance: -1000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 8,
+      kind: "debt",
+      name: "Family loan",
+    };
+    const run = {
+      accounts: [savings, house, loan, family],
+      plan: moving,
+      schedule: lines,
+    };
+    const points = project(run.accounts, lines, moving);
+    const [, , opened, after] = movedYears(points, run);
+
+    expect(points.map(({ balances }) => balances)).toStrictEqual([
+      { 3: 100000, 4: 400000, 5: -120000, 8: -1000 },
+      { 3: 88000, 4: 400000, 5: -108000, 8: -1000 },
+      { 3: 76000, 4: 400000, 5: -96000, 8: -1000 },
+      { 3: 54900, 4: 500000, 5: -189900, 8: -1000 },
+    ]);
+    expect(points.some(isShort)).toBe(false);
+    expect(opened?.run.schedule.expenses).toStrictEqual([
+      {
+        ...paying,
+        amount: 211000 / 120,
+        firstYear: 2028,
+        id: loan.id,
+        lastMonth: 11,
+        lastYear: 2037,
+      },
+    ]);
+    expect(after?.run).toBe(opened?.run);
+    expect(opened?.balances).toStrictEqual({
+      3: 76000,
+      4: 500000,
+      5: -211000,
+      8: -1000,
+    });
+  });
+
+  // Borrowing no more than 30% of the price, £150,000, leaves the move
+  // £61,000 short, drawn from the cash in January 2028 with that
+  // month's £500 of spending and £1,250 of the new mortgage, and the
+  // spending's line runs on beside it: £114,000 less £61,000 and twelve
+  // months of £1,750 leaves £32,000.
+  it("draws on the savings for what the sale and the most the mortgage borrows leave short", () => {
+    const capped: Account = {
+      ...house,
+      move: { ...move, mortgage: { loanToValue: 0.3, rate: 0, term: 10 } },
+    };
+    const spending = { ...household, amount: 500, growth: "nominal" } as const;
+    const run = {
+      accounts: [{ ...savings, balance: 150000 }, capped, loan],
+      plan: moving,
+      schedule: { expenses: [spending, paying], income: [] },
+    };
+    const points = project(run.accounts, run.schedule, moving);
+    const [, , opened] = movedYears(points, run);
+
+    expect(points.map(({ balances }) => balances)).toStrictEqual([
+      { 3: 150000, 4: 400000, 5: -120000 },
+      { 3: 132000, 4: 400000, 5: -108000 },
+      { 3: 114000, 4: 400000, 5: -96000 },
+      { 3: 32000, 4: 500000, 5: -135000 },
+    ]);
+    expect(points.some(isShort)).toBe(false);
+    expect(opened?.balances).toStrictEqual({ 3: 53000, 4: 500000, 5: -150000 });
+  });
+
+  // The salary's £6,346.45 a month after tax pays the ISA its £1,666.67
+  // a month of allowance, the rest going as spent. In January 2028 the
+  // move leaves £61,000 short, so that month is short too: the ISA is
+  // paid nothing in it while the cash is drawn on, and eleven months in
+  // 2028 rather than twelve.
+  it("pays nothing into the savings in the month a move is short", () => {
+    const capped: Account = {
+      ...house,
+      move: { ...move, mortgage: { loanToValue: 0.3, rate: 0, term: 10 } },
+    };
+    const saving: Account = { ...spareIsa, balance: 0 };
+    const points = project(
+      [savings, saving, capped, loan],
+      { expenses: [paying], income: funded.income },
+      moving,
+    );
+
+    expect(points.map(({ balances }) => balances[saving.id])).toStrictEqual([
+      0, 20000, 40000, 58333,
+    ]);
+    expect(points.map(({ balances }) => balances[savings.id])).toStrictEqual([
+      100000, 100000, 100000, 44096,
+    ]);
+  });
+
+  // The owner retires once liquid net worth is anything above nothing.
+  // A salary's £1,733.30 a month after tax lifts it from £40,000 below
+  // nothing by £20,799.60 a year, so the balances entering 2028 hold
+  // £1,599 above it; but the move that year borrows £211,000, and
+  // measured as the move leaves it the year holds £113,401 below
+  // nothing, so the owner works on, the plan never reaching it.
+  it("measures the year a house moves in for retirement as the move leaves it", () => {
+    const onLiquid = {
+      ...moving,
+      owners: [
+        {
+          ...working,
+          retirement: [{ measure: "liquid", of: "pounds", times: 0 }],
+        },
+      ],
+      retires: 47,
+    } as const satisfies Plan;
+    const earning: IncomeLine = {
+      ...salary,
+      amount: 24000,
+      bonus: 0,
+      endsAt: "retirement",
+      feeds: null,
+      lastYear: null,
+      rsu: 0,
+      sacrifice: 0,
+    };
+    const run = {
+      accounts: [
+        {
+          ...savings,
+          balance: 80000,
+          contribution: { cap: null, kind: "spare" },
+        },
+        house,
+        loan,
+      ],
+      plan: onLiquid,
+      schedule: { expenses: [paying], income: [earning] },
+    } as const satisfies Run;
+    const points = project(run.accounts, run.schedule, onLiquid);
+    const entering = points[2]?.balances ?? {};
+
+    expect((entering[3] ?? 0) + (entering[5] ?? 0)).toBe(1599);
+    expect(retirementIn(points, run)).toBeNull();
+  });
+
+  // The home growing at 5% is worth £441,000 as 2028 opens, so its sale
+  // leaves £345,000. A £250,000 house held to a £220,000 ceiling costs
+  // £220,000, whose stamp duty is £1,900, so £123,100 is left over,
+  // into the cash; nothing is borrowed, though the move would, and
+  // nothing is paid on the old mortgage after it.
+  it("lands what a move leaves over in the cash, holding the next house to its ceiling", () => {
+    const downsize: Account = {
+      ...house,
+      growth: { kind: "fixed", rate: 0.05 },
+      move: { ...move, ceiling: 220000, price: 250000 },
+    };
+
+    expect(
+      project([savings, downsize, loan], lines, moving).map(
+        ({ balances }) => balances,
+      ),
+    ).toStrictEqual([
+      { 3: 100000, 4: 400000, 5: -120000 },
+      { 3: 88000, 4: 420000, 5: -108000 },
+      { 3: 76000, 4: 441000, 5: -96000 },
+      { 3: 199100, 4: 220000, 5: 0 },
+    ]);
+  });
+
+  // A move borrowing nothing to a house costing £515,000 with its duty
+  // clears the old mortgage out of the £304,000 the sale leaves, finds
+  // the £26,000 the cash has left, and is short of the other £185,000
+  // as 2028 opens; nothing is paid on the old mortgage after it.
+  it("reports what neither the sale nor the savings cover on the year the move is made in", () => {
+    const outright: Account = {
+      ...house,
+      move: { at: 1, price: 500000, year: 2028 },
+    };
+    const points = project(
+      [{ ...savings, balance: 50000 }, outright, loan],
+      lines,
+      moving,
+    );
+
+    expect(points.map(({ balances }) => balances)).toStrictEqual([
+      { 3: 50000, 4: 400000, 5: -120000 },
+      { 3: 38000, 4: 400000, 5: -108000 },
+      { 3: 26000, 4: 400000, 5: -96000 },
+      { 3: 0, 4: 500000, 5: 0 },
+    ]);
+    expect(points.map(({ uncovered }) => uncovered)).toStrictEqual([
+      0, 0, 185000, 0,
+    ]);
+  });
+
+  it("refuses a move borrowing on a house with no loan on it", () => {
+    expect(() =>
+      project([savings, house], { expenses: [], income: [] }, moving),
+    ).toThrow("A move borrows on a loan already secured on the house");
+  });
+});
+
 describe("retiring when conditions hold", () => {
   const onConditions = {
     ...plan,
