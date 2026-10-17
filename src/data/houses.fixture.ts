@@ -17,6 +17,7 @@ export const homeValues: HouseValues = {
   bought: { month: { month: 9, year: 2021 }, price: 380000 },
   ceiling: 0,
   growth: 0.021,
+  move: null,
   name: "Home",
   parts: [homePart],
   status: "mortgaged",

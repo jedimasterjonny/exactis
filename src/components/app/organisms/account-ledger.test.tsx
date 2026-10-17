@@ -23,8 +23,11 @@ import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 import { golfPcp as finance, golf } from "@/data/cars.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
+import { moveChoices } from "@/data/houses";
 import { house, houseLoan as loan } from "@/data/houses.fixture";
-import { incomeLines, plan } from "@/data/income.fixture";
+import { incomeLines, plan, retiring } from "@/data/income.fixture";
+import { markersOf } from "@/data/milestones";
+import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import { saved as accepted, refused } from "@/lib/answer";
 import { commit, openEntry } from "@/test/dom";
@@ -66,9 +69,9 @@ function openRow(name: string, opens = name): HTMLElement {
   return screen.getByRole("dialog", { name: opens });
 }
 
-// The ledger on the fixture's accounts and owners, over the plan the
-// income fixture carries, which starts in September 2026, with whatever
-// a test gives in their place. Save reports through the toast manager,
+// The ledger on the fixture's accounts, owners and milestones, over the
+// plan the income fixture carries, which starts in September 2026, with
+// whatever a test gives in their place. Save reports through the toast manager,
 // which needs its Toaster mounted.
 function renderLedger(
   props: Partial<ComponentProps<typeof AccountLedger>> = {},
@@ -78,6 +81,7 @@ function renderLedger(
       accounts={accounts}
       expenses={[]}
       lines={[]}
+      milestones={moveChoices(markersOf(milestones, retiring), retiring, [])}
       owners={owners}
       plan={plan}
       {...props}
@@ -903,6 +907,15 @@ describe("AccountLedger", () => {
     expect(
       within(dialog).getByRole("textbox", { name: "Monthly payment" }),
     ).toHaveValue("£2,180");
+    expect(
+      within(within(dialog).getByRole("combobox", { name: "Moves" }))
+        .getAllByRole("option")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual([
+      "Stays put",
+      "At Kids leave home · 2040",
+      "At Downsize · 2059",
+    ]);
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
 

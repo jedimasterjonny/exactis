@@ -7,6 +7,7 @@ import { useOptimistic, useState } from "react";
 
 import type { Account, AccountKind } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
+import type { MoveChoice } from "@/data/houses";
 import type { IncomeLine } from "@/data/income";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
@@ -35,6 +36,7 @@ interface AccountLedgerProps {
   readonly accounts: readonly Account[];
   readonly expenses: readonly ExpenseLine[];
   readonly lines: readonly IncomeLine[];
+  readonly milestones: readonly MoveChoice[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
 }
@@ -80,11 +82,13 @@ type AssetOpening = "new" | Secured;
 // their own beneath the flow, and are handed to the sheet and the flow,
 // to say whose each wrapper is, and to the account dialog, to choose
 // it; the income lines are handed to the owners too, to say who earns
-// what and why they stay.
+// what and why they stay. The milestones a house may move at are
+// handed to the house dialog, for the one it moves at.
 export function AccountLedger({
   accounts,
   expenses,
   lines,
+  milestones,
   owners,
   plan,
 }: AccountLedgerProps): JSX.Element {
@@ -268,6 +272,7 @@ export function AccountLedger({
       {house !== null && (
         <HouseDialog
           house={house === "new" ? null : house}
+          milestones={milestones}
           onDelete={drop}
           onDismiss={close}
           onSaved={close}

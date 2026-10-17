@@ -1,10 +1,13 @@
-import type { Account, Purchase } from "@/data/accounts";
+import type { Account, Move, Purchase } from "@/data/accounts";
+import type { Marker } from "@/data/milestones";
+import type { Plan } from "@/data/plan";
 import type { LineValues, Month } from "@/data/schedule";
 import type { Secured, SecuredRecords } from "@/data/secured";
 import type { LoanFigure } from "@/lib/figures";
 import type { Owed, PlanMonth } from "@/lib/loans";
 
 import { toValues } from "@/data/accounts";
+import { endYear } from "@/data/plan";
 import { owes, securedRecords } from "@/data/secured";
 import { sumOf } from "@/lib/ledger";
 import { runsIn } from "@/lib/lines";
@@ -27,11 +30,13 @@ export interface HouseDraft<TPart extends PartDraft = PartDraft> extends Omit<
 // no higher than, whole pounds of today's money and nothing for none,
 // when it was bought and what it cost, and for a mortgaged house the
 // sub-accounts the mortgage is held in, one at least, in the order they
-// are listed. A house owned outright has none.
+// are listed. A house owned outright has none. A house moving carries
+// the move, and one staying put none.
 export interface HouseValues {
   readonly bought: Purchase;
   readonly ceiling: number;
   readonly growth: number;
+  readonly move: MoveValues | null;
   readonly name: string;
   readonly parts: readonly Part[];
   readonly status: Status;
@@ -44,6 +49,27 @@ export interface HouseValues {
 export interface Mortgage {
   readonly ids: ReadonlySet<number>;
   readonly name: string;
+}
+
+// A milestone a move may be at, as the house dialog offers it: one the
+// household lists, by its id, with its name and the year it falls in.
+export type MoveChoice = Omit<Marker, "id"> & { readonly id: number };
+
+// A move as the dialog holds it: flat, with every field present. The
+// milestone it is at, by its id, and the year that falls in; what the
+// next house costs and the ceiling it is held to, whole pounds of
+// today's money and nothing for none; and the share of the price the
+// mortgage may borrow, nothing for a move borrowing nothing, at its
+// rate over its term in whole years, which are kept beside a share of
+// nothing whether or not they apply.
+export interface MoveValues {
+  readonly at: number;
+  readonly ceiling: number;
+  readonly loanToValue: number;
+  readonly price: number;
+  readonly rate: number;
+  readonly term: number;
+  readonly year: number;
 }
 
 // A sub-account of a mortgage, which a lender may hold a mortgage in
@@ -81,6 +107,19 @@ interface Drawing<TItem> {
     mortgage: Mortgage,
   ) => TItem;
 }
+
+// The move a house opens on once a milestone is chosen for it: the next
+// house costing nothing yet, which holds the save until what it costs
+// is typed, held to no ceiling and borrowing nothing, with the term a
+// mortgage opens on, twenty-five years as a new sub-account's, standing
+// by. The milestone and its year are the choice's to give.
+export const openingMove = {
+  ceiling: 0,
+  loanToValue: 0,
+  price: 0,
+  rate: 0,
+  term: 25,
+} as const satisfies Omit<MoveValues, "at" | "year">;
 
 // The choices as a list, so the action's schema and the dialog's select
 // take the same words the type does and cannot drift from them.
@@ -131,7 +170,8 @@ export function drawnAsMortgages<TItem>(
 // sub-account, its balance owed, so it comes back positive, its rate
 // the sub-account's and its contribution the payment, a month as the
 // records lay it. A house with no loan against it is owned outright and
-// owes nothing.
+// owes nothing. A move is read flat, a ceiling and a mortgage it does
+// not carry as nothing, with the term a mortgage opens on beside them.
 export function houseOf(
   { asset, loans }: Secured,
   plan: PlanMonth,
@@ -141,6 +181,7 @@ export function houseOf(
     bought: asset.bought ?? openingPurchase(plan),
     ceiling: asset.limit ?? 0,
     growth: held.rate,
+    move: asset.move === undefined ? null : moveValuesOf(asset.move),
     name: held.name,
     parts: loans
       .map(toValues)
@@ -159,14 +200,18 @@ export function houseOf(
 // paying something and charged a rate no lower than nothing. The save
 // button holds until it is one, and while a ceiling sits below what the
 // house is worth, more likely a slip than a fall the engine would bring
-// the house straight down to.
+// the house straight down to. A move buys a house for something, under
+// any ceiling it carries for the same reason, and borrows only on a
+// house mortgaged now, whose loan carries the mortgage on through it,
+// over a whole number of years, one at least.
 export function isSound(house: HouseValues): boolean {
   return (
     house.name.trim() !== "" &&
     house.bought.price > 0 &&
     (house.ceiling === 0 || house.ceiling >= house.value) &&
     (house.status === "outright" ||
-      (house.parts.length > 0 && house.parts.every(owes)))
+      (house.parts.length > 0 && house.parts.every(owes))) &&
+    (house.move === null || movesSoundly(house.move, house.status))
   );
 }
 
@@ -213,6 +258,28 @@ export function mortgageOn({ asset, loans }: Secured): Mortgage | null {
     : null;
 }
 
+// The milestones a house may move at, from those the plan is laid out
+// by, in their order: each the household lists reached at an age within
+// the plan's years, since a move before them falls in no year the plan
+// carries and one after them in none it reaches, so it would be kept
+// and never made; and any a house moves at already, wherever it falls
+// now, so the dialog opens on the move as kept. Retirement is no
+// milestone the household lists.
+export function moveChoices(
+  markers: readonly Marker[],
+  plan: Plan,
+  accounts: readonly Account[],
+): readonly MoveChoice[] {
+  const isKept = (id: number): boolean =>
+    accounts.some(({ move }) => move?.at === id);
+  return markers.flatMap(({ id, name, year }) =>
+    id !== "retirement" &&
+    ((year >= plan.from && year <= endYear(plan)) || isKept(id))
+      ? [{ id, name, year }]
+      : [],
+  );
+}
+
 // The purchase a house opens on before one is typed: the month the
 // plan starts in, for nothing, which holds the save until what it cost
 // is typed.
@@ -222,7 +289,8 @@ export function openingPurchase(plan: PlanMonth): Purchase {
 
 // The records a house is written as: an asset of its own kind growing
 // at its own fixed rate, held to its ceiling if it has one and carrying
-// when it was bought, and for a mortgaged house each sub-account and
+// when it was bought and any move, and for a mortgaged house each
+// sub-account and
 // its payments, as every secured asset's loans are written, none
 // leaving a balloon standing. Both are named for the house, and a
 // mortgage in more than one sub-account names each by its place, so the
@@ -236,6 +304,7 @@ export function toRecords(
       bought: house.bought,
       kind: "house",
       ...(house.ceiling > 0 && { limit: house.ceiling }),
+      ...(house.move !== null && { move: moveOf(house.move) }),
       name: house.name,
       rate: house.growth,
       value: house.value,
@@ -259,6 +328,45 @@ export function toRecords(
 // wherever its sub-accounts are drawn as one.
 function mortgageOf(house: string): string {
   return `${house} mortgage`;
+}
+
+// A move as the records keep it: a ceiling of nothing is none, and a
+// share of nothing borrows nothing, so carries no mortgage.
+function moveOf({
+  ceiling,
+  loanToValue,
+  rate,
+  term,
+  ...move
+}: MoveValues): Move {
+  return {
+    ...move,
+    ...(ceiling > 0 && { ceiling }),
+    ...(loanToValue > 0 && { mortgage: { loanToValue, rate, term } }),
+  };
+}
+
+// Whether a move is one the store would take of a house with the status
+// given, as isSound says.
+function movesSoundly(move: MoveValues, status: Status): boolean {
+  return (
+    move.price > 0 &&
+    (move.ceiling === 0 || move.ceiling >= move.price) &&
+    (move.loanToValue === 0 ||
+      (status === "mortgaged" && Number.isInteger(move.term) && move.term >= 1))
+  );
+}
+
+// The reverse: a move as the dialog opens on it, what it does not carry
+// as nothing and a mortgage it does not take over the term one opens on.
+function moveValuesOf({ ceiling = 0, mortgage, ...move }: Move): MoveValues {
+  return {
+    ...move,
+    ceiling,
+    loanToValue: mortgage?.loanToValue ?? 0,
+    rate: mortgage?.rate ?? 0,
+    term: mortgage?.term ?? openingMove.term,
+  };
 }
 
 // What a mortgage's payments are over: the balance, which they clear,

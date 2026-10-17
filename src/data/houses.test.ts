@@ -9,9 +9,13 @@ import {
   homePart,
   house,
   houseLoan,
+  move,
 } from "@/data/houses.fixture";
+import { retiring } from "@/data/income.fixture";
+import { markersOf } from "@/data/milestones";
+import { milestones } from "@/data/milestones.fixture";
 
-import type { PartDraft } from "./houses";
+import type { MoveValues, PartDraft } from "./houses";
 
 import {
   derive,
@@ -20,10 +24,24 @@ import {
   isSound,
   mortgageLine,
   mortgageOn,
+  moveChoices,
   toRecords,
 } from "./houses";
 
 const draft: PartDraft = { ...homePart, key: 0, term: 26 };
+
+// The fixture's move as the dialog holds it: at the children leaving
+// home in 2040, to £650,000 held to £800,000, borrowing up to 90% at
+// 4.5% over 25 years.
+const moving: MoveValues = {
+  at: 1,
+  ceiling: 800000,
+  loanToValue: 0.9,
+  price: 650000,
+  rate: 0.045,
+  term: 25,
+  year: 2040,
+};
 
 // The plan read in September 2026, so eight months of the year are gone.
 const plan = { from: 2026, month: 8 };
@@ -60,6 +78,54 @@ describe("isSound", () => {
   it("wants a ceiling, if the house has one, no lower than what it is worth", () => {
     expect(isSound({ ...home, ceiling: home.value })).toBe(true);
     expect(isSound({ ...home, ceiling: home.value - 1 })).toBe(false);
+  });
+
+  it("wants a move to cost something, under any ceiling it carries, and to borrow only on a house mortgaged now, over whole years", () => {
+    const outright = { ...home, parts: [], status: "outright" } as const;
+
+    expect(isSound({ ...home, move: moving })).toBe(true);
+    expect(isSound({ ...home, move: { ...moving, ceiling: 0 } })).toBe(true);
+    expect(isSound({ ...home, move: { ...moving, price: 0 } })).toBe(false);
+    expect(isSound({ ...home, move: { ...moving, ceiling: 649999 } })).toBe(
+      false,
+    );
+    expect(isSound({ ...home, move: { ...moving, term: 0 } })).toBe(false);
+    expect(isSound({ ...home, move: { ...moving, term: 2.5 } })).toBe(false);
+    expect(isSound({ ...outright, move: moving })).toBe(false);
+    expect(
+      isSound({ ...outright, move: { ...moving, loanToValue: 0, term: 0 } }),
+    ).toBe(true);
+  });
+});
+
+describe("moveChoices", () => {
+  // The reference plan runs from 2026 to 2083, its owner retiring in
+  // 2053; the children leave home in 2040 and the downsize is in 2059.
+  const markers = markersOf(milestones, retiring);
+  const kidsLeave = { id: 1, name: "Kids leave home", year: 2040 };
+  const downsize = { id: 2, name: "Downsize", year: 2059 };
+
+  it("offers each milestone the household lists within the plan's years, and not retirement", () => {
+    expect(moveChoices(markers, retiring, [])).toStrictEqual([
+      kidsLeave,
+      downsize,
+    ]);
+  });
+
+  // A plan to 2046 ends before the downsize, and one from 2044 opens
+  // after the children leave.
+  it("leaves out one before the plan or past its end, unless a house moves at it already", () => {
+    const shorter = { ...retiring, years: 20 };
+
+    expect(moveChoices(markers, shorter, [])).toStrictEqual([kidsLeave]);
+    expect(
+      moveChoices(markers, shorter, [
+        { ...house, move: { ...move, at: 2, year: 2059 } },
+      ]),
+    ).toStrictEqual([kidsLeave, downsize]);
+    expect(
+      moveChoices(markers, { ...retiring, from: 2044, years: 39 }, []),
+    ).toStrictEqual([downsize]);
   });
 });
 
@@ -188,6 +254,7 @@ describe("houseOf", () => {
       bought: { month: { month: 9, year: 2021 }, price: 380000 },
       ceiling: 0,
       growth: 0.021,
+      move: null,
       name: "Home",
       parts: [owed],
       status: "mortgaged",
@@ -215,6 +282,7 @@ describe("houseOf", () => {
       bought: { month: { month: 9, year: 2021 }, price: 380000 },
       ceiling: 0,
       growth: 0.021,
+      move: null,
       name: "Home",
       parts: [],
       status: "outright",
@@ -223,6 +291,32 @@ describe("houseOf", () => {
     expect(
       houseOf({ ...pair, asset: { ...house, limit: 600000 } }, plan).ceiling,
     ).toBe(600000);
+  });
+
+  // A move kept with a ceiling and a mortgage reads back as it was, and
+  // one with neither reads them as nothing, over the term a mortgage
+  // opens on.
+  it("reads a move flat, a ceiling and a mortgage it does not carry as nothing", () => {
+    const pair = { asset: { ...house, move }, loans: [houseLoan] };
+
+    expect(houseOf(pair, plan).move).toStrictEqual(moving);
+    expect(
+      houseOf(
+        {
+          ...pair,
+          asset: { ...house, move: { at: 2, price: 300000, year: 2059 } },
+        },
+        plan,
+      ).move,
+    ).toStrictEqual({
+      at: 2,
+      ceiling: 0,
+      loanToValue: 0,
+      price: 300000,
+      rate: 0,
+      term: 25,
+      year: 2059,
+    });
   });
 
   // The household holds a house to carrying its purchase, so a record
@@ -264,6 +358,21 @@ describe("toRecords", () => {
     expect(toRecords({ ...home, ceiling: 600000 }, plan).asset.limit).toBe(
       600000,
     );
+  });
+
+  // A ceiling of nothing is none and a share of nothing borrows
+  // nothing, so neither is kept.
+  it("writes a move with the house as the records keep it", () => {
+    expect(toRecords({ ...home, move: moving }, plan).asset.move).toStrictEqual(
+      move,
+    );
+    expect(
+      toRecords(
+        { ...home, move: { ...moving, ceiling: 0, loanToValue: 0 } },
+        plan,
+      ).asset.move,
+    ).toStrictEqual({ at: 1, price: 650000, year: 2040 });
+    expect(toRecords(home, plan).asset).not.toHaveProperty("move");
   });
 
   // Its payments' end is the loan's to say, worked out when the

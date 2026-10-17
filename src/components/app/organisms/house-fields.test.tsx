@@ -4,11 +4,19 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LoanDraft } from "@/components/app/organisms/loan-fields";
-import type { HouseDraft, HouseValues, PartDraft } from "@/data/houses";
+import type {
+  HouseDraft,
+  HouseValues,
+  MoveValues,
+  PartDraft,
+} from "@/data/houses";
 import type { LoanFigure } from "@/lib/figures";
 
+import { moveChoices, openingMove } from "@/data/houses";
 import { homePart, homeValues } from "@/data/houses.fixture";
-import { plan } from "@/data/income.fixture";
+import { plan, retiring } from "@/data/income.fixture";
+import { markersOf } from "@/data/milestones";
+import { milestones } from "@/data/milestones.fixture";
 import { commit, field, select } from "@/test/dom";
 
 import { HouseFields } from "./house-fields";
@@ -24,6 +32,19 @@ const part: PartDraft = { ...homePart, key: 0, term: 26 };
 const home: HouseDraft = { ...homeValues, parts: [part] };
 
 const workedHint = "Worked out";
+
+// The move the fixture makes, as the dialog holds it: at the children
+// leaving home in 2040, to £650,000 held to £800,000, borrowing up to
+// 90% at 4.5% over 25 years.
+const moving: MoveValues = {
+  at: 1,
+  ceiling: 800000,
+  loanToValue: 0.9,
+  price: 650000,
+  rate: 0.045,
+  term: 25,
+  year: 2040,
+};
 
 // The spies the fields report to, where the dialog listens.
 interface Spies {
@@ -63,6 +84,7 @@ function renderFields(
         parts: draft.parts.map((each) => ({ ...each, figure: shown, worked })),
       }}
       initial={draft}
+      milestones={moveChoices(markersOf(milestones, retiring), retiring, [])}
       plan={plan}
     />
   );
@@ -247,6 +269,87 @@ describe("HouseFields", () => {
     expect(onWork).toHaveBeenCalledExactlyOnceWith(3, "payment");
     expect(onRemove).toHaveBeenCalledExactlyOnceWith(3);
     expect(onAdd).toHaveBeenCalledOnce();
+  });
+
+  // The children leave home in 2040 and the downsize is in 2059;
+  // retirement in 2053 is no milestone a move is made at.
+  it("offers each milestone reached at an age to move at, opening a move on the figures it held, and staying put", () => {
+    const { onAmend } = renderFields(home, "payment", 1889);
+
+    expect(select("Moves")).toHaveDisplayValue("Stays put");
+    expect(select("Moves")).toHaveAccessibleDescription(
+      "Sold, and the next bought, as its year opens",
+    );
+    expect(
+      within(select("Moves"))
+        .getAllByRole("option")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual([
+      "Stays put",
+      "At Kids leave home · 2040",
+      "At Downsize · 2059",
+    ]);
+    expect(
+      screen.queryByRole("textbox", { name: "Next house costs" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(select("Moves"), { target: { value: "1" } });
+
+    expect(onAmend).toHaveBeenLastCalledWith({
+      move: { ...openingMove, at: 1, year: 2040 },
+    });
+  });
+
+  it("mounts a move's fields on it, reports each change, and shows the mortgage's only while it borrows", () => {
+    const { onAmend } = renderFields(
+      { ...home, move: moving },
+      "payment",
+      1889,
+    );
+
+    expect(select("Moves")).toHaveDisplayValue("At Kids leave home · 2040");
+    expect(field("Next house costs")).toHaveValue("£650,000");
+    expect(field("Next house costs")).toHaveAccessibleDescription(
+      "Today's money",
+    );
+    expect(field("Next ceiling")).toHaveValue("£800,000");
+    expect(field("Borrows up to")).toHaveValue("90.00%");
+    expect(field("Mortgage rate")).toHaveValue("4.50%");
+    expect(field("Mortgage term")).toHaveValue("25");
+
+    commit(field("Next house costs"), "700,000");
+    commit(field("Next ceiling"), "0");
+    commit(field("Mortgage rate"), "5");
+    commit(field("Mortgage term"), "30");
+    commit(field("Borrows up to"), "0");
+    fireEvent.change(select("Moves"), { target: { value: "2" } });
+    fireEvent.change(select("Moves"), { target: { value: "stays" } });
+
+    expect(onAmend.mock.calls).toStrictEqual([
+      [{ move: { ...moving, price: 700000 } }],
+      [{ move: { ...moving, ceiling: 0 } }],
+      [{ move: { ...moving, rate: 0.05 } }],
+      [{ move: { ...moving, term: 30 } }],
+      [{ move: { ...moving, loanToValue: 0 } }],
+      [{ move: { ...moving, at: 2, year: 2059 } }],
+      [{ move: null }],
+    ]);
+  });
+
+  it("shows no mortgage's fields for a move borrowing nothing", () => {
+    renderFields(
+      { ...home, move: { ...moving, loanToValue: 0 } },
+      "payment",
+      1889,
+    );
+
+    expect(field("Borrows up to")).toHaveValue("0.00%");
+    expect(
+      screen.queryByRole("textbox", { name: "Mortgage rate" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Mortgage term" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows no loan fields for a house owned outright", () => {

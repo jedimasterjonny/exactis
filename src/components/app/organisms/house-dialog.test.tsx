@@ -17,8 +17,11 @@ import type { Answer } from "@/lib/answer";
 import { saveHouse } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
-import { house as houseAsset, houseLoan } from "@/data/houses.fixture";
-import { plan } from "@/data/income.fixture";
+import { moveChoices } from "@/data/houses";
+import { house as houseAsset, houseLoan, move } from "@/data/houses.fixture";
+import { plan, retiring } from "@/data/income.fixture";
+import { markersOf } from "@/data/milestones";
+import { milestones } from "@/data/milestones.fixture";
 import { saved as accepted, refused } from "@/lib/answer";
 import { commit, field, openDialog } from "@/test/dom";
 
@@ -55,6 +58,7 @@ function renderDialog(
   return render(
     <HouseDialog
       house={null}
+      milestones={moveChoices(markersOf(milestones, retiring), retiring, [])}
       onDismiss={vi.fn<() => void>()}
       onSaved={vi.fn<() => void>()}
       plan={plan}
@@ -134,6 +138,7 @@ describe("HouseDialog", () => {
       bought: { month: { month: 8, year: 2026 }, price: 380000 },
       ceiling: 0,
       growth: 0,
+      move: null,
       name: "Home",
       parts: [{ balance: 334670, payment: 1889, rate: 0.0485 }],
       status: "mortgaged",
@@ -205,6 +210,7 @@ describe("HouseDialog", () => {
       bought: { month: { month: 9, year: 2021 }, price: 380000 },
       ceiling: 600000,
       growth: 0.021,
+      move: null,
       name: "Home",
       parts: [{ balance: 176520, payment: 2180, rate: 0.0485 }],
       status: "mortgaged",
@@ -277,6 +283,7 @@ describe("HouseDialog", () => {
       bought: { month: { month: 9, year: 2021 }, price: 380000 },
       ceiling: 0,
       growth: 0.021,
+      move: null,
       name: "Home",
       parts: [{ balance: 176520, payment: 2180, rate: 0.0485 }],
       status: "mortgaged",
@@ -374,6 +381,7 @@ describe("HouseDialog", () => {
       bought: { month: { month: 8, year: 2026 }, price: 380000 },
       ceiling: 0,
       growth: 0,
+      move: null,
       name: "Home",
       parts: [{ balance: 334670, payment: 1000, rate: 0.0485 }],
       status: "mortgaged",
@@ -457,6 +465,7 @@ describe("HouseDialog", () => {
       bought: { month: { month: 9, year: 2021 }, price: 380000 },
       ceiling: 0,
       growth: 0.021,
+      move: null,
       name: "Home",
       parts: [
         { balance: 176520, payment: 2180, rate: 0.0485 },
@@ -557,6 +566,7 @@ describe("HouseDialog", () => {
       bought: { month: { month: 9, year: 2021 }, price: 230000 },
       ceiling: 0,
       growth: 0.02,
+      move: null,
       name: "Flat",
       parts: [],
       status: "outright",
@@ -565,6 +575,90 @@ describe("HouseDialog", () => {
     expect(
       screen.getByRole("dialog", { name: "House added" }),
     ).toHaveAccessibleDescription("Flat");
+  });
+
+  // The fixture's home moving up as the children leave home in 2040,
+  // borrowing up to 90%, which it can only while it is mortgaged now.
+  it("opens a house's move as kept, holds the save while it borrows on a house owned outright, and saves it with the edit", async () => {
+    const onSaved = vi.fn<() => void>();
+    saved(house.asset);
+    renderDialog({
+      house: { ...house, asset: { ...house.asset, move } },
+      onSaved,
+    });
+    const dialog = openDialog();
+
+    expect(
+      within(dialog).getByRole("combobox", { name: "Moves" }),
+    ).toHaveDisplayValue("At Kids leave home · 2040");
+    expect(field("Next house costs", dialog)).toHaveValue("£650,000");
+    expect(field("Next ceiling", dialog)).toHaveValue("£800,000");
+    expect(field("Borrows up to", dialog)).toHaveValue("90.00%");
+    expect(field("Mortgage rate", dialog)).toHaveValue("4.50%");
+    expect(field("Mortgage term", dialog)).toHaveValue("25");
+
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Status" }), {
+      target: { value: "outright" },
+    });
+
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(field("Borrows up to", dialog)).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(
+      within(dialog).getByText(
+        "A house owned outright borrows nothing as it moves",
+      ),
+    ).toHaveClass("text-destructive");
+
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Status" }), {
+      target: { value: "mortgaged" },
+    });
+
+    expect(
+      within(dialog).queryByText(
+        "A house owned outright borrows nothing as it moves",
+      ),
+    ).not.toBeInTheDocument();
+
+    // The mortgage's fields go while the move borrows nothing, and come
+    // back on the rate typed before they went.
+    commit(field("Mortgage rate", dialog), "5");
+    commit(field("Borrows up to", dialog), "0");
+
+    expect(
+      within(dialog).queryByRole("textbox", { name: "Mortgage rate" }),
+    ).not.toBeInTheDocument();
+
+    commit(field("Borrows up to", dialog), "90");
+
+    expect(field("Mortgage rate", dialog)).toHaveValue("5.00%");
+
+    commit(field("Next house costs", dialog), "700,000");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
+      bought: { month: { month: 9, year: 2021 }, price: 380000 },
+      ceiling: 0,
+      growth: 0.021,
+      move: {
+        at: 1,
+        ceiling: 800000,
+        loanToValue: 0.9,
+        price: 700000,
+        rate: 0.05,
+        term: 25,
+        year: 2040,
+      },
+      name: "Home",
+      parts: [{ balance: 176520, payment: 2180, rate: 0.0485 }],
+      status: "mortgaged",
+      value: 397512,
+    });
   });
 
   it("keeps a refused save open and says why", async () => {

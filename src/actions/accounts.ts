@@ -76,13 +76,28 @@ const car = z
 // no lower than nothing, a mortgaged house held in a sub-account at
 // least, each owing and paying something, a house owned outright in
 // none, since the form drops what its status hides, the month it was
-// bought in and the price, which its soundness holds to something, and
-// the name as typed less the space around it.
+// bought in and the price, which its soundness holds to something, the
+// name as typed less the space around it, and a move or none: at a
+// milestone by its id, in a whole year, its figures whole and never
+// negative, the share borrowed no more than the whole price and the
+// rate no lower than nothing. That the milestone is one the household
+// lists, reached at an age, is the household's to hold.
 const house = z
   .object({
     bought: z.object({ month, price: pounds }),
     ceiling: pounds,
     growth: z.number().min(-1),
+    move: z
+      .object({
+        at: recordId,
+        ceiling: pounds,
+        loanToValue: z.number().min(0).max(1),
+        price: pounds,
+        rate: z.number().nonnegative(),
+        term: z.number().int().nonnegative(),
+        year: z.number().int(),
+      })
+      .nullable(),
     name: named,
     parts: z.array(
       z.object({
@@ -461,12 +476,12 @@ function securedIn(
 // id is null, else written over the one with that id in its place,
 // keeping the asset a loan is secured on, since what an account
 // secures is not among the values a save sends, carrying the purchase
-// a house and the limit an asset sends beside its values, and dated as
-// below.
+// and the move a house and the limit an asset sends beside its values,
+// and dated as below.
 function writtenIn(
   kept: Kept,
   at: null | number,
-  values: AccountValues & Pick<Account, "bought" | "limit">,
+  values: AccountValues & Pick<Account, "bought" | "limit" | "move">,
 ): { readonly kept: Kept; readonly result: Account } {
   const {
     next,
