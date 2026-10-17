@@ -300,6 +300,42 @@ describe("derivedSet", () => {
     expect(all?.rebalancing).toBe(0);
   });
 
+  // At the glide path's 65/35 the rates are blended as they were, and
+  // rebalancing earns what it does between the sleeves in those shares.
+  it("derives the rates as blended at a split given in place of the target allocation's, and what rebalancing earns at it", () => {
+    const derived = derivedSet(sources, { stocks: 0.65 });
+    const [bonds, stocks] = [blended().bonds, blended().stocks];
+    const risk = riskOf(cma, blended());
+
+    expect(derived).toMatchObject({
+      allocation: { stocks: 0.65 },
+      rates: cmaRates(blended(), sources.deductions, inflationOf(curve).rate),
+    });
+    expect("short" in derived ? null : derived.rebalancing).toBe(
+      "short" in risk
+        ? null
+        : rebalancingOf(
+            {
+              bonds: { ...bonds, share: 0.35 },
+              stocks: { ...stocks, share: 0.65 },
+            },
+            risk,
+          ).portfolio,
+    );
+  });
+
+  // All in UK equities, nothing says what the 35% the glide path holds
+  // in bonds returns; all in stocks, it holds nothing in them.
+  it("derives none at a split holding a sleeve the target allocation holds none of", () => {
+    const equities = { ...sources, targets: onlyIn("UK equity") };
+
+    expect(derivedSet(equities, { stocks: 0.65 })).toStrictEqual({
+      short:
+        "The glide path holds bonds the target allocation holds none of, so nothing says what they return",
+    });
+    expect(derivedSet(equities, { stocks: 1 })).not.toHaveProperty("short");
+  });
+
   // A vintage pulled before volatilities were read gives the same rates
   // and nothing over them, so the plan runs on the blend as it did.
   it("derives the rates with nothing earned by rebalancing while the vintage gives no risk", () => {

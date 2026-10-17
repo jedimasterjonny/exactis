@@ -277,7 +277,9 @@ export function outcomesOf(
 
 // One future of the markets for the plan, a return and an inflation for
 // every year it carries, each drawn apart from the others and log-normal
-// about the plan's own: one plus a year's figure is one plus the plan's
+// about the plan's own, its return about the year's along a glide path,
+// and never about a path's, since a path is what is drawn here: one plus
+// a year's figure is one plus the plan's
 // times the exponential of a normal draw scaled to the spread. So the
 // middle year of the draws grows at exactly the plan's rate. That is
 // what the plan rate means, BlackRock's returns being annualised, a
@@ -295,15 +297,15 @@ export function outcomesOf(
 // says how the two move together, and each year apart from the last, so
 // a decade of high prices is rarer here than the past has known.
 export function pathOf(
-  plan: Pick<Plan, "inflation" | "rate" | "years">,
+  plan: Pick<Plan, "byYear" | "inflation" | "rate" | "years">,
   spread: Spread,
   normal: () => number,
 ): Path {
   const drawn = (rate: number, by: number): number =>
     (1 + rate) * Math.exp(by * normal()) - 1;
-  const years = Array.from({ length: plan.years }, () => ({
+  const years = Array.from({ length: plan.years }, (_, offset) => ({
     inflation: drawn(plan.inflation, spread.inflation),
-    rate: drawn(plan.rate, spread.rate),
+    rate: drawn(plan.byYear?.[offset] ?? plan.rate, spread.rate),
   }));
   return {
     inflation: years.map(({ inflation }) => inflation),

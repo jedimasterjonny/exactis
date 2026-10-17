@@ -59,6 +59,26 @@ export const openingRates: Rates = {
   stocks: 0.05,
 };
 
+// The share in bonds the glide path holds at an age: an anchor's own at
+// its age, the straight line between the anchors either side of it
+// between them, as the line is drawn, and the nearest anchor's before
+// the first and past the last, so the path holds flat beyond its ends.
+// The share is the bonds' own rather than what stocks leave, so an
+// anchor's figure comes back as it was typed. None for a glide path of
+// no anchors, which is no glide path, the plan holding the one split
+// for life.
+export function bondsAt(glide: readonly Anchor[], age: number): null | number {
+  const below = glide.findLast((anchor) => anchor.age <= age);
+  const above = glide.find((anchor) => anchor.age > age);
+  if (below === undefined || above === undefined) {
+    return (below ?? above)?.bonds ?? null;
+  }
+  return (
+    below.bonds +
+    ((above.bonds - below.bonds) * (age - below.age)) / (above.age - below.age)
+  );
+}
+
 // The rate every account on the plan rate grows at: what stocks return
 // in all and what bonds return, each in the share the split holds of it,
 // and what rebalancing earns over that blend, which the derived set
