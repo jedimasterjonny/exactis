@@ -38,9 +38,13 @@ export interface Path {
 // beside the accounts and the lines rather than inside the engine,
 // since the flow and the projection each read it and the flow is what
 // the projection is built on. A plan run over one future of the markets
-// rather than at its own rates carries that future's path as well.
+// rather than at its own rates carries that future's path as well. A
+// plan on a glide path carries the plan rate each of its years by year,
+// the first year's first, since the split moves with its owner's age,
+// and its own rate is then its first year's, the rate it grows at now.
 export interface Plan {
   readonly born: number;
+  readonly byYear?: readonly number[];
   readonly from: number;
   readonly inflation: number;
   readonly month: number;
@@ -277,6 +281,22 @@ export function rateFrom(account: Account, plan: Plan): number {
     case "plan":
       return plan.rate;
   }
+}
+
+// The plan rate in a year: the path's figure for it, along one, the
+// glide path's for a year the path holds none for, and the plan's own
+// for a year neither does, a year before the plan or past where either
+// runs, and for every year of a plan on one split for life carried at
+// its own rates.
+export function rateIn(
+  plan: Pick<Plan, "byYear" | "from" | "path" | "rate">,
+  year: number,
+): number {
+  return (
+    plan.path?.rate[year - plan.from] ??
+    plan.byYear?.[year - plan.from] ??
+    plan.rate
+  );
 }
 
 // The year the plan's owner retires in, the first in which they earn

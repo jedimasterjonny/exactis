@@ -35,8 +35,21 @@ import { derivedSet, openingDeductions, sleeves, spreadOf } from "@/data/cma";
 import { incomeKinds } from "@/data/income";
 import { ageOf, timed } from "@/data/milestones";
 import { openingOwner } from "@/data/owners";
-import { debtTermOf, endAge, oldestAge, planOf, rateFrom } from "@/data/plan";
-import { allInStocks, openingRates, rateSets } from "@/data/rates";
+import {
+  ageIn,
+  debtTermOf,
+  endAge,
+  oldestAge,
+  planOf,
+  rateFrom,
+} from "@/data/plan";
+import {
+  allInStocks,
+  bondsAt,
+  openingRates,
+  planRate,
+  rateSets,
+} from "@/data/rates";
 import { rules } from "@/data/rules";
 import {
   categoryValues,
@@ -536,7 +549,8 @@ const glide = z
   ) satisfies z.ZodType<readonly Anchor[]>;
 
 // The plan as the day it is read makes it: a month of the year, whole
-// years forward, the plan rate no lower than losing everything, prices
+// years forward, the plan rate no lower than losing everything, in each
+// year of a glide path as for life, prices
 // falling by less than everything, the owners it carries for the
 // engine, one at least, and the ages the plan action holds,
 // its owner retiring no later than it ends and it ending by the oldest
@@ -547,6 +561,7 @@ const glide = z
 const plan = z
   .object({
     born: z.number().int(),
+    byYear: z.array(z.number().min(-1, rules.beyondLoss)).exactOptional(),
     from: z.number().int(),
     inflation: z.number().gt(-1, rules.inflation),
     month: monthOfYear,
@@ -808,7 +823,14 @@ const kept = z
 // again. Neither can be done the other way round while the CMA's are
 // live, since a category is mapped once it is imported and onto a class
 // the latest vintage kept prices. A change under the rates typed, or one
-// leaving the CMA's whole, is let through.
+// leaving the CMA's whole, is let through. One leaving the CMA's whole
+// but the glide path holding a sleeve the target allocation then holds
+// none of is refused too, saying so, and that the way through is the
+// glide path or the rates typed, since choosing the CMA's again would be
+// refused the same way. Each anchor's own split is asked, which is
+// every split the path holds between them; an anchor outside the plan's
+// years is asked as well, which can refuse a change the plan's own
+// years would let through, and choosing the rates typed lets it through.
 export function holdWhileLive(
   kept: Kept,
   change: { readonly cannot: string; readonly then: string },
@@ -820,6 +842,14 @@ export function holdWhileLive(
   if ("short" in derived) {
     throw new Refusal(
       `${derived.short}, so ${change.cannot} while the plan runs on the CMA's rates. Choose custom rates, ${change.then}, then choose From CMA again`,
+    );
+  }
+  const glided = kept.glide
+    .map(({ bonds }) => derivedSet(kept, { stocks: 1 - bonds }))
+    .find((set): set is Shortfall => "short" in set);
+  if (glided !== undefined) {
+    throw new Refusal(
+      `${glided.short}, so ${change.cannot} while the plan runs on the CMA's rates. Change the glide path first, or choose custom rates`,
     );
   }
 }
@@ -916,6 +946,39 @@ function endsInAYear(line: {
   return line.lastMonth === null || line.lastYear !== null;
 }
 
+// The plan along the glide path, where the household keeps one: its
+// rate in each year the one the rates live make with the split the path
+// holds at the age its owner reaches in that year, and its own rate the
+// one it grows at in its first, so a figure naming the plan rate names
+// the rate it grows at now. Only the split moves from year to year, and
+// a path holds the same one through every flat stretch, so each split
+// is worked out once. A household with no glide path holds the one
+// split for life, and its plan is as it was made.
+function glidedOf(kept: Kept, plan: Plan): Plan {
+  if (kept.glide.length === 0) {
+    return plan;
+  }
+  const known = new Map<null | number, number>();
+  const rateIn = (year: number): number => {
+    const bonds = bondsAt(kept.glide, ageIn(year, plan));
+    const found = known.get(bonds);
+    if (found !== undefined) {
+      return found;
+    }
+    const live = liveOf(kept, bonds);
+    const rate = planRate(live.rates, live.allocation, live.rebalancing);
+    known.set(bonds, rate);
+    return rate;
+  };
+  return {
+    ...plan,
+    byYear: Array.from({ length: plan.years }, (_, offset) =>
+      rateIn(plan.from + offset),
+    ),
+    rate: rateIn(plan.from),
+  };
+}
+
 // The whole a kept household makes, its plan running from the month
 // after the one its balances are as of on the rates and the split live,
 // for the first listed owner, each line's tied ends read off the
@@ -923,7 +986,7 @@ function endsInAYear(line: {
 // the loan's payments do.
 function householdOf(kept: Kept): Household {
   const live = liveOf(kept);
-  const plan = planOf(kept, live);
+  const plan = glidedOf(kept, planOf(kept, live));
   return {
     accounts: kept.accounts,
     allocation: kept.allocation,
@@ -990,11 +1053,14 @@ function isListedOnce(records: readonly { readonly id: number }[]): boolean {
 // category with no class would, is refused saying what is missing,
 // rather than the plan falling back on the rates typed without a word.
 // The split typed is kept as it was while the CMA's is live, for the day
-// the rates typed are chosen again.
-function liveOf(kept: Kept): DerivedSet {
+// the rates typed are chosen again. Given a share in bonds, as the glide
+// path gives one for a year, the plan holds that split instead, under
+// either set.
+function liveOf(kept: Kept, bonds: null | number = null): DerivedSet {
+  const split = bonds === null ? null : { stocks: 1 - bonds };
   switch (kept.rateSet) {
     case "cma": {
-      const derived = derivedSet(kept);
+      const derived = derivedSet(kept, split);
       if ("short" in derived) {
         throw new Refusal(
           `${derived.short}, so the plan cannot run on the CMA's rates`,
@@ -1003,7 +1069,11 @@ function liveOf(kept: Kept): DerivedSet {
       return derived;
     }
     case "custom":
-      return { allocation: kept.allocation, rates: kept.rates, rebalancing: 0 };
+      return {
+        allocation: split ?? kept.allocation,
+        rates: kept.rates,
+        rebalancing: 0,
+      };
   }
 }
 
