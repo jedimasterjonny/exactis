@@ -9,6 +9,7 @@ import type { Answer } from "@/lib/answer";
 import { spreadOf } from "@/data/cma";
 import { cma } from "@/data/cma.fixture";
 import { blank, kept as reference, today } from "@/data/household.fixture";
+import { statePension } from "@/data/income.fixture";
 import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
 import { sam } from "@/data/owners.fixture";
@@ -101,7 +102,10 @@ describe("the household store", () => {
       points: reference.points,
       rates: reference.rates,
       rateSet: reference.rateSet,
-      schedule: reference.schedule,
+      schedule: {
+        ...reference.schedule,
+        income: [...reference.schedule.income, statePension],
+      },
       split: reference.allocation,
       spread: spreadOf(reference, typed(reference)),
       targets: reference.targets,
