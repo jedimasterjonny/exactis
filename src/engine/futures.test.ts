@@ -115,6 +115,23 @@ describe("pathOf", () => {
     expect(path.rate[2]).toBeCloseTo(0.05, 15);
   });
 
+  // Along a glide path, each year strays by its own spread: the first
+  // by none, so it is the plan's 7% exactly, and the second by 14%.
+  it("draws each year by the glide path's spread for it", () => {
+    const draws = Array.from({ length: 20 }, (_, seed) =>
+      pathOf(
+        { ...plan, years: 2 },
+        { byYear: [0, 0.14], inflation: 0, rate: 0.5 },
+        normalsFrom(seed),
+      ),
+    );
+
+    for (const { rate } of draws) {
+      expect(rate[0]).toBeCloseTo(0.07, 15);
+    }
+    expect(new Set(draws.map(({ rate }) => rate[1])).size).toBe(20);
+  });
+
   it("never draws a year losing everything, however far it strays", () => {
     const path = pathOf(plan, { inflation: 1, rate: 3 }, normalsFrom(7));
 
