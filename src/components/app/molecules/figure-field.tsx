@@ -104,6 +104,16 @@ export function YearField(
   return <FigureField {...props} {...presets.year} />;
 }
 
+// A count of whole years with no field of its own, for a cell of a
+// table, where there is no room for a label: written as a year is,
+// whole and with no separator, named for a screen reader by what it
+// counts, and held inside the bounds it is given.
+export function YearsInput(
+  props: Figure & Pick<Forwarded, "label" | "max" | "min" | "onValueCommitted">,
+): JSX.Element {
+  return <FigureInput {...props} {...presets.year} />;
+}
+
 // What the three fields share: a figure input under a label, a hint and,
 // if the caller gives one, an error. The figure is held as the caller
 // says, by default or by value.
