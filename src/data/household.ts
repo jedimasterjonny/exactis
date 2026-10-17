@@ -146,6 +146,13 @@ export interface Kept {
   readonly targets: null | Targets;
 }
 
+// What the plan comes to under one split the glide path holds: its
+// rate, and how far it strays.
+interface AtSplit {
+  readonly rate: number;
+  readonly spread: Shortfall | Spread;
+}
+
 // What every line of both schedules holds, as the actions take it, and
 // the id it is listed by.
 const line = { ...lineValues, id: recordId };
@@ -624,6 +631,7 @@ export const household = z
     spread: z.union([
       z.object({ short: z.string() }),
       z.object({
+        byYear: z.array(z.number().nonnegative()).exactOptional(),
         inflation: z.number().nonnegative(),
         rate: z.number().nonnegative(),
       }),
@@ -946,36 +954,49 @@ function endsInAYear(line: {
   return line.lastMonth === null || line.lastYear !== null;
 }
 
-// The plan along the glide path, where the household keeps one: its
-// rate in each year the one the rates live make with the split the path
-// holds at the age its owner reaches in that year, and its own rate the
-// one it grows at in its first, so a figure naming the plan rate names
-// the rate it grows at now. Only the split moves from year to year, and
-// a path holds the same one through every flat stretch, so each split
-// is worked out once. A household with no glide path holds the one
-// split for life, and its plan is as it was made.
-function glidedOf(kept: Kept, plan: Plan): Plan {
+// The plan and how far it strays along the glide path, where the
+// household keeps one: its rate in each year the one the rates live make
+// with the split the path holds at the age its owner reaches in that
+// year, and its own rate the one it grows at in its first, so a figure
+// naming the plan rate names the rate it grows at now; and how far that
+// rate strays each year at the same split, beside how far it strays
+// now. Only the split moves from year to year, and a path holds the same
+// one through every flat stretch, so each split is worked out once. A
+// household with no glide path holds the one split for life, and its
+// plan and spread are as they were made.
+function glidedOf(
+  kept: Kept,
+  plan: Plan,
+  live: DerivedSet,
+): { readonly plan: Plan; readonly spread: Shortfall | Spread } {
   if (kept.glide.length === 0) {
-    return plan;
+    return { plan, spread: spreadOf(kept, live) };
   }
-  const known = new Map<null | number, number>();
-  const rateIn = (year: number): number => {
+  const known = new Map<null | number, AtSplit>();
+  const atSplitIn = (year: number): AtSplit => {
     const bonds = bondsAt(kept.glide, ageIn(year, plan));
     const found = known.get(bonds);
     if (found !== undefined) {
       return found;
     }
-    const live = liveOf(kept, bonds);
-    const rate = planRate(live.rates, live.allocation, live.rebalancing);
-    known.set(bonds, rate);
-    return rate;
+    const held = liveOf(kept, bonds);
+    const atSplit = {
+      rate: planRate(held.rates, held.allocation, held.rebalancing),
+      spread: spreadOf(kept, held),
+    };
+    known.set(bonds, atSplit);
+    return atSplit;
   };
+  const now = atSplitIn(plan.from);
+  const years = Array.from({ length: plan.years }, (_, offset) =>
+    atSplitIn(plan.from + offset),
+  );
   return {
-    ...plan,
-    byYear: Array.from({ length: plan.years }, (_, offset) =>
-      rateIn(plan.from + offset),
+    plan: { ...plan, byYear: years.map(({ rate }) => rate), rate: now.rate },
+    spread: straysAlong(
+      now.spread,
+      years.map(({ spread }) => spread),
     ),
-    rate: rateIn(plan.from),
   };
 }
 
@@ -986,7 +1007,7 @@ function glidedOf(kept: Kept, plan: Plan): Plan {
 // the loan's payments do.
 function householdOf(kept: Kept): Household {
   const live = liveOf(kept);
-  const plan = glidedOf(kept, planOf(kept, live));
+  const { plan, spread } = glidedOf(kept, planOf(kept, live), live);
   return {
     accounts: kept.accounts,
     allocation: kept.allocation,
@@ -1011,7 +1032,7 @@ function householdOf(kept: Kept): Household {
         timed(line, kept.milestones, plan),
       ),
     },
-    spread: spreadOf(kept, live),
+    spread,
     targets: kept.targets,
   };
 }
@@ -1150,6 +1171,26 @@ function refusalOf(error: z.ZodError): Refusal {
   return new Refusal(
     [...new Set(error.issues.map(({ message }) => message))].join("; "),
   );
+}
+
+// How far a plan on a glide path strays: as it strays now, and each
+// year's rate beside it, or the first reason a year gives none, since
+// every future is drawn through every year.
+function straysAlong(
+  now: Shortfall | Spread,
+  years: readonly (Shortfall | Spread)[],
+): Shortfall | Spread {
+  if ("short" in now) {
+    return now;
+  }
+  const byYear: number[] = [];
+  for (const year of years) {
+    if ("short" in year) {
+      return year;
+    }
+    byYear.push(year.rate);
+  }
+  return { ...now, byYear };
 }
 
 // What every line of both schedules is tied to at either end, nothing

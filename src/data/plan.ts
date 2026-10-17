@@ -70,8 +70,12 @@ export interface PlanAges {
 // the standard deviation of the logarithm of one plus the plan rate's
 // return in a year, and of one plus prices' rise. The rate's is the
 // portfolio's as a whole, stocks and bonds in the split the plan holds,
-// since every account on the plan rate is carried at the one rate.
+// since every account on the plan rate is carried at the one rate. Along
+// a glide path the split moves with its owner's age, so the rate's is
+// carried for each year of the plan as well, the first year's first,
+// and its own is then the first year's.
 export interface Spread {
+  readonly byYear?: readonly number[];
   readonly inflation: number;
   readonly rate: number;
 }
