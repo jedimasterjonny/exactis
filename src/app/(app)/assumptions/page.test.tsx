@@ -12,6 +12,7 @@ import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
 import { retiring } from "@/data/income.fixture";
 import { curve } from "@/data/inflation.fixture";
+import { owners } from "@/data/owners.fixture";
 import { allocation, rates } from "@/data/rates.fixture";
 import { targets } from "@/data/targets.fixture";
 import { saved } from "@/lib/answer";
@@ -32,6 +33,7 @@ vi.mock("@/store/household", () => ({
 vi.mock("@/actions/cma", () => ({ pullCma: vi.fn() }));
 vi.mock("@/actions/inflation", () => ({ pullCurve: vi.fn() }));
 vi.mock("@/actions/lifestrategy", () => ({ pullLifeStrategy: vi.fn() }));
+vi.mock("@/actions/owners", () => ({ saveQualifyingYears: vi.fn() }));
 vi.mock("@/actions/targets", () => ({
   importTargets: vi.fn(),
   mapByName: vi.fn(),
@@ -205,6 +207,25 @@ describe("Assumptions", () => {
       "aria-selected",
       "true",
     );
+  });
+
+  // The owner, born in 1990, reaches 68 in 2058, and thirty years earn
+  // £10,755 a year. The plan screen's lock links to the tab by its name
+  // in the address.
+  it("hands the owners to the State Pension in the fourth tab, which the address opens", async () => {
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      owners: [{ ...owners[0], qualifyingYears: 30 }],
+    });
+
+    render(await page({ tab: "state-pension" }));
+
+    expect(
+      screen.getByRole("textbox", { name: "Qualifying years for Me" }),
+    ).toHaveValue("30");
+    expect(
+      screen.getByRole("cell", { name: "£10,755 from 2058" }),
+    ).toBeInTheDocument();
   });
 
   it("hands the rates typed the split typed while there is no glide path", async () => {

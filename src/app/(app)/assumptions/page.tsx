@@ -9,6 +9,7 @@ import { SourceDates } from "@/components/app/atoms/source-dates";
 import { GlidePath } from "@/components/app/organisms/glide-path";
 import { InflationSource } from "@/components/app/organisms/inflation-source";
 import { RateSet } from "@/components/app/organisms/rate-set";
+import { StatePension } from "@/components/app/organisms/state-pension";
 import { TargetAllocation } from "@/components/app/organisms/target-allocation";
 import { formatPercent } from "@/lib/money";
 import { today } from "@/lib/months";
@@ -22,7 +23,7 @@ const setNames: Record<Chosen, string> = {
 };
 
 // The assumptions the plan runs on, under a strip saying how old each
-// source they rest on is, in three tabs, the CMA's rates set beside the
+// source they rest on is, in four tabs, the CMA's rates set beside the
 // household's sources as they stood thirty days before, to say what has
 // moved them since. The two are read together, and the sources then are
 // handed on only while the CMA's rates are live, which is the only time
@@ -35,7 +36,8 @@ const setNames: Record<Chosen, string> = {
 // by hand set aside. The second holds the target
 // allocation last imported from Portfolio Performance, with the class
 // of the latest CMA each category is mapped onto. The third holds the
-// glide path, the bond share by age it sets. The header says what
+// glide path, the bond share by age it sets. The fourth holds the State
+// Pension, each owner's qualifying years and what they earn. The header says what
 // the plan grows at and what its prices rise by, made from the rates
 // live, and which set those are, so the screen answers its question
 // before a card is read, whichever tab is open. The tab the address
@@ -55,6 +57,7 @@ export default async function Assumptions({
       deductions,
       glide,
       mappings,
+      owners,
       plan,
       rates,
       rateSet,
@@ -114,6 +117,10 @@ export default async function Assumptions({
             {
               children: <GlidePath glide={glide} plan={plan} split={split} />,
               label: "Glide path",
+            },
+            {
+              children: <StatePension owners={owners} />,
+              label: "State pension",
             },
           ]}
         />

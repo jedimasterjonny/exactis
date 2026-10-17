@@ -106,9 +106,9 @@ describe("IncomeSchedule", () => {
 
   // The household pays the State Pension on the years typed on the
   // assumptions screen and keeps no line of it, so it says what it is
-  // and is locked here, its name linking there and the reason where its
-  // chevron would be.
-  it("locks a State Pension, linking to the screen its years are typed on", () => {
+  // and is locked here, its name linking there, open on its tab, and the
+  // reason where its chevron would be.
+  it("locks a State Pension, linking to the tab its years are typed on", () => {
     renderSchedule([salary, statePension]);
 
     expect(
@@ -116,7 +116,7 @@ describe("IncomeSchedule", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("link", { name: "State pension · Me" }).at(-1),
-    ).toHaveAttribute("href", "/assumptions");
+    ).toHaveAttribute("href", "/assumptions?tab=state-pension");
     expect(screen.getByText("State pension")).toHaveAttribute(
       "data-variant",
       "secondary",
