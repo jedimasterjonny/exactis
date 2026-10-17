@@ -35,6 +35,7 @@ interface RateSetProps {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
+  readonly hasGlide: boolean;
   readonly mappings: readonly Mapping[];
   readonly rates: Rates;
   readonly rateSet: Chosen;
@@ -53,7 +54,9 @@ const runsOn: Record<Chosen, string> = {
 // CMA-derived set the card is the worksheet that derives them; under the
 // rates typed by hand, the rates and the split as typed, worked out the
 // same way, and the derivation is set aside rather than shown dormant,
-// with a caution above the card saying so and what that costs. The
+// with a caution above the card saying so and what that costs. Under
+// either, while a glide path sets the split, the split worked out at is
+// the one it holds now. The
 // workbook can be pulled under either, so the CMA's rates can be given
 // something to derive from before they are chosen.
 //
@@ -90,6 +93,7 @@ export function RateSet({
   cma,
   curve,
   deductions,
+  hasGlide,
   mappings,
   rates,
   rateSet,
@@ -247,11 +251,16 @@ export function RateSet({
             deductions={shown}
             fields={fields}
             mappings={mappings}
+            split={hasGlide ? allocation : null}
             targets={targets}
           />
         ) : (
           <>
-            <CustomRates allocation={allocation} rates={rates} />
+            <CustomRates
+              allocation={allocation}
+              hasGlide={hasGlide}
+              rates={rates}
+            />
             <CardContent>
               <section
                 aria-labelledby={asideId}

@@ -7,6 +7,7 @@ import { cma } from "@/data/cma.fixture";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { owners, sam } from "@/data/owners.fixture";
 import { allocation, rates } from "@/data/rates.fixture";
+import { targetsUnder } from "@/data/targets.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
@@ -14,8 +15,10 @@ import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
 import {
+  removeAnchor,
   saveAges,
   saveAllocation,
+  saveAnchor,
   saveDeductions,
   saveRates,
   saveRateSet,
@@ -190,6 +193,131 @@ describe("saveRates", () => {
       refused("A debt's payments end"),
     );
     expect(await readLatest(db)).toMatchObject({ version: 1 });
+  });
+});
+
+describe("saveAnchor", () => {
+  const glide = [
+    { age: 50, bonds: 0.1 },
+    { age: 58, bonds: 0.35 },
+  ];
+
+  it("writes nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(saveAnchor(null, { age: 50, bonds: 0.1 })).rejects.toThrow(
+      "redirected",
+    );
+    expect(await readLatest(db)).toBeNull();
+  });
+
+  it("writes a new anchor beside the household's, youngest first, and draws the page again", async () => {
+    await keepAfter(db, 0, { ...blank, glide: glide.slice(1) });
+
+    expect(await saveAnchor(null, { age: 50, bonds: 0.1 })).toStrictEqual(
+      saved({ age: 50, bonds: 0.1 }),
+    );
+    expect(await readLatest(db)).toStrictEqual({
+      household: { ...blank, glide },
+      version: 2,
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  // The screen drew 50 and 58; another tab has since added 65, which an
+  // edit of 58 keeps.
+  it("writes an anchor in place of the one at the age it was saved at, keeping one added since", async () => {
+    const since = { age: 65, bonds: 0.35 };
+    await keepAfter(db, 0, { ...blank, glide: [...glide, since] });
+
+    expect(await saveAnchor(58, { age: 60, bonds: 0.3 })).toStrictEqual(
+      saved({ age: 60, bonds: 0.3 }),
+    );
+    expect(await readLatest(db)).toMatchObject({
+      household: { glide: [glide[0], { age: 60, bonds: 0.3 }, since] },
+    });
+  });
+
+  it("refuses an anchor at an age no anchor is at, deleted since", async () => {
+    await keepAfter(db, 0, { ...blank, glide });
+
+    expect(await saveAnchor(65, { age: 65, bonds: 0.2 })).toStrictEqual(
+      refused("No anchor is at that age"),
+    );
+    expect(await readLatest(db)).toMatchObject({ version: 1 });
+  });
+
+  it("refuses an anchor that is not a number", async () => {
+    await expect(
+      saveAnchor(null, { age: 50, bonds: Number.NaN }),
+    ).rejects.toThrow(z.ZodError);
+    expect(await readLatest(db)).toBeNull();
+  });
+
+  it("holds an age to one anchor, and each anchor to its rules", async () => {
+    await keepAfter(db, 0, { ...blank, glide });
+
+    expect(await saveAnchor(null, { age: 58, bonds: 0.2 })).toStrictEqual(
+      refused("An age holds one anchor, youngest first"),
+    );
+    expect(await saveAnchor(50, { age: 50, bonds: 1.1 })).toStrictEqual(
+      refused("Bonds hold none of the savings, all of them, or a share"),
+    );
+    expect(await readLatest(db)).toMatchObject({ version: 1 });
+  });
+
+  // All in equities under the CMA's rates, nothing says what bonds
+  // return.
+  it("refuses an anchor the CMA's rates cannot run on while they are live", async () => {
+    await keepAfter(db, 0, {
+      ...reference,
+      rateSet: "cma",
+      targets: targetsUnder("Equity"),
+    });
+
+    expect(await saveAnchor(null, { age: 58, bonds: 0.35 })).toStrictEqual(
+      refused(
+        "The glide path holds bonds the target allocation holds none of, so nothing says what they return, so the plan cannot run on the CMA's rates",
+      ),
+    );
+  });
+});
+
+describe("removeAnchor", () => {
+  const glide = [
+    { age: 50, bonds: 0.1 },
+    { age: 58, bonds: 0.35 },
+  ];
+
+  it("writes nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(removeAnchor(50)).rejects.toThrow("redirected");
+    expect(await readLatest(db)).toBeNull();
+  });
+
+  it("deletes the anchor at the age given, keeping the rest, and draws the page again", async () => {
+    await keepAfter(db, 0, { ...blank, glide });
+
+    expect(await removeAnchor(58)).toStrictEqual(saved(undefined));
+    expect(await readLatest(db)).toStrictEqual({
+      household: { ...blank, glide: glide.slice(0, 1) },
+      version: 2,
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("refuses an age no anchor is at, deleted since", async () => {
+    await keepAfter(db, 0, { ...blank, glide });
+
+    expect(await removeAnchor(65)).toStrictEqual(
+      refused("No anchor is at that age"),
+    );
+    expect(await readLatest(db)).toMatchObject({ version: 1 });
+  });
+
+  it("refuses an age that is not a number", async () => {
+    await expect(removeAnchor(Number.NaN)).rejects.toThrow(z.ZodError);
   });
 });
 

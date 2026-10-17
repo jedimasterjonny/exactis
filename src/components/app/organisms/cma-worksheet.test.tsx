@@ -5,9 +5,12 @@ import { describe, expect, it } from "vitest";
 
 import type { Sources } from "@/data/household";
 
+import { derivedSet } from "@/data/cma";
 import { cma, mappings } from "@/data/cma.fixture";
 import { curve } from "@/data/inflation.fixture";
+import { planRate } from "@/data/rates";
 import { targets, targetsUnder } from "@/data/targets.fixture";
+import { formatPercent } from "@/lib/money";
 import { worksheet } from "@/test/dom";
 
 import { CmaWorksheet } from "./cma-worksheet";
@@ -39,6 +42,7 @@ function renderSheet(
       deductions={{ dividends: 0.02, fees: 0.002 }}
       fields={null}
       mappings={mappings}
+      split={null}
       targets={targets}
       {...given}
     />,
@@ -207,6 +211,56 @@ describe("CmaWorksheet", () => {
     expect(shares[4]).toHaveTextContent("0.00%");
     expect(shares[4]).toHaveClass("text-muted-foreground");
     expect(terms[4]).toHaveClass("text-muted-foreground");
+  });
+
+  // The glide path holds nine tenths in stocks now: the sleeves blend as
+  // they did, and the portfolio holds them at 90/10, coming to the plan
+  // rate the plan grows at now. FTSE Global All Cap ex-UK's 48% of a
+  // four-fifths sleeve is 54% of a nine-tenths one, and global bonds'
+  // 14% of a fifth is 7% of a tenth. What moved is read at 90/10 too.
+  it("works the vintage out at the glide path's split now, scaling each category's share with its sleeve's", () => {
+    const split = { stocks: 0.9 };
+    const derived = derivedSet(sources, split);
+    const planRateNow =
+      "short" in derived
+        ? null
+        : formatPercent(
+            planRate(derived.rates, derived.allocation, derived.rebalancing),
+          );
+    renderSheet({
+      before: {
+        savedOn: "2026-09-01",
+        sources: { ...sources, deductions: { dividends: 0.02, fees: 0.001 } },
+      },
+      split,
+    });
+
+    const rows = worksheet(sheet);
+    const weights = screen.getByRole("region", { name: "Glide path weights" });
+
+    expect(rows[0]).toStrictEqual([
+      "Glide path weight",
+      "90.00%",
+      "10.00%",
+      "100.00%",
+    ]);
+    expect(rows.find(([label]) => label === "Return")?.[3]).toBe(planRateNow);
+    expect(
+      within(
+        within(weights).getByRole("group", { name: "Stocks" }),
+      ).getAllByRole("definition")[0],
+    ).toHaveTextContent("54.00%");
+    expect(
+      within(
+        within(weights).getByRole("group", { name: "Bonds" }),
+      ).getAllByRole("definition")[0],
+    ).toHaveTextContent("7.00%");
+    expect(
+      worksheet(
+        "What moved the rates, worked out",
+        screen.getByRole("region", { name: "What moved since 1 Sep 2026" }),
+      ).at(-1),
+    ).toStrictEqual(["Now", planRateNow, "2.95%", expect.any(String)]);
   });
 
   // On the first of September the fees were a tenth of a point less, so

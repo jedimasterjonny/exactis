@@ -72,6 +72,7 @@ function renderSet(
       cma={{ latest: cma, previous: may }}
       curve={curve}
       deductions={{ dividends: 0.02, fees: 0.002 }}
+      hasGlide={false}
       mappings={mappings}
       rates={rates}
       rateSet={rateSet}
@@ -171,6 +172,19 @@ describe("RateSet", () => {
       screen.queryByRole("textbox", { name: "Stocks share" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  // The glide path holds nine tenths in stocks now, handed down as the
+  // split, in place of the four fifths typed.
+  it("works the CMA's rates out at the glide path's split now while it sets one", () => {
+    renderSet("cma", { allocation: { stocks: 0.9 }, hasGlide: true });
+
+    expect(worksheet(derived)[0]).toStrictEqual([
+      "Glide path weight",
+      "90.00%",
+      "10.00%",
+      "100.00%",
+    ]);
   });
 
   it("says a vintage moved stocks up when it prices them higher than the one before", () => {
