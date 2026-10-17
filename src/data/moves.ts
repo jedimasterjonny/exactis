@@ -1,4 +1,5 @@
 import type { Sources } from "@/data/household";
+import type { Allocation } from "@/data/rates";
 
 import { derivedSet } from "@/data/cma";
 import { resultsOf } from "@/data/rates";
@@ -101,8 +102,17 @@ const steps: readonly {
 // mapped again, is taken together with the ones after it until they
 // derive some, and the step names them all. There is nothing to say
 // where the sources before derive no rates, as before a CMA is pulled,
-// or the sources now.
-export function movesBetween(before: Sources, now: Sources): Moves | null {
+// or the sources now. Given a split, the glide path's now, every
+// standing holds it rather than its own target allocation's, so the
+// plan rate is the one the plan grows at and what moves it is the
+// sources alone.
+export function movesBetween(
+  before: Sources,
+  now: Sources,
+  split: Allocation | null = null,
+): Moves | null {
+  const standingOf = (sources: Sources): null | Standing =>
+    standingAt(sources, split);
   const first = standingOf(before);
   if (first === null) {
     return null;
@@ -137,9 +147,13 @@ function apart(to: Standing, from: Standing): Standing {
   };
 }
 
-// What a set of sources comes to, or null while they derive no rates.
-function standingOf(sources: Sources): null | Standing {
-  const derived = derivedSet(sources);
+// What a set of sources comes to at the split given, or at its own
+// target allocation's given none, or null while they derive no rates.
+function standingAt(
+  sources: Sources,
+  split: Allocation | null,
+): null | Standing {
+  const derived = derivedSet(sources, split);
   if ("short" in derived) {
     return null;
   }

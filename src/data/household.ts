@@ -80,7 +80,9 @@ import { isWithinAllowance } from "@/lib/tax";
 // typed by hand, what comes off the CMA's returns to derive them
 // instead, which of the two sets is chosen, the split of the savings
 // typed by hand, the glide path that sets the split by age in its place
-// when it has anchors, the rates the plan runs on as it is, held to the rules
+// when it has anchors, the split the plan holds now, the glide path's at
+// its owner's age or the one for life, the rates the plan runs on as it
+// is, held to the rules
 // every rate is, the target allocation last imported from Portfolio
 // Performance, or none before one is, and the class each of its
 // categories is mapped onto: the whole of what the store holds for the
@@ -105,6 +107,7 @@ export interface Household {
     readonly expenses: readonly ExpenseLine[];
     readonly income: readonly IncomeLine[];
   };
+  readonly split: Allocation;
   readonly spread: Shortfall | Spread;
   readonly targets: null | Targets;
 }
@@ -147,9 +150,10 @@ export interface Kept {
 }
 
 // What the plan comes to under one split the glide path holds: its
-// rate, and how far it strays.
+// rate, the split itself, and how far it strays.
 interface AtSplit {
   readonly rate: number;
+  readonly split: Allocation;
   readonly spread: Shortfall | Spread;
 }
 
@@ -628,6 +632,7 @@ export const household = z
       expenses: z.array(expenseLine),
       income: z.array(incomeLine),
     }),
+    split: allocation,
     spread: z.union([
       z.object({ short: z.string() }),
       z.object({
@@ -960,17 +965,17 @@ function endsInAYear(line: {
 // year, and its own rate the one it grows at in its first, so a figure
 // naming the plan rate names the rate it grows at now; and how far that
 // rate strays each year at the same split, beside how far it strays
-// now. Only the split moves from year to year, and a path holds the same
+// now; and the split it holds now, which the screen shows. Only the split moves from year to year, and a path holds the same
 // one through every flat stretch, so each split is worked out once. A
 // household with no glide path holds the one split for life, and its
-// plan and spread are as they were made.
+// plan, split and spread are as they were made.
 function glidedOf(
   kept: Kept,
   plan: Plan,
   live: DerivedSet,
-): { readonly plan: Plan; readonly spread: Shortfall | Spread } {
+): Pick<Household, "plan" | "split" | "spread"> {
   if (kept.glide.length === 0) {
-    return { plan, spread: spreadOf(kept, live) };
+    return { plan, split: live.allocation, spread: spreadOf(kept, live) };
   }
   const known = new Map<null | number, AtSplit>();
   const atSplitIn = (year: number): AtSplit => {
@@ -982,6 +987,7 @@ function glidedOf(
     const held = liveOf(kept, bonds);
     const atSplit = {
       rate: planRate(held.rates, held.allocation, held.rebalancing),
+      split: held.allocation,
       spread: spreadOf(kept, held),
     };
     known.set(bonds, atSplit);
@@ -993,6 +999,7 @@ function glidedOf(
   );
   return {
     plan: { ...plan, byYear: years.map(({ rate }) => rate), rate: now.rate },
+    split: now.split,
     spread: straysAlong(
       now.spread,
       years.map(({ spread }) => spread),
@@ -1007,7 +1014,7 @@ function glidedOf(
 // the loan's payments do.
 function householdOf(kept: Kept): Household {
   const live = liveOf(kept);
-  const { plan, spread } = glidedOf(kept, planOf(kept, live), live);
+  const { plan, split, spread } = glidedOf(kept, planOf(kept, live), live);
   return {
     accounts: kept.accounts,
     allocation: kept.allocation,
@@ -1032,6 +1039,7 @@ function householdOf(kept: Kept): Household {
         timed(line, kept.milestones, plan),
       ),
     },
+    split,
     spread,
     targets: kept.targets,
   };
