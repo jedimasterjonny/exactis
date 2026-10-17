@@ -27,7 +27,7 @@ import { toAccount, toValues } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { toRecords as toCarRecords } from "@/data/cars";
 import { golfValues } from "@/data/cars.fixture";
-import { derivedSet } from "@/data/cma";
+import { derivedSet, spreadOf } from "@/data/cma";
 import { cma, mappings } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
@@ -1047,6 +1047,57 @@ describe("soundKept", () => {
     expect(plan.byYear?.[18]).toBeCloseTo(at(0.775), 15);
     expect(plan.byYear?.[22]).toBeCloseTo(at(0.65), 15);
     expect(plan.byYear?.[52]).toBeCloseTo(at(0.65), 15);
+  });
+
+  // At the rates typed, the futures stray as the CMA's sleeves do in
+  // each year's split, 90/10 now and 65/35 from 58, the split typed set
+  // aside.
+  it("strays along the glide path as each year's split does", () => {
+    const glide = [
+      { age: 50, bonds: 0.1 },
+      { age: 58, bonds: 0.35 },
+    ];
+    const { spread } = soundKept({
+      ...kept,
+      allocation,
+      glide,
+      rates,
+    }).household;
+    const at = (stocks: number): Shortfall | Spread =>
+      spreadOf(kept, { allocation: { stocks }, rates, rebalancing: 0 });
+
+    expect(spread).toMatchObject(at(0.9));
+    expect("short" in spread ? null : spread.byYear).toHaveLength(53);
+    const from58 = at(0.65);
+
+    expect("short" in spread ? null : spread.byYear?.[22]).toBe(
+      "short" in from58 ? null : from58.rate,
+    );
+  });
+
+  // All in equities, nothing says how far the 35% the glide path holds
+  // in bonds from 58 strays, so no future can be drawn through it; and
+  // with no CMA pulled, nothing says how far anything strays.
+  it("gives no spread along a glide path holding what the target allocation holds none of, or with no CMA", () => {
+    const { spread } = soundKept({
+      ...kept,
+      glide: [
+        { age: 36, bonds: 0 },
+        { age: 58, bonds: 0.35 },
+      ],
+      targets: targetsUnder("Equity"),
+    }).household;
+
+    expect(spread).toStrictEqual({
+      short:
+        "The plan holds bonds the target allocation holds none of, so nothing says how far they stray",
+    });
+    expect(
+      soundKept({
+        ...nothingKeptIn(september),
+        glide: [{ age: 58, bonds: 0.35 }],
+      }).household.spread,
+    ).toStrictEqual({ short: "No CMA is pulled" });
   });
 
   // Under the CMA's rates, 65/35 from 58 earns what rebalancing earns at
