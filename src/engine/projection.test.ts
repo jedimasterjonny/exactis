@@ -23,6 +23,7 @@ import {
   isShort,
   laidOut,
   monthsOn,
+  movedIn,
   movedYears,
   project,
   retirementIn,
@@ -1679,7 +1680,8 @@ describe("moving home", () => {
       schedule: lines,
     };
     const points = project(run.accounts, lines, moving);
-    const [, , opened, after] = movedYears(points, run);
+    const years = movedYears(points, run);
+    const [, , opened, after] = years;
 
     expect(points.map(({ balances }) => balances)).toStrictEqual([
       { 3: 100000, 4: 400000, 5: -120000, 8: -1000 },
@@ -1705,6 +1707,10 @@ describe("moving home", () => {
       5: -211000,
       8: -1000,
     });
+    expect(opened?.due).toBe(0);
+    expect(movedIn(years, run, 2027)).toStrictEqual({ due: 0, run });
+    expect(movedIn(years, run, 2029).run).toBe(opened?.run);
+    expect(movedIn(years, run, 2025)).toStrictEqual({ due: 0, run });
   });
 
   // Borrowing no more than 30% of the price, £150,000, leaves the move
@@ -1734,6 +1740,9 @@ describe("moving home", () => {
     ]);
     expect(points.some(isShort)).toBe(false);
     expect(opened?.balances).toStrictEqual({ 3: 53000, 4: 500000, 5: -150000 });
+    expect(opened?.due).toBe(61000);
+    expect(movedIn(movedYears(points, run), run, 2028).due).toBe(61000);
+    expect(movedIn(movedYears(points, run), run, 2030).due).toBe(0);
   });
 
   // The salary's £6,346.45 a month after tax pays the ISA its £1,666.67

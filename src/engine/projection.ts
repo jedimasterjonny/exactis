@@ -41,6 +41,18 @@ export interface MonthsOn {
   readonly paid: number;
 }
 
+// A year of a projection as its moves carry it: the month it opens
+// with, the balances entering it as its moves leave them, in today's
+// money, which is what the year is measured by, what its moves leave
+// short for its first month to find, in that month's pounds, and the
+// run as carried through it.
+export interface MovedYear {
+  readonly at: Month;
+  readonly balances: Readonly<Record<number, number>>;
+  readonly due: number;
+  readonly run: Run;
+}
+
 // A year of the projection: the balance the plan expects entering it,
 // whole pounds, and the age reached that year, since a plan is read by
 // age as much as by year. The first point is the balances as they are,
@@ -137,16 +149,6 @@ interface Moved {
   readonly balances: Readonly<Record<number, number>>;
   readonly cash: number;
   readonly held: ReadonlyMap<number, Held>;
-  readonly run: Run;
-}
-
-// A year of a projection as its moves carry it: the month it opens
-// with, the balances entering it as its moves leave them, in today's
-// money, which is what the year is measured by, and the run as carried
-// through it.
-interface MovedYear {
-  readonly at: Month;
-  readonly balances: Readonly<Record<number, number>>;
   readonly run: Run;
 }
 
@@ -351,14 +353,33 @@ export function monthsOn(
   return reached;
 }
 
+// The run a year is carried by, off a projection's years as movedYears
+// gives them, and what its moves leave its first month short: the run
+// of the latest of them no later than the year, or the run as given for
+// a year before them all, and the year's own shortfall, nothing for a
+// year none of them is. What a screen reading a year's month off the
+// plan reads it over, so a month after a move pays the mortgage the
+// move took out, and the month of the move finds what it leaves short.
+export function movedIn(
+  years: readonly MovedYear[],
+  run: Run,
+  year: number,
+): Pick<MovedYear, "due" | "run"> {
+  const found = years.findLast(({ at }) => at.year <= year);
+  return {
+    due: found?.at.year === year ? found.due : 0,
+    run: found?.run ?? run,
+  };
+}
+
 // A projection's years as its moves carry them: for each point, the
 // month its year opens with, the plan's own for the first, the balances
-// as the year's moves leave them, and the run as carried through the
-// year, the run as given until a house moves and moved from the year it
-// does, all read off the point entering that year, as the projection
-// read it. So a reader holding only the points measures the year of a
-// move after it, and a year after a move over the mortgage the move
-// took out.
+// as the year's moves leave them, what they leave its first month
+// short, and the run as carried through the year, the run as given
+// until a house moves and moved from the year it does, all read off the
+// point entering that year, as the projection read it. So a reader
+// holding only the points measures the year of a move after it, and a
+// year after a move over the mortgage the move took out.
 export function movedYears(
   points: readonly ProjectionPoint[],
   run: Run,
@@ -368,7 +389,12 @@ export function movedYears(
     const at = { month: offset === 0 ? run.plan.month : 0, year: point.year };
     const moving = movesIn(moved, point, at);
     moved = moving.run;
-    return { at, balances: moving.balances, run: moved };
+    return {
+      at,
+      balances: moving.balances,
+      due: Math.max(0, -moving.cash),
+      run: moved,
+    };
   });
 }
 
