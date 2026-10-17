@@ -294,4 +294,18 @@ describe("OwnerList", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete Me" })).toBeEnabled();
   });
+
+  // The household pays Sam a State Pension on the years they hold, which
+  // goes with them and can be given to nobody else.
+  it("neither names an owner's State Pension nor holds their bin for it", () => {
+    const [, , , statePension] = incomeLines;
+    renderList(
+      [me, sam],
+      [],
+      [{ ...statePension, kind: "state-pension", owner: sam.id }],
+    );
+
+    expect(screen.queryByText(/^Earns/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Sam" })).toBeEnabled();
+  });
 });

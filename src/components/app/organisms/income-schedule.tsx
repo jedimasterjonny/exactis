@@ -31,7 +31,7 @@ import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { isSound, spanOf } from "@/lib/lines";
 import { formatGbp, formatPercent } from "@/lib/money";
-import { plan as planScreen, subsectionLabel } from "@/lib/nav";
+import { assumptions, plan as planScreen, subsectionLabel } from "@/lib/nav";
 import { optionsOf } from "@/lib/options";
 import { firstOwnerOf, ownerOptions } from "@/lib/owners";
 
@@ -54,9 +54,12 @@ const kindLabels: Record<IncomeKind, string> = {
   other: "Other",
   pension: "Pension",
   "self-employment": "Self-employment",
+  "state-pension": "State pension",
 };
 
-// The kinds in the order the reference's dialog offers them.
+// The kinds in the order the reference's dialog offers them. The State
+// Pension is not among them, since its line is the household's own,
+// paid on the qualifying years typed on the assumptions screen.
 const kinds = optionsOf(kindLabels, [
   "employment",
   "self-employment",
@@ -344,7 +347,10 @@ function paidOf(
 // summed and before any sacrifice; for a line paid in parts beyond its
 // base or giving up a share of it, the parts written out beside the
 // badge, so the split is seen without opening the line; and the line as
-// it is paid, which for a salary or a profit stops at retirement.
+// it is paid, which for a salary or a profit stops at retirement. A
+// State Pension is locked, its name linking to the assumptions screen,
+// since the household pays it on the qualifying years typed there and
+// keeps no line of it to edit or delete here.
 function summarise(
   line: IncomeLine,
   {
@@ -355,6 +361,12 @@ function summarise(
   return {
     badge: { label: kindLabels[line.kind], variant: "secondary" },
     ...(hasParts(line) && { detail: formatParts(line, pensions) }),
+    ...(line.kind === "state-pension" && {
+      lock: {
+        at: assumptions.href,
+        reason: `Set by qualifying years, on the State pension tab of ${assumptions.label}`,
+      },
+    }),
     paid: asPaid(line, plan),
     total: totalOf(line),
   };

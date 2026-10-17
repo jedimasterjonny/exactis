@@ -67,12 +67,16 @@ export interface Opening {
 }
 
 // The kinds as a list, so the store's column takes the same words the
-// type does and cannot drift from them.
+// type does and cannot drift from them. The State Pension is a kind of
+// its own, paid on an owner's qualifying years by a line the household
+// makes rather than keeps, so no line of it is typed, and the household
+// refuses to keep one.
 export const incomeKinds = [
   "employment",
   "other",
   "pension",
   "self-employment",
+  "state-pension",
 ] as const;
 
 // The employer's National Insurance on pay, fifteen per cent from April

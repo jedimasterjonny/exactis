@@ -1372,6 +1372,55 @@ describe("soundKept", () => {
     );
   });
 
+  // The partner, born in 1993, reaches 68 in 2061, and thirty years earn
+  // £10,755 a year; the plan's owner has no years typed, and nine would
+  // earn nothing.
+  it("pays each owner whose qualifying years earn one a State Pension from their State Pension age, after the lines kept", () => {
+    const partner = { ...sam, id: 20, qualifyingYears: 30 };
+    const { household: read } = soundKept({
+      ...kept,
+      next: 21,
+      owners: [...owners, partner],
+    });
+
+    expect(read.schedule.income).toStrictEqual([
+      ...incomeLines,
+      expect.objectContaining({
+        amount: 10755,
+        firstYear: 2061,
+        id: 20,
+        kind: "state-pension",
+        lastYear: null,
+        owner: 20,
+      }),
+    ]);
+    expect(
+      soundKept({
+        ...kept,
+        next: 21,
+        owners: [...owners, { ...partner, qualifyingYears: 9 }],
+      }).household.schedule.income,
+    ).toStrictEqual(incomeLines);
+  });
+
+  // The fixture's typed state pension is a pension; kept as the State
+  // Pension, the household would pay it beside the one it makes.
+  it("refuses an income line kept as the State Pension, in its words", () => {
+    expect(() =>
+      soundKept({
+        ...kept,
+        schedule: {
+          ...kept.schedule,
+          income: incomeLines.map((line) =>
+            line.id === 19 ? { ...line, kind: "state-pension" } : line,
+          ),
+        },
+      }),
+    ).toThrow(
+      /^A State Pension is paid on its owner's qualifying years, not typed as a line$/,
+    );
+  });
+
   // A plan is somebody's: the household opens with an owner, and keeps
   // one at least.
   it("refuses a household with no owner, in its words", () => {
