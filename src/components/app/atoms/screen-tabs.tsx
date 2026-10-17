@@ -8,6 +8,7 @@ import {
 } from "@/components/kit/tabs";
 
 interface ScreenTabsProps {
+  readonly open?: string | undefined;
   readonly tabs: readonly [Tab, ...Tab[]];
 }
 
@@ -20,17 +21,24 @@ interface Tab {
 // A screen's body split into tabs, for a screen holding more than reads
 // down it at once: the tabs named across the top of the body and,
 // beneath, the regions of the one open, stacked at the gap the body
-// stacks them at. The first is open when the screen is, and which is
-// open is the screen's own rather than its address's, so a screen read
-// again opens on the first. A tab not open is kept, hidden, rather than
-// drawn afresh when it is opened again, so what is on its way in it, an
-// import or a pull, is still held when the tab is left and opened again
-// rather than offered a second time. The open panel takes the focus
-// after the tabs, and shows the ring every control here shows, which
-// the registry's panel takes away.
-export function ScreenTabs({ tabs }: ScreenTabsProps): JSX.Element {
+// stacks them at. The one the screen's address names is open when the
+// screen is, by its label in lower case with a hyphen for each space,
+// as glide-path names the glide path, and the first where it names
+// none; which is open after is the screen's own rather than its
+// address's, so a tab chosen leaves the address as it was. A tab not
+// open is kept, hidden, rather than drawn afresh when it is opened
+// again, so what is on its way in it, an import or a pull, is still
+// held when the tab is left and opened again rather than offered a
+// second time. The open panel takes the focus after the tabs, and shows
+// the ring every control here shows, which the registry's panel takes
+// away.
+export function ScreenTabs({ open, tabs }: ScreenTabsProps): JSX.Element {
+  const opening =
+    tabs.find(
+      ({ label }) => label.toLowerCase().replaceAll(" ", "-") === open,
+    ) ?? tabs[0];
   return (
-    <Tabs className="gap-5" defaultValue={tabs[0].label}>
+    <Tabs className="gap-5" defaultValue={opening.label}>
       <TabsList>
         {tabs.map(({ label }) => (
           <TabsTrigger key={label} value={label}>
