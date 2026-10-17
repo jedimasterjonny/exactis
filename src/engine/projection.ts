@@ -44,13 +44,14 @@ export interface MonthsOn {
 // A year of a projection as its moves carry it: the month it opens
 // with, the balances entering it as its moves leave them, in today's
 // money, which is what the year is measured by, what its moves leave
-// short for its first month to find, in that month's pounds, and the
-// run as carried through it.
+// short for its first month to find, in that month's pounds, the run as
+// carried through it, and what each move made as it opened came to.
 export interface MovedYear {
   readonly at: Month;
   readonly balances: Readonly<Record<number, number>>;
   readonly due: number;
   readonly run: Run;
+  readonly sales: readonly Sale[];
 }
 
 // A year of the projection: the balance the plan expects entering it,
@@ -143,13 +144,32 @@ interface Held {
 // What a year's moves come to as it opens: the run as carried from
 // then, each moved house and each loan on it as the moves leave them,
 // in the year's pounds, by the account's id, the point's balances as
-// they leave them, in today's money, and what the sales leave once the
-// purchases are paid, below nothing for what the savings must find.
+// they leave them, in today's money, what the sales leave once the
+// purchases are paid, below nothing for what the savings must find, and
+// what each move came to.
 interface Moved {
   readonly balances: Readonly<Record<number, number>>;
   readonly cash: number;
   readonly held: ReadonlyMap<number, Held>;
   readonly run: Run;
+  readonly sales: readonly Sale[];
+}
+
+// What a move came to as its year opened, in today's money: the
+// milestone it was made at, by its id, and the house it sold, by its
+// name; the equity the sale left once every loan on the house was
+// cleared; what the mortgage borrowed, nothing for a move borrowing
+// nothing; the deposit, what of the next house's price the mortgage did
+// not borrow, which is the whole of it bought outright; and the stamp
+// duty on that price. What the sale leaves over the deposit and the
+// duty lands in the cash, and what they want past it the savings find.
+interface Sale {
+  readonly at: number;
+  readonly borrowed: number;
+  readonly deposit: number;
+  readonly duty: number;
+  readonly equity: number;
+  readonly house: string;
 }
 
 // One owner's tax year as the projection has carried it so far: how
@@ -375,11 +395,12 @@ export function movedIn(
 // A projection's years as its moves carry them: for each point, the
 // month its year opens with, the plan's own for the first, the balances
 // as the year's moves leave them, what they leave its first month
-// short, and the run as carried through the year, the run as given
-// until a house moves and moved from the year it does, all read off the
-// point entering that year, as the projection read it. So a reader
-// holding only the points measures the year of a move after it, and a
-// year after a move over the mortgage the move took out.
+// short, the run as carried through the year, the run as given until a
+// house moves and moved from the year it does, and what each of its
+// moves came to, all read off the point entering that year, as the
+// projection read it. So a reader holding only the points measures the
+// year of a move after it, and a year after a move over the mortgage
+// the move took out, and can say what the move came to.
 export function movedYears(
   points: readonly ProjectionPoint[],
   run: Run,
@@ -394,6 +415,7 @@ export function movedYears(
       balances: moving.balances,
       due: Math.max(0, -moving.cash),
       run: moved,
+      sales: moving.sales,
     };
   });
 }
@@ -1020,9 +1042,20 @@ function movesIn(
             income: moved.run.schedule.income,
           },
         },
+        sales: [
+          ...moved.sales,
+          {
+            at: move.at,
+            borrowed: borrowed / prices,
+            deposit: (price - borrowed) / prices,
+            duty: duty / prices,
+            equity: proceeds / prices,
+            house: house.name,
+          },
+        ],
       };
     },
-    { cash: 0, held: new Map(), run },
+    { cash: 0, held: new Map(), run, sales: [] },
   );
   const into = run.accounts.find(({ kind }) => kind === "cash");
   return {
