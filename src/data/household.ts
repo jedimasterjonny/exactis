@@ -18,7 +18,7 @@ import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan, PlanAges, Spread } from "@/data/plan";
 import type { ProgressPoint } from "@/data/progress";
-import type { Allocation, Rates, RateSet } from "@/data/rates";
+import type { Allocation, Anchor, Rates, RateSet } from "@/data/rates";
 import type { Month, Tie } from "@/data/schedule";
 import type { Target, Targets } from "@/data/targets";
 
@@ -66,7 +66,8 @@ import { isWithinAllowance } from "@/lib/tax";
 // market assumptions last pulled, or none before one is, the rates
 // typed by hand, what comes off the CMA's returns to derive them
 // instead, which of the two sets is chosen, the split of the savings
-// typed by hand, the rates the plan runs on as it is, held to the rules
+// typed by hand, the glide path that sets the split by age in its place
+// when it has anchors, the rates the plan runs on as it is, held to the rules
 // every rate is, the target allocation last imported from Portfolio
 // Performance, or none before one is, and the class each of its
 // categories is mapped onto: the whole of what the store holds for the
@@ -77,6 +78,7 @@ export interface Household {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
+  readonly glide: readonly Anchor[];
   readonly housePrices: HousePrices | null;
   readonly liveRates: Rates;
   readonly mappings: readonly Mapping[];
@@ -101,8 +103,9 @@ export interface Household {
 // than the plan it makes with the first listed owner's years, the
 // curve as the Bank gave it rather
 // than the inflation it
-// makes, the vintages as BlackRock priced them, the rates and the split
-// as typed rather than the rate they make, the deductions and the rate
+// makes, the vintages as BlackRock priced them, the rates, the split
+// and the glide path's anchors as typed rather than the rate they make,
+// the deductions and the rate
 // set chosen rather than the rates they make, the target allocation as
 // it was imported, the classes its categories are mapped onto, and the
 // id the next record added is given. That id only
@@ -117,6 +120,7 @@ export interface Kept {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
+  readonly glide: readonly Anchor[];
   readonly housePrices: HousePrices | null;
   readonly mappings: readonly Mapping[];
   readonly milestones: readonly Milestone[];
@@ -504,6 +508,33 @@ const allocation = z.object({
     .max(1, "Stocks hold none of the savings, all of them, or a share"),
 }) satisfies z.ZodType<Allocation>;
 
+// The glide path: its anchors, youngest first, each at an age a plan
+// may run to and holding none of the savings in bonds, all of them or a
+// share, and no age anchored twice. None at all is no glide path, and
+// the plan holds the one split for life.
+const glide = z
+  .array(
+    z.object({
+      age: z
+        .number()
+        .int()
+        .nonnegative()
+        .max(oldestAge, `An anchor is set by ${String(oldestAge)}`),
+      bonds: z
+        .number()
+        .min(0, "Bonds hold none of the savings, all of them, or a share")
+        .max(1, "Bonds hold none of the savings, all of them, or a share"),
+    }),
+  )
+  .refine(
+    (anchors) =>
+      anchors.every((anchor, index) => {
+        const before = anchors[index - 1];
+        return before === undefined || before.age < anchor.age;
+      }),
+    "An age holds one anchor, youngest first",
+  ) satisfies z.ZodType<readonly Anchor[]>;
+
 // The plan as the day it is read makes it: a month of the year, whole
 // years forward, the plan rate no lower than losing everything, prices
 // falling by less than everything, the owners it carries for the
@@ -561,6 +592,7 @@ export const household = z
     cma: vintages.nullable(),
     curve: curve.nullable(),
     deductions,
+    glide,
     housePrices: housePrices.nullable(),
     liveRates: rates,
     mappings,
@@ -736,6 +768,7 @@ const kept = z
     cma: vintages.nullable(),
     curve: curve.nullable(),
     deductions,
+    glide,
     housePrices: housePrices.nullable(),
     mappings,
     milestones: z.array(milestone),
@@ -793,12 +826,12 @@ export function holdWhileLive(
 
 // The household before anything is saved: the one owner a plan opens
 // with, under the first id, and no other record, balances as of the
-// month given, no progress point and no house price index pulled, the
-// ages the dashboard has shown, a plan to 91 whose owner retires at 61,
-// no curve or CMA pulled, the rates a household opens with live and
-// everything in stocks, the manual method's fees and yield to deduct
-// from a CMA's returns, no target allocation imported or category
-// mapped, and the id after the owner's.
+// month given, no progress point and no house price index pulled, a
+// plan to 91 whose owner retires at 61, no curve or CMA pulled, the
+// rates a household opens with live and everything in stocks, with no
+// glide path to move it, the opening fees and yield to deduct from a
+// CMA's returns, no target allocation imported or category mapped, and
+// the id after the owner's.
 export function nothingKeptIn(asOf: Month): Kept {
   return {
     accounts: [],
@@ -808,6 +841,7 @@ export function nothingKeptIn(asOf: Month): Kept {
     cma: null,
     curve: null,
     deductions: openingDeductions,
+    glide: [],
     housePrices: null,
     mappings: [],
     milestones: [],
@@ -895,6 +929,7 @@ function householdOf(kept: Kept): Household {
     cma: kept.cma,
     curve: kept.curve,
     deductions: kept.deductions,
+    glide: kept.glide,
     housePrices: kept.housePrices,
     liveRates: live.rates,
     mappings: kept.mappings,
