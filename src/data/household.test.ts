@@ -18,7 +18,7 @@ import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan, Spread } from "@/data/plan";
 import type { ProgressPoint } from "@/data/progress";
-import type { Allocation, Rates, RateSet } from "@/data/rates";
+import type { Allocation, Anchor, Rates, RateSet } from "@/data/rates";
 import type { Month } from "@/data/schedule";
 import type { SecuredRecords } from "@/data/secured";
 import type { Target, Targets } from "@/data/targets";
@@ -60,6 +60,7 @@ interface Inputs {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
+  readonly glide: readonly Anchor[];
   readonly housePrices: HousePrices | null;
   readonly liveRates: Rates;
   readonly mappings: readonly Mapping[];
@@ -90,6 +91,10 @@ const sound: Inputs = {
   cma: { latest: cma, previous: null },
   curve,
   deductions: { dividends: 0.02, fees: 0.002 },
+  glide: [
+    { age: 50, bonds: 0.1 },
+    { age: 58, bonds: 0.35 },
+  ],
   housePrices: kept.housePrices,
   liveRates: rates,
   mappings,
@@ -670,6 +675,29 @@ const held: readonly Case[] = [
       points: [...given.points, ...given.points.slice(-1)],
     }),
   ],
+  [
+    "Bonds hold none of the savings, all of them, or a share",
+    (given): Inputs => ({ ...given, glide: [{ age: 50, bonds: -0.1 }] }),
+  ],
+  [
+    "Bonds hold none of the savings, all of them, or a share",
+    (given): Inputs => ({ ...given, glide: [{ age: 50, bonds: 1.1 }] }),
+  ],
+  [
+    "An anchor is set by 120",
+    (given): Inputs => ({ ...given, glide: [{ age: 121, bonds: 0.2 }] }),
+  ],
+  [
+    "An age holds one anchor, youngest first",
+    (given): Inputs => ({ ...given, glide: given.glide.toReversed() }),
+  ],
+  [
+    "An age holds one anchor, youngest first",
+    (given): Inputs => ({
+      ...given,
+      glide: [...given.glide, ...given.glide.slice(-1)],
+    }),
+  ],
 ];
 
 describe("household", () => {
@@ -760,6 +788,7 @@ describe("soundKept", () => {
         cma: null,
         curve: null,
         deductions: { dividends: 0.02, fees: 0.002 },
+        glide: [],
         housePrices: null,
         liveRates: { bonds: 0.05, dividends: 0, inflation: 0.02, stocks: 0.05 },
         mappings: [],
@@ -917,6 +946,21 @@ describe("soundKept", () => {
         cma: { latest: { ...cma, correlation: -1 }, previous: null },
       }),
     ).toThrow("Too small");
+  });
+
+  it("keeps the glide path's anchors as typed, and refuses one at no whole age", () => {
+    const glide = [
+      { age: 50, bonds: 0.1 },
+      { age: 58, bonds: 0.35 },
+    ];
+
+    expect(soundKept({ ...kept, glide })).toMatchObject({
+      household: { glide },
+      kept: { glide },
+    });
+    expect(() =>
+      soundKept({ ...kept, glide: [{ age: 50.5, bonds: 0.1 }] }),
+    ).toThrow("expected int");
   });
 
   it("keeps the target allocation as it was imported, and refuses one on no day", () => {
