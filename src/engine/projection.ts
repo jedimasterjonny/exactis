@@ -4,7 +4,7 @@ import type { Month } from "@/data/schedule";
 import type { CashFlow, Earned, Paid, Schedule } from "@/engine/cash-flow";
 
 import { isPension } from "@/data/accounts";
-import { ageIn, holderOf, pricesIn, rateFrom } from "@/data/plan";
+import { ageIn, holderOf, pricesIn, rateFrom, rateIn } from "@/data/plan";
 import { rules } from "@/data/rules";
 import { cashFlow } from "@/engine/cash-flow";
 import { isOnOrBefore, monthAfter } from "@/lib/months";
@@ -681,8 +681,9 @@ function paidOff(account: Account, flow: CashFlow): number {
 }
 
 // The rate a month of a year is carried at, held to losing no more than
-// everything. Along a path, a saving or an asset on the plan rate takes
-// the year's figure in place of the plan's, and nothing else does: an
+// everything. Along a path or a glide path, a saving or an asset on the
+// plan rate takes the year's figure in place of the plan's, and nothing
+// else does: an
 // account on a fixed rate keeps its own, and so does a debt on the plan
 // rate, since its payment and the term it clears in are worked out
 // against the plan's own rate, and charged at another it would be left
@@ -698,7 +699,7 @@ function paidOff(account: Account, flow: CashFlow): number {
 function rateOf(account: Account, plan: Plan, year: number): number {
   const rate =
     account.kind !== "debt" && account.growth.kind === "plan"
-      ? (plan.path?.rate[year - plan.from] ?? plan.rate)
+      ? rateIn(plan, year)
       : rateFrom(account, plan);
   if (rate < -1) {
     throw new Error(rules.beyondLoss);

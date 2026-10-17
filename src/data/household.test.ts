@@ -44,7 +44,12 @@ import { allocation, rates } from "@/data/rates.fixture";
 import { targets, targetsUnder } from "@/data/targets.fixture";
 import { project } from "@/engine/projection";
 
-import { household, nothingKeptIn, soundKept } from "./household";
+import {
+  holdWhileLive,
+  household,
+  nothingKeptIn,
+  soundKept,
+} from "./household";
 import { kept } from "./household.fixture";
 
 // A household made from the sound one to break one rule.
@@ -1025,6 +1030,81 @@ describe("soundKept", () => {
     expect(read.plan.rate).toBeCloseTo(0.078441 + 0.0020462, 7);
   });
 
+  // The plan opens in 2026 at 34 and runs 57 years. Fifteen points of
+  // bonds to 52, rising to 40 by 60: 85/15 at 34, 72.5/27.5 at 56 and
+  // 60/40 from 60 on, at the rates typed, the split typed set aside.
+  it("runs the plan along the glide path, each year at the split it holds at the age reached, and its rate the first year's", () => {
+    const glide = [
+      { age: 52, bonds: 0.15 },
+      { age: 60, bonds: 0.4 },
+    ];
+    const { plan } = soundKept({ ...kept, allocation, glide, rates }).household;
+    const at = (stocks: number): number => planRate(rates, { stocks }, 0);
+
+    expect(plan.byYear).toHaveLength(57);
+    expect(plan.rate).toBeCloseTo(at(0.85), 15);
+    expect(plan.byYear?.[0]).toBeCloseTo(at(0.85), 15);
+    expect(plan.byYear?.[22]).toBeCloseTo(at(0.725), 15);
+    expect(plan.byYear?.[26]).toBeCloseTo(at(0.6), 15);
+    expect(plan.byYear?.[56]).toBeCloseTo(at(0.6), 15);
+  });
+
+  // Under the CMA's rates, 60/40 from 60 earns what rebalancing earns at
+  // those shares rather than at the target allocation's four fifths.
+  it("runs the plan along the glide path on the CMA's rates, rebalancing at each year's split", () => {
+    const glide = [{ age: 60, bonds: 0.4 }];
+    const { household: read } = soundKept({ ...kept, glide, rateSet: "cma" });
+    const derived = derivedSet(kept, { stocks: 0.6 });
+
+    expect(read.plan.rate).toBeCloseTo(
+      "short" in derived
+        ? 0
+        : planRate(derived.rates, derived.allocation, derived.rebalancing),
+      15,
+    );
+    expect(read.plan.rate).not.toBeCloseTo(0.0712544 + 0.0039837, 7);
+  });
+
+  // Six tenths, three and one of equities add up to a hair under the
+  // whole in floating point, which the target allocation allows. With no
+  // glide path the plan holds the target allocation's own split, so
+  // nothing asks what the hair left over returns.
+  it("runs the plan on the CMA's rates for an all-equity allocation whose shares add up to a hair under the whole", () => {
+    const shares = new Map([
+      ["FTSE Global All Cap ex-UK", 0.6],
+      ["Global small cap", 0.1],
+      ["UK equity", 0.3],
+    ]);
+    const hair = {
+      ...targets,
+      categories: targets.categories.map((category) => ({
+        ...category,
+        share: shares.get(category.name) ?? 0,
+      })),
+    };
+    const derived = derivedSet({ ...kept, targets: hair });
+
+    expect("short" in derived ? null : derived.allocation.stocks).toBeLessThan(
+      1,
+    );
+    expect(() =>
+      soundKept({ ...kept, rateSet: "cma", targets: hair }),
+    ).not.toThrow();
+  });
+
+  it("refuses a glide path holding bonds under the CMA's rates while the target allocation holds none", () => {
+    expect(() =>
+      soundKept({
+        ...kept,
+        glide: [{ age: 60, bonds: 0.4 }],
+        rateSet: "cma",
+        targets: targetsUnder("Equity"),
+      }),
+    ).toThrow(
+      "The glide path holds bonds the target allocation holds none of, so nothing says what they return, so the plan cannot run on the CMA's rates",
+    );
+  });
+
   // An import of a category asking for a share with no class leaves the
   // CMA's rates none to give, and the plan none to run on.
   it("refuses the CMA's rates chosen while the CMA gives none, saying what is missing", () => {
@@ -1414,3 +1494,30 @@ function targeted(
     targets: { ...imported, categories: change(imported.categories) },
   };
 }
+
+describe("holdWhileLive", () => {
+  const change = {
+    cannot: "this allocation cannot be imported",
+    then: "import it there",
+  };
+
+  // All in equities under the CMA's rates, the glide path's 40% in bonds
+  // from 60 has nothing to say what it returns, and choosing the CMA's
+  // again after the rates typed would be refused the same way.
+  it("refuses a change leaving the glide path holding what the target allocation holds none of, pointing at the glide path", () => {
+    const equities = {
+      ...kept,
+      rateSet: "cma" as const,
+      targets: targetsUnder("Equity"),
+    };
+
+    expect(() => {
+      holdWhileLive({ ...equities, glide: [{ age: 60, bonds: 0.4 }] }, change);
+    }).toThrow(
+      "The glide path holds bonds the target allocation holds none of, so nothing says what they return, so this allocation cannot be imported while the plan runs on the CMA's rates. Change the glide path first, or choose custom rates",
+    );
+    expect(() => {
+      holdWhileLive({ ...equities, glide: [{ age: 60, bonds: 0 }] }, change);
+    }).not.toThrow();
+  });
+});

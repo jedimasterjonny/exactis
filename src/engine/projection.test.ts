@@ -1530,6 +1530,28 @@ describe("project", () => {
     ).toStrictEqual([20000, 22000, 17600, 22880, 24024]);
   });
 
+  // £20,000 on the plan rate earns the glide path's 10% in 2026 and 5%
+  // in 2027, 22,000 and 23,100; a path drawn over it is taken in its
+  // place, its 20% in 2026, 24,000, and the glide path's 5% past it,
+  // 25,200.
+  it("carries a saving on the plan rate at each year's rate along a glide path, and a path's over it", () => {
+    const saving: Account = { ...flatIsa, growth: { kind: "plan" } };
+    const glided = { ...plan, byYear: [0.1, 0.05], years: 2 };
+
+    expect(
+      project([saving], { expenses: [], income: [] }, glided).map((point) =>
+        balanceIn(point, saving.id),
+      ),
+    ).toStrictEqual([20000, 22000, 23100]);
+    expect(
+      project(
+        [saving],
+        { expenses: [], income: [] },
+        { ...glided, path: { inflation: [0], rate: [0.2] } },
+      ).map((point) => balanceIn(point, saving.id)),
+    ).toStrictEqual([20000, 24000, 25200]);
+  });
+
   // The mortgage on the plan rate and the home on its own are carried
   // the same whatever the path says the plan rate comes to.
   it("carries a debt and an account on a fixed rate as at the plan's rates, whatever the path", () => {

@@ -247,20 +247,28 @@ export function cmaRates(
 // what the portfolio earns over the blend, from the vintage's risk under
 // the same blends, and nothing while it gives none. There is nothing
 // before a vintage or a curve is pulled, or while the vintage makes no
-// blend, and what is missing is said.
-export function derivedSet({
-  cma,
-  curve,
-  deductions,
-  mappings,
-  targets,
-}: {
-  readonly cma: null | Vintages;
-  readonly curve: Curve | null;
-  readonly deductions: Deductions;
-  readonly mappings: readonly Mapping[];
-  readonly targets: null | Targets;
-}): DerivedSet | Shortfall {
+// blend, and what is missing is said. Given a split, as the glide path
+// gives one for a year, the plan holds that one instead, with the rates
+// as they were blended, and rebalancing earns what it does between the
+// sleeves in those shares; a split holding a sleeve the target
+// allocation holds none of leaves nothing to say what that part of the
+// savings returns, and that is said too.
+export function derivedSet(
+  {
+    cma,
+    curve,
+    deductions,
+    mappings,
+    targets,
+  }: {
+    readonly cma: null | Vintages;
+    readonly curve: Curve | null;
+    readonly deductions: Deductions;
+    readonly mappings: readonly Mapping[];
+    readonly targets: null | Targets;
+  },
+  split: Allocation | null = null,
+): DerivedSet | Shortfall {
   if (cma === null) {
     return { short: "No CMA is pulled" };
   }
@@ -271,11 +279,20 @@ export function derivedSet({
   if (curve === null) {
     return { short: "No inflation curve is pulled" };
   }
+  if (split !== null) {
+    const unheld = unheldBy(blends, split);
+    if (unheld.length > 0) {
+      return {
+        short: `The glide path holds ${listed.format(unheld)} the target allocation holds none of, so nothing says what they return`,
+      };
+    }
+  }
+  const held = split === null ? blends : heldAt(blends, split);
   const risk = riskOf(cma.latest, blends);
   return {
-    allocation: { stocks: blends.stocks.share },
+    allocation: { stocks: held.stocks.share },
     rates: cmaRates(blends, deductions, inflationOf(curve).rate),
-    rebalancing: "short" in risk ? 0 : rebalancingOf(blends, risk).portfolio,
+    rebalancing: "short" in risk ? 0 : rebalancingOf(held, risk).portfolio,
   };
 }
 
@@ -442,10 +459,7 @@ export function spreadOf(
     return risk;
   }
   const { stocks: share } = allocation;
-  const unheld = [
-    ...(share > 0 && blends.stocks.parts.length === 0 ? ["stocks"] : []),
-    ...(share < 1 && blends.bonds.parts.length === 0 ? ["bonds"] : []),
-  ];
+  const unheld = unheldBy(blends, allocation);
   if (unheld.length > 0) {
     return {
       short: `The plan holds ${listed.format(unheld)} the target allocation holds none of, so nothing says how far they stray`,
@@ -532,6 +546,18 @@ function blendOf(
   };
 }
 
+// The two blends held in the shares of a split rather than the target
+// allocation's, each sleeve blended as it was within itself.
+function heldAt(
+  { bonds, stocks }: { readonly bonds: Blend; readonly stocks: Blend },
+  { stocks: share }: Allocation,
+): { readonly bonds: Blend; readonly stocks: Blend } {
+  return {
+    bonds: { ...bonds, share: 1 - share },
+    stocks: { ...stocks, share },
+  };
+}
+
 // Whether a part's class carries how far it strays.
 function isRisked(part: Part): part is Risked {
   return part.asset.risk !== undefined;
@@ -560,4 +586,16 @@ function sharedBy(first: Risked, second: Risked, correlation: number): number {
     one.stocks * other.stocks +
     correlation * (one.bonds * other.stocks + one.stocks * other.bonds)
   );
+}
+
+// The sleeves a split holds some of that nothing in the target
+// allocation blends into, by name.
+function unheldBy(
+  blends: { readonly bonds: Blend; readonly stocks: Blend },
+  { stocks: share }: Allocation,
+): string[] {
+  return [
+    ...(share > 0 && blends.stocks.parts.length === 0 ? ["stocks"] : []),
+    ...(share < 1 && blends.bonds.parts.length === 0 ? ["bonds"] : []),
+  ];
 }

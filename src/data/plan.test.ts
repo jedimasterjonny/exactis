@@ -19,6 +19,7 @@ import {
   marginOf,
   planOf,
   pricesIn,
+  rateIn,
   retiringAt,
   risenBy,
   risenWith,
@@ -211,6 +212,26 @@ describe("inflationIn", () => {
       0.02,
       15,
     );
+  });
+});
+
+describe("rateIn", () => {
+  // A path from 2026 holds 2026, a glide path 2026 and 2027; the path is
+  // read over the glide path, and the plan's 5% before both, past both,
+  // and for every year of a plan with neither.
+  it("reads a year's rate off the path, the glide path's under it, and the plan's own otherwise", () => {
+    const plan = {
+      byYear: [0.07, 0.06],
+      from: 2026,
+      path: { inflation: [0], rate: [0.1] },
+      rate: 0.05,
+    };
+
+    expect(rateIn(plan, 2026)).toBeCloseTo(0.1, 15);
+    expect(rateIn(plan, 2027)).toBeCloseTo(0.06, 15);
+    expect(rateIn(plan, 2025)).toBeCloseTo(0.05, 15);
+    expect(rateIn(plan, 2028)).toBeCloseTo(0.05, 15);
+    expect(rateIn({ from: 2026, rate: 0.05 }, 2026)).toBeCloseTo(0.05, 15);
   });
 });
 

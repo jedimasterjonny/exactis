@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   allInStocks,
+  bondsAt,
   openingRates,
   planRate,
   realRate,
@@ -103,5 +104,38 @@ describe("planRate", () => {
   // The 7.25% the blend makes and 0.4 of a point rebalancing earns.
   it("adds what rebalancing earns over the blend", () => {
     expect(planRate(rates, allocation, 0.004)).toBeCloseTo(0.0765, 15);
+  });
+});
+
+describe("bondsAt", () => {
+  // Fifteen points of bonds to 52, rising to 40 by 60, and down to 25 by 75.
+  const glide = [
+    { age: 52, bonds: 0.15 },
+    { age: 60, bonds: 0.4 },
+    { age: 75, bonds: 0.25 },
+  ] as const;
+
+  // Halfway from 52 to 60 is halfway from 15% to 40%, 27.5%; a third of
+  // the way from 60 to 75 is a third of the way down to 25%, 35%.
+  it("holds an anchor's share at its age and the line between two between them", () => {
+    expect(bondsAt(glide, 56)).toBeCloseTo(0.275, 15);
+    expect(bondsAt(glide, 65)).toBeCloseTo(0.35, 15);
+  });
+
+  // An anchor's figure comes back as it was typed, not by way of what
+  // stocks leave, which would carry it a hair off.
+  it("gives an anchor's own figure back at its age, exactly", () => {
+    for (const anchor of glide) {
+      expect(bondsAt(glide, anchor.age)).toBe(anchor.bonds);
+    }
+  });
+
+  it("holds flat before the first anchor and past the last", () => {
+    expect(bondsAt(glide, 34)).toBe(glide[0].bonds);
+    expect(bondsAt(glide, 91)).toBe(glide[2].bonds);
+  });
+
+  it("holds no share for a glide path of no anchors", () => {
+    expect(bondsAt([], 52)).toBeNull();
   });
 });
