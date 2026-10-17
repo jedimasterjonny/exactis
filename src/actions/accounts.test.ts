@@ -100,7 +100,7 @@ const home = {
   balance: 416386,
   bought: { month: { month: 5, year: 2022 }, price: 380000 },
   growth: { kind: "fixed", rate: 0.021 },
-  id: 6,
+  id: 20,
   kind: "house",
   name: "Home",
   setOn: "2026-09-15",
@@ -110,10 +110,10 @@ const mortgage = {
   balance: -341810,
   contribution: { amount: 2210, cadence: "month", kind: "fixed" },
   growth: { kind: "fixed", rate: 0.0515 },
-  id: 7,
+  id: 21,
   kind: "debt",
   name: "Home mortgage",
-  secures: 6,
+  secures: 20,
   setOn: "2026-09-15",
 } as const;
 
@@ -124,11 +124,11 @@ const payments = {
   endsAt: null,
   firstYear: 2026,
   growth: "nominal",
-  id: 8,
+  id: 22,
   lastMonth: null,
   lastYear: null,
   name: "Home mortgage",
-  pays: 7,
+  pays: 21,
   startsAt: null,
 } as const;
 
@@ -149,11 +149,11 @@ const carPayments = {
   endsAt: null,
   firstYear: 2026,
   growth: "nominal",
-  id: 8,
+  id: 22,
   lastMonth: null,
   lastYear: null,
   name: "Golf PCP",
-  pays: 7,
+  pays: 21,
   startsAt: null,
 } as const;
 
@@ -164,7 +164,7 @@ const paid: Kept = {
   schedule: {
     ...kept.schedule,
     expenses: kept.schedule.expenses.map((line) =>
-      line.id === 3 ? { ...line, pays: 5 } : line,
+      line.id === 13 ? { ...line, pays: 5 } : line,
     ),
   },
 };
@@ -190,11 +190,11 @@ describe("the account actions", () => {
 
     it("adds a new account with the name trimmed, given the next id, and draws the page again", async () => {
       expect(await saveAccount(null, values)).toStrictEqual(
-        saved({ ...lifetime, id: 6 }),
+        saved({ ...lifetime, id: 20 }),
       );
       expect(await latest()).toMatchObject({
-        accounts: [...kept.accounts, { ...lifetime, id: 6 }],
-        next: 7,
+        accounts: [...kept.accounts, { ...lifetime, id: 20 }],
+        next: 21,
       });
       expect(await versions()).toBe(2);
       expect(refresh).toHaveBeenCalledOnce();
@@ -221,7 +221,7 @@ describe("the account actions", () => {
           ...kept.accounts.slice(2, 4),
           { id: 5, secures: 4 },
         ],
-        next: 6,
+        next: 20,
       });
     });
 
@@ -272,7 +272,7 @@ describe("the account actions", () => {
     });
 
     it("refuses to make a pension a salary feeds anything else, and writes nothing", async () => {
-      await expect(saveAccount(1, values)).resolves.toStrictEqual(
+      await expect(saveAccount(6, values)).resolves.toStrictEqual(
         refused("A salary feeds a pension alone"),
       );
       expect(await versions()).toBe(1);
@@ -309,11 +309,14 @@ describe("the account actions", () => {
         growth: "plan",
         kind: "tax-deferred",
         name: "Workplace pension",
-        shares: [{ line: 1, sacrifice: 0.05 }],
+        shares: [{ line: 16, sacrifice: 0.05 }],
       } as const;
 
-      await saveAccount(1, pension);
-      await saveAccount(1, { ...pension, shares: [{ line: 1, sacrifice: 1 }] });
+      await saveAccount(6, pension);
+      await saveAccount(6, {
+        ...pension,
+        shares: [{ line: 16, sacrifice: 1 }],
+      });
 
       expect(await latest()).toMatchObject({
         schedule: {
@@ -330,16 +333,16 @@ describe("the account actions", () => {
       const pension = {
         ...values,
         kind: "tax-deferred",
-        shares: [{ line: 2, sacrifice: 0.1 }],
+        shares: [{ line: 17, sacrifice: 0.1 }],
       } as const;
 
-      await expect(saveAccount(1, pension)).resolves.toStrictEqual(
+      await expect(saveAccount(6, pension)).resolves.toStrictEqual(
         refused("No salary feeding the account has the id"),
       );
       await expect(
         saveAccount(null, {
           ...pension,
-          shares: [{ line: 1, sacrifice: 0.1 }],
+          shares: [{ line: 16, sacrifice: 0.1 }],
         }),
       ).resolves.toStrictEqual(
         refused("No salary feeding the account has the id"),
@@ -457,7 +460,7 @@ describe("the account actions", () => {
           balance: 4000,
           contribution: { amount: 333, cadence: "month", kind: "fixed" },
           growth: { kind: "fixed", rate: 0.03 },
-          id: 6,
+          id: 20,
           kind: "cash",
           name: "Lifetime ISA",
           setOn: "2026-09-15",
@@ -535,7 +538,7 @@ describe("the account actions", () => {
       expect(await saveHouse(null, outright)).toStrictEqual(saved(home));
       expect(await latest()).toMatchObject({
         accounts: [...kept.accounts, home],
-        next: 7,
+        next: 21,
         schedule: kept.schedule,
       });
       expect(refresh).toHaveBeenCalledOnce();
@@ -545,7 +548,7 @@ describe("the account actions", () => {
       expect(await saveHouse(null, house)).toStrictEqual(saved(home));
       expect(await latest()).toMatchObject({
         accounts: [...kept.accounts, home, mortgage],
-        next: 9,
+        next: 23,
         schedule: { expenses: [...kept.schedule.expenses, payments] },
       });
       expect(await versions()).toBe(2);
@@ -555,7 +558,7 @@ describe("the account actions", () => {
       await saveHouse(null, house);
 
       expect(
-        await saveHouse(6, {
+        await saveHouse(20, {
           ...house,
           ceiling: 600000,
           parts: [{ ...homePart, payment: 3000 }],
@@ -568,11 +571,11 @@ describe("the account actions", () => {
           { ...home, balance: 450000, limit: 600000 },
           { ...mortgage, contribution: { amount: 3000 } },
         ],
-        next: 9,
+        next: 23,
         schedule: {
           expenses: [
             ...kept.schedule.expenses,
-            { amount: 3000, id: 8, pays: 7 },
+            { amount: 3000, id: 22, pays: 21 },
           ],
         },
       });
@@ -582,37 +585,37 @@ describe("the account actions", () => {
       await keepAfter(db, 1, {
         ...kept,
         accounts: [...kept.accounts, home, mortgage],
-        next: 8,
+        next: 22,
       });
 
-      await saveHouse(6, house);
+      await saveHouse(20, house);
 
       expect(await latest()).toMatchObject({
         accounts: [...kept.accounts, home, mortgage],
-        next: 9,
+        next: 23,
         schedule: { expenses: [...kept.schedule.expenses, payments] },
       });
     });
 
     it("mortgages a house owned outright", async () => {
       await saveHouse(null, outright);
-      await saveHouse(6, house);
+      await saveHouse(20, house);
 
       expect(await latest()).toMatchObject({
         accounts: [...kept.accounts, home, mortgage],
-        next: 9,
+        next: 23,
         schedule: { expenses: [...kept.schedule.expenses, payments] },
       });
     });
 
     it("sends a loan and its payments away when the house is owned outright now", async () => {
       await saveHouse(null, house);
-      await saveHouse(6, outright);
+      await saveHouse(20, outright);
 
       expect(await latest()).toStrictEqual({
         ...kept,
         accounts: [...kept.accounts, home],
-        next: 9,
+        next: 23,
       });
     });
 
@@ -620,16 +623,16 @@ describe("the account actions", () => {
       await keepAfter(db, 1, {
         ...kept,
         accounts: [...kept.accounts, home, mortgage],
-        next: 8,
+        next: 22,
       });
 
-      await saveHouse(6, outright);
-      await saveHouse(6, outright);
+      await saveHouse(20, outright);
+      await saveHouse(20, outright);
 
       expect(await latest()).toStrictEqual({
         ...kept,
         accounts: [...kept.accounts, home],
-        next: 8,
+        next: 22,
       });
     });
 
@@ -647,17 +650,17 @@ describe("the account actions", () => {
             balance: -100000,
             contribution: { amount: 540 },
             growth: { rate: 0.042 },
-            id: 9,
+            id: 23,
             name: "Home mortgage 2",
-            secures: 6,
+            secures: 20,
           },
         ],
-        next: 11,
+        next: 25,
         schedule: {
           expenses: [
             ...kept.schedule.expenses,
             { ...payments, name: "Home mortgage 1" },
-            { amount: 540, id: 10, name: "Home mortgage 2", pays: 9 },
+            { amount: 540, id: 24, name: "Home mortgage 2", pays: 23 },
           ],
         },
       });
@@ -667,11 +670,11 @@ describe("the account actions", () => {
     // records and the one past the last goes with its payments.
     it("writes over the sub-accounts in their places, and sends those past the last away with their payments", async () => {
       await saveHouse(null, parted);
-      await saveHouse(6, house);
+      await saveHouse(20, house);
 
       expect(await latest()).toMatchObject({
         accounts: [...kept.accounts, home, mortgage],
-        next: 11,
+        next: 25,
         schedule: { expenses: [...kept.schedule.expenses, payments] },
       });
     });
@@ -682,7 +685,7 @@ describe("the account actions", () => {
       await saveHouse(null, {
         ...house,
         move: {
-          at: 1,
+          at: 7,
           ceiling: 800000,
           loanToValue: 0.9,
           price: 650000,
@@ -698,7 +701,7 @@ describe("the account actions", () => {
           {
             ...home,
             move: {
-              at: 1,
+              at: 7,
               ceiling: 800000,
               mortgage: { loanToValue: 0.9, rate: 0.045, term: 25 },
               price: 650000,
@@ -715,7 +718,7 @@ describe("the account actions", () => {
         saveHouse(null, {
           ...house,
           move: {
-            at: 3,
+            at: 9,
             ceiling: 0,
             loanToValue: 0,
             price: 650000,
@@ -745,14 +748,14 @@ describe("the account actions", () => {
         schedule: {
           expenses: [
             ...kept.schedule.expenses,
-            { amount: 750, lastMonth: null, lastYear: null, pays: 7 },
+            { amount: 750, lastMonth: null, lastYear: null, pays: 21 },
           ],
         },
       });
     });
 
     it("refuses to write a house over a pension a salary feeds, and writes nothing", async () => {
-      await expect(saveHouse(1, house)).resolves.toStrictEqual(
+      await expect(saveHouse(6, house)).resolves.toStrictEqual(
         refused("A salary feeds a pension alone"),
       );
       expect(await versions()).toBe(1);
@@ -825,7 +828,7 @@ describe("the account actions", () => {
       expect(await saveCar(null, golf)).toStrictEqual(saved(car));
       expect(await latest()).toMatchObject({
         accounts: [...kept.accounts, car, finance],
-        next: 9,
+        next: 23,
         schedule: { expenses: [...kept.schedule.expenses, carPayments] },
       });
       expect(await versions()).toBe(2);
@@ -836,7 +839,7 @@ describe("the account actions", () => {
       await saveCar(null, golf);
 
       expect(
-        await saveCar(6, { ...golf, floor: 3000, value: 17000 }),
+        await saveCar(20, { ...golf, floor: 3000, value: 17000 }),
       ).toStrictEqual(saved({ ...car, balance: 17000, limit: 3000 }));
       expect(await latest()).toMatchObject({
         accounts: [
@@ -844,10 +847,10 @@ describe("the account actions", () => {
           { ...car, balance: 17000, limit: 3000 },
           finance,
         ],
-        next: 9,
+        next: 23,
       });
 
-      await saveCar(6, {
+      await saveCar(20, {
         ...golf,
         agreement: "outright",
         balance: 0,
@@ -859,12 +862,12 @@ describe("the account actions", () => {
       expect(await latest()).toStrictEqual({
         ...kept,
         accounts: [...kept.accounts, car],
-        next: 9,
+        next: 23,
       });
     });
 
     it("refuses to write a car over a pension a salary feeds, and writes nothing", async () => {
-      await expect(saveCar(1, golf)).resolves.toStrictEqual(
+      await expect(saveCar(6, golf)).resolves.toStrictEqual(
         refused("A salary feeds a pension alone"),
       );
       expect(await versions()).toBe(1);
@@ -916,11 +919,11 @@ describe("the account actions", () => {
         },
       };
       await keepAfter(db, 1, matched);
-      await removeAccount(1);
+      await removeAccount(6);
 
       expect(await latest()).toStrictEqual({
         ...matched,
-        accounts: kept.accounts.filter(({ id }) => id !== 1),
+        accounts: kept.accounts.filter(({ id }) => id !== 6),
         schedule: {
           ...kept.schedule,
           income: kept.schedule.income.with(0, {
@@ -935,9 +938,9 @@ describe("the account actions", () => {
 
     it("deletes a house with the loan secured on it and that loan's payments, and a loan with its payments", async () => {
       await saveHouse(null, house);
-      await removeAccount(6);
+      await removeAccount(20);
 
-      expect(await latest()).toStrictEqual({ ...kept, next: 9 });
+      expect(await latest()).toStrictEqual({ ...kept, next: 23 });
 
       await keepAfter(db, 3, paid);
       await removeAccount(5);
@@ -947,7 +950,7 @@ describe("the account actions", () => {
         accounts: kept.accounts.filter(({ id }) => id !== 5),
         schedule: {
           ...kept.schedule,
-          expenses: kept.schedule.expenses.filter(({ id }) => id !== 3),
+          expenses: kept.schedule.expenses.filter(({ id }) => id !== 13),
         },
       });
     });
@@ -1088,14 +1091,14 @@ describe("the account actions", () => {
     it("places nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(placeAccountsInOrder([5, 4, 3, 2, 1])).rejects.toThrow(
+      await expect(placeAccountsInOrder([5, 4, 3, 2, 6])).rejects.toThrow(
         "redirected",
       );
       expect(await versions()).toBe(1);
     });
 
     it("places the accounts in the order given and draws the page again", async () => {
-      await placeAccountsInOrder([5, 4, 3, 2, 1]);
+      await placeAccountsInOrder([5, 4, 3, 2, 6]);
 
       expect(await latest()).toStrictEqual({
         ...kept,

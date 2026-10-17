@@ -109,9 +109,9 @@ describe("markersOf", () => {
     expect(
       markersOf([downsize, firstMillion, kidsLeave, independence], retiring),
     ).toStrictEqual([
-      { id: 1, name: "Kids leave home", year: 2036 },
+      { id: 7, name: "Kids leave home", year: 2036 },
       { id: "retirement", name: "Retirement", year: 2049 },
-      { id: 2, name: "Downsize", year: 2055 },
+      { id: 8, name: "Downsize", year: 2055 },
     ]);
   });
 
@@ -131,7 +131,7 @@ describe("markersOf", () => {
         ...retiring,
         owners: [{ ...owners[0], retirement: independence.conditions }],
       }),
-    ).toStrictEqual([{ id: 1, name: "Kids leave home", year: 2036 }]);
+    ).toStrictEqual([{ id: 7, name: "Kids leave home", year: 2036 }]);
   });
 });
 
@@ -140,8 +140,8 @@ describe("isTiedTo", () => {
     expect(isTiedTo({ ...salary, endsAt: "retirement" }, "retirement")).toBe(
       true,
     );
-    expect(isTiedTo({ ...salary, startsAt: 1 }, 1)).toBe(true);
-    expect(isTiedTo({ ...salary, startsAt: 1 }, 2)).toBe(false);
+    expect(isTiedTo({ ...salary, startsAt: 7 }, 7)).toBe(true);
+    expect(isTiedTo({ ...salary, startsAt: 7 }, 8)).toBe(false);
     expect(isTiedTo(salary, "retirement")).toBe(false);
   });
 });
@@ -157,7 +157,7 @@ describe("moving", () => {
   it("leaves an account with no move as it is, and one moving at a milestone the household does not list or reached when conditions hold", () => {
     const [cash] = accounts;
     const unlisted = { ...house, move: { ...move, at: 99 } };
-    const conditional = { ...house, move: { ...move, at: 3 } };
+    const conditional = { ...house, move: { ...move, at: 9 } };
 
     expect(moving(cash, milestones, retiring)).toBe(cash);
     expect(moving(unlisted, milestones, retiring)).toBe(unlisted);
@@ -230,8 +230,8 @@ describe("timed", () => {
       lastYear: 2048,
     });
     expect(
-      timed({ ...salary, firstYear: 2030, startsAt: 1 }, milestones, retiring),
-    ).toStrictEqual({ ...salary, firstYear: 2036, startsAt: 1 });
+      timed({ ...salary, firstYear: 2030, startsAt: 7 }, milestones, retiring),
+    ).toStrictEqual({ ...salary, firstYear: 2036, startsAt: 7 });
   });
 
   // Three years after retirement in 2049 is the end of 2051.
@@ -251,8 +251,8 @@ describe("timed", () => {
       timed({ ...salary, endsAt: 99, startsAt: 99 }, milestones, retiring),
     ).toStrictEqual({ ...salary, endsAt: 99, startsAt: 99 });
     expect(
-      timed({ ...salary, endsAt: 4, startsAt: 3 }, milestones, retiring),
-    ).toStrictEqual({ ...salary, endsAt: 4, startsAt: 3 });
+      timed({ ...salary, endsAt: 10, startsAt: 9 }, milestones, retiring),
+    ).toStrictEqual({ ...salary, endsAt: 10, startsAt: 9 });
   });
 });
 
@@ -260,20 +260,20 @@ describe("untied", () => {
   it("fixes each end tied to the milestone in the year it falls in now, and leaves the rest tied", () => {
     expect(
       untied(
-        { ...salary, endsAt: 2, firstYear: 2036, lastYear: 2054, startsAt: 1 },
+        { ...salary, endsAt: 8, firstYear: 2036, lastYear: 2054, startsAt: 7 },
         kidsLeave,
         retiring,
       ),
     ).toStrictEqual({
       ...salary,
-      endsAt: 2,
+      endsAt: 8,
       firstYear: 2036,
       lastYear: 2054,
       startsAt: null,
     });
     expect(
       untied(
-        { ...salary, endsAt: 2, lastMonth: 3, lastYear: 2060 },
+        { ...salary, endsAt: 8, lastMonth: 3, lastYear: 2060 },
         downsize,
         retiring,
       ),
@@ -284,7 +284,7 @@ describe("untied", () => {
       lastYear: 2054,
     });
     expect(
-      untied({ ...salary, endsAfter: 3, endsAt: 2 }, downsize, retiring),
+      untied({ ...salary, endsAfter: 3, endsAt: 8 }, downsize, retiring),
     ).toStrictEqual({
       ...salary,
       endsAfter: 0,
@@ -298,7 +298,7 @@ describe("untied", () => {
   // Nothing is tied to a milestone reached when conditions hold, and
   // it has no year to fix an end in.
   it("leaves every line as it is for a milestone reached when conditions hold", () => {
-    const tied = { ...salary, startsAt: 3 };
+    const tied = { ...salary, startsAt: 9 };
 
     expect(untied(tied, firstMillion, retiring)).toBe(tied);
   });

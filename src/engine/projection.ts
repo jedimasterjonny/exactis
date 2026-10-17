@@ -1079,8 +1079,8 @@ function movesIn(
 // clears what it borrowed at its rate over its term, a month, fixed in
 // nominal terms as a loan's is, from the month the move is made in to
 // the one its last payment falls in, under the loan's name and its
-// id, which no line holds, since the store hands ids out across every
-// record.
+// id, which no line holds, since the kept household holds every id to
+// one record.
 function newMortgageLine(
   { loan, rate, term }: Borrowing,
   borrowed: number,

@@ -143,7 +143,9 @@ describe("the household store", () => {
       accounts: [...reference.accounts, ...reference.accounts],
     });
 
-    await expect(getHousehold()).rejects.toThrow("An account is listed once");
+    await expect(getHousehold()).rejects.toThrow(
+      "A record's id is held by no other record",
+    );
   });
 
   it("keeps the household an edit makes as the next version, draws the page again and hands back what the edit says", async () => {
@@ -154,8 +156,8 @@ describe("the household store", () => {
       return {
         kept: {
           ...kept,
-          next: 7,
-          owners: [...kept.owners, { ...sam, id: 6, name: "Partner" }],
+          next: 21,
+          owners: [...kept.owners, { ...sam, id: 20, name: "Partner" }],
         },
         result: "added",
       };
@@ -164,8 +166,8 @@ describe("the household store", () => {
     expect(result).toStrictEqual(saved("added"));
     expect(await readLatest(db)).toMatchObject({
       household: {
-        next: 7,
-        owners: [...reference.owners, { ...sam, id: 6, name: "Partner" }],
+        next: 21,
+        owners: [...reference.owners, { ...sam, id: 20, name: "Partner" }],
       },
       version: 2,
     });

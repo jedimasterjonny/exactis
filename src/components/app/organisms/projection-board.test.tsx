@@ -115,7 +115,7 @@ function livingFrom(firstYear: number, isTied: boolean): Schedule {
   return {
     ...schedule,
     expenses: schedule.expenses.map((line) =>
-      line.id === 4
+      line.id === 14
         ? { ...line, firstYear, startsAt: isTied ? "retirement" : null }
         : line,
     ),

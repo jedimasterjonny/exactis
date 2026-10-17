@@ -37,7 +37,7 @@ const workedHint = "Worked out";
 // leaving home in 2036, to £650,000 held to £800,000, borrowing up to
 // 90% at 4.5% over 25 years.
 const moving: MoveValues = {
-  at: 1,
+  at: 7,
   ceiling: 800000,
   loanToValue: 0.9,
   price: 650000,
@@ -293,10 +293,10 @@ describe("HouseFields", () => {
       screen.queryByRole("textbox", { name: "Next house costs" }),
     ).not.toBeInTheDocument();
 
-    fireEvent.change(select("Moves"), { target: { value: "1" } });
+    fireEvent.change(select("Moves"), { target: { value: "7" } });
 
     expect(onAmend).toHaveBeenLastCalledWith({
-      move: { ...openingMove, at: 1, year: 2036 },
+      move: { ...openingMove, at: 7, year: 2036 },
     });
   });
 
@@ -322,7 +322,7 @@ describe("HouseFields", () => {
     commit(field("Mortgage rate"), "5");
     commit(field("Mortgage term"), "30");
     commit(field("Borrows up to"), "0");
-    fireEvent.change(select("Moves"), { target: { value: "2" } });
+    fireEvent.change(select("Moves"), { target: { value: "8" } });
     fireEvent.change(select("Moves"), { target: { value: "stays" } });
 
     expect(onAmend.mock.calls).toStrictEqual([
@@ -331,7 +331,7 @@ describe("HouseFields", () => {
       [{ move: { ...moving, rate: 0.05 } }],
       [{ move: { ...moving, term: 30 } }],
       [{ move: { ...moving, loanToValue: 0 } }],
-      [{ move: { ...moving, at: 2, year: 2055 } }],
+      [{ move: { ...moving, at: 8, year: 2055 } }],
       [{ move: null }],
     ]);
   });

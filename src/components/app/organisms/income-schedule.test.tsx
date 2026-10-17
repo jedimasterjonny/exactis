@@ -503,7 +503,7 @@ describe("IncomeSchedule", () => {
         screen.queryByRole("dialog", { name: "Salary" }),
       ).not.toBeInTheDocument();
     });
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(1, {
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(16, {
       amount: 120000,
       bonus: 15000,
       cadence: "year",
@@ -845,7 +845,7 @@ describe("IncomeSchedule", () => {
     expect(
       screen.getByRole("dialog", { name: "Income line updated" }),
     ).toHaveAccessibleDescription("State pension · 2058–2070");
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(4, {
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(19, {
       amount: 23400,
       bonus: 0,
       cadence: "year",
@@ -926,13 +926,13 @@ describe("IncomeSchedule", () => {
     expect(
       screen.getByRole("dialog", { name: "Income line updated" }),
     ).toHaveAccessibleDescription("Salary · 2026–2048");
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(1, {
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(16, {
       amount: 120000,
       bonus: 15000,
       cadence: "year",
       endsAfter: 0,
       endsAt: null,
-      feeds: 1,
+      feeds: 6,
       firstYear: 2026,
       growth: "inflation-plus-1",
       kind: "employment",
@@ -985,13 +985,13 @@ describe("IncomeSchedule", () => {
     expect(
       screen.getByRole("dialog", { name: "Income line updated" }),
     ).toHaveAccessibleDescription("Salary · 2026 on");
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(1, {
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(16, {
       amount: 120000,
       bonus: 15000,
       cadence: "year",
       endsAfter: 0,
       endsAt: null,
-      feeds: 1,
+      feeds: 6,
       firstYear: 2050,
       growth: "inflation-plus-1",
       kind: "employment",

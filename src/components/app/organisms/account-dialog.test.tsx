@@ -403,7 +403,7 @@ describe("AccountDialog", () => {
       name: "Workplace pension",
       owner: 1,
       rate: 0,
-      shares: [{ line: 1, sacrifice: 0.08 }],
+      shares: [{ line: 16, sacrifice: 0.08 }],
     });
   });
 

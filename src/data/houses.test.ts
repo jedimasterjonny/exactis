@@ -34,7 +34,7 @@ const draft: PartDraft = { ...homePart, key: 0, term: 22 };
 // home in 2036, to £650,000 held to £800,000, borrowing up to 90% at
 // 4.5% over 25 years.
 const moving: MoveValues = {
-  at: 1,
+  at: 7,
   ceiling: 800000,
   loanToValue: 0.9,
   price: 650000,
@@ -102,8 +102,8 @@ describe("moveChoices", () => {
   // The reference plan runs from 2026 to 2079, its owner retiring in
   // 2049; the children leave home in 2036 and the downsize is in 2055.
   const markers = markersOf(milestones, retiring);
-  const kidsLeave = { id: 1, name: "Kids leave home", year: 2036 };
-  const downsize = { id: 2, name: "Downsize", year: 2055 };
+  const kidsLeave = { id: 7, name: "Kids leave home", year: 2036 };
+  const downsize = { id: 8, name: "Downsize", year: 2055 };
 
   it("offers each milestone the household lists within the plan's years, and not retirement", () => {
     expect(moveChoices(markers, retiring, [])).toStrictEqual([
@@ -120,7 +120,7 @@ describe("moveChoices", () => {
     expect(moveChoices(markers, shorter, [])).toStrictEqual([kidsLeave]);
     expect(
       moveChoices(markers, shorter, [
-        { ...house, move: { ...move, at: 2, year: 2055 } },
+        { ...house, move: { ...move, at: 8, year: 2055 } },
       ]),
     ).toStrictEqual([kidsLeave, downsize]);
     expect(
@@ -304,12 +304,12 @@ describe("houseOf", () => {
       houseOf(
         {
           ...pair,
-          asset: { ...house, move: { at: 2, price: 300000, year: 2055 } },
+          asset: { ...house, move: { at: 8, price: 300000, year: 2055 } },
         },
         plan,
       ).move,
     ).toStrictEqual({
-      at: 2,
+      at: 8,
       ceiling: 0,
       loanToValue: 0,
       price: 300000,
@@ -371,7 +371,7 @@ describe("toRecords", () => {
         { ...home, move: { ...moving, ceiling: 0, loanToValue: 0 } },
         plan,
       ).asset.move,
-    ).toStrictEqual({ at: 1, price: 650000, year: 2036 });
+    ).toStrictEqual({ at: 7, price: 650000, year: 2036 });
     expect(toRecords(home, plan).asset).not.toHaveProperty("move");
   });
 

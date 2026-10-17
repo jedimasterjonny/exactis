@@ -22,7 +22,7 @@ export const golfValues: CarValues = {
 export const golf: Account = {
   balance: 18000,
   growth: { kind: "fixed", rate: -0.15 },
-  id: 6,
+  id: 20,
   kind: "car",
   name: "Golf",
 };
@@ -33,7 +33,7 @@ export const golfLoan: Account = {
   balance: -14000,
   contribution: { amount: 438, cadence: "month", kind: "fixed" },
   growth: { kind: "fixed", rate: 0.079 },
-  id: 7,
+  id: 21,
   kind: "debt",
   name: "Golf loan",
   secures: golf.id,

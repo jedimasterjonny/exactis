@@ -818,8 +818,8 @@ describe("markersIn", () => {
     expect(
       markersIn(reaching, [kidsLeave, firstMillion], planned),
     ).toStrictEqual([
-      { id: 3, name: "First million", year: 2034 },
-      { id: 1, name: "Kids leave home", year: 2036 },
+      { id: 9, name: "First million", year: 2034 },
+      { id: 7, name: "Kids leave home", year: 2036 },
       retirement,
     ]);
   });
@@ -834,7 +834,7 @@ describe("markersIn", () => {
       retirement,
     ]);
     expect(markersIn([], [kidsLeave, firstMillion], planned)).toStrictEqual([
-      { id: 1, name: "Kids leave home", year: 2036 },
+      { id: 7, name: "Kids leave home", year: 2036 },
       retirement,
     ]);
   });
@@ -853,7 +853,7 @@ describe("markersIn", () => {
 
     expect(markersIn(reaching, [kidsLeave], onConditions)).toStrictEqual([
       { ...retirement, year: 2034 },
-      { id: 1, name: "Kids leave home", year: 2036 },
+      { id: 7, name: "Kids leave home", year: 2036 },
     ]);
     expect(
       markersIn(
