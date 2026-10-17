@@ -69,6 +69,14 @@ function ledger(): string[] {
   return screen.getAllByRole("listitem").map((row) => row.textContent);
 }
 
+// The one expense line the chosen year's month pays, which there has
+// to be only one of.
+function line(): null | string {
+  return within(screen.getByRole("region", { name: /^Expenses/ })).getByRole(
+    "listitem",
+  ).textContent;
+}
+
 // The strip's slider, whose value is the year chosen.
 function year(): HTMLElement {
   return screen.getByRole("slider", { hidden: true, name: "Year" });
@@ -494,12 +502,6 @@ describe("CashFlowCard", () => {
         }}
       />,
     );
-    // The one line the month pays, which there has to be only one of.
-    const line = (): null | string =>
-      within(screen.getByRole("region", { name: /^Expenses/ })).getByRole(
-        "listitem",
-      ).textContent;
-
     fireEvent.click(screen.getByRole("button", { name: /^Expenses/ }));
 
     expect(line()).toBe(
@@ -511,6 +513,114 @@ describe("CashFlowCard", () => {
     expect(line()).toBe(
       "Home mortgage£400 / mo · Fixed in pounds · 2026–Mar 2044−£400",
     );
+  });
+
+  // A home worth £397,512 owing £176,520 at no interest, paid £2,180 a
+  // month from September 2026, owes £10,840 as 2033 opens, when it
+  // moves to one costing £520,000 and £16,000 of duty: the sale leaves
+  // £386,672 and the mortgage borrows the £149,328 still wanted, paid
+  // over ten years at £1,244.40 a month, which is the line the year
+  // book pays from 2033 in place of the old one.
+  it("reads a year after a move over the mortgage it took out", () => {
+    const owed: Account = { ...houseLoan, growth: { kind: "fixed", rate: 0 } };
+    render(
+      <CashFlowCard
+        accounts={[
+          {
+            ...house,
+            growth: { kind: "fixed", rate: 0 },
+            move: {
+              at: 1,
+              mortgage: { loanToValue: 0.9, rate: 0, term: 10 },
+              price: 520000,
+              year: 2033,
+            },
+          },
+          owed,
+        ]}
+        milestones={[]}
+        plan={{ ...plan, inflation: 0 }}
+        schedule={{
+          expenses: [
+            {
+              ...household,
+              amount: 2180,
+              growth: "nominal",
+              lastYear: null,
+              name: "Mortgage",
+              pays: owed.id,
+            },
+          ],
+          income: [],
+        }}
+      />,
+    );
+    choose(2032);
+    fireEvent.click(screen.getByRole("button", { name: /^Expenses/ }));
+
+    expect(line()).toBe(
+      "Mortgage£2,180 / mo · Fixed in pounds · 2026 on−£2,180",
+    );
+
+    choose(2033);
+
+    expect(line()).toBe(
+      "Mortgage£1,244 / mo · Fixed in pounds · 2033–Dec 2042−£1,244",
+    );
+  });
+
+  // The same move borrowing no more than 20% of the price, £104,000,
+  // leaves it £45,328 short, which January 2033 finds beside the new
+  // mortgage's £866.67: £46,195 drawn from the cash the £250,000 left
+  // £84,320 of by then.
+  it("lays out what a move leaves short in the month it is made", () => {
+    const owed: Account = { ...houseLoan, growth: { kind: "fixed", rate: 0 } };
+    render(
+      <CashFlowCard
+        accounts={[
+          { ...cash, balance: 250000 },
+          {
+            ...house,
+            growth: { kind: "fixed", rate: 0 },
+            move: {
+              at: 1,
+              mortgage: { loanToValue: 0.2, rate: 0, term: 10 },
+              price: 520000,
+              year: 2033,
+            },
+          },
+          owed,
+        ]}
+        milestones={[]}
+        plan={{ ...plan, inflation: 0 }}
+        schedule={{
+          expenses: [
+            {
+              ...household,
+              amount: 2180,
+              growth: "nominal",
+              lastYear: null,
+              name: "Mortgage",
+              pays: owed.id,
+            },
+          ],
+          income: [],
+        }}
+      />,
+    );
+
+    choose(2032);
+
+    expect(ledger()).not.toContain(
+      "Moving homeWhat the sale and the mortgage leave short of the next house and its stamp duty−£45,328",
+    );
+
+    choose(2033);
+
+    expect(ledger().slice(-2)).toStrictEqual([
+      "Moving homeWhat the sale and the mortgage leave short of the next house and its stamp duty−£45,328",
+      `Short${drawn}£46,195`,
+    ]);
   });
 
   // At 3% a year, prices have risen 1.03 to the power of nine and a

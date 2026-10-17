@@ -11,7 +11,7 @@ import type { Account } from "@/data/accounts";
 import type { Marker, Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Fed, Paid, Schedule, Spent, Take } from "@/engine/cash-flow";
-import type { ProjectionPoint } from "@/engine/projection";
+import type { MovedYear, ProjectionPoint } from "@/engine/projection";
 
 import { MilestoneChips } from "@/components/app/atoms/milestone-chips";
 import { RowAction } from "@/components/app/atoms/row-action";
@@ -28,9 +28,9 @@ import {
 import { CardContent } from "@/components/kit/card";
 import { drawnAsMortgages, mortgageLine } from "@/data/houses";
 import { markersOf, yearsOf } from "@/data/milestones";
-import { ageIn, endYear } from "@/data/plan";
+import { ageIn, endYear, pricesIn } from "@/data/plan";
 import { cashFlow, inTodaysMoney, totalsOf } from "@/engine/cash-flow";
-import { isShort, project } from "@/engine/projection";
+import { isShort, movedIn, movedYears, project } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { listed } from "@/lib/feeders";
 import { sumOf } from "@/lib/ledger";
@@ -43,13 +43,16 @@ import { laneColumns } from "@/lib/span";
 // What every year of the book reads the plan by: the accounts and the
 // schedule the engine runs on, the plan, its milestones within its span,
 // and the projection's years, for what each leaves uncovered or draws
-// from a pension early.
+// from a pension early, and as its moves carry them, so a year after a
+// move is read over the mortgage the move took out and the month of a
+// move finds what it leaves short, as the projection's does.
 interface Book {
   readonly accounts: readonly Account[];
   readonly markers: readonly Marker[];
   readonly plan: Plan;
   readonly points: readonly ProjectionPoint[];
   readonly schedule: Schedule;
+  readonly years: readonly MovedYear[];
 }
 
 interface CashFlowCardProps {
@@ -120,12 +123,14 @@ export function CashFlowCard({
   const markers = markersOf(milestones, plan).filter(
     (marker) => marker.year >= plan.from && marker.year <= end,
   );
+  const points = project(accounts, schedule, plan);
   const book: Book = {
     accounts,
     markers,
     plan,
-    points: project(accounts, schedule, plan),
+    points,
     schedule,
+    years: movedYears(points, { accounts, plan, schedule }),
   };
   const chosen = yearOf(year, book);
   const net = netOf(chosen);
@@ -355,17 +360,25 @@ function isZero(amount: number): boolean {
 // account paid, each under its name with how it is paid and a
 // pension with what lands once the basic rate is claimed back on it, the
 // accounts the month pays nothing named together on one line rather
-// than a column of nothings burying the ones it pays, and what is left
-// or short closing the list. The month is the first the
+// than a column of nothings burying the ones it pays, what a move that
+// year leaves short of the next house, which the month finds, and what
+// is left or short closing the list. The month is the first the
 // plan runs in the year, the month the plan starts in for its first year
 // and January after, and the year steps either way across the plan, as
 // the strip does. Every figure is in today's money. The month is said
 // aloud as it steps.
 function MonthLedger({ book, onYear, year }: LedgerProps): JSX.Element {
-  const { accounts, markers, plan, points, schedule } = book;
+  const { markers, plan, points } = book;
+  const {
+    due,
+    run: { accounts, schedule },
+  } = movedIn(book.years, book, year);
   const month = year === plan.from ? plan.month : 0;
   const reading = { at: { month, year }, plan };
-  const flow = inTodaysMoney(cashFlow(accounts, schedule, reading), reading);
+  const flow = inTodaysMoney(
+    cashFlow(accounts, schedule, { ...reading, settlement: -due }),
+    reading,
+  );
   const marked = markers
     .filter((marker) => marker.year === year)
     .map(({ name }) => name);
@@ -449,6 +462,13 @@ function MonthLedger({ book, onYear, year }: LedgerProps): JSX.Element {
             label="Paid nothing this month"
           />
         )}
+        {due > 0 && (
+          <Row
+            amount={-due / pricesIn(plan, reading.at)}
+            detail="What the sale and the mortgage leave short of the next house and its stamp duty"
+            label="Moving home"
+          />
+        )}
         <Closing
           early={inYear.reduce((sum, point) => sum + point.early, 0)}
           left={flow.left}
@@ -528,14 +548,19 @@ function Row({
 // runs in the year, in today's money, and whether the plan falls short in
 // it, by the projection's one test of that, and whether by a pension
 // drawn before the pension age.
-function yearOf(
-  year: number,
-  { accounts, plan, points, schedule }: Book,
-): Year {
+function yearOf(year: number, book: Book): Year {
+  const { plan, points } = book;
+  const {
+    due,
+    run: { accounts, schedule },
+  } = movedIn(book.years, book, year);
   const month = year === plan.from ? plan.month : 0;
   const reading = { at: { month, year }, plan };
   const { drawn, saved } = totalsOf(
-    inTodaysMoney(cashFlow(accounts, schedule, reading), reading),
+    inTodaysMoney(
+      cashFlow(accounts, schedule, { ...reading, settlement: -due }),
+      reading,
+    ),
   );
   const inYear = points.filter((point) => point.year === year);
   return {

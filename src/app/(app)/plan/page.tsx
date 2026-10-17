@@ -14,7 +14,13 @@ import { MilestoneList } from "@/components/app/organisms/milestone-list";
 import { retiresOn } from "@/data/milestones";
 import { endAge, endYear } from "@/data/plan";
 import { cashFlow, inTodaysMoney, totalsOf } from "@/engine/cash-flow";
-import { isShort, laidOut, project } from "@/engine/projection";
+import {
+  isShort,
+  laidOut,
+  movedIn,
+  movedYears,
+  project,
+} from "@/engine/projection";
 import { formatGbp } from "@/lib/money";
 import { plan as planScreen, sectionLabel } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
@@ -94,20 +100,22 @@ export default async function Plan(): Promise<JSX.Element> {
 // month draws on them, and how much, since that is where the plan turns;
 // and the age the savings last to, or the age and the year the
 // projection first falls short of them in. A year is read by a month
-// of it, as the year book reads it, and a month drawing less than a
-// pound is drawing nothing, as the book writes it.
-function headlineOf({
-  accounts,
-  plan,
-  schedule,
-}: {
+// of it, over the run the projection's moves carry it by, as the year
+// book reads it, though without what a move leaves its month short,
+// which is drawn once rather than a month at a time; and a month drawing
+// less than a pound is drawing nothing, as the book writes it.
+function headlineOf(run: {
   readonly accounts: readonly Account[];
   readonly plan: Planned;
   readonly schedule: Schedule;
 }): string {
+  const { plan } = run;
+  const points = project(run.accounts, run.schedule, plan);
+  const years = movedYears(points, run);
   const monthIn = (year: number): Totals => {
     const month = year === plan.from ? plan.month : 0;
     const reading = { at: { month, year }, plan };
+    const { accounts, schedule } = movedIn(years, run, year).run;
     return totalsOf(
       inTodaysMoney(cashFlow(accounts, schedule, reading), reading),
     );
@@ -131,8 +139,7 @@ function headlineOf({
       : [
           `${formatGbp(drawing.totals.drawn)} a month drawn from ${String(drawing.from)}`,
         ]),
-    shortfallOf(project(accounts, schedule, plan)) ??
-      `the savings last to ${String(endAge(plan))}`,
+    shortfallOf(points) ?? `the savings last to ${String(endAge(plan))}`,
   ].join(" · ");
 }
 
