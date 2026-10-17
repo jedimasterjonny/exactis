@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Condition, Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
+import type { Sale } from "@/engine/projection";
 
 import { removeMilestone, saveMilestone } from "@/actions/milestones";
 import { Toaster } from "@/components/kit/toast";
@@ -59,9 +60,11 @@ function renderList(
   {
     onConditions,
     plan = retiring,
+    sales = [],
   }: {
     readonly onConditions?: readonly Condition[];
     readonly plan?: Plan;
+    readonly sales?: readonly Sale[];
   } = {},
 ): void {
   render(
@@ -69,6 +72,7 @@ function renderList(
       milestones={listed}
       onConditions={onConditions}
       plan={plan}
+      sales={sales}
       schedule={schedule}
     />,
     { wrapper: Toaster },
@@ -244,6 +248,44 @@ describe("MilestoneList", () => {
       screen.getAllByText("Ends Salary, Salary step-up and Household"),
     ).toHaveLength(2);
     expect(screen.getAllByText(/^(Ends|Starts) /)).toHaveLength(4);
+  });
+
+  // The home moving as the children leave leaves £304,000 of equity,
+  // puts £289,000 down on the next and pays £15,000 of stamp duty; the
+  // downsize, which nothing is tied to, leaves £420,000, pays its
+  // £300,000 outright and £5,000 of duty.
+  it("says what a move comes to beside the milestone it is made at", () => {
+    renderList(milestones, tied, {
+      sales: [
+        {
+          at: 1,
+          borrowed: 211000,
+          deposit: 289000,
+          duty: 15000,
+          equity: 304000,
+          house: "Home",
+        },
+        {
+          at: 2,
+          borrowed: 0,
+          deposit: 300000,
+          duty: 5000,
+          equity: 420000,
+          house: "Home",
+        },
+      ],
+    });
+
+    expect(
+      screen.getAllByText(
+        "Ends Childcare · Ends Mortgage payment 3 years after · Starts Salary step-up · Moves Home: £304,000 equity, £289,000 deposit, £15,000 stamp duty",
+      ),
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByText(
+        "Moves Home: £420,000 equity, £300,000 paid outright, £5,000 stamp duty",
+      ),
+    ).toHaveLength(2);
   });
 
   // A salary running with the plan is paid to the year before
