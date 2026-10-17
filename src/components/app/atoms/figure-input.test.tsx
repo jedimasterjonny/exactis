@@ -28,6 +28,23 @@ describe("FigureInput", () => {
     expect(input).toHaveClass("figure", "text-right");
   });
 
+  it("is named for a screen reader by the label it is given, with none drawn", () => {
+    render(
+      <FigureInput
+        defaultValue={30}
+        format={plain}
+        label="Qualifying years"
+        largeStep={10}
+        step={1}
+      />,
+    );
+
+    expect(
+      screen.getByRole("textbox", { name: "Qualifying years" }),
+    ).toHaveValue("30");
+    expect(screen.queryByText("Qualifying years")).not.toBeInTheDocument();
+  });
+
   it("commits the parsed value on blur and not before", () => {
     const onValueCommitted = vi.fn<(value: number) => void>();
     render(
