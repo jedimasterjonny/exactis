@@ -6,7 +6,7 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
 import { house, houseLoan, move } from "@/data/houses.fixture";
-import { incomeLines, plan } from "@/data/income.fixture";
+import { incomeLines, plan, statePension } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import { getHousehold } from "@/store/household";
@@ -44,7 +44,10 @@ describe("Plan", () => {
       milestones: [...milestones],
       owners: [...owners],
       plan,
-      schedule: { expenses: [...expenseLines], income: [...incomeLines] },
+      schedule: {
+        expenses: [...expenseLines],
+        income: [...incomeLines, statePension],
+      },
     });
 
     render(await Plan());
