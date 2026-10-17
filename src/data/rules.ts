@@ -13,6 +13,7 @@ export const rules = {
   belowNothing: "A balance below nothing is a debt's",
   beyondGain: "A rate is no more than 50%",
   beyondLoss: "A rate loses no more than everything",
+  borrowsOnLoan: "A move borrows on a loan already secured on the house",
   debtEnds: "A debt's payments end",
   earner: "An income line is earned by an owner the plan lists",
   feedsPension: "A salary feeds a pension alone",

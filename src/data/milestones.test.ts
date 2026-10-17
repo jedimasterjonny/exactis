@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import { accounts } from "@/data/accounts.fixture";
+import { house, move } from "@/data/houses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
 import { owners, sam } from "@/data/owners.fixture";
 
@@ -13,6 +15,7 @@ import {
   isReached,
   isTiedTo,
   markersOf,
+  moving,
   retirementYearOf,
   retiresOn,
   retiringAt,
@@ -140,6 +143,25 @@ describe("isTiedTo", () => {
     expect(isTiedTo({ ...salary, startsAt: 1 }, 1)).toBe(true);
     expect(isTiedTo({ ...salary, startsAt: 1 }, 2)).toBe(false);
     expect(isTiedTo(salary, "retirement")).toBe(false);
+  });
+});
+
+describe("moving", () => {
+  // The children leave home at 48, in 2040, wherever the move was saved.
+  it("reads a move's year off the milestone it is at", () => {
+    expect(
+      moving({ ...house, move: { ...move, year: 2044 } }, milestones, retiring),
+    ).toStrictEqual({ ...house, move });
+  });
+
+  it("leaves an account with no move as it is, and one moving at a milestone the household does not list or reached when conditions hold", () => {
+    const [cash] = accounts;
+    const unlisted = { ...house, move: { ...move, at: 99 } };
+    const conditional = { ...house, move: { ...move, at: 3 } };
+
+    expect(moving(cash, milestones, retiring)).toBe(cash);
+    expect(moving(unlisted, milestones, retiring)).toBe(unlisted);
+    expect(moving(conditional, milestones, retiring)).toBe(conditional);
   });
 });
 

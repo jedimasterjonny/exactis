@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import type { Account } from "@/data/accounts";
+import type { Account, Move } from "@/data/accounts";
 import type {
   Cma,
   Deductions,
@@ -31,7 +31,13 @@ import { derivedSet, spreadOf } from "@/data/cma";
 import { cma, mappings } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { toRecords as toHouseRecords } from "@/data/houses";
-import { homePart, homeValues } from "@/data/houses.fixture";
+import {
+  homePart,
+  homeValues,
+  house,
+  houseLoan,
+  move,
+} from "@/data/houses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
 import { inflationOf } from "@/data/inflation";
 import { curve } from "@/data/inflation.fixture";
@@ -301,6 +307,50 @@ const held: readonly Case[] = [
         bought: { ...homeValues.bought, price: 0 },
         kind: "house",
       })),
+  ],
+  [
+    "Only a house moves",
+    (given): Inputs => changed(given, 4, (home) => ({ ...home, move })),
+  ],
+  [
+    "A move buys a house for something",
+    (given): Inputs => moved(given, { ...move, price: 0 }),
+  ],
+  [
+    "A mortgage borrows a share of the price",
+    (given): Inputs =>
+      moved(given, {
+        ...move,
+        mortgage: { loanToValue: 1.1, rate: 0.045, term: 25 },
+      }),
+  ],
+  [
+    "A mortgage runs a year at least",
+    (given): Inputs =>
+      moved(given, {
+        ...move,
+        mortgage: { loanToValue: 0.9, rate: 0.045, term: 0 },
+      }),
+  ],
+  [
+    "A loan is charged nothing or more",
+    (given): Inputs =>
+      moved(given, {
+        ...move,
+        mortgage: { loanToValue: 0.9, rate: -0.01, term: 25 },
+      }),
+  ],
+  [
+    "A move is at a milestone the household lists, reached at an age",
+    (given): Inputs => moved(given, { ...move, at: 3 }),
+  ],
+  [
+    "A move is at a milestone the household lists, reached at an age",
+    (given): Inputs => moved(given, { ...move, at: 99 }),
+  ],
+  [
+    "A move borrows on a loan already secured on the house",
+    (given): Inputs => housed(given, move),
   ],
   [
     "A loan is secured on an asset the household lists",
@@ -749,6 +799,16 @@ describe("household", () => {
     expect(household.safeParse(parted).success).toBe(true);
   });
 
+  // The home moves up as the children leave home, borrowing on the
+  // mortgage already on it, or moves borrowing nothing while owned
+  // outright.
+  it("keeps a house moving at a milestone reached at an age", () => {
+    const outright = housed(sound, { at: 2, price: 300000, year: 2059 });
+
+    expect(household.safeParse(moved(sound)).success).toBe(true);
+    expect(household.safeParse(outright).success).toBe(true);
+  });
+
   // The children leaving home in 2040 have moved past the salary's last
   // year, which is its own; a tied end moves with its milestone, and the
   // move is not refused over a line it leaves running no years.
@@ -850,6 +910,24 @@ describe("soundKept", () => {
       endsAt: 2,
       lastYear: 2058,
     });
+  });
+
+  // The children leave home at 48, in 2040, wherever the move was when
+  // it was saved.
+  it("reads a move's year off the milestone it is at, as the household stands", () => {
+    const { household: read } = soundKept({
+      ...kept,
+      accounts: kept.accounts.map((listed) => {
+        if (listed.id === house.id) {
+          return { ...house, move: { ...move, year: 2044 } };
+        }
+        return listed.id === houseLoan.id ? houseLoan : listed;
+      }),
+    });
+
+    expect(read.accounts.find(({ id }) => id === house.id)?.move).toStrictEqual(
+      move,
+    );
   });
 
   // A version saved while an expense line carried a category reads with
@@ -1491,6 +1569,26 @@ function earning(
 }
 
 // The debt with that id paying its own fixed sum a month.
+// The reference household with its home the house it is, moving as
+// given, and nothing secured on it.
+function housed(given: Inputs, made: Move): Inputs {
+  return changed(given, 4, (home) => ({
+    ...home,
+    bought: homeValues.bought,
+    kind: "house",
+    move: made,
+  }));
+}
+
+// The reference household with its home the house it is, moving as
+// given, or as the fixture moves, and its mortgage secured on it.
+function moved(given: Inputs, made: Move = move): Inputs {
+  return changed(housed(given, made), 5, (mortgage) => ({
+    ...mortgage,
+    secures: 4,
+  }));
+}
+
 function paying(given: Inputs, id: number, amount: number): Inputs {
   return changed(given, id, (debt) => ({
     ...debt,

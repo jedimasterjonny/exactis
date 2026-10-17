@@ -1,3 +1,4 @@
+import type { Account } from "@/data/accounts";
 import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
 import type { LineValues, Tie } from "@/data/schedule";
@@ -172,6 +173,24 @@ export function markersOf(
   return [...retirement, ...fixed].sort(
     (first, second) => first.year - second.year,
   );
+}
+
+// A house as its move's tie makes it: the year it moves in read off the
+// milestone the move is at, as a line's tied end is, and a house moving
+// at a milestone the household does not list, or at one reached when
+// conditions hold, as it is, for the household to refuse. An account
+// with no move is as it is.
+export function moving(
+  account: Account,
+  milestones: readonly Milestone[],
+  plan: Plan,
+): Account {
+  const { move } = account;
+  const year =
+    move === undefined ? undefined : yearTied(move.at, milestones, plan);
+  return move === undefined || year === undefined
+    ? account
+    : { ...account, move: { ...move, year } };
 }
 
 // The year an owner the plan carries retires in: the year they reach
