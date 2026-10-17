@@ -1661,8 +1661,9 @@ describe("moving home", () => {
   const lines = { expenses: [paying], income: [] };
 
   // The sale's £304,000 goes in whole, so the mortgage borrows the
-  // £211,000 the £515,000 still wants, under 90% of the price, and the
-  // cash is untouched by the move. The new mortgage is paid £1,758.33
+  // £211,000 the £515,000 still wants, under 90% of the price, the
+  // deposit is the other £289,000 of it, and the cash is untouched by
+  // the move. The new mortgage is paid £1,758.33
   // a month over its ten years, £21,100 in 2028, and the old line
   // stops: the cash ends 2028 at £54,900. A debt on nothing the move
   // sells stays where it opened.
@@ -1708,16 +1709,27 @@ describe("moving home", () => {
       8: -1000,
     });
     expect(opened?.due).toBe(0);
+    expect(opened?.sales).toStrictEqual([
+      {
+        at: 1,
+        borrowed: 211000,
+        deposit: 289000,
+        duty: 15000,
+        equity: 304000,
+        house: "Home",
+      },
+    ]);
+    expect(years.map(({ sales }) => sales.length)).toStrictEqual([0, 0, 1, 0]);
     expect(movedIn(years, run, 2027)).toStrictEqual({ due: 0, run });
     expect(movedIn(years, run, 2029).run).toBe(opened?.run);
     expect(movedIn(years, run, 2025)).toStrictEqual({ due: 0, run });
   });
 
-  // Borrowing no more than 30% of the price, £150,000, leaves the move
-  // £61,000 short, drawn from the cash in January 2028 with that
-  // month's £500 of spending and £1,250 of the new mortgage, and the
-  // spending's line runs on beside it: £114,000 less £61,000 and twelve
-  // months of £1,750 leaves £32,000.
+  // Borrowing no more than 30% of the price, £150,000, leaves a deposit
+  // of £350,000, and the move £61,000 short, drawn from the cash in
+  // January 2028 with that month's £500 of spending and £1,250 of the
+  // new mortgage, and the spending's line runs on beside it: £114,000
+  // less £61,000 and twelve months of £1,750 leaves £32,000.
   it("draws on the savings for what the sale and the most the mortgage borrows leave short", () => {
     const capped: Account = {
       ...house,
@@ -1741,6 +1753,16 @@ describe("moving home", () => {
     expect(points.some(isShort)).toBe(false);
     expect(opened?.balances).toStrictEqual({ 3: 53000, 4: 500000, 5: -150000 });
     expect(opened?.due).toBe(61000);
+    expect(opened?.sales).toStrictEqual([
+      {
+        at: 1,
+        borrowed: 150000,
+        deposit: 350000,
+        duty: 15000,
+        equity: 304000,
+        house: "Home",
+      },
+    ]);
     expect(movedIn(movedYears(points, run), run, 2028).due).toBe(61000);
     expect(movedIn(movedYears(points, run), run, 2033).due).toBe(0);
   });
@@ -1865,6 +1887,28 @@ describe("moving home", () => {
     expect(points.map(({ uncovered }) => uncovered)).toStrictEqual([
       0, 0, 185000, 0,
     ]);
+  });
+
+  // At 2% a year, prices have risen by 1.0404 by January 2028, so the
+  // £400,000 home and the £96,000 it owes enter it as £384,468 and
+  // £92,272 of today's money, leaving £292,196 of equity. The £15,000 of
+  // stamp duty on the £500,000 price is £14,418 of today's, the deposit
+  // is the equity less it, and the mortgage borrows the rest of the
+  // £515,000.
+  it("says what a move comes to in today's money", () => {
+    const rising = { ...moving, inflation: 0.02 };
+    const run = {
+      accounts: [savings, house, loan],
+      plan: rising,
+      schedule: lines,
+    };
+    const [, , opened] = movedYears(project(run.accounts, lines, rising), run);
+    const [sale] = opened?.sales ?? [];
+
+    expect(sale?.equity).toBeCloseTo(292196, 6);
+    expect(sale?.duty).toBeCloseTo(15000 / 1.0404, 6);
+    expect(sale?.deposit).toBeCloseTo(292196 - 15000 / 1.0404, 6);
+    expect(sale?.borrowed).toBeCloseTo(515000 / 1.0404 - 292196, 6);
   });
 
   it("refuses a move borrowing on a house with no loan on it", () => {
