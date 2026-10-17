@@ -218,10 +218,13 @@ function deleteLockOf(
     : undefined;
 }
 
-// The names of the income lines the owner earns, in the order listed.
+// The names of the income lines the owner earns, in the order listed,
+// leaving out their State Pension: the household pays it on the years
+// the owner holds, so it goes with them rather than holding them, and
+// cannot be given to anyone else.
 function earnedBy(owner: Owner, lines: readonly IncomeLine[]): string[] {
   return lines
-    .filter((line) => line.owner === owner.id)
+    .filter((line) => line.owner === owner.id && line.kind !== "state-pension")
     .map(({ name }) => name);
 }
 

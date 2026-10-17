@@ -262,8 +262,9 @@ describe("insuranceOn", () => {
     ).toBeCloseTo(2811.6, 10);
   });
 
-  it("charges a pension and other income nothing", () => {
+  it("charges a pension, the State Pension and other income nothing", () => {
     expect(insuranceOn("pension", 60000, wholeYear)).toBe(0);
+    expect(insuranceOn("state-pension", 60000, wholeYear)).toBe(0);
     expect(insuranceOn("other", 60000, wholeYear)).toBe(0);
   });
 });

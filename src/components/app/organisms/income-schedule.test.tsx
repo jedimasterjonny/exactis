@@ -13,7 +13,6 @@ import type { Answer } from "@/lib/answer";
 import { removeIncomeLine, saveIncomeLine } from "@/actions/schedule";
 import { Toaster } from "@/components/kit/toast";
 import { accounts, sipp } from "@/data/accounts.fixture";
-import { incomeKinds } from "@/data/income";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { retiringAt } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
@@ -89,6 +88,38 @@ describe("IncomeSchedule", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("paragraph")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  // The household pays the State Pension on the years typed on the
+  // assumptions screen and keeps no line of it, so it says what it is
+  // and is locked here, its name linking there and the reason where its
+  // chevron would be.
+  it("locks a State Pension, linking to the screen its years are typed on", () => {
+    renderSchedule([
+      salary,
+      {
+        ...statePension,
+        id: 5,
+        kind: "state-pension",
+        name: "State pension · Me",
+      },
+    ]);
+
+    expect(
+      screen.queryByRole("button", { name: "State pension · Me" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link", { name: "State pension · Me" }).at(-1),
+    ).toHaveAttribute("href", "/assumptions");
+    expect(screen.getByText("State pension")).toHaveAttribute(
+      "data-variant",
+      "secondary",
+    );
+    expect(
+      screen.getAllByRole("img", {
+        name: "Set by qualifying years, on the State pension tab of Assumptions",
+      }),
+    ).toHaveLength(2);
   });
 
   // The Delete in a line's dialog asks first, holds the confirm while
@@ -623,11 +654,13 @@ describe("IncomeSchedule", () => {
     expect(within(dialog).getByRole("textbox", { name: "RSUs" })).toHaveValue(
       "£0",
     );
+    // Every kind is offered but the State Pension, which is no line
+    // typed.
     expect(
-      within(
-        within(dialog).getByRole("combobox", { name: "Category" }),
-      ).getAllByRole("option"),
-    ).toHaveLength(incomeKinds.length);
+      within(within(dialog).getByRole("combobox", { name: "Category" }))
+        .getAllByRole("option")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual(["Employment", "Self-employment", "Pension", "Other"]);
     expect(
       within(
         within(dialog).getByRole("combobox", { name: "Growth" }),

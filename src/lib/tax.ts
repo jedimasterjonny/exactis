@@ -200,7 +200,8 @@ export function incomeTaxOn(taxable: number, stretch: Stretch): number {
 // The National Insurance a kind of income pays on what a stretch of the
 // year earned: Class 1 on a salary and Class 4 on self-employed profit,
 // each against its thresholds as the income tax bands have risen. A
-// pension and other income pay income tax alone.
+// pension, the State Pension among them, and other income pay income
+// tax alone.
 export function insuranceOn(
   kind: IncomeKind,
   pay: number,
@@ -212,6 +213,7 @@ export function insuranceOn(
       return chargedOn(classOne, pay, shareOf(stretch));
     case "other":
     case "pension":
+    case "state-pension":
       return 0;
     case "self-employment":
       return chargedOn(classFour, pay, shareOf(stretch));

@@ -297,6 +297,10 @@ describe("the schedule actions", () => {
           { ...values, owner: 99 },
           "An income line is earned by an owner the plan lists",
         ],
+        [
+          { ...values, kind: "state-pension" },
+          "A State Pension is paid on its owner's qualifying years, not typed as a line",
+        ],
       ] as const) {
         await expect(saveIncomeLine(null, draft)).resolves.toStrictEqual(
           refused(refusal),

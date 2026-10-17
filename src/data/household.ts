@@ -62,6 +62,7 @@ import {
   pounds,
   recordId,
 } from "@/data/schemas";
+import { statePensionLines } from "@/data/state-pension";
 import { Refusal } from "@/lib/answer";
 import { fixedMonthly, monthly } from "@/lib/cadence";
 import { endsAfterItStarts } from "@/lib/lines";
@@ -836,11 +837,13 @@ const sources = z.object({
 // The household as the store may keep it: its records sound on their
 // own, the end age the plan action holds it to, the first listed owner
 // retiring no later than it, since the plan is theirs and the chart can
-// mark a retirement only within it, and every record's id below the one
-// the next is given and held by no other record, owner, account,
-// milestone or line, since a line the household lays for a record takes
-// that record's id, as the line paying a move's mortgage takes its
-// loan's. Every save writes the household as read here, and
+// mark a retirement only within it, every record's id below the one the
+// next is given and held by no other record, owner, account, milestone
+// or line, since a line the household lays for a record takes that
+// record's id, as the line paying a move's mortgage takes its loan's,
+// and no income line the State Pension, which the household pays on
+// the owners' qualifying years rather than keeps, so one typed would be
+// paid twice. Every save writes the household as read here, and
 // only the latest version is read whole, so nothing is defaulted: a
 // version kept in a shape since changed is refused rather than read,
 // and the store holding one is emptied. An older version is read only
@@ -887,6 +890,11 @@ const kept = z
   .refine(
     (kept) => isListedOnce(recordsIn(kept)),
     "A record's id is held by no other record",
+  )
+  .refine(
+    ({ schedule }) =>
+      schedule.income.every(({ kind }) => kind !== "state-pension"),
+    "A State Pension is paid on its owner's qualifying years, not typed as a line",
   ) satisfies z.ZodType<Kept>;
 
 // Holds a change that can be made only under the rates typed: one that
@@ -1072,8 +1080,10 @@ function glidedOf(
 // The whole a kept household makes, its plan running from the month
 // after the one its balances are as of on the rates and the split live,
 // for the first listed owner, each line's tied ends and each move's
-// year read off the milestones they are tied to, and each line paying a
-// loan running as the loan's payments do.
+// year read off the milestones they are tied to, each line paying a
+// loan running as the loan's payments do, and each owner whose
+// qualifying years earn a State Pension paid it from their State
+// Pension age, on a line of the household's own after the lines kept.
 function householdOf(kept: Kept): Household {
   const live = liveOf(kept);
   const { plan, split, spread } = glidedOf(kept, planOf(kept, live), live);
@@ -1099,9 +1109,12 @@ function householdOf(kept: Kept): Household {
       expenses: kept.schedule.expenses.map((line) =>
         paidOver(timed(line, kept.milestones, plan), kept.accounts, plan),
       ),
-      income: kept.schedule.income.map((line) =>
-        timed(line, kept.milestones, plan),
-      ),
+      income: [
+        ...kept.schedule.income.map((line) =>
+          timed(line, kept.milestones, plan),
+        ),
+        ...kept.owners.flatMap(statePensionLines),
+      ],
     },
     split,
     spread,
