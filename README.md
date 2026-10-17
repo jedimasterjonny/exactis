@@ -229,6 +229,22 @@ the move being refused over a line on another screen; a line saved that way is
 refused. Deleting a milestone fixes each end tied to it in the year it falls in
 then, so the lines stay where they were.
 
+The new State Pension is paid on each owner's qualifying years, typed on the
+assumptions screen. It is the household's own line rather than one kept: made
+from the owners whenever the household is read, listed locked on the plan
+screen, and paid as the owner's income, taxed with the rest of it and charged no
+National Insurance. Thirty-five years or more earn the full £241.30 a week for
+2026/27, held as £12,548 a year, fewer than ten earn nothing, and each year
+between earns a 35th of it, to the pound. It is paid in today's money from the
+year the owner reaches their State Pension age to the end of the plan: 66 for
+those born by 1960, 67 for those born from 1961 to 1977 and 68 from 1978, read
+off the year born as the pension age is, so the months by which the age phases
+up are not held. It rises with inflation, which the triple lock pays at least;
+what the lock pays above prices is not modelled, nor deferring it, nor the
+starting amount of years before 2016. The years are typed as they stand rather
+than counted forward from the years the plan has an owner work, which is
+deferred.
+
 A month the income does not cover is drawn out of the savings at the start of
 it, before the month's growth: cash first, then the GIA, since what it earns is
 taxed and what an ISA earns is not, then the tax-free wrapper, then the
