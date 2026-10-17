@@ -18,6 +18,7 @@ export type Figure =
 type FigureInputProps = Figure & {
   readonly format: Intl.NumberFormatOptions;
   readonly isReadOnly?: boolean | undefined;
+  readonly label?: string | undefined;
   readonly largeStep: number;
   readonly max?: number | undefined;
   readonly min?: number | undefined;
@@ -39,13 +40,17 @@ type FigureInputProps = Figure & {
 // A figure worked out elsewhere and only shown here is read-only: it can
 // be focused, selected and read out, but not typed over or stepped, and
 // it is set on the muted ground in either theme, over the input's own
-// dark ground, so it reads as shown rather than asked for.
+// dark ground, so it reads as shown rather than asked for. A figure
+// with no field of its own, in a cell of a table where there is no room
+// for a label, is named for a screen reader by the label it is given,
+// as a select in a cell is; one in a field is named by the field's.
 // Every money, rate and year value is entered through this rather than
 // a text input.
 export function FigureInput({
   defaultValue,
   format,
   isReadOnly = false,
+  label,
   largeStep,
   max,
   min,
@@ -72,6 +77,7 @@ export function FigureInput({
     >
       <NumberField.Group>
         <NumberField.Input
+          aria-label={label}
           render={
             <Input
               className={cn(

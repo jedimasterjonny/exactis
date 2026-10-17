@@ -8,6 +8,7 @@ import {
   MultipleField,
   RateField,
   YearField,
+  YearsInput,
 } from "./figure-field";
 
 // What tells the four apart: how each writes a figure, how far a key
@@ -179,6 +180,34 @@ describe("RateField", () => {
 
     expect(field).toHaveAttribute("readonly");
     expect(field).toHaveValue("5.95%");
+  });
+});
+
+describe("YearsInput", () => {
+  // Thirty years, in a cell of a table with no label of its own; sixty
+  // typed is held to fifty, and a fraction rounded to the whole year.
+  it("names a whole count of years for a screen reader alone, and holds it inside its bounds", () => {
+    const onValueCommitted = vi.fn<(value: number) => void>();
+    render(
+      <YearsInput
+        label="Qualifying years"
+        max={50}
+        min={0}
+        onValueCommitted={onValueCommitted}
+        value={30}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Qualifying years" });
+
+    expect(input).toHaveValue("30");
+    expect(input).toHaveClass("figure", "text-right");
+    expect(screen.queryByText("Qualifying years")).not.toBeInTheDocument();
+
+    commit(input, "60");
+    commit(input, "12.4");
+
+    expect(onValueCommitted.mock.calls).toStrictEqual([[50], [12]]);
   });
 });
 
