@@ -90,6 +90,22 @@ const classFour: readonly Band[] = [
   { from: 50270, rate: 0.02 },
 ];
 
+// Stamp Duty Land Tax as England charges it from April 2025 on a home
+// bought by someone replacing their only or main residence: nothing to
+// £125,000, 2% to £250,000, 5% to £925,000, 10% to £1.5 million and 12%
+// above. The surcharge on an additional dwelling is not charged, since
+// the home is sold as the next is bought, and nor is a first-time
+// buyer's relief, since a mover has owned one. Held in pounds as the
+// law sets them and never raised, as the allowances are, since the law
+// moves the thresholds only when it is changed.
+const stampDuty: readonly Band[] = [
+  { from: 0, rate: 0 },
+  { from: 125000, rate: 0.02 },
+  { from: 250000, rate: 0.05 },
+  { from: 925000, rate: 0.1 },
+  { from: 1500000, rate: 0.12 },
+];
+
 // The month a tax year opens in, April, January being nought. The year
 // opens on the sixth, and is taken here from the first.
 export const april = 3;
@@ -279,6 +295,12 @@ export function reliefOf(account: { readonly kind: AccountKind }): number {
 // at all.
 export function relievableOn(earned: number): number {
   return Math.max(leastRelievable / 12, earned);
+}
+
+// The stamp duty on a home bought for the price, in the pounds it is
+// paid in, each band's rate on the slice of the price within it.
+export function stampDutyOn(price: number): number {
+  return chargedOn(stampDuty, price, 1);
 }
 
 // How far the bands have risen by the tax year a month falls in, as a
