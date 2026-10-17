@@ -5,14 +5,14 @@ import * as z from "zod";
 
 import { blank, kept } from "@/data/household.fixture";
 import { atAge } from "@/data/milestones";
-import { sam } from "@/data/owners.fixture";
+import { owners, sam } from "@/data/owners.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
 import { requireSession } from "@/lib/session";
 
-import { removeOwner, saveOwner } from "./owners";
+import { removeOwner, saveOwner, saveQualifyingYears } from "./owners";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -65,6 +65,32 @@ describe("the owner actions", () => {
             partner,
           ],
         },
+      });
+    });
+
+    // The partner has thirty qualifying years, typed on the assumptions
+    // screen; the dialog holds none, and a save from it sends none.
+    it("keeps the qualifying years of the owner it writes over, and writes none it is sent", async () => {
+      await keepAfter(db, 1, {
+        ...shared,
+        owners: [owners[0], { ...partner, qualifyingYears: 30 }],
+      });
+
+      expect(await saveOwner(6, kid)).toStrictEqual(
+        saved({ ...kid, id: 6, qualifyingYears: 30 }),
+      );
+      expect(
+        await saveOwner(null, { ...kid, qualifyingYears: 12 }),
+      ).toStrictEqual(saved({ ...kid, id: 7 }));
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          owners: [
+            owners[0],
+            { ...kid, id: 6, qualifyingYears: 30 },
+            { ...kid, id: 7 },
+          ],
+        },
+        version: 4,
       });
     });
 
@@ -176,6 +202,50 @@ describe("the owner actions", () => {
     it("refuses an id the list could not have sent, and one no owner has", async () => {
       await expect(removeOwner(1.5)).rejects.toThrow(z.ZodError);
       await expect(removeOwner(99)).resolves.toStrictEqual(
+        refused("No owner has the id"),
+      );
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+  });
+
+  describe("saveQualifyingYears", () => {
+    it("writes nothing without a session", async () => {
+      vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+      await expect(saveQualifyingYears(6, 30)).rejects.toThrow("redirected");
+      expect(await readLatest(db)).toMatchObject({ version: 1 });
+    });
+
+    it("writes the owner's years alone, over the owner as the store holds it, and draws the page again", async () => {
+      expect(await saveQualifyingYears(6, 30)).toStrictEqual(
+        saved({ ...partner, qualifyingYears: 30 }),
+      );
+      expect(await readLatest(db)).toMatchObject({
+        household: {
+          next: 7,
+          owners: [owners[0], { ...partner, qualifyingYears: 30 }],
+        },
+        version: 2,
+      });
+      expect(refresh).toHaveBeenCalledOnce();
+    });
+
+    // Typed back to nothing, the years are nothing rather than absent:
+    // the owner has been asked, and has none.
+    it("writes years typed back to nothing as nothing, rather than as none typed", async () => {
+      await saveQualifyingYears(6, 30);
+
+      expect(await saveQualifyingYears(6, 0)).toStrictEqual(
+        saved({ ...partner, qualifyingYears: 0 }),
+      );
+    });
+
+    it("refuses years that are not whole, below nothing or above fifty, an id the screen could not have sent, and one no owner has", async () => {
+      await expect(saveQualifyingYears(6, 30.5)).rejects.toThrow(z.ZodError);
+      await expect(saveQualifyingYears(6, -1)).rejects.toThrow(z.ZodError);
+      await expect(saveQualifyingYears(6, 51)).rejects.toThrow(z.ZodError);
+      await expect(saveQualifyingYears(0, 30)).rejects.toThrow(z.ZodError);
+      await expect(saveQualifyingYears(99, 30)).resolves.toStrictEqual(
         refused("No owner has the id"),
       );
       expect(await readLatest(db)).toMatchObject({ version: 1 });
