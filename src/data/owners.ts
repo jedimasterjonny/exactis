@@ -18,12 +18,22 @@ export interface Owner extends OwnerValues {
 // which turns a year of the plan into an age of theirs, and their
 // retirement, from which they earn nothing by working, held as a
 // milestone's conditions are: one on the age, for a retirement reached
-// at an age.
+// at an age. The years of National Insurance they have qualified for
+// the State Pension on are absent rather than nothing until they are
+// typed, as the model has them, and are typed on the assumptions screen
+// rather than in the dialog.
 export interface OwnerValues {
   readonly born: number;
   readonly name: string;
+  readonly qualifyingYears?: number;
   readonly retirement: readonly Condition[];
 }
+
+// The most qualifying years an owner holds: more than a working life
+// holds, and more than earn anything, since the full State Pension is
+// earned on fewer. The figure typing them and the store keeping them
+// hold them to the same.
+export const mostQualifyingYears = 50;
 
 // The owner a household opens with, before anyone is named: "Me", born
 // in 1990 and retiring at 59, the ages the dashboard has shown, so a

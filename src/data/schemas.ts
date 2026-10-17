@@ -4,6 +4,7 @@ import type { Month } from "@/data/schedule";
 
 import { cadences } from "@/data/accounts";
 import { bases, measures } from "@/data/milestones";
+import { mostQualifyingYears } from "@/data/owners";
 import { lineGrowths } from "@/data/schedule";
 
 // The pieces the model's rules and the actions' parsing are both built
@@ -86,15 +87,24 @@ const conditions = z
 export const milestoneValues = { conditions, name: named };
 
 // What an owner holds: the name, the year they were born, whole, since
-// the plan reads an age off it and a fraction of a year is no year, and
-// what they retire on, as a milestone is reached, an age being whole
-// years and nothing or more. Who may retire on what, and that the
-// first listed owner retires no later than the plan ends, are the
-// household's to hold, since the order of the owners and the plan's end
-// are kept beside them.
+// the plan reads an age off it and a fraction of a year is no year,
+// the years they have qualified for the State Pension on, whole, from
+// nothing to the most an owner holds, and absent rather than nothing
+// until they are typed, so a household kept before there were any reads
+// as it was, and what they retire on, as a milestone is reached, an age
+// being whole years and nothing or more. Who may retire on what, and
+// that the first listed owner retires no later than the plan ends, are
+// the household's to hold, since the order of the owners and the plan's
+// end are kept beside them.
 export const ownerValues = {
   born: z.number().int(),
   name: named,
+  qualifyingYears: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(mostQualifyingYears)
+    .exactOptional(),
   retirement: conditions,
 };
 

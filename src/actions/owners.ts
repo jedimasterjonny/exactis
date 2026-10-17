@@ -7,14 +7,19 @@ import type { Answer } from "@/lib/answer";
 
 import { ownerValues, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
-import { removed, written } from "@/lib/records";
+import { found, removed, replaced, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
 // What a save may carry: the name as typed less the space around it,
 // which the form also trims, and never empty, the year born and the age
-// retiring, each as the model holds them.
-const values = z.object(ownerValues) satisfies z.ZodType<OwnerValues>;
+// retiring, each as the model holds them. The qualifying years are not
+// among them, since the dialog does not hold them: they are typed on
+// the assumptions screen and written by saveQualifyingYears, and a save
+// here keeps them as they are.
+const values = z
+  .object(ownerValues)
+  .omit({ qualifyingYears: true }) satisfies z.ZodType<OwnerValues>;
 
 // Deletes the owner with that id, unless an account or an income line
 // names it: an ISA or a pension belongs to an owner, and an income line
@@ -39,10 +44,10 @@ export async function removeOwner(id: number): Promise<Answer<undefined>> {
 }
 
 // Writes an owner: a new one when the id is null, given the household's
-// next id, else over the one with that id, and hands back the owner as
-// the household now has it. An action answers a POST from anywhere, so
-// it checks the session for itself and parses what it was sent rather
-// than trusting the form.
+// next id, else over the one with that id, keeping the qualifying years
+// it holds, and hands back the owner as the household now has it. An
+// action answers a POST from anywhere, so it checks the session for
+// itself and parses what it was sent rather than trusting the form.
 export async function saveOwner(
   id: null | number,
   draft: OwnerValues,
@@ -55,10 +60,40 @@ export async function saveOwner(
       next,
       records,
       written: owner,
-    } = written(kept.owners, { at, next: kept.next, noun: "owner" }, (id) => ({
-      ...parsed,
-      id,
-    }));
+    } = written(
+      kept.owners,
+      { at, next: kept.next, noun: "owner" },
+      (id, listed) => ({
+        ...parsed,
+        id,
+        ...(listed?.qualifyingYears !== undefined && {
+          qualifyingYears: listed.qualifyingYears,
+        }),
+      }),
+    );
     return { kept: { ...kept, next, owners: records }, result: owner };
+  });
+}
+
+// Writes the years of National Insurance the owner with that id has
+// qualified for the State Pension on, and hands back the owner as the
+// household now has it. Only the years are written, over the owner as
+// the store holds it, so a name or a retirement saved on another screen
+// since is kept rather than written over. An action answers a POST from
+// anywhere, so it checks the session for itself and parses what it was
+// sent, as the model holds the years, rather than trusting the figure.
+export async function saveQualifyingYears(
+  id: number,
+  years: number,
+): Promise<Answer<Owner>> {
+  await requireSession();
+  const at = recordId.parse(id);
+  const qualifyingYears = ownerValues.qualifyingYears.parse(years);
+  return amend(({ kept }) => {
+    const owner = { ...found(kept.owners, at, "owner"), qualifyingYears };
+    return {
+      kept: { ...kept, owners: replaced(kept.owners, owner) },
+      result: owner,
+    };
   });
 }
