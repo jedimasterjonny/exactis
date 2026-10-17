@@ -3,7 +3,12 @@
 import type { JSX } from "react";
 
 import type { Account } from "@/data/accounts";
-import type { HouseDraft, HouseValues, PartDraft } from "@/data/houses";
+import type {
+  HouseDraft,
+  HouseValues,
+  MoveChoice,
+  PartDraft,
+} from "@/data/houses";
 import type { Secured } from "@/data/secured";
 import type { Entry } from "@/hooks/use-editor";
 import type { LoanFigure, WorkedOut } from "@/lib/figures";
@@ -22,6 +27,7 @@ type Draft = HouseDraft<Working>;
 
 interface HouseDialogProps {
   readonly house: null | Secured;
+  readonly milestones: readonly MoveChoice[];
   readonly onDelete?: ((asset: Account) => void) | undefined;
   readonly onDismiss: () => void;
   readonly onSaved: () => void;
@@ -54,12 +60,14 @@ const blankPart = {
 } as const satisfies Omit<Working, "key">;
 
 // A new house: mortgaged, since that is the case with something to work
-// out, worth nothing, with no ceiling and held in one new sub-account.
+// out, worth nothing, with no ceiling, held in one new sub-account and
+// staying put.
 // When it was bought is the plan's to say, since a house opens on the
 // plan's month before one is typed.
 const blank = {
   ceiling: 0,
   growth: 0,
+  move: null,
   name: "",
   parts: [{ ...blankPart, key: 0 }],
   status: "mortgaged",
@@ -72,7 +80,8 @@ const blank = {
 // as long as it is mounted, so the ledger renders it while it holds a
 // house to open on, or a new one, and the entry mounts from that. The
 // fields are uncontrolled but for the loan's figures, which the dialog
-// shows by value. The save holds while the draft is not sound, or a
+// shows by value, and are handed the milestones, for the one a house
+// moves at. The save holds while the draft is not sound, or a
 // rate could not be worked out; a term that could not is no bar, since
 // a loan the payment never clears is paid to the end of the plan and
 // the store reads that off the figures it keeps. The plan's month is
@@ -89,6 +98,7 @@ const blank = {
 // to delete and is offered none.
 export function HouseDialog({
   house,
+  milestones,
   onDelete,
   onDismiss,
   onSaved,
@@ -139,6 +149,7 @@ export function HouseDialog({
       <HouseFields
         draft={{ ...entry.draft, parts }}
         initial={entry.initial}
+        milestones={milestones}
         onAdd={() => {
           amend(entry, {
             parts: [
@@ -236,6 +247,7 @@ function workedOut(draft: Draft): {
     bought: draft.bought,
     ceiling: draft.ceiling,
     growth: draft.growth,
+    move: draft.move,
     name: draft.name.trim(),
     parts: isMortgaged
       ? parts.map(({ balance, figure, payment, rate, worked }) =>

@@ -676,6 +676,62 @@ describe("the account actions", () => {
       });
     });
 
+    // The move up as the children leave home is written on the house's
+    // own account, as the records keep it.
+    it("writes a house's move on its account", async () => {
+      await saveHouse(null, {
+        ...house,
+        move: {
+          at: 1,
+          ceiling: 800000,
+          loanToValue: 0.9,
+          price: 650000,
+          rate: 0.045,
+          term: 25,
+          year: 2036,
+        },
+      });
+
+      expect(await latest()).toMatchObject({
+        accounts: [
+          ...kept.accounts,
+          {
+            ...home,
+            move: {
+              at: 1,
+              ceiling: 800000,
+              mortgage: { loanToValue: 0.9, rate: 0.045, term: 25 },
+              price: 650000,
+              year: 2036,
+            },
+          },
+          mortgage,
+        ],
+      });
+    });
+
+    it("refuses a move at a milestone reached when conditions hold, in the household's words, and writes nothing", async () => {
+      await expect(
+        saveHouse(null, {
+          ...house,
+          move: {
+            at: 3,
+            ceiling: 0,
+            loanToValue: 0,
+            price: 650000,
+            rate: 0,
+            term: 25,
+            year: 2036,
+          },
+        }),
+      ).resolves.toStrictEqual(
+        refused(
+          "A move is at a milestone the household lists, reached at an age",
+        ),
+      );
+      expect(await versions()).toBe(1);
+    });
+
     // £750 a month only meets the interest on £200,000 at 4.5%, so the
     // line runs to the end of the plan and carries it, and the loan's own
     // sum is never charged.
@@ -713,6 +769,39 @@ describe("the account actions", () => {
         { ...house, parts: [{ ...homePart, balance: 0 }] },
         { ...parted, parts: [homePart, { ...homePart, payment: 0 }] },
         { ...outright, parts: [homePart] },
+        ...[
+          { loanToValue: 1.1 },
+          { rate: -0.01 },
+          { term: 2.5 },
+          { at: 0 },
+          { price: 0 },
+          { ceiling: 1 },
+          { loanToValue: 0.9, term: 0 },
+        ].map((change) => ({
+          ...house,
+          move: {
+            at: 1,
+            ceiling: 0,
+            loanToValue: 0,
+            price: 650000,
+            rate: 0,
+            term: 25,
+            year: 2036,
+            ...change,
+          },
+        })),
+        {
+          ...outright,
+          move: {
+            at: 1,
+            ceiling: 0,
+            loanToValue: 0.9,
+            price: 650000,
+            rate: 0,
+            term: 25,
+            year: 2036,
+          },
+        },
       ] as const) {
         await expect(saveHouse(null, draft)).rejects.toThrow(z.ZodError);
       }
