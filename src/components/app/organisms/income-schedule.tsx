@@ -348,9 +348,9 @@ function paidOf(
 // base or giving up a share of it, the parts written out beside the
 // badge, so the split is seen without opening the line; and the line as
 // it is paid, which for a salary or a profit stops at retirement. A
-// State Pension is locked, its name linking to the assumptions screen,
-// since the household pays it on the qualifying years typed there and
-// keeps no line of it to edit or delete here.
+// State Pension is locked, its name linking to the assumptions screen
+// open on its tab, since the household pays it on the qualifying years
+// typed there and keeps no line of it to edit or delete here.
 function summarise(
   line: IncomeLine,
   {
@@ -363,7 +363,7 @@ function summarise(
     ...(hasParts(line) && { detail: formatParts(line, pensions) }),
     ...(line.kind === "state-pension" && {
       lock: {
-        at: assumptions.href,
+        at: "/assumptions?tab=state-pension",
         reason: `Set by qualifying years, on the State pension tab of ${assumptions.label}`,
       },
     }),
