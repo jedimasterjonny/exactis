@@ -5,6 +5,8 @@ import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { AccountLedger } from "@/components/app/organisms/account-ledger";
 import { MonthEnd } from "@/components/app/organisms/month-end";
+import { moveChoices } from "@/data/houses";
+import { markersOf } from "@/data/milestones";
 import { laidOut } from "@/engine/projection";
 import { balanceOf } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
@@ -24,7 +26,8 @@ import { getHousehold } from "@/store/household";
 // month the ledger counts the salaries in, which is the month the plan
 // starts in, and the rate the savings grow at, laid out as its own
 // projection has it, so an owner already past the conditions they
-// retire on earns no salary in that month. The header is the
+// retire on earns no salary in that month, and the milestones it is
+// laid out by that a house may move at, for the one it moves at. The header is the
 // page's, as the plan screen's is, since it reads that month and what
 // the balances come to and nothing else: it says the starting net worth
 // and the month the balances are as of, the one before the plan starts
@@ -67,6 +70,11 @@ export default async function Accounts(): Promise<JSX.Element> {
           accounts={accounts}
           expenses={schedule.expenses}
           lines={schedule.income}
+          milestones={moveChoices(
+            markersOf(household.milestones, plan),
+            plan,
+            accounts,
+          )}
           owners={owners}
           plan={plan}
         />
