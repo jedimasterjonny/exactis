@@ -110,6 +110,23 @@ export interface Run {
   readonly schedule: Schedule;
 }
 
+// What a move came to as its year opened, in today's money: the
+// milestone it was made at, by its id, and the house it sold, by its
+// name; the equity the sale left once every loan on the house was
+// cleared; what the mortgage borrowed, nothing for a move borrowing
+// nothing; the deposit, what of the next house's price the mortgage did
+// not borrow, which is the whole of it bought outright; and the stamp
+// duty on that price. What the sale leaves over the deposit and the
+// duty lands in the cash, and what they want past it the savings find.
+export interface Sale {
+  readonly at: number;
+  readonly borrowed: number;
+  readonly deposit: number;
+  readonly duty: number;
+  readonly equity: number;
+  readonly house: string;
+}
+
 // The mortgage a move takes out, and the loan on the house it is
 // carried in.
 type Borrowing = NonNullable<Move["mortgage"]> & { readonly loan: Account };
@@ -153,23 +170,6 @@ interface Moved {
   readonly held: ReadonlyMap<number, Held>;
   readonly run: Run;
   readonly sales: readonly Sale[];
-}
-
-// What a move came to as its year opened, in today's money: the
-// milestone it was made at, by its id, and the house it sold, by its
-// name; the equity the sale left once every loan on the house was
-// cleared; what the mortgage borrowed, nothing for a move borrowing
-// nothing; the deposit, what of the next house's price the mortgage did
-// not borrow, which is the whole of it bought outright; and the stamp
-// duty on that price. What the sale leaves over the deposit and the
-// duty lands in the cash, and what they want past it the savings find.
-interface Sale {
-  readonly at: number;
-  readonly borrowed: number;
-  readonly deposit: number;
-  readonly duty: number;
-  readonly equity: number;
-  readonly house: string;
 }
 
 // One owner's tax year as the projection has carried it so far: how

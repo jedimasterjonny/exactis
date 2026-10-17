@@ -10,6 +10,7 @@ import type { Condition, Marker, Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { LineValues } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
+import type { Sale } from "@/engine/projection";
 
 import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { PinBar } from "@/components/app/atoms/pin-bar";
@@ -31,6 +32,7 @@ import {
 import { ageIn, endYear } from "@/data/plan";
 import { counted } from "@/lib/count";
 import { listed } from "@/lib/feeders";
+import { formatGbp } from "@/lib/money";
 import { plan as planScreen, subsectionLabel } from "@/lib/nav";
 import { laneColumns } from "@/lib/span";
 
@@ -38,6 +40,7 @@ interface MilestoneListProps {
   readonly milestones: readonly Milestone[];
   readonly onConditions: readonly Condition[] | undefined;
   readonly plan: Plan;
+  readonly sales: readonly Sale[];
   readonly schedule: Schedule;
 }
 
@@ -80,7 +83,11 @@ interface MilestoneRowProps {
 // hold, which the screen is told since the plan it is handed is laid
 // out at the year its own rates reach them: its row says what it is
 // reached on beside the lines tied to it, and pins that year, or draws
-// no pin where the plan never reaches them.
+// no pin where the plan never reaches them. A milestone a house moves
+// at says beside its ties what the move comes to, as the plan at its
+// own rates makes it: the equity the sale leaves, the deposit on the
+// next house, or its price where it is bought outright, and the stamp
+// duty on it.
 // The span is ruled in decades above the rows, in the pins' column, and
 // every pin's track carries a faint rule at each milestone, as every
 // line's bar beneath does, so the three cards read as lanes on the one
@@ -92,6 +99,7 @@ export function MilestoneList({
   milestones,
   onConditions,
   plan,
+  sales,
   schedule,
 }: MilestoneListProps): JSX.Element {
   const [opened, setOpened] = useState<"new" | "retirement" | Milestone | null>(
@@ -135,16 +143,14 @@ export function MilestoneList({
               const isOnConditions =
                 milestone === undefined && onConditions !== undefined;
               const ties = tiesAt(marker, paid);
+              const said = [
+                ...(isOnConditions ? onConditions.map(conditionOf) : []),
+                ...(ties === undefined ? [] : [ties]),
+                ...sales.filter(({ at }) => at === marker.id).map(saleOf),
+              ];
               return (
                 <MilestoneRow
-                  detail={
-                    isOnConditions
-                      ? [
-                          ...onConditions.map(conditionOf),
-                          ...(ties === undefined ? [] : [ties]),
-                        ].join(" · ")
-                      : ties
-                  }
+                  detail={said.length === 0 ? undefined : said.join(" · ")}
                   key={marker.id}
                   marks={marks}
                   name={marker.name}
@@ -262,6 +268,14 @@ function MilestoneRow({
 // The lines' names as a sentence lists them.
 function namesOf(lines: readonly LineValues[]): string {
   return listed.format(lines.map(({ name }) => name));
+}
+
+// What a move comes to, "Moves Home: £304,000 equity, £289,000
+// deposit, £15,000 stamp duty", the price "paid outright" rather than a
+// deposit where the move borrows nothing.
+function saleOf({ borrowed, deposit, duty, equity, house }: Sale): string {
+  const paid = borrowed === 0 ? "paid outright" : "deposit";
+  return `Moves ${house}: ${formatGbp(equity)} equity, ${formatGbp(deposit)} ${paid}, ${formatGbp(duty)} stamp duty`;
 }
 
 // Which lines end and start at the milestone, "Ends Salary and

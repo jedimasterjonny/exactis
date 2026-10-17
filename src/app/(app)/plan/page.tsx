@@ -3,7 +3,7 @@ import type { JSX } from "react";
 import type { Account } from "@/data/accounts";
 import type { Plan as Planned } from "@/data/plan";
 import type { Schedule, Totals } from "@/engine/cash-flow";
-import type { ProjectionPoint } from "@/engine/projection";
+import type { MovedYear, ProjectionPoint } from "@/engine/projection";
 
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
@@ -49,7 +49,9 @@ import { getHousehold } from "@/store/household";
 // laid out as its own projection has it, so a retirement on conditions
 // falls where the plan at its own rates reaches them and every card and
 // dialog reads the one year; the milestones are told what it is reached
-// on, which the plan laid out no longer says.
+// on, which the plan laid out no longer says, and what each move made at
+// one comes to as the plan at its own rates makes it, off the one
+// projection of the plan the headline reads too.
 export default async function Plan(): Promise<JSX.Element> {
   const household = await getHousehold();
   const { accounts, milestones, owners } = household;
@@ -58,16 +60,20 @@ export default async function Plan(): Promise<JSX.Element> {
     household.schedule,
     household.plan,
   );
+  const run = { accounts, plan, schedule };
+  const points = project(accounts, schedule, plan);
+  const years = movedYears(points, run);
   return (
     <>
       <ScreenHeader label={sectionLabel(planScreen)} title={planScreen.title}>
-        {headlineOf({ accounts, plan, schedule })}
+        {headlineOf(run, { points, years })}
       </ScreenHeader>
       <ScreenBody>
         <MilestoneList
           milestones={milestones}
           onConditions={retiresOn(household.plan)}
           plan={plan}
+          sales={years.flatMap(({ sales }) => sales)}
           schedule={schedule}
         />
         <IncomeSchedule
@@ -103,15 +109,24 @@ export default async function Plan(): Promise<JSX.Element> {
 // of it, over the run the projection's moves carry it by, as the year
 // book reads it, though without what a move leaves its month short,
 // which is drawn once rather than a month at a time; and a month drawing
-// less than a pound is drawing nothing, as the book writes it.
-function headlineOf(run: {
-  readonly accounts: readonly Account[];
-  readonly plan: Planned;
-  readonly schedule: Schedule;
-}): string {
+// less than a pound is drawing nothing, as the book writes it. The
+// page's one projection of the plan is handed in, with its years as
+// its moves carry them.
+function headlineOf(
+  run: {
+    readonly accounts: readonly Account[];
+    readonly plan: Planned;
+    readonly schedule: Schedule;
+  },
+  {
+    points,
+    years,
+  }: {
+    readonly points: readonly ProjectionPoint[];
+    readonly years: readonly MovedYear[];
+  },
+): string {
   const { plan } = run;
-  const points = project(run.accounts, run.schedule, plan);
-  const years = movedYears(points, run);
   const monthIn = (year: number): Totals => {
     const month = year === plan.from ? plan.month : 0;
     const reading = { at: { month, year }, plan };

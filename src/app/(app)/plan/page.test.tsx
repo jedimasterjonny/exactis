@@ -5,6 +5,7 @@ import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
+import { house, houseLoan, move } from "@/data/houses.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
@@ -169,5 +170,31 @@ describe("Plan", () => {
     expect(await headlineWith(10000000)).toBe(
       "£3,350 a month drawn from the savings now · the savings fall short at 34, in 2026, carried by an early pension draw",
     );
+  });
+  // The fixture's home moving up as the children leave home, in 2040:
+  // the milestone's row says what the move comes to as the plan at its
+  // own rates makes it. With no inflation, today's money is the year's.
+  // The £397,512 home, grown 2.1% a year for the thirteen and a third
+  // years to January 2040 and its mortgage cleared by then, sells for
+  // £524,437; the £650,000 next, grown the same, would cost £857,544,
+  // so it is held to its £800,000 ceiling, whose stamp duty is £2,500
+  // and 5% of £550,000, £30,000; and the deposit is the equity less
+  // that.
+  it("says what a move comes to beside the milestone it is made at", async () => {
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      accounts: [...accounts.slice(0, 3), { ...house, move }, houseLoan],
+      milestones: [...milestones],
+      owners: [...owners],
+      plan,
+      schedule: { expenses: [...expenseLines], income: [...incomeLines] },
+    });
+    render(await Plan());
+
+    expect(
+      screen.getAllByText(
+        "Moves Home: £524,437 equity, £494,437 deposit, £30,000 stamp duty",
+      ),
+    ).toHaveLength(2);
   });
 });
