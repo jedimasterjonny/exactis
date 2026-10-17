@@ -59,7 +59,7 @@ describe("EmploymentFields", () => {
     expect(field("RSUs")).toHaveAccessibleDescription(
       "Vesting at the salary's cadence",
     );
-    expect(choice).toHaveValue("1");
+    expect(choice).toHaveValue("6");
     expect(choice).not.toHaveAccessibleDescription();
     expect(
       within(choice)
@@ -163,11 +163,11 @@ describe("EmploymentFields", () => {
     });
 
     fireEvent.change(screen.getByRole("combobox", { name: "Pension" }), {
-      target: { value: "1" },
+      target: { value: "6" },
     });
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
-      feeds: 1,
+      feeds: 6,
       match: 0.07,
       opens: null,
       sacrifice: 0.1,
@@ -184,11 +184,11 @@ describe("EmploymentFields", () => {
     });
 
     fireEvent.change(screen.getByRole("combobox", { name: "Pension" }), {
-      target: { value: "6" },
+      target: { value: "20" },
     });
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
-      feeds: 6,
+      feeds: 20,
       match: 0.05,
       opens: null,
       sacrifice: 0.05,
@@ -243,13 +243,13 @@ describe("EmploymentFields", () => {
     fireEvent.change(field("Pension name"), { target: { value: "Nest" } });
     commit(field("Pension balance"), "1,000");
     fireEvent.change(screen.getByRole("combobox", { name: "Pension" }), {
-      target: { value: "1" },
+      target: { value: "6" },
     });
 
     expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
       { opens: { balance: 500, name: "Nest", owner: 1 } },
       { opens: { balance: 1000, name: "Aviva", owner: 1 } },
-      { feeds: 1, match: 0, opens: null, sacrifice: 0.05 },
+      { feeds: 6, match: 0, opens: null, sacrifice: 0.05 },
     ]);
   });
 

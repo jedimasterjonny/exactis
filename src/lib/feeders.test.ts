@@ -15,16 +15,16 @@ describe("fedOf", () => {
   // salary is matched to seven per cent, and the step-up's £1,000 a
   // month at a twentieth of its base, stated a year beside it.
   it("sums what every salary feeding the account lands in it a year, whatever its cadence", () => {
-    expect(fedOf(1, incomeLines)).toBeCloseTo(13800, 8);
-    expect(fedOf(1, [{ ...salary, match: 0.07 }])).toBeCloseTo(22200, 8);
+    expect(fedOf(6, incomeLines)).toBeCloseTo(13800, 8);
+    expect(fedOf(6, [{ ...salary, match: 0.07 }])).toBeCloseTo(22200, 8);
     expect(
-      fedOf(1, [
+      fedOf(6, [
         salary,
         {
           ...stepUp,
           amount: 20000,
           cadence: "month",
-          feeds: 1,
+          feeds: 6,
           sacrifice: 0.05,
         },
       ]),
@@ -33,27 +33,27 @@ describe("fedOf", () => {
 
   it("lands nothing in an account nothing feeds", () => {
     expect(fedOf(2, incomeLines)).toBe(0);
-    expect(fedOf(1, [])).toBe(0);
+    expect(fedOf(6, [])).toBe(0);
   });
 });
 
 describe("feedersOf", () => {
   it("names every salary feeding the account", () => {
-    expect(feedersOf(1, incomeLines)).toStrictEqual(["Salary"]);
+    expect(feedersOf(6, incomeLines)).toStrictEqual(["Salary"]);
     expect(
-      feedersOf(1, [salary, { ...stepUp, feeds: 1, sacrifice: 0.05 }]),
+      feedersOf(6, [salary, { ...stepUp, feeds: 6, sacrifice: 0.05 }]),
     ).toStrictEqual(["Salary", "Salary step-up"]);
   });
 
   it("names none for an account nothing feeds", () => {
     expect(feedersOf(2, incomeLines)).toStrictEqual([]);
-    expect(feedersOf(1, [])).toStrictEqual([]);
+    expect(feedersOf(6, [])).toStrictEqual([]);
   });
 });
 
 describe("feeding", () => {
   it("lists the lines feeding the account, as they are", () => {
-    expect(feeding(1, incomeLines)).toStrictEqual([salary]);
+    expect(feeding(6, incomeLines)).toStrictEqual([salary]);
     expect(feeding(2, incomeLines)).toStrictEqual([]);
   });
 });

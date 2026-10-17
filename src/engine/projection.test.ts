@@ -149,17 +149,17 @@ describe("project", () => {
     expect(project(accounts, funded, { ...plan, years: 2 })).toStrictEqual([
       point(
         2026,
-        { 1: 412880, 2: 286145, 3: 18300, 4: 416386, 5: -182940 },
+        { 2: 286145, 3: 18300, 4: 416386, 5: -182940, 6: 412880 },
         { deferred: 412880, free: 286145 },
       ),
       point(
         2027,
-        { 1: 468432, 2: 320990, 3: 18300, 4: 425130, 5: -165432 },
+        { 2: 320990, 3: 18300, 4: 425130, 5: -165432, 6: 468432 },
         { deferred: 468432, free: 320990 },
       ),
       point(
         2028,
-        { 1: 526761, 2: 357577, 3: 18300, 4: 434058, 5: -147001 },
+        { 2: 357577, 3: 18300, 4: 434058, 5: -147001, 6: 526761 },
         { deferred: 526761, free: 357577 },
       ),
     ]);
@@ -367,9 +367,9 @@ describe("project", () => {
     expect(
       project([fed], { expenses: [], income: [salary] }, { ...plan, years: 2 }),
     ).toStrictEqual([
-      point(2026, { 1: 0 }),
-      point(2027, { 1: 13800 }, { deferred: 13800 }),
-      point(2028, { 1: 27600 }, { deferred: 27600 }),
+      point(2026, { 6: 0 }),
+      point(2027, { 6: 13800 }, { deferred: 13800 }),
+      point(2028, { 6: 27600 }, { deferred: 27600 }),
     ]);
   });
 
@@ -394,8 +394,8 @@ describe("project", () => {
         { ...plan, years: 1 },
       ),
     ).toStrictEqual([
-      point(2026, { 1: 0 }),
-      point(2027, { 1: 22200 }, { deferred: 22200 }),
+      point(2026, { 6: 0 }),
+      point(2027, { 6: 22200 }, { deferred: 22200 }),
     ]);
   });
 
@@ -470,7 +470,10 @@ describe("project", () => {
       project([spareIsa, twin], schedule, { ...plan, years: 0 }),
     ).toThrow("An account is listed once");
     expect(() =>
-      project([spareIsa, flatIsa], schedule, { ...plan, years: 1 }),
+      project([spareIsa, { ...flatIsa, id: 20 }], schedule, {
+        ...plan,
+        years: 1,
+      }),
     ).not.toThrow();
   });
 
@@ -1437,7 +1440,7 @@ describe("project", () => {
     expect(
       project([pension, isa], funded, { ...plan, years: 0 }),
     ).toStrictEqual([
-      point(2026, { 1: 412880, 2: 286145 }, { deferred: 412880, free: 286145 }),
+      point(2026, { 2: 286145, 6: 412880 }, { deferred: 412880, free: 286145 }),
     ]);
   });
 
@@ -2207,7 +2210,7 @@ describe("monthsOn", () => {
   // is not drawn, a month end checking the balances rather than
   // spending them.
   it("takes what keeps a pension always funded paid out of the cash and the ISAs, and nothing for the spending", () => {
-    const kept: Account = { ...pension, isAlwaysFunded: true };
+    const kept: Account = { ...pension, id: 20, isAlwaysFunded: true };
     const month = byId(
       monthsOn([kept, flatIsa, pocket], short, { months: 1, plan: year }),
     );

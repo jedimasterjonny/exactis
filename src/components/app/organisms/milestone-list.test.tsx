@@ -41,13 +41,13 @@ const [household, childcare, mortgage] = expenseLines;
 const tied = {
   expenses: [
     { ...household, endsAt: "retirement" },
-    { ...childcare, endsAt: 1 },
-    { ...mortgage, endsAfter: 3, endsAt: 1 },
+    { ...childcare, endsAt: 7 },
+    { ...mortgage, endsAfter: 3, endsAt: 7 },
     ...expenseLines.slice(3),
   ],
   income: [
     { ...salary, endsAt: "retirement" },
-    { ...stepUp, endsAt: "retirement", startsAt: 1 },
+    { ...stepUp, endsAt: "retirement", startsAt: 7 },
     ...incomeLines.slice(2),
   ],
 } as const;
@@ -258,7 +258,7 @@ describe("MilestoneList", () => {
     renderList(milestones, tied, {
       sales: [
         {
-          at: 1,
+          at: 7,
           borrowed: 211000,
           deposit: 289000,
           duty: 15000,
@@ -266,7 +266,7 @@ describe("MilestoneList", () => {
           house: "Home",
         },
         {
-          at: 2,
+          at: 8,
           borrowed: 0,
           deposit: 300000,
           duty: 5000,
@@ -446,7 +446,7 @@ describe("MilestoneList", () => {
 
   it("says the one line tied to a milestone stays where it is", () => {
     renderList(milestones, {
-      expenses: [{ ...childcare, endsAt: 1 }],
+      expenses: [{ ...childcare, endsAt: 7 }],
       income: [],
     });
 

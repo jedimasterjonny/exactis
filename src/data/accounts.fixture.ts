@@ -10,7 +10,7 @@ export const accounts = [
     balance: 412880,
     contribution: { amount: 27195, cadence: "year", kind: "fixed" },
     growth: { kind: "plan" },
-    id: 1,
+    id: 6,
     kind: "tax-deferred",
     name: "Workplace pension",
     owner: 1,
@@ -53,7 +53,7 @@ export const accounts = [
 export const sipp: Account = {
   balance: 0,
   growth: { kind: "plan" },
-  id: 6,
+  id: 20,
   kind: "tax-deferred",
   name: "SIPP",
 };

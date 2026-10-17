@@ -43,7 +43,7 @@ const nothing: Schedule = { expenses: [], income: [] };
 
 // The childcare tied to end at the children leaving home.
 const oneTied: Schedule = {
-  expenses: [{ ...childcare, endsAt: 1 }],
+  expenses: [{ ...childcare, endsAt: 7 }],
   income: [],
 };
 
@@ -51,10 +51,10 @@ const oneTied: Schedule = {
 // the children leaving home, and the step-up to start at it.
 const threeTied: Schedule = {
   expenses: [
-    { ...childcare, endsAt: 1 },
-    { ...mortgage, endsAfter: 3, endsAt: 1 },
+    { ...childcare, endsAt: 7 },
+    { ...mortgage, endsAfter: 3, endsAt: 7 },
   ],
-  income: [{ ...stepUp, startsAt: 1 }],
+  income: [{ ...stepUp, startsAt: 7 }],
 };
 
 function radio(name: string): HTMLElement {

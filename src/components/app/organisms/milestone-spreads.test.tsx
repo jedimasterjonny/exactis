@@ -475,7 +475,7 @@ describe("MilestoneSpreads", () => {
   // on the answer.
   it("asks from a saved milestone's dialog before deleting it, the dialog closing first, saying what becomes of the lines tied to it", async () => {
     renderList(milestones, futures, {
-      expenses: [{ ...childcare, endsAt: 1 }],
+      expenses: [{ ...childcare, endsAt: 7 }],
       income: [],
     });
     const { promise, resolve: answer } =
