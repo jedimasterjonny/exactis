@@ -152,6 +152,21 @@ describe("household store", () => {
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
+  it("drops a scenario's versions up to the one given, and leaves those after it", async () => {
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
+    await keepAfter(db, { scenario: "Retire early", version: 1 }, named);
+    await keepAfter(db, { scenario: "Retire early", version: 2 }, reference);
+
+    await dropScenario(db, "Retire early", 2);
+
+    expect(
+      await db
+        .select({ version: householdVersions.version })
+        .from(householdVersions),
+    ).toStrictEqual([{ version: 3 }]);
+    expect(await listScenarios(db)).toStrictEqual(["Retire early"]);
+  });
+
   // The reference household on the rates typed by hand on the first of
   // September, which holds every source the CMA's are derived from, then
   // on the CMA's rates on the tenth and the twentieth; and a scenario
