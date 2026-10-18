@@ -46,19 +46,23 @@ to, the rates and the split of the savings the plan runs on, the inflation curve
 last pulled from the Bank of England, the vintages of BlackRock's capital market
 assumptions last pulled and the target allocation last imported from Portfolio
 Performance, lives in Postgres as one document, a version of it a save, reached
-through [Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. The table
-is `src/db/schema.ts`, the migration generated from it is in `drizzle/`, and the
-two queries, reading the latest version and keeping the next, are in
-`src/db/household.ts`.
+through [Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. Every
+version is kept on a branch, the household itself or a scenario by its name,
+each counting its versions from one. The table is `src/db/schema.ts`, the
+migrations generated from it are in `drizzle/`, and the queries, each naming the
+branch it reads or writes, are in `src/db/household.ts`: reading the latest
+version, keeping the next, reading the version the rates stood at on a day,
+listing the scenarios and dropping one.
 
 A save reads the latest version, makes the household it leaves, holds the whole
 of it to the rules in `src/data/household.ts`, and keeps it as the version after
 the one it read, in one statement. So a save lands whole or not at all, one the
 household changed under since it was read is refused rather than written over
 the other, and a save that breaks a rule is refused in the rule's words. No
-version is written over or deleted, which the table holds with a trigger, so
-every household the store has held stays. A read holds the latest version to the
-same rules before any screen draws from it.
+version is written over, and none of the household's is deleted, which the table
+holds with a trigger, so every household the store has held stays; a scenario
+can be dropped, every version of it at once, where the household never can. A
+read holds the latest version to the same rules before any screen draws from it.
 
 The plan is the first listed owner's, as the first listed account is the first
 paid: it runs to the age they reach, and the retirement its lines are tied to is
@@ -89,9 +93,13 @@ latest version is in an old shape is refused on read until it is emptied. An
 older version is read only for the sources its rates rest on, to show what moved
 them, through a schema of their own that defaults what a version too old to hold
 them lacks. A change to the table is a new migration, written with `db:generate`
-and committed with the change. The tests apply the migrations to an in-process
-Postgres ([PGlite](https://pglite.dev)), so a migration that does not apply
-fails the suite before it reaches a database.
+and committed with the change, with whatever drizzle-kit cannot write, such as
+the trigger, written into it by hand. A migration is applied before the app that
+needs it is deployed, so the app already running has to run on the migrated
+table in between: the scenario column defaults to the household, so that app
+reads and writes the household's versions as it did. The tests apply the
+migrations to an in-process Postgres ([PGlite](https://pglite.dev)), so a
+migration that does not apply fails the suite before it reaches a database.
 
 ## The projection
 

@@ -50,7 +50,7 @@ describe("pullCma", () => {
 
     await expect(pullCma()).rejects.toThrow("redirected");
     expect(fetch).not.toHaveBeenCalled();
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("keeps BlackRock's latest vintage with none before it, draws the page again and hands the vintage back", async () => {
@@ -61,7 +61,7 @@ describe("pullCma", () => {
       "https://www.blackrock.com/blk-inst-c-assets/images/tools/blackrock-investment-institute/cma/blackrock-capital-market-assumptions.xlsx",
       expect.objectContaining({ cache: "no-store" }),
     );
-    expect(await readLatest(db)).toMatchObject({
+    expect(await readLatest(db, "")).toMatchObject({
       household: { cma: { latest: cma, previous: null } },
       version: 1,
     });
@@ -70,12 +70,12 @@ describe("pullCma", () => {
 
   it("moves the vintage held to the previous when a later one is pulled, and keeps the rest of the household as it was", async () => {
     const held = { ...kept, cma: { latest: may, previous: null } };
-    await keepAfter(db, 0, held);
+    await keepAfter(db, { scenario: "", version: 0 }, held);
     blackRockSends(new Response(file));
 
     await pullCma();
 
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: { ...held, cma: { latest: cma, previous: may } },
       version: 2,
     });
@@ -85,14 +85,15 @@ describe("pullCma", () => {
   // vintage before it rather than with itself.
   it("replaces the vintage held with the same one again, keeping the previous as it was", async () => {
     const reissued = { ...cma, asOf: "2026-06-29" };
-    await keepAfter(db, 0, {
-      ...kept,
-      cma: { latest: reissued, previous: may },
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...kept, cma: { latest: reissued, previous: may } },
+    );
     blackRockSends(new Response(file));
 
     expect(await pullCma()).toStrictEqual(saved(cma));
-    expect(await readLatest(db)).toMatchObject({
+    expect(await readLatest(db, "")).toMatchObject({
       household: { cma: { latest: cma, previous: may } },
       version: 2,
     });
@@ -106,11 +107,11 @@ describe("pullCma", () => {
         startingPointOf(priced.filter(([, , name]) => name !== "US cash")),
       ),
     );
-    await keepAfter(db, 0, {
-      ...kept,
-      cma: { latest: may, previous: null },
-      rateSet: "cma",
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...kept, cma: { latest: may, previous: null }, rateSet: "cma" },
+    );
     blackRockSends(new Response(uncarried));
 
     expect(await pullCma()).toStrictEqual(
@@ -118,22 +119,23 @@ describe("pullCma", () => {
         "Global bonds, hedged is mapped onto a class the August 2026 CMA does not price, so this vintage cannot be kept while the plan runs on the CMA's rates. Choose custom rates, pull it and map onto its classes, then choose From CMA again",
       ),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
 
     blackRockSends(new Response(file));
 
     expect(await pullCma()).toStrictEqual(saved(cma));
-    expect(await readLatest(db)).toMatchObject({
+    expect(await readLatest(db, "")).toMatchObject({
       household: { rateSet: "cma" },
       version: 2,
     });
   });
 
   it("refuses a vintage earlier than the one held, and keeps nothing", async () => {
-    await keepAfter(db, 0, {
-      ...kept,
-      cma: { latest: november, previous: cma },
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...kept, cma: { latest: november, previous: cma } },
+    );
     blackRockSends(new Response(file));
 
     expect(await pullCma()).toStrictEqual(
@@ -141,7 +143,7 @@ describe("pullCma", () => {
         "BlackRock's workbook is its August 2026 vintage, before the November 2026 one already kept",
       ),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
   it("refuses when BlackRock does not answer, and keeps nothing", async () => {
@@ -153,7 +155,7 @@ describe("pullCma", () => {
     expect(await pullCma()).toStrictEqual(
       refused("BlackRock did not send its capital market assumptions"),
     );
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("refuses a workbook no vintage can be read from, in the reader's words, and keeps nothing", async () => {
@@ -166,6 +168,6 @@ describe("pullCma", () => {
     expect(await pullCma()).toStrictEqual(
       refused("The workbook has no sheet Starting point"),
     );
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 });

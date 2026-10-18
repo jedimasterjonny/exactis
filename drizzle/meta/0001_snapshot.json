@@ -1,0 +1,65 @@
+{
+  "id": "9262fd30-94cb-4ffb-9ea9-00d90778ada0",
+  "prevId": "472c702e-d594-480c-aeeb-3bc5b7308e92",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.household_versions": {
+      "name": "household_versions",
+      "schema": "",
+      "columns": {
+        "household": {
+          "name": "household",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "saved_at": {
+          "name": "saved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "scenario": {
+          "name": "scenario",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "household_versions_scenario_version_pk": {
+          "name": "household_versions_scenario_version_pk",
+          "columns": [
+            "scenario",
+            "version"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
