@@ -215,6 +215,15 @@ export default defineConfig({
   server: { fs: { allow: [${JSON.stringify(repoRoot)}] } },
   test: {
     environment: "jsdom",
+    // Off, because the cache would be the parent run's own: vitest keeps
+    // transformed modules at the workspace root's node_modules/.vitest-cache,
+    // which the symlink makes this project's, and a child that finds no
+    // lockfile beside its config takes the lockfile to have changed and
+    // clears the cache whole. Under a full run that races the parent's
+    // workers writing into it and the child dies at startup, ENOTEMPTY,
+    // leaving no report; on a quiet run it throws the parent's cache away.
+    // A project this short-lived has nothing to persist anyway.
+    fsModuleCache: false,
     include: ["*.test.ts"],
     outputFile: "report.json",
     reporters: ["json", "default"],
