@@ -1238,6 +1238,49 @@ describe("project", () => {
     ).toStrictEqual([0, 11626, 12464]);
   });
 
+  // Read in April, a salary of £72,000 with a £12,000 bonus runs the
+  // 2026 tax year to March. Every month's pay is past a twelfth of the
+  // upper earnings limit however the bonus is paid, so its NI is the
+  // same over the year, £3,690.60; a bonus paid in one month is taxed in
+  // it as a twelfth of a year earning £216,000 and the year settled in
+  // the April after, so the year's income tax is what £84,000 owes,
+  // £21,032, however it was paid, and the cash keeps the same £59,277.40
+  // by the time the next year closes. December 2026 closes on what nine
+  // months had been paid by then: nine twelfths of the bonus, £44,458;
+  // three quarters of it, in June, September and December, £44,058; or
+  // none of it before February, £39,238.
+  it("settles a tax year to the same income tax however its bonus was paid", () => {
+    const flat: Account = {
+      ...cash,
+      balance: 0,
+      contribution: { cap: null, kind: "spare" },
+    };
+    const salaried = {
+      ...salary,
+      amount: 72000,
+      bonus: 12000,
+      feeds: null,
+      lastMonth: 2,
+      lastYear: 2027,
+      rsu: 0,
+      sacrifice: 0,
+    };
+    const cashIn = (line: IncomeLine): number[] =>
+      project(
+        [flat],
+        { expenses: [], income: [line] },
+        { ...plan, month: 3, years: 2 },
+      ).map((point) => balanceIn(point, flat.id));
+
+    expect(cashIn(salaried)).toStrictEqual([0, 44458, 59277]);
+    expect(cashIn({ ...salaried, bonusCadence: "quarter" })).toStrictEqual([
+      0, 44058, 59277,
+    ]);
+    expect(
+      cashIn({ ...salaried, bonusCadence: "year", bonusMonth: 1 }),
+    ).toStrictEqual([0, 39238, 59277]);
+  });
+
   // Read in September, the plan holds seven months of the 2026 tax
   // year, which is taxed against seven twelfths of each band. The
   // salary ends with December, so four months of £2,453.30 are earned,

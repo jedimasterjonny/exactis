@@ -284,7 +284,13 @@ const nobody: ReadonlySet<number> = new Set();
 // model. It comes before the other fixed sums because it is drawn for:
 // met after them, it would sell savings to keep a saving paid. The order
 // the accounts are listed in sets which saving is paid first, and a debt
-// is no saving. A yearly figure is spread over the twelve months. A loan
+// is no saving. A yearly figure is spread over the twelve months, save
+// a salary's bonus, which is paid as its line says: a twelfth of the
+// year's every month, a quarter of it in each quarter's last month, or
+// the whole of it in the month it is paid once a year, so a bonus month
+// meets the 2% rate of National Insurance past the upper earnings limit
+// as the month's pay does under PAYE, and its income tax, charged on
+// the month as a twelfth of a year, is settled with the year. A loan
 // whose payments are a line pays nothing as a fixed sum, since the line
 // is its payment and the ledger shows the same figure against the loan:
 // it is counted once, as the line, and stops when the line does. A
@@ -718,6 +724,25 @@ function allowanceIn(
   );
 }
 
+// What a line's bonus pays in the month read, in that month's pounds:
+// the year's bonus, the figure typed at the line's cadence, risen as
+// the base is, and a twelfth of it every month for a line naming no
+// cadence for it, as every line kept before one was asked names none; a
+// quarter of it in each quarter's last month, March, June, September
+// and December, for one paid every quarter; the whole of it in its
+// month for one paid once a year; and nothing in any other month.
+function bonusIn(line: IncomeLine, reading: Reading): number {
+  const twelfth = monthlyOf(line, line.bonus, reading);
+  const { month } = reading.at;
+  if (line.bonusCadence === undefined) {
+    return twelfth;
+  }
+  if (line.bonusCadence === "quarter") {
+    return month % 3 === 2 ? 3 * twelfth : 0;
+  }
+  return month === line.bonusMonth ? 12 * twelfth : 0;
+}
+
 // The owner who earns a line, as the lines are grouped by owner: the
 // id as a string, which is how a room is keyed too.
 function byOwner(line: IncomeLine): string {
@@ -936,7 +961,8 @@ function payableInto(account: Account, limit: number, purse: Purse): number {
     : limit - (room * rate) / (1 + rate);
 }
 
-// What the lines given pay in the month, each as it is earned less
+// What the lines given pay in the month, each as it is earned, its
+// base and RSUs at its cadence and its bonus as the line pays it, less
 // what it gives up into the pension it feeds.
 function payOf(
   lines: readonly IncomeLine[],
@@ -946,7 +972,8 @@ function payOf(
   return lines.reduce(
     (sum, line) =>
       sum +
-      monthlyOf(line, totalOf(line), reading) -
+      monthlyOf(line, totalOf(line) - line.bonus, reading) +
+      bonusIn(line, reading) -
       (fed.find((entry) => entry.line === line)?.sacrificed ?? 0),
     0,
   );

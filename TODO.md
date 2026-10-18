@@ -46,24 +46,23 @@ of taxed money claims the basic rate and not the higher rate a taxpayer claims
 back through a return; nor does its gross come off the income the personal
 allowance is withdrawn against, which between £100,000 and £125,140 is worth
 another 20%; and it claims relief after 75, when relief stops. The employee's NI
-runs past the State Pension age, when it stops, and a bonus is spread over the
-year as the line pays it, where paid in one month most of it would meet the 2%
-rate. Cash interest is not taxed, and nor is a GIA: neither the dividends it is
-paid each year nor the gain a draw realises, which would need what it cost held
-beside what it is worth, and an owner for the allowances and bands it is charged
-under. The bands are those outside Scotland. From April 2031 every band rises
-with prices together, where the law raises the personal allowance and the basic
-rate band and leaves the £100,000 the allowance is withdrawn from where it is. A
-draw before the pension age is charged a flat 55% however small against the
-pension, and the lump sum allowance is taken to be whole when the plan opens.
-The pension age is read off the year its owner was born and not the day, so the
-whole of the year an age is reached counts as reaching it, and a protected
-pension age some schemes give is not held. A refund a month has no account to
-take goes where any money the month leaves goes, which is nowhere the projection
-counts. What a pension is worth is counted at the basic rate on the three
-quarters taxed, where a draw meets the rate of the year it is taken in beside
-what else is earned then. A progress point's pensions are read gross, as the
-sheet summed them, since a point pools pensions without owners.
+runs past the State Pension age, when it stops. Cash interest is not taxed, and
+nor is a GIA: neither the dividends it is paid each year nor the gain a draw
+realises, which would need what it cost held beside what it is worth, and an
+owner for the allowances and bands it is charged under. The bands are those
+outside Scotland. From April 2031 every band rises with prices together, where
+the law raises the personal allowance and the basic rate band and leaves the
+£100,000 the allowance is withdrawn from where it is. A draw before the pension
+age is charged a flat 55% however small against the pension, and the lump sum
+allowance is taken to be whole when the plan opens. The pension age is read off
+the year its owner was born and not the day, so the whole of the year an age is
+reached counts as reaching it, and a protected pension age some schemes give is
+not held. A refund a month has no account to take goes where any money the month
+leaves goes, which is nowhere the projection counts. What a pension is worth is
+counted at the basic rate on the three quarters taxed, where a draw meets the
+rate of the year it is taken in beside what else is earned then. A progress
+point's pensions are read gross, as the sheet summed them, since a point pools
+pensions without owners.
 
 Decide the order the plan draws in, so its drawdown is after tax as its worth
 is; the smaller gaps are figures to add as the plan needs them.
