@@ -738,4 +738,99 @@ describe("ProjectionBoard", () => {
       screen.queryByRole("group", { name: "Milestones" }),
     ).not.toBeInTheDocument();
   });
+
+  // The scenario retires at 61, in 2053, and the household it is set
+  // against at 64, in 2056: the milestone tile reads the scenario at its
+  // retirement against the household at its own, and the net worth tile
+  // the scenario at the plan's end against the household at its own,
+  // each in pounds; the chart draws the household's line over the
+  // scenario's columns. Neither has a spread to draw the futures at, so
+  // the chance carries nothing.
+  it("reads each tile against the household it is set against, and draws the household's line", () => {
+    const household = retiringAt(retiring, 64);
+    const worthOf = (held: Plan, year: number): number => {
+      const point = pointIn(held, year, schedule);
+      return point === undefined
+        ? 0
+        : Object.values(worthsIn(point, accounts)).reduce(
+            (sum, worth) => sum + worth,
+            0,
+          );
+    };
+    const signed = (value: number): string =>
+      `${value < 0 ? "−" : "+"}${formatGbp(Math.abs(value))}`;
+    render(
+      <ProjectionBoard
+        accounts={accounts}
+        against={{
+          accounts,
+          milestones: [],
+          plan: household,
+          schedule,
+          spread: short,
+        }}
+        milestones={[]}
+        plan={retiring}
+        schedule={schedule}
+        spread={short}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        signed(worthOf(retiring, 2053) - worthOf(household, 2056)),
+      ),
+    ).toHaveClass("figure");
+    expect(
+      screen.getByText(
+        signed(worthOf(retiring, 2083) - worthOf(household, 2083)),
+      ),
+    ).toHaveClass("figure");
+    expect(screen.queryByText(/pp$/)).not.toBeInTheDocument();
+    expect(
+      screen.getAllByText(
+        (_content, element) =>
+          element?.classList.contains("recharts-line") === true,
+        { suggest: false },
+      ),
+    ).toHaveLength(1);
+  });
+
+  // A household retired before its plan starts has no retirement in its
+  // years for the scenario's to be read against, and a scenario retired
+  // before its own keeps the retirement tile, which carries nothing; the
+  // net worth is read against the household's either way.
+  it("reads the milestone tile against nothing where either has no milestone in its years", () => {
+    // A delta in whole pounds, signed, which an axis label, shortened to
+    // thousands or millions, never is.
+    const deltas = (): readonly string[] =>
+      screen
+        .queryAllByText(/^[+−]£[\d,]+$/)
+        .map(({ textContent }) => textContent);
+    const set = (scenario: Plan, household: Plan): JSX.Element => (
+      <ProjectionBoard
+        accounts={accounts}
+        against={{
+          accounts,
+          milestones: [],
+          plan: household,
+          schedule,
+          spread: short,
+        }}
+        milestones={[]}
+        plan={scenario}
+        schedule={schedule}
+        spread={short}
+      />
+    );
+    const { rerender } = render(set(retiring, retiringAt(retiring, 28)));
+
+    expect(screen.getByText("At Retirement")).toBeInTheDocument();
+    expect(deltas()).toHaveLength(1);
+
+    rerender(set(retiringAt(retiring, 28), retiring));
+
+    expect(screen.getByText("Retirement")).toBeInTheDocument();
+    expect(deltas()).toHaveLength(1);
+  });
 });

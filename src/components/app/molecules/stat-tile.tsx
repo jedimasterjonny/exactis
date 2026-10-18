@@ -17,7 +17,7 @@ import {
 interface StatTileProps {
   readonly action?: Slot;
   readonly caption?: string;
-  readonly delta?: number;
+  readonly delta?: number | undefined;
   readonly deltaFormat?: DeltaFormat;
   readonly icon?: LucideIcon;
   readonly isHiddenOnPhone?: boolean;

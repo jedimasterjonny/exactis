@@ -13,6 +13,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Line,
   ReferenceDot,
   ReferenceLine,
   XAxis,
@@ -43,6 +44,14 @@ import { listed } from "@/lib/feeders";
 import { formatAxisGbp, formatGbp } from "@/lib/money";
 import { accountsAndAssets } from "@/lib/nav";
 
+// The household a scenario is set against: its accounts, its owners and
+// its projection, which the chart counts as it counts its own.
+interface Against {
+  readonly accounts: readonly Account[];
+  readonly plan: Pick<Plan, "owners">;
+  readonly points: readonly ProjectionPoint[];
+}
+
 // What the chart counts: the money the plan could spend, its savings less
 // every debt, with a house or a car left out and the loan on it owed as
 // any debt is; or all it is worth, a house or a car counted at its
@@ -72,6 +81,7 @@ type Mark = "area" | "bar";
 
 interface ProjectionChartProps {
   readonly accounts: readonly Account[];
+  readonly against?: Against | undefined;
   readonly choices?: ReactNode;
   readonly controls?: ReactNode;
   readonly milestones: readonly Marker[];
@@ -99,6 +109,10 @@ interface Series {
   readonly name: string;
   readonly valueAt: (point: ProjectionPoint) => number;
 }
+
+// What the household comes to in a year on the basis counted, or null
+// in a year its plan does not reach.
+type Total = (point: ProjectionPoint) => null | number;
 
 // The families the chart stacks, in the order they stack, the first at
 // the baseline: the pensions, then the ISAs, then the GIAs, then cash; then
@@ -201,8 +215,14 @@ const axisWidth = 57;
 // holds nothing yet, says so in the plot's place rather than drawing a
 // flat zero over a column of £0 ticks, and points at the screen where
 // an account is added: the dashboard has no way to add one itself.
+// Given the household a scenario is set against, the chart draws what
+// the household comes to on the basis counted as a dashed line over the
+// stack, a year at a time and only in the years its own plan reaches,
+// named Household under the crosshair beneath the scenario's total, and
+// the scale takes it in, so the two read off one axis.
 export function ProjectionChart({
   accounts,
+  against,
   choices,
   controls,
   milestones,
@@ -218,29 +238,20 @@ export function ProjectionChart({
   // every column to move a line. Both bases are made at once, from one
   // series for each account, so a column the basis switched to still
   // draws keeps the dataKey it had, and recharts does not draw it again
-  // before its figures have moved.
+  // before its figures have moved. The household's line is made the
+  // same way, both bases at once, for as long as the household is.
   const bases = useMemo(() => seriesOf(accounts), [accounts]);
   const series = bases[basis];
-  // Each point with every account at what it counts for on each basis
-  // rather than what it holds, as the tiles count it: on the net worth
-  // what worthsIn says it is worth, and on the liquidity what liquidOf
-  // leaves of that, so the stack comes to what they read. Made once for
-  // the points, both bases at once, as the series are, so every column,
-  // the axis and the crosshair read the one figure.
-  const counted = useMemo(() => {
-    const worths = projected.map((point) => ({
-      ...point,
-      balances: worthsIn(point, accounts),
-    }));
-    return {
-      liquidity: worths.map((point) => ({
-        ...point,
-        balances: liquidOf(point.balances, point.year, { accounts, plan }),
-      })),
-      "net-worth": worths,
-    };
-  }, [accounts, plan, projected]);
+  const counted = useMemo(
+    () => countedOf(projected, { accounts, plan }),
+    [accounts, plan, projected],
+  );
   const points = counted[basis];
+  const households = useMemo(
+    () => (against === undefined ? undefined : totalsOf(against)),
+    [against],
+  );
+  const household = households?.[basis];
 
   if (!projected.some(holdsAnything)) {
     return (
@@ -274,7 +285,7 @@ export function ProjectionChart({
   const config = Object.fromEntries(
     series.map(({ color, key, name }) => [key, { color, label: name }]),
   );
-  const scale = scaleOf(points, series);
+  const scale = scaleOf(points, series, household);
 
   // The first year that could not draw what it needed from anywhere,
   // which is the year the money runs out. Undefined while every year
@@ -361,6 +372,7 @@ export function ProjectionChart({
               content={(props) => (
                 <ProjectionTooltip
                   {...props}
+                  household={household}
                   milestones={milestones}
                   points={points}
                   series={series}
@@ -391,6 +403,18 @@ export function ProjectionChart({
                   stackId="accounts"
                 />
               ),
+            )}
+            {household !== undefined && (
+              <Line
+                activeDot={false}
+                dataKey={household}
+                dot={false}
+                isAnimationActive={false}
+                name="Household"
+                stroke="var(--muted-foreground)"
+                strokeDasharray="4 4"
+                strokeWidth={1.5}
+              />
             )}
             {marked.map((marker) => (
               <ReferenceLine
@@ -477,6 +501,29 @@ function BasisToggle({
       {basisNames[basis]}
     </LabelledSwitch>
   );
+}
+
+// Each point with every account at what it counts for on each basis
+// rather than what it holds, as the tiles count it: on the net worth
+// what worthsIn says it is worth, and on the liquidity what liquidOf
+// leaves of that, so the stack comes to what they read. Made once for
+// the points, both bases at once, as the series are, so every column,
+// the axis and the crosshair read the one figure.
+function countedOf(
+  projected: readonly ProjectionPoint[],
+  { accounts, plan }: Omit<Against, "points">,
+): Record<Basis, readonly ProjectionPoint[]> {
+  const worths = projected.map((point) => ({
+    ...point,
+    balances: worthsIn(point, accounts),
+  }));
+  return {
+    liquidity: worths.map((point) => ({
+      ...point,
+      balances: liquidOf(point.balances, point.year, { accounts, plan }),
+    })),
+    "net-worth": worths,
+  };
 }
 
 // What an area draws for an account, a year at a time: its balance, and
@@ -571,9 +618,12 @@ function Placeholder({ children }: { readonly children: string }): JSX.Element {
 // cover. The values lead, in mono, with
 // a stroke of the series' colour keying the name beside each. The point
 // is found by the year the crosshair names rather than read out of the
-// entry recharts hands over, which is untyped.
+// entry recharts hands over, which is untyped. Beneath the total, where
+// a scenario is set against the household, what the household comes to
+// that year on the same basis, keyed by a dashed stroke as its line is.
 function ProjectionTooltip({
   active: isActive,
+  household,
   label,
   milestones,
   points,
@@ -581,6 +631,7 @@ function ProjectionTooltip({
   total,
 }: Pick<ProjectionChartProps, "milestones" | "points"> &
   TooltipContentProps & {
+    readonly household: Total | undefined;
     readonly series: readonly Series[];
     readonly total: string;
   }): JSX.Element | null {
@@ -591,6 +642,7 @@ function ProjectionTooltip({
   const falling = milestones
     .filter((marker) => marker.year === point.year)
     .map(({ name }) => name);
+  const theirs = household?.(point) ?? null;
   return (
     <div
       className="grid min-w-44 gap-1.5 rounded-md border bg-popover px-2.5 py-2 text-xs text-popover-foreground shadow-md"
@@ -630,6 +682,18 @@ function ProjectionTooltip({
           {formatGbp(totalIn(point, series))}
         </span>
       </span>
+      {theirs !== null && (
+        <span className="flex items-center gap-2">
+          <span
+            aria-hidden
+            className="w-3 border-t border-dashed border-muted-foreground"
+          />
+          <span className="text-muted-foreground">Household</span>
+          <span className="ml-auto figure font-medium">
+            {formatGbp(theirs)}
+          </span>
+        </span>
+      )}
       {point.early > 0 && (
         <span className="flex items-center gap-2">
           <span className="text-muted-foreground">Drawn early</span>
@@ -652,23 +716,28 @@ function ProjectionTooltip({
 
 // The pounds the axis spans and the ticks it marks, from the most the
 // stack ever holds above nothing to the deepest it ever goes below it,
-// what is owed and any equity below nothing.
+// what is owed and any equity below nothing, and wherever the
+// household's line goes past either.
 function scaleOf(
   points: readonly ProjectionPoint[],
   series: readonly Series[],
+  household: Total | undefined,
 ): { readonly domain: [number, number]; readonly ticks: number[] } {
   const sumOf = (
     point: ProjectionPoint,
     side: (value: number) => number,
   ): number =>
     series.reduce((sum, line) => sum + side(valueIn(point, line)), 0);
+  const theirs = points.flatMap((point) => household?.(point) ?? []);
   return axisOf(
     Math.min(
       0,
+      ...theirs,
       ...points.map((point) => sumOf(point, (value) => Math.min(0, value))),
     ),
     Math.max(
       0,
+      ...theirs,
       ...points.map((point) => sumOf(point, (value) => Math.max(0, value))),
     ),
   );
@@ -756,6 +825,22 @@ function seriesOf(
 // crosshair and where the chosen milestone's dot stands.
 function totalIn(point: ProjectionPoint, series: readonly Series[]): number {
   return series.reduce((sum, line) => sum + valueIn(point, line), 0);
+}
+
+// What the household comes to on each basis, a year at a time, counted
+// as the chart counts its own, for its line and its row under the
+// crosshair: each made once, so the line keeps its dataKey for as long
+// as the household is.
+function totalsOf({ accounts, plan, points }: Against): Record<Basis, Total> {
+  const counted = countedOf(points, { accounts, plan });
+  const bases = seriesOf(accounts);
+  const totalOn = (basis: Basis): Total => {
+    const totals = new Map(
+      counted[basis].map((point) => [point.year, totalIn(point, bases[basis])]),
+    );
+    return (point) => totals.get(point.year) ?? null;
+  };
+  return { liquidity: totalOn("liquidity"), "net-worth": totalOn("net-worth") };
 }
 
 // What a series stands at on a point as the chart counts it: what the
