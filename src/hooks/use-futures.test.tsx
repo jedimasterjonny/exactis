@@ -332,6 +332,221 @@ describe("useFutures", () => {
     });
   });
 
+  // The household's and a comparison's side by side, as the dashboard
+  // draws them while a scenario is open: each is drawn once, on two
+  // workers of its own, and neither drops the other's.
+  it("draws two screens over different plans side by side, each its own futures, neither dropping the other's", () => {
+    const started = watchWorkers();
+    const household = { count: 30, plan, spread };
+    const compared = { ...household, plan: { ...plan, rate: 0.08 } };
+    const { result: householdBoard } = renderHook(() =>
+      useFutures(accounts, schedule, household),
+    );
+    const { result: comparedBoard } = renderHook(() =>
+      useFutures(accounts, schedule, compared),
+    );
+
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(started.map(({ handed }) => handed)).toStrictEqual([
+      [0, 20],
+      [10],
+      [0, 20],
+      [10],
+    ]);
+    expect(householdBoard.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, household).take(30).toArray(),
+      isDone: true,
+    });
+    expect(comparedBoard.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, compared).take(30).toArray(),
+      isDone: true,
+    });
+  });
+
+  // The comparison is changed part way, as a scenario edited is, and
+  // its first run, read after the household's but by no screen now, is
+  // the one dropped: the household's carries on from its slices rather
+  // than starting over, and the comparison changed back draws afresh.
+  it("drops the run read longest ago that no screen still reads for a third, and the two still read carry on", () => {
+    const started = watchWorkers();
+    const household = { count: 30, plan, spread };
+    const compared = { ...household, plan: { ...plan, rate: 0.08 } };
+    const edited = { ...household, plan: { ...plan, rate: 0.03 } };
+    const { result: householdBoard } = renderHook(() =>
+      useFutures(accounts, schedule, household),
+    );
+    const { rerender, result: comparedBoard } = renderHook(
+      ({ over }) => useFutures(accounts, schedule, over),
+      { initialProps: { over: compared } },
+    );
+    act(() => {
+      vi.advanceTimersByTime(took);
+    });
+
+    rerender({ over: edited });
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(started.map(({ handed }) => handed)).toStrictEqual([
+      [0, 20],
+      [10],
+      [0, 20],
+      [10],
+      [0, 20],
+      [10],
+    ]);
+    expect(householdBoard.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, household).take(30).toArray(),
+      isDone: true,
+    });
+    expect(comparedBoard.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, edited).take(30).toArray(),
+      isDone: true,
+    });
+    rerender({ over: compared });
+    expect(comparedBoard.current).toStrictEqual({ futures: [], isDone: false });
+    expect(householdBoard.current.isDone).toBe(true);
+  });
+
+  // A third screen opened beside the two over a plan of its own: a run
+  // a screen is reading is kept past two, so none is dropped from under
+  // the screen showing it.
+  it("keeps every run a screen is reading past two, so three screens over three plans side by side each draw their own", () => {
+    const started = watchWorkers();
+    const household = { count: 30, plan, spread };
+    const compared = { ...household, plan: { ...plan, rate: 0.08 } };
+    const third = { ...household, plan: { ...plan, rate: 0.03 } };
+    const { result: householdBoard } = renderHook(() =>
+      useFutures(accounts, schedule, household),
+    );
+    const { result: comparedBoard } = renderHook(() =>
+      useFutures(accounts, schedule, compared),
+    );
+    const { result: thirdBoard } = renderHook(() =>
+      useFutures(accounts, schedule, third),
+    );
+
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(started).toHaveLength(6);
+    expect(householdBoard.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, household).take(30).toArray(),
+      isDone: true,
+    });
+    expect(comparedBoard.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, compared).take(30).toArray(),
+      isDone: true,
+    });
+    expect(thirdBoard.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, third).take(30).toArray(),
+      isDone: true,
+    });
+  });
+
+  // The household's drawn, a comparison is opened beside it and drawn
+  // in turn: none of its hand-overs is the household's, so the
+  // household's screen is not drawn again for any of them.
+  it("does not draw a screen again for another run's hand-overs", () => {
+    watchWorkers();
+    const household = { count: 5, plan, spread };
+    const compared = { count: 30, plan: { ...plan, rate: 0.08 }, spread };
+    let timesDrawn = 0;
+    renderHook(() => {
+      timesDrawn += 1;
+      return useFutures(accounts, schedule, household);
+    });
+    act(() => {
+      vi.runAllTimers();
+    });
+    const drawnBefore = timesDrawn;
+
+    const { result: comparedBoard } = renderHook(() =>
+      useFutures(accounts, schedule, compared),
+    );
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(comparedBoard.current.isDone).toBe(true);
+    expect(timesDrawn).toBe(drawnBefore);
+  });
+
+  // Both drawn part way, the third slice of each still on its way, when
+  // the futures are drawn again, here from the seed 7.
+  it("draws every run kept again from the one seed drawn, dropping what was drawn of each", () => {
+    watchWorkers();
+    vi.spyOn(crypto, "getRandomValues").mockReturnValue(new Uint32Array([7]));
+    const household = { count: 30, plan, spread };
+    const compared = { ...household, plan: { ...plan, rate: 0.08 } };
+    const { result: householdBoard } = renderHook(() =>
+      useFutures(accounts, schedule, household),
+    );
+    const { result: comparedBoard } = renderHook(() =>
+      useFutures(accounts, schedule, compared),
+    );
+    act(() => {
+      vi.advanceTimersByTime(took);
+    });
+
+    act(() => {
+      drawAgain();
+    });
+
+    expect(householdBoard.current).toStrictEqual({
+      futures: [],
+      isDone: false,
+    });
+    expect(comparedBoard.current).toStrictEqual({ futures: [], isDone: false });
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(householdBoard.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, { ...household, seed: 7 })
+        .take(30)
+        .toArray(),
+      isDone: true,
+    });
+    expect(comparedBoard.current).toStrictEqual({
+      futures: futuresOf(accounts, schedule, { ...compared, seed: 7 })
+        .take(30)
+        .toArray(),
+      isDone: true,
+    });
+  });
+
+  it("forgets every run kept", () => {
+    watchWorkers();
+    const household = { count: 5, plan, spread };
+    const compared = { ...household, plan: { ...plan, rate: 0.08 } };
+    const { unmount } = renderHook(() =>
+      useFutures(accounts, schedule, household),
+    );
+    const { unmount: unmountCompared } = renderHook(() =>
+      useFutures(accounts, schedule, compared),
+    );
+    act(() => {
+      vi.runAllTimers();
+    });
+    unmount();
+    unmountCompared();
+
+    forget();
+
+    expect(
+      renderHook(() => useFutures(accounts, schedule, household)).result
+        .current,
+    ).toStrictEqual({ futures: [], isDone: false });
+    expect(
+      renderHook(() => useFutures(accounts, schedule, compared)).result.current,
+    ).toStrictEqual({ futures: [], isDone: false });
+  });
+
   it("stops the workers when the screen is taken down", () => {
     const started = watchWorkers();
     const { unmount } = renderHook(() =>
