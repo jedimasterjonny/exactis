@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
 import {
+  existsSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
@@ -271,6 +272,7 @@ describe("console guard", () => {
     )) {
       writeFileSync(join(directory, `${name}.test.ts`), content);
     }
+    const started = performance.now();
     const child = spawnSync(
       process.execPath,
       [join(repoRoot, "node_modules", "vitest", "vitest.mjs"), "run"],
@@ -278,7 +280,23 @@ describe("console guard", () => {
     );
     exitCode = child.status;
     output = `${child.stdout}\n${child.stderr}`;
-    files = parseReport(readFileSync(join(directory, "report.json"), "utf8"));
+    const report = join(directory, "report.json");
+    // A child run that leaves no report says why, since the report is
+    // all the tests read: how it ended, how long it took, and what it
+    // wrote, which an ENOENT on the report would otherwise throw away.
+    if (!existsSync(report)) {
+      throw new Error(
+        [
+          `the child vitest run left no report after ${String(Math.round(performance.now() - started))}ms`,
+          `status ${String(child.status)}, signal ${String(child.signal)}, error ${child.error?.message ?? "none"}`,
+          "--- stdout",
+          child.stdout.slice(-4000),
+          "--- stderr",
+          child.stderr.slice(-4000),
+        ].join("\n"),
+      );
+    }
+    files = parseReport(readFileSync(report, "utf8"));
   }, 60_000);
 
   afterAll(() => {
