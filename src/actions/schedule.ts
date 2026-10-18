@@ -11,7 +11,14 @@ import type { Held } from "@/store/household";
 import { toAccount } from "@/data/accounts";
 import { incomeKinds, toPension } from "@/data/income";
 import { timed } from "@/data/milestones";
-import { lineValues, named, pounds, recordId, target } from "@/data/schemas";
+import {
+  bonusValues,
+  lineValues,
+  named,
+  pounds,
+  recordId,
+  target,
+} from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { endsAfterItStarts } from "@/lib/lines";
 import { today } from "@/lib/months";
@@ -29,19 +36,21 @@ import { amend } from "@/store/household";
 const expenseValues = z.object(lineValues) satisfies z.ZodType<LineValues>;
 
 // An income line adds its kind, the owner who earns it, its parts, whole
-// and never negative, the pension it feeds, the share of its base it
+// and never negative, how its bonus is paid, as the model holds it, the
+// pension it feeds, the share of its base it
 // sacrifices and the share its employer matches, each a fraction of the
 // base at most, and the pension it opens,
 // named, holding nothing or more and naming its owner, as every pension
 // does. A line opens one only while it is a salary, and not while it
 // feeds one by id, since the id is the household's to give. What else
 // holds a line, the owner one the household lists, the parts and the
-// pension a salary's alone and a share given up only into a pension, is
-// the household's to hold, once any pension the line opens is among its
-// accounts.
+// pension a salary's alone, a month named for a bonus paid once a year
+// alone and a share given up only into a pension, is the household's to
+// hold, once any pension the line opens is among its accounts.
 const incomeValues = z
   .object({
     ...lineValues,
+    ...bonusValues,
     bonus: pounds,
     feeds: recordId.nullable(),
     kind: z.enum(incomeKinds),
