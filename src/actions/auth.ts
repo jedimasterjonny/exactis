@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { isDevSignInOpen } from "@/lib/dev-sign-in";
 import { readEnv } from "@/lib/env";
 import { verifyPassword } from "@/lib/password";
+import { closeScenario } from "@/lib/scenario";
 import { endSession, startSession } from "@/lib/session";
 
 // What the login form shows between attempts: nothing, or why the last
@@ -44,9 +45,11 @@ export async function signInAsDeveloper(): Promise<void> {
   redirect("/");
 }
 
-// Ends the session and goes to the login screen. Posted from the sidebar,
-// so it takes the form's data and reads none of it.
+// Ends the session and goes to the login screen, closing any scenario
+// open, so the next sign-in opens on the household. Posted from the
+// sidebar, so it takes the form's data and reads none of it.
 export async function signOut(): Promise<void> {
   await endSession();
+  await closeScenario();
   redirect("/login");
 }

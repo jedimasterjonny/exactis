@@ -22,6 +22,7 @@ import {
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
+vi.mock("@/lib/scenario", () => ({ openedScenario: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 
 const memory = inMemory();

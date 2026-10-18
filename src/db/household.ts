@@ -10,7 +10,7 @@ import { Refusal } from "@/lib/answer";
 
 // What a save read: the branch, and the version of it, nought where
 // nothing was kept there yet.
-interface Read {
+export interface Read {
   readonly scenario: string;
   readonly version: number;
 }
@@ -18,7 +18,7 @@ interface Read {
 // A version the store has kept: its number, and the household as the
 // store holds it, which is for the model to read and hold to its rules
 // rather than for the store to vouch for.
-interface Version {
+export interface Version {
   readonly household: unknown;
   readonly version: number;
 }
@@ -81,7 +81,9 @@ export async function listScenarios(db: Database): Promise<readonly string[]> {
 // them is one they derived from, since the household refuses them
 // otherwise, which a version merely holding a CMA, a curve and a target
 // allocation is not: its categories may not all have a class yet. Null
-// while none ran on them.
+// while none ran on them. A scenario with no version saved by the
+// moment did not exist then, so the household's version as of it is
+// read in its place, which is what the scenario was made from.
 export async function readAsOf(
   db: Database,
   scenario: string,
@@ -102,6 +104,16 @@ export async function readAsOf(
     .limit(1);
   if (kept !== undefined) {
     return kept;
+  }
+  if (scenario !== "") {
+    const [since] = await db
+      .select({ version: householdVersions.version })
+      .from(householdVersions)
+      .where(and(branch, lte(householdVersions.savedAt, at)))
+      .limit(1);
+    if (since === undefined) {
+      return readAsOf(db, "", at);
+    }
   }
   const [first] = await db
     .select(columns)
