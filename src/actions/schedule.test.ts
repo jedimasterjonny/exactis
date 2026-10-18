@@ -129,6 +129,33 @@ describe("the schedule actions", () => {
       );
     });
 
+    it("takes how a salary's bonus is paid, once a year in its month or every quarter", async () => {
+      const employment = {
+        ...values,
+        bonus: 16500,
+        kind: "employment",
+      } as const;
+
+      expect(
+        await saveIncomeLine(null, {
+          ...employment,
+          bonusCadence: "year",
+          bonusMonth: 1,
+        }),
+      ).toStrictEqual(
+        saved({
+          ...lineOf(employment, 20),
+          bonusCadence: "year",
+          bonusMonth: 1,
+        }),
+      );
+      expect(
+        await saveIncomeLine(null, { ...employment, bonusCadence: "quarter" }),
+      ).toStrictEqual(
+        saved({ ...lineOf(employment, 21), bonusCadence: "quarter" }),
+      );
+    });
+
     it("takes the pension an employment line feeds and the share of its base it sacrifices, the whole of it included", async () => {
       const sacrificing = {
         ...values,
@@ -234,6 +261,7 @@ describe("the schedule actions", () => {
         { ...values, amount: -1 },
         { ...values, amount: 0.5 },
         { ...values, bonus: -1, kind: "employment" },
+        { ...values, bonusCadence: "year", bonusMonth: 12, kind: "employment" },
         { ...values, feeds: 0, kind: "employment" },
         { ...values, feeds: 1, kind: "employment", sacrifice: 1.5 },
         { ...values, feeds: 1, kind: "employment", sacrifice: -0.1 },
@@ -288,6 +316,10 @@ describe("the schedule actions", () => {
         [
           { ...values, feeds: 6 },
           "A bonus, RSUs and a pension are a salary's alone",
+        ],
+        [
+          { ...values, bonusCadence: "year", kind: "employment" },
+          "A bonus paid once a year is paid in a month of its own, and no other is",
         ],
         [
           { ...values, kind: "employment", sacrifice: 0.12 },

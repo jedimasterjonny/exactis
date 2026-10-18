@@ -52,6 +52,7 @@ import {
 } from "@/data/rates";
 import { rules } from "@/data/rules";
 import {
+  bonusValues,
   categoryValues,
   lineValues,
   milestoneValues,
@@ -298,13 +299,16 @@ const expenseLine = z
   ) satisfies z.ZodType<ExpenseLine>;
 
 // An income line adds the owner who earns it, the parts only a salary is
-// paid in and the pension only a salary feeds, and a share given up and
-// a share matched only into a pension, each a fraction of the base at
-// most, in the engine's words for a share outside it. That the owner is
-// one the household lists is the household's to hold.
+// paid in, how its bonus is paid and the pension only a salary feeds, a
+// month named for a bonus paid once a year and for no other, and a
+// share given up and a share matched only into a pension, each a
+// fraction of the base at most, in the engine's words for a share
+// outside it. That the owner is one the household lists is the
+// household's to hold.
 const incomeLine = z
   .object({
     ...line,
+    ...bonusValues,
     bonus: pounds,
     feeds: recordId.nullable(),
     kind: z.enum(incomeKinds),
@@ -319,8 +323,16 @@ const incomeLine = z
   .refine(
     (line) =>
       line.kind === "employment" ||
-      (line.bonus === 0 && line.rsu === 0 && line.feeds === null),
+      (line.bonus === 0 &&
+        line.bonusCadence === undefined &&
+        line.rsu === 0 &&
+        line.feeds === null),
     "A bonus, RSUs and a pension are a salary's alone",
+  )
+  .refine(
+    (line) =>
+      (line.bonusCadence === "year") === (line.bonusMonth !== undefined),
+    "A bonus paid once a year is paid in a month of its own, and no other is",
   )
   .refine(
     (line) => line.feeds !== null || (line.sacrifice === 0 && line.match === 0),
