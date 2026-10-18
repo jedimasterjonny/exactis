@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { blank, kept as reference } from "@/data/household.fixture";
@@ -6,7 +7,13 @@ import { sam } from "@/data/owners.fixture";
 import { inMemory } from "@/db/memory.fixture";
 import { householdVersions } from "@/db/schema";
 
-import { keepAfter, readAsOf, readLatest } from "./household";
+import {
+  dropScenario,
+  keepAfter,
+  listScenarios,
+  readAsOf,
+  readLatest,
+} from "./household";
 
 const { close, db, empty, ready } = inMemory();
 
@@ -27,59 +34,181 @@ describe("household store", () => {
   afterAll(close);
 
   it("reads nothing before anything is kept, then the latest version kept", async () => {
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
 
-    await keepAfter(db, 0, blank);
-    await keepAfter(db, 1, named);
+    await keepAfter(db, { scenario: "", version: 0 }, blank);
+    await keepAfter(db, { scenario: "", version: 1 }, named);
 
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: named,
       version: 2,
     });
   });
 
   it("refuses a save after the version another save has kept, and writes nothing", async () => {
-    await keepAfter(db, 0, blank);
-    await keepAfter(db, 1, named);
+    await keepAfter(db, { scenario: "", version: 0 }, blank);
+    await keepAfter(db, { scenario: "", version: 1 }, named);
 
-    await expect(keepAfter(db, 1, blank)).rejects.toThrow(
+    await expect(
+      keepAfter(db, { scenario: "", version: 1 }, blank),
+    ).rejects.toThrow(
       "The household changed while this was being saved, so nothing was",
     );
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: named,
       version: 2,
     });
   });
 
+  // The household kept twice, then a scenario branched from it and
+  // saved twice in turn, then the household saved again.
+  it("counts a scenario's versions from one on their own, and leaves the household's as they were", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, blank);
+    await keepAfter(db, { scenario: "", version: 1 }, named);
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, named);
+    await keepAfter(db, { scenario: "Retire early", version: 1 }, reference);
+
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: named,
+      version: 2,
+    });
+    expect(await readLatest(db, "Retire early")).toStrictEqual({
+      household: reference,
+      version: 2,
+    });
+
+    await keepAfter(db, { scenario: "", version: 2 }, blank);
+
+    expect(await readLatest(db, "")).toMatchObject({ version: 3 });
+    expect(await readLatest(db, "Retire early")).toMatchObject({ version: 2 });
+    expect(await readLatest(db, "Never kept")).toBeNull();
+  });
+
+  // The household and a scenario each at their first version: a save
+  // after it lands on either, and a second save after it is refused on
+  // the branch it was made to, as is a second scenario by one name.
+  it("refuses a save after the version another save has kept on the same branch alone", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, blank);
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
+
+    await expect(
+      keepAfter(db, { scenario: "Retire early", version: 0 }, named),
+    ).rejects.toThrow(
+      "The household changed while this was being saved, so nothing was",
+    );
+    await keepAfter(db, { scenario: "Retire early", version: 1 }, named);
+    await keepAfter(db, { scenario: "", version: 1 }, reference);
+    await expect(
+      keepAfter(db, { scenario: "", version: 1 }, named),
+    ).rejects.toThrow(
+      "The household changed while this was being saved, so nothing was",
+    );
+
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: reference,
+      version: 2,
+    });
+    expect(await readLatest(db, "Retire early")).toStrictEqual({
+      household: named,
+      version: 2,
+    });
+  });
+
+  it("lists the scenarios kept by name, once each and in order, and not the household", async () => {
+    expect(await listScenarios(db)).toStrictEqual([]);
+
+    await keepAfter(db, { scenario: "", version: 0 }, blank);
+
+    expect(await listScenarios(db)).toStrictEqual([]);
+
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
+    await keepAfter(db, { scenario: "Retire early", version: 1 }, named);
+    await keepAfter(db, { scenario: "Move house", version: 0 }, blank);
+
+    expect(await listScenarios(db)).toStrictEqual([
+      "Move house",
+      "Retire early",
+    ]);
+  });
+
+  it("drops every version of a scenario and nothing else, and never the household", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, blank);
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
+    await keepAfter(db, { scenario: "Retire early", version: 1 }, named);
+    await keepAfter(db, { scenario: "Move house", version: 0 }, reference);
+
+    await dropScenario(db, "Retire early");
+
+    expect(await readLatest(db, "Retire early")).toBeNull();
+    expect(await listScenarios(db)).toStrictEqual(["Move house"]);
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: blank,
+      version: 1,
+    });
+
+    await expect(dropScenario(db, "")).rejects.toThrow(
+      "The household is never dropped",
+    );
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+  });
+
   // The reference household on the rates typed by hand on the first of
   // September, which holds every source the CMA's are derived from, then
-  // on the CMA's rates on the tenth and the twentieth.
-  it("reads the version the CMA's rates stood at by a moment, or the first to run on them where none by then did", async () => {
+  // on the CMA's rates on the tenth and the twentieth; and a scenario
+  // branched on the first, on the CMA's rates from the start.
+  it("reads the version the CMA's rates stood at by a moment on the branch, or the first to run on them where none by then did", async () => {
     const day = (date: string): Date => new Date(`${date}T12:00:00Z`);
-    await db
-      .insert(householdVersions)
-      .values([
-        { household: reference, savedAt: day("2026-09-01"), version: 1 },
-      ]);
-
-    expect(await readAsOf(db, day("2026-09-15"))).toBeNull();
-
     await db.insert(householdVersions).values([
-      { household: derived, savedAt: day("2026-09-10"), version: 2 },
-      { household: later, savedAt: day("2026-09-20"), version: 3 },
+      {
+        household: reference,
+        savedAt: day("2026-09-01"),
+        scenario: "",
+        version: 1,
+      },
+      {
+        household: derived,
+        savedAt: day("2026-09-01"),
+        scenario: "Retire early",
+        version: 1,
+      },
     ]);
 
-    expect(await readAsOf(db, day("2026-09-15"))).toStrictEqual({
+    expect(await readAsOf(db, "", day("2026-09-15"))).toBeNull();
+    expect(await readAsOf(db, "Retire early", day("2026-09-15"))).toStrictEqual(
+      { household: derived, savedAt: day("2026-09-01"), version: 1 },
+    );
+
+    await db.insert(householdVersions).values([
+      {
+        household: derived,
+        savedAt: day("2026-09-10"),
+        scenario: "",
+        version: 2,
+      },
+      {
+        household: later,
+        savedAt: day("2026-09-20"),
+        scenario: "",
+        version: 3,
+      },
+    ]);
+
+    expect(await readAsOf(db, "", day("2026-09-15"))).toStrictEqual({
       household: derived,
       savedAt: day("2026-09-10"),
       version: 2,
     });
-    expect(await readAsOf(db, day("2026-09-20"))).toMatchObject({ version: 3 });
-    expect(await readAsOf(db, day("2026-09-05"))).toMatchObject({ version: 2 });
+    expect(await readAsOf(db, "", day("2026-09-20"))).toMatchObject({
+      version: 3,
+    });
+    expect(await readAsOf(db, "", day("2026-09-05"))).toMatchObject({
+      version: 2,
+    });
   });
 
-  it("never writes over or deletes a version it has kept", async () => {
-    await keepAfter(db, 0, blank);
+  it("never writes over a version it has kept, or deletes one of the household's", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, blank);
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
 
     const refused = {
       cause: {
@@ -88,12 +217,28 @@ describe("household store", () => {
       },
     };
     await expect(
+      db
+        .update(householdVersions)
+        .set({ household: named })
+        .where(eq(householdVersions.scenario, "Retire early")),
+    ).rejects.toMatchObject(refused);
+    await expect(
       db.update(householdVersions).set({ household: named }),
     ).rejects.toMatchObject(refused);
     await expect(db.delete(householdVersions)).rejects.toMatchObject(refused);
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: blank,
       version: 1,
     });
+    expect(await readLatest(db, "Retire early")).toStrictEqual({
+      household: blank,
+      version: 1,
+    });
+
+    await db
+      .delete(householdVersions)
+      .where(eq(householdVersions.scenario, "Retire early"));
+
+    expect(await readLatest(db, "Retire early")).toBeNull();
   });
 });

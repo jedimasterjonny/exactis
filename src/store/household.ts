@@ -52,7 +52,7 @@ export async function amend<TResult>(
   const { version, ...held } = await readHeld();
   try {
     const { kept, result } = edit(held);
-    await keepAfter(getDb(), version, soundKept(kept).kept);
+    await keepAfter(getDb(), { scenario: "", version }, soundKept(kept).kept);
     refresh();
     return saved(result);
   } catch (error: unknown) {
@@ -80,6 +80,7 @@ export async function getSourcesDaysAgo(days: number): Promise<Before | null> {
   await requireSession();
   const kept = await readAsOf(
     getDb(),
+    "",
     new Date(Date.now() - days * 86_400_000),
   );
   const sources = kept === null ? null : sourcesIn(kept.household);
@@ -103,7 +104,7 @@ export async function getSourcesDaysAgo(days: number): Promise<Before | null> {
 // month is read at request time, since the session is read before
 // anything that reads it.
 async function readHeld(): Promise<Held & { readonly version: number }> {
-  const latest = await readLatest(getDb());
+  const latest = await readLatest(getDb(), "");
   return {
     ...soundKept(latest?.household ?? nothingKeptIn(monthBefore(thisMonth()))),
     version: latest?.version ?? 0,
