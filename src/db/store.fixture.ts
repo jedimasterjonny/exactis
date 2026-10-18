@@ -33,7 +33,7 @@ export function standUp(
       vi.useFakeTimers({ now: today, toFake: ["Date"] });
     }
     if (seed !== undefined) {
-      await keepAfter(db, 0, seed);
+      await keepAfter(db, { scenario: "", version: 0 }, seed);
     }
   });
   afterAll(close);

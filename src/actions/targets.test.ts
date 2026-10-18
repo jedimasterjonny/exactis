@@ -34,14 +34,14 @@ describe("importTargets", () => {
     await expect(importTargets(targets.categories)).rejects.toThrow(
       "redirected",
     );
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("keeps the categories as imported today, draws the page again and hands them back", async () => {
     expect(await importTargets(targets.categories)).toStrictEqual(
       saved(importedToday),
     );
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: { ...blank, targets: importedToday },
       version: 1,
     });
@@ -49,7 +49,7 @@ describe("importTargets", () => {
   });
 
   it("keeps an import over the one the household held, and nothing else", async () => {
-    await keepAfter(db, 0, reference);
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
     const [first, second, ...rest] = targets.categories;
     const moved = [
       ...(first === undefined ? [] : [{ ...first, share: 0.5 }]),
@@ -59,7 +59,7 @@ describe("importTargets", () => {
 
     await importTargets(moved);
 
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: {
         ...reference,
         targets: { categories: moved, importedOn: "2026-09-15" },
@@ -83,7 +83,11 @@ describe("importTargets", () => {
         value: 0,
       },
     ];
-    await keepAfter(db, 0, { ...reference, rateSet: "cma" });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...reference, rateSet: "cma" },
+    );
 
     expect(await importTargets(adding)).toStrictEqual(
       refused(
@@ -93,9 +97,9 @@ describe("importTargets", () => {
     expect(await importTargets(targets.categories)).toStrictEqual(
       saved(importedToday),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 2 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 2 });
 
-    await keepAfter(db, 2, reference);
+    await keepAfter(db, { scenario: "", version: 2 }, reference);
 
     expect(await importTargets(adding)).toMatchObject({ kind: "saved" });
   });
@@ -104,7 +108,7 @@ describe("importTargets", () => {
     expect(await importTargets(targets.categories.slice(1))).toStrictEqual(
       refused("A target allocation's categories add up to 100%"),
     );
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   // Only a bug or a forgery sends a category the reader could not
@@ -116,7 +120,7 @@ describe("importTargets", () => {
     }));
 
     await expect(importTargets(unnamed)).rejects.toThrow(z.ZodError);
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 });
 
@@ -134,11 +138,11 @@ describe("mapCategory", () => {
     await expect(
       mapCategory({ asset: "US large cap equities", category: "any" }),
     ).rejects.toThrow("redirected");
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("maps a category onto a class the latest CMA prices, draws the page again and hands every mapping back", async () => {
-    await keepAfter(db, 0, reference);
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
     const mapped = [
       ...mappings,
       { asset: "Global ex-UK large cap equities", category: usa },
@@ -150,7 +154,7 @@ describe("mapCategory", () => {
         category: usa ?? "",
       }),
     ).toStrictEqual(saved(mapped));
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: { ...reference, mappings: mapped },
       version: 2,
     });
@@ -158,7 +162,7 @@ describe("mapCategory", () => {
   });
 
   it("maps a category over the class it was mapped onto, and onto none", async () => {
-    await keepAfter(db, 0, reference);
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
     const others = mappings.filter(({ category }) => category !== ukEquity);
 
     expect(
@@ -175,14 +179,14 @@ describe("mapCategory", () => {
     expect(
       await mapCategory({ asset: null, category: ukEquity ?? "" }),
     ).toStrictEqual(saved(others));
-    expect(await readLatest(db)).toMatchObject({
+    expect(await readLatest(db, "")).toMatchObject({
       household: { mappings: others },
       version: 3,
     });
   });
 
   it("refuses a category the target allocation does not list, and keeps nothing", async () => {
-    await keepAfter(db, 0, reference);
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
 
     expect(
       await mapCategory({
@@ -190,18 +194,18 @@ describe("mapCategory", () => {
         category: "Asset Allocation/Cash",
       }),
     ).toStrictEqual(refused("A category is mapped once it is imported"));
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
   it("refuses any category before a target allocation is imported", async () => {
     expect(
       await mapCategory({ asset: null, category: ukEquity ?? "" }),
     ).toStrictEqual(refused("A category is mapped once it is imported"));
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("refuses a class the latest CMA does not price, or any before one is pulled", async () => {
-    await keepAfter(db, 0, reference);
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
 
     expect(
       await mapCategory({
@@ -212,12 +216,16 @@ describe("mapCategory", () => {
       refused("The latest CMA prices no Canada large cap equities"),
     );
 
-    await keepAfter(db, 1, { ...reference, cma: null });
+    await keepAfter(
+      db,
+      { scenario: "", version: 1 },
+      { ...reference, cma: null },
+    );
 
     expect(
       await mapCategory({ asset: "UK cash", category: ukEquity ?? "" }),
     ).toStrictEqual(refused("The latest CMA prices no UK cash"));
-    expect(await readLatest(db)).toMatchObject({ version: 2 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 2 });
   });
 
   // Only a bug or a forgery sends a class with no name, so it fails
@@ -226,7 +234,7 @@ describe("mapCategory", () => {
     await expect(
       mapCategory({ asset: " ", category: ukEquity ?? "" }),
     ).rejects.toThrow(z.ZodError);
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 });
 
@@ -243,7 +251,7 @@ describe("mapByName", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(mapByName()).rejects.toThrow("redirected");
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("maps each category the CMA cannot blend onto its suggestion, draws the page again and hands back what it mapped", async () => {
@@ -252,14 +260,18 @@ describe("mapByName", () => {
         ? { ...mapping, asset: "Canada large cap equities" }
         : mapping,
     );
-    await keepAfter(db, 0, { ...reference, mappings: stale });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...reference, mappings: stale },
+    );
     const mapped = [
       { asset: "UK large cap equities", category: ukEquity },
       { asset: "US large cap equities", category: usa },
     ];
 
     expect(await mapByName()).toStrictEqual(saved(mapped));
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: {
         ...reference,
         mappings: [
@@ -273,18 +285,22 @@ describe("mapByName", () => {
   });
 
   it("refuses when no category without a class has one suggested, and keeps nothing", async () => {
-    await keepAfter(db, 0, {
-      ...reference,
-      mappings: [
-        ...mappings,
-        { asset: "US large cap equities", category: usa },
-      ],
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...reference,
+        mappings: [
+          ...mappings,
+          { asset: "US large cap equities", category: usa },
+        ],
+      },
+    );
 
     expect(await mapByName()).toStrictEqual(
       refused("No category without a class has one suggested"),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
   it("refuses before a CMA is pulled or a target allocation imported", async () => {
@@ -294,13 +310,21 @@ describe("mapByName", () => {
 
     expect(await mapByName()).toStrictEqual(refusal);
 
-    await keepAfter(db, 0, { ...reference, cma: null });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...reference, cma: null },
+    );
 
     expect(await mapByName()).toStrictEqual(refusal);
 
-    await keepAfter(db, 1, { ...reference, targets: null });
+    await keepAfter(
+      db,
+      { scenario: "", version: 1 },
+      { ...reference, targets: null },
+    );
 
     expect(await mapByName()).toStrictEqual(refusal);
-    expect(await readLatest(db)).toMatchObject({ version: 2 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 2 });
   });
 });

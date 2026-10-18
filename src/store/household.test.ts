@@ -74,8 +74,8 @@ describe("the household store", () => {
   });
 
   it("reads each part of the latest version, and the plan on the day it is read", async () => {
-    await keepAfter(db, 0, blank);
-    await keepAfter(db, 1, reference);
+    await keepAfter(db, { scenario: "", version: 0 }, blank);
+    await keepAfter(db, { scenario: "", version: 1 }, reference);
 
     expect(await getHousehold()).toStrictEqual({
       accounts: reference.accounts,
@@ -118,7 +118,11 @@ describe("the household store", () => {
   // balances are as of rather than sliding with the day the page is
   // read.
   it("runs the plan from the month after the one the balances are as of, whatever day it is read", async () => {
-    await keepAfter(db, 0, { ...reference, asOf: { month: 2, year: 2026 } });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...reference, asOf: { month: 2, year: 2026 } },
+    );
 
     expect((await getHousehold()).plan).toMatchObject({ from: 2026, month: 3 });
 
@@ -134,7 +138,7 @@ describe("the household store", () => {
     await amend(({ kept }) => ({ kept, result: null }));
     vi.setSystemTime(new Date("2027-01-15T12:00:00Z"));
 
-    expect(await readLatest(db)).toMatchObject({
+    expect(await readLatest(db, "")).toMatchObject({
       household: { asOf: { month: 7, year: 2026 } },
     });
     expect((await getHousehold()).plan).toMatchObject({ from: 2026, month: 8 });
@@ -142,10 +146,14 @@ describe("the household store", () => {
 
   // Written past the rules, as a version kept before they tightened.
   it("refuses a version that breaks a rule, in its words, rather than hand it on", async () => {
-    await keepAfter(db, 0, {
-      ...reference,
-      accounts: [...reference.accounts, ...reference.accounts],
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...reference,
+        accounts: [...reference.accounts, ...reference.accounts],
+      },
+    );
 
     await expect(getHousehold()).rejects.toThrow(
       "A record's id is held by no other record",
@@ -153,7 +161,7 @@ describe("the household store", () => {
   });
 
   it("keeps the household an edit makes as the next version, draws the page again and hands back what the edit says", async () => {
-    await keepAfter(db, 0, reference);
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
 
     const result = await amend(({ household, kept }) => {
       expect(household.plan).toStrictEqual(planOf(reference, typed(reference)));
@@ -168,7 +176,7 @@ describe("the household store", () => {
     });
 
     expect(result).toStrictEqual(saved("added"));
-    expect(await readLatest(db)).toMatchObject({
+    expect(await readLatest(db, "")).toMatchObject({
       household: {
         next: 21,
         owners: [...reference.owners, { ...sam, id: 20, name: "Partner" }],
@@ -181,33 +189,33 @@ describe("the household store", () => {
   it("keeps the first save as the first version", async () => {
     await amend(({ kept }) => ({ kept, result: null }));
 
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: blank,
       version: 1,
     });
   });
 
   it("refuses an edit that breaks a rule, in its words, and writes nothing", async () => {
-    await keepAfter(db, 0, reference);
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
 
     await expect(
       amend(({ kept }) => ({ kept: { ...kept, owners: [] }, result: null })),
     ).resolves.toStrictEqual(refused("A plan is somebody's"));
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     expect(refresh).not.toHaveBeenCalled();
   });
 
   // A bug in an edit, or a store that cannot answer, is no rule broken:
   // it stays a failure for the page to report as one.
   it("lets anything but a refusal through as the failure it is, and writes nothing", async () => {
-    await keepAfter(db, 0, reference);
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
 
     await expect(
       amend(() => {
         throw new Error("The edit broke");
       }),
     ).rejects.toThrow("The edit broke");
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     expect(refresh).not.toHaveBeenCalled();
   });
 
@@ -215,7 +223,7 @@ describe("the household store", () => {
   // so both read before either writes, and the second to write is from
   // a household that is gone by then.
   it("refuses a save the household changed under after it was read", async () => {
-    await keepAfter(db, 0, reference);
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
     const renamed = async (name: string): Promise<Answer<string>> =>
       amend(({ kept }) => ({
         kept: {
@@ -239,7 +247,7 @@ describe("the household store", () => {
         ),
       },
     ]);
-    expect(await readLatest(db)).toMatchObject({
+    expect(await readLatest(db, "")).toMatchObject({
       household: { owners: [{ ...reference.owners[0], name: "First" }] },
       version: 2,
     });
@@ -251,7 +259,7 @@ describe("the household store", () => {
     await expect(amend(({ kept }) => ({ kept, result: null }))).rejects.toThrow(
       "redirected",
     );
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   // Saved half an hour into the sixth of September by the UK's clock,
@@ -264,6 +272,7 @@ describe("the household store", () => {
         {
           household: { ...reference, rateSet: "cma" },
           savedAt: new Date("2026-09-05T23:30:00Z"),
+          scenario: "",
           version: 1,
         },
       ]);
@@ -286,14 +295,18 @@ describe("the household store", () => {
 
   // August's vintage kept with May's before it, which no comparison reads.
   it("leaves out the vintage before the latest one kept then", async () => {
-    await keepAfter(db, 0, {
-      ...reference,
-      cma: {
-        latest: cma,
-        previous: { ...cma, vintage: { month: 4, year: 2026 } },
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...reference,
+        cma: {
+          latest: cma,
+          previous: { ...cma, vintage: { month: 4, year: 2026 } },
+        },
+        rateSet: "cma",
       },
-      rateSet: "cma",
-    });
+    );
 
     expect(await getSourcesDaysAgo(0)).toMatchObject({
       sources: { cma: { latest: cma, previous: null } },
@@ -303,11 +316,15 @@ describe("the household store", () => {
   it("reads nothing before anything is kept, or where the sources kept then break a rule", async () => {
     expect(await getSourcesDaysAgo(30)).toBeNull();
 
-    await keepAfter(db, 0, {
-      ...reference,
-      deductions: { dividends: -0.01, fees: 0.002 },
-      rateSet: "cma",
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...reference,
+        deductions: { dividends: -0.01, fees: 0.002 },
+        rateSet: "cma",
+      },
+    );
 
     expect(await getSourcesDaysAgo(30)).toBeNull();
   });

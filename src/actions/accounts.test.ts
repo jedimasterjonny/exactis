@@ -170,11 +170,11 @@ const paid: Kept = {
 };
 
 async function latest(): Promise<unknown> {
-  return (await readLatest(db))?.household;
+  return (await readLatest(db, ""))?.household;
 }
 
 async function versions(): Promise<number | undefined> {
-  return (await readLatest(db))?.version;
+  return (await readLatest(db, ""))?.version;
 }
 
 describe("the account actions", () => {
@@ -201,12 +201,16 @@ describe("the account actions", () => {
     });
 
     it("writes over the account with the id, in its place, keeping the asset a loan is secured on", async () => {
-      await keepAfter(db, 1, {
-        ...kept,
-        accounts: kept.accounts.map((account) =>
-          account.id === 5 ? { ...account, secures: 4 } : account,
-        ),
-      });
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        {
+          ...kept,
+          accounts: kept.accounts.map((account) =>
+            account.id === 5 ? { ...account, secures: 4 } : account,
+          ),
+        },
+      );
 
       expect(await saveAccount(2, values)).toStrictEqual(
         saved({ ...lifetime, id: 2 }),
@@ -230,12 +234,16 @@ describe("the account actions", () => {
     // current account, never dated, stays undated while its balance is
     // left as it was.
     it("dates a balance the day it is set, and keeps the day a save leaves it", async () => {
-      await keepAfter(db, 1, {
-        ...kept,
-        accounts: kept.accounts.map((account) =>
-          account.id === 2 ? { ...account, setOn: "2026-08-31" } : account,
-        ),
-      });
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        {
+          ...kept,
+          accounts: kept.accounts.map((account) =>
+            account.id === 2 ? { ...account, setOn: "2026-08-31" } : account,
+          ),
+        },
+      );
       const isa = {
         ...values,
         balance: 271930,
@@ -279,7 +287,7 @@ describe("the account actions", () => {
     });
 
     it("refuses to make a debt a line pays anything else, and writes nothing", async () => {
-      await keepAfter(db, 1, paid);
+      await keepAfter(db, { scenario: "", version: 1 }, paid);
 
       await expect(saveAccount(5, values)).resolves.toStrictEqual(
         refused("A line pays a debt alone"),
@@ -582,11 +590,11 @@ describe("the account actions", () => {
     });
 
     it("adds the payments a loan is missing", async () => {
-      await keepAfter(db, 1, {
-        ...kept,
-        accounts: [...kept.accounts, home, mortgage],
-        next: 22,
-      });
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        { ...kept, accounts: [...kept.accounts, home, mortgage], next: 22 },
+      );
 
       await saveHouse(20, house);
 
@@ -620,11 +628,11 @@ describe("the account actions", () => {
     });
 
     it("sends a loan with no payments away, and leaves a house with no loan alone", async () => {
-      await keepAfter(db, 1, {
-        ...kept,
-        accounts: [...kept.accounts, home, mortgage],
-        next: 22,
-      });
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        { ...kept, accounts: [...kept.accounts, home, mortgage], next: 22 },
+      );
 
       await saveHouse(20, outright);
       await saveHouse(20, outright);
@@ -918,7 +926,7 @@ describe("the account actions", () => {
           income: kept.schedule.income.with(0, { ...salary, match: 0.06 }),
         },
       };
-      await keepAfter(db, 1, matched);
+      await keepAfter(db, { scenario: "", version: 1 }, matched);
       await removeAccount(6);
 
       expect(await latest()).toStrictEqual({
@@ -942,7 +950,7 @@ describe("the account actions", () => {
 
       expect(await latest()).toStrictEqual({ ...kept, next: 23 });
 
-      await keepAfter(db, 3, paid);
+      await keepAfter(db, { scenario: "", version: 3 }, paid);
       await removeAccount(5);
 
       expect(await latest()).toStrictEqual({

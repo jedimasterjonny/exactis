@@ -37,14 +37,14 @@ describe("the owner actions", () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
       await expect(saveOwner(null, kid)).rejects.toThrow("redirected");
-      expect(await readLatest(db)).toMatchObject({ version: 1 });
+      expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     });
 
     it("adds a new owner with the name trimmed, given the next id, and draws the page again", async () => {
       expect(await saveOwner(null, { ...kid, name: "  Kid  " })).toStrictEqual(
         saved({ ...kid, id: 21 }),
       );
-      expect(await readLatest(db)).toMatchObject({
+      expect(await readLatest(db, "")).toMatchObject({
         household: { next: 22, owners: [...shared.owners, { ...kid, id: 21 }] },
         version: 2,
       });
@@ -63,7 +63,7 @@ describe("the owner actions", () => {
           retirement: atAge(60),
         }),
       );
-      expect(await readLatest(db)).toMatchObject({
+      expect(await readLatest(db, "")).toMatchObject({
         household: {
           next: 21,
           owners: [
@@ -83,10 +83,11 @@ describe("the owner actions", () => {
     // The partner has thirty qualifying years, typed on the assumptions
     // screen; the dialog holds none, and a save from it sends none.
     it("keeps the qualifying years of the owner it writes over, and writes none it is sent", async () => {
-      await keepAfter(db, 1, {
-        ...shared,
-        owners: [owners[0], { ...partner, qualifyingYears: 30 }],
-      });
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        { ...shared, owners: [owners[0], { ...partner, qualifyingYears: 30 }] },
+      );
 
       expect(await saveOwner(20, kid)).toStrictEqual(
         saved({ ...kid, id: 20, qualifyingYears: 30 }),
@@ -94,7 +95,7 @@ describe("the owner actions", () => {
       expect(
         await saveOwner(null, { ...kid, qualifyingYears: 12 }),
       ).toStrictEqual(saved({ ...kid, id: 21 }));
-      expect(await readLatest(db)).toMatchObject({
+      expect(await readLatest(db, "")).toMatchObject({
         household: {
           owners: [
             owners[0],
@@ -129,7 +130,7 @@ describe("the owner actions", () => {
       ).resolves.toStrictEqual(
         refused("Only the plan's owner retires when conditions hold"),
       );
-      expect(await readLatest(db)).toMatchObject({ version: 1 });
+      expect(await readLatest(db, "")).toMatchObject({ version: 1 });
       expect(await saveOwner(1, { ...kid, retirement })).toStrictEqual(
         saved({ ...kid, id: 1, qualifyingYears: 35, retirement }),
       );
@@ -155,7 +156,7 @@ describe("the owner actions", () => {
       await expect(saveOwner(99, kid)).resolves.toStrictEqual(
         refused("No owner has the id"),
       );
-      expect(await readLatest(db)).toMatchObject({ version: 1 });
+      expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     });
   });
 
@@ -164,13 +165,13 @@ describe("the owner actions", () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
       await expect(removeOwner(20)).rejects.toThrow("redirected");
-      expect(await readLatest(db)).toMatchObject({ version: 1 });
+      expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     });
 
     it("deletes the owner with the id and draws the page again", async () => {
       await removeOwner(20);
 
-      expect(await readLatest(db)).toMatchObject({
+      expect(await readLatest(db, "")).toMatchObject({
         household: { owners: kept.owners },
         version: 2,
       });
@@ -181,36 +182,40 @@ describe("the owner actions", () => {
       await expect(removeOwner(1)).resolves.toStrictEqual(
         refused("An owner who holds an account stays"),
       );
-      expect(await readLatest(db)).toMatchObject({ version: 1 });
+      expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     });
 
     // The consulting, earned by the partner, who holds no account.
     it("refuses to delete an owner who earns an income line, and writes nothing", async () => {
-      await keepAfter(db, 1, {
-        ...shared,
-        schedule: {
-          ...shared.schedule,
-          income: shared.schedule.income.map((line) =>
-            line.id === 18 ? { ...line, owner: 20 } : line,
-          ),
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        {
+          ...shared,
+          schedule: {
+            ...shared.schedule,
+            income: shared.schedule.income.map((line) =>
+              line.id === 18 ? { ...line, owner: 20 } : line,
+            ),
+          },
         },
-      });
+      );
 
       await expect(removeOwner(20)).resolves.toStrictEqual(
         refused("An owner who earns an income line stays"),
       );
-      expect(await readLatest(db)).toMatchObject({ version: 2 });
+      expect(await readLatest(db, "")).toMatchObject({ version: 2 });
     });
 
     // The household before anything is saved holds its one owner, who
     // holds nothing and still cannot go.
     it("refuses to delete the last owner, in the household's words, and writes nothing", async () => {
-      await keepAfter(db, 1, blank);
+      await keepAfter(db, { scenario: "", version: 1 }, blank);
 
       await expect(removeOwner(1)).resolves.toStrictEqual(
         refused("A plan is somebody's"),
       );
-      expect(await readLatest(db)).toMatchObject({ version: 2 });
+      expect(await readLatest(db, "")).toMatchObject({ version: 2 });
     });
 
     it("refuses an id the list could not have sent, and one no owner has", async () => {
@@ -218,7 +223,7 @@ describe("the owner actions", () => {
       await expect(removeOwner(99)).resolves.toStrictEqual(
         refused("No owner has the id"),
       );
-      expect(await readLatest(db)).toMatchObject({ version: 1 });
+      expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     });
   });
 
@@ -227,14 +232,14 @@ describe("the owner actions", () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
       await expect(saveQualifyingYears(20, 30)).rejects.toThrow("redirected");
-      expect(await readLatest(db)).toMatchObject({ version: 1 });
+      expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     });
 
     it("writes the owner's years alone, over the owner as the store holds it, and draws the page again", async () => {
       expect(await saveQualifyingYears(20, 30)).toStrictEqual(
         saved({ ...partner, qualifyingYears: 30 }),
       );
-      expect(await readLatest(db)).toMatchObject({
+      expect(await readLatest(db, "")).toMatchObject({
         household: {
           next: 21,
           owners: [owners[0], { ...partner, qualifyingYears: 30 }],
@@ -262,7 +267,7 @@ describe("the owner actions", () => {
       await expect(saveQualifyingYears(99, 30)).resolves.toStrictEqual(
         refused("No owner has the id"),
       );
-      expect(await readLatest(db)).toMatchObject({ version: 1 });
+      expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     });
   });
 });

@@ -54,7 +54,7 @@ describe("saveAges", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(saveAges({ retires: 60 })).rejects.toThrow("redirected");
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   // The plan is the first listed owner's, so the retirement age is
@@ -63,18 +63,22 @@ describe("saveAges", () => {
     expect(await saveAges({ retires: 55 })).toStrictEqual(
       saved({ ends: 91, retires: 55 }),
     );
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: retiringAt(55),
       version: 1,
     });
     expect(refresh).toHaveBeenCalledOnce();
 
-    await keepAfter(db, 1, { ...blank, next: 3, owners: [me, sam] });
+    await keepAfter(
+      db,
+      { scenario: "", version: 1 },
+      { ...blank, next: 3, owners: [me, sam] },
+    );
 
     expect(await saveAges({ retires: 52 })).toStrictEqual(
       saved({ ends: 91, retires: 52 }),
     );
-    expect(await readLatest(db)).toMatchObject({
+    expect(await readLatest(db, "")).toMatchObject({
       household: { owners: [{ ...me, retirement: atAge(52) }, sam] },
       version: 3,
     });
@@ -89,7 +93,7 @@ describe("saveAges", () => {
   it("refuses an age that is not a whole number, or is below nothing", async () => {
     await expect(saveAges({ retires: 61.5 })).rejects.toThrow(z.ZodError);
     await expect(saveAges({ retires: -1 })).rejects.toThrow(z.ZodError);
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   // 34 is the age already reached, so a plan to it has no year left.
@@ -106,7 +110,7 @@ describe("saveAges", () => {
     expect(await saveAges({ ends: 120 })).toStrictEqual(
       saved({ ends: 120, retires: 35 }),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 2 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 2 });
   });
 
   // The household holds a plan to 33, which its owner of 34 has already
@@ -114,7 +118,11 @@ describe("saveAges", () => {
   // than held to today again, so a retirement age saved beside it
   // stands, while one past it is still refused.
   it("keeps an end age already outlived rather than refusing a retirement age saved beside it", async () => {
-    await keepAfter(db, 0, { ...retiringAt(34), ages: { ends: 33 } });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...retiringAt(32), ages: { ends: 33 } },
+    );
 
     expect(await saveAges({ retires: 28 })).toStrictEqual(
       saved({ ends: 33, retires: 28 }),
@@ -136,7 +144,7 @@ describe("saveAges", () => {
     expect(await saveAges({ retires: 28 })).toStrictEqual(
       saved({ ends: 91, retires: 28 }),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 });
 
@@ -145,14 +153,14 @@ describe("saveRates", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(saveRates({ stocks: 0.06 })).rejects.toThrow("redirected");
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("writes the rates sent over the household's, keeping the rest, and draws the page again", async () => {
     expect(await saveRates({ dividends: 0.02, stocks: 0.0595 })).toStrictEqual(
       saved({ ...blank.rates, dividends: 0.02, stocks: 0.0595 }),
     );
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: {
         ...blank,
         rates: { ...blank.rates, dividends: 0.02, stocks: 0.0595 },
@@ -169,7 +177,7 @@ describe("saveRates", () => {
     await expect(
       saveRates({ inflation: Number.POSITIVE_INFINITY }),
     ).rejects.toThrow(z.ZodError);
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("holds each rate to its rule, in the household's words", async () => {
@@ -182,24 +190,28 @@ describe("saveRates", () => {
     await expect(saveRates({ inflation: -1 })).resolves.toStrictEqual(
       refused("Inflation is a rate, and prices fall by less than everything"),
     );
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   // The reference's mortgage pays £2,180 a month on £176,520. Charged
   // the plan rate rather than its own 4.85%, it clears at 5% in stocks,
   // and never at 20%, where the month's interest is £2,942.
   it("refuses rates that leave a debt charged the plan rate never paid off", async () => {
-    await keepAfter(db, 0, {
-      ...reference,
-      accounts: reference.accounts.map((listed) =>
-        listed.id === 5 ? { ...listed, growth: { kind: "plan" } } : listed,
-      ),
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...reference,
+        accounts: reference.accounts.map((listed) =>
+          listed.id === 5 ? { ...listed, growth: { kind: "plan" } } : listed,
+        ),
+      },
+    );
 
     await expect(saveRates({ stocks: 0.2 })).resolves.toStrictEqual(
       refused("A debt's payments end"),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 });
 
@@ -215,16 +227,20 @@ describe("saveAnchor", () => {
     await expect(saveAnchor(null, { age: 52, bonds: 0.15 })).rejects.toThrow(
       "redirected",
     );
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("writes a new anchor beside the household's, youngest first, and draws the page again", async () => {
-    await keepAfter(db, 0, { ...blank, glide: glide.slice(1) });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...blank, glide: glide.slice(1) },
+    );
 
     expect(await saveAnchor(null, { age: 52, bonds: 0.15 })).toStrictEqual(
       saved({ age: 52, bonds: 0.15 }),
     );
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: { ...blank, glide },
       version: 2,
     });
@@ -235,34 +251,38 @@ describe("saveAnchor", () => {
   // edit of 60 keeps.
   it("writes an anchor in place of the one at the age it was saved at, keeping one added since", async () => {
     const since = { age: 67, bonds: 0.4 };
-    await keepAfter(db, 0, { ...blank, glide: [...glide, since] });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...blank, glide: [...glide, since] },
+    );
 
     expect(await saveAnchor(60, { age: 62, bonds: 0.35 })).toStrictEqual(
       saved({ age: 62, bonds: 0.35 }),
     );
-    expect(await readLatest(db)).toMatchObject({
+    expect(await readLatest(db, "")).toMatchObject({
       household: { glide: [glide[0], { age: 62, bonds: 0.35 }, since] },
     });
   });
 
   it("refuses an anchor at an age no anchor is at, deleted since", async () => {
-    await keepAfter(db, 0, { ...blank, glide });
+    await keepAfter(db, { scenario: "", version: 0 }, { ...blank, glide });
 
     expect(await saveAnchor(67, { age: 67, bonds: 0.25 })).toStrictEqual(
       refused("No anchor is at that age"),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
   it("refuses an anchor that is not a number", async () => {
     await expect(
       saveAnchor(null, { age: 52, bonds: Number.NaN }),
     ).rejects.toThrow(z.ZodError);
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("holds an age to one anchor, and each anchor to its rules", async () => {
-    await keepAfter(db, 0, { ...blank, glide });
+    await keepAfter(db, { scenario: "", version: 0 }, { ...blank, glide });
 
     expect(await saveAnchor(null, { age: 60, bonds: 0.25 })).toStrictEqual(
       refused("An age holds one anchor, youngest first"),
@@ -270,17 +290,17 @@ describe("saveAnchor", () => {
     expect(await saveAnchor(52, { age: 52, bonds: 1.1 })).toStrictEqual(
       refused("Bonds hold none of the savings, all of them, or a share"),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
   // All in equities under the CMA's rates, nothing says what bonds
   // return.
   it("refuses an anchor the CMA's rates cannot run on while they are live", async () => {
-    await keepAfter(db, 0, {
-      ...reference,
-      rateSet: "cma",
-      targets: targetsUnder("Equity"),
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...reference, rateSet: "cma", targets: targetsUnder("Equity") },
+    );
 
     expect(await saveAnchor(null, { age: 60, bonds: 0.4 })).toStrictEqual(
       refused(
@@ -300,14 +320,14 @@ describe("removeAnchor", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(removeAnchor(52)).rejects.toThrow("redirected");
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("deletes the anchor at the age given, keeping the rest, and draws the page again", async () => {
-    await keepAfter(db, 0, { ...blank, glide });
+    await keepAfter(db, { scenario: "", version: 0 }, { ...blank, glide });
 
     expect(await removeAnchor(60)).toStrictEqual(saved(undefined));
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: { ...blank, glide: glide.slice(0, 1) },
       version: 2,
     });
@@ -315,12 +335,12 @@ describe("removeAnchor", () => {
   });
 
   it("refuses an age no anchor is at, deleted since", async () => {
-    await keepAfter(db, 0, { ...blank, glide });
+    await keepAfter(db, { scenario: "", version: 0 }, { ...blank, glide });
 
     expect(await removeAnchor(67)).toStrictEqual(
       refused("No anchor is at that age"),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
   it("refuses an age that is not a number", async () => {
@@ -333,12 +353,12 @@ describe("saveAllocation", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(saveAllocation(allocation)).rejects.toThrow("redirected");
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("writes the split over the household's and draws the page again", async () => {
     expect(await saveAllocation(allocation)).toStrictEqual(saved(allocation));
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: { ...blank, allocation },
       version: 1,
     });
@@ -349,7 +369,7 @@ describe("saveAllocation", () => {
     await expect(saveAllocation({ stocks: Number.NaN })).rejects.toThrow(
       z.ZodError,
     );
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("holds the share to none of the savings, all of them, or a share", async () => {
@@ -370,19 +390,23 @@ describe("saveAllocation", () => {
   // 3% and never at stocks' 20%, where the month's interest on
   // £176,520 is £2,942 against the £2,180 paid.
   it("refuses a split that leaves a debt charged the plan rate never paid off", async () => {
-    await keepAfter(db, 0, {
-      ...reference,
-      accounts: reference.accounts.map((listed) =>
-        listed.id === 5 ? { ...listed, growth: { kind: "plan" } } : listed,
-      ),
-      allocation: { stocks: 0 },
-      rates: { ...reference.rates, bonds: 0.03, stocks: 0.2 },
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...reference,
+        accounts: reference.accounts.map((listed) =>
+          listed.id === 5 ? { ...listed, growth: { kind: "plan" } } : listed,
+        ),
+        allocation: { stocks: 0 },
+        rates: { ...reference.rates, bonds: 0.03, stocks: 0.2 },
+      },
+    );
 
     await expect(saveAllocation({ stocks: 1 })).resolves.toStrictEqual(
       refused("A debt's payments end"),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 });
 
@@ -391,14 +415,14 @@ describe("saveDeductions", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(saveDeductions({ fees: 0.002 })).rejects.toThrow("redirected");
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("writes the deductions sent over the household's, keeping the rest, dated today, and draws the page again", async () => {
     expect(await saveDeductions({ fees: 0.0025 })).toStrictEqual(
       saved({ dividends: 0.02, fees: 0.0025, setOn: "2026-09-15" }),
     );
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: {
         ...blank,
         deductions: { dividends: 0.02, fees: 0.0025, setOn: "2026-09-15" },
@@ -414,22 +438,26 @@ describe("saveDeductions", () => {
 
   // Kept on the first of the month and confirmed on the fifteenth.
   it("confirms the deductions still right, keeping both and dating them today, when sent neither", async () => {
-    await keepAfter(db, 0, {
-      ...reference,
-      deductions: { dividends: 0.019, fees: 0.0025, setOn: "2026-09-01" },
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...reference,
+        deductions: { dividends: 0.019, fees: 0.0025, setOn: "2026-09-01" },
+      },
+    );
 
     expect(await saveDeductions({})).toStrictEqual(
       saved({ dividends: 0.019, fees: 0.0025, setOn: "2026-09-15" }),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 2 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 2 });
   });
 
   it("refuses a deduction that is not a number", async () => {
     await expect(saveDeductions({ fees: Number.NaN })).rejects.toThrow(
       z.ZodError,
     );
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("holds each deduction to its rule, in the household's words", async () => {
@@ -445,7 +473,7 @@ describe("saveDeductions", () => {
     await expect(saveDeductions({ dividends: 0.11 })).resolves.toStrictEqual(
       refused("A deduction is no more than 10%"),
     );
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   // Fees of 10% off classes losing 95% a year leave stocks growing at
@@ -462,18 +490,22 @@ describe("saveDeductions", () => {
         previous: null,
       },
     };
-    await keepAfter(db, 0, losing);
+    await keepAfter(db, { scenario: "", version: 0 }, losing);
 
     expect(await saveDeductions({ fees: 0.1 })).toStrictEqual(
       saved({ dividends: 0.02, fees: 0.1, setOn: "2026-09-15" }),
     );
 
-    await keepAfter(db, 2, { ...losing, rateSet: "cma" });
+    await keepAfter(
+      db,
+      { scenario: "", version: 2 },
+      { ...losing, rateSet: "cma" },
+    );
 
     await expect(saveDeductions({ fees: 0.1 })).resolves.toStrictEqual(
       refused("A rate loses no more than everything"),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 3 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 3 });
   });
 });
 
@@ -482,21 +514,21 @@ describe("saveRateSet", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(saveRateSet("custom")).rejects.toThrow("redirected");
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   it("chooses the CMA's rates while the CMA gives some, draws the page again, and chooses the rates typed back", async () => {
-    await keepAfter(db, 0, reference);
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
 
     expect(await saveRateSet("cma")).toStrictEqual(saved("cma"));
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: { ...reference, rateSet: "cma" },
       version: 2,
     });
     expect(refresh).toHaveBeenCalledOnce();
 
     expect(await saveRateSet("custom")).toStrictEqual(saved("custom"));
-    expect(await readLatest(db)).toMatchObject({
+    expect(await readLatest(db, "")).toMatchObject({
       household: { rateSet: "custom" },
       version: 3,
     });
@@ -507,13 +539,17 @@ describe("saveRateSet", () => {
       refused("No CMA is pulled, so the plan cannot run on the CMA's rates"),
     );
 
-    await keepAfter(db, 0, { ...reference, curve: null });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...reference, curve: null },
+    );
 
     await expect(saveRateSet("cma")).resolves.toStrictEqual(
       refused(
         "No inflation curve is pulled, so the plan cannot run on the CMA's rates",
       ),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 });

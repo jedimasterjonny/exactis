@@ -60,7 +60,7 @@ describe("pullHousePrices", () => {
 
     await expect(pullHousePrices()).rejects.toThrow("redirected");
     expect(fetch).not.toHaveBeenCalled();
-    expect(await readLatest(db)).toBeNull();
+    expect(await readLatest(db, "")).toBeNull();
   });
 
   // The balances are as of September 2026, past July's latest figure,
@@ -68,7 +68,7 @@ describe("pullHousePrices", () => {
   // forward, and dated the day the pull was made.
   it("keeps the index pulled, writes the house into the points from its purchase, sets the house's balance off it, draws the page again and hands the pull back", async () => {
     const fetch = registrySends(new Response(file));
-    await keepAfter(db, 0, withHouse);
+    await keepAfter(db, { scenario: "", version: 0 }, withHouse);
     const index = readIndex(file, homeValues.bought.month);
 
     const housePrices = {
@@ -84,7 +84,7 @@ describe("pullHousePrices", () => {
       address,
       expect.objectContaining({ cache: "no-store" }),
     );
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: {
         ...withHouse,
         accounts: [
@@ -104,7 +104,7 @@ describe("pullHousePrices", () => {
   // A save landing while the index is on its way, here the price
   // corrected, leaves a purchase the index was not asked for.
   it("refuses to keep the pull over a house saved while the index was on its way, and keeps the save", async () => {
-    await keepAfter(db, 0, withHouse);
+    await keepAfter(db, { scenario: "", version: 0 }, withHouse);
     const corrected = {
       ...withHouse,
       accounts: [
@@ -116,7 +116,7 @@ describe("pullHousePrices", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation(async () => {
-        await keepAfter(db, 1, corrected);
+        await keepAfter(db, { scenario: "", version: 1 }, corrected);
         return new Response(file);
       }),
     );
@@ -126,7 +126,7 @@ describe("pullHousePrices", () => {
         "The house changed while its prices were pulled, so nothing was kept; pull them again",
       ),
     );
-    expect(await readLatest(db)).toStrictEqual({
+    expect(await readLatest(db, "")).toStrictEqual({
       household: corrected,
       version: 2,
     });
@@ -138,19 +138,23 @@ describe("pullHousePrices", () => {
   // writes it back with the year its milestone gives.
   it("keeps the pull over a house whose move was saved with a year its milestone has moved from", async () => {
     registrySends(new Response(file));
-    await keepAfter(db, 0, {
-      ...withHouse,
-      accounts: [
-        ...kept.accounts.slice(0, 3),
-        { ...house, move: { ...move, year: 2044 } },
-        houseLoan,
-      ],
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...withHouse,
+        accounts: [
+          ...kept.accounts.slice(0, 3),
+          { ...house, move: { ...move, year: 2044 } },
+          houseLoan,
+        ],
+      },
+    );
 
     expect(await pullHousePrices()).toMatchObject(
       saved({ name: "Home", worth: 368635 }),
     );
-    expect((await readLatest(db))?.household).toMatchObject({
+    expect((await readLatest(db, ""))?.household).toMatchObject({
       accounts: [
         ...kept.accounts.slice(0, 3),
         { ...house, balance: 368635, move },
@@ -161,17 +165,21 @@ describe("pullHousePrices", () => {
 
   it("refuses an index running to a month before the one already pulled, and keeps nothing", async () => {
     registrySends(new Response(file));
-    await keepAfter(db, 0, {
-      ...withHouse,
-      housePrices: { ...withHouse.housePrices, to: { month: 7, year: 2026 } },
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...withHouse,
+        housePrices: { ...withHouse.housePrices, to: { month: 7, year: 2026 } },
+      },
+    );
 
     expect(await pullHousePrices()).toStrictEqual(
       refused(
         "The Land Registry's index runs to July 2026, before the August 2026 already pulled",
       ),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
   // The fixture's home is a real asset, so the reference household
@@ -184,28 +192,32 @@ describe("pullHousePrices", () => {
       refused("No house is listed, so there is nothing to revalue"),
     );
 
-    await keepAfter(db, 0, kept);
+    await keepAfter(db, { scenario: "", version: 0 }, kept);
 
     expect(await pullHousePrices()).toStrictEqual(
       refused("No house is listed, so there is nothing to revalue"),
     );
     expect(fetch).not.toHaveBeenCalled();
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
   it("refuses before asking the Registry while the household lists two houses, and keeps nothing", async () => {
     const fetch = registrySends(new Response(file));
-    await keepAfter(db, 0, {
-      ...withHouse,
-      accounts: [...withHouse.accounts, { ...house, id: 20, name: "Flat" }],
-      next: 21,
-    });
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...withHouse,
+        accounts: [...withHouse.accounts, { ...house, id: 20, name: "Flat" }],
+        next: 21,
+      },
+    );
 
     expect(await pullHousePrices()).toStrictEqual(
       refused("The points carry one house, and the household lists 2 houses"),
     );
     expect(fetch).not.toHaveBeenCalled();
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
   it("refuses when the Registry does not answer, and keeps nothing", async () => {
@@ -213,21 +225,21 @@ describe("pullHousePrices", () => {
       "fetch",
       vi.fn().mockRejectedValue(new TypeError("fetch failed")),
     );
-    await keepAfter(db, 0, withHouse);
+    await keepAfter(db, { scenario: "", version: 0 }, withHouse);
 
     expect(await pullHousePrices()).toStrictEqual(
       refused("The Land Registry did not send its house price index"),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
   it("refuses an answer no index can be read from, in the reader's words, and keeps nothing", async () => {
     registrySends(new Response("<html>Service unavailable</html>"));
-    await keepAfter(db, 0, withHouse);
+    await keepAfter(db, { scenario: "", version: 0 }, withHouse);
 
     expect(await pullHousePrices()).toStrictEqual(
       refused("The Land Registry's answer is not its house price index"),
     );
-    expect(await readLatest(db)).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 });
