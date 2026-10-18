@@ -519,7 +519,17 @@ export function movedYears(
 // each is carried from month to month rather than read afresh, and so
 // are the owners who have drawn on a pension as income, since from the
 // month after their pension allowance is the money purchase one for the
-// rest of the plan, which the flow is handed with the month. Each
+// rest of the plan, which the flow is handed with the month. So is
+// what has landed under each owner's ISA and pension allowances since
+// the tax year opened, which the flow adds to as it pays them, so a
+// month opens each allowance at what the year has left of it: a month
+// short of spare money leaves its share to the months after it, and a
+// bonus month can fill what the months before it left. It starts again
+// each April with the tax year, and the months of the plan's first tax
+// year before it opened, which hold nothing the projection paid, are
+// taken to have used a twelfth each, as the flow takes them, rather
+// than leave the months left of a year already part-spent the whole of
+// it. Each
 // month is taxed as a twelfth of a year, which overcharges a tax year
 // whose months are not alike, the one a salary stops in above all, so
 // the projection carries each owner's tax year as well, what its
@@ -611,6 +621,7 @@ export function project(
   let allowances: ReadonlyMap<number, number> = new Map();
   let drawn: ReadonlySet<number> = new Set();
   let taxYears: ReadonlyMap<number, TaxYear> = new Map();
+  let used: ReadonlyMap<string, number> = new Map();
   let moved: Run = { accounts, plan, schedule };
   let retired: null | number = null;
   const conditions = retiresOn(plan);
@@ -677,6 +688,7 @@ export function project(
             : 0;
         if (month === april) {
           taxYears = new Map();
+          used = new Map();
         }
         const flow = cashFlow(carried.accounts, carried.schedule, {
           at,
@@ -684,7 +696,14 @@ export function project(
           plan: carried.plan,
           reserve: reserveOf(held),
           settlement: settlement - due,
+          used,
         });
+        used = new Map([
+          ...used,
+          ...[...flow.landed].map(
+            ([held, landed]) => [held, (used.get(held) ?? 0) + landed] as const,
+          ),
+        ]);
         const draw = drawnFrom(held, Math.max(0, -flow.left), {
           allowances,
           at,
