@@ -15,7 +15,7 @@ import {
 import { retiringAt } from "@/data/milestones";
 import { sam, working } from "@/data/owners.fixture";
 
-import type { CashFlow, Schedule } from "./cash-flow";
+import type { CashFlow, Paid, Schedule } from "./cash-flow";
 
 import { cashFlow, inTodaysMoney, totalsOf } from "./cash-flow";
 
@@ -975,6 +975,99 @@ describe("cashFlow", () => {
     ]);
     expect(pennies(flow.relief)).toStrictEqual([
       { account: topped, amount: 166.67 },
+    ]);
+  });
+
+  // A £150,000 base with a £60,000 bonus paid in February and three
+  // tenths of the base sacrificed is £210,000 of threshold income and
+  // £216,750 of adjusted income over the year, under £260,000, so the
+  // allowance is whole, £5,000 a month, and the £4,312.50 the sacrifice
+  // lands is within it in February as in January: each month is taxed on
+  // what it paid alone. Twelve of February's £72,500 would have read as
+  // £870,000 and tapered the allowance to its floor.
+  it("tapers nothing in a bonus month that the year's pay would not", () => {
+    const bonused: IncomeLine = {
+      ...salary,
+      amount: 150000,
+      bonus: 60000,
+      bonusCadence: "year",
+      bonusMonth: 1,
+      rsu: 0,
+      sacrifice: 0.3,
+    };
+    const taxableIn = (month: number): number =>
+      cashFlow(
+        [pension],
+        { expenses: [], income: [bonused] },
+        { at: { month, year: 2026 }, plan },
+      ).taxable;
+
+    expect(taxableIn(0)).toBeCloseTo(12500 - 3750, 8);
+    expect(taxableIn(1)).toBeCloseTo(72500 - 3750, 8);
+  });
+
+  // A £240,000 base starting in 2027 with a £60,000 bonus paid in
+  // February and a quarter of the base sacrificed is read in January,
+  // its first month and no bonus month, at its own year: £300,000 of
+  // threshold income and £309,000 of adjusted income, the £69,000 the
+  // sacrifice lands on top of the £240,000 paid, which takes £24,500
+  // off the allowance and leaves £2,958.33 a month. The £5,750 landed is
+  // £2,791.67 past it, charged on top of the £15,000 the month paid,
+  // where January's pay alone would have read as £249,000 and tapered
+  // nothing.
+  it("reads a line at its own year's pay from the first month it runs, its bonus with it", () => {
+    const starting: IncomeLine = {
+      ...salary,
+      amount: 240000,
+      bonus: 60000,
+      bonusCadence: "year",
+      bonusMonth: 1,
+      firstYear: 2027,
+      rsu: 0,
+      sacrifice: 0.25,
+    };
+    const flow = cashFlow(
+      [pension],
+      { expenses: [], income: [starting] },
+      { at: { month: 0, year: 2027 }, plan },
+    );
+
+    expect(flow.taxable).toBeCloseTo(15000 + 5750 - 35500 / 12, 8);
+  });
+
+  // £12,000 of base and a £36,000 bonus paid in February earn £48,000 a
+  // year, so the pension paid £1,000 a month out of taxed money is
+  // relieved on £4,000 a month, a twelfth of it, in January as in
+  // February: all of the £1,000 claims the basic rate back, £250, where
+  // January's £1,000 alone would have relieved £800 of it.
+  it("relieves a pension on a twelfth of its owner's year in every month, whenever the bonus is paid", () => {
+    const topped: Account = {
+      ...pension,
+      contribution: { amount: 1000, cadence: "month", kind: "fixed" },
+    };
+    const reliefIn = (month: number): readonly Paid[] =>
+      cashFlow(
+        [topped],
+        {
+          expenses: [],
+          income: [
+            {
+              ...plain,
+              amount: 12000,
+              bonus: 36000,
+              bonusCadence: "year",
+              bonusMonth: 1,
+            },
+          ],
+        },
+        { at: { month, year: 2026 }, plan },
+      ).relief;
+
+    expect(pennies(reliefIn(0))).toStrictEqual([
+      { account: topped, amount: 250 },
+    ]);
+    expect(pennies(reliefIn(1))).toStrictEqual([
+      { account: topped, amount: 250 },
     ]);
   });
 

@@ -154,8 +154,9 @@ interface Feeding {
 
 // What the payments out of the month are held to as they are made:
 // what is left of each allowance, in what lands, and what is left of
-// each owner's relief, in what lands with it, which opens at what that
-// owner's own earnings in the month relieve, by the owner's id, with
+// each owner's relief, in what lands with it, which opens at what a
+// twelfth of that owner's own earnings in a year relieves, by the
+// owner's id, with
 // the relief each pension has claimed so far.
 interface Purse {
   readonly relief: Paid[];
@@ -388,8 +389,10 @@ const nobody: ReadonlySet<number> = new Set();
 // income tax is. The allowance is each owner's own for the month:
 // £60,000, tapered by a pound for every two of adjusted income over
 // £260,000 to a floor of £10,000 for an owner whose threshold income is
-// over £200,000 as well, each read off the month's lines twelve times
-// over, the sacrifice counted back into the threshold income and what
+// over £200,000 as well, each read off what the lines running in the
+// month pay in a year, so a bonus paid in one month is counted once
+// rather than twelve times over, the sacrifice counted back into the
+// threshold income and what
 // it lands into the adjusted income; and once an owner has drawn on a
 // pension as income it is the money purchase allowance, £10,000, from
 // the month after for the rest of the plan, which the projection hands
@@ -515,7 +518,10 @@ export function cashFlow(
       reliefs: new Map(),
       relievable: new Map(
         [...Map.groupBy(running.filter(isEarned), byOwner)].map(
-          ([owner, lines]) => [owner, relievableOn(payOf(lines, fed, reading))],
+          ([owner, lines]) => [
+            owner,
+            relievableOn(evenPayOf(lines, fed, reading)),
+          ],
         ),
       ),
       rooms: new Map(
@@ -694,9 +700,12 @@ function accountAt(
 
 // A twelfth of an owner's pension allowance for the month: the money
 // purchase allowance for an owner who has drawn on a pension as income
-// before the month, whatever their incomes, and otherwise read off the
-// month's lines twelve times over, as the tax is charged on a twelfth
-// of a year: the adjusted income is what the owner's lines pay after
+// before the month, whatever their incomes, and otherwise read off what
+// the lines running in the month pay in a year, each its own year's at
+// its cadence and risen to the month, a bonus paid in one month counted
+// once rather than twelve times over, and a line starting in the year
+// read at its own year's pay: the adjusted income is what the owner's
+// lines pay after
 // the sacrifice with what their sacrifices land on top, which is the
 // employer's contributions, and the threshold income is that pay with
 // the sacrifice added back, as the law adds back a sacrifice arranged
@@ -713,7 +722,7 @@ function allowanceIn(
 ): number {
   const { drawn = nobody } = reading;
   const own = fed.filter((entry) => entry.line.owner === owner);
-  const pay = payOf(theirs, fed, reading);
+  const pay = evenPayOf(theirs, fed, reading);
   const sacrificed = own.reduce((sum, entry) => sum + entry.sacrificed, 0);
   return (
     pensionAllowanceOf({
@@ -816,6 +825,28 @@ function checkLinks(
       throw new Error(rules.paysDebt);
     }
   }
+}
+
+// A twelfth of what the lines given pay in a year, risen to the month
+// read: each line's year at its cadence, its bonus whenever in the year
+// it is paid, less what it gives up into the pension it feeds, which
+// is the base's alone and so even through the year. What the pension
+// allowance is tapered on and what a payment out of taxed money is
+// relieved on are read off this rather than off the month's pay, since
+// a bonus paid in one month is a year's bonus at once, and twelve of
+// that month would taper the allowance on pay the year never earns.
+function evenPayOf(
+  lines: readonly IncomeLine[],
+  fed: readonly Fed[],
+  reading: Reading,
+): number {
+  return lines.reduce(
+    (sum, line) =>
+      sum +
+      monthlyOf(line, totalOf(line), reading) -
+      (fed.find((entry) => entry.line === line)?.sacrificed ?? 0),
+    0,
+  );
 }
 
 // The fixed sum an account states a month, before the month is asked
@@ -980,8 +1011,8 @@ function payOf(
 }
 
 // What is left of the relief an account's owner may claim in the month,
-// in what lands with it: what the owner's own earnings in the month
-// relieve until a payment has claimed some of it, the £3,600 floor for
+// in what lands with it: what a twelfth of the owner's own earnings in
+// a year relieves until a payment has claimed some of it, the £3,600 floor for
 // an owner earning nothing, and nothing for an account that claims no
 // relief.
 function reliefIn(purse: Purse, account: Account): number {

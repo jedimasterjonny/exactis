@@ -305,8 +305,8 @@ export function reliefOf(account: { readonly kind: AccountKind }): number {
 }
 
 // The most a person's pensions may take in with relief in a month, on
-// what is paid out of taxed money, in what lands: what they earn in the
-// month, from a salary or from self-employment, or a twelfth of £3,600
+// what is paid out of taxed money, in what lands: a twelfth of what they
+// earn in a year, from a salary or from self-employment, or of £3,600
 // when they earn less, even nothing, so a month earning nothing
 // relieves £300. What a salary sacrifices is not earned, being given up
 // before it is paid, and a pension or any other income earns no relief
