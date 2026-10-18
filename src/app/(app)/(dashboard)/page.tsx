@@ -9,7 +9,12 @@ import { Badge } from "@/components/kit/badge";
 import { vintageMonth } from "@/data/cma";
 import { endAge } from "@/data/plan";
 import { dashboard, sectionLabel } from "@/lib/nav";
-import { getHousehold, getScenario, getScenarios } from "@/store/household";
+import {
+  getBaseline,
+  getHousehold,
+  getScenario,
+  getScenarios,
+} from "@/store/household";
 
 // The dashboard, over the accounts, the lines, the milestones, the plan
 // and the spread its rates carry, read from the store behind the
@@ -32,13 +37,17 @@ import { getHousehold, getScenario, getScenarios } from "@/store/household";
 // plan runs to, so the whole of it renders behind the loading screen
 // beside it rather than the chart alone. The scenarios' menu sits in the
 // header beside the assumptions, given the scenario open and every one
-// kept, read with the household.
+// kept, read with the household. While a scenario is open the household
+// itself is read too, and the board sets the scenario against it: its
+// accounts, milestones, plan, lines and spread, which is all the board
+// projects, rather than the whole household carried to the browser.
 export default async function Dashboard(): Promise<JSX.Element> {
   const [
     { accounts, cma, milestones, plan, rateSet, schedule, spread },
     scenario,
     scenarios,
   ] = await Promise.all([getHousehold(), getScenario(), getScenarios()]);
+  const baseline = scenario === null ? undefined : await getBaseline();
   const age = String(endAge(plan));
   // The store refuses a household running on the CMA's rates with no CMA
   // pulled, so a vintage is always there to name; the check on it is for
@@ -65,6 +74,15 @@ export default async function Dashboard(): Promise<JSX.Element> {
       <ScreenBody>
         <ProjectionBoard
           accounts={accounts}
+          against={
+            baseline && {
+              accounts: baseline.accounts,
+              milestones: baseline.milestones,
+              plan: baseline.plan,
+              schedule: baseline.schedule,
+              spread: baseline.spread,
+            }
+          }
           milestones={milestones}
           plan={plan}
           schedule={schedule}

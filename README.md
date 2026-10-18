@@ -369,11 +369,17 @@ projection entering that year. A second tile reads the plan's net worth entering
 its last year, at its own rates: the one figure the chance of success's futures
 spread either side of, and the one its screen sets the middle future against.
 The header names the set of rates the plan runs on, the CMA's vintage with it
-when that set is live. The reads every screen goes through, one read of the
-latest version a request, and the save every action makes live under
-`src/store`, and the server actions a save goes to under `src/actions`: neither
-is a route, and the organisms that save through an action sit beneath the
-routes.
+when that set is live. While a scenario is open the dashboard reads the
+household too and sets the scenario beside it: the browser projects both and
+draws futures for both, each tile carries what the scenario differs from the
+household by, the milestone and the net worth in pounds and the chance of
+success in percentage points, and the chart draws the household's total on the
+basis it counts as a dashed line over the scenario's columns, named Household
+under the crosshair. The retirement age dragged there is the scenario's, and
+saves to it. The reads every screen goes through, one read of the latest version
+a request, and the save every action makes live under `src/store`, and the
+server actions a save goes to under `src/actions`: neither is a route, and the
+organisms that save through an action sit beneath the routes.
 
 The net worth and the liquid net worth the tiles, the milestones and the chance
 of success read count a pension as drawn at the basic rate, which is what a draw

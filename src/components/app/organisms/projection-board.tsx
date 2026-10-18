@@ -8,10 +8,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Run } from "@/components/app/organisms/chance-tile";
 import type { Account } from "@/data/accounts";
 import type { Shortfall } from "@/data/cma";
-import type { Milestone } from "@/data/milestones";
+import type { Measured, Milestone } from "@/data/milestones";
 import type { Plan, Spread } from "@/data/plan";
 import type { Tie } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
+import type { Future } from "@/engine/futures";
+import type { ProjectionPoint } from "@/engine/projection";
 
 import { saveAges } from "@/actions/plan";
 import { MilestoneChips } from "@/components/app/atoms/milestone-chips";
@@ -42,8 +44,22 @@ import { useFutures } from "@/hooks/use-futures";
 import { useSender } from "@/hooks/use-sender";
 import { formatGbp } from "@/lib/money";
 
-interface BoardProps extends Omit<ProjectionBoardProps, "spread"> {
+interface BoardProps extends Planned {
+  readonly against?: Compared | undefined;
   readonly run: Run;
+}
+
+// The household a scenario is set against, and its run of the futures.
+interface Compared {
+  readonly household: Planned;
+  readonly run: Run;
+}
+
+// What the scenario's milestone tile and net worth tile differ from the
+// household's by, where a household is set against the board.
+interface Deltas {
+  readonly at: number | undefined;
+  readonly end: number | undefined;
 }
 
 // An age moved on the board and not yet known to be in the store, and
@@ -51,6 +67,23 @@ interface BoardProps extends Omit<ProjectionBoardProps, "spread"> {
 interface Draft {
   readonly age: number;
   readonly over: number;
+}
+
+// What the futures are drawn over, and the run they make, as far as it
+// has been drawn, or why it cannot be.
+interface FuturesProps extends Planned {
+  readonly children: (run: Run) => JSX.Element;
+  readonly spread: Shortfall | Spread;
+}
+
+// What the board reads the scenario's tiles from: what the plan holds
+// entering the year of the milestone chosen, the milestone, the measure
+// read, and the plan's future.
+interface Mine {
+  readonly at: Measured | undefined;
+  readonly chosen: Tie | undefined;
+  readonly measure: Exclude<keyof Measured, "age">;
+  readonly projected: Future;
 }
 
 // A save waiting for the age to settle: the timer that sends it, and
@@ -62,11 +95,25 @@ interface Pending {
   readonly timer: ReturnType<typeof setTimeout>;
 }
 
-interface ProjectionBoardProps {
+// What a plan is projected over.
+interface Planned {
   readonly accounts: readonly Account[];
   readonly milestones: readonly Milestone[];
   readonly plan: Plan;
   readonly schedule: Schedule;
+}
+
+// A plan's projection, the future it reads as, and the plan as that
+// future lays it out.
+interface Projected {
+  readonly laid: Plan;
+  readonly points: readonly ProjectionPoint[];
+  readonly projected: Future;
+}
+
+interface ProjectionBoardProps extends Planned {
+  readonly against?:
+    (Pick<ProjectionBoardProps, "spread"> & Planned) | undefined;
   readonly spread: Shortfall | Spread;
 }
 
@@ -143,27 +190,46 @@ export const settle = 400;
 // what the store holds, read afresh, and says why under a toast. A
 // retirement on conditions has no age to drag, so the row says what it
 // is reached on instead, as the plan screen's milestones say it.
+// Given the household a scenario is set against, as the dashboard is
+// while one is open, the board projects the household too and draws its
+// futures beside the scenario's, and each tile carries what the
+// scenario differs from the household by: the milestone chosen read on
+// the same measure where the household reaches it, in pounds; the
+// chance of success, in percentage points, once both runs are drawn;
+// and the net worth at the end of each plan, in pounds. The chart draws
+// the household's line over the scenario's stack. The retirement age
+// dragged here is the scenario's, and saves to it.
 export function ProjectionBoard({
+  against,
   spread,
   ...props
 }: ProjectionBoardProps): JSX.Element {
-  if ("short" in spread) {
-    return (
-      <Board {...props} run={{ unrun: "No spread to draw the futures from" }} />
-    );
-  }
-  if (!props.accounts.some(takesSpare)) {
-    return (
-      <Board {...props} run={{ unrun: "No savings for the futures to grow" }} />
-    );
-  }
-  return <Drawn {...props} spread={spread} />;
+  return (
+    <Futures {...props} spread={spread}>
+      {(run) =>
+        against === undefined ? (
+          <Board {...props} run={run} />
+        ) : (
+          <Futures {...against}>
+            {(theirs) => (
+              <Board
+                {...props}
+                against={{ household: against, run: theirs }}
+                run={run}
+              />
+            )}
+          </Futures>
+        )
+      }
+    </Futures>
+  );
 }
 
 // The board over the tiles and the chart, handed the run as far as it
 // has been drawn, or why it cannot be.
 function Board({
   accounts,
+  against,
   milestones,
   plan,
   run,
@@ -192,28 +258,34 @@ function Board({
     () => (retiresOn(plan) === undefined ? retiringAt(plan, retires) : plan),
     [plan, retires],
   );
-  const { laid, points, projected } = useMemo(() => {
-    const lines = {
-      expenses: schedule.expenses.map((line) =>
-        timed(line, milestones, drafted),
-      ),
-      income: schedule.income.map((line) => timed(line, milestones, drafted)),
-    };
-    const projection = project(accounts, lines, drafted);
-    const run = { accounts, plan: drafted, schedule: lines };
-    const future = futureOf(projection, run);
+  const { laid, points, projected } = useMemo(
+    () => projectionOf({ accounts, milestones, plan: drafted, schedule }),
+    [accounts, drafted, milestones, schedule],
+  );
+  // The household's, where a scenario is set against it, projected as
+  // the store holds it, so it does not move as the scenario's age is
+  // dragged; with what the chart counts of it.
+  const household = against?.household;
+  const theirs = useMemo(() => {
+    if (household === undefined) {
+      return undefined;
+    }
+    const projection = projectionOf(household);
     return {
-      laid: carriedBy(run, future.retired ?? endYear(drafted) + 1).plan,
-      points: projection,
-      projected: future,
+      ...projection,
+      drawn: {
+        accounts: household.accounts,
+        plan: household.plan,
+        points: projection.points,
+      },
     };
-  }, [accounts, drafted, milestones, schedule]);
+  }, [household]);
   const isProjecting = points.some(holdsAnything);
   // The milestones are placed by the futures drawn so far, so a chip
   // and a line move as the slices land; while the run is drawn, the
   // ones it has yet to place are said to be coming, and once it is,
   // the ones it never placed give the share of the run that reach them.
-  const drawn = "unrun" in run ? [] : run.futures;
+  const drawn = futuresIn(run);
   const markers = isProjecting
     ? markersIn(drawn, milestones, laid).filter(({ year }) =>
         points.some((point) => point.year === year),
@@ -255,6 +327,11 @@ function Board({
     condition === undefined || condition.measure === "age"
       ? "worth"
       : condition.measure;
+  const deltas = deltasOf(
+    { at, chosen: chosen?.id, measure, projected },
+    against,
+    theirs,
+  );
   const lastWorking =
     projected.retired === null
       ? "Not retired by the plan's end"
@@ -317,15 +394,22 @@ function Board({
         ) : (
           <StatTile
             caption={`${measureNames[measure]} · ${String(chosen.year)} · age ${String(at.age)}`}
+            delta={deltas.at}
             icon={Flag}
             label={`At ${chosen.name}`}
             tone="inverse"
             value={formatGbp(at[measure])}
           />
         )}
-        <ChanceTile milestones={milestones} plan={plan} run={run} />
+        <ChanceTile
+          against={against?.run}
+          milestones={milestones}
+          plan={plan}
+          run={run}
+        />
         <StatTile
           caption="At the plan's own rates"
+          delta={deltas.end}
           icon={Landmark}
           isHiddenOnPhone
           label={`Net worth at ${String(endAge(plan))}`}
@@ -334,6 +418,7 @@ function Board({
       </TileGrid>
       <ProjectionChart
         accounts={accounts}
+        against={theirs?.drawn}
         choices={
           chosen === undefined ? undefined : (
             <MilestoneChips
@@ -372,17 +457,96 @@ function Board({
   );
 }
 
-// The board over the futures as they are drawn, at the spread given.
+// What the scenario's milestone tile and net worth tile differ from the
+// household's by: the milestone chosen, on the same measure, against
+// what the household holds entering the year its own run reaches it,
+// where it does; and the net worth at the end of each plan. Nothing for
+// either where no household is set against the board.
+function deltasOf(
+  { at, chosen, measure, projected }: Mine,
+  against: Compared | undefined,
+  theirs: Projected | undefined,
+): Deltas {
+  if (against === undefined || theirs === undefined) {
+    return { at: undefined, end: undefined };
+  }
+  const year = markersIn(
+    futuresIn(against.run),
+    against.household.milestones,
+    theirs.laid,
+  ).find(({ id }) => id === chosen)?.year;
+  const held =
+    theirs.projected.measured[
+      theirs.points.findIndex((point) => point.year === year)
+    ];
+  return {
+    at:
+      at === undefined || held === undefined
+        ? undefined
+        : at[measure] - held[measure],
+    end: endWorthOf(projected) - endWorthOf(theirs.projected),
+  };
+}
+
+// What is drawn over the futures as they are drawn, at the spread
+// given, in a component of its own so the hook is never called on a
+// condition, and a second run, the household's, is a second of these.
 function Drawn({
+  children,
   spread,
   ...props
-}: Omit<ProjectionBoardProps, "spread"> & {
-  readonly spread: Spread;
-}): JSX.Element {
+}: Omit<FuturesProps, "spread"> & { readonly spread: Spread }): JSX.Element {
   const { futures, isDone } = useFutures(props.accounts, props.schedule, {
     count: runLength,
     plan: props.plan,
     spread,
   });
-  return <Board {...props} run={{ futures, isDone }} />;
+  return children({ futures, isDone });
+}
+
+// What is drawn over a plan's run of the futures: the futures as they
+// are drawn, or why there are none, while the plan has no spread or no
+// savings for them to grow.
+function Futures({ children, spread, ...props }: FuturesProps): JSX.Element {
+  if ("short" in spread) {
+    return children({ unrun: "No spread to draw the futures from" });
+  }
+  if (!props.accounts.some(takesSpare)) {
+    return children({ unrun: "No savings for the futures to grow" });
+  }
+  return (
+    <Drawn {...props} spread={spread}>
+      {children}
+    </Drawn>
+  );
+}
+
+// The futures a run has drawn so far, or none while there is nothing to
+// draw them at.
+function futuresIn(run: Run): readonly Future[] {
+  return "unrun" in run ? [] : run.futures;
+}
+
+// A plan's projection over its lines, each laid by its milestones, read
+// as a future each year measured as a milestone measures one, and the
+// plan as that future lays it out, retiring where it retired or past
+// its end where it never did.
+function projectionOf({
+  accounts,
+  milestones,
+  plan,
+  schedule,
+}: Planned): Projected {
+  const lines = {
+    expenses: schedule.expenses.map((line) => timed(line, milestones, plan)),
+    income: schedule.income.map((line) => timed(line, milestones, plan)),
+  };
+  const projection = project(accounts, lines, plan);
+  const run = { accounts, plan, schedule: lines };
+  const future = futureOf(projection, run);
+  return {
+    laid: carriedBy(run, future.retired ?? endYear(plan) + 1).plan,
+    points: projection,
+    projected: future,
+  };
 }
