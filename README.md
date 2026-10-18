@@ -177,7 +177,7 @@ the owner's income at their marginal rate, the annual allowance charge, and
 settled with the tax year as the rest of the income tax is. The pension
 allowance is tapered by a pound for every two of adjusted income over £260,000,
 to £10,000, for an owner whose threshold income is over £200,000 as well, each
-read off the month's lines twelve times over, the sacrifice counted back into
+read off the year's pay, not a month's, the sacrifice counted back into
 threshold income and what the salary lands in the pension into adjusted income;
 what is paid into a pension out of taxed money is not taken off threshold
 income, so an owner within those payments of £200,000 is tapered a little early.
