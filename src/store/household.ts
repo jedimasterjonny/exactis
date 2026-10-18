@@ -146,6 +146,17 @@ export async function getSourcesDaysAgo(days: number): Promise<Before | null> {
       };
 }
 
+// The household held on the branch open, with the branch and the
+// version it is there, read afresh, as a save reads it, so a cookie
+// naming a scenario no longer kept is refused as a save's is: for an
+// action that writes from the household open other than through amend,
+// as a scenario is made from it. The session is checked first, as every
+// read's is.
+export async function readHeld(): Promise<Held & Read> {
+  await requireSession();
+  return heldIn(await readOpen(true));
+}
+
 // The latest version kept on a branch, or the household before anything
 // is saved, its balances as of the end of the month before this one, so
 // that its plan starts in this one, held to every rule as it is today,

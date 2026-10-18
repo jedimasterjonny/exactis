@@ -27,16 +27,29 @@ export interface Version {
 // being the scenario with no name, and none defaults it, so a branch
 // forgotten is a type error rather than a save written to the household.
 
-// Drops every version of a scenario. The household is never dropped,
-// which the trigger holds too; asking to is a bug, so it fails here
-// before the store is asked.
-export async function dropScenario(db: Database, name: string): Promise<void> {
+// Drops the versions of a scenario: every one, or those up to and
+// including the version given, so a version saved after the one an
+// adoption read is left rather than dropped unseen. The household is
+// never dropped, which the trigger holds too; asking to is a bug, so it
+// fails here before the store is asked.
+export async function dropScenario(
+  db: Database,
+  name: string,
+  through?: number,
+): Promise<void> {
   if (name === "") {
     throw new Error("The household is never dropped");
   }
   await db
     .delete(householdVersions)
-    .where(eq(householdVersions.scenario, name));
+    .where(
+      and(
+        eq(householdVersions.scenario, name),
+        through === undefined
+          ? undefined
+          : lte(householdVersions.version, through),
+      ),
+    );
 }
 
 // Keeps the household as the version after the one the save read on its
