@@ -90,9 +90,19 @@ export interface MovedYear {
 // prices have risen by the start of the point's year, and a month's
 // shortfall or early draw by how far they have risen by that month,
 // before either is summed. So a balance that keeps pace with prices
-// reads level, and the first point is the balances as they are.
+// reads level, and the first point is the balances as they are. Beside
+// the balances is what is left of each owner's lump sum allowance as
+// the year opens, by the owner's id, an owner who has not drawn on a
+// pension holding the whole of it, whole pounds as the balances are, so
+// a pension can be read at what drawing it would leave. The allowance
+// is frozen in nominal pounds while the balances are read in today's
+// money, so it is divided by how far prices have risen by the start of
+// the year as they are, and the quarter it caps is capped against like
+// money: left in nominal pounds, an allowance decades out would read as
+// worth more than it is beside the balance it caps.
 export interface ProjectionPoint {
   readonly age: number;
+  readonly allowances: Readonly<Record<number, number>>;
   readonly balances: Readonly<Record<number, number>>;
   readonly deferred: number;
   readonly early: number;
@@ -559,6 +569,12 @@ export function project(
         Math.round(balance / prices),
       ]),
     );
+    const left = Object.fromEntries(
+      plan.owners.map(({ id }) => [
+        id,
+        Math.round((allowances.get(id) ?? lumpSumAllowance) / prices),
+      ]),
+    );
     const moving = movesIn(moved, { balances }, opens);
     let due = 0;
     if (moving.run !== moved) {
@@ -655,6 +671,7 @@ export function project(
     }
     return {
       age,
+      allowances: left,
       balances,
       deferred,
       early: upToPound(early),

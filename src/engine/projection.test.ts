@@ -68,6 +68,7 @@ function point(
 ): ProjectionPoint {
   return {
     age: year - plan.born,
+    allowances: { [working.id]: lumpSumAllowance },
     balances,
     deferred: 0,
     early: 0,
@@ -830,6 +831,9 @@ describe("project", () => {
   // are drawn as income and the nine months after early, £2,222.22 each
   // and £20,000 in all, read to the penny rather than rounded up from
   // the residue of adding them. 2029 reaches 57 and is income again.
+  // Each draw as income takes its £250 off the lump sum allowance, £3,000
+  // over a year of them and £750 over 2028's three, and an early one
+  // takes nothing.
   it("draws a pension as income from 55 until the pension age rises in April 2028, and from 57 after", () => {
     expect(
       project([{ ...sipp, balance: 100000 }], short, {
@@ -839,9 +843,26 @@ describe("project", () => {
       }),
     ).toStrictEqual([
       point(2027, { 7: 100000 }, { age: 55, deferred: 100000 }),
-      point(2028, { 7: 88000 }, { age: 56, deferred: 88000, early: 20000 }),
-      point(2029, { 7: 65000 }, { age: 57, deferred: 65000 }),
-      point(2030, { 7: 53000 }, { age: 58, deferred: 53000 }),
+      point(
+        2028,
+        { 7: 88000 },
+        {
+          age: 56,
+          allowances: { [working.id]: 265275 },
+          deferred: 88000,
+          early: 20000,
+        },
+      ),
+      point(
+        2029,
+        { 7: 65000 },
+        { age: 57, allowances: { [working.id]: 264525 }, deferred: 65000 },
+      ),
+      point(
+        2030,
+        { 7: 53000 },
+        { age: 58, allowances: { [working.id]: 261525 }, deferred: 53000 },
+      ),
     ]);
   });
 
@@ -850,7 +871,8 @@ describe("project", () => {
   // £1,396.67 is taxed nothing, its taxed three quarters inside a
   // twelfth of the personal allowance, and each pound after keeps 85p,
   // the basic rate taken off three quarters of it. Twelve of them are
-  // £39,395.29, leaving 60,604.71.
+  // £39,395.29, leaving 60,604.71, and a quarter of them, £9,848.82, is
+  // taken off the lump sum allowance.
   it("grosses a pension draw up so what is left of it once taxed covers the month", () => {
     const drawn: Account = { ...sipp, balance: 100000 };
 
@@ -862,7 +884,11 @@ describe("project", () => {
       ),
     ).toStrictEqual([
       point(2026, { 7: 100000 }, { age: 66, deferred: 100000 }),
-      point(2027, { 7: 60605 }, { age: 67, deferred: 60605 }),
+      point(
+        2027,
+        { 7: 60605 },
+        { age: 67, allowances: { [working.id]: 258426 }, deferred: 60605 },
+      ),
     ]);
   });
 
@@ -1012,9 +1038,10 @@ describe("project", () => {
   // income tax and £156.20 of NI, and the £46.70 it is short is drawn
   // from the SIPP as income, since the owner, born in 1960, is past the
   // pension age: £54.94, each pound keeping 85p in the basic rate band
-  // with a quarter of it free. That draw is a flexible access, so from
-  // February the owner's allowance is the £10,000 money purchase one,
-  // £833.33 a month, which the £1,725 is £891.67 past; the month is
+  // with a quarter of it free, £13.74 off the lump sum allowance. That
+  // draw is a flexible access, so from February the owner's allowance
+  // is the £10,000 money purchase one, £833.33 a month, which the £1,725
+  // is £891.67 past; the month is
   // taxed on £1,500 and that £891.67, £268.83 at the basic rate where
   // the £1,500 alone pays £90.50, and with £36.20 of NI leaves
   // £1,194.97 for the ISA, £13,144.63 over the eleven months, while the
@@ -1047,7 +1074,12 @@ describe("project", () => {
       point(
         2027,
         { 2: 13145, 7: 118920 },
-        { age: 67, deferred: 118920, free: 13145 },
+        {
+          age: 67,
+          allowances: { [working.id]: 268261 },
+          deferred: 118920,
+          free: 13145,
+        },
       ),
     ]);
     expect(over([]).at(-1)).toStrictEqual(
@@ -1488,6 +1520,24 @@ describe("project", () => {
         ({ early }) => early,
       ),
     ).toStrictEqual([26667, 26667, 0]);
+  });
+
+  // Neither owner draws on a pension, so each holds the whole £268,275
+  // in nominal pounds, which at 10% a year is £243,886 of today's money
+  // entering 2027 and £221,715 entering 2028.
+  it("carries each owner's lump sum allowance left on the point in today's money", () => {
+    expect(
+      project([], funded, {
+        ...plan,
+        inflation: 0.1,
+        owners: [working, sam],
+        years: 2,
+      }).map(({ allowances }) => allowances),
+    ).toStrictEqual([
+      { [sam.id]: 268275, [working.id]: 268275 },
+      { [sam.id]: 243886, [working.id]: 243886 },
+      { [sam.id]: 221715, [working.id]: 221715 },
+    ]);
   });
 
   // Read from April 2030 at 3%, £36,000 a year fixed in nominal terms
