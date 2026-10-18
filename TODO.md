@@ -32,12 +32,12 @@ rest are figures to add as the plan needs them.
 
 The month's income pays income tax and the employee's NI, a pension draw is
 grossed up for its tax and each tax year is settled in the April after it, so
-what is spare is after tax. What a pension is worth is not: the chart sums a
-pension and an ISA as if worth the same, the pension gross of what taking it out
-would cost. And the draw order is the one that was right before tax, cash, then
-the GIA, then the ISA, then the pension, where filling the personal allowance
-from the pension before the ISA is touched pays less over a life; with draws
-taxed, the engine can now weigh the two, and does not.
+what is spare is after tax, and a pension is counted as drawn at the basic rate,
+a quarter free of tax as far as its owner's lump sum allowance reaches. The draw
+order is not: it is the one that was right before tax, cash, then the GIA, then
+the ISA, then the pension, where filling the personal allowance from the pension
+before the ISA is touched pays less over a life; with draws taxed, the engine
+can now weigh the two, and does not.
 
 Smaller gaps sit beside those. The employer's NI is credited at the full rate on
 the whole sacrifice, ignoring the threshold and what the scheme passes on, and
@@ -60,12 +60,13 @@ The pension age is read off the year its owner was born and not the day, so the
 whole of the year an age is reached counts as reaching it, and a protected
 pension age some schemes give is not held. A refund a month has no account to
 take goes where any money the month leaves goes, which is nowhere the projection
-counts.
+counts. What a pension is worth is counted at the basic rate on the three
+quarters taxed, where a draw meets the rate of the year it is taken in beside
+what else is earned then. A progress point's pensions are read gross, as the
+sheet summed them, since a point pools pensions without owners.
 
-Decide what a pension is worth beside an ISA once the tax on taking it out is
-counted, and the order the plan draws in, so the projection's two lines and its
-drawdown are both after tax; the smaller gaps are figures to add as the plan
-needs them.
+Decide the order the plan draws in, so its drawdown is after tax as its worth
+is; the smaller gaps are figures to add as the plan needs them.
 
 ## Debt
 
