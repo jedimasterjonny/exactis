@@ -8,7 +8,7 @@ import { MonthEnd } from "@/components/app/organisms/month-end";
 import { moveChoices } from "@/data/houses";
 import { markersOf } from "@/data/milestones";
 import { laidOut } from "@/engine/projection";
-import { balanceOf } from "@/lib/ledger";
+import { balanceOf, drawingTaxOf } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
 import { formatMonth, monthBefore, thisMonth, today } from "@/lib/months";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
@@ -62,7 +62,7 @@ export default async function Accounts(): Promise<JSX.Element> {
         label={sectionLabel(accountsAndAssets)}
         title={accountsAndAssets.title}
       >
-        {`Starting net worth ${formatGbp(balanceOf(accounts))} · balances as of the end of ${formatMonth(monthBefore({ month: plan.month, year: plan.from }))}`}
+        {`Starting net worth ${formatGbp(balanceOf(accounts) - drawingTaxOf(accounts))} · balances as of the end of ${formatMonth(monthBefore({ month: plan.month, year: plan.from }))}`}
       </ScreenHeader>
       <ScreenBody>
         <BalanceDates accounts={accounts} today={day} />

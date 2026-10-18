@@ -142,7 +142,7 @@ describe("AccountLedger", () => {
         { name: "Mortgage" },
       ),
     ).toBeInTheDocument();
-    expect(within(sheet()).getByText("£950,771")).toHaveClass("figure");
+    expect(within(sheet()).getByText("£888,839")).toHaveClass("figure");
     expect(
       screen.queryByRole("button", { name: /^Move / }),
     ).not.toBeInTheDocument();
