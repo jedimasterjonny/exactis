@@ -17,7 +17,7 @@ describe("AppFrame", () => {
   it("frames the screen in the main landmark beside the wordmark, nav and motto", () => {
     stubViewport(1024);
     render(
-      <AppFrame>
+      <AppFrame banner={null}>
         <p>Screen</p>
       </AppFrame>,
     );
@@ -44,7 +44,7 @@ describe("AppFrame", () => {
   it("names the current screen's section in the bar above it on a phone", () => {
     stubViewport(390);
     render(
-      <AppFrame>
+      <AppFrame banner={null}>
         <p>Screen</p>
       </AppFrame>,
     );
@@ -60,7 +60,7 @@ describe("AppFrame", () => {
   it("offers sign-out as a form posting to its action", () => {
     stubViewport(1024);
     render(
-      <AppFrame>
+      <AppFrame banner={null}>
         <p>Screen</p>
       </AppFrame>,
     );
@@ -75,5 +75,22 @@ describe("AppFrame", () => {
     fireEvent.click(button);
 
     expect(signOut).toHaveBeenCalledOnce();
+  });
+
+  it("heads the main column with the banner it is handed, above the phone's bar", () => {
+    stubViewport(390);
+    render(
+      <AppFrame banner={<p>Banner</p>}>
+        <p>Screen</p>
+      </AppFrame>,
+    );
+
+    const main = screen.getByRole("main");
+
+    expect(
+      within(main)
+        .getAllByText(/^(Banner|Sect\. I · Dashboard|Screen)$/)
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual(["Banner", "Sect. I · Dashboard", "Screen"]);
   });
 });
