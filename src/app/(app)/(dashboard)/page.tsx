@@ -4,11 +4,12 @@ import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { PlanAssumptions } from "@/components/app/organisms/plan-assumptions";
 import { ProjectionBoard } from "@/components/app/organisms/projection-board";
+import { ScenarioMenu } from "@/components/app/organisms/scenario-menu";
 import { Badge } from "@/components/kit/badge";
 import { vintageMonth } from "@/data/cma";
 import { endAge } from "@/data/plan";
 import { dashboard, sectionLabel } from "@/lib/nav";
-import { getHousehold } from "@/store/household";
+import { getHousehold, getScenario, getScenarios } from "@/store/household";
 
 // The dashboard, over the accounts, the lines, the milestones, the plan
 // and the spread its rates carry, read from the store behind the
@@ -29,10 +30,15 @@ import { getHousehold } from "@/store/household";
 // chance of success, and nothing models an estate. It reads the store
 // from its header down, since the header is titled with the age the
 // plan runs to, so the whole of it renders behind the loading screen
-// beside it rather than the chart alone.
+// beside it rather than the chart alone. The scenarios' menu sits in the
+// header beside the assumptions, given the scenario open and every one
+// kept, read with the household.
 export default async function Dashboard(): Promise<JSX.Element> {
-  const { accounts, cma, milestones, plan, rateSet, schedule, spread } =
-    await getHousehold();
+  const [
+    { accounts, cma, milestones, plan, rateSet, schedule, spread },
+    scenario,
+    scenarios,
+  ] = await Promise.all([getHousehold(), getScenario(), getScenarios()]);
   const age = String(endAge(plan));
   // The store refuses a household running on the CMA's rates with no CMA
   // pulled, so a vintage is always there to name; the check on it is for
@@ -44,7 +50,12 @@ export default async function Dashboard(): Promise<JSX.Element> {
   return (
     <>
       <ScreenHeader
-        actions={<PlanAssumptions plan={plan} />}
+        actions={
+          <>
+            <ScenarioMenu names={scenarios} scenario={scenario} />
+            <PlanAssumptions plan={plan} />
+          </>
+        }
         label={sectionLabel(dashboard)}
         title={`${dashboard.title} ${age}`}
       >

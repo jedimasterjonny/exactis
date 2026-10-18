@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Household } from "@/data/household";
@@ -10,13 +10,24 @@ import { blank, kept } from "@/data/household.fixture";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
 import { forget } from "@/hooks/use-futures";
-import { getHousehold } from "@/store/household";
+import { getHousehold, getScenario, getScenarios } from "@/store/household";
 import { FuturesWorker } from "@/test/futures-worker";
 
 import Dashboard from "./page";
 
 vi.mock("@/actions/plan", () => ({ saveAges: vi.fn() }));
-vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
+vi.mock("@/actions/scenarios", () => ({
+  adoptScenario: vi.fn(),
+  createScenario: vi.fn(),
+  deleteScenario: vi.fn(),
+  enterScenario: vi.fn(),
+  leaveScenario: vi.fn(),
+}));
+vi.mock("@/store/household", () => ({
+  getHousehold: vi.fn(),
+  getScenario: vi.fn(),
+  getScenarios: vi.fn(),
+}));
 
 // The fixtures' records, laid over the household before anything is
 // saved as the store reads it. The fixture's plan runs to 2083 for
@@ -33,6 +44,8 @@ const household: Household = {
 describe("Dashboard", () => {
   beforeEach(() => {
     vi.mocked(getHousehold).mockResolvedValue(household);
+    vi.mocked(getScenario).mockResolvedValue(null);
+    vi.mocked(getScenarios).mockResolvedValue([]);
     // jsdom has no Worker, and the chance of success draws its futures on two.
     vi.stubGlobal("Worker", FuturesWorker);
     // Each test opens a page of its own, with no run kept from the last.
@@ -98,6 +111,23 @@ describe("Dashboard", () => {
     expect(
       screen.getByRole("button", { name: "Assumptions" }),
     ).toBeInTheDocument();
+  });
+
+  it("offers the scenarios kept in the header, the one open chosen", async () => {
+    vi.mocked(getScenario).mockResolvedValue("Retire early");
+    vi.mocked(getScenarios).mockResolvedValue(["Move house", "Retire early"]);
+
+    render(await Dashboard());
+
+    const menu = screen.getByRole("combobox", { name: "Scenario" });
+
+    expect(menu).toHaveValue("branch:Retire early");
+    expect(
+      within(menu)
+        .getAllByRole("option")
+        .map(({ textContent }) => textContent)
+        .slice(0, 3),
+    ).toStrictEqual(["Household", "Move house", "Retire early"]);
   });
 
   // The first tile reads the plan at retirement to begin with, and the

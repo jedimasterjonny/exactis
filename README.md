@@ -83,28 +83,30 @@ and the store afresh. The household itself is read beside a scenario for the
 dashboard to compare the two.
 
 The actions in `src/actions/scenarios.ts` make a scenario, enter one kept, leave
-it for the household, delete one and adopt one. A scenario is made from
-whichever branch is open, the household or another scenario, its latest version
-copied whole as the scenario's first, balances and progress points included, and
-is opened as it is made. Adopting one keeps the scenario's plan over the
-household's bookkeeping as the household's next version, under the household's
-own check that nothing was saved there since it was read, so what was recorded
-in the household while the scenario was explored is not rolled back. The
-bookkeeping is the household's: each account's balance and the day it was set,
-the month the balances are as of, the progress points, and what was pulled from
-outside, the house price index, the CMA and the inflation curve. The rest is the
-plan, and the scenario's: the owners, the accounts and what pays into them, the
-milestones, both schedules, the ages, the rates typed and which set is live, the
-split, the glide path, the deductions, and the target allocation and its
-mappings. Balances go by account: an account in both takes the household's, one
-the scenario added keeps its own, and one only the household holds is gone,
-since the scenario deleted it. The merge is held to every rule, as any save is.
-The versions of the scenario up to the one adopted are then dropped, so one
-saved to it since stays. The store runs no transaction, so the write comes first
-and the drop second: a drop that fails leaves a scenario already adopted, and
-nothing lost. While a scenario is open, a banner naming it heads every screen,
-with a button that leaves it for the household, so nothing is edited without
-saying where it is saved.
+it for the household, delete one and adopt one, and the dashboard's header
+offers them in one menu, which opens the household or any scenario kept, makes a
+new one, and asks before the one open is made the household or deleted. A
+scenario is made from whichever branch is open, the household or another
+scenario, its latest version copied whole as the scenario's first, balances and
+progress points included, and is opened as it is made. Adopting one keeps the
+scenario's plan over the household's bookkeeping as the household's next
+version, under the household's own check that nothing was saved there since it
+was read, so what was recorded in the household while the scenario was explored
+is not rolled back. The bookkeeping is the household's: each account's balance
+and the day it was set, the month the balances are as of, the progress points,
+and what was pulled from outside, the house price index, the CMA and the
+inflation curve. The rest is the plan, and the scenario's: the owners, the
+accounts and what pays into them, the milestones, both schedules, the ages, the
+rates typed and which set is live, the split, the glide path, the deductions,
+and the target allocation and its mappings. Balances go by account: an account
+in both takes the household's, one the scenario added keeps its own, and one
+only the household holds is gone, since the scenario deleted it. The merge is
+held to every rule, as any save is. The versions of the scenario up to the one
+adopted are then dropped, so one saved to it since stays. The store runs no
+transaction, so the write comes first and the drop second: a drop that fails
+leaves a scenario already adopted, and nothing lost. While a scenario is open, a
+banner naming it heads every screen, with a button that leaves it for the
+household, so nothing is edited without saying where it is saved.
 
 The plan is the first listed owner's, as the first listed account is the first
 paid: it runs to the age they reach, and the retirement its lines are tied to is
