@@ -8,18 +8,18 @@ import type { Slice } from "@/hooks/futures.worker";
 
 import { defaultSeed } from "@/engine/futures";
 
-// The run kept, and the seed every run is drawn from, held beside the
-// run rather than in it, since it is the module's and not the run's.
+// The runs kept, the one read last first, and the seed every one of
+// them is drawn from.
 interface Drawn {
-  readonly run: Kept;
+  readonly runs: readonly Kept[];
   readonly seed: number;
 }
 
-// The run drawn last, kept past the screen that drew it: what it was
-// drawn over, written out whole so a plan handed down again in new
-// objects reads as the plan it is, the slices of it drawn so far, each
-// at the place it falls in the run, a slice not yet drawn left empty,
-// and the futures the screens have been handed of them.
+// A run kept past the screen that drew it: what it was drawn over,
+// written out whole so a plan handed down again in new objects reads as
+// the plan it is, the slices of it drawn so far, each at the place it
+// falls in the run, a slice not yet drawn left empty, and the futures
+// the screens have been handed of them.
 interface Kept {
   readonly for: string;
   readonly futures: readonly Future[];
@@ -36,13 +36,23 @@ const handed = 200;
 
 // Nothing drawn, as a page opens with, and every run drawn from the
 // seed the engine draws from.
-const none: Drawn = {
-  run: { for: "", futures: [], slices: [] },
-  seed: defaultSeed,
-};
+const none: Drawn = { runs: [], seed: defaultSeed };
 
-// The screens reading the run kept, told when it changes.
+// The screens reading the runs kept, told when they change.
 const listeners = new Set<() => void>();
+
+// Nothing drawn of a run, which a screen reads until its run has some:
+// one array, so a screen handed it again is not drawn again.
+const nothing: readonly Future[] = [];
+
+// The keys of the runs the screens are reading, one for each screen.
+const reading: string[] = [];
+
+// How many runs are kept: the household's, and the one it is compared
+// against, the chance of success reading the household's. A run a
+// screen is reading is kept past it, so a third drawn beside the two
+// is not dropped while a screen still shows it.
+const runsKept = 2;
 
 // How many futures a worker is handed at a time: few enough that slices
 // land many times between the screen's hand-overs, so the count rises
@@ -53,23 +63,24 @@ const listeners = new Set<() => void>();
 // limp, half a pair and then the rest 200 ms later.
 const slice = 10;
 
-// How many workers draw a run between them.
+// How many workers draw a run between them, each run its own, so two
+// runs drawn side by side start four.
 const workers = 2;
 
 let kept = none;
 
-// Draws the futures again from a seed of their own, dropping the run
-// kept, so every screen reading it draws the plan over other markets;
+// Draws the futures again from a seed of their own, dropping every run
+// kept, so every screen reading one draws its plan over other markets;
 // and so does every run after it until the page is opened afresh, so a
 // plan changed since still meets the markets the one before it did. The
 // engine's seed stands behind the one drawn for the type alone, which
 // does not know that an array of one holds one.
 export function drawAgain(): void {
   const [seed = defaultSeed] = crypto.getRandomValues(new Uint32Array(1));
-  keep({ run: { for: "", futures: [], slices: [] }, seed });
+  keep({ runs: [], seed });
 }
 
-// Drops the run kept, as a page opening has none: for the tests, which
+// Drops the runs kept, as a page opening has none: for the tests, which
 // each open on a page of their own.
 export function forget(): void {
   kept = none;
@@ -87,13 +98,19 @@ export function forget(): void {
 // screen taken down stops the workers, hearing nothing more from them,
 // and hands over what had landed since it last handed any over, unless
 // the run has been drawn again since and what landed is of no use.
-// The run is kept beyond the screen that drew it, one run, the last, so
-// a screen opened over the same plan, as the chance of success opened
-// from the dashboard is, reads the futures the other drew, carrying on
-// from the slices drawn if it was left part way, rather than drawing
-// them again; and so does a screen hidden and shown again, as Next
-// hides a route navigated away from rather than taking it down. Every
-// screen reading the run is handed the same futures as they land.
+// Two runs are kept beyond the screens that drew them, found by what
+// they were drawn over, so a screen opened over the same plan, as the
+// chance of success opened from the dashboard is, reads the futures the
+// other drew, carrying on from the slices drawn if it was left part
+// way, rather than drawing them again; and so does a screen hidden and
+// shown again, as Next hides a route navigated away from rather than
+// taking it down; and two screens over different plans side by side,
+// as a comparison is drawn beside the household's, each read their own
+// rather than dropping the other's. Past two, the runs dropped are
+// those read longest ago that no screen is still reading, and a run a
+// screen is reading is never dropped. Every screen reading a run is
+// handed the same futures as they land, and is not drawn again as
+// another run's land.
 //
 // ponytail: two workers; one a core, from
 // navigator.hardwareConcurrency, would take a run to the cores' share,
@@ -107,8 +124,7 @@ export function useFutures(
     spread,
   }: { readonly count: number; readonly plan: Plan; readonly spread: Spread },
 ): { readonly futures: readonly Future[]; readonly isDone: boolean } {
-  const drawn = useSyncExternalStore(subscribe, read, read);
-  const { seed } = drawn;
+  const seed = useSyncExternalStore(subscribe, readSeed, readSeed);
   const run = useMemo(
     () => ({
       accounts,
@@ -122,10 +138,19 @@ export function useFutures(
     [accounts, count, plan, schedule, seed, spread],
   );
   useEffect(() => {
-    if (kept.run.for !== run.key) {
-      keep({ ...kept, run: { for: run.key, futures: [], slices: [] } });
+    reading.push(run.key);
+    const mine = kept.runs.find(({ for: key }) => key === run.key) ?? {
+      for: run.key,
+      futures: nothing,
+      slices: [],
+    };
+    if (kept.runs[0] !== mine) {
+      keep({
+        ...kept,
+        runs: trimmed([mine, ...kept.runs.filter((other) => other !== mine)]),
+      });
     }
-    const { slices } = kept.run;
+    const { slices } = mine;
     const waiting = Array.from(
       { length: Math.ceil(run.count / slice) },
       (_, index) => index,
@@ -138,8 +163,12 @@ export function useFutures(
     function handOver(): void {
       timer = undefined;
       lastHanded = performance.now();
-      if (kept.run.slices === slices) {
-        keep({ ...kept, run: { ...kept.run, futures: slices.flat() } });
+      const index = kept.runs.findIndex((other) => other.slices === slices);
+      if (index !== -1) {
+        keep({
+          ...kept,
+          runs: kept.runs.with(index, { ...mine, futures: slices.flat() }),
+        });
       }
     }
     function hand(worker: Worker): void {
@@ -177,6 +206,7 @@ export function useFutures(
       hand(worker);
     }
     return (): void => {
+      reading.splice(reading.indexOf(run.key), 1);
       if (timer !== undefined) {
         clearTimeout(timer);
         handOver();
@@ -187,11 +217,15 @@ export function useFutures(
       }
     };
   }, [run]);
-  const futures = drawn.run.for === run.key ? drawn.run.futures : [];
+  // This screen's run's futures alone, which only its own hand-overs
+  // replace, so another run's do not draw this screen again.
+  const readFutures = (): readonly Future[] =>
+    kept.runs.find(({ for: key }) => key === run.key)?.futures ?? nothing;
+  const futures = useSyncExternalStore(subscribe, readFutures, readFutures);
   return { futures, isDone: futures.length >= count };
 }
 
-// Keeps the run given, telling every screen reading it.
+// Keeps the runs given, telling every screen reading them.
 function keep(next: Drawn): void {
   kept = next;
   for (const listener of listeners) {
@@ -199,17 +233,32 @@ function keep(next: Drawn): void {
   }
 }
 
-// The run kept and the seed, as a screen reads them: on the server
-// too, which keeps none, since it draws nothing, and so as a page is
-// hydrated, which has drawn nothing yet.
-function read(): Drawn {
-  return kept;
+// The seed the runs are drawn from, as a screen reads it: on the server
+// too, which keeps the engine's, since it draws nothing, and so as a
+// page is hydrated, which has drawn nothing yet.
+function readSeed(): number {
+  return kept.seed;
 }
 
-// Tells the listener given when the run kept changes, until it unsubscribes.
+// Tells the listener given when the runs kept change, until it unsubscribes.
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return (): void => {
     listeners.delete(listener);
   };
+}
+
+// The runs given, the one read last first: every run a screen is
+// reading, and of the rest those read last, while there is room for
+// them under runsKept.
+function trimmed(runs: readonly Kept[]): readonly Kept[] {
+  const isRead = ({ for: key }: Kept): boolean => reading.includes(key);
+  let spare = runsKept - runs.filter(isRead).length;
+  return runs.filter((run) => {
+    if (isRead(run)) {
+      return true;
+    }
+    spare -= 1;
+    return spare >= 0;
+  });
 }
