@@ -144,9 +144,13 @@ their own personal allowance, bands and thresholds, so two salaries of £40,000
 pay two people's tax rather than one person's on £80,000. Income tax is charged
 on every kind of line, with the personal allowance withdrawn over £100,000,
 Class 1 National Insurance on a salary and Class 4 on self-employed profit, and
-none on a pension or other income. A sacrifice comes off the salary before
-either, so what it saves in tax is what it saves the month; a salary feeds a
-pension of the owner who earns it, since a sacrifice is an employer's
+none on a pension or other income. A salary's bonus is typed at the salary's
+cadence and paid as the line says: a twelfth of the year's every month, a
+quarter of it in March, June, September and December, or the whole of it in a
+month of its own, so a bonus month meets the 2% rate of Class 1 past a month's
+upper earnings limit, as PAYE charges it. A sacrifice comes off the salary
+before either, so what it saves in tax is what it saves the month; a salary
+feeds a pension of the owner who earns it, since a sacrifice is an employer's
 contribution to the employee's own pension, and the household refuses one
 feeding another owner's. An employer that matches the sacrifice pays its match
 into the same pension, pound for pound with the sacrifice up to the share of the
@@ -287,10 +291,13 @@ a time by how far they had risen by that month, so the chart and its tiles are
 in today's money. The plan screen's month is read the same way, so a line rising
 with inflation reads at what it states in whichever year is shown, and what an
 account is paid reads at what it is worth then; the cap it is paid to is shown
-as it is stated, as the line is. A house's ceiling and a car's floor are stated
-in today's money, as a line is, since what a house tops out at or a car is
-scrapped for rises with every other price: the engine holds the asset to its
-limit risen to the month, so one held there reads at it on every point.
+as it is stated, as the line is. A bonus paid once a year shows in its month
+alone, so the month the plan screen reads, the plan's first and each January
+after it, shows none of a bonus paid in February and the whole of one paid in
+January. A house's ceiling and a car's floor are stated in today's money, as a
+line is, since what a house tops out at or a car is scrapped for rises with
+every other price: the engine holds the asset to its limit risen to the month,
+so one held there reads at it on every point.
 
 The dashboard reads the accounts, the lines, the milestones and the plan from
 the store and hands them to the browser, which runs the engine itself, so a save

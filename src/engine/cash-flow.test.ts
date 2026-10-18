@@ -186,6 +186,106 @@ describe("cashFlow", () => {
     expect(flow.left).toBeCloseTo(8450 - 2356 - 293.35, 10);
   });
 
+  // The salary earned whole, the pension it names not being listed:
+  // its £120,000 of base and £12,000 of RSUs are £11,000 a month however
+  // its £15,000 bonus is paid, and the bonus is £1,250 every month for a
+  // line naming no cadence, £3,750 in March, June, September and
+  // December for one paid every quarter, and the whole £15,000 in
+  // February for one paid then, each £147,000 over the year. A monthly
+  // salary's £500 bonus paid once a year is twelve of it, £6,000, in its
+  // month.
+  it("pays a bonus every month, in each quarter's last month, or once a year in its month", () => {
+    const incomeIn = (line: IncomeLine): number[] =>
+      Array.from(
+        { length: 12 },
+        (_, month) =>
+          cashFlow(
+            [],
+            { expenses: [], income: [line] },
+            { at: { month, year: 2026 }, plan },
+          ).income,
+      );
+    const quarterly: IncomeLine = { ...salary, bonusCadence: "quarter" };
+    const february: IncomeLine = {
+      ...salary,
+      bonusCadence: "year",
+      bonusMonth: 1,
+    };
+    const monthly: IncomeLine = {
+      ...plain,
+      amount: 3000,
+      bonus: 500,
+      bonusCadence: "year",
+      bonusMonth: 11,
+      cadence: "month",
+    };
+
+    expect(incomeIn(salary)).toStrictEqual(
+      Array.from({ length: 12 }, () => 12250),
+    );
+    expect(incomeIn(quarterly)).toStrictEqual([
+      11000, 11000, 14750, 11000, 11000, 14750, 11000, 11000, 14750, 11000,
+      11000, 14750,
+    ]);
+    expect(incomeIn(february)).toStrictEqual([
+      11000, 26000, 11000, 11000, 11000, 11000, 11000, 11000, 11000, 11000,
+      11000, 11000,
+    ]);
+    expect(incomeIn(monthly)).toStrictEqual([
+      ...Array.from({ length: 11 }, () => 3000),
+      9000,
+    ]);
+  });
+
+  // Rising with prices from January 2026, the salary is paid its £12,250
+  // risen by however far it has risen by February 2027, and a bonus paid
+  // then is the whole £15,000 risen as far, beside £11,000 of the rest.
+  it("rises a bonus with its line's growth as the base rises", () => {
+    const rising = { ...plan, inflation: 0.03 };
+    const at = { month: 1, year: 2027 };
+    const incomeOf = (line: IncomeLine): number =>
+      cashFlow([], { expenses: [], income: [line] }, { at, plan: rising })
+        .income;
+    const risen = incomeOf({ ...salary, growth: "inflation" }) / 12250;
+
+    expect(risen).toBeGreaterThan(1);
+    expect(
+      incomeOf({
+        ...salary,
+        bonusCadence: "year",
+        bonusMonth: 1,
+        growth: "inflation",
+      }),
+    ).toBeCloseTo(26000 * risen, 8);
+  });
+
+  // £36,000 with a £24,000 bonus paid in February: £27,000 that month,
+  // which pays 8% of £3,141.67, a twelfth of the £37,700 from the
+  // primary threshold to the upper earnings limit, and 2% of the
+  // £22,810.83 past a twelfth of the limit, £707.55, where every other
+  // month's £3,000 pays 8% of the £1,952.50 past a twelfth of the
+  // threshold, £156.20: £2,425.75 over the year, as PAYE charges it. The
+  // bonus spread a twelfth a month makes £5,000, £267.55 a month and
+  // £3,210.60 a year.
+  it("charges a bonus month's National Insurance at 2% past a month's upper earnings limit", () => {
+    const insuranceIn = (line: IncomeLine, month: number): number =>
+      cashFlow(
+        [],
+        { expenses: [], income: [line] },
+        { at: { month, year: 2026 }, plan },
+      ).insurance;
+    const spread: IncomeLine = { ...plain, bonus: 24000 };
+    const february: IncomeLine = {
+      ...spread,
+      bonusCadence: "year",
+      bonusMonth: 1,
+    };
+
+    expect(insuranceIn(february, 1)).toBeCloseTo(707.55, 10);
+    expect(insuranceIn(february, 2)).toBeCloseTo(156.2, 10);
+    expect(insuranceIn(spread, 1)).toBeCloseTo(267.55, 10);
+  });
+
   // Retiring at 59, someone born in 1990 works to the end of 2048 and
   // earns nothing by working from 2049, though the salary and the
   // consulting both run on for good by their lines. December 2048 is
