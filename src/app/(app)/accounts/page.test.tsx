@@ -50,10 +50,12 @@ describe("Accounts", () => {
       "label",
     );
     // The fixture's balances come to £950,771, its mortgage taking away,
-    // and its plan runs from September, so they are as of August's end.
+    // and £888,839 once its pension is counted at what drawing it would
+    // leave, as the plan's first year opens; its plan runs from
+    // September, so they are as of August's end.
     expect(
       screen.getByText(
-        "Starting net worth £950,771 · balances as of the end of August 2026",
+        "Starting net worth £888,839 · balances as of the end of August 2026",
       ),
     ).toBeInTheDocument();
     // The fixture's balances were kept before their days were, so no
