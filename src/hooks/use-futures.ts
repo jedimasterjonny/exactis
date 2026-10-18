@@ -8,16 +8,21 @@ import type { Slice } from "@/hooks/futures.worker";
 
 import { defaultSeed } from "@/engine/futures";
 
+// The run kept, and the seed every run is drawn from, held beside the
+// run rather than in it, since it is the module's and not the run's.
+interface Drawn {
+  readonly run: Kept;
+  readonly seed: number;
+}
+
 // The run drawn last, kept past the screen that drew it: what it was
 // drawn over, written out whole so a plan handed down again in new
 // objects reads as the plan it is, the slices of it drawn so far, each
 // at the place it falls in the run, a slice not yet drawn left empty,
-// the futures the screens have been handed of them, and the seed the
-// runs are drawn from.
+// and the futures the screens have been handed of them.
 interface Kept {
   readonly for: string;
   readonly futures: readonly Future[];
-  readonly seed: number;
   readonly slices: (readonly Future[])[];
 }
 
@@ -31,7 +36,10 @@ const handed = 200;
 
 // Nothing drawn, as a page opens with, and every run drawn from the
 // seed the engine draws from.
-const none: Kept = { for: "", futures: [], seed: defaultSeed, slices: [] };
+const none: Drawn = {
+  run: { for: "", futures: [], slices: [] },
+  seed: defaultSeed,
+};
 
 // The screens reading the run kept, told when it changes.
 const listeners = new Set<() => void>();
@@ -58,7 +66,7 @@ let kept = none;
 // does not know that an array of one holds one.
 export function drawAgain(): void {
   const [seed = defaultSeed] = crypto.getRandomValues(new Uint32Array(1));
-  keep({ for: "", futures: [], seed, slices: [] });
+  keep({ run: { for: "", futures: [], slices: [] }, seed });
 }
 
 // Drops the run kept, as a page opening has none: for the tests, which
@@ -114,10 +122,10 @@ export function useFutures(
     [accounts, count, plan, schedule, seed, spread],
   );
   useEffect(() => {
-    if (kept.for !== run.key) {
-      keep({ for: run.key, futures: [], seed: run.seed, slices: [] });
+    if (kept.run.for !== run.key) {
+      keep({ ...kept, run: { for: run.key, futures: [], slices: [] } });
     }
-    const { slices } = kept;
+    const { slices } = kept.run;
     const waiting = Array.from(
       { length: Math.ceil(run.count / slice) },
       (_, index) => index,
@@ -130,8 +138,8 @@ export function useFutures(
     function handOver(): void {
       timer = undefined;
       lastHanded = performance.now();
-      if (kept.slices === slices) {
-        keep({ ...kept, futures: slices.flat() });
+      if (kept.run.slices === slices) {
+        keep({ ...kept, run: { ...kept.run, futures: slices.flat() } });
       }
     }
     function hand(worker: Worker): void {
@@ -179,22 +187,22 @@ export function useFutures(
       }
     };
   }, [run]);
-  const futures = drawn.for === run.key ? drawn.futures : [];
+  const futures = drawn.run.for === run.key ? drawn.run.futures : [];
   return { futures, isDone: futures.length >= count };
 }
 
 // Keeps the run given, telling every screen reading it.
-function keep(next: Kept): void {
+function keep(next: Drawn): void {
   kept = next;
   for (const listener of listeners) {
     listener();
   }
 }
 
-// The run kept, as a screen reads it: on the server too, which keeps
-// none, since it draws nothing, and so as a page is hydrated, which has
-// drawn nothing yet.
-function read(): Kept {
+// The run kept and the seed, as a screen reads them: on the server
+// too, which keeps none, since it draws nothing, and so as a page is
+// hydrated, which has drawn nothing yet.
+function read(): Drawn {
   return kept;
 }
 
