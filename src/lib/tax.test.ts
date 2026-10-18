@@ -7,6 +7,7 @@ import {
   incomeTaxOn,
   insuranceOn,
   isWithinAllowance,
+  keptOf,
   lumpSumAllowance,
   mostFixedOf,
   pensionAllowanceOf,
@@ -338,6 +339,22 @@ describe("relievableOn", () => {
     expect(relievableOn(1000)).toBe(1000);
     expect(relievableOn(200)).toBe(300);
     expect(relievableOn(0)).toBe(300);
+  });
+});
+
+describe("keptOf", () => {
+  // £100,000 is £25,000 free and £75,000 at 20%, £15,000, leaving
+  // £85,000. At four times the allowance, £1,073,100, the quarter is
+  // the allowance exactly, still 85%, and past it the quarter is held
+  // there, so £2,000,000 is £268,275 free and £1,731,725 at 20%. With
+  // nothing left of the allowance the whole of it is taxed, and nothing
+  // leaves nothing.
+  it("leaves the quarter free as far as the allowance reaches and the rest at the basic rate", () => {
+    expect(keptOf(100000, lumpSumAllowance)).toBe(85000);
+    expect(keptOf(1073100, lumpSumAllowance)).toBe(912135);
+    expect(keptOf(2000000, lumpSumAllowance)).toBe(1653655);
+    expect(keptOf(100000, 0)).toBe(80000);
+    expect(keptOf(0, lumpSumAllowance)).toBe(0);
   });
 });
 
