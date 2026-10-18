@@ -18,6 +18,7 @@ import {
 } from "@/components/kit/sidebar";
 
 interface AppFrameProps {
+  readonly banner: ReactNode;
   readonly children: ReactNode;
 }
 
@@ -31,8 +32,10 @@ interface AppFrameProps {
 // needs no client code of its own. Its button is the registry's, so hover
 // and focus come from where the navigation's do, but the footer's
 // micro-label type is laid back over it: this row reads with the motto
-// below it, not the navigation above.
-export function AppFrame({ children }: AppFrameProps): JSX.Element {
+// below it, not the navigation above. The banner, whatever the route
+// hands it, runs across the top of the main column above the phone's
+// bar, so it heads every screen at every width.
+export function AppFrame({ banner, children }: AppFrameProps): JSX.Element {
   return (
     <SidebarProvider>
       <Sidebar>
@@ -66,6 +69,7 @@ export function AppFrame({ children }: AppFrameProps): JSX.Element {
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
+        {banner}
         <div className="flex h-12 items-center gap-2 border-b bg-card px-4 md:hidden">
           <SidebarTrigger />
           <ScreenLabel />
