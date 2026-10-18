@@ -1,26 +1,47 @@
 import type { JSX } from "react";
 
 import type { Account } from "@/data/accounts";
-import type { IncomeLineDraft } from "@/data/income";
+import type { BonusCadence, IncomeLineDraft } from "@/data/income";
 import type { Owner } from "@/data/owners";
 import type { Option } from "@/lib/options";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { MoneyField, RateField } from "@/components/app/molecules/figure-field";
+import { MonthField } from "@/components/app/molecules/month-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { isFeeding, totalOf } from "@/data/income";
 import { yearly } from "@/lib/cadence";
 import { formatGbp } from "@/lib/money";
+import { optionsOf } from "@/lib/options";
 import { ownerFor, ownerOptions } from "@/lib/owners";
+
+// How a bonus is paid, as the choice offers it: every month, which a
+// line holds as no cadence at all, or at a cadence it names.
+type BonusChoice = "month" | BonusCadence;
 
 interface EmploymentFieldsProps {
   readonly draft: IncomeLineDraft;
   readonly initial: IncomeLineDraft;
   readonly onAmend: (patch: Partial<IncomeLineDraft>) => void;
+  readonly onTime: (timing: Timing) => void;
   readonly owners: readonly Owner[];
   readonly pensions: readonly Account[];
 }
+
+// How a bonus is paid, as a line holds it: both fields absent for one
+// paid every month, the cadence alone for one paid every quarter, and
+// the cadence and the month for one paid once a year. The schedule puts
+// it in place of how the draft's was paid, since a patch can set a
+// field the line holds only sometimes but cannot take one away.
+type Timing = Pick<IncomeLineDraft, "bonusCadence" | "bonusMonth">;
+
+// How a bonus may be paid, in the order the choice offers them, the
+// most often first.
+const bonusChoices = optionsOf<BonusChoice>(
+  { month: "Every month", quarter: "Every quarter", year: "Once a year" },
+  ["month", "quarter", "year"],
+);
 
 // The pension choice's two choices that are no pension listed: none,
 // and one the save opens.
@@ -31,8 +52,12 @@ const opened = "new";
 // fields leave for whatever a schedule adds: its bonus and RSUs on a row
 // of their own, with what the base and both come to a year beside them,
 // read off the draft as it is typed and said aloud as it changes, since
-// the parts are paid at the salary's cadence and a bonus typed as a
-// year's and left on a monthly salary is paid twelve times over, and
+// the parts are typed at the salary's cadence and a bonus typed as a
+// year's and left on a monthly salary is paid twelve times over; how
+// the bonus is paid beneath them, every month, every quarter, in the
+// last month of each, or once a year in a month chosen beside it, which
+// shows only for a bonus paid so, the figure typed being the same
+// whichever is chosen; and
 // beneath them the pension it feeds, chosen from the
 // pensions among the accounts the page hands down, or none, or a new
 // one the save opens, with the share of the base it sacrifices and the
@@ -50,6 +75,7 @@ export function EmploymentFields({
   draft,
   initial,
   onAmend,
+  onTime,
   owners,
   pensions,
 }: EmploymentFieldsProps): JSX.Element {
@@ -116,6 +142,30 @@ export function EmploymentFields({
             {`${formatGbp(yearly(totalOf(draft), draft.cadence))} a year`}
           </span>
         </div>
+      </FieldRow>
+      <FieldRow layout="triple">
+        <SelectField
+          defaultValue={initial.bonusCadence ?? "month"}
+          hint={
+            draft.bonusCadence === "quarter"
+              ? "In March, June, September and December"
+              : undefined
+          }
+          label="Bonus paid"
+          onValueChange={(choice) => {
+            onTime(timingOf(choice, initial));
+          }}
+          options={bonusChoices}
+        />
+        {draft.bonusMonth !== undefined && (
+          <MonthField
+            label="Bonus month"
+            onValueChange={(bonusMonth) => {
+              onAmend({ bonusMonth });
+            }}
+            value={draft.bonusMonth}
+          />
+        )}
       </FieldRow>
       <FieldRow layout="triple">
         <SelectField
@@ -194,4 +244,20 @@ function choiceOf(line: IncomeLineDraft): string {
     return opened;
   }
   return line.feeds === null ? none : String(line.feeds);
+}
+
+// How a bonus paid as chosen is held: every month as no cadence or
+// month at all, as a line kept before it was asked is; every quarter as
+// the cadence alone; and once a year in the month the line opened with,
+// or in January for one that opened with none, which the month's field
+// mounts showing, as the pension's shares come back as the line opened.
+function timingOf(choice: BonusChoice, initial: IncomeLineDraft): Timing {
+  switch (choice) {
+    case "month":
+      return {};
+    case "quarter":
+      return { bonusCadence: choice };
+    case "year":
+      return { bonusCadence: choice, bonusMonth: initial.bonusMonth ?? 0 };
+  }
 }
