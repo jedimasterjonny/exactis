@@ -3,6 +3,7 @@ import * as z from "zod";
 import type { Month } from "@/data/schedule";
 
 import { cadences } from "@/data/accounts";
+import { bonusCadences } from "@/data/income";
 import { bases, measures } from "@/data/milestones";
 import { mostQualifyingYears } from "@/data/owners";
 import { lineGrowths } from "@/data/schedule";
@@ -45,6 +46,17 @@ export const lineValues = {
   lastYear: z.number().int().positive().nullable(),
   name: named,
   startsAt: tie.nullable(),
+};
+
+// How a salary's bonus is paid, as an income line holds it: absent for
+// one paid every month, as every line kept before it was asked is,
+// every quarter or once a year, and the month of the year it is paid in
+// once a year, absent otherwise. That a month is named for a bonus paid
+// once a year and for no other is the household's to hold, as every
+// rule across the fields is.
+export const bonusValues = {
+  bonusCadence: z.enum(bonusCadences).exactOptional(),
+  bonusMonth: monthOfYear.exactOptional(),
 };
 
 // What a condition of a milestone holds: the measure, the basis it is

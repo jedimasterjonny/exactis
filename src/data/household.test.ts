@@ -531,6 +531,33 @@ const held: readonly Case[] = [
       earning(given, 18, (consulting) => ({ ...consulting, bonus: 100 })),
   ],
   [
+    "A bonus, RSUs and a pension are a salary's alone",
+    (given): Inputs =>
+      earning(given, 18, (consulting) => ({
+        ...consulting,
+        bonusCadence: "quarter",
+      })),
+  ],
+  [
+    "A bonus paid once a year is paid in a month of its own, and no other is",
+    (given): Inputs =>
+      earning(given, 16, (salary) => ({ ...salary, bonusCadence: "year" })),
+  ],
+  [
+    "A bonus paid once a year is paid in a month of its own, and no other is",
+    (given): Inputs =>
+      earning(given, 16, (salary) => ({
+        ...salary,
+        bonusCadence: "quarter",
+        bonusMonth: 2,
+      })),
+  ],
+  [
+    "A bonus paid once a year is paid in a month of its own, and no other is",
+    (given): Inputs =>
+      earning(given, 16, (salary) => ({ ...salary, bonusMonth: 1 })),
+  ],
+  [
     "A salary gives up a share, and is matched one, only into a pension it feeds",
     (given): Inputs =>
       earning(given, 17, (salary) => ({ ...salary, sacrifice: 0.1 })),
@@ -1377,6 +1404,37 @@ describe("soundKept", () => {
     );
     expect(() => soundKept(withPartner(-1))).toThrow(
       "Too small: expected number to be >=0",
+    );
+  });
+
+  // A household kept before a bonus's cadence was asked holds a salary
+  // naming none, which is paid every month and reads as it was.
+  it("keeps how a salary's bonus is paid as typed, or not at all, and refuses a month that is none of the twelve or a cadence not offered", () => {
+    const paying = (timing: object): unknown => ({
+      ...kept,
+      schedule: {
+        ...kept.schedule,
+        income: kept.schedule.income.map((line) =>
+          line.id === 16 ? { ...line, ...timing } : line,
+        ),
+      },
+    });
+    const salaryIn = (value: unknown): IncomeLine | undefined =>
+      soundKept(value).household.schedule.income.find(({ id }) => id === 16);
+
+    expect(
+      salaryIn(paying({ bonusCadence: "year", bonusMonth: 1 })),
+    ).toMatchObject({ bonusCadence: "year", bonusMonth: 1 });
+    expect(salaryIn(paying({ bonusCadence: "quarter" }))).toMatchObject({
+      bonusCadence: "quarter",
+    });
+    expect(salaryIn(kept)).not.toHaveProperty("bonusCadence");
+    expect(salaryIn(kept)).not.toHaveProperty("bonusMonth");
+    expect(() =>
+      soundKept(paying({ bonusCadence: "year", bonusMonth: 12 })),
+    ).toThrow("Too big: expected number to be <=11");
+    expect(() => soundKept(paying({ bonusCadence: "month" }))).toThrow(
+      'Invalid option: expected one of "quarter"|"year"',
     );
   });
 

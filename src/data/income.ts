@@ -11,8 +11,13 @@ export type IncomeKind = (typeof incomeKinds)[number];
 // pension, a side line. It holds what every line holds, and an employment
 // line carries a bonus and RSUs on top of its base, each nothing when
 // there is none and both nothing on any other kind of line; the three
-// are paid together, at the line's one cadence, but held apart, since
-// a pension contribution is a share of the base alone. An employment
+// are typed at the line's one cadence, but held apart, since a pension
+// contribution is a share of the base alone and the bonus need not be
+// paid as the base is. A salary's bonus is paid every month, and then
+// the line names no cadence for it, as every line kept before one was
+// asked names none; or every quarter; or once a year, in a month of
+// its own, January being nought as the date gives it, which only a
+// bonus paid once a year names. An employment
 // line paid through a salary sacrifice names the pension its sacrifice
 // goes into, by the account's id, the share of the base it gives up,
 // a fraction as every rate is, and the share of the base its employer
@@ -43,9 +48,13 @@ export interface IncomeLineDraft extends IncomeLineValues {
 
 // The line as a form or a row holds it, which is the line less its id:
 // every field present, no last year for a line that runs to the end of
-// the plan and no pension for a line with none.
+// the plan and no pension for a line with none, save how its bonus is
+// paid, which is absent for a bonus paid every month, so a line kept
+// before it was asked reads as it was.
 export interface IncomeLineValues extends LineValues {
   readonly bonus: number;
+  readonly bonusCadence?: BonusCadence;
+  readonly bonusMonth?: number;
   readonly feeds: null | number;
   readonly kind: IncomeKind;
   readonly match: number;
@@ -65,6 +74,13 @@ export interface Opening {
   readonly name: string;
   readonly owner: null | number;
 }
+
+type BonusCadence = (typeof bonusCadences)[number];
+
+// How often a salary's bonus is paid when it is not paid every month,
+// as a list, so the store's column takes the same words the type does:
+// every quarter, or once a year.
+export const bonusCadences = ["quarter", "year"] as const;
 
 // The kinds as a list, so the store's column takes the same words the
 // type does and cannot drift from them. The State Pension is a kind of
