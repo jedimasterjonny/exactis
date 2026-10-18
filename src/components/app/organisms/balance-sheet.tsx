@@ -14,11 +14,17 @@ import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { Ledger } from "@/components/app/atoms/ledger";
 import { ShareBar } from "@/components/app/atoms/share-bar";
 import { Button } from "@/components/kit/button";
-import { kindLabels } from "@/data/accounts";
+import { isPension, kindLabels } from "@/data/accounts";
 import { mortgageOn } from "@/data/houses";
 import { fixedMonthly } from "@/lib/cadence";
 import { counted } from "@/lib/count";
-import { balanceOf, equityOf, formatMonthly, sumOf } from "@/lib/ledger";
+import {
+  balanceOf,
+  drawingTaxOf,
+  equityOf,
+  formatMonthly,
+  sumOf,
+} from "@/lib/ledger";
 import { formatGbp, formatPercent, negated } from "@/lib/money";
 import { monthName } from "@/lib/months";
 
@@ -57,8 +63,10 @@ const groups = [
 
 // What the plan starts from, as one balance sheet: what the household
 // owns on the left, what it owes on the right, and the starting net
-// worth ruled off beneath both, worked out from the two totals so it
-// is read as a sum rather than stated. The savings are grouped by kind,
+// worth ruled off beneath both, worked out from the two totals and the
+// tax on the pensions counted as drawn at the basic rate, so it is read
+// as a sum rather than stated and is the net worth the plan opens on.
+// The savings are grouped by kind,
 // each group under its subtotal, and numbered in the order they are
 // paid in when there are two or more, since that order runs across the
 // kinds. Each asset is drawn level with the loan secured on it, so the
@@ -99,6 +107,8 @@ export function BalanceSheet({
   const worth = sumOf(assets, ({ asset }) => asset.balance);
   const secured = balanceOf(loans);
   const unsecured = balanceOf(debts);
+  const pensions = balanceOf(savings.filter(isPension));
+  const tax = drawingTaxOf(savings);
   const isOrdered = savings.length > 1;
 
   return (
@@ -209,8 +219,13 @@ export function BalanceSheet({
                 figure: formatGbp(secured + unsecured),
                 label: "Total owed",
               },
+              {
+                detail: `${formatGbp(pensions)} in pensions counted as drawn at the basic rate, a quarter free of tax as far as each owner's lump sum allowance reaches`,
+                figure: formatGbp(negated(tax)),
+                label: "Tax on drawing the pensions",
+              },
             ]}
-            total={formatGbp(saved + worth + secured + unsecured)}
+            total={formatGbp(saved + worth + secured + unsecured - tax)}
             totalName="Starting net worth"
           />
         </div>

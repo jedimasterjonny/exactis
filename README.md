@@ -328,7 +328,10 @@ pension all along, and not at the 55% a draw before that age is charged, since
 what the household owns is not what it can have this month. The chart stacks
 each pension at the same figure, on the liquidity only from the year the liquid
 net worth counts it, so on either basis the stack comes to the figure the tiles
-read.
+read. The accounts screen's starting net worth takes off the tax on the pensions
+counted so, read off the engine's own count with each owner's allowance whole,
+so it is the net worth the plan opens on to the pound; the month end's total is
+the balances as the statements have them, a pension at what it holds.
 
 ## Inflation
 

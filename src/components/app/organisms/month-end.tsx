@@ -75,9 +75,10 @@ interface Row {
 // the worksheet says what it was and what was planned to be paid in, or
 // paid off a debt, then, once it is checked, what moved it besides,
 // which is the rest of the difference, and before that the day it was
-// last set. The worksheet closes on the starting net worth the month
-// leaves, ruled off from what the balances were, what was paid in and
-// what moved, over the balances checked; the footer counts them. A
+// last set. The worksheet closes on the balances the month leaves, as
+// the statements have them, a pension at what it holds, ruled off from
+// what they were, what was paid in and what moved, over the balances
+// checked; the footer counts them. A
 // store that refuses leaves the worksheet open and says why. The year
 // picked is held between the year the plan's owner was born and the
 // year of the last month that has ended, which are the months the store
@@ -214,7 +215,7 @@ function typedAs(account: Account, value: number): number {
 }
 
 // The open worksheet: the month, a field a balance in its group, and
-// the net worth the month leaves, between the title and the footer.
+// the balances the month leaves, between the title and the footer.
 // Closing the end of a month carries every month from the plan's first
 // through it, the one more than the months between them: the plan's
 // first month alone closes its own end, and the month the balances are
@@ -368,7 +369,7 @@ function Worksheet({
           },
         ]}
         total={formatGbp(was + paid + moved)}
-        totalName={`Starting net worth at the end of ${formatMonth(draft.asOf)}`}
+        totalName={`As the balances stand at the end of ${formatMonth(draft.asOf)}`}
       />
     </DialogFrame>
   );

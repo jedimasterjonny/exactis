@@ -26,7 +26,7 @@ vi.mock("@/actions/accounts", () => ({ closeBalances: vi.fn() }));
 const [pension, isa, , home] = accounts;
 const [salary] = incomeLines;
 
-// The steps of the net worth the month leaves, and what they come to.
+// The steps of the balances the month leaves, and what they come to.
 function ledger(sheet: HTMLElement): (null | string)[] {
   return within(sheet)
     .getAllByRole("listitem")
@@ -143,7 +143,7 @@ describe("MonthEnd", () => {
     ]);
     expect(
       within(sheet).getByText(
-        "Starting net worth at the end of September 2026",
+        "As the balances stand at the end of September 2026",
       ),
     ).toHaveClass("label");
     expect(within(sheet).getByText("£908,892")).toBeInTheDocument();

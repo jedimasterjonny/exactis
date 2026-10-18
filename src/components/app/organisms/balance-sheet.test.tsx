@@ -8,8 +8,12 @@ import type { Account } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { golf, golfPcp } from "@/data/cars.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
+import { kept } from "@/data/household.fixture";
 import { house, houseLoan } from "@/data/houses.fixture";
+import { retiring } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
+import { measuredOf, project } from "@/engine/projection";
+import { formatGbp } from "@/lib/money";
 import { bySlot } from "@/test/dom";
 
 import { BalanceSheet } from "./balance-sheet";
@@ -317,20 +321,47 @@ describe("BalanceSheet", () => {
 
   // The fixture's balances come to £901,462, the mortgage taking away:
   // £680,470 in its savings and £397,512 in its home, less £176,520.
-  it("rules the starting net worth off beneath what is owned and what is owed", () => {
+  // Its £391,640 pension counted as drawn at the basic rate owes
+  // £58,746, a quarter of it free and the rest at 20%, so it starts
+  // worth £842,716, as the plan's first year opens.
+  it("rules the starting net worth off beneath what is owned, what is owed and the tax on drawing the pensions", () => {
     renderSheet();
 
     expect(
       screen
         .getAllByRole("listitem")
-        .slice(-2)
+        .slice(-3)
         .map((step) => step.textContent),
     ).toStrictEqual([
       "Total owned£680,470 in savings and £397,512 in property and vehicles£1,077,982",
       "Total owed£0 secured on property and vehicles and £176,520 in other debts−£176,520",
+      "Tax on drawing the pensions£391,640 in pensions counted as drawn at the basic rate, a quarter free of tax as far as each owner's lump sum allowance reaches−£58,746",
     ]);
     expect(screen.getByText("Starting net worth")).toHaveClass("label");
-    expect(screen.getByText("£901,462")).toHaveClass("figure", "text-3xl");
+    expect(screen.getByText("£842,716")).toHaveClass("figure", "text-3xl");
+  });
+
+  // What the sheet rules off is what the engine measures the reference
+  // plan's first year as opening on, over the same accounts, so the
+  // accounts screen and the dashboard start from the one figure.
+  it("rules off the net worth the plan's first year opens on", () => {
+    const run = { ...kept, plan: retiring };
+    const [opening] = project(run.accounts, run.schedule, run.plan);
+    renderSheet();
+
+    expect(
+      screen.getByText(
+        formatGbp(
+          opening === undefined
+            ? 0
+            : measuredOf(
+                opening,
+                { month: run.plan.month, year: run.plan.from },
+                run,
+              ).worth,
+        ),
+      ),
+    ).toHaveClass("figure", "text-3xl");
   });
 
   it("opens a row's account, a loan its asset, and asks for a debt from its button", () => {
