@@ -29,11 +29,11 @@ import { normalsFrom } from "@/lib/random";
 // out; and each year of it measured as a milestone measures one,
 // entering it and in today's money as the projection's points are: what the
 // plan is worth, every account it holds less every debt it owes, a
-// house or a car at its value less the loan on it, as the dashboard
-// counts net worth, and the rest beside it, the lines tied to
-// retirement running as they did; and the year the plan's owner
-// retired in, or null for a future in which their retirement on
-// conditions is never reached. A future that falls short by drawing
+// house or a car at its value less the loan on it and a pension at what
+// drawing it would leave, as the dashboard counts net worth, and the
+// rest beside it, the lines tied to retirement running as they did;
+// and the year the plan's owner retired in, or null for a future in
+// which their retirement on conditions is never reached. A future that falls short by drawing
 // early has not lasted: the 55% the draw is charged keeps the plan
 // going only on paper, which is why the projection marks it. Nor has
 // one whose owner never retires, which lasts only by working to the
@@ -138,11 +138,13 @@ export function futureOf(points: readonly ProjectionPoint[], run: Run): Future {
   const ran = new Map<Run, Run>();
   return {
     fell: points.find(isShort)?.year ?? null,
-    measured: movedYears(points, run).map(({ at, balances, run: moved }) => {
-      const carried = ran.get(moved) ?? carriedBy(moved, retired);
-      ran.set(moved, carried);
-      return measuredOf({ balances }, at, carried);
-    }),
+    measured: movedYears(points, run).map(
+      ({ allowances, at, balances, run: moved }) => {
+        const carried = ran.get(moved) ?? carriedBy(moved, retired);
+        ran.set(moved, carried);
+        return measuredOf({ allowances, balances }, at, carried);
+      },
+    ),
     ranOut: points.find(({ uncovered }) => uncovered > 0)?.year ?? null,
     retired,
   };
