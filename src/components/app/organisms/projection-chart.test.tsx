@@ -1277,6 +1277,49 @@ describe("ProjectionChart", () => {
 
     expect(dots()[0]).toHaveAttribute("y", liquidIn(2047));
   });
+
+  // A scenario's pension and ISA set against a household holding the
+  // ISA alone, at £600,000 a year from 2027, which is past the
+  // scenario's own stack in no year, so the axis is the scenario's; the
+  // household's plan opens a year later, so its line starts there.
+  it("draws the household it is set against as a dashed line over the columns, named under the crosshair", async () => {
+    render(
+      <ProjectionChart
+        accounts={held}
+        against={{
+          accounts: [isa],
+          plan: drawing,
+          points: points
+            .slice(1)
+            .map((point) => ({ ...point, balances: { 2: 600_000 } })),
+        }}
+        milestones={[]}
+        plan={drawing}
+        points={points}
+      />,
+    );
+
+    expect(
+      screen.getByText(byClass("recharts-line-curve"), { suggest: false }),
+    ).toHaveAttribute("stroke-dasharray", "4 4");
+    expect(
+      screen.getAllByText(byClass("recharts-bar"), { suggest: false }),
+    ).toHaveLength(2);
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    expect(await screen.findByText("2027 · Age 37")).toHaveClass("font-medium");
+
+    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+
+    expect(tooltip.getByText("Household")).toBeInTheDocument();
+    expect(tooltip.getByText("£600,000")).toHaveClass("figure");
+    expect(
+      screen.getByText(byClass("recharts-tooltip-cursor"), { suggest: false }),
+    ).toHaveClass("recharts-rectangle");
+  });
 });
 
 describe("ProjectionPending", () => {

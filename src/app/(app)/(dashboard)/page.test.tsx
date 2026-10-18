@@ -8,9 +8,15 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { blank, kept } from "@/data/household.fixture";
 import { incomeLines, plan, retiring } from "@/data/income.fixture";
+import { retiringAt } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { forget } from "@/hooks/use-futures";
-import { getHousehold, getScenario, getScenarios } from "@/store/household";
+import {
+  getBaseline,
+  getHousehold,
+  getScenario,
+  getScenarios,
+} from "@/store/household";
 import { FuturesWorker } from "@/test/futures-worker";
 
 import Dashboard from "./page";
@@ -24,6 +30,7 @@ vi.mock("@/actions/scenarios", () => ({
   leaveScenario: vi.fn(),
 }));
 vi.mock("@/store/household", () => ({
+  getBaseline: vi.fn(),
   getHousehold: vi.fn(),
   getScenario: vi.fn(),
   getScenarios: vi.fn(),
@@ -43,6 +50,7 @@ const household: Household = {
 
 describe("Dashboard", () => {
   beforeEach(() => {
+    vi.mocked(getBaseline).mockResolvedValue(household);
     vi.mocked(getHousehold).mockResolvedValue(household);
     vi.mocked(getScenario).mockResolvedValue(null);
     vi.mocked(getScenarios).mockResolvedValue([]);
@@ -128,6 +136,44 @@ describe("Dashboard", () => {
         .map(({ textContent }) => textContent)
         .slice(0, 3),
     ).toStrictEqual(["Household", "Move house", "Retire early"]);
+  });
+
+  // The household open, so nothing to set it against.
+  it("reads the household alone, and draws no line beside it, while no scenario is open", async () => {
+    render(await Dashboard());
+
+    expect(getBaseline).not.toHaveBeenCalled();
+    expect(
+      screen.queryAllByText(
+        (_content, element) =>
+          element?.classList.contains("recharts-line") === true,
+        { suggest: false },
+      ),
+    ).toHaveLength(0);
+  });
+
+  // A scenario open, set against the household retiring three years
+  // later: the net worth tile carries a delta, and the chart draws the
+  // household's line.
+  it("reads the household while a scenario is open, and sets the scenario against it", async () => {
+    vi.mocked(getScenario).mockResolvedValue("Retire early");
+    vi.mocked(getScenarios).mockResolvedValue(["Retire early"]);
+    vi.mocked(getBaseline).mockResolvedValue({
+      ...household,
+      plan: retiringAt(retiring, 62),
+    });
+
+    render(await Dashboard());
+
+    expect(getBaseline).toHaveBeenCalledOnce();
+    expect(
+      screen.getAllByText(
+        (_content, element) =>
+          element?.classList.contains("recharts-line") === true,
+        { suggest: false },
+      ),
+    ).toHaveLength(1);
+    expect(screen.getAllByText(/^[+−]£[\d,]+$/)).not.toHaveLength(0);
   });
 
   // The first tile reads the plan at retirement to begin with, and the

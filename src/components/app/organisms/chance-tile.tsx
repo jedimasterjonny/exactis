@@ -23,6 +23,7 @@ export type Run =
   | { readonly unrun: string };
 
 interface ChanceTileProps {
+  readonly against?: Run | undefined;
   readonly milestones: readonly Milestone[];
   readonly plan: Plan;
   readonly run: Run;
@@ -49,8 +50,11 @@ const label = "Chance of success";
 // which keeps its row for the two the plan is steered by. While they
 // are drawn, how many have been; and a dash, saying why, while there
 // is nothing to draw them at. The run is the board's, which draws it
-// once for the tiles and the chart alike.
+// once for the tiles and the chart alike. Set against the household's
+// run, as a scenario's is on the dashboard, the chance carries the
+// difference in percentage points once both runs are drawn.
 export function ChanceTile({
+  against,
   milestones,
   plan,
   run,
@@ -76,12 +80,22 @@ export function ChanceTile({
     );
   }
   const { futures, isDone } = run;
+  const theirs =
+    against === undefined || "unrun" in against || !against.isDone
+      ? undefined
+      : readingOf(against.futures).chance;
   return (
     <>
       {isDone ? (
         <StatTile
           action={<DrawAgain />}
           caption={`Of ${formatCount(runLength)} futures, lasting to ${String(endAge(plan))}`}
+          delta={
+            theirs === undefined
+              ? undefined
+              : (readingOf(futures).chance - theirs) * 100
+          }
+          deltaFormat="points"
           label={label}
           value={formatWholePercent(readingOf(futures).chance)}
         />

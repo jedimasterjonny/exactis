@@ -74,6 +74,49 @@ describe("ChanceTile", () => {
     ).toBeInTheDocument();
   });
 
+  // Eight in ten last, set against a household whose every future lasts,
+  // so twenty points fewer; and nothing set against a household whose
+  // run is still drawn, or has nothing to draw.
+  it("carries the difference from the household it is set against in percentage points once both runs are drawn", () => {
+    const lasting = futures.map((future) => ({
+      ...future,
+      fell: null,
+      ranOut: null,
+    }));
+    const { rerender } = render(
+      <ChanceTile
+        against={{ futures: lasting, isDone: true }}
+        milestones={[]}
+        plan={plan}
+        run={{ futures, isDone: true }}
+      />,
+    );
+
+    expect(screen.getByText("−20.00pp")).toHaveClass("figure");
+
+    rerender(
+      <ChanceTile
+        against={{ futures: lasting.slice(0, 5), isDone: false }}
+        milestones={[]}
+        plan={plan}
+        run={{ futures, isDone: true }}
+      />,
+    );
+
+    expect(screen.queryByText(/pp$/)).not.toBeInTheDocument();
+
+    rerender(
+      <ChanceTile
+        against={{ unrun: "No spread to draw the futures from" }}
+        milestones={[]}
+        plan={plan}
+        run={{ futures, isDone: true }}
+      />,
+    );
+
+    expect(screen.queryByText(/pp$/)).not.toBeInTheDocument();
+  });
+
   it("says how many futures are drawn while the run is, for the chance and for each milestone", () => {
     render(
       <ChanceTile
