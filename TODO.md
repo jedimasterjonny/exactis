@@ -12,11 +12,13 @@ against it, a typed cap only lowers it, and a fixed sum or the spare money past
 it is not paid, staying in the month for the accounts after it, while a
 sacrifice is given up whole and what lands past it is charged as the owner's
 income; what none of them takes is spent. A fixed sum that alone is past it is
-refused when it is saved. It is held a twelfth a month rather than across the
-tax year, so a month short of spare money loses its twelfth for good, and a sum
-paid once a year is spread as if paid monthly. Each allowance is held in pounds
-as the law sets it and never raised, so over a plan of decades it shrinks in
-today's money as prices rise, as it would if no government changed it again.
+refused when it is saved. It is held across the tax year, the months of the
+plan's first before it opens taken to have used a twelfth each, but a typed cap
+is still held a twelfth a month, so an account capped below the allowance never
+catches up a month that went short, and a fixed sum stated a year is spread as
+if paid monthly. Each allowance is held in pounds as the law sets it and never
+raised, so over a plan of decades it shrinks in today's money as prices rise, as
+it would if no government changed it again.
 
 What the law adds on top is not all held. There is no carry-forward of the three
 years before, so the money purchase allowance's loss of it is moot. The taper
@@ -24,9 +26,8 @@ reads threshold income without taking off what is paid into a pension out of
 taxed money, and adjusted income without a draw on a pension in the month. And
 the ISA allowance is one figure, with no Lifetime ISA held to £4,000 within it.
 
-Decide whether the allowance is held across the tax year rather than a month at
-a time, which would have the projection carry it as it carries the tax year; the
-rest are figures to add as the plan needs them.
+Decide whether a cap is held across the tax year as the allowance is; the rest
+are figures to add as the plan needs them.
 
 ## Tax
 

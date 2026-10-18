@@ -41,10 +41,12 @@ interface DrawingCase {
 }
 
 // What an earning plan has kept so far: what the pension has been fed
-// and paid, what the ISA holds, and the tax year it is in.
+// and paid, what the ISA holds, what the tax year has used of each
+// allowance, and the tax year it is in.
 interface Earning {
   readonly fed: number;
   readonly kept: number;
+  readonly used: Used;
   readonly year: TaxYear;
 }
 
@@ -63,6 +65,13 @@ interface TaxYear {
   readonly paid: number;
   readonly profit: number;
   readonly taxable: number;
+}
+
+// What a tax year has used of the ISA's allowance and the pension's, in
+// what has landed in each.
+interface Used {
+  readonly isa: number;
+  readonly pension: number;
 }
 
 // Every kind of income, which income tax is charged on together.
@@ -86,7 +95,7 @@ const plans = 40;
 const april = 3;
 
 // The ISA an earning plan keeps what is left in, at no growth, up to
-// its allowance, a twelfth of £20,000 a month.
+// what its tax year has left of its £20,000 allowance.
 const isa: Account = {
   balance: 0,
   contribution: { cap: null, kind: "spare" },
@@ -97,13 +106,14 @@ const isa: Account = {
   owner: 1,
 };
 
-// The ISA's twelfth of its allowance.
-const isaRoom = 20000 / 12;
+// The ISA's allowance for a tax year.
+const isaAllowance = 20000;
 
-// The pension's twelfth of its allowance, which what lands in it is
-// held to: a sacrifice with the employer's NI on it, and a fixed sum
-// with the basic rate claimed back.
-const pensionRoom = 60000 / 12;
+// The pension's allowance for a tax year, which what lands in it is
+// held to: a sacrifice with the employer's NI on it, whatever is left,
+// what lands past it charged as income, and a fixed sum with the basic
+// rate claimed back, within what is left.
+const pensionAllowance = 60000;
 
 // The cash an earning plan keeps what the ISA has no room for in,
 // uncapped and opening on a sum wide enough to cover any April a
@@ -147,14 +157,16 @@ function drawnIn(
   };
 }
 
-// A month of an earning plan: the refund settled into it, the month's
-// income less its tax, sacrificing only while that covers the month
-// and only as much as the pension's allowance takes, the pension paid
-// its fixed sum out of what is left and what its allowance has left,
-// with the basic rate claimed on as much of it as the month's earnings
-// less what they sacrifice relieve, or a twelfth of £3,600 when that is
-// more, and the ISA the rest up to its allowance, what is past it going
-// to cash.
+// A month of an earning plan: the refund settled into it, and in April
+// a tax year with nothing used of either allowance; the month's income
+// less its tax, sacrificing whole while that covers the month, what
+// the sacrifice lands past what the tax year has left of the pension's
+// allowance taxed as income; the pension paid its fixed sum out of what
+// is left and what its allowance has left, with the basic rate claimed
+// on as much of it as the month's earnings less what they sacrifice
+// relieve, or a twelfth of £3,600 when that is more; and the ISA the
+// rest up to what the tax year has left of its allowance, what is past
+// it going to cash.
 function earnedFrom(
   earning: Earning,
   at: Month,
@@ -162,26 +174,32 @@ function earnedFrom(
 ): Earning {
   const refund = at.month === april ? refundOf(earning.year) : 0;
   const year = at.month === april ? opened : earning.year;
+  const used = at.month === april ? { isa: 0, pension: 0 } : earning.used;
   const profit = earnedIn(income, at, ["self-employment"]);
-  const sacrifice = Math.min(givenUpIn(income, at), pensionRoom / 1.15);
+  const pensionLeft = Math.max(0, pensionAllowance - used.pension);
+  const taxableOf = (sacrificed: number): number =>
+    earnedIn(income, at, everyKind) -
+    sacrificed +
+    Math.max(0, sacrificed * 1.15 - pensionLeft);
   const netOf = (sacrificed: number): number => {
-    const taxable = earnedIn(income, at, everyKind) - sacrificed;
     const pay = earnedIn(income, at, ["employment"]) - sacrificed;
     return (
-      taxable -
-      lawIncomeTax(taxable, 1) -
+      earnedIn(income, at, everyKind) -
+      sacrificed -
+      lawIncomeTax(taxableOf(sacrificed), 1) -
       lawInsurance(0.08, pay, 1) -
       lawInsurance(0.06, profit, 1) +
       refund
     );
   };
+  const sacrifice = givenUpIn(income, at);
   const sacrificed = netOf(sacrifice) >= -1e-9 ? sacrifice : 0;
   const net = netOf(sacrificed);
   const relievable = Math.max(
     3600 / 12,
     earnedIn(income, at, ["employment", "self-employment"]) - sacrificed,
   );
-  const room = pensionRoom - sacrificed * 1.15;
+  const room = Math.max(0, pensionLeft - sacrificed * 1.15);
   const paid = Math.max(
     0,
     Math.min(
@@ -191,10 +209,18 @@ function earnedFrom(
     ),
   );
   const relief = Math.min(paid, relievable / 1.25) / 4;
+  const saved = Math.max(
+    0,
+    Math.min(net - paid, Math.max(0, isaAllowance - used.isa)),
+  );
   return {
     fed: earning.fed + sacrificed * 1.15 + paid + relief,
-    kept: earning.kept + Math.max(0, Math.min(net - paid, isaRoom)),
-    year: yearWith(year, earnedIn(income, at, everyKind) - sacrificed, profit),
+    kept: earning.kept + saved,
+    used: {
+      isa: used.isa + saved,
+      pension: used.pension + sacrificed * 1.15 + paid + relief,
+    },
+    year: yearWith(year, taxableOf(sacrificed), profit),
   };
 }
 
@@ -422,6 +448,17 @@ function seeded(seed: number): () => number {
   };
 }
 
+// What the months of a plan's first tax year before it opened are taken
+// to have used of each allowance, which the plan holds nothing of: a
+// twelfth each, from April to the month the plan opens in.
+function usedBefore(plan: Plan): Used {
+  const before = (plan.month - april + 12) % 12;
+  return {
+    isa: (isaAllowance * before) / 12,
+    pension: (pensionAllowance * before) / 12,
+  };
+}
+
 // A tax year a month on: the month's income tax and Class 4 paid as
 // twelfths, and what they were charged on.
 function yearWith(year: TaxYear, taxable: number, profit: number): TaxYear {
@@ -457,7 +494,12 @@ describe("project against the law", () => {
         { length: 1 + Math.floor(random() * 4) },
         (_, index) => lineFrom(random, index + 1, plan.from),
       );
-      let earning: Earning = { fed: 0, kept: isa.balance, year: opened };
+      let earning: Earning = {
+        fed: 0,
+        kept: isa.balance,
+        used: usedBefore(plan),
+        year: opened,
+      };
       const expected = [earning];
       for (const { at, isLast } of monthsOf(plan)) {
         earning = earnedFrom(earning, at, { fixed, income });

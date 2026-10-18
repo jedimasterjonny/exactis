@@ -285,14 +285,18 @@ describe("project", () => {
     ]);
   });
 
-  // £3,992.20 a month is left, of which the ISA takes £1,666.67, a
-  // twelfth of its £20,000 allowance, so a year adds £20,000: 291,930,
-  // then 311,930.
+  // £3,992.20 a month is left, of which the ISA takes what its tax year
+  // has left of the £20,000 allowance. The plan opens in January, the
+  // nine months of the 2025 tax year before it taken to have used a
+  // twelfth each, so January and February fill the £5,000 left; from
+  // April each tax year takes all the month has until September fills
+  // its £20,000, and January to March take nothing. 2026 adds £25,000
+  // and 2027 £20,000: 296,930, then 316,930.
   it("pays a spare-money account its take of the year's cash flow, every month", () => {
     expect(project([spareIsa], schedule, { ...plan, years: 2 })).toStrictEqual([
       point(2026, { 2: 271930 }, { free: 271930 }),
-      point(2027, { 2: 291930 }, { free: 291930 }),
-      point(2028, { 2: 311930 }, { free: 311930 }),
+      point(2027, { 2: 296930 }, { free: 296930 }),
+      point(2028, { 2: 316930 }, { free: 316930 }),
     ]);
   });
 
@@ -519,15 +523,16 @@ describe("project", () => {
   });
 
   // The household ends in 2051, so from 2052 the whole salary is spare,
-  // and the ISA still takes no more than its allowance.
+  // and the ISA still takes no more than its allowance: £20,000 a tax
+  // year, and the £5,000 left of the one the plan opens in.
   it("reads each year's cash flow afresh", () => {
     const points = project([spareIsa], schedule, { ...plan, years: 27 });
     const [first, second] = points;
     const last = points.at(-1);
 
-    expect(second?.free).toBe((first?.free ?? 0) + 20000);
+    expect(second?.free).toBe((first?.free ?? 0) + 25000);
     expect(last?.year).toBe(2053);
-    expect(last?.free).toBe(271930 + 23 * 20000);
+    expect(last?.free).toBe(271930 + 5000 + 27 * 20000);
   });
 
   // A salary of £20,000 leaves £1,493.30 a month after £123.83 of
@@ -560,15 +565,18 @@ describe("project", () => {
     ]);
   });
 
-  // Read in September, the first year has four months to run: £1,666.67
-  // in each is £6,666.67, then a whole year's £20,000 on top.
+  // Read in September, the first year has four months to run, and the
+  // five of its tax year before it are taken to have used a twelfth of
+  // the ISA's allowance each, leaving £11,666.67, which the four fill;
+  // 2027's January to March take nothing more, and its April a whole
+  // tax year's £20,000 on top.
   it("carries the first year from the month the plan is read in", () => {
     expect(
       project([spareIsa], schedule, { ...plan, month: 8, years: 2 }),
     ).toStrictEqual([
       point(2026, { 2: 271930 }, { free: 271930 }),
-      point(2027, { 2: 278597 }, { free: 278597 }),
-      point(2028, { 2: 298597 }, { free: 298597 }),
+      point(2027, { 2: 283597 }, { free: 283597 }),
+      point(2028, { 2: 303597 }, { free: 303597 }),
     ]);
   });
 
@@ -1042,11 +1050,16 @@ describe("project", () => {
   // pension age: £54.94, each pound keeping 85p in the basic rate band
   // with a quarter of it free, £13.74 off the lump sum allowance. That
   // draw is a flexible access, so from February the owner's allowance
-  // is the £10,000 money purchase one, £833.33 a month, which the £1,725
-  // is £891.67 past; the month is
-  // taxed on £1,500 and that £891.67, £268.83 at the basic rate where
-  // the £1,500 alone pays £90.50, and with £36.20 of NI leaves
-  // £1,194.97 for the ISA, £13,144.63 over the eleven months, while the
+  // is the £10,000 money purchase one, held across the tax year: the
+  // plan opens in January, the nine months of the 2025/26 tax year before
+  // it taken to have used a twelfth each, so £2,500 is left, which
+  // February's £1,725 is within and March's £950 past; from April the
+  // year's £10,000 takes five months whole and £1,375 of September's,
+  // and October to December land the whole £1,725 past it. A month is
+  // taxed on the £1,500 it is paid and what lands past, at the basic
+  // rate, and with £36.20 of NI leaves the ISA £1,373.30 where nothing
+  // is past, £1,183.30 in March, £1,303.30 in September and £1,028.30 in
+  // each of the last three, £13,811.30 over the eleven months, while the
   // SIPP is fed its £1,725 whatever the charge, 100,000 − 54.94 +
   // 18,975 = 118,920.06. The three months of the 2025/26 tax year each
   // sit in the basic rate band, so April settles nothing. With nothing
@@ -1075,12 +1088,12 @@ describe("project", () => {
       point(2026, { 2: 0, 7: 100000 }, { age: 66, deferred: 100000 }),
       point(
         2027,
-        { 2: 13145, 7: 118920 },
+        { 2: 13811, 7: 118920 },
         {
           age: 67,
           allowances: { [working.id]: 268261 },
           deferred: 118920,
-          free: 13145,
+          free: 13811,
         },
       ),
     ]);
@@ -1249,6 +1262,110 @@ describe("project", () => {
   // months had been paid by then: nine twelfths of the bonus, £44,458;
   // three quarters of it, in June, September and December, £44,058; or
   // none of it before February, £39,238.
+  // Read in April, £12,000 of base pays £1,000 a month, under the
+  // personal allowance's twelfth, which the ISA takes whole, ten
+  // twelfths of the 2026 tax year by January. February adds a £24,000
+  // bonus: £25,000, taxed as a twelfth of a year of it, £10,100.25, and
+  // £667.55 of NI, leaves £14,232.20, of which the ISA takes the £10,000
+  // its tax year has left and the cash the rest; March's £1,000 finds
+  // no room and goes to the cash too. April 2027 opens a new tax year,
+  // whose room takes the £5,414.25 the old one is refunded, the year
+  // having earned £36,000 and owing £4,686: £25,414.25 in the ISA and
+  // £5,232.20 in the cash. Held a twelfth a month, the ISA would have
+  // taken £1,666.67 of February, March's £1,000 and £1,666.67 of the
+  // refund.
+  it("fills what the tax year has left of the ISA in a bonus month", () => {
+    const saving: Account = { ...spareIsa, balance: 0 };
+    const spareCash: Account = {
+      ...cash,
+      balance: 0,
+      contribution: { cap: null, kind: "spare" },
+    };
+    const bonused: IncomeLine = {
+      ...salary,
+      amount: 12000,
+      bonus: 24000,
+      bonusCadence: "year",
+      bonusMonth: 1,
+      feeds: null,
+      lastMonth: 2,
+      lastYear: 2027,
+      rsu: 0,
+      sacrifice: 0,
+    };
+    const points = project(
+      [saving, spareCash],
+      { expenses: [], income: [bonused] },
+      { ...plan, month: 3, years: 2 },
+    );
+
+    expect(points.map((point) => balanceIn(point, saving.id))).toStrictEqual([
+      0, 9000, 25414,
+    ]);
+    expect(points.map((point) => balanceIn(point, spareCash.id))).toStrictEqual(
+      [0, 0, 5232],
+    );
+  });
+
+  // Read in April, the ISA is paid £3,000 a month of its own, which the
+  // month has, past the £20,000 a tax year holds it to: April to
+  // August land £15,000, September the whole £3,000 and October the
+  // £2,000 left, and November to March nothing, the rest staying in the
+  // month as spent. The room opens again in April 2027, and the same
+  // £20,000 lands by October.
+  it("holds a fixed sum back once the tax year's allowance is used, and opens it again in April", () => {
+    const topped: Account = {
+      ...spareIsa,
+      balance: 0,
+      contribution: { amount: 3000, cadence: "month", kind: "fixed" },
+    };
+
+    expect(
+      project([topped], funded, { ...plan, month: 3, years: 2 }).map((point) =>
+        balanceIn(point, topped.id),
+      ),
+    ).toStrictEqual([0, 20000, 40000]);
+  });
+
+  // Read in April, a £150,000 base sacrificing two fifths lands £5,750 a
+  // month in the SIPP, £69,000 a year's worth; but it ends in December,
+  // and the £51,750 its nine months land is within the year's £60,000,
+  // so nothing is charged as income. Each month pays £7,500, taxed as a
+  // twelfth of £90,000 at £1,952.67 with £317.55 of NI, leaving
+  // £5,229.78 for the cash, £47,068.05; April 2027 refunds the £3,142
+  // the nine months paid past what £67,500 owes over the year:
+  // £50,210.05. Held a twelfth a month, £750 of each month would have
+  // been charged as income, £2,700 more tax.
+  it("charges as income only what passes the tax year's pension allowance", () => {
+    const fed: Account = { ...sipp, balance: 0 };
+    const spareCash: Account = {
+      ...cash,
+      balance: 0,
+      contribution: { cap: null, kind: "spare" },
+    };
+    const sacrificing: IncomeLine = {
+      ...salary,
+      amount: 150000,
+      bonus: 0,
+      feeds: fed.id,
+      lastYear: 2026,
+      rsu: 0,
+      sacrifice: 0.4,
+    };
+    const points = project(
+      [fed, spareCash],
+      { expenses: [], income: [sacrificing] },
+      { ...plan, month: 3, years: 2 },
+    );
+
+    expect(points.map((point) => balanceIn(point, fed.id))).toStrictEqual([
+      0, 51750, 51750,
+    ]);
+    expect(points.map((point) => balanceIn(point, spareCash.id))).toStrictEqual(
+      [0, 47068, 50210],
+    );
+  });
+
   it("settles a tax year to the same income tax however its bonus was paid", () => {
     const flat: Account = {
       ...cash,
@@ -1866,16 +1983,20 @@ describe("moving home", () => {
   });
 
   // The salary's £6,346.45 a month after tax pays the ISA its £1,666.67
-  // a month of allowance, the rest going as spent. In January 2028 the
-  // move leaves £61,000 short, so that month is short too: the ISA is
-  // paid nothing in it while the cash is drawn on, and eleven months in
-  // 2028 rather than twelve.
+  // a month, a twelfth of the £20,000 it is capped at, the rest going as
+  // spent. In January 2028 the move leaves £61,000 short, so that month
+  // is short too: the ISA is paid nothing in it while the cash is drawn
+  // on, and eleven months in 2028 rather than twelve.
   it("pays nothing into the savings in the month a move is short", () => {
     const capped: Account = {
       ...house,
       move: { ...move, mortgage: { loanToValue: 0.3, rate: 0, term: 10 } },
     };
-    const saving: Account = { ...spareIsa, balance: 0 };
+    const saving: Account = {
+      ...spareIsa,
+      balance: 0,
+      contribution: { cap: 20000, kind: "spare" },
+    };
     const points = project(
       [savings, saving, capped, loan],
       { expenses: [paying], income: funded.income },
