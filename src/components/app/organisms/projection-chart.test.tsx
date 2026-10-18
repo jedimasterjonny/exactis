@@ -9,6 +9,11 @@ import type { Account } from "@/data/accounts";
 import type { ProjectionPoint } from "@/engine/projection";
 
 import { accounts, sipp } from "@/data/accounts.fixture";
+import { kept } from "@/data/household.fixture";
+import { retiring } from "@/data/income.fixture";
+import { owners } from "@/data/owners.fixture";
+import { measuredOf, project } from "@/engine/projection";
+import { formatGbp } from "@/lib/money";
 import { lumpSumAllowance } from "@/lib/tax";
 import { bySlot } from "@/test/dom";
 
@@ -39,6 +44,12 @@ const byClass =
 // the ids they are listed under.
 const [pension, isa, cash, home, mortgage] = accounts;
 const held: readonly Account[] = [pension, isa];
+
+// The plan the points are counted against: the fixture's owner, born
+// early enough to draw a pension all through every year here, so a
+// pension counts on the liquidity as on the net worth in every test but
+// the one on the year it starts to.
+const drawing = { owners: [{ ...owners[0], born: 1960 }] };
 
 const points = [
   {
@@ -186,19 +197,28 @@ const flatNames = (): (null | string)[] =>
 
 describe("ProjectionChart", () => {
   it("plots the years with no legend, leaving the series to the crosshair to name", () => {
-    render(<ProjectionChart accounts={held} milestones={[]} points={points} />);
+    render(
+      <ProjectionChart
+        accounts={held}
+        milestones={[]}
+        plan={drawing}
+        points={points}
+      />,
+    );
 
     expect(screen.getByRole("application")).toHaveClass("recharts-surface");
     expect(screen.queryByText(pension.name)).not.toBeInTheDocument();
   });
 
   // The crosshair moves on the arrow keys as it does under the pointer,
-  // and recharts moves it a frame later.
+  // and recharts moves it a frame later. The pension's £438,308 is
+  // written at the £372,562 drawing it would leave, 85% of it.
   it("shows the year, the age, the figure of each account holding anything and the total under the crosshair", async () => {
     render(
       <ProjectionChart
-        accounts={[...held, sipp]}
+        accounts={[...held, { ...sipp, owner: pension.owner }]}
         milestones={[]}
+        plan={drawing}
         points={points}
       />,
     );
@@ -214,9 +234,9 @@ describe("ProjectionChart", () => {
     expect(tooltip.getByText(pension.name)).toBeInTheDocument();
     expect(tooltip.getByText(isa.name)).toBeInTheDocument();
     expect(tooltip.queryByText(sipp.name)).not.toBeInTheDocument();
-    expect(tooltip.getByText("£438,308")).toHaveClass("figure");
+    expect(tooltip.getByText("£372,562")).toHaveClass("figure");
     expect(tooltip.getByText("£305,483")).toHaveClass("figure");
-    expect(tooltip.getByText("£743,791")).toHaveClass("figure");
+    expect(tooltip.getByText("£678,045")).toHaveClass("figure");
     expect(tooltip.getByText("Liquidity")).toBeInTheDocument();
   });
 
@@ -231,6 +251,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={[...held, cash]}
         milestones={[]}
+        plan={drawing}
         points={withCash}
       />,
     );
@@ -243,7 +264,7 @@ describe("ProjectionChart", () => {
     const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
 
     expect(tooltip.queryByText(cash.name)).not.toBeInTheDocument();
-    expect(tooltip.getByText("£753,791")).toHaveClass("figure");
+    expect(tooltip.getByText("£688,045")).toHaveClass("figure");
   });
 
   // A GIA is stacked between the ISA and the cash in the slate kept
@@ -264,6 +285,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={[...held, cash, gia]}
         milestones={[]}
+        plan={drawing}
         points={withGia}
       />,
     );
@@ -289,7 +311,7 @@ describe("ProjectionChart", () => {
 
     expect(tooltip.getByText(gia.name)).toBeInTheDocument();
     expect(tooltip.getByText("£10,000")).toHaveClass("figure");
-    expect(tooltip.getByText("£754,091")).toHaveClass("figure");
+    expect(tooltip.getByText("£688,345")).toHaveClass("figure");
   });
 
   // Two pensions, the ISA, the current account and the home, stacked
@@ -297,9 +319,11 @@ describe("ProjectionChart", () => {
   // toward the card from the first, and the mortgage stacked down from
   // nothing in loss red, each but the current account named under the
   // crosshair from the top of the stack down, over the net worth they
-  // come to, which counts the home and the current account.
+  // come to, which counts the home and the current account. The two
+  // pensions are one owner's, and their £1,600 counts at the £1,360
+  // drawing them would leave.
   it("draws each account on its own, family by family, and names each under the crosshair", async () => {
-    const listed = [...accounts, sipp];
+    const listed = [...accounts, { ...sipp, owner: pension.owner }];
     const years = [2026, 2027].map((year, place) => ({
       age: 34 + place,
       allowances: { 1: lumpSumAllowance },
@@ -311,7 +335,12 @@ describe("ProjectionChart", () => {
       year,
     }));
     render(
-      <ProjectionChart accounts={listed} milestones={[]} points={years} />,
+      <ProjectionChart
+        accounts={listed}
+        milestones={[]}
+        plan={drawing}
+        points={years}
+      />,
     );
     fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
     fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
@@ -356,7 +385,7 @@ describe("ProjectionChart", () => {
     ]);
     expect(tooltip.getByText("−£180,000")).toHaveClass("figure");
     expect(tooltip.getByText("Net worth")).toBeInTheDocument();
-    expect(tooltip.getByText("£223,900")).toHaveClass("figure");
+    expect(tooltip.getByText("£223,660")).toHaveClass("figure");
   });
 
   // Four debts take loss red, oxide and ochre in the order they are
@@ -391,7 +420,12 @@ describe("ProjectionChart", () => {
       year: 2026 + place,
     }));
     render(
-      <ProjectionChart accounts={listed} milestones={[]} points={years} />,
+      <ProjectionChart
+        accounts={listed}
+        milestones={[]}
+        plan={drawing}
+        points={years}
+      />,
     );
     fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
 
@@ -458,6 +492,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={[car, pcp, card]}
         milestones={[]}
+        plan={drawing}
         points={years}
       />,
     );
@@ -538,6 +573,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={[isa, flat, loan]}
         milestones={[]}
+        plan={drawing}
         points={years}
       />,
     );
@@ -602,6 +638,7 @@ describe("ProjectionChart", () => {
           { ...first, id: 12, name: "Flat mortgage 2" },
         ]}
         milestones={[]}
+        plan={drawing}
         points={years}
       />,
     );
@@ -654,6 +691,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={[isa, flat, loan]}
         milestones={[]}
+        plan={drawing}
         points={years}
       />,
     );
@@ -693,6 +731,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={listed}
         milestones={[]}
+        plan={drawing}
         points={plan({ 5: -100000, 6: 1000000 })}
       />,
     );
@@ -703,6 +742,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={listed}
         milestones={[]}
+        plan={drawing}
         points={plan({ 5: -600000, 6: 1000000 })}
       />,
     );
@@ -721,6 +761,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={listed}
         milestones={[]}
+        plan={drawing}
         points={plan({ 5: -188000, 6: 0 })}
       />,
     );
@@ -760,6 +801,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={[isa, flat, loan]}
         milestones={[]}
+        plan={drawing}
         points={years}
       />,
     );
@@ -789,6 +831,7 @@ describe("ProjectionChart", () => {
         choices={<button type="button">A choice</button>}
         controls={<button type="button">A control</button>}
         milestones={[]}
+        plan={drawing}
         points={points}
       />,
     );
@@ -810,6 +853,7 @@ describe("ProjectionChart", () => {
         choices={<button type="button">A choice</button>}
         controls={<button type="button">A control</button>}
         milestones={[]}
+        plan={drawing}
         points={[]}
       />,
     );
@@ -823,7 +867,14 @@ describe("ProjectionChart", () => {
   });
 
   it("draws a column per year to begin with, and swaps it for areas on the toggle and back", () => {
-    render(<ProjectionChart accounts={held} milestones={[]} points={points} />);
+    render(
+      <ProjectionChart
+        accounts={held}
+        milestones={[]}
+        plan={drawing}
+        points={points}
+      />,
+    );
 
     expect(
       screen.getAllByText(byClass("recharts-bar"), { suggest: false }),
@@ -855,7 +906,14 @@ describe("ProjectionChart", () => {
   });
 
   it("marks no year and names nothing uncovered while the money lasts", async () => {
-    render(<ProjectionChart accounts={held} milestones={[]} points={points} />);
+    render(
+      <ProjectionChart
+        accounts={held}
+        milestones={[]}
+        plan={drawing}
+        points={points}
+      />,
+    );
 
     const chart = screen.getByRole("application");
     chart.focus();
@@ -873,7 +931,12 @@ describe("ProjectionChart", () => {
 
   it("marks the first year a pension is drawn early apart from the year the money runs out", () => {
     render(
-      <ProjectionChart accounts={held} milestones={[]} points={earlyPoints} />,
+      <ProjectionChart
+        accounts={held}
+        milestones={[]}
+        plan={drawing}
+        points={earlyPoints}
+      />,
     );
 
     expect(marks().map((mark) => mark.getAttribute("x"))).toStrictEqual([
@@ -891,6 +954,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={held}
         milestones={[{ id: "retirement", name: "Retirement", year: 2026 }]}
+        plan={drawing}
         points={earlyPoints}
       />,
     );
@@ -914,7 +978,12 @@ describe("ProjectionChart", () => {
 
   it("names what a year drew early under the crosshair", async () => {
     render(
-      <ProjectionChart accounts={held} milestones={[]} points={earlyPoints} />,
+      <ProjectionChart
+        accounts={held}
+        milestones={[]}
+        plan={drawing}
+        points={earlyPoints}
+      />,
     );
 
     const chart = screen.getByRole("application");
@@ -936,7 +1005,12 @@ describe("ProjectionChart", () => {
 
   it("marks the first year the money runs out, and only that year", () => {
     render(
-      <ProjectionChart accounts={held} milestones={[]} points={shortPoints} />,
+      <ProjectionChart
+        accounts={held}
+        milestones={[]}
+        plan={drawing}
+        points={shortPoints}
+      />,
     );
 
     expect(marks()).toHaveLength(1);
@@ -951,7 +1025,12 @@ describe("ProjectionChart", () => {
 
   it("names what a short year could not cover under the crosshair", async () => {
     render(
-      <ProjectionChart accounts={held} milestones={[]} points={shortPoints} />,
+      <ProjectionChart
+        accounts={held}
+        milestones={[]}
+        plan={drawing}
+        points={shortPoints}
+      />,
     );
 
     const chart = screen.getByRole("application");
@@ -975,6 +1054,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={held}
         milestones={[]}
+        plan={drawing}
         points={[
           {
             age: 34,
@@ -1011,7 +1091,14 @@ describe("ProjectionChart", () => {
   });
 
   it("has nothing to plot over no years either", () => {
-    render(<ProjectionChart accounts={held} milestones={[]} points={[]} />);
+    render(
+      <ProjectionChart
+        accounts={held}
+        milestones={[]}
+        plan={drawing}
+        points={[]}
+      />,
+    );
 
     expect(
       screen.getByText("Add an account or an asset to see it projected."),
@@ -1021,10 +1108,11 @@ describe("ProjectionChart", () => {
   // Fifteen years from 2026. Every milestone within them is marked, the
   // chosen one solid with a dot at what the stack comes to on the basis
   // counted, the rest faint; one past them goes undrawn. No milestone is
-  // named on the plot. The wrappers hold £200,000 beside £20,000 of cash
-  // and £150,000 owed on a home worth £300,000, so the liquidity is
-  // £70,000 and the net worth £370,000, and the dot stands at each in
-  // turn where the wrappers alone would put it at £200,000.
+  // named on the plot. The wrappers hold £200,000, the pension's half of
+  // it counted at the £85,000 drawing it would leave, beside £20,000 of
+  // cash and £150,000 owed on a home worth £300,000, so the liquidity is
+  // £55,000 and the net worth £355,000, and the dot stands at each in
+  // turn where the wrappers alone would put it at £185,000.
   it("marks every milestone in the plan's years, the chosen one solid with a dot where the basis's total stands", () => {
     const years = Array.from({ length: 15 }, (_, place) => ({
       age: 34 + place,
@@ -1044,6 +1132,7 @@ describe("ProjectionChart", () => {
           { id: "retirement", name: "Retirement", year: 2030 },
           { id: 5, name: "Care", year: 2060 },
         ]}
+        plan={drawing}
         points={years}
         selected="retirement"
       />,
@@ -1059,11 +1148,11 @@ describe("ProjectionChart", () => {
     expect(dots()).toHaveLength(1);
     expect(dots()[0]).toHaveAttribute("fill", "var(--brand)");
     expect(dots()[0]).toHaveAttribute("x", "2030");
-    expect(dots()[0]).toHaveAttribute("y", "70000");
+    expect(dots()[0]).toHaveAttribute("y", "55000");
 
     fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
 
-    expect(dots()[0]).toHaveAttribute("y", "370000");
+    expect(dots()[0]).toHaveAttribute("y", "355000");
     expect(
       screen.queryByText(/^(Kids leave home|Retirement|Care)$/),
     ).not.toBeInTheDocument();
@@ -1074,6 +1163,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={held}
         milestones={[{ id: 5, name: "Care", year: 2060 }]}
+        plan={drawing}
         points={points}
         selected={5}
       />,
@@ -1086,6 +1176,7 @@ describe("ProjectionChart", () => {
       <ProjectionChart
         accounts={held}
         milestones={[{ id: "retirement", name: "Retirement", year: 2027 }]}
+        plan={drawing}
         points={points}
       />,
     );
@@ -1102,6 +1193,7 @@ describe("ProjectionChart", () => {
           { id: "retirement", name: "Retirement", year: 2027 },
           { id: 2, name: "Sabbatical", year: 2027 },
         ]}
+        plan={drawing}
         points={points}
       />,
     );
@@ -1116,6 +1208,74 @@ describe("ProjectionChart", () => {
         "Retirement and Sabbatical",
       ),
     ).toHaveClass("text-muted-foreground");
+  });
+
+  // The reference household projected two years on: its pension counts
+  // in the stack at what drawing it would leave, so on the net worth the
+  // stack comes to the net worth the tiles measure off the same point.
+  it("stacks to the net worth the tiles measure, a pension at what drawing it would leave", async () => {
+    const run = { ...kept, plan: { ...retiring, years: 2 } };
+    const projected = project(run.accounts, run.schedule, run.plan);
+    const [, entering2027] = projected;
+    render(
+      <ProjectionChart
+        accounts={run.accounts}
+        milestones={[]}
+        plan={run.plan}
+        points={projected}
+      />,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2027 · Age 35");
+
+    expect(
+      within(screen.getByText(bySlot("projection-tooltip"))).getByText(
+        formatGbp(
+          entering2027 === undefined
+            ? 0
+            : measuredOf(entering2027, { month: 0, year: 2027 }, run).worth,
+        ),
+      ),
+    ).toHaveClass("figure");
+  });
+
+  // The reference household projected to 2050. Its owner, born in 1992,
+  // is 56 entering 2048, short of the pension age all year, and 57
+  // entering 2049, drawing it all year. On the liquidity the chosen
+  // milestone's dot stands at the liquid net worth the tiles measure off
+  // the same point in both, the pension left out of the stack in the
+  // first and counted in it from the second.
+  it("stacks to the liquid net worth the tiles measure, a pension from its owner's pension age", () => {
+    const run = { ...kept, plan: { ...retiring, years: 24 } };
+    const projected = project(run.accounts, run.schedule, run.plan);
+    const liquidIn = (year: number): string => {
+      const entering = projected.find((point) => point.year === year);
+      return String(
+        entering === undefined
+          ? 0
+          : measuredOf(entering, { month: 0, year }, run).liquid,
+      );
+    };
+    const chart = (year: number): JSX.Element => (
+      <ProjectionChart
+        accounts={run.accounts}
+        milestones={[{ id: "retirement", name: "Retirement", year }]}
+        plan={run.plan}
+        points={projected}
+        selected="retirement"
+      />
+    );
+    const { rerender } = render(chart(2048));
+
+    expect(dots()[0]).toHaveAttribute("y", liquidIn(2048));
+
+    rerender(chart(2049));
+
+    expect(dots()[0]).toHaveAttribute("y", liquidIn(2049));
   });
 });
 

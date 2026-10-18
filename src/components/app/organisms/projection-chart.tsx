@@ -21,6 +21,7 @@ import {
 
 import type { Account, AccountKind } from "@/data/accounts";
 import type { Marker } from "@/data/milestones";
+import type { Plan } from "@/data/plan";
 import type { Tie } from "@/data/schedule";
 import type { ProjectionPoint } from "@/engine/projection";
 
@@ -31,7 +32,12 @@ import { Card, CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
 import { isAsset } from "@/data/accounts";
 import { drawnAsMortgages } from "@/data/houses";
-import { balanceIn, holdsAnything } from "@/engine/projection";
+import {
+  balanceIn,
+  holdsAnything,
+  liquidOf,
+  worthsIn,
+} from "@/engine/projection";
 import { axisOf } from "@/lib/axis";
 import { listed } from "@/lib/feeders";
 import { formatAxisGbp, formatGbp } from "@/lib/money";
@@ -40,7 +46,11 @@ import { accountsAndAssets } from "@/lib/nav";
 // What the chart counts: the money the plan could spend, its savings less
 // every debt, with a house or a car left out and the loan on it owed as
 // any debt is; or all it is worth, a house or a car counted at its
-// equity, the loan secured on it drawn in it.
+// equity, the loan secured on it drawn in it. On either, each account
+// counts for what the tiles count it for, so the stack comes to the
+// figure they read: a pension counted as drawn at the basic rate, and on
+// the liquidity only in a year its owner can draw it all through, so
+// its band joins the stack at the pension age.
 type Basis = "liquidity" | "net-worth";
 
 // The kinds of account that share a colour, and the hues they are drawn
@@ -65,6 +75,7 @@ interface ProjectionChartProps {
   readonly choices?: ReactNode;
   readonly controls?: ReactNode;
   readonly milestones: readonly Marker[];
+  readonly plan: Pick<Plan, "owners">;
   readonly points: readonly ProjectionPoint[];
   readonly selected?: Tie | undefined;
 }
@@ -139,8 +150,9 @@ const axisWidth = 57;
 // a year at a time and each drawn on its own, what it holds stacked up
 // from nothing and what it owes down from it, as a column per year to
 // begin with or, on the toggle, as areas under lines. It counts the
-// plan's liquidity to begin with, the savings less every debt, and on
-// a second toggle its net worth, a house or a car at its equity with
+// plan's liquidity to begin with, the savings less every debt, a
+// pension among the savings from its owner's pension age, and on a
+// second toggle its net worth, a house or a car at its equity with
 // the loans secured on it. The plot alone, with no figure
 // over it: a hairline grid, the years and the pounds as recessive ticks,
 // and a crosshair with the year's figures on hover and on the arrow
@@ -194,7 +206,8 @@ export function ProjectionChart({
   choices,
   controls,
   milestones,
-  points,
+  plan,
+  points: projected,
   selected,
 }: ProjectionChartProps): JSX.Element {
   const [basis, setBasis] = useState<Basis>("liquidity");
@@ -208,8 +221,28 @@ export function ProjectionChart({
   // before its figures have moved.
   const bases = useMemo(() => seriesOf(accounts), [accounts]);
   const series = bases[basis];
+  // Each point with every account at what it counts for on each basis
+  // rather than what it holds, as the tiles count it: on the net worth
+  // what worthsIn says it is worth, and on the liquidity what liquidOf
+  // leaves of that, so the stack comes to what they read. Made once for
+  // the points, both bases at once, as the series are, so every column,
+  // the axis and the crosshair read the one figure.
+  const counted = useMemo(() => {
+    const worths = projected.map((point) => ({
+      ...point,
+      balances: worthsIn(point, accounts),
+    }));
+    return {
+      liquidity: worths.map((point) => ({
+        ...point,
+        balances: liquidOf(point.balances, point.year, { accounts, plan }),
+      })),
+      "net-worth": worths,
+    };
+  }, [accounts, plan, projected]);
+  const points = counted[basis];
 
-  if (!points.some(holdsAnything)) {
+  if (!projected.some(holdsAnything)) {
     return (
       <Frame>
         <EmptyState
@@ -725,8 +758,8 @@ function totalIn(point: ProjectionPoint, series: readonly Series[]): number {
   return series.reduce((sum, line) => sum + valueIn(point, line), 0);
 }
 
-// What a series stands at on a point: what the accounts it sums hold,
-// less what they owe.
+// What a series stands at on a point as the chart counts it: what the
+// accounts it sums count for on the basis, less what they owe.
 function valueIn(point: ProjectionPoint, { ids }: Pick<Series, "ids">): number {
   return ids.reduce((sum, id) => sum + balanceIn(point, id), 0);
 }
