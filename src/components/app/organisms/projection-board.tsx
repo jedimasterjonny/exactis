@@ -364,6 +364,7 @@ function Board({
           )
         }
         milestones={markers}
+        plan={plan}
         points={points}
         selected={chosen?.id}
       />

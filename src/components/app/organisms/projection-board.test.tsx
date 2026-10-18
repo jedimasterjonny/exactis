@@ -20,7 +20,6 @@ import type { Slice } from "@/hooks/futures.worker";
 
 import { saveAges } from "@/actions/plan";
 import { toast } from "@/components/kit/toast";
-import { isAsset } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
@@ -28,7 +27,7 @@ import { retiring } from "@/data/income.fixture";
 import { atAge, retiringAt } from "@/data/milestones";
 import { working } from "@/data/owners.fixture";
 import { futureOf } from "@/engine/futures";
-import { balanceIn, project, worthsIn } from "@/engine/projection";
+import { liquidOf, project, worthsIn } from "@/engine/projection";
 import { forget } from "@/hooks/use-futures";
 import { refused } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
@@ -135,17 +134,18 @@ function pointIn(
 }
 
 // The liquidity the chart gives for a year of a plan, as its tooltip
-// writes it to begin with: every account it draws, which is every one
-// but the home, the mortgage owed among them.
+// writes it to begin with: what every account it draws counts for in
+// the liquid net worth, which is every one but the home, the mortgage
+// owed among them, and the pension left out before its owner's pension
+// age.
 function totalIn(held: Plan, year: number, lines: Schedule = schedule): string {
   const point = pointIn(held, year, lines);
   return formatGbp(
-    accounts
-      .filter((account) => !isAsset(account))
-      .reduce(
-        (sum, { id }) => sum + (point === undefined ? 0 : balanceIn(point, id)),
-        0,
-      ),
+    point === undefined
+      ? 0
+      : Object.values(
+          liquidOf(worthsIn(point, accounts), year, { accounts, plan: held }),
+        ).reduce((sum, worth) => sum + worth, 0),
   );
 }
 
@@ -261,8 +261,11 @@ describe("ProjectionBoard", () => {
   // at 50 rather than 59 starts it in 2040 rather than 2049, and 2045
   // pays it beside the household spending that runs to 2047: the chart
   // gives the engine's figure for the line moved with the age, not the
-  // one handed down. On fake timers, as the test before it is, so the
-  // save cannot fire and drop the draft before the figure is read.
+  // one handed down. At 55 the pension is out of the liquidity until 57
+  // and the ISA alone is counted, so its figure and the total read the
+  // same, the total written last. On fake timers, as the test before it
+  // is, so the save cannot fire and drop the draft before the figure is
+  // read.
   it("moves a line tied to retirement with the age moved to, before it is saved", () => {
     vi.useFakeTimers();
     render(board(retiring, livingFrom(2049, true)));
@@ -283,7 +286,7 @@ describe("ProjectionBoard", () => {
 
     expect(screen.getByText("2045 · Age 55")).toBeInTheDocument();
     expect(moved).not.toBe(totalIn(early, 2045, livingFrom(2049, false)));
-    expect(screen.getByText(moved)).toHaveClass("figure");
+    expect(screen.getAllByText(moved).at(-1)).toHaveClass("figure");
     expect(saveAges).not.toHaveBeenCalled();
   });
 
