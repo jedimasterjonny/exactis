@@ -102,7 +102,9 @@ since the scenario deleted it. The merge is held to every rule, as any save is.
 The versions of the scenario up to the one adopted are then dropped, so one
 saved to it since stays. The store runs no transaction, so the write comes first
 and the drop second: a drop that fails leaves a scenario already adopted, and
-nothing lost.
+nothing lost. While a scenario is open, a banner naming it heads every screen,
+with a button that leaves it for the household, so nothing is edited without
+saying where it is saved.
 
 The plan is the first listed owner's, as the first listed account is the first
 paid: it runs to the age they reach, and the retirement its lines are tied to is
