@@ -27,6 +27,7 @@ import {
   drawOf,
   incomeTaxOn,
   insuranceOn,
+  keptOf,
   lumpSumAllowance,
   stampDutyOn,
   upratingIn,
@@ -42,11 +43,13 @@ export interface MonthsOn {
 }
 
 // A year of a projection as its moves carry it: the month it opens
-// with, the balances entering it as its moves leave them, in today's
-// money, which is what the year is measured by, what its moves leave
-// short for its first month to find, in that month's pounds, the run as
-// carried through it, and what each move made as it opened came to.
+// with, each owner's lump sum allowance left and the balances entering
+// it as its moves leave them, in today's money, which is what the year
+// is measured by, what its moves leave short for its first month to
+// find, in that month's pounds, the run as carried through it, and
+// what each move made as it opened came to.
 export interface MovedYear {
+  readonly allowances: Readonly<Record<number, number>>;
   readonly at: Month;
   readonly balances: Readonly<Record<number, number>>;
   readonly due: number;
@@ -291,25 +294,78 @@ export function laidOut(
   return carriedBy(run, retired ?? endYear(plan) + 1);
 }
 
+// What each account counts for in the liquid net worth, by its id, from
+// what worthsIn says each is worth on a point of the year given: what it
+// is worth, save a property or a vehicle and a pension its owner cannot
+// draw all year, which count for nothing. A pension counts for a year only
+// if it can be drawn all year, so the pension age is read as it stands
+// in December: an owner's age does not change within a year, as ageIn
+// reads it off the year, but the pension age rises from 55 to 57 in
+// April 2028, and read as the year opens it would count the pension of
+// an owner of 55 or 56 for 2028 alone and drop it again in 2029. What
+// measuredOf sums for the liquid net worth and the chart stacks on the
+// liquidity, so the stack and the figure it shows cannot disagree.
+export function liquidOf(
+  worths: Readonly<Record<number, number>>,
+  year: number,
+  {
+    accounts,
+    plan,
+  }: {
+    readonly accounts: readonly Account[];
+    readonly plan: Pick<Plan, "owners">;
+  },
+): Readonly<Record<number, number>> {
+  const december = { month: 11, year };
+  return {
+    ...worths,
+    ...Object.fromEntries(
+      accounts
+        .filter(
+          (account) =>
+            isAsset(account) ||
+            (isPension(account) &&
+              isBeforePensionAge(
+                ageIn(year, holderOf(account, plan)),
+                december,
+              )),
+        )
+        .map(({ id }) => [id, 0]),
+    ),
+  };
+}
+
 // A year of a projection as a milestone measures it, from the month it
 // opens with: the age the plan's owner reaches in it, and every sum whole
-// pounds of today's money: what every account comes to, which is the
-// plan's net worth; what it owes, every debt's balance turned to a sum
-// owed, nothing where it owes nothing rather than nothing with a sign;
-// what it is worth less the property and vehicles; and twelve of what
-// the expense lines running in the month cost it, read in today's
-// money at how far prices have risen by then along the future's path.
+// pounds of today's money: what every account is worth as worthsIn
+// counts it, a pension counted as drawn at the basic rate and anything
+// else at its balance, which is the plan's net worth; what it owes,
+// every debt's balance turned to a sum owed, nothing where it owes
+// nothing rather than nothing with a sign; what every account counts
+// for as liquidOf counts it, which leaves out the property and vehicles
+// and every pension its owner cannot draw all year, which is its liquid
+// net worth; and twelve of what the expense lines running in the month
+// cost it, read in today's money at how far prices have risen by then
+// along the future's path. A pension before its pension age is still
+// counted in the net worth, and not at the 55% a draw then is charged:
+// what the plan owns is not what it can have this month. The futures
+// measure every year of every future here, so the worths are worked
+// out once and read as they are.
 export function measuredOf(
-  point: Pick<ProjectionPoint, "balances">,
+  point: Pick<ProjectionPoint, "allowances" | "balances">,
   at: Month,
   { accounts, plan, schedule }: Run,
 ): Measured {
-  const sum = (held: readonly Account[]): number =>
-    held.reduce((total, { id }) => total + balanceIn(point, id), 0);
-  const worth = sum(accounts);
+  const worths = worthsIn(point, accounts);
+  const sum = (counted: Readonly<Record<number, number>>): number =>
+    Object.values(counted).reduce((total, each) => total + each, 0);
   return {
     age: ageIn(at.year, plan),
-    debt: 0 - sum(accounts.filter(({ kind }) => kind === "debt")),
+    debt:
+      0 -
+      accounts
+        .filter(({ kind }) => kind === "debt")
+        .reduce((total, { id }) => total + balanceIn(point, id), 0),
     expenses: Math.round(
       (12 *
         spentIn(accounts, schedule, { at, plan }).reduce(
@@ -318,8 +374,8 @@ export function measuredOf(
         )) /
         pricesIn(plan, at),
     ),
-    liquid: worth - sum(accounts.filter(isAsset)),
-    worth,
+    liquid: sum(liquidOf(worths, at.year, { accounts, plan })),
+    worth: sum(worths),
   };
 }
 
@@ -421,6 +477,7 @@ export function movedYears(
     const moving = movesIn(moved, point, at);
     moved = moving.run;
     return {
+      allowances: point.allowances,
       at,
       balances: moving.balances,
       due: Math.max(0, -moving.cash),
@@ -590,7 +647,10 @@ export function project(
     if (
       conditions !== undefined &&
       retired === null &&
-      isRetiring(moving, opens, { conditions, run: moved })
+      isRetiring({ allowances: left, balances: moving.balances }, opens, {
+        conditions,
+        run: moved,
+      })
     ) {
       retired = year;
       carried = carriedBy(moved, year);
@@ -697,9 +757,54 @@ export function retirementIn(
     return retirementYear(run.plan);
   }
   return (
-    movedYears(points, run).find(({ at, balances, run: moved }) =>
-      isRetiring({ balances }, at, { conditions, run: moved }),
+    movedYears(points, run).find(({ allowances, at, balances, run: moved }) =>
+      isRetiring({ allowances, balances }, at, { conditions, run: moved }),
     )?.at.year ?? null
+  );
+}
+
+// What each account on a point is worth, by its id: a pension what it
+// leaves counted as drawn at the basic rate, and anything else what it
+// holds, or owes as a negative. An owner's pensions share one lump sum
+// allowance, so they are counted together, against what the point has
+// left of the owner's, and what they leave is shared across them by
+// what each holds: counted one at a time, two pensions of one owner
+// would each take the whole allowance. A point holds an allowance for
+// every owner of the plan, so an owner it holds none for is outside the
+// plan, with none to draw against, and their pensions are taxed in
+// full. Each pension is rounded to the pound on its own, as a point's
+// balances are, so the net worth summed here and a chart stacking the
+// same figures agree. The futures measure every year of every future
+// through here, so each owner's pensions are summed and counted once.
+export function worthsIn(
+  point: Pick<ProjectionPoint, "allowances" | "balances">,
+  accounts: readonly Account[],
+): Readonly<Record<number, number>> {
+  const owners = new Map(
+    [...Map.groupBy(accounts.filter(isPension), ({ owner }) => owner)].map(
+      ([owner, held]) => {
+        const gross = held.reduce(
+          (sum, { id }) => sum + balanceIn(point, id),
+          0,
+        );
+        const left = owner === undefined ? 0 : (point.allowances[owner] ?? 0);
+        return [owner, { gross, kept: keptOf(gross, left) }];
+      },
+    ),
+  );
+  return Object.fromEntries(
+    accounts.map((account) => {
+      const balance = balanceIn(point, account.id);
+      const counted = owners.get(account.owner);
+      if (!isPension(account) || counted === undefined) {
+        return [account.id, balance];
+      }
+      const { gross, kept } = counted;
+      return [
+        account.id,
+        gross === 0 ? 0 : Math.round((balance * kept) / gross),
+      ];
+    }),
   );
 }
 
@@ -861,7 +966,7 @@ function isReserve(account: Account): boolean {
 // they would retire to is what twenty-five years of expenses is
 // twenty-five years of.
 function isRetiring(
-  point: Pick<ProjectionPoint, "balances">,
+  point: Pick<ProjectionPoint, "allowances" | "balances">,
   at: Month,
   {
     conditions,

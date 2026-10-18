@@ -22,11 +22,13 @@ import {
   holdsAnything,
   isShort,
   laidOut,
+  measuredOf,
   monthsOn,
   movedIn,
   movedYears,
   project,
   retirementIn,
+  worthsIn,
 } from "./projection";
 
 const [pension, isa, cash, home, mortgage] = accounts;
@@ -2321,6 +2323,140 @@ describe("balanceIn", () => {
     expect(point && balanceIn(point, isa.id)).toBe(271930);
     expect(point && balanceIn(point, mortgage.id)).toBe(-176520);
     expect(point && balanceIn(point, pension.id)).toBe(0);
+  });
+});
+
+describe("worthsIn", () => {
+  // £100,000 in a pension is £25,000 free of tax and £75,000 at 20%,
+  // £85,000, and everything else counts at what it holds or owes.
+  it("counts a pension at what drawing it would leave, and anything else at its balance", () => {
+    expect(
+      worthsIn(point(2026, { 2: 50000, 4: 300000, 5: -100000, 6: 100000 }), [
+        pension,
+        isa,
+        cash,
+        home,
+        mortgage,
+      ]),
+    ).toStrictEqual({ 2: 50000, 3: 0, 4: 300000, 5: -100000, 6: 85000 });
+  });
+
+  // £2,000,000 is more than four times the £268,275 allowance, so its
+  // quarter is held to the allowance: £268,275 free and £1,731,725 at
+  // 20%, leaving £1,653,655 rather than 85% of it.
+  it("holds a pension's tax-free quarter to its owner's allowance", () => {
+    expect(worthsIn(point(2026, { 6: 2000000 }), [pension])).toStrictEqual({
+      6: 1653655,
+    });
+  });
+
+  // The owner's £1,500,000 and £500,000 are counted together, as the
+  // £2,000,000 that leaves £1,653,655, three quarters of it to the first
+  // and a quarter to the second; counted one at a time each would take a
+  // whole allowance and leave 85%, £1,700,000 between them. Sam's
+  // £100,000, against the nothing Sam has left, leaves £80,000, and a
+  // pension holding nothing is worth nothing.
+  it("shares one allowance across an owner's pensions by what each holds, and holds each owner to their own", () => {
+    const sams: Account = { ...sipp, id: 8, owner: sam.id };
+
+    expect(
+      worthsIn(
+        point(
+          2026,
+          { 6: 1500000, 7: 500000, 8: 100000 },
+          { allowances: { [sam.id]: 0, [working.id]: lumpSumAllowance } },
+        ),
+        [pension, sipp, sams],
+      ),
+    ).toStrictEqual({ 6: 1240241, 7: 413414, 8: 80000 });
+    expect(worthsIn(point(2026, {}), [pension, sipp, sams])).toStrictEqual({
+      6: 0,
+      7: 0,
+      8: 0,
+    });
+  });
+
+  // An owner the point holds no allowance for has none to take a
+  // quarter free under, so the whole pension is taxed, and so is a
+  // pension with no owner at all, here the current account's fields as
+  // a pension's.
+  it("taxes the whole of a pension whose owner the point holds no allowance for", () => {
+    const ownerless: Account = { ...cash, kind: "tax-deferred" };
+
+    expect(
+      worthsIn(point(2026, { 6: 100000 }, { allowances: {} }), [pension]),
+    ).toStrictEqual({ 6: 80000 });
+    expect(worthsIn(point(2026, { 3: 100000 }), [ownerless])).toStrictEqual({
+      3: 80000,
+    });
+  });
+});
+
+describe("measuredOf", () => {
+  // The pension counts at its £85,000 in the net worth, £345,000 with
+  // the ISA, the cash and the home's equity. Its owner, born in 1992,
+  // is 34 in 2026 and 56 in 2048, short of the pension age, so the
+  // liquid net worth leaves it out with the home, the ISA and the cash
+  // less the mortgage, -£40,000; at 57 in 2049 it can be drawn and
+  // counts there at the same £85,000, £45,000. What is owed, the
+  // expenses and the age are read as they were.
+  it("counts a pension net in the net worth, and in the liquid net worth only from its owner's pension age", () => {
+    const run = {
+      accounts: [pension, isa, cash, home, mortgage],
+      plan: { ...plan, years: 60 },
+      schedule: short,
+    };
+    const at = (year: number): ReturnType<typeof measuredOf> =>
+      measuredOf(
+        point(year, { 2: 50000, 3: 10000, 4: 300000, 5: -100000, 6: 100000 }),
+        { month: 0, year },
+        run,
+      );
+
+    expect(at(2026)).toStrictEqual({
+      age: 34,
+      debt: 100000,
+      expenses: 12000,
+      liquid: -40000,
+      worth: 345000,
+    });
+    expect(at(2048)).toStrictEqual({
+      age: 56,
+      debt: 100000,
+      expenses: 12000,
+      liquid: -40000,
+      worth: 345000,
+    });
+    expect(at(2049)).toStrictEqual({
+      age: 57,
+      debt: 100000,
+      expenses: 12000,
+      liquid: 45000,
+      worth: 345000,
+    });
+  });
+
+  // The pension age rises from 55 to 57 in April 2028. An owner of 55 in
+  // 2028, born in 1973, can draw from January to March and not after,
+  // so not all year, and the £85,000 the pension counts at is left out
+  // of 2028's liquid net worth, the ISA's £50,000 alone; one of 57 then,
+  // born in 1971, can draw all year, and so can one of 55 in 2027, born
+  // in 1972, the age not yet risen, so theirs counts, £135,000.
+  it("counts a pension in the liquid net worth for a year only if it can be drawn all year", () => {
+    const liquidIn = (born: number, year: number): number =>
+      measuredOf(
+        point(year, { 2: 50000, 6: 100000 }),
+        { month: 0, year },
+        {
+          accounts: [pension, isa],
+          plan: { ...bornIn(born), years: 60 },
+          schedule: short,
+        },
+      ).liquid;
+
+    expect(liquidIn(1973, 2028)).toBe(50000);
+    expect(liquidIn(1971, 2028)).toBe(135000);
+    expect(liquidIn(1972, 2027)).toBe(135000);
   });
 });
 

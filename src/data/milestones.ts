@@ -32,9 +32,12 @@ export interface Marker {
 
 // A year of a future as a milestone measures it: the age the plan's
 // owner reaches in it, and every sum in today's money: what the plan
-// is worth entering the year, every account less every debt; what it
-// is worth less the property and vehicles, which is the savings less
-// every debt, the mortgage among them, as a liquid net worth is read;
+// is worth entering the year, every account less every debt, a pension
+// counted as drawn at the basic rate; what it is worth less the
+// property and vehicles, which is the savings less every debt, the
+// mortgage among them, as a liquid net worth is read, the savings
+// leaving out every pension in a year its owner cannot draw it all
+// through, short of their pension age;
 // what a year of its expense lines comes to as the year opens; and
 // what it owes, every debt summed, as a sum owed rather than a balance
 // below nothing.

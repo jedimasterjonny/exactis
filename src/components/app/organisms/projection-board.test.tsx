@@ -28,7 +28,7 @@ import { retiring } from "@/data/income.fixture";
 import { atAge, retiringAt } from "@/data/milestones";
 import { working } from "@/data/owners.fixture";
 import { futureOf } from "@/engine/futures";
-import { balanceIn, project } from "@/engine/projection";
+import { balanceIn, project, worthsIn } from "@/engine/projection";
 import { forget } from "@/hooks/use-futures";
 import { refused } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
@@ -156,15 +156,18 @@ function typeAge(age: string): void {
 }
 
 // The net worth the plan holds entering a year, as the net worth tile
-// reads it: every account the fixture holds, the home and the mortgage
-// owed on it among them.
+// reads it: what every account the fixture holds is worth, the home and
+// the mortgage owed on it among them, and the pension at what drawing
+// it would leave.
 function worthIn(held: Plan, year: number, lines: Schedule = schedule): string {
   const point = pointIn(held, year, lines);
   return formatGbp(
-    accounts.reduce(
-      (sum, { id }) => sum + (point === undefined ? 0 : balanceIn(point, id)),
-      0,
-    ),
+    point === undefined
+      ? 0
+      : Object.values(worthsIn(point, accounts)).reduce(
+          (sum, worth) => sum + worth,
+          0,
+        ),
   );
 }
 
@@ -649,11 +652,12 @@ describe("ProjectionBoard", () => {
   });
 
   // Retiring on twenty-five years of expenses in liquid net worth, the
-  // plan at its own rates reaches it entering 2044, at 52: retirement is
-  // chosen there and read on liquid net worth, and with no age to drag,
-  // the row says what it is reached on. Ten thousand years of expenses
-  // it never reaches, so there is no milestone to choose and the tile
-  // says so.
+  // plan at its own rates reaches it entering 2049, at 57, the pension
+  // age, since the pension is no part of the liquid net worth before it:
+  // retirement is chosen there and read on liquid net worth, and with no
+  // age to drag, the row says what it is reached on. Ten thousand years
+  // of expenses it never reaches, so there is no milestone to choose and
+  // the tile says so.
   it("marks a retirement on conditions where the plan at its own rates reaches them, and says what it is reached on in the age's place", () => {
     const onConditions = (times: number): Plan => ({
       ...retiring,
@@ -675,18 +679,18 @@ describe("ProjectionBoard", () => {
 
     expect(screen.getByText("At Retirement")).toBeInTheDocument();
     expect(
-      screen.getByText("Liquid net worth · 2044 · age 52"),
+      screen.getByText("Liquid net worth · 2049 · age 57"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(formatGbp(measured[2044 - 2026]?.liquid ?? 0)),
+      screen.getByText(formatGbp(measured[2049 - 2026]?.liquid ?? 0)),
     ).toHaveClass("figure");
     expect(
       within(screen.getByRole("group", { name: "Milestones" })).getByRole(
         "button",
-        { name: "Retirement 2044", pressed: true },
+        { name: "Retirement 2049", pressed: true },
       ),
     ).toBeInTheDocument();
-    expect(marks()).toStrictEqual(["2044"]);
+    expect(marks()).toStrictEqual(["2049"]);
     expect(
       screen.queryByRole("textbox", { name: "Retirement age" }),
     ).not.toBeInTheDocument();

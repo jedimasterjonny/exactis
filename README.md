@@ -312,6 +312,21 @@ latest version a request, and the save every action makes live under
 is a route, and the organisms that save through an action sit beneath the
 routes.
 
+The net worth and the liquid net worth the tiles, the milestones and the chance
+of success read count a pension as drawn at the basic rate, which is what a draw
+beside the State Pension mostly meets: a quarter free of tax as far as its
+owner's lump sum allowance left reaches, one allowance across all of the owner's
+pensions, what they leave shared between them by what each holds, and the rest
+taxed at 20%. Each point carries what is left of each owner's allowance in
+today's money, as it carries the balances, though the law holds the allowance in
+nominal pounds, so the quarter is capped against like money. The liquid net
+worth is the net worth less the property and vehicles and less every pension in
+a year its owner cannot draw it all through, the pension age read as it stands
+at the year's end, so its rise to 57 in April 2028 does not count a pension for
+2028 alone; from that age it counts at the same figure. The net worth counts a
+pension all along, and not at the 55% a draw before that age is charged, since
+what the household owns is not what it can have this month.
+
 ## Inflation
 
 The plan's inflation is one of its rates, typed by hand or derived. A rate is
