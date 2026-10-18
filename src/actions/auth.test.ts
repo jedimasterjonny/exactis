@@ -3,11 +3,13 @@ import { redirect } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { hashPassword } from "@/lib/password";
+import { closeScenario } from "@/lib/scenario";
 import { endSession, startSession } from "@/lib/session";
 
 import { signIn, signInAsDeveloper, signOut } from "./auth";
 
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("@/lib/scenario", () => ({ closeScenario: vi.fn() }));
 vi.mock("@/lib/session", () => ({
   endSession: vi.fn(),
   startSession: vi.fn(),
@@ -78,13 +80,14 @@ describe("signInAsDeveloper", () => {
 });
 
 describe("signOut", () => {
-  it("ends the session and goes to the login screen", async () => {
+  it("ends the session, closes any scenario open and goes to the login screen", async () => {
     vi.mocked(redirect).mockImplementation(() => {
       throw new Error("redirected");
     });
 
     await expect(signOut()).rejects.toThrow("redirected");
     expect(endSession).toHaveBeenCalledOnce();
+    expect(closeScenario).toHaveBeenCalledOnce();
     expect(redirect).toHaveBeenCalledExactlyOnceWith("/login");
   });
 });

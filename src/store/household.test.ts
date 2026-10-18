@@ -21,13 +21,22 @@ import { inMemory } from "@/db/memory.fixture";
 import { householdVersions } from "@/db/schema";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
+import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 
-import { amend, getHousehold, getSourcesDaysAgo } from "./household";
+import {
+  amend,
+  getBaseline,
+  getHousehold,
+  getScenario,
+  getScenarios,
+  getSourcesDaysAgo,
+} from "./household";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
+vi.mock("@/lib/scenario", () => ({ openedScenario: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 
 const memory = inMemory();
@@ -333,6 +342,142 @@ describe("the household store", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(getSourcesDaysAgo(30)).rejects.toThrow("redirected");
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("opens on the household without a scenario's cookie, and lists the scenarios kept", async () => {
+    expect(await getScenario()).toBeNull();
+    expect(await getScenarios()).toStrictEqual([]);
+    expect(await getBaseline()).toStrictEqual(await getHousehold());
+
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
+    await keepAfter(db, { scenario: "Move house", version: 0 }, blank);
+
+    expect(await getScenario()).toBeNull();
+    expect(await getScenarios()).toStrictEqual(["Move house", "Retire early"]);
+  });
+
+  // The household kept as the reference, and a scenario beside it
+  // holding the household before anything is saved.
+  it("reads and saves the scenario the cookie names, and leaves the household as it was", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
+    vi.mocked(openedScenario).mockResolvedValue("Retire early");
+
+    expect(await getScenario()).toBe("Retire early");
+    expect(await getHousehold()).toMatchObject({
+      accounts: [],
+      owners: blank.owners,
+    });
+
+    await expect(
+      amend(({ kept }) => ({
+        kept: { ...kept, ages: { ends: 95 } },
+        result: null,
+      })),
+    ).resolves.toStrictEqual(saved(null));
+
+    expect(await readLatest(db, "Retire early")).toStrictEqual({
+      household: { ...blank, ages: { ends: 97 } },
+      version: 2,
+    });
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: reference,
+      version: 1,
+    });
+    expect(await getBaseline()).toMatchObject({
+      accounts: reference.accounts,
+      owners: reference.owners,
+    });
+  });
+
+  // A cookie naming a scenario dropped since, as from another tab: the
+  // page reads the household, so its banner goes.
+  it("reads the household where the cookie names no scenario kept", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+    vi.mocked(openedScenario).mockResolvedValue("Dropped");
+
+    expect(await getScenario()).toBeNull();
+    expect(await getHousehold()).toMatchObject({
+      accounts: reference.accounts,
+    });
+  });
+
+  // An edit from a page drawn in that scenario before it was dropped was
+  // meant for the scenario, so it is not kept in the household.
+  it("refuses a save where the cookie names no scenario kept, and writes nothing", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+    vi.mocked(openedScenario).mockResolvedValue("Dropped");
+
+    await expect(
+      amend(({ kept }) => ({ kept, result: null })),
+    ).resolves.toStrictEqual(refused("No scenario is kept under that name"));
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "Dropped")).toBeNull();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  // Written past the rules, as a version kept before they tightened.
+  it("refuses a save from a version that breaks a rule, in its words, and writes nothing", async () => {
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...reference,
+        accounts: [...reference.accounts, ...reference.accounts],
+      },
+    );
+
+    expect(await amend(({ kept }) => ({ kept, result: null }))).toMatchObject({
+      kind: "refused",
+      reason: expect.stringContaining(
+        "A record's id is held by no other record",
+      ) as unknown,
+    });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+  });
+
+  // The household on the CMA's rates from the fifth of September, and a
+  // scenario made from it on the fourteenth, its fees since raised to a
+  // quarter of a point, read on the fifteenth: a day back the scenario
+  // was there, and five days back only the household was.
+  it("reads the sources as they stood on the scenario open, and the household's from before it was made", async () => {
+    await db.insert(householdVersions).values([
+      {
+        household: { ...reference, rateSet: "cma" },
+        savedAt: new Date("2026-09-05T12:00:00Z"),
+        scenario: "",
+        version: 1,
+      },
+      {
+        household: {
+          ...reference,
+          deductions: { ...reference.deductions, fees: 0.0025 },
+          rateSet: "cma",
+        },
+        savedAt: new Date("2026-09-14T12:00:00Z"),
+        scenario: "Retire early",
+        version: 1,
+      },
+    ]);
+    vi.mocked(openedScenario).mockResolvedValue("Retire early");
+
+    expect(await getSourcesDaysAgo(1)).toMatchObject({
+      savedOn: "2026-09-14",
+      sources: { deductions: { fees: 0.0025 } },
+    });
+    expect(await getSourcesDaysAgo(5)).toMatchObject({
+      savedOn: "2026-09-05",
+      sources: { deductions: reference.deductions },
+    });
+  });
+
+  it("reads no scenario, no list of them and no baseline without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(getScenario()).rejects.toThrow("redirected");
+    await expect(getScenarios()).rejects.toThrow("redirected");
+    await expect(getBaseline()).rejects.toThrow("redirected");
     expect(getDb).not.toHaveBeenCalled();
   });
 });

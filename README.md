@@ -64,6 +64,24 @@ holds with a trigger, so every household the store has held stays; a scenario
 can be dropped, every version of it at once, where the household never can. A
 read holds the latest version to the same rules before any screen draws from it.
 
+A scenario is a branch of the household in the same table: the household is the
+branch with no name, and a request opens a scenario by the `exactis_scenario`
+cookie naming it, so every screen, action, rule and engine run works on
+whichever is open without knowing which. The store reads and writes the branch
+open, so whatever is saved in a scenario, a balance typed or a CMA pulled as
+much as a retirement age dragged, stays there, and the household's history is
+untouched: bookkeeping belongs in the household, and what-ifs in a scenario. The
+cookie names a branch and guards nothing, so it is not sealed: the session's
+cookie is what lets a request in, and the cookie ends with the browser's session
+or its sign-out, so the next visit opens on the household. A name no scenario is
+kept under, as one dropped since, reads as the household on a page, but a save
+under it is refused, so an edit meant for a scenario never lands in the
+household. The branch open is the browser's, shared by its tabs, so a form
+filled in one saves to whichever branch another has opened since. A page reads
+the branch once a request, through React's cache, and an action reads the cookie
+and the store afresh. The household itself is read beside a scenario for the
+dashboard to compare the two.
+
 The plan is the first listed owner's, as the first listed account is the first
 paid: it runs to the age they reach, and the retirement its lines are tied to is
 theirs. A household holds an owner at least, so it opens with one, and the last

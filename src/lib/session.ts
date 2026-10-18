@@ -1,3 +1,5 @@
+import type { ResponseCookie } from "next/dist/compiled/@edge-runtime/cookies";
+
 import "server-only";
 import { sealData, unsealData } from "iron-session";
 import { io } from "next/cache";
@@ -19,6 +21,23 @@ export const sessionCookie = "exactis_session";
 
 // Thirty days, then sign in again.
 const ttl = 60 * 60 * 24 * 30;
+
+// The attributes every cookie the app writes carries, the session's and
+// the scenario's alike: kept from scripts, for every path, sent only
+// with same-site navigations, and over HTTPS wherever the app is not on
+// localhost. Read when the cookie is written, since where the app runs
+// is the environment's to say.
+export function cookieAttributes(): Pick<
+  ResponseCookie,
+  "httpOnly" | "path" | "sameSite" | "secure"
+> {
+  return {
+    httpOnly: true,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  };
+}
 
 // Clears the seal. From a server action, since a cookie cannot be
 // written while a page renders.
@@ -62,9 +81,8 @@ export async function requireSession(): Promise<void> {
   }
 }
 
-// Seals a new session into the cookie. From a server action, as above.
-// Kept from scripts, sent only with same-site navigations, and over HTTPS
-// wherever the app is not on localhost.
+// Seals a new session into the cookie, for as long as a session lasts.
+// From a server action, as above.
 export async function startSession(): Promise<void> {
   const session: Session = { signedInAt: Date.now() };
   const seal = await sealData(session, {
@@ -72,10 +90,7 @@ export async function startSession(): Promise<void> {
     ttl,
   });
   (await cookies()).set(sessionCookie, seal, {
-    httpOnly: true,
+    ...cookieAttributes(),
     maxAge: ttl,
-    path: "/",
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
   });
 }
