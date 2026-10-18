@@ -325,7 +325,10 @@ a year its owner cannot draw it all through, the pension age read as it stands
 at the year's end, so its rise to 57 in April 2028 does not count a pension for
 2028 alone; from that age it counts at the same figure. The net worth counts a
 pension all along, and not at the 55% a draw before that age is charged, since
-what the household owns is not what it can have this month.
+what the household owns is not what it can have this month. The chart stacks
+each pension at the same figure, on the liquidity only from the year the liquid
+net worth counts it, so on either basis the stack comes to the figure the tiles
+read.
 
 ## Inflation
 
