@@ -52,4 +52,22 @@ describe("ConfirmDialog", () => {
     );
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
   });
+
+  it("names its confirm as the caller says, where the answer is no deletion", () => {
+    const onConfirm = vi.fn<() => void>();
+    render(
+      <ConfirmDialog
+        confirm="Make the household"
+        onCancel={vi.fn<() => void>()}
+        onConfirm={onConfirm}
+        title="Make Retire early the household?"
+      >
+        Its figures replace the household&apos;s.
+      </ConfirmDialog>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Make the household" }));
+
+    expect(onConfirm).toHaveBeenCalledOnce();
+  });
 });

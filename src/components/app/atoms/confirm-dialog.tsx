@@ -13,6 +13,7 @@ import {
 
 interface ConfirmDialogProps {
   readonly children: ReactNode;
+  readonly confirm?: string;
   readonly isBusy?: boolean;
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
@@ -26,9 +27,12 @@ interface ConfirmDialogProps {
 // ask about and not otherwise. An alert dialog closes only from its
 // buttons, never from a press outside, so the only change it can report
 // is Cancel or Escape, both of which cancel. The confirm spins while
-// the caller says the deletion is on its way to the store.
+// the caller says the deletion is on its way to the store. It says
+// Delete unless the caller names what it does, for a question whose
+// answer writes over something rather than deleting it.
 export function ConfirmDialog({
   children,
+  confirm = "Delete",
   isBusy = false,
   onCancel,
   onConfirm,
@@ -49,7 +53,7 @@ export function ConfirmDialog({
             size="sm"
             variant="destructive"
           >
-            Delete
+            {confirm}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
