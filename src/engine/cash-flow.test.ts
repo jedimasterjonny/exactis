@@ -845,6 +845,129 @@ describe("cashFlow", () => {
     expect(flow.left).toBe(0);
   });
 
+  // The same month says what landed under each allowance: the £1,150
+  // the salary feeds the pension and the £1,350 the spare money lands in
+  // it, £2,500, and the ISA's £1,666.67. A debt, a house and the current
+  // account have no allowance to land under.
+  it("says what landed under each allowance, by its owner and kind", () => {
+    const flow = cashFlow(
+      [spareIsa, sparePension, spareCash, home, mortgage],
+      { expenses: [], income: [salary] },
+      { at: { month: 0, year: 2026 }, plan },
+    );
+
+    expect(
+      [...flow.landed].map(([held, amount]) => [
+        held,
+        Math.round(amount * 100) / 100,
+      ]),
+    ).toStrictEqual([
+      ["1 tax-deferred", 2500],
+      ["1 tax-free", 1666.67],
+    ]);
+  });
+
+  // The salary's pension is not listed, so it is earned whole, £7,474.70
+  // after its tax. Read on its own, a month knows nothing of the year
+  // and opens the ISA at a twelfth of its £20,000, £1,666.67, in April
+  // and in March alike.
+  it("opens each allowance at a twelfth of the year's in a month read on its own, wherever in the tax year it falls", () => {
+    const takenIn = (month: number): number[] =>
+      pennies(
+        cashFlow(
+          [spareIsa, spareCash],
+          { expenses: [], income: [salary] },
+          { at: { month, year: 2027 }, plan },
+        ).spare,
+      ).map(({ amount }) => amount);
+
+    expect(takenIn(3)).toStrictEqual([1666.67, 5808.03]);
+    expect(takenIn(2)).toStrictEqual([1666.67, 5808.03]);
+  });
+
+  // Carried, a month opens the ISA at what the tax year has left of its
+  // £20,000: the whole of it in April, with nothing used, so the ISA
+  // takes all £7,474.70; £5,000 in February once £15,000 has landed,
+  // the current account taking the £2,474.70 past it; and nothing once
+  // the year has used more than the whole.
+  it("opens each allowance at what the tax year has left of it in a month the projection carries", () => {
+    const takenIn = (month: number, used: number): number[] =>
+      pennies(
+        cashFlow(
+          [spareIsa, spareCash],
+          { expenses: [], income: [salary] },
+          {
+            at: { month, year: 2027 },
+            plan,
+            used: new Map([["1 tax-free", used]]),
+          },
+        ).spare,
+      ).map(({ amount }) => amount);
+
+    expect(takenIn(3, 0)).toStrictEqual([7474.7, 0]);
+    expect(takenIn(1, 15000)).toStrictEqual([5000, 2474.7]);
+    expect(takenIn(1, 25000)).toStrictEqual([0, 7474.7]);
+  });
+
+  // An ISA whose owner the plan does not list has no allowance the
+  // month opens for them, and is held to a twelfth of the kind's, as a
+  // month read on its own is, however the year was carried.
+  it("holds a wrapper whose owner the plan does not list to a twelfth of its kind's allowance", () => {
+    const strangers: Account = { ...spareIsa, owner: 99 };
+    const flow = cashFlow(
+      [strangers, spareCash],
+      { expenses: [], income: [salary] },
+      { at: { month: 3, year: 2027 }, plan, used: new Map() },
+    );
+
+    expect(pennies(flow.spare).map(({ amount }) => amount)).toStrictEqual([
+      1666.67, 5808.03,
+    ]);
+  });
+
+  // The plan opens in January 2026, holding three months of the 2025
+  // tax year; the nine before it are none it carries, and are taken to
+  // have used a twelfth each, so February opens the ISA at a quarter of
+  // its £20,000, £5,000, less what January used.
+  it("takes the months of the plan's first tax year before it opened to have used a twelfth each", () => {
+    const takenIn = (used: number): number[] =>
+      pennies(
+        cashFlow(
+          [spareIsa, spareCash],
+          { expenses: [], income: [salary] },
+          {
+            at: { month: 1, year: 2026 },
+            plan,
+            used: new Map([["1 tax-free", used]]),
+          },
+        ).spare,
+      ).map(({ amount }) => amount);
+
+    expect(takenIn(0)).toStrictEqual([5000, 2474.7]);
+    expect(takenIn(1000)).toStrictEqual([4000, 3474.7]);
+  });
+
+  // The salary lands £1,150 a month in the pension it feeds. Carried
+  // with £59,500 of the year's £60,000 used, February has £500 of room,
+  // so the £650 past it is the owner's income, taxed on top of the
+  // £11,250 the month pays after the sacrifice; with £50,000 used, none
+  // is.
+  it("charges what a salary lands past what the tax year has left of the pension allowance as the owner's income", () => {
+    const taxableWith = (used: number): number =>
+      cashFlow(
+        [pension],
+        { expenses: [], income: [salary] },
+        {
+          at: { month: 1, year: 2027 },
+          plan,
+          used: new Map([["1 tax-deferred", used]]),
+        },
+      ).taxable;
+
+    expect(taxableWith(59500)).toBeCloseTo(11250 + 650, 8);
+    expect(taxableWith(50000)).toBe(11250);
+  });
+
   // A cap says how much of the allowance an account may use, not that
   // it has more. The salary's pension is not listed, so it is earned
   // whole, £7,474.70 after its tax: an ISA capped at £50,000 a year
@@ -2265,6 +2388,7 @@ describe("cashFlow", () => {
       income: 0,
       incomeTax: 0,
       insurance: 0,
+      landed: new Map(),
       left: 0,
       profit: 0,
       relief: [],
@@ -2320,6 +2444,7 @@ describe("inTodaysMoney", () => {
       [flow.relief[0]?.amount, read.relief[0]?.amount],
       [flow.spare[0]?.amount, read.spare[0]?.amount],
       [flow.taxable, read.taxable],
+      [flow.landed.get("1 tax-free"), read.landed.get("1 tax-free")],
     ]) {
       expect(is).toBeCloseTo((was ?? Number.NaN) / 1.03, 9);
     }

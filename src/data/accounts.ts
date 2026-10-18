@@ -193,6 +193,9 @@ export const kindLabels: Record<AccountKind, string> = {
   taxable: "GIA (taxable)",
 };
 
+// The most a year's payments into a person's ISAs may land.
+export const isaAllowance = 20000;
+
 // The most a year's payments into a person's pensions, from every
 // source, land within before the excess is charged as their income.
 export const pensionAllowance = 60000;
@@ -213,7 +216,7 @@ export function allowanceOf(kind: AccountKind): null | number {
     case "tax-deferred":
       return pensionAllowance;
     case "tax-free":
-      return 20000;
+      return isaAllowance;
   }
 }
 
