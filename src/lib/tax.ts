@@ -111,7 +111,8 @@ const stampDuty: readonly Band[] = [
 export const april = 3;
 
 // The basic rate, which a pension claims back on what is paid into it
-// out of taxed money.
+// out of taxed money, and the rate the taxed part of a pension is
+// counted as drawn at.
 const basicRate = 0.2;
 
 // The year the last tax year the bands are frozen for opens in:
@@ -236,6 +237,21 @@ export function isWithinAllowance(values: AccountValues): boolean {
     most === null ||
     yearly(values.contribution, values.cadence) <= most
   );
+}
+
+// What a pension of `gross` leaves counted as drawn at the basic rate:
+// a quarter of it free of tax as far as the `allowance` left reaches,
+// and the rest taxed at 20%. What a pension is counted as worth beside
+// an ISA, which owes nothing on the way out. Not what drawing all of it
+// in one year would leave, which would reach the higher rates: the
+// basic rate is what a draw beside the State Pension mostly meets, and
+// the rate a draw really meets turns on the year it is taken in and
+// what is earned beside it, which a count of what is held today cannot
+// know. The allowance is the owner's for all their pensions together,
+// so it is read against what they hold in all of them at once.
+export function keptOf(gross: number, allowance: number): number {
+  const taxFree = Math.min(gross * taxFreeShare, allowance);
+  return gross - (gross - taxFree) * basicRate;
 }
 
 // The most a fixed sum into an account of the kind can be paid a year
