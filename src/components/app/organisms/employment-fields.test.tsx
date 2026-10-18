@@ -22,6 +22,9 @@ const salary: IncomeLineDraft = { ...line, opens: null };
 const [workplace] = accounts;
 const pensions: readonly Account[] = [workplace, sipp];
 
+// How a bonus is paid, as the fields report it.
+type Timing = Pick<IncomeLineDraft, "bonusCadence" | "bonusMonth">;
+
 // The fields as the dialog would mount them, opened on a line and shown
 // the draft that mirrors them, with a spy where the schedule listens.
 function renderFields(
@@ -32,18 +35,21 @@ function renderFields(
   readonly onAmend: ReturnType<
     typeof vi.fn<(patch: Partial<IncomeLineDraft>) => void>
   >;
+  readonly onTime: ReturnType<typeof vi.fn<(timing: Timing) => void>>;
 } {
   const onAmend = vi.fn<(patch: Partial<IncomeLineDraft>) => void>();
+  const onTime = vi.fn<(timing: Timing) => void>();
   render(
     <EmploymentFields
       draft={draft}
       initial={initial}
       onAmend={onAmend}
+      onTime={onTime}
       owners={held}
       pensions={pensions}
     />,
   );
-  return { onAmend };
+  return { onAmend, onTime };
 }
 
 describe("EmploymentFields", () => {
@@ -105,6 +111,70 @@ describe("EmploymentFields", () => {
     renderFields(salary, { ...salary, cadence: "month" });
 
     expect(screen.getByText("£1,728,000 a year")).toBeInTheDocument();
+  });
+
+  // A line naming no cadence for its bonus is paid it every month, as
+  // every line kept before the choice was is, and names no month.
+  it("opens a bonus naming no cadence on every month, with no month to choose, and reports each choice", () => {
+    const { onAmend, onTime } = renderFields(salary);
+    const paid = screen.getByRole("combobox", { name: "Bonus paid" });
+
+    expect(paid).toHaveValue("month");
+    expect(paid).not.toHaveAccessibleDescription();
+    expect(
+      within(paid)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual(["Every month", "Every quarter", "Once a year"]);
+    expect(
+      screen.queryByRole("combobox", { name: "Bonus month" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(paid, { target: { value: "quarter" } });
+    fireEvent.change(paid, { target: { value: "year" } });
+    fireEvent.change(paid, { target: { value: "month" } });
+
+    expect(onTime.mock.calls.map(([timing]) => timing)).toStrictEqual([
+      { bonusCadence: "quarter" },
+      { bonusCadence: "year", bonusMonth: 0 },
+      {},
+    ]);
+    expect(onAmend).not.toHaveBeenCalled();
+  });
+
+  // March, June, September and December are each quarter's last month.
+  it("says which months a bonus paid every quarter lands in", () => {
+    renderFields(salary, { ...salary, bonusCadence: "quarter" });
+
+    expect(
+      screen.getByRole("combobox", { name: "Bonus paid" }),
+    ).toHaveAccessibleDescription("In March, June, September and December");
+  });
+
+  // February is month one, January being nought.
+  it("opens a bonus paid once a year on its month, reports another, and comes back to it from another cadence", () => {
+    const yearly = { ...salary, bonusCadence: "year", bonusMonth: 1 } as const;
+    const { onAmend, onTime } = renderFields(yearly);
+    const month = screen.getByRole("combobox", { name: "Bonus month" });
+
+    expect(screen.getByRole("combobox", { name: "Bonus paid" })).toHaveValue(
+      "year",
+    );
+    expect(month).toHaveValue("1");
+    expect(within(month).getAllByRole("option")).toHaveLength(12);
+
+    fireEvent.change(month, { target: { value: "2" } });
+    const paid = screen.getByRole("combobox", { name: "Bonus paid" });
+    fireEvent.change(paid, { target: { value: "quarter" } });
+    fireEvent.change(paid, { target: { value: "year" } });
+
+    expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
+      { bonusMonth: 2 },
+    ]);
+    expect(onTime.mock.calls.map(([timing]) => timing)).toStrictEqual([
+      { bonusCadence: "quarter" },
+      { bonusCadence: "year", bonusMonth: 1 },
+    ]);
   });
 
   it("holds the shares to the base they come out of", () => {
