@@ -9,6 +9,7 @@ import type { Account } from "@/data/accounts";
 import type { ProjectionPoint } from "@/engine/projection";
 
 import { accounts, sipp } from "@/data/accounts.fixture";
+import { lumpSumAllowance } from "@/lib/tax";
 import { bySlot } from "@/test/dom";
 
 import { ProjectionChart, ProjectionPending } from "./projection-chart";
@@ -42,6 +43,7 @@ const held: readonly Account[] = [pension, isa];
 const points = [
   {
     age: 34,
+    allowances: { 1: lumpSumAllowance },
     balances: { 2: 271930, 6: 391640 },
     deferred: 391640,
     early: 0,
@@ -51,6 +53,7 @@ const points = [
   },
   {
     age: 35,
+    allowances: { 1: lumpSumAllowance },
     balances: { 2: 305483, 6: 438308 },
     deferred: 438308,
     early: 0,
@@ -60,6 +63,7 @@ const points = [
   },
   {
     age: 36,
+    allowances: { 1: lumpSumAllowance },
     balances: { 2: 340714, 6: 487309 },
     deferred: 487309,
     early: 0,
@@ -74,6 +78,7 @@ const points = [
 const shortPoints = [
   {
     age: 34,
+    allowances: { 1: lumpSumAllowance },
     balances: { 2: 271930, 6: 391640 },
     deferred: 391640,
     early: 0,
@@ -83,6 +88,7 @@ const shortPoints = [
   },
   {
     age: 35,
+    allowances: { 1: lumpSumAllowance },
     balances: { 2: 0, 6: 41209 },
     deferred: 41209,
     early: 0,
@@ -92,6 +98,7 @@ const shortPoints = [
   },
   {
     age: 36,
+    allowances: { 1: lumpSumAllowance },
     balances: { 2: 0, 6: 0 },
     deferred: 0,
     early: 0,
@@ -106,6 +113,7 @@ const shortPoints = [
 const earlyPoints = [
   {
     age: 34,
+    allowances: { 1: lumpSumAllowance },
     balances: { 2: 271930, 6: 391640 },
     deferred: 391640,
     early: 0,
@@ -115,6 +123,7 @@ const earlyPoints = [
   },
   {
     age: 35,
+    allowances: { 1: lumpSumAllowance },
     balances: { 2: 0, 6: 41209 },
     deferred: 41209,
     early: 26667,
@@ -124,6 +133,7 @@ const earlyPoints = [
   },
   {
     age: 36,
+    allowances: { 1: lumpSumAllowance },
     balances: { 2: 0, 6: 0 },
     deferred: 0,
     early: 0,
@@ -292,6 +302,7 @@ describe("ProjectionChart", () => {
     const listed = [...accounts, sipp];
     const years = [2026, 2027].map((year, place) => ({
       age: 34 + place,
+      allowances: { 1: lumpSumAllowance },
       balances: { 2: 2000, 3: 300, 4: 400000, 5: -180000, 6: 1000, 20: 600 },
       deferred: 1600,
       early: 0,
@@ -371,6 +382,7 @@ describe("ProjectionChart", () => {
       { 5: -160000, 7: 0, 8: -1000, 9: -1000 },
     ].map((balances, place) => ({
       age: 34 + place,
+      allowances: { 1: lumpSumAllowance },
       balances,
       deferred: 0,
       early: 0,
@@ -434,6 +446,7 @@ describe("ProjectionChart", () => {
       { 10: 18000, 11: -10000, 12: -500 },
     ].map((balances, place) => ({
       age: 34 + place,
+      allowances: { 1: lumpSumAllowance },
       balances,
       deferred: 0,
       early: 0,
@@ -513,6 +526,7 @@ describe("ProjectionChart", () => {
     };
     const years = [2026, 2027].map((year, place) => ({
       age: 34 + place,
+      allowances: { 1: lumpSumAllowance },
       balances: { 2: 250000, 10: 500000, 11: -200000 },
       deferred: 0,
       early: 0,
@@ -571,6 +585,7 @@ describe("ProjectionChart", () => {
     };
     const years = [2026, 2027].map((year, place) => ({
       age: 34 + place,
+      allowances: { 1: lumpSumAllowance },
       balances: { 2: 250000, 10: 500000, 11: -150000, 12: -50000 },
       deferred: 0,
       early: 0,
@@ -627,6 +642,7 @@ describe("ProjectionChart", () => {
     };
     const years = [2026, 2027].map((year, place) => ({
       age: 34 + place,
+      allowances: { 1: lumpSumAllowance },
       balances: { 2: 250000, 10: 500000, 11: -200000 },
       deferred: 0,
       early: 0,
@@ -664,6 +680,7 @@ describe("ProjectionChart", () => {
     const plan = (balances: Record<number, number>): ProjectionPoint[] =>
       [2026, 2027].map((year, place) => ({
         age: 34 + place,
+        allowances: { 1: lumpSumAllowance },
         balances,
         deferred: 0,
         early: 0,
@@ -731,6 +748,7 @@ describe("ProjectionChart", () => {
     };
     const years = [2026, 2027].map((year, place) => ({
       age: 34 + place,
+      allowances: { 1: lumpSumAllowance },
       balances: { 2: 250000, 10: 500000, 11: -200000 },
       deferred: 0,
       early: 0,
@@ -960,6 +978,7 @@ describe("ProjectionChart", () => {
         points={[
           {
             age: 34,
+            allowances: { 1: lumpSumAllowance },
             balances: { 2: 0, 6: 0 },
             deferred: 0,
             early: 0,
@@ -969,6 +988,7 @@ describe("ProjectionChart", () => {
           },
           {
             age: 35,
+            allowances: { 1: lumpSumAllowance },
             balances: { 2: 0, 6: 0 },
             deferred: 0,
             early: 0,
@@ -1008,6 +1028,7 @@ describe("ProjectionChart", () => {
   it("marks every milestone in the plan's years, the chosen one solid with a dot where the basis's total stands", () => {
     const years = Array.from({ length: 15 }, (_, place) => ({
       age: 34 + place,
+      allowances: { 1: lumpSumAllowance },
       balances: { 2: 100000, 3: 20000, 4: 300000, 5: -150000, 6: 100000 },
       deferred: 100000,
       early: 0,
