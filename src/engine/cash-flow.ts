@@ -8,6 +8,7 @@ import type { Figures, Owed, PlanMonth } from "@/lib/loans";
 import {
   allowanceOf,
   capOf,
+  isaAllowance,
   isOwned,
   isPension,
   takesSpare,
@@ -34,6 +35,7 @@ import { runsIn } from "@/lib/lines";
 import { lastPaymentOf, paidUntil, termOf } from "@/lib/loans";
 import { monthsBetween } from "@/lib/months";
 import {
+  april,
   incomeTaxOn,
   insuranceOn,
   pensionAllowanceOf,
@@ -46,13 +48,16 @@ import {
 // formatted where it is rendered: what comes in, what goes out, in sum
 // and line by line, what each pension is fed, the income tax and the
 // National Insurance the month pays, what each account is paid, what
-// each pension paid out of taxed money claims back on it, and what is
-// left after all of it.
+// each pension paid out of taxed money claims back on it, what is left
+// after all of it, and what landed under each allowance, by the owner
+// and the kind it is held for, which the projection adds to what the
+// tax year has used.
 export interface CashFlow extends Taxed {
   readonly expenses: number;
   readonly fed: readonly Fed[];
   readonly fixed: readonly Paid[];
   readonly income: number;
+  readonly landed: Used;
   readonly left: number;
   readonly relief: readonly Paid[];
   readonly spare: readonly Take[];
@@ -157,8 +162,10 @@ interface Feeding {
 // each owner's relief, in what lands with it, which opens at what a
 // twelfth of that owner's own earnings in a year relieves, by the
 // owner's id, with
-// the relief each pension has claimed so far.
+// the relief each pension has claimed so far, and what has landed under
+// each allowance in the month.
 interface Purse {
+  readonly landed: Rooms;
   readonly relief: Paid[];
   readonly reliefs: Rooms;
   readonly relievable: Rooms;
@@ -178,17 +185,32 @@ interface Purse {
 // beside them are the owners who have drawn on a pension as income
 // before the month, by id, whose pension allowance is the money
 // purchase one, which only the projection knows, having drawn; a month
-// read on its own has none.
+// read on its own has none. Last is what has landed under each
+// allowance since the tax year opened, by the owner and the kind it is
+// held for, which only the projection knows, having carried the year: a
+// month it carries opens each allowance at what the year has left of
+// it, so a bonus month can fill what the months before it left. The
+// months of the plan's first tax year before the plan opened are none
+// it carries, and are taken to have used a twelfth each, since the
+// household has part-spent that year already. A month read on its own
+// carries nothing and opens each allowance at a twelfth of the year's:
+// it knows nothing of the months either side of it, so it takes the
+// year to be paid at an even pace on both sides, the months before it
+// having used a twelfth each and the months after it keeping theirs,
+// where the projection knows the pace behind it. Opened at what is left
+// of the year instead, a month read on its own in April would open the
+// whole year's room in one month.
 interface Reading {
   readonly at: Month;
   readonly drawn?: ReadonlySet<number>;
   readonly plan: Plan;
   readonly reserve?: number;
   readonly settlement?: number;
+  readonly used?: Used;
 }
 
 // What is left of each allowance in the month, by the owner and the
-// kind it is held for, in what lands: a twelfth of the allowance until
+// kind it is held for, in what lands: what the month opens it at until
 // something is paid under it, each owner's pension room opening at
 // their own allowance for the month, tapered or whole, and nothing once
 // the salaries' sacrifices alone have filled it. An account whose kind
@@ -211,6 +233,10 @@ interface Taxed {
   readonly profit: number;
   readonly taxable: number;
 }
+
+// What has landed under each allowance, by the owner and the kind it is
+// held for, as the rooms are keyed.
+type Used = ReadonlyMap<string, number>;
 
 // The least a month may be short by and be short at all. Tenths of a
 // pound do not add back to nothing in binary - £0.30 of income against
@@ -365,8 +391,11 @@ const nobody: ReadonlySet<number> = new Set();
 // flow and a list the store cannot produce is wrong wherever it is
 // read. An allowance is its owner's, one of each kind shared across
 // every account of that kind they hold, so each owner's ISAs are held
-// together to a twelfth of the ISA allowance in what lands in them each
-// month, and their pensions to a twelfth of the pension allowance, from
+// together to what the month opens the ISA allowance at in what lands
+// in them, and their pensions to what it opens the pension allowance
+// at, as the reading says: what the tax year has left of it for a month
+// the projection carries, and a twelfth of it for a month read on its
+// own. Each is held from
 // every source and in the order the month pays them: what the salaries
 // feed each, then the fixed sums in the order the accounts are listed,
 // then the spare money's takes in the same order, each taking only
@@ -382,12 +411,12 @@ const nobody: ReadonlySet<number> = new Set();
 // owns naming an owner is refused beside it, as the store refuses it. A
 // sacrifice is given up whole whatever room the allowance has, since it
 // is the employer's contribution under the scheme and the scheme pays
-// it in; what lands in an owner's pensions past a twelfth of their
-// allowance is the annual allowance charge, added to the owner's
+// it in; what lands in an owner's pensions past what the month opens
+// their allowance at is the annual allowance charge, added to the owner's
 // taxable income for the month and charged through their bands at
 // their marginal rate, and settled with the tax year as the rest of the
-// income tax is. The allowance is each owner's own for the month:
-// £60,000, tapered by a pound for every two of adjusted income over
+// income tax is. The pension allowance is each owner's own for the
+// year as the month reads it: £60,000, tapered by a pound for every two of adjusted income over
 // £260,000 to a floor of £10,000 for an owner whose threshold income is
 // over £200,000 as well, each read off what the lines running in the
 // month pay in a year, so a bonus paid in one month is counted once
@@ -401,10 +430,7 @@ const nobody: ReadonlySet<number> = new Set();
 // past the room is not paid, since each is a payment the plan chooses
 // rather than one it owes, and stays in the month to pay the sums and
 // the spare money after it, and what none of them takes is left, which
-// the plan takes as spent rather than saved. A twelfth rather than
-// what is left of the tax year, so a
-// month reads the same whenever in the year it falls and needs nothing
-// the projection carries. A pension paid out of taxed money claims the
+// the plan takes as spent rather than saved. A pension paid out of taxed money claims the
 // basic rate back on no more than its owner is relieved on, held the
 // same way: a twelfth of what the owner's own salaries and
 // self-employed profit earn a year, less what they sacrifice, or of
@@ -514,6 +540,7 @@ export function cashFlow(
     const taxed = taxOn(running, fed, reading);
     const month = leftWith(fed, taxed);
     const purse: Purse = {
+      landed: new Map(),
       relief: [],
       reliefs: new Map(),
       relievable: new Map(
@@ -525,18 +552,26 @@ export function cashFlow(
         ),
       ),
       rooms: new Map(
-        reading.plan.owners.map(({ id }) => [
-          roomOf({ kind: "tax-deferred", owner: id }),
-          allowanceIn(
-            id,
-            running.filter((line) => line.owner === id),
-            { fed, reading },
-          ),
-        ]),
+        reading.plan.owners.flatMap(({ id }) => {
+          const isa = roomOf({ kind: "tax-free", owner: id });
+          const pension = roomOf({ kind: "tax-deferred", owner: id });
+          const theirs = running.filter((line) => line.owner === id);
+          return [
+            [isa, openedAt(isa, isaAllowance, reading)],
+            [
+              pension,
+              openedAt(
+                pension,
+                allowanceIn(id, theirs, { fed, reading }),
+                reading,
+              ),
+            ],
+          ];
+        }),
       ),
     };
     for (const entry of fed) {
-      landIn(purse.rooms, entry.account, entry.amount);
+      landIn(purse, entry.account, entry.amount);
     }
     const { sums: funded } = fixedSums(
       saving.filter((account) => account.isAlwaysFunded === true),
@@ -567,6 +602,7 @@ export function cashFlow(
     income,
     incomeTax: taxed.incomeTax,
     insurance: taxed.insurance,
+    landed: purse.landed,
     left: Math.abs(left) < nanopound ? 0 : left,
     profit: taxed.profit,
     relief: purse.relief,
@@ -610,6 +646,9 @@ export function inTodaysMoney(
     income: read(flow.income),
     incomeTax: read(flow.incomeTax),
     insurance: read(flow.insurance),
+    landed: new Map(
+      [...flow.landed].map(([held, amount]) => [held, read(amount)]),
+    ),
     left: read(flow.left),
     profit: read(flow.profit),
     relief: flow.relief.map((entry) => ({
@@ -698,7 +737,8 @@ function accountAt(
   return accounts.find((account) => account.id === id);
 }
 
-// A twelfth of an owner's pension allowance for the month: the money
+// An owner's pension allowance for the year as the month reads it, which
+// the month opens their pension room at as the reading says: the money
 // purchase allowance for an owner who has drawn on a pension as income
 // before the month, whatever their incomes, and otherwise read off what
 // the lines running in the month pay in a year, each its own year's at
@@ -724,13 +764,11 @@ function allowanceIn(
   const own = fed.filter((entry) => entry.line.owner === owner);
   const pay = evenPayOf(theirs, fed, reading);
   const sacrificed = own.reduce((sum, entry) => sum + entry.sacrificed, 0);
-  return (
-    pensionAllowanceOf({
-      adjusted: 12 * (pay + total(own)),
-      hasDrawn: drawn.has(owner),
-      threshold: 12 * (pay + sacrificed),
-    }) / 12
-  );
+  return pensionAllowanceOf({
+    adjusted: 12 * (pay + total(own)),
+    hasDrawn: drawn.has(owner),
+    threshold: 12 * (pay + sacrificed),
+  });
 }
 
 // What a line's bonus pays in the month read, in that month's pounds:
@@ -924,11 +962,15 @@ function fixedSums(
 // allowance for its kind in the month, never below nothing, so a
 // sacrifice landing past the room empties it rather than owing against
 // it, and the residue of grossing a pension's payment up for its relief
-// and back cannot leave a room a fraction of a penny short of empty. An
-// account with no allowance is left out.
-function landIn(rooms: Rooms, account: Account, landed: number): void {
+// and back cannot leave a room a fraction of a penny short of empty, and
+// added to what has landed under that allowance in the month, the whole
+// of it, for the projection to carry. An account with no allowance is
+// left out.
+function landIn(purse: Purse, account: Account, landed: number): void {
   if (allowanceOf(account.kind) !== null) {
-    rooms.set(roomOf(account), Math.max(0, roomIn(rooms, account) - landed));
+    const held = roomOf(account);
+    purse.rooms.set(held, Math.max(0, roomIn(purse.rooms, account) - landed));
+    purse.landed.set(held, (purse.landed.get(held) ?? 0) + landed);
   }
 }
 
@@ -948,7 +990,7 @@ function landWithRelief(account: Account, paid: number, purse: Purse): void {
     );
     purse.relief.push({ account, amount: relieved * rate });
   }
-  landIn(purse.rooms, account, paid + relieved * rate);
+  landIn(purse, account, paid + relieved * rate);
 }
 
 // What a sum a line states is paid a month in the month read, in that
@@ -966,6 +1008,34 @@ function monthlyOf(
     monthly(amount, line.cadence) *
     (margin === null ? 1 : risenWith(margin, plan, at))
   );
+}
+
+// What an allowance opens the month at, in what lands, as the reading
+// says: a twelfth of the year's for a month read on its own, which
+// carries nothing of the year and takes it to be paid at an even pace
+// either side of the month; and for a month the projection carries,
+// what is left of the year's once what the year has used under it is
+// off, the months of the plan's first tax year before it opened taken
+// to have used a twelfth each, and never below nothing, since an owner
+// whose allowance falls to the money purchase one part way through a
+// year may have used more than it already.
+function openedAt(
+  held: string,
+  allowance: number,
+  { at, plan, used }: Reading,
+): number {
+  if (used === undefined) {
+    return allowance / 12;
+  }
+  const opens = {
+    month: april,
+    year: at.month < april ? at.year - 1 : at.year,
+  };
+  const before = Math.max(
+    0,
+    monthsBetween(opens, { month: plan.month, year: plan.from }),
+  );
+  return Math.max(0, allowance * (1 - before / 12) - (used.get(held) ?? 0));
 }
 
 // The month a line paying a loan makes its first payment in, which the
@@ -1024,12 +1094,13 @@ function reliefIn(purse: Purse, account: Account): number {
 }
 
 // What is left of an account's allowance in the month, in what lands:
-// its owner's for its kind, a twelfth of it until something has been
-// paid under it into any of the owner's accounts of the kind, and no
-// limit at all for an account whose kind has none. A pension's room
-// opens at its owner's own allowance for the month, which the purse is
-// seeded with; a room nothing seeded, an ISA's or a pension's whose
-// owner the plan does not list, opens at a twelfth of the kind's.
+// its owner's for its kind, what the month opened it at until something
+// has been paid under it into any of the owner's accounts of the kind,
+// and no limit at all for an account whose kind has none. Each owner's
+// ISA and pension rooms open as openedAt says, which the purse is
+// seeded with, a pension's at its owner's own allowance; a room nothing
+// seeded, an ISA's or a pension's whose owner the plan does not list,
+// opens at a twelfth of the kind's.
 function roomIn(rooms: Rooms, account: Account): number {
   const allowance = allowanceOf(account.kind);
   return allowance === null
@@ -1115,9 +1186,9 @@ function spareMoney(
 // job with a threshold of its own. Each is charged on the month alone
 // against a twelfth of each band as the bands stand in its tax year,
 // which is a twelfth of what a year of the month would pay, so a month
-// is charged the same whenever in the tax year it falls. What lands in
-// an owner's pensions past a twelfth of the pension allowance is
-// charged on top of what they earned, as their income and so at their
+// is charged the same whenever in the tax year it falls. What a salary
+// lands in an owner's pensions past what the month opens their pension
+// allowance at is charged on top of what they earned, as their income and so at their
 // marginal rate, which is the annual allowance charge; it is no
 // earnings, so the National Insurance leaves it out. What the month
 // pays is the owners' summed, and what it is charged on is everything
@@ -1140,7 +1211,12 @@ function taxOn(
       const landed = total(fed.filter((entry) => entry.line.owner === owner));
       const excess = Math.max(
         0,
-        landed - allowanceIn(owner, theirs, { fed, reading }),
+        landed -
+          openedAt(
+            roomOf({ kind: "tax-deferred", owner }),
+            allowanceIn(owner, theirs, { fed, reading }),
+            reading,
+          ),
       );
       const taxable = payOf(theirs, fed, reading) + excess;
       return {
