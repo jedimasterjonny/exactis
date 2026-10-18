@@ -35,6 +35,9 @@ vi.mock("@/actions/schedule", () => ({
 
 const [salary] = incomeLines;
 
+// The salary as its dialog holds it, less the id a save is sent beside.
+const { id, ...salaryValues } = salary;
+
 // A private pension typed as a line: £23,400 a year from 2058, when its
 // owner is 68, rising with inflation and running to the end of the plan.
 const annuity: IncomeLine = {
@@ -986,6 +989,85 @@ describe("IncomeSchedule", () => {
       rsu: 20000,
       sacrifice: 0.1,
       startsAt: null,
+    });
+  });
+
+  // February is month one, January being nought. A line naming no
+  // cadence for its bonus is paid it every month, and one moved there
+  // names neither the cadence nor a month.
+  it("pays a salary's bonus once a year in a month chosen, keeps it across the category, and writes it back", async () => {
+    renderSchedule();
+    saved({ ...salary, bonusCadence: "year", bonusMonth: 1 });
+
+    const dialog = openRow("Salary");
+    const paid = (): HTMLElement =>
+      within(dialog).getByRole("combobox", { name: "Bonus paid" });
+
+    fireEvent.change(paid(), { target: { value: "year" } });
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Bonus month" }),
+      { target: { value: "1" } },
+    );
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Category" }),
+      { target: { value: "pension" } },
+    );
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Category" }),
+      { target: { value: "employment" } },
+    );
+
+    expect(paid()).toHaveValue("month");
+    expect(
+      within(dialog).queryByRole("combobox", { name: "Bonus month" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(paid(), { target: { value: "quarter" } });
+    fireEvent.change(paid(), { target: { value: "year" } });
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Bonus month" }),
+      { target: { value: "1" } },
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Salary" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(id, {
+      ...salaryValues,
+      bonusCadence: "year",
+      bonusMonth: 1,
+      opens: null,
+    });
+  });
+
+  it("drops the month of a bonus moved off once a year, and the cadence of one moved to every month", async () => {
+    renderSchedule([{ ...salary, bonusCadence: "year", bonusMonth: 1 }]);
+    saved(salary);
+
+    const dialog = openRow("Salary");
+    const paid = within(dialog).getByRole("combobox", { name: "Bonus paid" });
+
+    expect(
+      within(dialog).getByRole("combobox", { name: "Bonus month" }),
+    ).toHaveValue("1");
+
+    fireEvent.change(paid, { target: { value: "quarter" } });
+
+    expect(
+      within(dialog).queryByRole("combobox", { name: "Bonus month" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(paid, { target: { value: "month" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(id, {
+        ...salaryValues,
+        opens: null,
+      });
     });
   });
 

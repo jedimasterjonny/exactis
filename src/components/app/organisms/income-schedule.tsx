@@ -116,7 +116,8 @@ export function IncomeSchedule({
   });
   const pensions = accounts.filter(isPension);
 
-  // The category choice: an employment line's parts and its pension are
+  // The category choice: an employment line's parts, how its bonus is
+  // paid and its pension are
   // kept only while it is one, and come back as the line opened with
   // them when it is one again, which is what the fields mount showing.
   // A pension the line was to open goes with the category, since a
@@ -124,7 +125,11 @@ export function IncomeSchedule({
   // one to come back to.
   function categorise(current: Entry<Draft>, kind: IncomeKind): void {
     const { initial } = current;
-    amend(current, {
+    const reset = {
+      ...current,
+      draft: retimed(current.draft, kind === "employment" ? initial : {}),
+    };
+    amend(reset, {
       kind,
       ...(kind === "employment"
         ? {
@@ -251,6 +256,9 @@ export function IncomeSchedule({
                 onAmend={(patch) => {
                   amend(entry, patch);
                 }}
+                onTime={(timing) => {
+                  amend({ ...entry, draft: retimed(entry.draft, timing) }, {});
+                }}
                 owners={owners}
                 pensions={pensions}
               />
@@ -339,6 +347,27 @@ function paidOf(
       draft.firstYear < retirement
         ? `Paid to ${String(retirement - 1)}, when its owner retires.`
         : `Never paid; its owner retires in ${String(retirement)}.`,
+  };
+}
+
+// A draft with its bonus paid as another holds it, in place of how it
+// was paid: both fields taken off and whichever the other holds put
+// back, since a patch can set a field a line holds only sometimes but
+// cannot take one away, and a bonus moved off once a year keeps no
+// month.
+function retimed(
+  draft: Draft,
+  { bonusCadence, bonusMonth }: Pick<Draft, "bonusCadence" | "bonusMonth">,
+): Draft {
+  const untimed: { -readonly [TKey in keyof Draft]: Draft[TKey] } = {
+    ...draft,
+  };
+  delete untimed.bonusCadence;
+  delete untimed.bonusMonth;
+  return {
+    ...untimed,
+    ...(bonusCadence !== undefined && { bonusCadence }),
+    ...(bonusMonth !== undefined && { bonusMonth }),
   };
 }
 

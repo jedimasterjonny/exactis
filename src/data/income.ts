@@ -5,6 +5,8 @@ import type { LineValues } from "@/data/schedule";
 import { retirementYearOf } from "@/data/milestones";
 import { earnerOf, retirementYear } from "@/data/plan";
 
+export type BonusCadence = (typeof bonusCadences)[number];
+
 export type IncomeKind = (typeof incomeKinds)[number];
 
 // An income line is money coming in over a run of years: a salary, a
@@ -74,8 +76,6 @@ export interface Opening {
   readonly name: string;
   readonly owner: null | number;
 }
-
-type BonusCadence = (typeof bonusCadences)[number];
 
 // How often a salary's bonus is paid when it is not paid every month,
 // as a list, so the store's column takes the same words the type does:
