@@ -206,6 +206,48 @@ describe("household store", () => {
     });
   });
 
+  // The household on the CMA's rates from the first of September; a
+  // scenario made on the tenth on the rates typed, which chose the CMA's
+  // on the twentieth; and one made on the twentieth.
+  it("reads the household's version for a scenario made after the moment, and a scenario's own once it was there", async () => {
+    const day = (date: string): Date => new Date(`${date}T12:00:00Z`);
+    await db.insert(householdVersions).values([
+      {
+        household: derived,
+        savedAt: day("2026-09-01"),
+        scenario: "",
+        version: 1,
+      },
+      {
+        household: reference,
+        savedAt: day("2026-09-10"),
+        scenario: "Retire early",
+        version: 1,
+      },
+      {
+        household: later,
+        savedAt: day("2026-09-20"),
+        scenario: "Retire early",
+        version: 2,
+      },
+      {
+        household: later,
+        savedAt: day("2026-09-20"),
+        scenario: "Move house",
+        version: 1,
+      },
+    ]);
+
+    expect(await readAsOf(db, "Move house", day("2026-09-15"))).toStrictEqual({
+      household: derived,
+      savedAt: day("2026-09-01"),
+      version: 1,
+    });
+    expect(await readAsOf(db, "Retire early", day("2026-09-15"))).toStrictEqual(
+      { household: later, savedAt: day("2026-09-20"), version: 2 },
+    );
+  });
+
   it("never writes over a version it has kept, or deletes one of the household's", async () => {
     await keepAfter(db, { scenario: "", version: 0 }, blank);
     await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
