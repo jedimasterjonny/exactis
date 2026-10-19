@@ -22,10 +22,12 @@ export type IncomeKind = (typeof incomeKinds)[number];
 // bonus paid once a year names. An employment
 // line paid through a salary sacrifice names the pension its sacrifice
 // goes into, by the account's id, the share of the base it gives up,
-// a fraction as every rate is, and the share of the base its employer
-// matches, pound for pound with the sacrifice up to that share; a line
-// with no pension names none, gives up nothing and is matched nothing,
-// as every other kind of line does. Lines overlap
+// a fraction as every rate is, the share of the base its employer
+// matches, pound for pound with the sacrifice up to that share, and the
+// share of the base its employer pays whatever is given up, the floor
+// under the match, which a line whose employer pays none names none of;
+// a line with no pension names none, gives up nothing and is matched
+// nothing, as every other kind of line does. Lines overlap
 // freely: a step-up is a second line starting mid-way, not an edit to
 // the first, and both may feed the one pension. The kind says what the
 // money is, for the badge and for the tax it pays. Every line names
@@ -51,13 +53,15 @@ export interface IncomeLineDraft extends IncomeLineValues {
 // The line as a form or a row holds it, which is the line less its id:
 // every field present, no last year for a line that runs to the end of
 // the plan and no pension for a line with none, save how its bonus is
-// paid, which is absent for a bonus paid every month, so a line kept
-// before it was asked reads as it was.
+// paid, which is absent for a bonus paid every month, and the floor
+// under its match, which is absent for none, so a line kept before
+// either was asked reads as it was.
 export interface IncomeLineValues extends LineValues {
   readonly bonus: number;
   readonly bonusCadence?: BonusCadence;
   readonly bonusMonth?: number;
   readonly feeds: null | number;
+  readonly floor?: number;
   readonly kind: IncomeKind;
   readonly match: number;
   readonly owner: number;
@@ -168,12 +172,17 @@ export function isOpeningSound(draft: IncomeLineDraft): boolean {
 
 // What a line's employer pays into its pension beside the sacrifice at
 // its cadence: pound for pound with what the line gives up, up to the
-// share of the base the line states, of the base alone as the sacrifice
-// is, and nothing for a line that gives up none, however much its
-// employer would match. It comes off nothing the owner is paid, so
-// the salary is taxed as it is without it.
+// share of the base the line states, and never less than the floor the
+// line states whatever it gives up, each of the base alone as the
+// sacrifice is. A line that gives up none is paid its floor and no more,
+// however much its employer would match, and a line with no floor is
+// paid nothing where it gives up nothing. It comes off nothing the
+// owner is paid, so the salary is taxed as it is without it.
 export function matchOf(line: IncomeLineValues): number {
-  return line.amount * Math.min(line.sacrifice, line.match);
+  return (
+    line.amount *
+    Math.max(line.floor ?? 0, Math.min(line.sacrifice, line.match))
+  );
 }
 
 // What a line gives up into its pension at its cadence: the share of

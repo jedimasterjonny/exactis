@@ -116,6 +116,21 @@ describe("matchOf", () => {
     expect(matchOf(salary)).toBe(0);
     expect(matchOf({ ...stepUp, match: 0.07 })).toBe(0);
   });
+
+  // The owner's own scheme, matched to seven per cent of the £120,000
+  // base and floored at three: 2% given up is paid the floor, £3,600;
+  // 5% is matched, £6,000; a tenth is matched only to seven per cent,
+  // £8,400; a line giving up nothing is paid the floor all the same;
+  // and a floor of nothing pays what no floor does.
+  it("pays the floor where the match falls short of it, whatever is given up", () => {
+    const scheme = { ...salary, floor: 0.03, match: 0.07 };
+
+    expect(matchOf({ ...scheme, sacrifice: 0.02 })).toBeCloseTo(3600, 8);
+    expect(matchOf({ ...scheme, sacrifice: 0.05 })).toBeCloseTo(6000, 8);
+    expect(matchOf(scheme)).toBeCloseTo(8400, 8);
+    expect(matchOf({ ...scheme, sacrifice: 0 })).toBeCloseTo(3600, 8);
+    expect(matchOf({ ...salary, floor: 0, match: 0.07 })).toBeCloseTo(8400, 8);
+  });
 });
 
 describe("contributionOf", () => {
@@ -126,6 +141,16 @@ describe("contributionOf", () => {
     expect(contributionOf(salary)).toBeCloseTo(13800, 8);
     expect(contributionOf({ ...salary, match: 0.07 })).toBeCloseTo(22200, 8);
     expect(contributionOf(stepUp)).toBe(0);
+  });
+
+  // Floored at three per cent, 2% given up lands its £2,400 with £360 of
+  // NI and the employer's £3,600, and nothing given up lands the £3,600
+  // alone.
+  it("pays the employer's floor beside what is given up, and alone where nothing is", () => {
+    const scheme = { ...salary, floor: 0.03, match: 0.07 };
+
+    expect(contributionOf({ ...scheme, sacrifice: 0.02 })).toBeCloseTo(6360, 8);
+    expect(contributionOf({ ...scheme, sacrifice: 0 })).toBeCloseTo(3600, 8);
   });
 });
 
