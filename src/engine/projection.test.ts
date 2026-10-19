@@ -303,19 +303,19 @@ describe("project", () => {
   // The salary's £1,000 a month sacrificed, the tax on the rest and the
   // household leave £3,444.70, and the fixed sums come out of it before
   // the spare money does: the mortgage's £2,210 first and whole, being
-  // owed, though it is listed last, and the pension the £1,234.70 left
-  // of its £2,266.25. The current account, listed first and uncapped,
-  // would take whatever was left, and nothing is, so the ISA is paid
-  // nothing either; the pension is paid what the month had, which lands
-  // with the basic rate claimed back as £1,543.38, and fed the £1,150
-  // that lands with the NI saved on top: 466,713.
+  // owed, though it is listed last, and the pension, marked droppable,
+  // the £1,234.70 left of its £2,266.25. The current account, listed
+  // first and uncapped, would take whatever was left, and nothing is, so
+  // the ISA is paid nothing either; the pension is paid what the month
+  // had, which lands with the basic rate claimed back as £1,543.38, and
+  // fed the £1,150 that lands with the NI saved on top: 466,713.
   it("reads the cash flow over every account, in the order they are listed", () => {
     const spareCash: Account = {
       ...cash,
       contribution: { cap: null, kind: "spare" },
     };
     const [, a, b] = project(
-      [spareCash, spareIsa, pension, mortgage],
+      [spareCash, spareIsa, { ...pension, isDroppable: true }, mortgage],
       schedule,
       { ...plan, years: 2 },
     );
@@ -753,17 +753,16 @@ describe("project", () => {
     ]);
   });
 
-  // Nothing coming in and nothing spent, and a SIPP always funded at
-  // £800 a month: the £1,200 of cash and the £2,000 ISA keep it paid
+  // Nothing coming in and nothing spent, and a SIPP kept paid at £800
+  // a month: the £1,200 of cash and the £2,000 ISA keep it paid
   // for four months, each landing as £860, since with no earnings only
   // £240 of it is relieved, and then it is paid nothing, since the only
   // savings left are pensions. The old pension beside it is never drawn
   // on, so nothing is drawn early and nothing goes uncovered.
-  it("keeps an always funded pension paid out of cash and the ISA, and never out of a pension", () => {
+  it("keeps a pension paid out of cash and the ISA, and never out of a pension", () => {
     const kept: Account = {
       ...sipp,
       contribution: { amount: 800, cadence: "month", kind: "fixed" },
-      isAlwaysFunded: true,
     };
     const old: Account = { ...sipp, balance: 50000, id: 9, name: "Old SIPP" };
 
@@ -2404,17 +2403,16 @@ describe("monthsOn", () => {
     expect(over(265)?.balance).toBeCloseTo(0, 6);
   });
 
-  // A month spending £1,000 with nothing coming in keeps a pension always
-  // funded paid only as far as the £1,200 of cash reaches once the
-  // spending is met, as the projection keeps it: £200, landing as £250
-  // with the basic rate claimed back on it, where with no reserve read
-  // it would be kept paid its whole £2,266.25.
-  it("keeps a pension always funded paid only as far as the cash reaches, as the projection does", () => {
-    const [kept] = monthsOn(
-      [{ ...pension, isAlwaysFunded: true }, pocket],
-      short,
-      { months: 1, plan: year },
-    );
+  // A month spending £1,000 with nothing coming in keeps a pension paid
+  // only as far as the £1,200 of cash reaches once the spending is met,
+  // as the projection keeps it: £200, landing as £250 with the basic
+  // rate claimed back on it, where with no reserve read it would be kept
+  // paid its whole £2,266.25.
+  it("keeps a pension paid only as far as the cash reaches, as the projection does", () => {
+    const [kept] = monthsOn([pension, pocket], short, {
+      months: 1,
+      plan: year,
+    });
 
     expect(kept?.paid).toBeCloseTo(250);
   });
@@ -2425,8 +2423,8 @@ describe("monthsOn", () => {
   // counted as paid off each, while the £1,000 the spending is short of
   // is not drawn, a month end checking the balances rather than
   // spending them.
-  it("takes what keeps a pension always funded paid out of the cash and the ISAs, and nothing for the spending", () => {
-    const kept: Account = { ...pension, id: 20, isAlwaysFunded: true };
+  it("takes what keeps a pension paid out of the cash and the ISAs, and nothing for the spending", () => {
+    const kept: Account = { ...pension, id: 20 };
     const month = byId(
       monthsOn([kept, flatIsa, pocket], short, { months: 1, plan: year }),
     );
@@ -2443,11 +2441,10 @@ describe("monthsOn", () => {
   // the spending it does not draw off what keeps the pension paid, so it
   // too pays it six months, £3,000 out of the cash, landing as £3,360
   // with the basic rate on the £300 a month nothing earned relieves.
-  it("stops keeping a pension always funded paid when the projection would, over a long gap", () => {
+  it("stops keeping a pension paid when the projection would, over a long gap", () => {
     const kept: Account = {
       ...pension,
       contribution: { amount: 500, cadence: "month", kind: "fixed" },
-      isAlwaysFunded: true,
     };
     const months = byId(
       monthsOn([kept, { ...pocket, balance: 10000 }], short, {

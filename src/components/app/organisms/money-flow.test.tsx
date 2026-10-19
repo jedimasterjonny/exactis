@@ -160,14 +160,14 @@ describe("MoneyFlow", () => {
   });
 
   // The ISA takes what its allowance leaves room for and the cash the
-  // rest, so nothing is left over; a pension always funded says so.
+  // rest, so nothing is left over; a pension marked droppable says so.
   it("hands the spare money down the savings that take it, each up to its cap", () => {
     renderFlow({
-      savings: [{ ...pension, isAlwaysFunded: true }, spareIsa, spareCash],
+      savings: [{ ...pension, isDroppable: true }, spareIsa, spareCash],
     });
 
     expect(steps()).toStrictEqual([
-      "1Workplace pension£3,983 / moMe · £1,150 salary sacrifice from Salary + £2,266 fixed sum + £567 tax relief · always funded£47,794 of the £60,000 allowance a year",
+      "1Workplace pension£3,983 / moMe · £1,150 salary sacrifice from Salary + £2,266 fixed sum + £567 tax relief · dropped when short£47,794 of the £60,000 allowance a year",
       "2Stocks & shares ISA£1,667 / moMe · spare money£20,000 of the £20,000 allowance a year",
       "3Current account£802 / mospare money · no cap",
     ]);

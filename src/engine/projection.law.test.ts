@@ -472,8 +472,9 @@ function yearWith(year: TaxYear, taxable: number, profit: number): TaxYear {
 
 describe("project against the law", () => {
   // Earning years: lines of every kind, salaries sacrificing into a
-  // pension that is also paid a fixed sum out of the month, an ISA
-  // taking what is left up to its allowance, and cash taking the rest.
+  // pension that is also paid a fixed sum out of the month, marked
+  // droppable so it is paid no more than the month has, an ISA taking
+  // what is left up to its allowance, and cash taking the rest.
   it("keeps what the law leaves of every month's income, a tax year settled at a time", () => {
     const random = seeded(20260923);
     for (let run = 0; run < plans; run += 1) {
@@ -486,6 +487,7 @@ describe("project against the law", () => {
         }),
         growth: { kind: "fixed", rate: 0 },
         id: 50,
+        isDroppable: true,
         kind: "tax-deferred",
         name: "Pension",
         owner: 1,

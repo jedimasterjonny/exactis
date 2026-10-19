@@ -132,11 +132,11 @@ describe("BalanceSheet", () => {
 
   // A saving owned by nobody at the plan rate says nothing beneath its
   // name, and what it is paid is the money's flow's to say.
-  it("says whose a saving is, how it grows where that is its own, and when it is always funded", () => {
+  it("says whose a saving is, how it grows where that is its own, and when it is dropped in a short month", () => {
     renderSheet({
       owners: [],
       savings: [
-        { ...pension, isAlwaysFunded: true },
+        { ...pension, isDroppable: true },
         isa,
         { ...cash, growth: { kind: "fixed", rate: 0.04 } },
         { ...cash, growth: { kind: "plan" }, id: 9, name: "Premium bonds" },
@@ -144,7 +144,7 @@ describe("BalanceSheet", () => {
     });
 
     expect(rowsOf("Pensions · tax-deferred")).toStrictEqual([
-      "1Workplace pension£412,880always funded",
+      "1Workplace pension£412,880dropped when short",
     ]);
     expect(rowsOf("ISAs · tax-free")).toStrictEqual([
       "2Stocks & shares ISA£286,145",

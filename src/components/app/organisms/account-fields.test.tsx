@@ -16,7 +16,7 @@ const isa: AccountValues = {
   contribution: 500,
   funding: "fixed",
   growth: "plan",
-  isAlwaysFunded: false,
+  isDroppable: false,
   kind: "tax-free",
   name: "ISA",
   owner: 1,
@@ -131,39 +131,30 @@ describe("AccountFields", () => {
   });
 
   // A pension is asked what it is paid in a month that cannot pay it,
-  // beside its balance and its contribution, and the choice reports as
-  // whether it is always funded; an ISA is asked nothing of it.
+  // beside its balance and its contribution, kept paid unless told
+  // otherwise, and the choice reports as whether it is droppable; an
+  // ISA is asked nothing of it.
   it("asks a pension what it is paid in a month short of it, and an ISA nothing", () => {
-    const { onAmend } = renderFields({
-      ...isa,
-      isAlwaysFunded: true,
-      kind: "tax-deferred",
-    });
+    const { onAmend } = renderFields({ ...isa, kind: "tax-deferred" });
     const shortfall = screen.getByRole("combobox", { name: "When short" });
 
-    expect(shortfall).toHaveTextContent("Always fund it");
-    expect(shortfall).toHaveAccessibleDescription(
-      "Drawn from cash, GIAs and ISAs",
-    );
+    expect(shortfall).toHaveTextContent("Draw on the savings");
+    expect(shortfall).toHaveAccessibleDescription("From cash, GIAs and ISAs");
 
-    fireEvent.change(shortfall, { target: { value: "month" } });
+    fireEvent.change(shortfall, { target: { value: "dropped" } });
 
-    expect(onAmend).toHaveBeenCalledExactlyOnceWith({ isAlwaysFunded: false });
+    expect(onAmend).toHaveBeenCalledExactlyOnceWith({ isDroppable: true });
 
-    fireEvent.change(shortfall, { target: { value: "always" } });
+    fireEvent.change(shortfall, { target: { value: "kept" } });
 
-    expect(onAmend).toHaveBeenLastCalledWith({ isAlwaysFunded: true });
+    expect(onAmend).toHaveBeenLastCalledWith({ isDroppable: false });
   });
 
-  // Only an always funded pension is told where its money comes from,
-  // so one paid what the month can manage is told nothing.
-  it("says nothing beneath the answer to a month short of it but always funding it", () => {
-    const pension: AccountValues = {
-      ...isa,
-      isAlwaysFunded: true,
-      kind: "tax-deferred",
-    };
-    renderFields(pension, { ...pension, isAlwaysFunded: false });
+  // Only a pension kept paid is told where its money comes from, so one
+  // whose payments are dropped is told nothing.
+  it("says nothing beneath the answer to a month short of it but drawing on the savings", () => {
+    const pension: AccountValues = { ...isa, kind: "tax-deferred" };
+    renderFields(pension, { ...pension, isDroppable: true });
 
     expect(
       screen.getByRole("combobox", { name: "When short" }),
@@ -238,7 +229,7 @@ describe("AccountFields", () => {
       ...isa,
       funding: "spare",
       growth: "fixed",
-      isAlwaysFunded: false,
+      isDroppable: false,
       kind: "cash",
       rate: 0.02,
     });

@@ -12,14 +12,27 @@ type Step = (document: Record<string, unknown>) => Record<string, unknown>;
 // household kept in the first shape to the second, so there is one fewer
 // than there are shapes. A change to the model a household kept before
 // it cannot be read under is a step appended here, which counts the
-// shape up by itself. There is none yet: the chain starts with the shape
-// the store holds, and the changes made before it were carried by
-// rewriting the store rather than by steps. A step carries what it finds
-// and leaves what it does not, refusing with a Refusal rather than
-// throwing anything else, since an older version is read through the
-// chain for its sources alone, before the rules, and a refusal reads as
-// no sources there where anything else thrown fails the page.
-const steps: readonly Step[] = [];
+// shape up by itself. The changes made before the first shape were
+// carried by rewriting the store rather than by steps. A step carries
+// what it finds and leaves what it does not, refusing with a Refusal
+// rather than throwing anything else, since an older version is read
+// through the chain for its sources alone, before the rules, and a
+// refusal reads as no sources there where anything else thrown fails
+// the page.
+//
+// 1 to 2: a pension was dropped in a month short of it unless it was
+// marked always funded, and is now kept paid unless it is marked
+// droppable. The old mark comes off every account and nothing is marked
+// droppable, since the old default was the wrong way round: every
+// pension is kept paid until its owner marks the ones to drop.
+const steps: readonly Step[] = [
+  (document): Record<string, unknown> => {
+    const { accounts } = document;
+    return Array.isArray(accounts)
+      ? { ...document, accounts: accounts.map(unmarked) }
+      : document;
+  },
+];
 
 // The shape a household is kept in now, which every save stamps on it:
 // the one the last step reaches. A household kept before shapes were
@@ -67,4 +80,16 @@ export function upcast(value: unknown, from: readonly Step[] = steps): unknown {
     throw new Refusal("This household was saved by a newer app than this one");
   }
   return from.slice(shape - 1).reduce((older, step) => step(older), document);
+}
+
+// An account kept in the first shape with the mark of a pension always
+// funded taken off, and anything else as it was found.
+function unmarked(account: unknown): unknown {
+  return typeof account === "object" &&
+    account !== null &&
+    "isAlwaysFunded" in account
+    ? Object.fromEntries(
+        Object.entries(account).filter(([key]) => key !== "isAlwaysFunded"),
+      )
+    : account;
 }
