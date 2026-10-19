@@ -257,213 +257,37 @@ const nanopound = 1e-9;
 // on its own: none, since only the projection draws.
 const nobody: ReadonlySet<number> = new Set();
 
-// A month's money: the income lines running that month, as they are
-// earned, less what a salary sacrifices into its pension, less the
-// income tax and the National Insurance on the rest, less the expense
-// lines, each kept as well as summed, and less each debt's fixed sum,
-// whole and before any other wherever the debt is listed. What that
-// leaves pays each pension kept paid its fixed sum, then the other
-// fixed sums, each in the order the accounts are listed, each taking
-// its sum or what the month still has when it no longer covers it, and
-// then the spare money to each account that takes it in the order they
-// are listed, each up to its cap and passing the rest on, and what is
-// left after them, which is negative by the expenses, the debts'
-// payments and what a pension is kept paid that the income after its
-// tax does not cover, and by nothing else. So the
-// spare money is what the month has after tax, and an account taking
-// it is paid money the month really has rather than the tax bill on
-// top. The tax is charged
-// on the month as a twelfth of a year, a twelfth of what a year of
-// months like it would pay, which is the year's tax exactly whenever
-// the year's months are alike and more than it when they are not,
-// since a month earning more than the rest meets a twelfth of each
-// band that the quieter months leave unused. The projection settles
-// the difference in the April after the tax year, which comes into
-// that month's money as income does, untaxed, and is spent, saved or
-// drawn for with the rest of it. The tax is each owner's: income tax
-// and National Insurance are charged on a person, so each owner's
-// lines are taxed together against their own allowance, bands and
-// thresholds and apart from everyone else's, and two salaries of
-// £40,000 pay two people's tax rather than one person's on £80,000;
-// the month's figures are the owners' summed. A salary or a
-// self-employed profit runs only until the owner who earns it retires,
-// at their own age, whatever its own last year says, since money
-// earned by working is not earned once the work stops; a line ending
-// before then ends where it says, and a pension or any other income
-// runs on. What is left within a
-// nanopound of nothing is nothing exactly: a month whose lines cancel
-// to the penny need not
-// cancel in binary, and a shortfall too small to write down is no
-// shortfall to draw savings for. A fixed sum into savings is a
-// contribution out of what the month has, not a drawdown: an account is
-// paid only while the income funding it lasts, and selling out of one
-// wrapper to keep a payment into another going would be a shortfall the
-// ledger read back as saving. A pension is the one saving kept paid all
-// the same, unless it is marked droppable, since what it is paid out of
-// taxed money is relieved, and a pension an ISA is sold to keep paid
-// holds more than the ISA did: its own fixed sum is paid out of what
-// the month has and
-// then out of what the cash, the GIAs and the ISAs hold, once the spending
-// and the debts' payments the month is short of have been met from them,
-// and never out of a pension, since one pension sold to pay another is
-// money going round in a circle, charged 55% before the pension age.
-// Once the cash, the GIAs and the ISAs are spent it is paid only what the
-// month has, as any other saving is. A debt's fixed sum is owed rather than
-// saved, so it goes out with the expenses and is drawn for as they are
-// when the month is short of it, rather than going short itself: a debt
-// short of its payments is a debt in default, which the plan does not
-// model. It comes before the other fixed sums because it is drawn for:
-// met after them, it would sell savings to keep a saving paid. The order
-// the accounts are listed in sets which saving is paid first, and a debt
-// is no saving. A yearly figure is spread over the twelve months, save
-// a salary's bonus, which is paid as its line says: a twelfth of the
-// year's every month, a quarter of it in each quarter's last month, or
-// the whole of it in the month it is paid once a year, so a bonus month
-// meets the 2% rate of National Insurance past the upper earnings limit
-// as the month's pay does under PAYE, and its income tax, charged on
-// the month as a twelfth of a year, is settled with the year. A loan
-// whose payments are a line pays nothing as a fixed sum, since the line
-// is its payment and the ledger shows the same figure against the loan:
-// it is counted once, as the line, and stops when the line does. A
-// debt paying its own fixed sum stops too, at the month the loan maths
-// says the payments clear it, read off the balance it owes, the balloon
-// it leaves standing, the rate it is charged at and the sum itself, and
-// counted from the month the plan starts in. In that month it is
-// charged only what clears it, what it owes with the month's interest,
-// since the term is rounded up to a whole month and the sum it states
-// is more than is left; the rest is the month's to save, and a line
-// paying a loan is charged the same way in the month it clears the
-// loan. A debt's payments have an
-// end, always: charged for every month of the plan instead, a £5,000
-// card at £250 a month costs £90,000 over thirty years and the money it
-// would have saved after the second is never saved. A payment that
-// never clears its debt has no such month, and the action refuses to
-// save one, so a debt that reaches here with one is a caller's mistake
-// rather than a debt paid for ever. A
-// salary feeding a pension among the accounts gives up its sacrifice
-// before the month sees it, and the pension is fed the sacrifice with
-// the employer's NI saved on it and the employer's match, pound for
-// pound with the sacrifice up to the share of the base the line
-// states and never less than the floor it states, over and above
-// whatever fixed sum the pension is paid in its
-// own right; a salary naming a pension not listed is earned whole, as
-// a line paying a loan not listed pays nothing off it. A sacrifice is
-// given up before the tax is charged, since it is never paid to its
-// owner at all, so the salary pays income tax and National Insurance
-// on what is left of it and the sacrifice costs the month less than it
-// puts in the pension; the match was never the owner's, so it comes
-// off nothing and is taxed on nothing, and the share of it the
-// sacrifice earns lands with the sacrifice or not at all, while the
-// floor, which the employer pays whatever is given up and so costs the
-// month nothing, lands whether the month gives the sacrifice up or
-// not. Into a
-// pension marked droppable it is given up only while what is left of
-// the income after the tax on it still covers the expenses, the debts'
-// payments and what the pensions kept paid are fed and paid, a month
-// short of them by less than a
-// nanopound covering them as a month left with that much is left with
-// nothing: what the sacrifices are dropped for and what the month
-// is left with are the one figure, so the two are read against the one
-// rule and a plan whose month cancels to the penny does not give up
-// every sacrifice in every month of it over the residue of adding the
-// lines up. In a month that is really short, no such line sacrifices at
-// all, every such line is earned and taxed whole and every such pension
-// is fed nothing but the floor under its salary's match. All of them or
-// none,
-// rather than a share of each or
-// the lines that fit, since a sacrifice a month cannot afford is a
-// drawdown by another name and the pension would be fed in the very
-// month a wrapper is sold to cover the spending. A salary feeding a
-// pension kept paid gives up its sacrifice whatever the month has,
-// all of them or none as the rest, so long as the cash, the GIAs and the
-// ISAs have what the month is then short of, once the spending has been met
-// from them: the month is short by what it gave up too, for the
-// projection to draw. So a month that is short feeds nothing but the
-// pensions kept paid and the floors, pays no fixed sum but a debt's
-// and such a
-// pension's, and hands over no spare money, and what is left is short
-// by the expenses, the debts' payments and what the pensions are kept
-// paid that the income does not cover, and by nothing else. A salary
-// naming an account that is no pension is refused, as the spare money
-// into a real asset is, and so is an
-// expense line naming an account that is no debt: the action holds each
-// link to the kind it may name, so one that reached here is a caller's
-// mistake rather than a result, and a sacrifice would otherwise leave
-// the salary and land in no wrapper while a line paying a wrapper would
-// drop the sum that wrapper states and pay it nowhere. Both links are
-// read over the whole schedule before any month is worked out, since a
-// link is wrong the day it is written rather than the year its line
-// starts in. An account the plan lists twice is refused beside them:
-// the store hands out an id an account, so two entries sharing one are
-// a caller's mistake in the same way, and listed twice the account is
-// paid its fixed sum twice over in every month and takes the spare
-// money twice on the way down, while a projection carrying it counts
-// its balance twice in every year. Refused here rather than where the
-// plan is carried, since the plan card reads a month straight from the
-// flow and a list the store cannot produce is wrong wherever it is
-// read. An allowance is its owner's, one of each kind shared across
-// every account of that kind they hold, so each owner's ISAs are held
-// together to what the month opens the ISA allowance at in what lands
-// in them, and their pensions to what it opens the pension allowance
-// at, as the reading says: what the tax year has left of it for a month
-// the projection carries, and a twelfth of it for a month read on its
-// own. Each is held from
-// every source and in the order the month pays them: what the salaries
-// feed each, then the fixed sums in the order the accounts are listed,
-// then the spare money's takes in the same order, each taking only
-// what the ones before it left. A sacrifice the month does not give up
-// takes none of it, and its floor only what lands, so what a pension
-// kept paid is fed in a month
-// short of the rest does not hang on which salary is listed first. A
-// wrapper naming no owner is refused
-// with the rest, since the store holds every wrapper to one and an
-// allowance with nobody to hold it to is a figure the flow cannot
-// place; read as a number rather than as present, so an owner of null
-// from a caller that skipped the model is refused too rather than
-// pooling every such wrapper into one allowance. An account nobody
-// owns naming an owner is refused beside it, as the store refuses it. A
-// sacrifice is given up whole whatever room the allowance has, since it
-// is the employer's contribution under the scheme and the scheme pays
-// it in; what lands in an owner's pensions past what the month opens
-// their allowance at is the annual allowance charge, added to the owner's
-// taxable income for the month and charged through their bands at
-// their marginal rate, and settled with the tax year as the rest of the
-// income tax is. The pension allowance is each owner's own for the
-// year as the month reads it: £60,000, tapered by a pound for every two of adjusted income over
-// £260,000 to a floor of £10,000 for an owner whose threshold income is
-// over £200,000 as well, each read off what the lines running in the
-// month pay in a year, so a bonus paid in one month is counted once
-// rather than twelve times over, the sacrifice counted back into the
-// threshold income and what
-// it lands into the adjusted income; and once an owner has drawn on a
-// pension as income it is the money purchase allowance, £10,000, from
-// the month after for the rest of the plan, which the projection hands
-// the month, a draw before the pension age being a payment the rules do
-// not allow and so no such draw. A fixed sum or the spare money
-// past the room is not paid, since each is a payment the plan chooses
-// rather than one it owes, and stays in the month to pay the sums and
-// the spare money after it, and what none of them takes is left, which
-// the plan takes as spent rather than saved. A pension paid out of taxed money claims the
-// basic rate back on no more than its owner is relieved on, held the
-// same way: a twelfth of what the owner's own salaries and
-// self-employed profit earn a year, less what they sacrifice, or of
-// £3,600 when that is more, shared across the owner's pensions in the
-// order the month pays them, and a pound paid past it lands as a pound.
-// An owner who earns nothing is relieved on the £3,600 whatever anyone
-// else in the household earns. The month is
-// worked out in its own pounds. A line states its amount in today's
-// money, the money of the month the plan starts in, and is paid it risen
-// since then at the rate its growth gives, a month at a time: with the
-// plan's inflation, a point or two over it, or not at all for a line
-// fixed in nominal terms. The tax bands are frozen to April 2031 and
-// rise with prices a tax year at a time after it, as the tax module
-// holds them. Everything an account states,
-// its fixed sum, its cap and the allowance it is held to, is taken in
-// the pounds of the day it is paid, as a loan's payment and the law's
-// figures are. A plan whose prices fall by everything in a year, or
-// whose inflation is no finite number, is refused, since no amount can
-// be read in today's money against it and every figure after the plan's
-// first month would be no number at all; the store refuses to keep one.
+// A month's money, from the accounts, the two schedules and the reading
+// of the month. It first refuses what the store could not have handed
+// it: an account listed twice, an inflation no prices can be read
+// against, a wrapper with no owner or an owner on anything else, a
+// droppable mark on what is no pension, and any link the schedule holds
+// to the wrong kind of account or to an owner the plan does not list,
+// or a share of the base that is no share, read over every line whether
+// or not it runs in the month; and, as the month reaches them, a real
+// asset or a debt taking the spare money and a debt whose payments never
+// end. Then, in order: the income lines running in the month, a salary
+// or a profit only until its owner retires; what the salaries sacrifice
+// into the pensions they feed, with the employer's match and floor; the
+// income tax and the National Insurance on the rest, owner by owner; the
+// expense lines and each debt's own fixed sum; the fixed sums of the
+// pensions kept paid; the other fixed sums, down the accounts in the
+// order listed; and the spare money, down the accounts that take it. The
+// sacrifices into the pensions kept paid are given up only while the
+// cash, the GIAs and the ISAs the reading says the month opens with
+// cover what the month is then short of, and those into the rest only
+// while the month can still pay the spending, the debts and the pensions
+// kept paid. What the month pays an ISA or a pension is held to its
+// owner's allowance, what a salary feeds landing whole and charged past
+// it, and a pension's relief to what its owner earns. It hands back the
+// month in its own pounds, line by line and summed, with what each
+// pension was fed and claims in relief, what landed under each allowance
+// and what each owner is taxed on, for the projection to carry, and what
+// is left, below nothing by what the month must draw. The rules, and
+// why, are under The month, Lines and milestones, Salaries and what they
+// feed, The tax on the month, Debts, Pensions kept paid, The allowances
+// and relief, Today's money and What is refused, and where in README.md
+// beside this file.
 export function cashFlow(
   accounts: readonly Account[],
   schedule: Schedule,
