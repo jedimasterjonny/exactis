@@ -77,6 +77,21 @@ describe("AppFrame", () => {
     expect(signOut).toHaveBeenCalledOnce();
   });
 
+  it("offers what is open as a file, drawn as sign-out is", () => {
+    stubViewport(1024);
+    render(
+      <AppFrame banner={null}>
+        <p>Screen</p>
+      </AppFrame>,
+    );
+
+    const link = screen.getByRole("link", { name: "Export as file" });
+
+    expect(link).toHaveAttribute("href", "/export");
+    expect(link).toHaveAttribute("data-slot", "sidebar-menu-button");
+    expect(link).toHaveClass("label");
+  });
+
   it("heads the main column with the banner it is handed, above the phone's bar", () => {
     stubViewport(390);
     render(
