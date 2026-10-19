@@ -142,6 +142,19 @@ The premise that `ui/` is byte-identical to the registry is what the exemptions
 rest on, so it is checked weekly by `.github/workflows/vendor.yml` rather than
 assumed. On drift it opens a pull request.
 
+# The model
+
+`src/engine/README.md` is the specification of the model: the rules of a month
+and of a run, each with its reason, stated once under a heading of its own. A
+rule changes there, in the code that holds it and in its test, in the same
+commit. The comments above `cashFlow`, `project` and `drawnFrom` say what each
+takes, hands back and does in what order, and name the sections that say why. A
+comment added or changed beside code a section specifies, in `src/engine`,
+`src/lib` or `src/data`, says what that code does and leaves the reason to the
+section, since a rule stated in four places drifted in the one a change missed.
+`README.md` and `TODO.md` point at it rather than restating it: the one tours
+the app around the engine, and the other lists what the model does not yet hold.
+
 # Commit hygiene
 
 Conventional Commits, and every commit carries a scope. A bare `type:` header
