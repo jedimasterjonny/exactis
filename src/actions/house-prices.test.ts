@@ -6,6 +6,7 @@ import { readIndex, revalued, worthIn } from "@/data/house-prices";
 import { quoted, registryAnswer } from "@/data/house-prices.fixture";
 import { kept, today } from "@/data/household.fixture";
 import { homeValues, house, houseLoan, move } from "@/data/houses.fixture";
+import { stamped } from "@/data/shapes";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
@@ -86,7 +87,7 @@ describe("pullHousePrices", () => {
       expect.objectContaining({ cache: "no-store" }),
     );
     expect(await readLatest(db, "")).toStrictEqual({
-      household: {
+      household: stamped({
         ...withHouse,
         accounts: [
           ...kept.accounts.slice(0, 3),
@@ -95,7 +96,7 @@ describe("pullHousePrices", () => {
         ],
         housePrices,
         points: revalued(kept.points, homeValues.bought, index),
-      },
+      }),
       version: 2,
     });
     expect(worthIn(kept.asOf, homeValues.bought, index)).toBe(368635);
@@ -128,7 +129,7 @@ describe("pullHousePrices", () => {
       ),
     );
     expect(await readLatest(db, "")).toStrictEqual({
-      household: corrected,
+      household: stamped(corrected),
       version: 2,
     });
   });

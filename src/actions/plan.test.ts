@@ -8,6 +8,7 @@ import { blank, kept as reference, today } from "@/data/household.fixture";
 import { atAge } from "@/data/milestones";
 import { owners, sam } from "@/data/owners.fixture";
 import { allocation, rates } from "@/data/rates.fixture";
+import { stamped } from "@/data/shapes";
 import { targetsUnder } from "@/data/targets.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -65,7 +66,7 @@ describe("saveAges", () => {
       saved({ ends: 91, retires: 55 }),
     );
     expect(await readLatest(db, "")).toStrictEqual({
-      household: retiringAt(55),
+      household: stamped(retiringAt(55)),
       version: 1,
     });
     expect(refresh).toHaveBeenCalledOnce();
@@ -162,10 +163,10 @@ describe("saveRates", () => {
       saved({ ...blank.rates, dividends: 0.02, stocks: 0.0595 }),
     );
     expect(await readLatest(db, "")).toStrictEqual({
-      household: {
+      household: stamped({
         ...blank,
         rates: { ...blank.rates, dividends: 0.02, stocks: 0.0595 },
-      },
+      }),
       version: 1,
     });
     expect(refresh).toHaveBeenCalledOnce();
@@ -242,7 +243,7 @@ describe("saveAnchor", () => {
       saved({ age: 52, bonds: 0.15 }),
     );
     expect(await readLatest(db, "")).toStrictEqual({
-      household: { ...blank, glide },
+      household: stamped({ ...blank, glide }),
       version: 2,
     });
     expect(refresh).toHaveBeenCalledOnce();
@@ -329,7 +330,7 @@ describe("removeAnchor", () => {
 
     expect(await removeAnchor(60)).toStrictEqual(saved(undefined));
     expect(await readLatest(db, "")).toStrictEqual({
-      household: { ...blank, glide: glide.slice(0, 1) },
+      household: stamped({ ...blank, glide: glide.slice(0, 1) }),
       version: 2,
     });
     expect(refresh).toHaveBeenCalledOnce();
@@ -360,7 +361,7 @@ describe("saveAllocation", () => {
   it("writes the split over the household's and draws the page again", async () => {
     expect(await saveAllocation(allocation)).toStrictEqual(saved(allocation));
     expect(await readLatest(db, "")).toStrictEqual({
-      household: { ...blank, allocation },
+      household: stamped({ ...blank, allocation }),
       version: 1,
     });
     expect(refresh).toHaveBeenCalledOnce();
@@ -424,10 +425,10 @@ describe("saveDeductions", () => {
       saved({ dividends: 0.02, fees: 0.0025, setOn: "2026-09-15" }),
     );
     expect(await readLatest(db, "")).toStrictEqual({
-      household: {
+      household: stamped({
         ...blank,
         deductions: { dividends: 0.02, fees: 0.0025, setOn: "2026-09-15" },
-      },
+      }),
       version: 1,
     });
     expect(refresh).toHaveBeenCalledOnce();
@@ -523,7 +524,7 @@ describe("saveRateSet", () => {
 
     expect(await saveRateSet("cma")).toStrictEqual(saved("cma"));
     expect(await readLatest(db, "")).toStrictEqual({
-      household: { ...reference, rateSet: "cma" },
+      household: stamped({ ...reference, rateSet: "cma" }),
       version: 2,
     });
     expect(refresh).toHaveBeenCalledOnce();

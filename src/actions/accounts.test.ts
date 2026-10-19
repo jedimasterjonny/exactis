@@ -10,6 +10,7 @@ import { golfPcp, golfValues, golf as owned } from "@/data/cars.fixture";
 import { kept, today } from "@/data/household.fixture";
 import { homePart, homeValues } from "@/data/houses.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { upcast } from "@/data/shapes";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
@@ -171,7 +172,7 @@ const paid: Kept = {
 };
 
 async function latest(): Promise<unknown> {
-  return (await readLatest(db, ""))?.household;
+  return upcast((await readLatest(db, ""))?.household);
 }
 
 async function versions(): Promise<number | undefined> {

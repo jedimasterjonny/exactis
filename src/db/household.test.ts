@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { blank, kept as reference } from "@/data/household.fixture";
 import { sam } from "@/data/owners.fixture";
+import { currentShape, stamped } from "@/data/shapes";
 import { inMemory } from "@/db/memory.fixture";
 import { householdVersions } from "@/db/schema";
 
@@ -40,8 +41,17 @@ describe("household store", () => {
     await keepAfter(db, { scenario: "", version: 1 }, named);
 
     expect(await readLatest(db, "")).toStrictEqual({
-      household: named,
+      household: stamped(named),
       version: 2,
+    });
+  });
+
+  it("stamps every version it keeps with the shape it is kept in", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, blank);
+
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: { ...blank, shape: currentShape },
+      version: 1,
     });
   });
 
@@ -55,7 +65,7 @@ describe("household store", () => {
       "The household changed while this was being saved, so nothing was",
     );
     expect(await readLatest(db, "")).toStrictEqual({
-      household: named,
+      household: stamped(named),
       version: 2,
     });
   });
@@ -69,11 +79,11 @@ describe("household store", () => {
     await keepAfter(db, { scenario: "Retire early", version: 1 }, reference);
 
     expect(await readLatest(db, "")).toStrictEqual({
-      household: named,
+      household: stamped(named),
       version: 2,
     });
     expect(await readLatest(db, "Retire early")).toStrictEqual({
-      household: reference,
+      household: stamped(reference),
       version: 2,
     });
 
@@ -105,11 +115,11 @@ describe("household store", () => {
     );
 
     expect(await readLatest(db, "")).toStrictEqual({
-      household: reference,
+      household: stamped(reference),
       version: 2,
     });
     expect(await readLatest(db, "Retire early")).toStrictEqual({
-      household: named,
+      household: stamped(named),
       version: 2,
     });
   });
@@ -142,7 +152,7 @@ describe("household store", () => {
     expect(await readLatest(db, "Retire early")).toBeNull();
     expect(await listScenarios(db)).toStrictEqual(["Move house"]);
     expect(await readLatest(db, "")).toStrictEqual({
-      household: blank,
+      household: stamped(blank),
       version: 1,
     });
 
@@ -284,11 +294,11 @@ describe("household store", () => {
     ).rejects.toMatchObject(refused);
     await expect(db.delete(householdVersions)).rejects.toMatchObject(refused);
     expect(await readLatest(db, "")).toStrictEqual({
-      household: blank,
+      household: stamped(blank),
       version: 1,
     });
     expect(await readLatest(db, "Retire early")).toStrictEqual({
-      household: blank,
+      household: stamped(blank),
       version: 1,
     });
 

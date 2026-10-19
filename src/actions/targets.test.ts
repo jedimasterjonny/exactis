@@ -5,6 +5,7 @@ import * as z from "zod";
 
 import { mappings } from "@/data/cma.fixture";
 import { blank, kept as reference, today } from "@/data/household.fixture";
+import { stamped } from "@/data/shapes";
 import { targets } from "@/data/targets.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -43,7 +44,7 @@ describe("importTargets", () => {
       saved(importedToday),
     );
     expect(await readLatest(db, "")).toStrictEqual({
-      household: { ...blank, targets: importedToday },
+      household: stamped({ ...blank, targets: importedToday }),
       version: 1,
     });
     expect(refresh).toHaveBeenCalledOnce();
@@ -61,10 +62,10 @@ describe("importTargets", () => {
     await importTargets(moved);
 
     expect(await readLatest(db, "")).toStrictEqual({
-      household: {
+      household: stamped({
         ...reference,
         targets: { categories: moved, importedOn: "2026-09-15" },
-      },
+      }),
       version: 2,
     });
   });
@@ -156,7 +157,7 @@ describe("mapCategory", () => {
       }),
     ).toStrictEqual(saved(mapped));
     expect(await readLatest(db, "")).toStrictEqual({
-      household: { ...reference, mappings: mapped },
+      household: { ...stamped(reference), mappings: mapped },
       version: 2,
     });
     expect(refresh).toHaveBeenCalledOnce();
@@ -273,13 +274,13 @@ describe("mapByName", () => {
 
     expect(await mapByName()).toStrictEqual(saved(mapped));
     expect(await readLatest(db, "")).toStrictEqual({
-      household: {
+      household: stamped({
         ...reference,
         mappings: [
           ...stale.filter(({ category }) => category !== ukEquity),
           ...mapped,
         ],
-      },
+      }),
       version: 2,
     });
     expect(refresh).toHaveBeenCalledOnce();

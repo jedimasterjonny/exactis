@@ -7,8 +7,10 @@ import type { Kept } from "@/data/household";
 import type { Answer } from "@/lib/answer";
 
 import { blank, kept as reference, today } from "@/data/household.fixture";
+import { currentShape, stamped } from "@/data/shapes";
 import { keepAfter, listScenarios, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
+import { householdVersions } from "@/db/schema";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
 import { closeScenario, openedScenario, openScenario } from "@/lib/scenario";
@@ -61,7 +63,7 @@ describe("createScenario", () => {
       saved("Retire early"),
     );
     expect(await readLatest(db, "Retire early")).toStrictEqual({
-      household: reference,
+      household: stamped(reference),
       version: 1,
     });
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
@@ -74,7 +76,7 @@ describe("createScenario", () => {
       saved("Retire early"),
     );
     expect(await readLatest(db, "Retire early")).toStrictEqual({
-      household: blank,
+      household: stamped(blank),
       version: 1,
     });
     expect(await readLatest(db, "")).toBeNull();
@@ -90,7 +92,7 @@ describe("createScenario", () => {
       saved("Retire earlier"),
     );
     expect(await readLatest(db, "Retire earlier")).toStrictEqual({
-      household: longer,
+      household: stamped(longer),
       version: 1,
     });
   });
@@ -102,7 +104,7 @@ describe("createScenario", () => {
       refused("A scenario is kept under that name already"),
     );
     expect(await readLatest(db, "Retire early")).toStrictEqual({
-      household: blank,
+      household: stamped(blank),
       version: 1,
     });
     expect(openScenario).not.toHaveBeenCalled();
@@ -215,7 +217,7 @@ describe("deleteScenario", () => {
     );
     expect(await listScenarios(db)).toStrictEqual(["Move house"]);
     expect(await readLatest(db, "")).toStrictEqual({
-      household: reference,
+      household: stamped(reference),
       version: 1,
     });
     expect(closeScenario).toHaveBeenCalledOnce();
@@ -286,11 +288,11 @@ describe("adoptScenario", () => {
 
     expect(await adoptScenario("Retire early")).toStrictEqual(saved(undefined));
     expect(await readLatest(db, "")).toStrictEqual({
-      household: {
+      household: stamped({
         ...planned,
         accounts: [...recorded.accounts, bonds],
         points: reference.points,
-      },
+      }),
       version: 3,
     });
     expect(await listScenarios(db)).toStrictEqual([]);
@@ -337,11 +339,11 @@ describe("adoptScenario", () => {
 
     expect(await adoptScenario("Retire early")).toStrictEqual(saved(undefined));
     expect(await readLatest(db, "")).toStrictEqual({
-      household: reference,
+      household: stamped(reference),
       version: 2,
     });
     expect(await readLatest(db, "Retire early")).toStrictEqual({
-      household: { ...reference, ages: { ends: 97 } },
+      household: stamped({ ...reference, ages: { ends: 97 } }),
       version: 2,
     });
     expect(closeScenario).toHaveBeenCalledOnce();
@@ -352,7 +354,7 @@ describe("adoptScenario", () => {
 
     expect(await adoptScenario("Retire early")).toStrictEqual(saved(undefined));
     expect(await readLatest(db, "")).toStrictEqual({
-      household: longer,
+      household: stamped(longer),
       version: 1,
     });
     expect(closeScenario).not.toHaveBeenCalled();
@@ -386,6 +388,28 @@ describe("adoptScenario", () => {
     expect(await listScenarios(db)).toStrictEqual(["Retire early"]);
   });
 
+  // Written raw, since a save stamps this app's shape: each side as a
+  // version a newer app kept, read once that app is rolled back.
+  it("carries both sides through the chain, refusing either a newer app kept in its words", async () => {
+    const newer = { ...reference, shape: currentShape + 1 };
+    await db.insert(householdVersions).values([
+      { household: newer, scenario: "Retire early", version: 1 },
+      { household: reference, scenario: "Move house", version: 1 },
+      { household: newer, scenario: "", version: 1 },
+    ]);
+
+    await expect(adoptScenario("Retire early")).resolves.toStrictEqual(
+      refused("This household was saved by a newer app than this one"),
+    );
+    await expect(adoptScenario("Move house")).resolves.toStrictEqual(
+      refused("This household was saved by a newer app than this one"),
+    );
+    expect(await listScenarios(db)).toStrictEqual([
+      "Move house",
+      "Retire early",
+    ]);
+  });
+
   // Two scenarios adopted at once: both read the household's first
   // version before either writes, so the second to write is from a
   // household that is gone by then, and its scenario is kept.
@@ -410,7 +434,7 @@ describe("adoptScenario", () => {
       },
     ]);
     expect(await readLatest(db, "")).toStrictEqual({
-      household: { ...reference, ages: { ends: 97 } },
+      household: stamped({ ...reference, ages: { ends: 97 } }),
       version: 2,
     });
     expect(await listScenarios(db)).toStrictEqual(["Move house"]);
