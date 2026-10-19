@@ -8,6 +8,7 @@ import { AppFrame } from "./app-frame";
 
 vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
 vi.mock("@/actions/auth", () => ({ signOut: vi.fn() }));
+vi.mock("@/actions/household", () => ({ importHousehold: vi.fn() }));
 
 describe("AppFrame", () => {
   afterEach(() => {
@@ -90,6 +91,24 @@ describe("AppFrame", () => {
     expect(link).toHaveAttribute("href", "/export");
     expect(link).toHaveAttribute("data-slot", "sidebar-menu-button");
     expect(link).toHaveClass("label");
+  });
+
+  it("offers to import a household file beside the export, drawn as sign-out is", () => {
+    stubViewport(1024);
+    render(
+      <AppFrame banner={null}>
+        <p>Screen</p>
+      </AppFrame>,
+    );
+
+    const button = screen.getByRole("button", { name: "Import file…" });
+
+    expect(button).toHaveAttribute("data-slot", "sidebar-menu-button");
+    expect(button).toHaveClass("label");
+    expect(screen.getByLabelText("Household file")).toHaveAttribute(
+      "type",
+      "file",
+    );
   });
 
   it("heads the main column with the banner it is handed, above the phone's bar", () => {
