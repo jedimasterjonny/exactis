@@ -127,23 +127,29 @@ bun run db:migrate
 ```
 
 The household's shape is the model's rather than the table's, so changing it is
-a change to `src/data/household.ts` and no migration. Until the store holds a
-household worth keeping, a change to the shape is made in place, and a store
-holding the old shape is emptied rather than carried forward, with
-`TRUNCATE household_versions`, which the trigger lets through where it refuses a
-delete. Nothing is read into the new shape: every save writes the household as
-the model parses it, and only the latest version is read whole, so a store whose
-latest version is in an old shape is refused on read until it is emptied. An
-older version is read only for the sources its rates rest on, to show what moved
-them, through a schema of their own that defaults what a version too old to hold
-them lacks. A change to the table is a new migration, written with `db:generate`
-and committed with the change, with whatever drizzle-kit cannot write, such as
-the trigger, written into it by hand. A migration is applied before the app that
-needs it is deployed, so the app already running has to run on the migrated
-table in between: the scenario column defaults to the household, so that app
-reads and writes the household's versions as it did. The tests apply the
-migrations to an in-process Postgres ([PGlite](https://pglite.dev)), so a
-migration that does not apply fails the suite before it reaches a database.
+a change to `src/data/household.ts` and no migration. Every save stamps the
+household with the shape it is kept in, numbered in `src/data/shapes.ts`, and
+every read carries a version through the steps there from the shape it was kept
+in to this app's before the model's rules are held to it. A household kept
+before shapes were numbered carries no stamp and is in the first. A change to
+the model that a household kept before it cannot be read under is a step
+appended there, taking the shape before to the new one, which counts
+`currentShape` up by itself. So a version kept in an older shape is read as it
+stands rather than refused, nothing is rewritten to carry it forward, and the
+store is never emptied; a version stamped by a newer app than the one reading it
+is refused, since it may hold what this one cannot read, and one the steps
+cannot carry into a household the rules hold is refused in their words, the way
+through being a step. Only the latest version is read whole. An older one is
+read only for the sources its rates rest on, to show what moved them, through a
+schema of their own that defaults what a version too old to hold them lacks. A
+change to the table is a new migration, written with `db:generate` and committed
+with the change, with whatever drizzle-kit cannot write, such as the trigger,
+written into it by hand. A migration is applied before the app that needs it is
+deployed, so the app already running has to run on the migrated table in
+between: the scenario column defaults to the household, so that app reads and
+writes the household's versions as it did. The tests apply the migrations to an
+in-process Postgres ([PGlite](https://pglite.dev)), so a migration that does not
+apply fails the suite before it reaches a database.
 
 ## The projection
 

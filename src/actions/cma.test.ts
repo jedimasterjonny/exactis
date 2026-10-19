@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { cma } from "@/data/cma.fixture";
 import { kept, today } from "@/data/household.fixture";
+import { stamped } from "@/data/shapes";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
@@ -77,7 +78,7 @@ describe("pullCma", () => {
     await pullCma();
 
     expect(await readLatest(db, "")).toStrictEqual({
-      household: { ...held, cma: { latest: cma, previous: may } },
+      household: stamped({ ...held, cma: { latest: cma, previous: may } }),
       version: 2,
     });
   });

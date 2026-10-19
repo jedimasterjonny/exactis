@@ -1,7 +1,15 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
+import * as z from "zod";
 
-import { acceptedOf, answerOf, Refusal, refused, saved } from "./answer";
+import {
+  acceptedOf,
+  answerOf,
+  Refusal,
+  refusalOf,
+  refused,
+  saved,
+} from "./answer";
 
 describe("answerOf", () => {
   it("hands back what the call gives as saved, a refusal it throws in its own words, and fails on anything else", () => {
@@ -37,5 +45,19 @@ describe("Refusal", () => {
 
     expect(refusal).toBeInstanceOf(Error);
     expect(refusal.message).toBe("A line pays a debt alone");
+  });
+});
+
+describe("refusalOf", () => {
+  it("refuses in the words of every rule broken, each said once", () => {
+    const error = new z.ZodError([
+      { code: "custom", input: null, message: "A name is words", path: [0] },
+      { code: "custom", input: null, message: "A sum is whole", path: [1] },
+      { code: "custom", input: null, message: "A name is words", path: [2] },
+    ]);
+
+    expect(refusalOf(error)).toStrictEqual(
+      new Refusal("A name is words; A sum is whole"),
+    );
   });
 });

@@ -63,8 +63,9 @@ import {
   pounds,
   recordId,
 } from "@/data/schemas";
+import { upcast } from "@/data/shapes";
 import { statePensionLines } from "@/data/state-pension";
-import { Refusal } from "@/lib/answer";
+import { answerOf, Refusal, refusalOf } from "@/lib/answer";
 import { fixedMonthly, monthly } from "@/lib/cadence";
 import { endsAfterItStarts } from "@/lib/lines";
 import { paidUntil, termOf } from "@/lib/loans";
@@ -855,12 +856,14 @@ const sources = z.object({
 // record's id, as the line paying a move's mortgage takes its loan's,
 // and no income line the State Pension, which the household pays on
 // the owners' qualifying years rather than keeps, so one typed would be
-// paid twice. Every save writes the household as read here, and
-// only the latest version is read whole, so nothing is defaulted: a
-// version kept in a shape since changed is refused rather than read,
-// and the store holding one is emptied. An older version is read only
-// for its sources, above. A household with no owner is refused for
-// that, and holds nobody to the plan's end.
+// paid twice. Every save writes the household as read here, stamped
+// with the shape it is kept in, and every read carries a version kept
+// in an older shape to this one first, so nothing is defaulted here:
+// what the chain cannot carry is refused rather than read. Only the
+// latest version is read whole; an older one is read only for its
+// sources, above. The stamp is no key here, so it is dropped on the
+// read and never reaches the household in memory. A household with no
+// owner is refused for that, and holds nobody to the plan's end.
 const kept = z
   .object({
     accounts: z.array(account),
@@ -985,7 +988,12 @@ export function nothingKeptIn(asOf: Month): Kept {
 // refusal in the words of every rule it breaks, once each:
 // what a save is held to before it is kept, and what a read is held to
 // before anything is drawn from it, so neither a save nor a stored
-// version the rules have since tightened past reaches the engine.
+// version the rules have since tightened past reaches the engine. The
+// rules alone: a stored version or a file is carried to this shape by
+// the chain where it comes in, before it is handed here, and a household
+// made in memory, which carries no stamp, never goes through the chain,
+// so no step runs on it twice. A stamp left on is read past, as any key
+// the household does not hold is.
 export function soundKept(value: unknown): {
   readonly household: Household;
   readonly kept: Kept;
@@ -1006,9 +1014,16 @@ export function soundKept(value: unknown): {
 // rates with the latest's, since one the rules have since tightened past
 // leaves nothing to compare rather than a refusal to show. Only the
 // sources are read, so a version whose other records the rules have
-// since tightened past can still be compared.
+// since tightened past can still be compared. It is carried to this
+// shape first, as the latest is, and one the chain refuses, as one a
+// newer app kept before it was rolled back, leaves nothing to compare
+// too; anything else thrown stays a failure.
 export function sourcesIn(value: unknown): null | Sources {
-  const parsed = sources.safeParse(value);
+  const carried = answerOf(() => upcast(value));
+  if (carried.kind === "refused") {
+    return null;
+  }
+  const parsed = sources.safeParse(carried.value);
   return parsed.success ? parsed.data : null;
 }
 
@@ -1287,12 +1302,6 @@ function recordsIn({
     ...schedule.expenses,
     ...schedule.income,
   ];
-}
-
-function refusalOf(error: z.ZodError): Refusal {
-  return new Refusal(
-    [...new Set(error.issues.map(({ message }) => message))].join("; "),
-  );
 }
 
 // How far a plan on a glide path strays: as it strays now, and each

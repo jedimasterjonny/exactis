@@ -8,6 +8,7 @@ import type { Answer } from "@/lib/answer";
 
 import { soundKept } from "@/data/household";
 import { named } from "@/data/schemas";
+import { upcast } from "@/data/shapes";
 import { getDb } from "@/db/client";
 import { dropScenario, keepAfter, readLatest } from "@/db/household";
 import { Refusal, refused, saved } from "@/lib/answer";
@@ -37,9 +38,12 @@ const unkept = "No scenario is kept under that name";
 // open. So balances and progress points recorded in the household while
 // the scenario was explored are kept rather than rolled back, as the
 // merge below says; and a version saved to the scenario after it was
-// read stays, rather than vanishing unseen. Both sides, and what they
-// make, are held to every rule as any save is, so one kept before a rule
-// tightened, or a merge breaking one, is refused in the rule's words.
+// read stays, rather than vanishing unseen. Both sides are read from the
+// store, so each is carried to this shape by the chain first, and one a
+// newer app kept is refused; the merge is made in memory and is not.
+// Both, and what they make, are held to every rule as any save is, so
+// one kept before a rule tightened, or a merge breaking one, is refused
+// in the rule's words.
 // The store runs no transaction, so the write comes first: a drop that
 // fails after it leaves a scenario already adopted, and nothing lost.
 export async function adoptScenario(name: string): Promise<Answer<undefined>> {
@@ -54,14 +58,14 @@ export async function adoptScenario(name: string): Promise<Answer<undefined>> {
     return refused(unkept);
   }
   try {
-    const plan = soundKept(adopted.household).kept;
+    const plan = soundKept(upcast(adopted.household)).kept;
     await keepAfter(
       db,
       { scenario: "", version: household?.version ?? 0 },
       soundKept(
         household === null
           ? plan
-          : planOver(soundKept(household.household).kept, plan),
+          : planOver(soundKept(upcast(household.household)).kept, plan),
       ).kept,
     );
   } catch (error: unknown) {

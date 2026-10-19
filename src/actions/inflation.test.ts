@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { kept, today } from "@/data/household.fixture";
 import { curve } from "@/data/inflation.fixture";
+import { stamped } from "@/data/shapes";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
@@ -69,7 +70,7 @@ describe("pullCurve", () => {
     await pullCurve();
 
     expect(await readLatest(db, "")).toStrictEqual({
-      household: { ...held, curve: readCurve(file) },
+      household: stamped({ ...held, curve: readCurve(file) }),
       version: 2,
     });
   });

@@ -47,6 +47,7 @@ import { owners, sam } from "@/data/owners.fixture";
 import { points } from "@/data/progress.fixture";
 import { planRate } from "@/data/rates";
 import { allocation, rates } from "@/data/rates.fixture";
+import { currentShape, stamped } from "@/data/shapes";
 import { targets, targetsUnder } from "@/data/targets.fixture";
 import { project } from "@/engine/projection";
 
@@ -57,6 +58,7 @@ import {
   household,
   nothingKeptIn,
   soundKept,
+  sourcesIn,
 } from "./household";
 import { kept } from "./household.fixture";
 
@@ -1507,6 +1509,24 @@ describe("soundKept", () => {
     );
   });
 
+  // The stamp is the store's, and is no key of the household's, so it is
+  // read past rather than kept in memory.
+  it("reads a household stamped with the shape it is kept in, without the stamp", () => {
+    const { kept: read } = soundKept(stamped(kept));
+
+    expect(read).toStrictEqual(kept);
+    expect(read).not.toHaveProperty("shape");
+  });
+
+  // The chain runs where a stored version or a file comes in, not here,
+  // so a stamp, even a newer app's, is read past as any key the
+  // household does not hold is.
+  it("holds a household to the rules alone, whatever shape it is stamped with", () => {
+    expect(soundKept({ ...kept, shape: currentShape + 1 }).kept).toStrictEqual(
+      kept,
+    );
+  });
+
   // A version kept before salaries carried the share their employer
   // matches is refused on the read, as any field a line lacks is,
   // rather than read as matched nothing.
@@ -1535,6 +1555,23 @@ describe("soundKept", () => {
         ),
       }),
     ).toThrow(/^A balance below nothing is a debt's$/);
+  });
+});
+
+describe("sourcesIn", () => {
+  it("reads the sources a stamped household holds, without the stamp", () => {
+    expect(sourcesIn(stamped(kept))).toStrictEqual({
+      cma: kept.cma,
+      curve: kept.curve,
+      deductions: kept.deductions,
+      mappings: kept.mappings,
+      targets: kept.targets,
+    });
+  });
+
+  // As a version a newer app kept reads once that app is rolled back.
+  it("reads a household a newer app kept as having no sources to compare", () => {
+    expect(sourcesIn({ ...kept, shape: currentShape + 1 })).toBeNull();
   });
 });
 
