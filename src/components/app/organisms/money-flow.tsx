@@ -294,7 +294,7 @@ function Lines({
     take === undefined
       ? undefined
       : spareOf(landed, { allowance, cap: take.cap, isFull }),
-    account.isAlwaysFunded === true ? "always funded" : undefined,
+    account.isDroppable === true ? "dropped when short" : undefined,
   ].filter((part) => part !== undefined);
   return (
     <div className="grid gap-0.5 text-xs text-muted-foreground">

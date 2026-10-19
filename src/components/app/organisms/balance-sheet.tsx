@@ -236,8 +236,8 @@ export function BalanceSheet({
 
 // What a saving's row says of it beneath its name, its group having
 // said its kind: whose it is, when it is anyone's, a rate of its own
-// where it does not grow at the plan's, and a pension always funded
-// saying so in words, since the order of payment keeps it paid when the
+// where it does not grow at the plan's, and a pension marked droppable
+// saying so in words, since every other pension is kept paid when the
 // month runs short; or no line for one with none of them.
 function aboutOf(
   account: Account,
@@ -246,7 +246,7 @@ function aboutOf(
   const said = [
     owners.find(({ id }) => id === account.owner)?.name,
     account.growth.kind === "fixed" ? growthOf(account) : undefined,
-    account.isAlwaysFunded === true ? "always funded" : undefined,
+    account.isDroppable === true ? "dropped when short" : undefined,
   ].filter((part) => part !== undefined);
   return said.length === 0 ? undefined : <span>{said.join(" · ")}</span>;
 }

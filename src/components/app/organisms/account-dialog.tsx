@@ -49,7 +49,7 @@ const blank: Draft = {
   contribution: 0,
   funding: "fixed",
   growth: "plan",
-  isAlwaysFunded: false,
+  isDroppable: false,
   kind: "tax-deferred",
   name: "",
   owner: null,
@@ -126,7 +126,7 @@ export function AccountDialog({
   // opened with it, which is what the choice mounts showing. A change that
   // stays on one side leaves the choice where it is. The owner goes with
   // a treatment nobody owns and comes back with a wrapper's, as below.
-  // Whether the account is always funded goes with any treatment but a
+  // Whether the account is droppable goes with any treatment but a
   // pension's and comes back as the account opened with it, which is
   // what the choice mounts showing when a pension is chosen again. The
   // growth goes to a fixed rate with a debt and comes back as the
@@ -135,7 +135,7 @@ export function AccountDialog({
     const willTakeSpare = takesSpare({ kind });
     const treated = {
       ...grownBy(current, kind),
-      isAlwaysFunded: isPension({ kind }) && current.initial.isAlwaysFunded,
+      isDroppable: isPension({ kind }) && current.initial.isDroppable,
       kind,
       owner: ownerAfter(current, kind, owners),
     };

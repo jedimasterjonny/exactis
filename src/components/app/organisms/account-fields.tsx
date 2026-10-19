@@ -42,11 +42,11 @@ const growths = [
   { label: "Fixed rate", value: "fixed" },
 ] as const;
 
-// What a pension is paid in a month that cannot pay it: what the month
-// has, or all of it, drawn from the cash, the GIAs and the ISAs.
+// What a pension is paid in a month that cannot pay it: all of it,
+// drawn from the cash, the GIAs and the ISAs, or what the month has.
 const shortfalls = [
-  { label: "Pay what it can", value: "month" },
-  { label: "Always fund it", value: "always" },
+  { label: "Draw on the savings", value: "kept" },
+  { label: "Drop the payments", value: "dropped" },
 ] as const;
 
 // The types the dialog offers, in the order the reference's offers
@@ -160,15 +160,11 @@ export function AccountFields({
         )}
         {isPension(draft) && (
           <SelectField
-            defaultValue={initial.isAlwaysFunded ? "always" : "month"}
-            hint={
-              draft.isAlwaysFunded
-                ? "Drawn from cash, GIAs and ISAs"
-                : undefined
-            }
+            defaultValue={initial.isDroppable ? "dropped" : "kept"}
+            hint={draft.isDroppable ? undefined : "From cash, GIAs and ISAs"}
             label="When short"
             onValueChange={(shortfall) => {
-              onAmend({ isAlwaysFunded: shortfall === "always" });
+              onAmend({ isDroppable: shortfall === "dropped" });
             }}
             options={shortfalls}
           />

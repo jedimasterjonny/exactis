@@ -49,7 +49,7 @@ const values = {
   contribution: 333,
   funding: "fixed",
   growth: "fixed",
-  isAlwaysFunded: false,
+  isDroppable: false,
   kind: "tax-free",
   name: " Lifetime ISA ",
   owner: 1,
@@ -478,21 +478,21 @@ describe("the account actions", () => {
       );
     });
 
-    // A pension may be kept paid out of the savings, and nothing else
+    // A pension may be dropped when the month is short, and nothing else
     // may: the mark is written onto a pension and refused on an ISA.
-    it("marks a pension always funded, and refuses the mark on anything else", async () => {
+    it("marks a pension droppable, and refuses the mark on anything else", async () => {
       await expect(
-        saveAccount(null, { ...values, isAlwaysFunded: true }),
-      ).resolves.toStrictEqual(refused("Only a pension is always funded"));
+        saveAccount(null, { ...values, isDroppable: true }),
+      ).resolves.toStrictEqual(refused("Only a pension is dropped when short"));
       expect(await versions()).toBe(1);
 
       expect(
         await saveAccount(null, {
           ...values,
-          isAlwaysFunded: true,
+          isDroppable: true,
           kind: "tax-deferred",
         }),
-      ).toMatchObject(saved({ isAlwaysFunded: true, kind: "tax-deferred" }));
+      ).toMatchObject(saved({ isDroppable: true, kind: "tax-deferred" }));
     });
 
     it("refuses the spare money into a debt, in the household's words", async () => {

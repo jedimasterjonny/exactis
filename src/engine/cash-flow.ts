@@ -142,11 +142,11 @@ export interface Totals {
 }
 
 // A month fed one way, with or without the sacrifices into the pensions
-// that are not always funded: what the salaries feed, the tax on what is
-// left of them, what the month then has, the purse the payments out of
-// it are held to, and what each pension always funded is paid of its
-// fixed sum, which is the last thing to know before the month can say
-// whether it is short. Fed the other sacrifices too, the month is asked
+// marked droppable: what the salaries feed, the tax on what is left of
+// them, what the month then has, the purse the payments out of it are
+// held to, and what each pension kept paid is paid of its fixed sum,
+// which is the last thing to know before the month can say whether it
+// is short. Fed the other sacrifices too, the month is asked
 // for that sum whole rather than as far as the cash, the GIAs and the ISAs
 // reach, since whether it can afford them is whether it pays that pension
 // in full after them, and a month with nothing in any would otherwise
@@ -182,8 +182,9 @@ interface Purse {
 // owes as a negative, which only the projection knows, having carried
 // the year; a month read on its own settles nothing. Beside it is what
 // the cash, the GIAs and the ISAs hold as the month opens, the savings a
-// pension always funded may be kept paid out of, which the projection knows
-// too; a month read on its own is taken to have enough of them. And
+// pension not marked droppable is kept paid out of, which the
+// projection knows too; a month read on its own is taken to have enough
+// of them. And
 // beside them are the owners who have drawn on a pension as income
 // before the month, by id, whose pension allowance is the money
 // purchase one, which only the projection knows, having drawn; a month
@@ -261,14 +262,14 @@ const nobody: ReadonlySet<number> = new Set();
 // income tax and the National Insurance on the rest, less the expense
 // lines, each kept as well as summed, and less each debt's fixed sum,
 // whole and before any other wherever the debt is listed. What that
-// leaves pays each pension always funded its fixed sum, then the other
+// leaves pays each pension kept paid its fixed sum, then the other
 // fixed sums, each in the order the accounts are listed, each taking
 // its sum or what the month still has when it no longer covers it, and
 // then the spare money to each account that takes it in the order they
 // are listed, each up to its cap and passing the rest on, and what is
 // left after them, which is negative by the expenses, the debts'
-// payments and what a pension always funded is kept paid that the
-// income after its tax does not cover, and by nothing else. So the
+// payments and what a pension is kept paid that the income after its
+// tax does not cover, and by nothing else. So the
 // spare money is what the month has after tax, and an account taking
 // it is paid money the month really has rather than the tax bill on
 // top. The tax is charged
@@ -297,10 +298,11 @@ const nobody: ReadonlySet<number> = new Set();
 // contribution out of what the month has, not a drawdown: an account is
 // paid only while the income funding it lasts, and selling out of one
 // wrapper to keep a payment into another going would be a shortfall the
-// ledger read back as saving. A pension always funded is the one saving
-// kept paid all the same, since what it is paid out of taxed money is
-// relieved, and a pension an ISA is sold to keep paid holds more than
-// the ISA did: its own fixed sum is paid out of what the month has and
+// ledger read back as saving. A pension is the one saving kept paid all
+// the same, unless it is marked droppable, since what it is paid out of
+// taxed money is relieved, and a pension an ISA is sold to keep paid
+// holds more than the ISA did: its own fixed sum is paid out of what
+// the month has and
 // then out of what the cash, the GIAs and the ISAs hold, once the spending
 // and the debts' payments the month is short of have been met from them,
 // and never out of a pension, since one pension sold to pay another is
@@ -354,31 +356,33 @@ const nobody: ReadonlySet<number> = new Set();
 // sacrifice earns lands with the sacrifice or not at all, while the
 // floor, which the employer pays whatever is given up and so costs the
 // month nothing, lands whether the month gives the sacrifice up or
-// not. It is
-// given up only while what is left of the income after the tax on it
-// still covers the expenses, the debts' payments and what a pension
-// always funded is fed and paid, a month short of them by less than a
+// not. Into a
+// pension marked droppable it is given up only while what is left of
+// the income after the tax on it still covers the expenses, the debts'
+// payments and what the pensions kept paid are fed and paid, a month
+// short of them by less than a
 // nanopound covering them as a month left with that much is left with
 // nothing: what the sacrifices are dropped for and what the month
 // is left with are the one figure, so the two are read against the one
 // rule and a plan whose month cancels to the penny does not give up
 // every sacrifice in every month of it over the residue of adding the
-// lines up. In a month that is really short, no line sacrifices at all,
-// every line is earned and taxed whole and every pension is fed
-// nothing but the floor under its salary's match. All of them or none,
+// lines up. In a month that is really short, no such line sacrifices at
+// all, every such line is earned and taxed whole and every such pension
+// is fed nothing but the floor under its salary's match. All of them or
+// none,
 // rather than a share of each or
 // the lines that fit, since a sacrifice a month cannot afford is a
 // drawdown by another name and the pension would be fed in the very
 // month a wrapper is sold to cover the spending. A salary feeding a
-// pension always funded gives up its sacrifice whatever the month has,
+// pension kept paid gives up its sacrifice whatever the month has,
 // all of them or none as the rest, so long as the cash, the GIAs and the
 // ISAs have what the month is then short of, once the spending has been met
 // from them: the month is short by what it gave up too, for the
-// projection to draw. So a month that is short feeds nothing but a
-// pension always funded and the floors, pays no fixed sum but a debt's
+// projection to draw. So a month that is short feeds nothing but the
+// pensions kept paid and the floors, pays no fixed sum but a debt's
 // and such a
 // pension's, and hands over no spare money, and what is left is short
-// by the expenses, the debts' payments and what the pension is kept
+// by the expenses, the debts' payments and what the pensions are kept
 // paid that the income does not cover, and by nothing else. A salary
 // naming an account that is no pension is refused, as the spare money
 // into a real asset is, and so is an
@@ -409,7 +413,7 @@ const nobody: ReadonlySet<number> = new Set();
 // then the spare money's takes in the same order, each taking only
 // what the ones before it left. A sacrifice the month does not give up
 // takes none of it, and its floor only what lands, so what a pension
-// always funded is fed in a month
+// kept paid is fed in a month
 // short of the rest does not hang on which salary is listed first. A
 // wrapper naming no owner is refused
 // with the rest, since the store holds every wrapper to one and an
@@ -482,10 +486,10 @@ export function cashFlow(
   }
   if (
     accounts.some(
-      (account) => account.isAlwaysFunded === true && !isPension(account),
+      (account) => account.isDroppable === true && !isPension(account),
     )
   ) {
-    throw new Error(rules.alwaysFunded);
+    throw new Error(rules.droppable);
   }
   checkLinks(accounts, schedule, reading.plan);
   const running = schedule.income.filter(
@@ -546,16 +550,12 @@ export function cashFlow(
     Math.max(0, -leftWith([])),
     reading.reserve ?? Number.POSITIVE_INFINITY,
   );
-  const kept = feedingInto(() => true).filter(
-    ({ account }) => account.isAlwaysFunded === true,
+  const kept = feedingInto(() => true).filter(({ account }) =>
+    isKeptPaid(account),
   );
   const isKeeping = kept.length > 0 && leftWith(kept) >= floor - nanopound;
-  const feeding = feedingInto(
-    (account) => isKeeping || account.isAlwaysFunded !== true,
-  );
-  const others = feeding.filter(
-    ({ account }) => account.isAlwaysFunded !== true,
-  );
+  const feeding = feedingInto((account) => isKeeping || !isKeptPaid(account));
+  const others = feeding.filter(({ account }) => !isKeptPaid(account));
   const saving = own.filter((account) => account.kind !== "debt");
   const paidWith = (fed: readonly Fed[], least: number): Feeding => {
     const taxed = taxOn(running, fed, reading);
@@ -595,7 +595,7 @@ export function cashFlow(
       landIn(purse, entry.account, entry.amount);
     }
     const { sums: funded } = fixedSums(
-      saving.filter((account) => account.isAlwaysFunded === true),
+      saving.filter(isKeptPaid),
       month - least,
       { purse, reading },
     );
@@ -608,13 +608,11 @@ export function cashFlow(
     sacrificing.month - total(sacrificing.funded) >= -nanopound
       ? sacrificing
       : paidWith(
-          feedingInto(
-            (account) => isKeeping && account.isAlwaysFunded === true,
-          ),
+          feedingInto((account) => isKeeping && isKeptPaid(account)),
           floor,
         );
   const { left: rest, sums: saved } = fixedSums(
-    saving.filter((account) => account.isAlwaysFunded !== true),
+    saving.filter((account) => !isKeptPaid(account)),
     month - total(funded),
     { purse, reading },
   );
@@ -985,6 +983,12 @@ function fixedSums(
     left -= sum;
   }
   return { left, sums };
+}
+
+// Whether an account is a pension kept paid in a month short of it,
+// which is every pension but one marked droppable.
+function isKeptPaid(account: Account): boolean {
+  return isPension(account) && account.isDroppable !== true;
 }
 
 // Whether a figure is a share of a base, from none of it to all of it,
