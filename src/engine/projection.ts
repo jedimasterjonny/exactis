@@ -211,9 +211,10 @@ const drawOrder: readonly AccountKind[] = [
   "tax-deferred",
 ];
 
-// The order each drawdown draws the kinds in, as drawnFrom gives the
-// reasons for: the savings first, as above; the pension after the GIA
-// and before the ISA; and the pension first, ahead of the cash.
+// The order each drawdown draws the kinds in, as The draw in README.md
+// beside this file gives the reasons for: the savings first, as above;
+// the pension after the GIA and before the ISA; and the pension first,
+// ahead of the cash.
 const drawOrders: Readonly<Record<Drawdown, readonly AccountKind[]>> = {
   "pension-before-isa": ["cash", "taxable", "tax-deferred", "tax-free"],
   "pension-first": ["tax-deferred", "cash", "taxable", "tax-free"],
@@ -498,115 +499,28 @@ export function movedYears(
   });
 }
 
-// The plan's years, the first holding the balances as they are and each
-// after it the year before carried to its end, a month at a time: what
-// the account is paid that month, then a month's growth at its rate, a
-// fixed one or the plan's. The first year is carried from the month the
-// plan starts in, since the balances it opens with are that month's
-// and the months before it are already in them; the last year is not
-// carried at all, since no point follows it. Each account is carried on
-// its own and the year sums them by wrapper. A house, a car or another
-// real asset is carried as a saving is, paid what the flow pays it and
-// grown at its own rate, below nothing for one that loses value, a
-// house held to its ceiling and a car to its floor, and is
-// never drawn on: the plan sells nothing it lives in or drives to cover
-// a month. A debt is carried apart from them, paid down a month at a
-// time by what the flow pays off it, as the loan maths reads a month,
-// and never drawn on either. What an account is paid a
-// month is what that month's cash flow says, a salary's sacrifice with
-// the NI saved on it and the employer's match, a fixed sum spread over
-// the months as the flow
-// spreads it or the spare money's take, read afresh each month since a
-// line may end in one; and the flow is read over every account, since
-// a fixed sum into any of them is money the month no longer has, and a
-// pension not listed would be fed nothing. A month the income does not
-// cover is drawn from the savings: cash first, then the GIA, then the
-// tax-free wrapper, then the tax-deferred one, grossed up for its tax, and
-// before the year its owner reaches the pension age for the charge on
-// taking it early, at the start of the month and before
-// its growth as a payment lands, so what leaves earns nothing for the
-// month it is gone. The lump sum allowance a pension's tax-free quarter
-// comes out of is its owner's for life, one each, so what is left of
-// each is carried from month to month rather than read afresh, and so
-// are the owners who have drawn on a pension as income, since from the
-// month after their pension allowance is the money purchase one for the
-// rest of the plan, which the flow is handed with the month. So is
-// what has landed under each owner's ISA and pension allowances since
-// the tax year opened, which the flow adds to as it pays them, so a
-// month opens each allowance at what the year has left of it: a month
-// short of spare money leaves its share to the months after it, and a
-// bonus month can fill what the months before it left. It starts again
-// each April with the tax year, and the months of the plan's first tax
-// year before it opened, which hold nothing the projection paid, are
-// taken to have used a twelfth each, as the flow takes them, rather
-// than leave the months left of a year already part-spent the whole of
-// it. Each
-// month is taxed as a twelfth of a year, which overcharges a tax year
-// whose months are not alike, the one a salary stops in above all, so
-// the projection carries each owner's tax year as well, what its
-// months were taxed on and what they were charged, and settles it in
-// the April after: the year's tax on all of it, against as much of
-// each band as the months it held, as the bands stood that year, less
-// what the months paid, refunded into April's money or owed out of it,
-// every owner's together, since the month's money is the household's.
-// Income tax is settled so, and Class 4 with it, since it too is due
-// on the year's profit rather than a month's; Class 1 is charged a pay
-// period at a time, as the flow charges it, and owes nothing more at
-// the year's end. The first tax year is the months of
-// it the plan holds, taxed against their share of each band, and the
-// last is cut off where the plan ends and never settled. A draw
-// and a payment into savings never meet in one month: the flow pays a
-// saving's fixed sum and the spare money only out of what the month
-// has, and no salary sacrifices at all in a month the income would not
-// cover the expenses and the debts' payments without it, so a saving's
-// fixed sum, a take of the spare money and a pension fed are each
-// nothing in the month a wrapper is drawn on. A debt's payment is made
-// in that month all the same, being owed, and is part of what the
-// wrapper is drawn for, and so is what a pension not marked droppable
-// is paid and fed, as far as the cash, the GIAs and the ISAs reach once the
-// spending is met from them: the flow is handed what they hold as the month
-// opens for that, and never keeps such a pension paid past it, so no
-// pension is drawn on to pay one, under any drawdown, since what it
-// adds is drawn after the spending and out of those alone. What no
-// account covered is the year's uncovered shortfall, summed over its
-// months and reported on the point the year's balances are read off, so
-// the loop reads the balances entering the year, carries it, and emits
-// the point after. An account listed twice is refused: the store hands
-// out an id an account, so two entries sharing one are a caller's
-// mistake rather than a result, and carried as two the account's
-// balance is counted twice in every year and paid twice over in every
-// month. The flow refuses the same list where it is read, which is
-// the first thing a carried year does; it is refused here as well so
-// a plan of no years, which reads no month, is refused all the same
-// rather than plotting the twice-counted balance as its one point. A
-// held account opening below nothing is refused the same way: a
-// balance below nothing is a debt's, and no debt is held here, so a
-// wrapper, a GIA, a cash account or an asset at one is a figure nothing can
-// mean, compounded deeper every month by the growth and never drawn on, the
-// draw taking the lesser of what the account holds and what the month
-// is short under a floor of nothing. The action refuses the same
-// balance where it is saved, and a debt opening above nothing beside
-// it: carried as the debt it is, a balance above nothing would read as
-// money held on the first point and be wiped off by its first payment,
-// paid down no further than nothing. A wrapper belonging to nobody the
-// plan lists is refused beside them, as the household refuses it, since
-// there is no age to draw it at and no allowance to draw it under; read
-// before any month, as the flow reads its links, rather than in the
-// first month a draw reaches it. A plan whose owner retires when
-// conditions hold is retired in the first year whose opening holds them,
-// read off the balances entering it as its point has them and a year's
-// expenses as they would be were the owner to retire then, since which
-// year it is depends on how the run has gone: until then they earn, a
-// line starting at retirement has not started and one ending at it
-// runs on, and from then the year is carried as a plan retiring at the
-// age they reach in it. A house moving in a year is moved as the year
-// opens, after its point is read and before its owner's retirement is,
-// so the year is measured as it will be carried, on the balances as the
-// move leaves them: the sale and the purchase as movesIn lays them,
-// what the sale leaves over landing in the first cash account, and what
-// it leaves short taken out of the year's first month as a settlement
-// is, so that month pays nothing into the savings and draws it as any
-// shortfall is drawn.
+// The plan's years, a point to each, from the accounts, the two
+// schedules and the plan. It first refuses an account listed twice, a
+// held balance below nothing, a debt's above it and a wrapper belonging
+// to nobody the plan lists. The first point is the balances as they
+// are, and each after it the year before carried to its end a month at
+// a time, from the month the plan starts in; the last year is not
+// carried. Each year opens by moving any house moving in it and, for an
+// owner retiring on conditions, retiring them if its opening holds
+// them. Each month then, in April, settles the tax year before it and
+// opens the allowances afresh; reads its cash flow over the run as
+// carried, handed what the cash, the GIAs and the ISAs hold, the owners
+// who have drawn on a pension and what the tax year has used; draws what
+// it is short out of the savings; and carries each account on, paid what
+// the flow pays it and grown, or a debt paid down. What a month cannot
+// read afresh is carried to the next: each owner's lump sum allowance
+// left, the owners who have drawn on a pension as income, what has
+// landed under each allowance since April and each owner's tax year. A
+// point is the balances entering its year, with what the year went
+// short and drew early, in today's money. The rules, and why, are under
+// The tax on the month, Debts, The allowances and relief, The run,
+// Moves, Retirement on conditions, The draw, Today's money and What is
+// refused, and where in README.md beside this file.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -870,55 +784,21 @@ function carried(balance: number, paid: number, rate: number): number {
   return (balance + paid) * (1 + rate) ** (1 / 12);
 }
 
-// What a month's shortfall takes out of the savings, and what is left
-// of it after them, with what is left of each owner's lump sum
-// allowance, what each owner is taxed on once the draws on their
-// pensions are counted, and what it drew from a pension early. It comes
-// in two parts, what the spending and the debts' payments are short of
-// and what keeping the pensions not marked droppable paid adds to it,
-// and the spending is drawn first, its kinds in the order the plan's
-// drawdown names. Drawing the
-// savings first, which a plan naming none does, takes cash first, since
-// it is spent as it stands and grows least; then the GIA, since what it
-// earns is taxed and what an ISA earns is not, though the plan charges
-// a GIA nothing; then the tax-free wrapper, which is reached at any age
-// and owes nothing on the way out; then the tax-deferred one. Drawing
-// the pension before the ISA takes it after the GIA and ahead of the
-// ISA, so what it gives up as income fills its owner's personal
-// allowance and lower bands in the years before the ISA would have run
-// out, which can pay less tax over a life; drawing the pension first
-// takes it ahead of the cash as well. From its owner's pension age a
-// pension is drawn as income where its kind falls in the order; before
-// it, under every drawdown, only once every other kind is empty and
-// every pension drawable as income has been drawn, as the last thing
-// between the month and running out, and at the charge on a payment
-// the rules do not allow, 45p kept of each pound, since the money can
-// be had that way and at no other. Within a
-// kind the accounts are drawn in the
-// order they are listed, each giving up what it holds or what the month
-// is still short, whichever is the lesser, so an account is emptied and
-// never overdrawn and what it could not cover passes to the next. A
-// pension is taxed on the way out, as its owner's income, so what it
-// gives up is grossed up until what is left of it covers what is short:
-// a quarter free of tax while its owner's allowance lasts, and the rest
-// taxed as income on top of what its owner earned in the month and what
-// any pension of theirs drawn before it gave up, so a second pension of
-// the one owner's in the same month is taxed from where the first left
-// off, and another owner's from where their own income stands. One that
-// holds less than that gives up all it holds and covers
-// what that leaves once taxed. What keeping a pension paid adds is
-// drawn after the spending, out of the cash, then the GIA, then the
-// ISA, and never out of a pension, as the flow pays it once the
-// spending is met: the flow keeps such a pension paid only while those
-// hold the two together, so what the spending leaves of them covers it,
-// and drawn before the spending it would push the spending on into a
-// pension the drawdown had not yet reached. What the last of
-// them leaves is uncovered: the plan is short by it, and the projection
-// says so rather than lending it. A draw as income is a flexible access
-// of the pension, which puts every pension of its owner's on the money
-// purchase allowance from the month after, so the owner is marked as
-// having drawn; a draw before the pension age is an unauthorised
-// payment, and is no such access.
+// From the savings, the month's shortfall in its two parts, what each
+// owner's lump sum allowance has left, who has drawn as income and what
+// each owner is already taxed on this month: what the shortfall takes
+// out of the savings, and what is left of it after them, with what is
+// left of each owner's lump sum allowance, the owners who have now drawn
+// on a pension as income, what each owner is taxed on once the draws on
+// their pensions are counted, and what it drew from a pension early.
+// The spending comes first, its kinds in the order the plan's drawdown
+// names and then a last pass for the pensions before their owner's
+// pension age, the accounts of a kind in the order listed, each drawn to
+// nothing and no lower. A pension's draw is grossed up for its tax, or
+// for the charge on an early one. What keeping the pensions paid adds
+// comes after, out of the cash, the GIAs and the ISAs alone. What the
+// last of them leaves is uncovered. The rules, and why, are under The
+// draw in README.md beside this file.
 function drawnFrom(
   held: readonly Held[],
   { kept, spending }: { readonly kept: number; readonly spending: number },
