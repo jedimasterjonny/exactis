@@ -8,6 +8,18 @@ import { rules } from "@/data/rules";
 import { termOf } from "@/lib/loans";
 import { monthAfter, monthsBetween } from "@/lib/months";
 
+// The order a month's shortfall is drawn in, which the plan chooses:
+// the savings before the pension, the pension before the ISA, or the
+// pension first. The engine holds what each draws, and draws a pension
+// before its owner's pension age last under every one.
+export type Drawdown = (typeof drawdowns)[number];
+
+export const drawdowns = [
+  "pension-before-isa",
+  "pension-first",
+  "savings-first",
+] as const;
+
 // One future of the markets, a figure for each year the plan carries,
 // the first year's the one the plan starts in and each after it the
 // year on: what the plan rate comes to that year, and what prices rise
@@ -45,9 +57,12 @@ export interface Path {
 // plan on a glide path carries the plan rate each of its years by year,
 // the first year's first, since the split moves with its owner's age,
 // and its own rate is then its first year's, the rate it grows at now.
+// A plan may name the drawdown a shortfall is drawn in, and one naming
+// none draws its savings first.
 export interface Plan {
   readonly born: number;
   readonly byYear?: readonly number[];
+  readonly drawdown?: Drawdown;
   readonly from: number;
   readonly inflation: number;
   readonly month: number;
@@ -90,10 +105,12 @@ type Priced = Pick<Plan, "from" | "inflation" | "month" | "path">;
 
 // What the plan is set by, as the store keeps it: the age it runs to,
 // the month its balances are as of, which its first year opens with,
-// and the owners, the first listed of whom it is.
+// the owners, the first listed of whom it is, and the drawdown, where
+// one is chosen.
 interface Setting {
   readonly ages: Pick<PlanAges, "ends">;
   readonly asOf: Month;
+  readonly drawdown?: Drawdown;
   readonly owners: readonly Owner[];
 }
 
@@ -236,7 +253,8 @@ export function marginOf(line: {
 // the plan and this cannot read them, and past the plan's end where it
 // is reached when conditions hold, growing at the rate the rates given
 // make with the savings split as the allocation given splits them and
-// what rebalancing earns over it, and taking the rates' inflation:
+// what rebalancing earns over it, taking the rates' inflation, and
+// drawn down as the household chose, where it chose:
 // what the projection runs on and what the plan screen lays its lines
 // over. The rates, the split and the rebalancing are taken together,
 // as the household keeps them. A plan whose age is already
@@ -244,7 +262,7 @@ export function marginOf(line: {
 // household with no owner has no plan to make, and the store refuses to
 // keep one, so a caller handing one here has skipped the model.
 export function planOf(
-  { ages, asOf, owners }: Setting,
+  { ages, asOf, drawdown, owners }: Setting,
   {
     allocation,
     rates,
@@ -263,6 +281,7 @@ export function planOf(
   const [only, ...rest] = owner.retirement;
   return {
     born: owner.born,
+    ...(drawdown !== undefined && { drawdown }),
     from: start.year,
     inflation: rates.inflation,
     month: start.month,

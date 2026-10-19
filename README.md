@@ -324,13 +324,19 @@ than counted forward from the years the plan has an owner work, which is
 deferred.
 
 A month the income does not cover is drawn out of the savings at the start of
-it, before the month's growth: cash first, then the GIA, since what it earns is
-taxed and what an ISA earns is not, then the tax-free wrapper, then the
-tax-deferred one, as income from its owner's pension age: from the year the
-owner the pension belongs to turns 55 until the age rises in April 2028, and
-from the year they turn 57 after it, read off each owner's own year of birth,
-the ages held as constants in the engine until the assumptions screen sets them,
-as the plan's rates are held in the store. Before the pension age a pension is
+it, before the month's growth, in the order the plan's drawdown names. Savings
+first, which a plan naming none draws, takes cash first, then the GIA, since
+what it earns is taxed and what an ISA earns is not, then the tax-free wrapper,
+then the tax-deferred one. Pension before the ISA takes the pension after the
+GIA and ahead of the ISA, so a draw fills its owner's personal allowance and
+lower bands while the ISA stands, which can pay less tax over a life. Pension
+first takes the pension ahead of the cash as well. A pension is drawn as income
+from its owner's pension age: from the year the owner the pension belongs to
+turns 55 until the age rises in April 2028, and from the year they turn 57 after
+it, read off each owner's own year of birth, the ages held as constants in the
+engine until the assumptions screen sets them, as the plan's rates are held in
+the store. Before its owner's pension age, whatever the drawdown, a pension is
+drawn after every pension drawable as income has given up all it holds, and is
 drawn only as the last resort, once cash, the GIA and the tax-free wrapper are
 empty, and at the 55% a payment before the pension age is charged; a registered
 scheme will not normally make one, so what a year draws that way is carried on

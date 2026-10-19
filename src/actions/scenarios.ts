@@ -171,7 +171,7 @@ async function closeIfOpen(name: string): Promise<void> {
 // index, the CMA and the inflation curve. The rest is the plan, and the
 // scenario's: the owners, the accounts and what pays into them, the
 // milestones, both schedules, the ages, the rates typed and which set
-// is live, the split, the glide path, the deductions, the target
+// is live, the drawdown, the split, the glide path, the deductions, the target
 // allocation and its mappings, and the next record's id. Balances go by
 // the account's id: an account in both takes the household's balance,
 // one only the scenario holds keeps its own, and one only the household

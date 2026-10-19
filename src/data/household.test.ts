@@ -44,6 +44,7 @@ import { curve } from "@/data/inflation.fixture";
 import { atAge } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { owners, sam } from "@/data/owners.fixture";
+import { drawdowns } from "@/data/plan";
 import { points } from "@/data/progress.fixture";
 import { planRate } from "@/data/rates";
 import { allocation, rates } from "@/data/rates.fixture";
@@ -1470,6 +1471,20 @@ describe("soundKept", () => {
       }),
     ).toMatchObject({ floor: 0.045 });
     expect(salaryIn(kept)).not.toHaveProperty("floor");
+  });
+
+  // A household kept before the plan chose a drawdown holds none, which
+  // draws the savings first and reads as it was.
+  it("keeps the drawdown chosen on the plan, or none, and refuses one not offered", () => {
+    expect(
+      drawdowns.map(
+        (drawdown) => soundKept({ ...kept, drawdown }).household.plan.drawdown,
+      ),
+    ).toStrictEqual(drawdowns);
+    expect(soundKept(kept).household.plan).not.toHaveProperty("drawdown");
+    expect(() => soundKept({ ...kept, drawdown: "isa-first" })).toThrow(
+      'Invalid option: expected one of "pension-before-isa"|"pension-first"|"savings-first"',
+    );
   });
 
   // The plan's owner, born in 1992, holds the full 35 years and reaches

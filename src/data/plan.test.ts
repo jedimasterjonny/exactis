@@ -147,6 +147,16 @@ describe("planOf", () => {
     ).toBe(92);
   });
 
+  // A household that chose to draw its pension first carries the choice
+  // onto its plan, and one that chose none names none, which draws the
+  // savings first.
+  it("carries the drawdown chosen, and names none where none was chosen", () => {
+    expect(
+      planOf({ ...setting, drawdown: "pension-first" }, opening).drawdown,
+    ).toBe("pension-first");
+    expect(planOf(setting, opening)).not.toHaveProperty("drawdown");
+  });
+
   // Born in 1992, a plan to 28 has run its course by 2026, and runs no
   // years forward rather than a count below nothing.
   it("runs no years forward once its age is reached", () => {

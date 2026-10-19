@@ -16,7 +16,7 @@ import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
-import type { Plan, PlanAges, Spread } from "@/data/plan";
+import type { Drawdown, Plan, PlanAges, Spread } from "@/data/plan";
 import type { ProgressPoint } from "@/data/progress";
 import type { Allocation, Anchor, Rates, RateSet } from "@/data/rates";
 import type { Month, Tie } from "@/data/schedule";
@@ -38,6 +38,7 @@ import { openingOwner } from "@/data/owners";
 import {
   ageIn,
   debtTermOf,
+  drawdowns,
   endAge,
   oldestAge,
   planOf,
@@ -126,7 +127,8 @@ export interface Household {
 // and the glide path's anchors as typed rather than the rate they make,
 // the deductions and the rate
 // set chosen rather than the rates they make, the target allocation as
-// it was imported, the classes its categories are mapped onto, and the
+// it was imported, the classes its categories are mapped onto, the
+// drawdown, where one is chosen, and the
 // id the next record added is given. That id only
 // ever counts up, so one a deleted record held is never given to
 // another, which a form left open on the deleted one would otherwise
@@ -139,6 +141,7 @@ export interface Kept {
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
+  readonly drawdown?: Drawdown;
   readonly glide: readonly Anchor[];
   readonly housePrices: HousePrices | null;
   readonly mappings: readonly Mapping[];
@@ -631,6 +634,7 @@ const plan = z
   .object({
     born: z.number().int(),
     byYear: z.array(z.number().min(-1, rules.beyondLoss)).exactOptional(),
+    drawdown: z.enum(drawdowns).exactOptional(),
     from: z.number().int(),
     inflation: z.number().gt(-1, rules.inflation),
     month: monthOfYear,
@@ -885,6 +889,7 @@ const kept = z
     cma: vintages.nullable(),
     curve: curve.nullable(),
     deductions,
+    drawdown: z.enum(drawdowns).exactOptional(),
     glide,
     housePrices: housePrices.nullable(),
     mappings,
