@@ -196,7 +196,9 @@ sacrifice is given up, and its own fixed sum paid, out of what the month has and
 then out of the cash, the GIAs and the ISAs, once they have met whatever
 spending the month is short of. It is never paid out of a pension, and once the
 cash, the GIAs and the ISAs are spent it is paid what the month has, as any
-other saving is.
+other saving is. In a month a sacrifice is dropped, the employer's floor under
+its match lands all the same, since it costs the household nothing, and counts
+against the allowance as it does in any month.
 
 The income is taxed as the UK outside Scotland taxes it for 2026/27, the rates
 held in `src/lib/tax.ts`, and it is taxed owner by owner, since tax is charged
