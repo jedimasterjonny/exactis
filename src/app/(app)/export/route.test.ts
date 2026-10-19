@@ -1,8 +1,11 @@
 // @vitest-environment node
+import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Kept } from "@/data/household";
 
+import { accounts as listed } from "@/data/accounts.fixture";
+import { balancesSheet } from "@/data/balances-sheet";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { stamped } from "@/data/shapes";
 import { keepAfter } from "@/db/household";
@@ -24,6 +27,12 @@ const { db } = memory;
 
 standUp(memory, { today });
 
+// The export asked for, as the link in the sidebar asks for it, with the
+// query given.
+function asked(query = ""): NextRequest {
+  return new NextRequest(new URL(`/export${query}`, "https://exactis.test"));
+}
+
 // What the file handed out holds, read back as the browser saves it.
 async function bodyOf(response: Response): Promise<unknown> {
   return JSON.parse(await response.text());
@@ -38,7 +47,7 @@ describe("GET /export", () => {
   it("hands the household out as a file named for it and the day, stamped as a save writes it and never cached", async () => {
     await keepFirst("", reference);
 
-    const response = await GET();
+    const response = await GET(asked());
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-disposition")).toBe(
@@ -53,7 +62,7 @@ describe("GET /export", () => {
     await keepFirst("Retire early", blank);
     vi.mocked(openedScenario).mockResolvedValue("Retire early");
 
-    const response = await GET();
+    const response = await GET(asked());
 
     expect(response.headers.get("content-disposition")).toBe(
       "attachment; filename*=UTF-8''exactis-Retire%20early-2026-09-15.json",
@@ -67,7 +76,7 @@ describe("GET /export", () => {
     await keepFirst("Sam's plan (early)", blank);
     vi.mocked(openedScenario).mockResolvedValue("Sam's plan (early)");
 
-    expect((await GET()).headers.get("content-disposition")).toBe(
+    expect((await GET(asked())).headers.get("content-disposition")).toBe(
       "attachment; filename*=UTF-8''exactis-Sam%27s%20plan%20%28early%29-2026-09-15.json",
     );
   });
@@ -78,7 +87,7 @@ describe("GET /export", () => {
     await keepFirst("", reference);
     vi.mocked(openedScenario).mockResolvedValue("Dropped");
 
-    const response = await GET();
+    const response = await GET(asked());
 
     expect(response.headers.get("content-disposition")).toBe(
       "attachment; filename*=UTF-8''exactis-household-2026-09-15.json",
@@ -87,13 +96,51 @@ describe("GET /export", () => {
   });
 
   it("hands out the household as it opens before anything is kept", async () => {
-    expect(await bodyOf(await GET())).toStrictEqual(stamped(blank));
+    expect(await bodyOf(await GET(asked()))).toStrictEqual(stamped(blank));
+  });
+
+  // The reference household's balances set on three days of August,
+  // listed out of the order they were set in.
+  it("hands the balances out as a row of the owner's sheet, dated by the oldest set and never cached", async () => {
+    const [pension, isa, current, ...rest] = listed;
+    const accounts = [
+      { ...pension, setOn: "2026-08-29" },
+      { ...isa, setOn: "2026-08-31" },
+      { ...current, setOn: "2026-08-30" },
+      ...rest,
+    ];
+    await keepFirst("", { ...reference, accounts });
+
+    const response = await GET(asked("?as=csv"));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe(
+      "text/csv; charset=utf-8",
+    );
+    expect(response.headers.get("content-disposition")).toBe(
+      "attachment; filename*=UTF-8''exactis-balances-household-2026-08-29.csv",
+    );
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.text()).toBe(balancesSheet(accounts, "2026-08-29"));
+  });
+
+  it("dates the balances by today where none was set on a day", async () => {
+    await keepFirst("", reference);
+
+    const response = await GET(asked("?as=csv"));
+
+    expect(response.headers.get("content-disposition")).toBe(
+      "attachment; filename*=UTF-8''exactis-balances-household-2026-09-15.csv",
+    );
+    expect(await response.text()).toBe(
+      balancesSheet(reference.accounts, "2026-09-15"),
+    );
   });
 
   it("hands nothing out without a session", async () => {
     await keepFirst("", reference);
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-    await expect(GET()).rejects.toThrow("redirected");
+    await expect(GET(asked())).rejects.toThrow("redirected");
   });
 });
