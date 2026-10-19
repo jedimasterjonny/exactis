@@ -302,16 +302,21 @@ const expenseLine = z
 // An income line adds the owner who earns it, the parts only a salary is
 // paid in, how its bonus is paid and the pension only a salary feeds, a
 // month named for a bonus paid once a year and for no other, and a
-// share given up and a share matched only into a pension, each a
-// fraction of the base at most, in the engine's words for a share
-// outside it. That the owner is one the household lists is the
-// household's to hold.
+// share given up, a share matched and a floor under the match only into
+// a pension, each a fraction of the base at most, in the engine's words
+// for a share outside it, the floor absent for none. That the owner is
+// one the household lists is the household's to hold.
 const incomeLine = z
   .object({
     ...line,
     ...bonusValues,
     bonus: pounds,
     feeds: recordId.nullable(),
+    floor: z
+      .number()
+      .min(0, rules.floored)
+      .max(1, rules.floored)
+      .exactOptional(),
     kind: z.enum(incomeKinds),
     match: z.number().min(0, rules.matched).max(1, rules.matched),
     owner: recordId,
@@ -336,8 +341,10 @@ const incomeLine = z
     "A bonus paid once a year is paid in a month of its own, and no other is",
   )
   .refine(
-    (line) => line.feeds !== null || (line.sacrifice === 0 && line.match === 0),
-    "A salary gives up a share, and is matched one, only into a pension it feeds",
+    (line) =>
+      line.feeds !== null ||
+      (line.sacrifice === 0 && line.match === 0 && (line.floor ?? 0) === 0),
+    "A salary gives up a share, and is matched or paid one, only into a pension it feeds",
   ) satisfies z.ZodType<IncomeLine>;
 
 // A milestone as the model lays it: what the actions take, and the id

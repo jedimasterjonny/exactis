@@ -340,7 +340,8 @@ const nobody: ReadonlySet<number> = new Set();
 // before the month sees it, and the pension is fed the sacrifice with
 // the employer's NI saved on it and the employer's match, pound for
 // pound with the sacrifice up to the share of the base the line
-// states, over and above whatever fixed sum the pension is paid in its
+// states and never less than the floor it states, over and above
+// whatever fixed sum the pension is paid in its
 // own right; a salary naming a pension not listed is earned whole, as
 // a line paying a loan not listed pays nothing off it. A sacrifice is
 // given up before the tax is charged, since it is never paid to its
@@ -837,24 +838,28 @@ function chargedIn(
 // it earns, and a share past the whole would give up pay the salary
 // never paid. The share its employer matches is held the same way, in
 // words of its own, since a match below nothing would take back out of
-// the pension what the sacrifice put in.
+// the pension what the sacrifice put in, and so is the floor under it,
+// a line with none floored at nothing.
 function checkLinks(
   accounts: readonly Account[],
   schedule: Schedule,
   plan: Plan,
 ): void {
   for (const line of schedule.income) {
-    const { feeds, match, sacrifice } = line;
+    const { feeds, floor = 0, match, sacrifice } = line;
     earnerOf(line, plan);
     const account = accountAt(accounts, feeds);
     if (account !== undefined && !isPension(account)) {
       throw new Error(rules.feedsPension);
     }
-    if (!(sacrifice >= 0 && sacrifice <= 1)) {
+    if (!isShare(sacrifice)) {
       throw new Error(rules.share);
     }
-    if (!(match >= 0 && match <= 1)) {
+    if (!isShare(match)) {
       throw new Error(rules.matched);
+    }
+    if (!isShare(floor)) {
+      throw new Error(rules.floored);
     }
   }
   for (const { pays } of schedule.expenses) {
@@ -956,6 +961,12 @@ function fixedSums(
     left -= sum;
   }
   return { left, sums };
+}
+
+// Whether a figure is a share of a base, from none of it to all of it,
+// which a figure that is no number at all is not.
+function isShare(value: number): boolean {
+  return value >= 0 && value <= 1;
 }
 
 // What lands in an account, taken off what is left of its owner's

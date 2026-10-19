@@ -224,6 +224,12 @@ const thrown: readonly Thrown[] = [
       earning(given, 16, (salary) => ({ ...salary, match: 1.5 })),
   ],
   [
+    "An employer's minimum is a share of the base",
+    "An employer's minimum is a share of the base",
+    (given): Inputs =>
+      earning(given, 16, (salary) => ({ ...salary, floor: 1.5 })),
+  ],
+  [
     "A line pays a debt alone",
     "A line pays a debt alone",
     (given): Inputs => spending(given, 11, (line) => ({ ...line, pays: 2 })),
@@ -560,14 +566,19 @@ const held: readonly Case[] = [
       earning(given, 16, (salary) => ({ ...salary, bonusMonth: 1 })),
   ],
   [
-    "A salary gives up a share, and is matched one, only into a pension it feeds",
+    "A salary gives up a share, and is matched or paid one, only into a pension it feeds",
     (given): Inputs =>
       earning(given, 17, (salary) => ({ ...salary, sacrifice: 0.1 })),
   ],
   [
-    "A salary gives up a share, and is matched one, only into a pension it feeds",
+    "A salary gives up a share, and is matched or paid one, only into a pension it feeds",
     (given): Inputs =>
       earning(given, 17, (salary) => ({ ...salary, match: 0.07 })),
+  ],
+  [
+    "A salary gives up a share, and is matched or paid one, only into a pension it feeds",
+    (given): Inputs =>
+      earning(given, 17, (salary) => ({ ...salary, floor: 0.03 })),
   ],
   [
     "A plan's owner retires no later than it ends",
@@ -1438,6 +1449,27 @@ describe("soundKept", () => {
     expect(() => soundKept(paying({ bonusCadence: "month" }))).toThrow(
       'Invalid option: expected one of "quarter"|"year"',
     );
+  });
+
+  // A household kept before a salary carried the floor under its match
+  // holds none, which pays what a floor of nothing does and reads as it
+  // was.
+  it("keeps the floor under a salary's match as typed, or none", () => {
+    const salaryIn = (value: unknown): IncomeLine | undefined =>
+      soundKept(value).household.schedule.income.find(({ id }) => id === 16);
+
+    expect(
+      salaryIn({
+        ...kept,
+        schedule: {
+          ...kept.schedule,
+          income: kept.schedule.income.map((line) =>
+            line.id === 16 ? { ...line, floor: 0.03 } : line,
+          ),
+        },
+      }),
+    ).toMatchObject({ floor: 0.03 });
+    expect(salaryIn(kept)).not.toHaveProperty("floor");
   });
 
   // The plan's owner, born in 1990, holds the full 35 years and reaches
