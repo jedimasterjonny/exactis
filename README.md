@@ -112,15 +112,15 @@ The plan is the first listed owner's, as the first listed account is the first
 paid: it runs to the age they reach, and the retirement its lines are tied to is
 theirs. A household holds an owner at least, so it opens with one, and the last
 cannot be deleted. The accounts and plan screens read and write it, the
-dashboard projects what it holds and saves the age the plan runs to and the age
-its owner retires at, and the assumptions screen types the rates, the deductions
-and the split of the savings into it, chooses the set of rates the plan runs on,
-pulls the inflation curve and the CMA into it, and imports the target allocation
-into it and maps its categories; the progress screen reads the progress points
-and pulls the house price index into them. The sidebar hands the household, or
-the scenario open, out as a file, as a save would keep it, and its balances as
-one row of the owner's balances sheet. A file is read back in as the next
-version of what is open, refused as any save is. `DATABASE_URL` names the
+dashboard projects what it holds and saves the age the plan runs to, the age its
+owner retires at and the drawdown, and the assumptions screen types the rates,
+the deductions and the split of the savings into it, chooses the set of rates
+the plan runs on, pulls the inflation curve and the CMA into it, and imports the
+target allocation into it and maps its categories; the progress screen reads the
+progress points and pulls the house price index into them. The sidebar hands the
+household, or the scenario open, out as a file, as a save would keep it, and its
+balances as one row of the owner's balances sheet. A file is read back in as the
+next version of what is open, refused as any save is. `DATABASE_URL` names the
 database, as `.env.example` shows. Nothing reads it until a query runs, so a
 build needs no database. Locally, point it at a Neon branch of your own and
 apply the migrations once:
@@ -353,7 +353,8 @@ its owner's £268,275 lump sum allowance is used up over the plan, one allowance
 each, and the rest is taxed as income on top of what its owner earned in the
 month and drew from their other pensions before it, so a second owner's pension
 is drawn under their own allowance and bands rather than from where the first's
-left off.
+left off. The drawdown is chosen in the dashboard's assumptions dialog, beneath
+the age the plan runs to.
 
 The engine works in the pounds of each month and reads out in today's money, the
 money of the month the plan starts in. A line states its amount in today's
