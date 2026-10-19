@@ -1,6 +1,9 @@
 # exactis
 
-A Next.js skeleton: React 19, Tailwind CSS, and shadcn/ui over Base UI.
+A financial planner for one UK household: it projects the household's savings,
+pensions, property and debts a month at a time, after each owner's own tax,
+through retirement to the age its plan runs to, on Next.js, React 19, Tailwind
+CSS and shadcn/ui over Base UI.
 
 ## Getting started
 
