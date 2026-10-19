@@ -16,6 +16,7 @@ import { SectionCard } from "@/components/app/molecules/section-card";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { allowanceOf, isOwned } from "@/data/accounts";
+import { matchOf } from "@/data/income";
 import { cashFlow } from "@/engine/cash-flow";
 import { listed } from "@/lib/feeders";
 import { formatGbp } from "@/lib/money";
@@ -253,7 +254,7 @@ function landedIn(account: Account, flow: CashFlow): Landed {
     fed: sumIn(fed),
     feeders: fed.map(({ line }) => line.name),
     fixed: sumIn(flow.fixed.filter((entry) => entry.account.id === account.id)),
-    isMatched: fed.some(({ line }) => line.match > 0),
+    isMatched: fed.some(({ line }) => matchOf(line) > 0),
     relief: sumIn(
       flow.relief.filter((entry) => entry.account.id === account.id),
     ),

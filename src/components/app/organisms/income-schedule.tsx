@@ -135,6 +135,7 @@ export function IncomeSchedule({
         ? {
             bonus: initial.bonus,
             feeds: initial.feeds,
+            ...(initial.floor !== undefined && { floor: initial.floor }),
             match: initial.match,
             opens: initial.opens,
             rsu: initial.rsu,
@@ -143,6 +144,7 @@ export function IncomeSchedule({
         : {
             bonus: 0,
             feeds: null,
+            floor: 0,
             match: 0,
             opens: null,
             rsu: 0,
@@ -301,30 +303,63 @@ function blank(plan: Plan, owner: number): Draft {
   };
 }
 
-// An employment line's parts, each named, leaving out one it has none
-// of, and the share of the base it sacrifices into the pension it
-// feeds, named, when it feeds one among the pensions, with the share
-// its employer matches where it is matched.
-function formatParts(line: IncomeLine, pensions: readonly Account[]): string {
-  const pension = pensions.find(({ id }) => id === line.feeds);
+// What a salary's employer pays beside its sacrifice, as the row says
+// it: the share it matches to, and the floor under the match, said to
+// be the employer's where no match says so already; nothing where it
+// pays neither.
+function formatEmployer(line: IncomeLine): string {
+  const floor = line.floor ?? 0;
   const matched =
     line.match > 0 ? `, matched to ${formatPercent(line.match)}` : "";
+  if (floor === 0) {
+    return matched;
+  }
+  return line.match > 0
+    ? `${matched}, at least ${formatPercent(floor)}`
+    : `, at least ${formatPercent(floor)} from the employer`;
+}
+
+// What a salary puts into the pension it feeds, as the row says it: the
+// share of the base it gives up, with what its employer pays beside it;
+// where it gives up nothing, the floor its employer pays all the same;
+// and nothing where there is neither.
+function formatFed(line: IncomeLine, pension: Account): readonly string[] {
+  const floor = line.floor ?? 0;
+  if (line.sacrifice > 0) {
+    return [
+      `${formatPercent(line.sacrifice)} of the base into ${pension.name}${formatEmployer(line)}`,
+    ];
+  }
+  return floor > 0
+    ? [
+        `at least ${formatPercent(floor)} of the base from the employer into ${pension.name}`,
+      ]
+    : [];
+}
+
+// An employment line's parts, each named, leaving out one it has none
+// of, and what it puts into the pension it feeds, named, when it feeds
+// one among the pensions.
+function formatParts(line: IncomeLine, pensions: readonly Account[]): string {
+  const pension = pensions.find(({ id }) => id === line.feeds);
   return [
     `${formatGbp(line.amount)} base`,
     ...(line.bonus > 0 ? [`${formatGbp(line.bonus)} bonus`] : []),
     ...(line.rsu > 0 ? [`${formatGbp(line.rsu)} RSUs`] : []),
-    ...(pension !== undefined && line.sacrifice > 0
-      ? [
-          `${formatPercent(line.sacrifice)} of the base into ${pension.name}${matched}`,
-        ]
-      : []),
+    ...(pension === undefined ? [] : formatFed(line, pension)),
   ].join(" · ");
 }
 
 // Whether a line is paid in parts beyond its base, which only an
-// employment line with a bonus or RSUs is, or gives up a share of it.
+// employment line with a bonus or RSUs is, or gives up a share of it,
+// or is paid a floor into its pension by its employer.
 function hasParts(line: IncomeLine): boolean {
-  return line.bonus > 0 || line.rsu > 0 || line.sacrifice > 0;
+  return (
+    line.bonus > 0 ||
+    line.rsu > 0 ||
+    line.sacrifice > 0 ||
+    (line.floor ?? 0) > 0
+  );
 }
 
 // What the dialog says of a line stopped short of its end when the

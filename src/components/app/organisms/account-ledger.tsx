@@ -294,11 +294,12 @@ export function AccountLedger({
 
 // What goes with an account when it is deleted, for the dialog to say
 // in plain words: a pension takes the sacrifice of every salary feeding
-// it, which is paid as salary from then on, since the store stops the
-// salaries before the pension goes and the share typed against each is
-// lost with it; a house or a car takes the loans secured on it and
-// their payments; and any other account, or an asset with no loan,
-// goes alone, taking its balance off the sheet for good.
+// it, which is paid as salary from then on, and the minimum and match
+// its employer pays into it, which nothing pays back, since the store
+// stops the salaries before the pension goes and the shares typed
+// against each are lost with it; a house or a car takes the loans
+// secured on it and their payments; and any other account, or an asset
+// with no loan, goes alone, taking its balance off the sheet for good.
 function goesWith(
   account: Account,
   accounts: readonly Account[],
@@ -306,7 +307,8 @@ function goesWith(
 ): string {
   const feeders = feedersOf(account.id, lines);
   if (feeders.length > 0) {
-    return `${listed.format(feeders)} ${feeders.length === 1 ? "stops" : "stop"} sacrificing into it, and ${feeders.length === 1 ? "pays that share" : "pay those shares"} as salary instead.`;
+    const isOne = feeders.length === 1;
+    return `${listed.format(feeders)} ${isOne ? "stops" : "stop"} feeding it: what ${isOne ? "it sacrifices" : "they sacrifice"} is paid as salary instead, and ${isOne ? "the employer's" : "each employer's"} minimum and match go with it.`;
   }
   const loans = securedFor(account, accounts)?.loans ?? [];
   if (loans.length === 0) {

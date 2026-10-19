@@ -1172,9 +1172,9 @@ describe("AccountLedger", () => {
   });
 
   // The pension takes the sacrifice of every salary feeding it, named
-  // as a list, in the singular for one; an account nothing feeds says
-  // nothing of it.
-  it("says which salaries stop sacrificing into a pension", () => {
+  // as a list, in the singular for one, and what each employer pays into
+  // it beside the sacrifice; an account nothing feeds says nothing of it.
+  it("says which salaries stop feeding a pension, and that the employer's minimum and match go with it", () => {
     const [salary, stepUp] = incomeLines;
     renderLedger({
       accounts: [pension, isa],
@@ -1186,7 +1186,7 @@ describe("AccountLedger", () => {
     expect(
       screen.getByRole("alertdialog", { name: "Delete Workplace pension?" }),
     ).toHaveAccessibleDescription(
-      "Salary and Salary step-up stop sacrificing into it, and pay those shares as salary instead.",
+      "Salary and Salary step-up stop feeding it: what they sacrifice is paid as salary instead, and each employer's minimum and match go with it.",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));

@@ -60,17 +60,20 @@ const opened = "new";
 // whichever is chosen; and
 // beneath them the pension it feeds, chosen from the
 // pensions among the accounts the page hands down, or none, or a new
-// one the save opens, with the share of the base it sacrifices and the
-// share its employer matches beside it while there is a pension to
-// take them. A new pension asks its name,
-// what it holds today and its owner on a row of its own beneath, since
+// one the save opens, on a row of its own. A new pension asks its name,
+// what it holds today and its owner on a row of its own directly
+// beneath the choice, since
 // the accounts list it by name and every pension belongs to an owner,
 // the first the page hands down until another is chosen; the rest of
 // what an account carries is
-// left at what a new pension is and edited from the accounts. The
-// fields are uncontrolled and mount with the line as it opened, and
-// report each change to the schedule, whose draft mirrors them, as the
-// line fields beside them do.
+// left at what a new pension is and edited from the accounts. Beneath
+// the pension, while there is one to take them, sit the share of the
+// base the line sacrifices, the share its employer pays at least,
+// whatever is sacrificed, and the share its employer matches up to, on
+// a row in that order, since the scheme reads as a minimum and a
+// maximum. The fields are uncontrolled and mount with the line as it
+// opened, and report each change to the schedule, whose draft mirrors
+// them, as the line fields beside them do.
 export function EmploymentFields({
   draft,
   initial,
@@ -93,7 +96,8 @@ export function EmploymentFields({
   ];
 
   // The pension choice: a line feeding none gives up nothing and is
-  // matched nothing, and the shares go with the fields that show them;
+  // matched nothing, floor and all, and the shares go with the fields
+  // that show them;
   // a line given a pension, listed or new, keeps the shares it has, or
   // takes the ones it opened with when the fields come back, which is
   // what they mount showing. A new pension opens unnamed, holding
@@ -101,19 +105,19 @@ export function EmploymentFields({
   // showing, and a listed one opens none.
   function feed(choice: string): void {
     if (choice === none) {
-      onAmend({ feeds: null, match: 0, opens: null, sacrifice: 0 });
+      onAmend({ feeds: null, floor: 0, match: 0, opens: null, sacrifice: 0 });
       return;
     }
-    const { match, sacrifice } = isFeeding(draft) ? draft : initial;
+    const { floor, match, sacrifice } = isFeeding(draft) ? draft : initial;
+    const shares = { ...(floor !== undefined && { floor }), match, sacrifice };
     onAmend(
       choice === opened
         ? {
+            ...shares,
             feeds: null,
-            match,
             opens: { balance: 0, name: "", owner: ownerFor(null, owners) },
-            sacrifice,
           }
-        : { feeds: Number(choice), match, opens: null, sacrifice },
+        : { ...shares, feeds: Number(choice), opens: null },
     );
   }
 
@@ -174,30 +178,6 @@ export function EmploymentFields({
           onValueChange={feed}
           options={pensionChoices}
         />
-        {isFeeding(draft) && (
-          <>
-            <RateField
-              defaultValue={initial.sacrifice}
-              hint="Of the base alone"
-              label="Salary sacrifice"
-              max={1}
-              min={0}
-              onValueCommitted={(sacrifice) => {
-                onAmend({ sacrifice });
-              }}
-            />
-            <RateField
-              defaultValue={initial.match}
-              hint="Pound for pound, up to this share of the base"
-              label="Employer match"
-              max={1}
-              min={0}
-              onValueCommitted={(match) => {
-                onAmend({ match });
-              }}
-            />
-          </>
-        )}
       </FieldRow>
       {opens !== null && (
         <FieldRow layout="triple">
@@ -229,6 +209,40 @@ export function EmploymentFields({
               onAmend({ opens: { ...opens, owner: Number(owner) } });
             }}
             options={ownerOptions(owners)}
+          />
+        </FieldRow>
+      )}
+      {isFeeding(draft) && (
+        <FieldRow layout="triple">
+          <RateField
+            defaultValue={initial.sacrifice}
+            hint="Of the base alone"
+            label="Salary sacrifice"
+            max={1}
+            min={0}
+            onValueCommitted={(sacrifice) => {
+              onAmend({ sacrifice });
+            }}
+          />
+          <RateField
+            defaultValue={initial.floor ?? 0}
+            hint="Of the base, whatever is sacrificed"
+            label="Employer minimum"
+            max={1}
+            min={0}
+            onValueCommitted={(floor) => {
+              onAmend({ floor });
+            }}
+          />
+          <RateField
+            defaultValue={initial.match}
+            hint="Pound for pound, up to this share of the base"
+            label="Employer match"
+            max={1}
+            min={0}
+            onValueCommitted={(match) => {
+              onAmend({ match });
+            }}
           />
         </FieldRow>
       )}
