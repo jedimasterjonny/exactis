@@ -103,6 +103,8 @@ describe("Accounts", () => {
 
     expect(
       screen.getByRole("alertdialog", { name: "Delete Workplace pension?" }),
-    ).toHaveAccessibleDescription(/^Salary stops sacrificing into it/);
+    ).toHaveAccessibleDescription(
+      "Salary stops feeding it: what it sacrifices is paid as salary instead, and the employer's minimum and match go with it.",
+    );
   });
 });

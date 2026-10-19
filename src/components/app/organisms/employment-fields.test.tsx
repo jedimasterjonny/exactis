@@ -80,18 +80,52 @@ describe("EmploymentFields", () => {
     expect(field("Employer match")).toHaveAccessibleDescription(
       "Pound for pound, up to this share of the base",
     );
+    expect(field("Employer minimum")).toHaveValue("0.00%");
+    expect(field("Employer minimum")).toHaveAccessibleDescription(
+      "Of the base, whatever is sacrificed",
+    );
 
     commit(field("Bonus"), "20,000");
     commit(field("RSUs"), "14,000");
     commit(field("Salary sacrifice"), "8");
+    commit(field("Employer minimum"), "3");
     commit(field("Employer match"), "7");
 
     expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
       { bonus: 20000 },
       { rsu: 14000 },
       { sacrifice: 0.08 },
+      { floor: 0.03 },
       { match: 0.07 },
     ]);
+  });
+
+  // A new pension's own fields sit directly beneath the choice that
+  // opens it, and the shares beneath them; the scheme reads as a minimum
+  // and a maximum, so the employer's minimum sits between what is given
+  // up and the match it caps at.
+  it("lays the pension out as chosen, then a new pension's fields, then the shares given up, the employer's minimum and its match", () => {
+    renderFields({
+      ...salary,
+      feeds: null,
+      opens: { balance: 0, name: "Aviva", owner: 1 },
+    });
+
+    const order = [
+      screen.getByRole("combobox", { name: "Pension" }),
+      field("Pension name"),
+      screen.getByRole("combobox", { name: "Pension owner" }),
+      field("Salary sacrifice"),
+      field("Employer minimum"),
+      field("Employer match"),
+    ];
+
+    for (const [place, later] of order.slice(1).entries()) {
+      expect(
+        order[place]?.compareDocumentPosition(later) ??
+          Node.DOCUMENT_POSITION_PRECEDING,
+      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    }
   });
 
   // A share is at most the whole of the base, so 150 commits as 100.
@@ -181,12 +215,15 @@ describe("EmploymentFields", () => {
     const { onAmend } = renderFields(salary);
 
     commit(field("Salary sacrifice"), "150");
+    commit(field("Employer minimum"), "150");
     commit(field("Employer match"), "150");
 
     expect(field("Salary sacrifice")).toHaveValue("100.00%");
+    expect(field("Employer minimum")).toHaveValue("100.00%");
     expect(field("Employer match")).toHaveValue("100.00%");
     expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
       { sacrifice: 1 },
+      { floor: 1 },
       { match: 1 },
     ]);
   });
@@ -203,10 +240,13 @@ describe("EmploymentFields", () => {
     expect(
       screen.queryByRole("textbox", { name: "Employer match" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Employer minimum" }),
+    ).not.toBeInTheDocument();
   });
 
   it("gives up nothing and is matched nothing when the pension goes", () => {
-    const { onAmend } = renderFields({ ...salary, match: 0.07 });
+    const { onAmend } = renderFields({ ...salary, floor: 0.03, match: 0.07 });
 
     fireEvent.change(screen.getByRole("combobox", { name: "Pension" }), {
       target: { value: "none" },
@@ -214,6 +254,7 @@ describe("EmploymentFields", () => {
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
       feeds: null,
+      floor: 0,
       match: 0,
       opens: null,
       sacrifice: 0,
@@ -224,10 +265,11 @@ describe("EmploymentFields", () => {
   // with, so the draft is given them back rather than the nothing the
   // choice of none left behind.
   it("takes back the shares the line opened with when a pension comes back", () => {
-    const matched = { ...salary, match: 0.07 };
+    const matched = { ...salary, floor: 0.03, match: 0.07 };
     const { onAmend } = renderFields(matched, {
       ...matched,
       feeds: null,
+      floor: 0,
       match: 0,
       sacrifice: 0,
     });
@@ -238,6 +280,7 @@ describe("EmploymentFields", () => {
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
       feeds: 6,
+      floor: 0.03,
       match: 0.07,
       opens: null,
       sacrifice: 0.1,
@@ -249,6 +292,7 @@ describe("EmploymentFields", () => {
   it("keeps typed shares across a change of pension", () => {
     const { onAmend } = renderFields(salary, {
       ...salary,
+      floor: 0.04,
       match: 0.05,
       sacrifice: 0.05,
     });
@@ -259,6 +303,7 @@ describe("EmploymentFields", () => {
 
     expect(onAmend).toHaveBeenCalledExactlyOnceWith({
       feeds: 20,
+      floor: 0.04,
       match: 0.05,
       opens: null,
       sacrifice: 0.05,

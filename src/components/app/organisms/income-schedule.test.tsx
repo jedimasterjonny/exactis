@@ -288,6 +288,39 @@ describe("IncomeSchedule", () => {
     ).toHaveLength(2);
   });
 
+  // A salary floored as well as matched says the floor after the match,
+  // and one floored and matched nothing says the floor is the
+  // employer's. One giving up nothing, with no bonus or RSUs, still
+  // says what its employer's floor puts into the pension, and one giving
+  // up nothing and floored at nothing names no pension.
+  it("names the floor an employer pays under its match, and a floor alone as the employer's", () => {
+    renderSchedule([
+      { ...salary, floor: 0.03, match: 0.07 },
+      { ...salary, floor: 0.03, id: 20 },
+      { ...salary, bonus: 0, floor: 0.03, id: 21, rsu: 0, sacrifice: 0 },
+      { ...salary, id: 22, sacrifice: 0 },
+    ]);
+
+    expect(
+      screen.getAllByText(
+        "£120,000 base · £15,000 bonus · £12,000 RSUs · 10.00% of the base into Workplace pension, matched to 7.00%, at least 3.00%",
+      ),
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByText(
+        "£120,000 base · £15,000 bonus · £12,000 RSUs · 10.00% of the base into Workplace pension, at least 3.00% from the employer",
+      ),
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByText(
+        "£120,000 base · at least 3.00% of the base from the employer into Workplace pension",
+      ),
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByText("£120,000 base · £15,000 bonus · £12,000 RSUs"),
+    ).toHaveLength(2);
+  });
+
   // A salary naming a pension not among the accounts, or giving up
   // nothing, has no sacrifice to name.
   it("names only the parts a line has beyond its base", () => {
@@ -338,6 +371,9 @@ describe("IncomeSchedule", () => {
     expect(
       within(dialog).queryByRole("textbox", { name: "Employer match" }),
     ).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("textbox", { name: "Employer minimum" }),
+    ).not.toBeInTheDocument();
 
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: "New job" },
@@ -362,6 +398,10 @@ describe("IncomeSchedule", () => {
 
     commit(share, "8");
     commit(
+      within(dialog).getByRole("textbox", { name: "Employer minimum" }),
+      "3",
+    );
+    commit(
       within(dialog).getByRole("textbox", { name: "Employer match" }),
       "7",
     );
@@ -381,6 +421,7 @@ describe("IncomeSchedule", () => {
       endsAt: "retirement",
       feeds: 6,
       firstYear: 2026,
+      floor: 0.03,
       growth: "inflation",
       kind: "employment",
       lastMonth: null,
@@ -553,6 +594,7 @@ describe("IncomeSchedule", () => {
       endsAt: null,
       feeds: sipp.id,
       firstYear: 2026,
+      floor: 0,
       growth: "inflation-plus-1",
       kind: "employment",
       lastMonth: null,
@@ -749,6 +791,7 @@ describe("IncomeSchedule", () => {
       endsAt: null,
       feeds: null,
       firstYear: 2030,
+      floor: 0,
       growth: "inflation-plus-2",
       kind: "self-employment",
       lastMonth: null,
@@ -911,11 +954,12 @@ describe("IncomeSchedule", () => {
     });
   });
 
-  // The salary matched to seven per cent of its base, so the match is
-  // seen to go with the category and come back with it.
+  // The salary matched to seven per cent of its base and floored at
+  // three, so the match and the floor are seen to go with the category
+  // and come back with it.
   it("opens an employment line's parts as they are, keeps them across the category and writes an edit back", async () => {
-    renderSchedule([{ ...salary, match: 0.07 }]);
-    saved({ ...salary, match: 0.07, rsu: 20000 });
+    renderSchedule([{ ...salary, floor: 0.03, match: 0.07 }]);
+    saved({ ...salary, floor: 0.03, match: 0.07, rsu: 20000 });
 
     const dialog = openRow("Salary");
 
@@ -958,6 +1002,9 @@ describe("IncomeSchedule", () => {
     expect(
       within(dialog).getByRole("textbox", { name: "Employer match" }),
     ).toHaveValue("7.00%");
+    expect(
+      within(dialog).getByRole("textbox", { name: "Employer minimum" }),
+    ).toHaveValue("3.00%");
 
     commit(within(dialog).getByRole("textbox", { name: "RSUs" }), "20,000");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
@@ -978,6 +1025,7 @@ describe("IncomeSchedule", () => {
       endsAt: null,
       feeds: 6,
       firstYear: 2026,
+      floor: 0.03,
       growth: "inflation-plus-1",
       kind: "employment",
       lastMonth: null,
@@ -1039,6 +1087,7 @@ describe("IncomeSchedule", () => {
       ...salaryValues,
       bonusCadence: "year",
       bonusMonth: 1,
+      floor: 0,
       opens: null,
     });
   });
