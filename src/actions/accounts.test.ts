@@ -918,14 +918,18 @@ describe("the account actions", () => {
     });
 
     // The salary feeding the workplace pension is left earned whole, and
-    // matched nothing, since a match goes with the pension it was paid
-    // into.
+    // matched nothing and floored at nothing, since a match and its floor
+    // go with the pension they were paid into.
     it("stops a salary feeding the account, with the account gone", async () => {
       const matched = {
         ...kept,
         schedule: {
           ...kept.schedule,
-          income: kept.schedule.income.with(0, { ...salary, match: 0.06 }),
+          income: kept.schedule.income.with(0, {
+            ...salary,
+            floor: 0.045,
+            match: 0.06,
+          }),
         },
       };
       await keepAfter(db, { scenario: "", version: 1 }, matched);
@@ -939,6 +943,7 @@ describe("the account actions", () => {
           income: kept.schedule.income.with(0, {
             ...salary,
             feeds: null,
+            floor: 0,
             match: 0,
             sacrifice: 0,
           }),

@@ -17,6 +17,7 @@ export const rules = {
   debtEnds: "A debt's payments end",
   earner: "An income line is earned by an owner the plan lists",
   feedsPension: "A salary feeds a pension alone",
+  floored: "An employer's minimum is a share of the base",
   inflation: "Inflation is a rate, and prices fall by less than everything",
   listedOnce: "An account is listed once",
   matched: "An employer matches a share of the base",

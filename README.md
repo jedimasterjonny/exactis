@@ -218,33 +218,36 @@ into the same pension, pound for pound with the sacrifice up to the share of the
 base the line states, so 12% of the base given up and matched to six per
 cent lands 19.8% of it; the match was never the employee's, so it comes off
 nothing they are paid, pays no tax or NI, and counts against the pension
-allowance as the sacrifice does. A fixed sum or the spare money paid into a
-pension comes out of taxed money instead, so the pension claims the basic rate
-back on it and £800 paid lands as £1,000, which is what a pension's cap is held
-to; the relief a higher rate taxpayer claims on top is theirs rather than the
-pension's, and is not counted. Relief is claimed on no more than the owner earns
-from their own salary or self-employment, less what they sacrifice, or £3,600 a
-year when that is more, so a pension paid after its owner retires, or an owner
-who earns nothing whatever the rest of the household earns, lands a pound a
-pound past £300 a month. Each owner's ISAs are held together to what the tax
-year has left of the £20,000 ISA allowance in what lands in them, and their
-pensions to what it has left of their pension allowance, £60,000, from every
-source in the order the month pays them: what the salaries feed, then the fixed
-sums, then the spare money. The projection carries what each tax year has used
-from April, so a bonus month fills what the months before it left, and takes the
-months of the plan's first tax year before it opens to have used a twelfth each;
-a month read on its own, as the plan screen reads one, opens each at a twelfth,
-the room a month has at an even pace. A fixed sum or the spare money past the
-room is not paid and stays in the month, since each is a payment the plan
-chooses; what a salary feeds, the sacrifice with its NI and the match, lands
-whole, since it is the employer's contribution under the scheme, and what lands
-past the allowance is charged as the owner's income at their marginal rate, the
-annual allowance charge, and settled with the tax year as the rest of the income
-tax is. The pension allowance is tapered by a pound for every two of adjusted
-income over £260,000, to £10,000, for an owner whose threshold income is over
-£200,000 as well, each read off the year's pay, not a month's, the sacrifice
-counted back into threshold income and what the salary lands in the pension into
-adjusted income; what is paid into a pension out of taxed money is not taken off
+allowance as the sacrifice does. An employer that pays a floor whatever is given
+up pays that share where the match falls short of it, so 2% of the base given up
+under a floor of 4.5% and a match to 6% lands the 2% with its NI and 4.5% from the
+employer. A fixed sum or the spare money paid into a pension comes out of taxed
+money instead, so the pension claims the basic rate back on it and £800 paid
+lands as £1,000, which is what a pension's cap is held to; the relief a higher
+rate taxpayer claims on top is theirs rather than the pension's, and is not
+counted. Relief is claimed on no more than the owner earns from their own salary
+or self-employment, less what they sacrifice, or £3,600 a year when that is
+more, so a pension paid after its owner retires, or an owner who earns nothing
+whatever the rest of the household earns, lands a pound a pound past £300 a
+month. Each owner's ISAs are held together to what the tax year has left of the
+£20,000 ISA allowance in what lands in them, and their pensions to what it has
+left of their pension allowance, £60,000, from every source in the order the
+month pays them: what the salaries feed, then the fixed sums, then the spare
+money. The projection carries what each tax year has used from April, so a bonus
+month fills what the months before it left, and takes the months of the plan's
+first tax year before it opens to have used a twelfth each; a month read on its
+own, as the plan screen reads one, opens each at a twelfth, the room a month has
+at an even pace. A fixed sum or the spare money past the room is not paid and
+stays in the month, since each is a payment the plan chooses; what a salary
+feeds, the sacrifice with its NI and the match, lands whole, since it is the
+employer's contribution under the scheme, and what lands past the allowance is
+charged as the owner's income at their marginal rate, the annual allowance
+charge, and settled with the tax year as the rest of the income tax is. The
+pension allowance is tapered by a pound for every two of adjusted income over
+£260,000, to £10,000, for an owner whose threshold income is over £200,000 as
+well, each read off the year's pay, not a month's, the sacrifice counted back
+into threshold income and what the salary lands in the pension into adjusted
+income; what is paid into a pension out of taxed money is not taken off
 threshold income, so an owner within those payments of £200,000 is tapered a
 little early. Once an owner has drawn on a pension as income, their pension
 allowance is the money purchase one, £10,000, from the month after for the rest

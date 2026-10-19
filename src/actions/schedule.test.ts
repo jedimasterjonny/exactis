@@ -173,6 +173,20 @@ describe("the schedule actions", () => {
       ).toStrictEqual(saved(lineOf({ ...sacrificing, sacrifice: 1 }, 21)));
     });
 
+    it("takes the floor an employer pays under its match", async () => {
+      const floored = {
+        ...values,
+        feeds: 6,
+        floor: 0.045,
+        kind: "employment",
+        match: 0.06,
+      } as const;
+
+      expect(await saveIncomeLine(null, floored)).toStrictEqual(
+        saved({ ...lineOf(floored, 20), floor: 0.045 }),
+      );
+    });
+
     // The ISA, the current account, and an id no account has.
     it("refuses a pension that is no account or an account of another kind, and writes nothing", async () => {
       for (const feeds of [2, 3, 99]) {
@@ -266,6 +280,7 @@ describe("the schedule actions", () => {
         { ...values, feeds: 0, kind: "employment" },
         { ...values, feeds: 1, kind: "employment", sacrifice: 1.5 },
         { ...values, feeds: 1, kind: "employment", sacrifice: -0.1 },
+        { ...values, feeds: 1, floor: 1.5, kind: "employment" },
         { ...values, opens: { balance: 0, name: "Aviva", owner: 1 } },
         {
           ...values,
@@ -324,7 +339,11 @@ describe("the schedule actions", () => {
         ],
         [
           { ...values, kind: "employment", sacrifice: 0.12 },
-          "A salary gives up a share, and is matched one, only into a pension it feeds",
+          "A salary gives up a share, and is matched or paid one, only into a pension it feeds",
+        ],
+        [
+          { ...values, floor: 0.045, kind: "employment" },
+          "A salary gives up a share, and is matched or paid one, only into a pension it feeds",
         ],
         [
           { ...values, owner: 99 },

@@ -254,8 +254,9 @@ export async function placeAccountsInOrder(
 // Deletes the account with that id, and what cannot stand without it: a
 // house takes the loans secured on it and their payments, and a loan
 // takes its payments; a salary feeding the account stops, and is
-// left earned whole, giving up nothing. All of it goes together or none
-// of it does. Checked as a save is.
+// left earned whole, giving up nothing, its employer's match and floor
+// going with the pension. All of it goes together or none of it does.
+// Checked as a save is.
 export async function removeAccount(id: number): Promise<Answer<undefined>> {
   await requireSession();
   const at = recordId.parse(id);
@@ -277,7 +278,7 @@ export async function removeAccount(id: number): Promise<Answer<undefined>> {
           ),
           income: kept.schedule.income.map((line) =>
             line.feeds === at
-              ? { ...line, feeds: null, match: 0, sacrifice: 0 }
+              ? { ...line, feeds: null, floor: 0, match: 0, sacrifice: 0 }
               : line,
           ),
         },

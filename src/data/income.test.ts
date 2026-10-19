@@ -107,14 +107,29 @@ describe("sacrificeOf", () => {
 
 describe("matchOf", () => {
   // Six per cent of the £120,000 base, £7,200, matched pound for pound
-  // with the 12% given up; a fifth is matched only as far as that
-  // 12%, £14,400; and a line giving up nothing is matched nothing,
-  // however much its employer would match.
+  // with the 12% given up; a fifth is matched only as far as that 12%,
+  // £14,400; and a line giving up nothing is matched nothing, however
+  // much its employer would match.
   it("pays pound for pound with the sacrifice up to the share matched, of the base alone", () => {
     expect(matchOf({ ...salary, match: 0.06 })).toBeCloseTo(7200, 8);
     expect(matchOf({ ...salary, match: 0.2 })).toBe(14400);
     expect(matchOf(salary)).toBe(0);
     expect(matchOf({ ...stepUp, match: 0.06 })).toBe(0);
+  });
+
+  // The owner's own scheme, matched to six per cent of the £120,000
+  // base and floored at four and a half: 2% given up is paid the floor,
+  // £5,400; 5% is matched, £6,000; 12% is matched only to six per cent,
+  // £7,200; a line giving up nothing is paid the floor all the same;
+  // and a floor of nothing pays what no floor does.
+  it("pays the floor where the match falls short of it, whatever is given up", () => {
+    const scheme = { ...salary, floor: 0.045, match: 0.06 };
+
+    expect(matchOf({ ...scheme, sacrifice: 0.02 })).toBeCloseTo(5400, 8);
+    expect(matchOf({ ...scheme, sacrifice: 0.05 })).toBeCloseTo(6000, 8);
+    expect(matchOf(scheme)).toBeCloseTo(7200, 8);
+    expect(matchOf({ ...scheme, sacrifice: 0 })).toBeCloseTo(5400, 8);
+    expect(matchOf({ ...salary, floor: 0, match: 0.06 })).toBeCloseTo(7200, 8);
   });
 });
 
@@ -126,6 +141,16 @@ describe("contributionOf", () => {
     expect(contributionOf(salary)).toBeCloseTo(16560, 8);
     expect(contributionOf({ ...salary, match: 0.06 })).toBeCloseTo(23760, 8);
     expect(contributionOf(stepUp)).toBe(0);
+  });
+
+  // Floored at four and a half per cent, 2% given up lands its £2,400
+  // with £360 of NI and the employer's £5,400, and nothing given up
+  // lands the £5,400 alone.
+  it("pays the employer's floor beside what is given up, and alone where nothing is", () => {
+    const scheme = { ...salary, floor: 0.045, match: 0.06 };
+
+    expect(contributionOf({ ...scheme, sacrifice: 0.02 })).toBeCloseTo(8160, 8);
+    expect(contributionOf({ ...scheme, sacrifice: 0 })).toBeCloseTo(5400, 8);
   });
 });
 

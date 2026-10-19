@@ -757,6 +757,38 @@ describe("cashFlow", () => {
     expect(totalsOf(matched).saved).toBe(1200);
   });
 
+  // The owner's own scheme, floored at 4.5% of the base and matched to
+  // six per cent: 2% given up, £200 a month, lands £230 with its NI and
+  // the employer's £450 floor beside it; and giving up nothing it lands
+  // the £450 alone, sacrificing nothing, so the salary is taxed on its
+  // whole £12,000.
+  it("feeds the pension the employer's floor where the match falls short of it, and where nothing is given up", () => {
+    const unpaid: Account = {
+      balance: 391640,
+      growth: { kind: "plan" },
+      id: pension.id,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+      owner: 1,
+    };
+    const flowWith = (sacrifice: number): CashFlow =>
+      cashFlow(
+        [unpaid],
+        {
+          expenses: [],
+          income: [{ ...salary, floor: 0.045, match: 0.06, sacrifice }],
+        },
+        { at: { month: 0, year: 2026 }, plan },
+      );
+
+    expect(flowWith(0.02).fed[0]?.amount).toBeCloseTo(680, 9);
+    expect(flowWith(0.02).fed[0]?.sacrificed).toBeCloseTo(200, 9);
+    expect(flowWith(0).fed).toHaveLength(1);
+    expect(flowWith(0).fed[0]?.amount).toBeCloseTo(450, 9);
+    expect(flowWith(0).fed[0]?.sacrificed).toBe(0);
+    expect(flowWith(0).taxable).toBe(12000);
+  });
+
   // The feed runs with the line: before its first year, and after the
   // month it ends in, the pension is fed nothing and the month is
   // short by nothing, though the pension is listed and the line names
@@ -2141,6 +2173,28 @@ describe("cashFlow", () => {
         cashFlow(
           [pension],
           { expenses: [], income: [{ ...salary, match }] },
+          { at: { month: 0, year: 2026 }, plan },
+        ),
+      ).not.toThrow();
+    }
+  });
+
+  // And so is the floor under the match, in words of its own.
+  it("refuses a salary floored below none of its base or above all of it", () => {
+    for (const floor of [-0.1, 1.5, Number.NaN]) {
+      expect(() =>
+        cashFlow(
+          [pension],
+          { expenses: [], income: [{ ...salary, floor }] },
+          { at: { month: 0, year: 2026 }, plan },
+        ),
+      ).toThrow("An employer's minimum is a share of the base");
+    }
+    for (const floor of [0, 1]) {
+      expect(() =>
+        cashFlow(
+          [pension],
+          { expenses: [], income: [{ ...salary, floor }] },
           { at: { month: 0, year: 2026 }, plan },
         ),
       ).not.toThrow();
