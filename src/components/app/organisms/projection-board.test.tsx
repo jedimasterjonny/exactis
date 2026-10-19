@@ -20,7 +20,7 @@ import type { Slice } from "@/hooks/futures.worker";
 
 import { saveAges } from "@/actions/plan";
 import { toast } from "@/components/kit/toast";
-import { accounts } from "@/data/accounts.fixture";
+import { accounts as fixture } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
 import { retiring } from "@/data/income.fixture";
@@ -46,7 +46,15 @@ vi.mock(import("@/engine/projection"), async (importOriginal) => {
 });
 
 const { milestones, schedule } = kept;
-const [, , , home, mortgage] = accounts;
+const [, , , home, mortgage] = fixture;
+
+// The fixture's accounts, the pension marked droppable, so a month short
+// of its fixed sum pays it what the month has rather than drawing on the
+// ISA and the cash for it, as the years below are worked.
+const accounts: readonly Account[] = [
+  { ...fixture[0], isDroppable: true },
+  ...fixture.slice(1),
+];
 
 // No CMA, so no spread to draw the futures at, which is how most of
 // the board is read: the futures are the chance of success's to test.

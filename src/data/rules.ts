@@ -8,13 +8,13 @@
 // extends one the two share, so the pair reads as one rule.
 export const rules = {
   aboveBalloon: "A debt paid its own sum owes more than its balloon",
-  alwaysFunded: "Only a pension is always funded",
   belongs: "An ISA or a pension belongs to an owner the household lists",
   belowNothing: "A balance below nothing is a debt's",
   beyondGain: "A rate is no more than 50%",
   beyondLoss: "A rate loses no more than everything",
   borrowsOnLoan: "A move borrows on a loan already secured on the house",
   debtEnds: "A debt's payments end",
+  droppable: "Only a pension is dropped when short",
   earner: "An income line is earned by an owner the plan lists",
   feedsPension: "A salary feeds a pension alone",
   floored: "An employer's minimum is a share of the base",

@@ -201,7 +201,8 @@ interface TaxYear {
 // The kinds a month's shortfall is drawn from, in the order it draws
 // them: cash, then the GIA, then the tax-free wrapper, then the
 // tax-deferred one. The three before the pension are the savings a
-// pension always funded is kept paid out of, as far as they reach.
+// pension not marked droppable is kept paid out of, as far as they
+// reach.
 const drawOrder: readonly AccountKind[] = [
   "cash",
   "taxable",
@@ -385,13 +386,13 @@ export function measuredOf(
 // month at its rate, and a debt is charged a month's interest and paid
 // down by what the month pays off it, each month's flow read over every
 // account as they opened the plan, and over what the cash, the GIAs and the
-// ISAs hold as the month opens for a pension always funded, as the
+// ISAs hold as the month opens for a pension kept paid, as the
 // projection reads it, through the one month step the projection takes.
 // What it is for is a month end: the balance the plan expected each account
 // to reach by then, to be checked against its statement, and what the
 // months were planned to pay into it, so the rest of the difference is
 // what moved it. A month the income does not cover pays nothing into
-// the savings but a pension always funded, and is not drawn on here as
+// the savings but a pension kept paid, and is not drawn on here as
 // the projection would draw on it, since a month end checks the plan
 // against the balances rather than spending them; but what that pension
 // is kept paid comes out of the cash, the GIAs and the ISAs, as the
@@ -551,8 +552,8 @@ export function movedYears(
 // fixed sum, a take of the spare money and a pension fed are each
 // nothing in the month a wrapper is drawn on. A debt's payment is made
 // in that month all the same, being owed, and is part of what the
-// wrapper is drawn for, and so is what a pension always funded is paid
-// and fed, as far as the cash, the GIAs and the ISAs reach once the
+// wrapper is drawn for, and so is what a pension not marked droppable
+// is paid and fed, as far as the cash, the GIAs and the ISAs reach once the
 // spending is met from them: the flow is handed what they hold as the month
 // opens for that, and never keeps such a pension paid past it, so no
 // pension is drawn on to pay one. What no
@@ -971,9 +972,10 @@ function isBeforePensionAge(age: number, { month, year }: Month): boolean {
   return age < (hasRisen ? pensionAge.after : pensionAge.before);
 }
 
-// Whether an account is among the savings a pension always funded is
-// kept paid out of: drawn on for a shortfall, and no pension, since one
-// pension sold to pay another is money going round in a circle.
+// Whether an account is among the savings a pension not marked
+// droppable is kept paid out of: drawn on for a shortfall, and no
+// pension, since one pension sold to pay another is money going round
+// in a circle.
 function isReserve(account: Account): boolean {
   return drawOrder.includes(account.kind) && !isPension(account);
 }
@@ -1005,8 +1007,9 @@ function isRetiring(
   );
 }
 
-// What keeping the pensions always funded paid takes out of the savings
-// in a month the income does not cover it, as a month end reads one:
+// What keeping the pensions not marked droppable paid takes out of the
+// savings in a month the income does not cover it, as a month end reads
+// one:
 // what the month is short of with those pensions paid, less what it is
 // short of with nothing kept paid out of the cash, the GIAs and the ISAs,
 // taken from them in the order a shortfall is drawn, the kinds as the draw
@@ -1323,7 +1326,8 @@ function rateOf(account: Account, plan: Plan, year: number): number {
 }
 
 // What the cash, the GIAs and the ISAs hold as a month opens, which is as
-// far as the flow keeps a pension always funded paid out of the savings.
+// far as the flow keeps a pension not marked droppable paid out of the
+// savings.
 function reserveOf(held: readonly Held[]): number {
   return held
     .filter(({ account }) => isReserve(account))

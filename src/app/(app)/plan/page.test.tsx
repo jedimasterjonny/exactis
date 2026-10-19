@@ -36,11 +36,13 @@ describe("Plan", () => {
   // £1,200 sacrificed into the pension and the tax on the rest, against
   // the household's £3,350, and the pension's and the ISA's fixed sums
   // taking all that leaves before the mortgage's is reached, so the last
-  // of the ledger's figures, what is left, is nothing.
+  // of the ledger's figures, what is left, is nothing. The pension is
+  // marked droppable, so it is paid what the month has rather than kept
+  // paid out of the savings.
   it("hands the store's milestones, lines and plan to their cards under one header, and this year's cash flow beneath", async () => {
     vi.mocked(getHousehold).mockResolvedValue({
       ...household,
-      accounts: [...accounts],
+      accounts: [{ ...accounts[0], isDroppable: true }, ...accounts.slice(1)],
       milestones: [...milestones],
       owners: [...owners],
       plan,
@@ -147,13 +149,14 @@ describe("Plan", () => {
   // carried by drawing it early at the 55% charge, and the plan falls
   // short there rather than lasting on paper. The fixture's £391,640
   // runs out after it, at 39 in 2031, which is said too; £10,000,000
-  // never does.
+  // never does. The pension is marked droppable, so its own fixed sum is
+  // not kept paid on top of the spending.
   it("says when the savings are carried only by drawing a pension early, and when they then run out", async () => {
     const [pension] = accounts;
     const headlineWith = async (balance: number): Promise<null | string> => {
       vi.mocked(getHousehold).mockResolvedValue({
         ...household,
-        accounts: [{ ...pension, balance }],
+        accounts: [{ ...pension, balance, isDroppable: true }],
         milestones: [],
         owners: [...owners],
         plan,

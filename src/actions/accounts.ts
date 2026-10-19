@@ -130,7 +130,7 @@ const house = z
 // allowance on its own, a debt paying its own fixed sum paying it off,
 // since the engine charges that sum to the month the loan maths says
 // the payments end in and a payment the interest swallows gives it no
-// such month, and the mark of an account always funded on a pension
+// such month, and the mark of an account droppable on a pension
 // alone.
 const values = z
   .object({
@@ -141,7 +141,7 @@ const values = z
     contribution: pounds,
     funding: z.enum(fundings),
     growth: z.enum(growthKinds),
-    isAlwaysFunded: z.boolean(),
+    isDroppable: z.boolean(),
     kind: z.enum(accountKinds),
     name: named,
     owner: recordId.nullable(),

@@ -48,7 +48,7 @@ describe("accounts", () => {
       contribution: 2180,
       funding: "fixed",
       growth: "fixed",
-      isAlwaysFunded: false,
+      isDroppable: false,
       kind: "debt",
       name: "Mortgage",
       owner: null,
@@ -71,7 +71,7 @@ describe("accounts", () => {
         contribution: 0,
         funding: "fixed",
         growth: "plan",
-        isAlwaysFunded: false,
+        isDroppable: false,
         kind: "tax-free",
         name: "Lifetime ISA",
         owner: 1,
@@ -96,7 +96,7 @@ describe("accounts", () => {
       contribution: 0,
       funding: "fixed",
       growth: "plan",
-      isAlwaysFunded: false,
+      isDroppable: false,
       kind: "tax-free",
       name: "Lifetime ISA",
       owner: 1,
@@ -147,7 +147,7 @@ describe("accounts", () => {
       contribution: 333,
       funding: "spare",
       growth: "plan",
-      isAlwaysFunded: false,
+      isDroppable: false,
       kind: "tax-free",
       name: "Lifetime ISA",
       owner: 1,
@@ -214,22 +214,22 @@ describe("balloon", () => {
   });
 });
 
-describe("isAlwaysFunded", () => {
-  // A pension always funded carries the mark and reads back as marked;
-  // one that is not carries none, rather than a mark of false.
-  it("reads the mark of an always funded pension off an account and back, and drops one that is not", () => {
+describe("isDroppable", () => {
+  // A pension marked droppable carries the mark and reads back as
+  // marked; one that is not carries none, rather than a mark of false.
+  it("reads the mark of a droppable pension off an account and back, and drops one that is not", () => {
     const [pension] = accounts;
-    const values = { ...toValues(pension), isAlwaysFunded: true };
+    const values = { ...toValues(pension), isDroppable: true };
 
     expect(toAccount(values, 6)).toStrictEqual({
       ...pension,
-      isAlwaysFunded: true,
+      isDroppable: true,
     });
     expect(toValues(toAccount(values, 6))).toStrictEqual(values);
-    expect(toValues(pension).isAlwaysFunded).toBe(false);
-    expect(
-      toAccount({ ...values, isAlwaysFunded: false }, 1),
-    ).not.toHaveProperty("isAlwaysFunded");
+    expect(toValues(pension).isDroppable).toBe(false);
+    expect(toAccount({ ...values, isDroppable: false }, 1)).not.toHaveProperty(
+      "isDroppable",
+    );
   });
 });
 

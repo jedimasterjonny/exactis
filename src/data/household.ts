@@ -203,7 +203,7 @@ const move = z.object({
 // losing everything, a link to an asset only on the loan secured on
 // it, a purchase on a house and on nothing else, a limit of something
 // on a house or a car alone, a move on a house alone, and the mark of
-// an account always funded only on a pension. A contribution, a
+// an account droppable only on a pension. A contribution, a
 // balloon, a limit, a move, an owner, a link, the mark and the day its
 // balance was set are absent rather than nothing, as the model has
 // them.
@@ -233,7 +233,7 @@ const account = z
       z.object({ kind: z.literal("plan") }),
     ]),
     id: recordId,
-    isAlwaysFunded: z.literal(true).exactOptional(),
+    isDroppable: z.literal(true).exactOptional(),
     kind: z.enum(accountKinds),
     limit: z.number().int().positive().exactOptional(),
     move: move.exactOptional(),
@@ -282,8 +282,8 @@ const account = z
     "Only a house moves",
   )
   .refine(
-    (account) => account.isAlwaysFunded === undefined || isPension(account),
-    rules.alwaysFunded,
+    (account) => account.isDroppable === undefined || isPension(account),
+    rules.droppable,
   ) satisfies z.ZodType<Account>;
 
 // An expense line adds the debt it pays, if it pays one, and then pays

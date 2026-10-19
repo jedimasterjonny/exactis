@@ -24,7 +24,8 @@ const [household, , , retirement] = expenseLines;
 const salary = flat(incomeLines[0]);
 
 // The fixture's accounts with the ISA and the current account paid the
-// spare money, the ISA to its allowance and the account uncapped, so a
+// spare money, the ISA to its allowance and the account uncapped, and
+// the pension marked droppable, paid what the month has, so a
 // month in 2026 has the salary's £12,000 coming in, £1,200 of it
 // sacrificed into the pension, £3,710.25 of income tax and £383.55 of
 // NI on the rest, and the household's £3,350 going out, which leaves
@@ -43,7 +44,12 @@ const spareCash: Account = {
   contribution: { cap: null, kind: "spare" },
 };
 
-const held = [pension, spareIsa, spareCash, mortgage];
+const held: readonly Account[] = [
+  { ...pension, isDroppable: true },
+  spareIsa,
+  spareCash,
+  mortgage,
+];
 
 const schedule: Schedule = {
   expenses: kept.schedule.expenses.map(flat),
@@ -344,11 +350,12 @@ describe("CashFlowCard", () => {
   // pension draw of £7,444.44 at the 55% charge, £29,777.78 over the four
   // months, carried on the year's point rounded up to the pound. The
   // pension covers every month, so nothing is uncovered, and the plan has
-  // fallen short all the same, as the chance of success counts it.
+  // fallen short all the same, as the chance of success counts it. The
+  // pension is marked droppable, so its own fixed sum adds nothing.
   it("tones a year carried by an early pension draw as a loss, and says so", () => {
     render(
       <CashFlowCard
-        accounts={[pension]}
+        accounts={[{ ...pension, isDroppable: true }]}
         milestones={[]}
         plan={plan}
         schedule={{ expenses: [household], income: [] }}

@@ -189,16 +189,20 @@ saved, so it is paid whole and first wherever the debt is listed, and a month
 short of it draws on the savings as it would for an expense; the order sets
 which saving is paid first, and a debt is no saving.
 
-A pension can be marked always funded, for a pension worth keeping paid when the
-month cannot, since what it is paid out of taxed money is relieved. It is paid
+A pension is kept paid when the month cannot pay it, unless it is marked
+droppable, since what it is paid out of taxed money is relieved. It is paid
 after the debts and before every other saving: what the salaries feeding it
 sacrifice is given up, and its own fixed sum paid, out of what the month has and
 then out of the cash, the GIAs and the ISAs, once they have met whatever
 spending the month is short of. It is never paid out of a pension, and once the
 cash, the GIAs and the ISAs are spent it is paid what the month has, as any
-other saving is. In a month a sacrifice is dropped, the employer's floor under
-its match lands all the same, since it costs the household nothing, and counts
-against the allowance as it does in any month.
+other saving is. A pension marked droppable is paid out of what the month has
+alone, in the order it is listed, as any other saving is, and in a month that
+cannot cover the spending, the debts' payments and the pensions kept paid, the
+salaries feeding it sacrifice nothing, all of them or none. In a month a
+sacrifice is dropped, the employer's floor under its match lands all the same,
+since it costs the household nothing, and counts against the allowance as it
+does in any month.
 
 The income is taxed as the UK outside Scotland taxes it for 2026/27, the rates
 held in `src/lib/tax.ts`, and it is taxed owner by owner, since tax is charged

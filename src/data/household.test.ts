@@ -240,10 +240,10 @@ const thrown: readonly Thrown[] = [
     (given): Inputs => paying(given, 5, 700),
   ],
   [
-    "Only a pension is always funded",
-    "Only a pension is always funded",
+    "Only a pension is dropped when short",
+    "Only a pension is dropped when short",
     (given): Inputs =>
-      changed(given, 2, (isa) => ({ ...isa, isAlwaysFunded: true })),
+      changed(given, 2, (isa) => ({ ...isa, isDroppable: true })),
   ],
   [
     "A real asset or a debt takes no spare money",

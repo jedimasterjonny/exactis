@@ -120,7 +120,7 @@ describe("AccountDialog", () => {
       contribution: 0,
       funding: "fixed",
       growth: "plan",
-      isAlwaysFunded: false,
+      isDroppable: false,
       kind: "tax-free",
       name: "Lifetime ISA",
       owner: 1,
@@ -175,7 +175,7 @@ describe("AccountDialog", () => {
       contribution: 28512,
       funding: "fixed",
       growth: "plan",
-      isAlwaysFunded: false,
+      isDroppable: false,
       kind: "tax-deferred",
       name: "Workplace pension",
       owner: 1,
@@ -398,7 +398,7 @@ describe("AccountDialog", () => {
       contribution: 28512,
       funding: "fixed",
       growth: "plan",
-      isAlwaysFunded: false,
+      isDroppable: false,
       kind: "tax-deferred",
       name: "Workplace pension",
       owner: 1,
@@ -542,15 +542,15 @@ describe("AccountDialog", () => {
     });
   });
 
-  // A pension always funded made cash is not, since only a pension may
-  // be, and the choice leaves with the treatment.
-  it("drops the mark of a pension always funded with another treatment", async () => {
+  // A pension marked droppable made cash is not, since only a pension
+  // may be, and the choice leaves with the treatment.
+  it("drops the mark of a droppable pension with another treatment", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
-    renderDialog({ account: { ...pension, isAlwaysFunded: true }, onSaved });
+    renderDialog({ account: { ...pension, isDroppable: true }, onSaved });
     const dialog = openDialog();
     vi.mocked(saveAccount).mockResolvedValue(saved(pension));
 
-    expect(choice(dialog, "When short")).toHaveTextContent("Always fund it");
+    expect(choice(dialog, "When short")).toHaveTextContent("Drop the payments");
 
     fireEvent.change(choice(dialog, "Type"), { target: { value: "cash" } });
 
@@ -561,7 +561,7 @@ describe("AccountDialog", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(vi.mocked(saveAccount).mock.calls[0]?.[1]).toMatchObject({
-      isAlwaysFunded: false,
+      isDroppable: false,
       kind: "cash",
     });
     await waitFor(() => {
@@ -569,11 +569,11 @@ describe("AccountDialog", () => {
     });
   });
 
-  // Made cash and then a pension again, it is always funded as it
-  // opened, which the choice mounts showing, and saves so.
+  // Made cash and then a pension again, it is droppable as it opened,
+  // which the choice mounts showing, and saves so.
   it("brings the mark back as it opened when a pension is chosen again", async () => {
     const onSaved = vi.fn<(account: Account) => void>();
-    renderDialog({ account: { ...pension, isAlwaysFunded: true }, onSaved });
+    renderDialog({ account: { ...pension, isDroppable: true }, onSaved });
     const dialog = openDialog();
     vi.mocked(saveAccount).mockResolvedValue(saved(pension));
 
@@ -582,12 +582,12 @@ describe("AccountDialog", () => {
       target: { value: "tax-deferred" },
     });
 
-    expect(choice(dialog, "When short")).toHaveTextContent("Always fund it");
+    expect(choice(dialog, "When short")).toHaveTextContent("Drop the payments");
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(vi.mocked(saveAccount).mock.calls[0]?.[1]).toMatchObject({
-      isAlwaysFunded: true,
+      isDroppable: true,
       kind: "tax-deferred",
     });
     await waitFor(() => {
