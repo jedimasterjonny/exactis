@@ -158,6 +158,16 @@ export async function readHeld(): Promise<Held & Read> {
   return heldIn(await readOpen(true));
 }
 
+// The household held on the branch open as a page reads it, with the
+// branch and the version it is, read afresh: a cookie naming a scenario
+// no longer kept reads as the household, as a page draws it, rather than
+// refused as a save's is, for the export, which hands out what the
+// screen shows. The session is checked first, as every read's is.
+export async function readShown(): Promise<Held & Read> {
+  await requireSession();
+  return heldIn(await readOpen(false));
+}
+
 // The latest version kept on a branch, carried to this shape by the
 // chain, or the household before anything is saved, its balances as of
 // the end of the month before this one, so that its plan starts in this

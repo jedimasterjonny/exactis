@@ -1,6 +1,6 @@
 import type { JSX, ReactNode } from "react";
 
-import { LogOut } from "lucide-react";
+import { Download, LogOut } from "lucide-react";
 
 import { signOut } from "@/actions/auth";
 import { AppNav } from "@/components/app/atoms/app-nav";
@@ -23,8 +23,8 @@ interface AppFrameProps {
 }
 
 // The shell every signed-in screen sits in: the ink sidebar with the
-// wordmark, the navigation, the theme toggle, sign-out and the motto, and
-// the main column beside it. The inset is the page's one main landmark, so
+// wordmark, the navigation, the theme toggle, export, sign-out and the motto,
+// and the main column beside it. The inset is the page's one main landmark, so
 // screens render their content directly. On a phone the sidebar is off
 // canvas and a trigger above the screen opens it as a sheet, with the
 // screen's section label beside it in place of the header's. Sign-out is a
@@ -32,9 +32,15 @@ interface AppFrameProps {
 // needs no client code of its own. Its button is the registry's, so hover
 // and focus come from where the navigation's do, but the footer's
 // micro-label type is laid back over it: this row reads with the motto
-// below it, not the navigation above. The banner, whatever the route
-// hands it, runs across the top of the main column above the phone's
-// bar, so it heads every screen at every width.
+// below it, not the navigation above. The export is drawn as the same
+// button, made a plain link to the route that hands the household open
+// out as a file. The route's own header makes the browser save what it
+// answers, so a redirect to the login screen, as an expired session
+// gets, shows that screen rather than being saved as the file. The link
+// is a plain one, so the browser follows it rather than the router
+// taking it for a screen. The banner, whatever the route hands it, runs
+// across the top of the main column above the phone's bar, so it heads
+// every screen at every width.
 export function AppFrame({ banner, children }: AppFrameProps): JSX.Element {
   return (
     <SidebarProvider>
@@ -53,6 +59,15 @@ export function AppFrame({ banner, children }: AppFrameProps): JSX.Element {
         </SidebarContent>
         <SidebarFooter className="gap-3 px-4 pb-5">
           <ThemeToggle />
+          <SidebarMenuButton
+            className="-mx-2 label text-xs text-sidebar-foreground/60 [&_svg]:size-3.5"
+            render={
+              <a href="/export">
+                <Download aria-hidden />
+                Export as file
+              </a>
+            }
+          />
           <form action={signOut} aria-label="Sign out">
             <SidebarMenuButton
               className="-mx-2 label text-xs text-sidebar-foreground/60 [&_svg]:size-3.5"
