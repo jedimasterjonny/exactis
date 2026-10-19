@@ -146,6 +146,19 @@ describe("MoneyFlow", () => {
     );
   });
 
+  // Matched nothing but floored at 4.5 per cent of its base, the
+  // salary lands the employer's £450 a month beside its £1,380, and the
+  // step says so as it does of a match.
+  it("names the employer's floor among what an unmatched salary lands", () => {
+    renderFlow({
+      schedule: { expenses: [], income: [{ ...salary, floor: 0.045 }] },
+    });
+
+    expect(steps()[0]).toContain(
+      "£1,830 salary sacrifice and employer match from Salary",
+    );
+  });
+
   // The ISA takes what its allowance leaves room for and the cash the
   // rest, so nothing is left over; a pension always funded says so.
   it("hands the spare money down the savings that take it, each up to its cap", () => {
