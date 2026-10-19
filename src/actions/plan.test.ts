@@ -22,6 +22,7 @@ import {
   saveAllocation,
   saveAnchor,
   saveDeductions,
+  saveDrawdown,
   saveRates,
   saveRateSet,
 } from "./plan";
@@ -508,6 +509,37 @@ describe("saveDeductions", () => {
       refused("A rate loses no more than everything"),
     );
     expect(await readLatest(db, "")).toMatchObject({ version: 3 });
+  });
+});
+
+describe("saveDrawdown", () => {
+  it("writes nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(saveDrawdown("pension-first")).rejects.toThrow("redirected");
+    expect(await readLatest(db, "")).toBeNull();
+  });
+
+  // A household that has never chosen draws its savings first, so the
+  // name saved over it is written whole, and the savings chosen back are
+  // written as a name rather than as none.
+  it("writes the drawdown over the household's, draws the page again, and writes the savings first back", async () => {
+    expect(await saveDrawdown("pension-first")).toStrictEqual(
+      saved("pension-first"),
+    );
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped({ ...blank, drawdown: "pension-first" }),
+      version: 1,
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+
+    expect(await saveDrawdown("savings-first")).toStrictEqual(
+      saved("savings-first"),
+    );
+    expect(await readLatest(db, "")).toMatchObject({
+      household: { drawdown: "savings-first" },
+      version: 2,
+    });
   });
 });
 

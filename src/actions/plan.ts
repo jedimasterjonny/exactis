@@ -3,12 +3,12 @@
 import * as z from "zod";
 
 import type { Deductions } from "@/data/cma";
-import type { PlanAges } from "@/data/plan";
+import type { Drawdown, PlanAges } from "@/data/plan";
 import type { Allocation, Anchor, Rates, RateSet } from "@/data/rates";
 import type { Answer } from "@/lib/answer";
 
 import { atAge } from "@/data/milestones";
-import { ageIn, oldestAge } from "@/data/plan";
+import { ageIn, drawdowns, oldestAge } from "@/data/plan";
 import { rateSets } from "@/data/rates";
 import { Refusal } from "@/lib/answer";
 import { today } from "@/lib/months";
@@ -186,6 +186,20 @@ export async function saveDeductions(
     const deductions = { ...kept.deductions, ...parsed, setOn: today() };
     return { kept: { ...kept, deductions }, result: deductions };
   });
+}
+
+// Writes the order a month's shortfall is drawn in, and hands it back
+// as written. An action answers a POST from anywhere, so it checks the
+// session for itself and parses what it was sent rather than trusting
+// the form; a name the dialog does not offer fails there, as only a bug
+// or a forgery could send one.
+export async function saveDrawdown(draft: Drawdown): Promise<Answer<Drawdown>> {
+  await requireSession();
+  const drawdown = z.enum(drawdowns).parse(draft);
+  return amend(({ kept }) => ({
+    kept: { ...kept, drawdown },
+    result: drawdown,
+  }));
 }
 
 // Writes the plan's rates, the ones sent over the ones the household
