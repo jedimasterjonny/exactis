@@ -15,7 +15,8 @@ bun install --frozen-lockfile
 bun dev
 ```
 
-The app is then at <http://localhost:3000>, rendered from `src/app/page.tsx`.
+The app is then at <http://localhost:3000>, the dashboard rendered from
+`src/app/(app)/(dashboard)/page.tsx` behind the sign-in.
 
 Node is pinned in `.node-version`, which CI and Vercel read. With nvm, match it:
 
@@ -161,227 +162,15 @@ apply fails the suite before it reaches a database.
 
 The engine is `src/engine/projection.ts`: a pure function over the accounts, the
 income and expense lines and a plan, giving a point per year to the plan's
-horizon, each the balance entering that year. So far it plots the two wrappers,
-tax-free and tax-deferred, each paid into a month at a time as its accounts say
-and grown at the plan rate. That is made from the rates live, one to a class and
-flat for life, either those typed or those derived from the capital market
-assumptions, below: what stocks return in all, their growth and the dividend
-yield on top, which every wrapper reinvests, and what bonds return, each in the
-share of the savings the live set holds in it, typed or the target allocation's;
-under the derived set the plan rate also earns what rebalancing adds over that
-blend, as the capital market assumptions section says. Each rate typed is held
-between losing everything and 50% a year, as is every class return a vintage
-keeps, since a return outside that is no reading of any market and a figure past
-it is a percentage typed as a fraction. Cash is carried beside them, so a short
-month can be drawn from it, but it is not plotted, since the progress points a
-projection is laid over carry no cash figure. The first year runs from the month
-after the one the household's balances are as of, since a balance is what an
-account held at that month's end, as a statement is dated and as each progress
-point is read, so the plan pays nothing into a month the statements already
-hold, whatever day the plan is read on; a household read before anything is
-saved opens as of the month before the one it is read in, so its plan starts in
-that one, and keeps the month from its first save. What an account is paid in a
-month is what `src/engine/cash-flow.ts` works out: the month's income, less what
-the salaries sacrifice, the tax on the rest, what the expense lines cost and
-each debt's own fixed sum, pays the other fixed sums, handed down the accounts
-in the order they are listed, and what survives them is the spare money, handed
-down the accounts that take it the same way, each to a twelfth of its cap. A
-fixed sum into savings is therefore paid only out of what the month has, so a
-contribution stops when the income funding it ends. A debt's is owed rather than
-saved, so it is paid whole and first wherever the debt is listed, and a month
-short of it draws on the savings as it would for an expense; the order sets
-which saving is paid first, and a debt is no saving.
-
-A pension is kept paid when the month cannot pay it, unless it is marked
-droppable, since what it is paid out of taxed money is relieved. It is paid
-after the debts and before every other saving: what the salaries feeding it
-sacrifice is given up, and its own fixed sum paid, out of what the month has and
-then out of the cash, the GIAs and the ISAs, once they have met whatever
-spending the month is short of. It is never paid out of a pension, and once the
-cash, the GIAs and the ISAs are spent it is paid what the month has, as any
-other saving is. A pension marked droppable is paid out of what the month has
-alone, in the order it is listed, as any other saving is, and in a month that
-cannot cover the spending, the debts' payments and the pensions kept paid, the
-salaries feeding it sacrifice nothing, all of them or none. In a month a
-sacrifice is dropped, the employer's floor under its match lands all the same,
-since it costs the household nothing, and counts against the allowance as it
-does in any month.
-
-The income is taxed as the UK outside Scotland taxes it for 2026/27, the rates
-held in `src/lib/tax.ts`, and it is taxed owner by owner, since tax is charged
-on a person and not a household: each owner's lines are taxed together against
-their own personal allowance, bands and thresholds, so two salaries of £40,000
-pay two people's tax rather than one person's on £80,000. Income tax is charged
-on every kind of line, with the personal allowance withdrawn over £100,000,
-Class 1 National Insurance on a salary and Class 4 on self-employed profit, and
-none on a pension or other income. A salary's bonus is typed at the salary's
-cadence and paid as the line says: a twelfth of the year's every month, a
-quarter of it in March, June, September and December, or the whole of it in a
-month of its own, so a bonus month meets the 2% rate of Class 1 past a month's
-upper earnings limit, as PAYE charges it. A sacrifice comes off the salary
-before either, so what it saves in tax is what it saves the month; a salary
-feeds a pension of the owner who earns it, since a sacrifice is an employer's
-contribution to the employee's own pension, and the household refuses one
-feeding another owner's. An employer that matches the sacrifice pays its match
-into the same pension, pound for pound with the sacrifice up to the share of the
-base the line states, so a tenth of the base given up and matched to seven per
-cent lands 18.5% of it; the match was never the employee's, so it comes off
-nothing they are paid, pays no tax or NI, and counts against the pension
-allowance as the sacrifice does. An employer that pays a floor whatever is given
-up pays that share where the match falls short of it, so 2% of the base given up
-under a floor of 3% and a match to 7% lands the 2% with its NI and 3% from the
-employer. A fixed sum or the spare money paid into a pension comes out of taxed
-money instead, so the pension claims the basic rate back on it and £800 paid
-lands as £1,000, which is what a pension's cap is held to; the relief a higher
-rate taxpayer claims on top is theirs rather than the pension's, and is not
-counted. Relief is claimed on no more than the owner earns from their own salary
-or self-employment, less what they sacrifice, or £3,600 a year when that is
-more, so a pension paid after its owner retires, or an owner who earns nothing
-whatever the rest of the household earns, lands a pound a pound past £300 a
-month. Each owner's ISAs are held together to what the tax year has left of the
-£20,000 ISA allowance in what lands in them, and their pensions to what it has
-left of their pension allowance, £60,000, from every source in the order the
-month pays them: what the salaries feed, then the fixed sums, then the spare
-money. The projection carries what each tax year has used from April, so a bonus
-month fills what the months before it left, and takes the months of the plan's
-first tax year before it opens to have used a twelfth each; a month read on its
-own, as the plan screen reads one, opens each at a twelfth, the room a month has
-at an even pace. A fixed sum or the spare money past the room is not paid and
-stays in the month, since each is a payment the plan chooses; what a salary
-feeds, the sacrifice with its NI and the match, lands whole, since it is the
-employer's contribution under the scheme, and what lands past the allowance is
-charged as the owner's income at their marginal rate, the annual allowance
-charge, and settled with the tax year as the rest of the income tax is. The
-pension allowance is tapered by a pound for every two of adjusted income over
-£260,000, to £10,000, for an owner whose threshold income is over £200,000 as
-well, each read off the year's pay, not a month's, the sacrifice counted back
-into threshold income and what the salary lands in the pension into adjusted
-income; what is paid into a pension out of taxed money is not taken off
-threshold income, so an owner within those payments of £200,000 is tapered a
-little early. Once an owner has drawn on a pension as income, their pension
-allowance is the money purchase one, £10,000, from the month after for the rest
-of the plan; a draw before the pension age, being a payment the rules do not
-allow, does not do that. Each month is taxed as a twelfth of a year, which is
-the year's tax exactly when its months are alike and too much or too little when
-they are not, as in the year a salary stops. So the projection carries each
-owner's tax year, April to April, and settles it in the April after: the owner's
-income tax on everything their months earned and drew from their pensions, and
-their Class 4 on all their profit, less what they paid, is refunded into that
-month's money or owed out of it, every owner's together, since the month's money
-is the household's. Class 1 is charged a pay period at a time, as the months
-charge it, and is not settled. The first tax year is the months of it the plan
-holds, against their share of each band. The bands are frozen until April 2031
-and are held so: flat in pounds through the 2030/31 tax year, so an income
-rising with prices is dragged into a higher band, and rising with the plan's
-inflation each April from 2031/32, so each tax year is charged and settled
-against its own. A debt's own fixed sum is a loan's payments, so it runs only
-until the loan maths in `src/lib/loans.ts` says they clear what is owed: the
-term the payment takes at the debt's rate, counted from the month the plan
-starts in, and nothing charged after the month the last payment falls in. In
-that month only what clears the debt is charged, what is owed with the month's
-interest, since the term is rounded up to a whole month and the last payment is
-more than is left; a lender takes what is left, and the rest is the month's to
-save. A debt whose payments an expense line carries is left out of the fixed
-sums as before, the line being the payment, and the line is charged the same way
-in the month it clears the loan. When it runs is the loan's to say, not the
-line's: whenever the household is read, the line runs from the plan's first year
-to the month the same loan maths clears the loan in, a PCP's balloon refinanced
-on the same terms, or to the end of the plan when it never clears, as an
-interest-only mortgage does. So a mortgage's end moves with the balances' month
-as a plain debt's does. Saving a debt whose fixed payment never clears it is
-refused, since a payment the month's interest swallows gives the projection no
-month to stop at. So is saving one owing no more than its balloon, or a line
-paying a debt nothing: either leaves the debt standing as it is for the whole
-plan, paid nothing and charged nothing.
-
-Any other line may tie its first or last year to a milestone rather than fix it,
-and then runs as the milestone does. A milestone is the first year of what it
-marks, so whenever the household is read a line tied to start at one starts in
-its year, and a line tied to end at one runs the whole of the year before, or
-ends as many whole years after it as the line says; two lines tied to it, one
-each way, hand over there with no year left unpaid or paid twice. Retirement is
-a milestone of its own, the year the plan's owner retires in, so a line tied to
-it moves with the retirement age. A salary or a self-employed profit stops when
-the owner who earns it retires, at their own age, whatever its line says: the
-plan's owner's at Retirement, and another owner's in their own last working
-year, since the milestone is the plan's owner's alone. A milestone moved past
-the other end of a line tied to it leaves the line running no years, rather than
-the move being refused over a line on another screen; a line saved that way is
-refused. Deleting a milestone fixes each end tied to it in the year it falls in
-then, so the lines stay where they were.
-
-The new State Pension is paid on each owner's qualifying years, typed on the
-assumptions screen. It is the household's own line rather than one kept: made
-from the owners whenever the household is read, listed locked on the plan
-screen, and paid as the owner's income, taxed with the rest of it and charged no
-National Insurance. Thirty-five years or more earn the full £241.30 a week for
-2026/27, held as £12,548 a year, fewer than ten earn nothing, and each year
-between earns a 35th of it, to the pound. It is paid in today's money from the
-year the owner reaches their State Pension age to the end of the plan: 66 for
-those born by 1960, 67 for those born from 1961 to 1977 and 68 from 1978, read
-off the year born as the pension age is, so the months by which the age phases
-up are not held. It rises with inflation, which the triple lock pays at least;
-what the lock pays above prices is not modelled, nor deferring it, nor the
-starting amount of years before 2016. The years are typed as they stand rather
-than counted forward from the years the plan has an owner work, which is
-deferred.
-
-A month the income does not cover is drawn out of the savings at the start of
-it, before the month's growth, in the order the plan's drawdown names. Savings
-first, which a plan naming none draws, takes cash first, then the GIA, since
-what it earns is taxed and what an ISA earns is not, then the tax-free wrapper,
-then the tax-deferred one. Pension before the ISA takes the pension after the
-GIA and ahead of the ISA, so a draw fills its owner's personal allowance and
-lower bands while the ISA stands, which can pay less tax over a life. Pension
-first takes the pension ahead of the cash as well. A pension is drawn as income
-from its owner's pension age: from the year the owner the pension belongs to
-turns 55 until the age rises in April 2028, and from the year they turn 57 after
-it, read off each owner's own year of birth, the ages held as constants in the
-engine until the assumptions screen sets them, as the plan's rates are held in
-the store. Before its owner's pension age, whatever the drawdown, a pension is
-drawn after every pension drawable as income has given up all it holds, and is
-drawn only as the last resort, once cash, the GIA and the tax-free wrapper are
-empty, and at the 55% a payment before the pension age is charged; a registered
-scheme will not normally make one, so what a year draws that way is carried on
-its point to be marked rather than counted on: the dashboard's chart marks the
-year, and the plan screen's year book draws it in the loss tone as it draws a
-year the money runs out in, saying beneath the month what was drawn early. Each
-account is drawn to nothing and no lower, and what a year could not draw from
-anywhere is carried on its point, so the projection can say when the money runs
-out and the dashboard's chart marks that year. Cash, the GIA and the tax-free
-wrapper give up what the month is short, a GIA charged no tax on what its draw
-realises, and a pension is grossed up so that what is left of the draw once
-taxed is what the month is short: a quarter of each draw is free of tax until
-its owner's £268,275 lump sum allowance is used up over the plan, one allowance
-each, and the rest is taxed as income on top of what its owner earned in the
-month and drew from their other pensions before it, so a second owner's pension
-is drawn under their own allowance and bands rather than from where the first's
-left off. The drawdown is chosen in the dashboard's assumptions dialog, beneath
-the age the plan runs to.
-
-The engine works in the pounds of each month and reads out in today's money, the
-money of the month the plan starts in. A line states its amount in today's
-money, and is paid it risen from there a month at a time at the rate its growth
-gives: the plan's inflation, a point or two over it, or nothing for a line fixed
-in nominal terms. A loan's payments are always fixed so, whatever the line was
-saved with, since the loan maths reads one payment for the whole term.
-Everything an account states is in the pounds of the day, as a statement or an
-agreement gives it: its balance, its fixed sum, its cap and its rate, the plan
-rate among them, which is a nominal return. So are the figures the law sets and
-does not raise, the ISA and pension allowances, the lump sum allowance and the
-£3,600 of relief. A point divides every balance by how far prices have risen by
-the start of its year, and what the year went short or drew early by a month at
-a time by how far they had risen by that month, so the chart and its tiles are
-in today's money. The plan screen's month is read the same way, so a line rising
-with inflation reads at what it states in whichever year is shown, and what an
-account is paid reads at what it is worth then; the cap it is paid to is shown
-as it is stated, as the line is. A bonus paid once a year shows in its month
-alone, so the month the plan screen reads, the plan's first and each January
-after it, shows none of a bonus paid in February and the whole of one paid in
-January. A house's ceiling and a car's floor are stated in today's money, as a
-line is, since what a house tops out at or a car is scrapped for rises with
-every other price: the engine holds the asset to its limit risen to the month,
-so one held there reads at it on every point.
+horizon, each the balance entering that year. Each month of it is worked out by
+`src/engine/cash-flow.ts` in that month's pounds, and every point is read in
+today's money, the money of the month the plan starts in. The rules both work
+by, from the tax on a month and the bands' freeze until April 2031 to the draw
+on the savings and what a point is worth, are specified once, each with its
+reason, in [`src/engine/README.md`](src/engine/README.md), and
+[`TODO.md`](TODO.md) lists what the model does not yet hold. The plan grows at
+the live set of rates, typed or derived from the capital market assumptions,
+below.
 
 The dashboard reads the accounts, the lines, the milestones and the plan from
 the store and hands them to the browser, which runs the engine itself, so a save
@@ -409,26 +198,29 @@ a request, and the save every action makes live under `src/store`, and the
 server actions a save goes to under `src/actions`: neither is a route, and the
 organisms that save through an action sit beneath the routes.
 
-The net worth and the liquid net worth the tiles, the milestones and the chance
-of success read count a pension as drawn at the basic rate, which is what a draw
-beside the State Pension mostly meets: a quarter free of tax as far as its
-owner's lump sum allowance left reaches, one allowance across all of the owner's
-pensions, what they leave shared between them by what each holds, and the rest
-taxed at 20%. Each point carries what is left of each owner's allowance in
-today's money, as it carries the balances, though the law holds the allowance in
-nominal pounds, so the quarter is capped against like money. The liquid net
-worth is the net worth less the property and vehicles and less every pension in
-a year its owner cannot draw it all through, the pension age read as it stands
-at the year's end, so its rise to 57 in April 2028 does not count a pension for
-2028 alone; from that age it counts at the same figure. The net worth counts a
-pension all along, and not at the 55% a draw before that age is charged, since
-what the household owns is not what it can have this month. The chart stacks
-each pension at the same figure, on the liquidity only from the year the liquid
-net worth counts it, so on either basis the stack comes to the figure the tiles
-read. The accounts screen's starting net worth takes off the tax on the pensions
-counted so, read off the engine's own count with each owner's allowance whole,
-so it is the net worth the plan opens on to the pound; the month end's total is
-the balances as the statements have them, a pension at what it holds.
+The dashboard's chart stacks each account the plan holds or owes a year at a
+time, and marks the first year the money runs out in and the first year a
+pension is drawn before its owner's pension age. The plan screen's year book
+draws every year that falls short either way in the loss tone, saying beneath
+the month what was drawn early. The drawdown is chosen in the dashboard's
+assumptions dialog, beneath the age the plan runs to, and each owner's
+qualifying years for the State Pension are typed on the assumptions screen, the
+line they make listed locked on the plan screen. The plan screen reads a month
+on its own, in today's money as Today's money in the specification reads one,
+and shows the cap an account is paid to as it is stated, as the line is. A bonus
+paid once a year shows in its month alone, so the month the plan screen reads,
+the plan's first and each January after it, shows none of a bonus paid in
+February and the whole of one paid in January.
+
+The tiles, the milestones and the chance of success read the net worth and the
+liquid net worth as the specification counts them, a pension as drawn at the
+basic rate. The chart stacks each pension at the same figure, on the liquidity
+only from the year the liquid net worth counts it, so on either basis the stack
+comes to the figure the tiles read. The accounts screen's starting net worth
+takes off the tax on the pensions counted so, read off the engine's own count
+with each owner's allowance whole, so it is the net worth the plan opens on to
+the pound; the month end's total is the balances as the statements have them, a
+pension at what it holds.
 
 ## Inflation
 
@@ -455,8 +247,9 @@ screen lays those steps out beside the curve at 5, 10, 20 and 30 years. The plan
 takes the derived rate when it runs on the rates derived from the capital market
 assumptions, below, and otherwise the inflation typed into its rates, which a
 household opens on at the Bank of England's 2% target. The projection grows the
-lines with whichever it takes, and the tax bands once their freeze ends, as
-above.
+lines with whichever it takes, and the tax bands once their freeze ends in April
+2031, under The tax on the month in
+[`src/engine/README.md`](src/engine/README.md).
 
 ## Capital market assumptions
 
