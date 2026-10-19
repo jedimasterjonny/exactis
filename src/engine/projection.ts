@@ -1,7 +1,7 @@
 import type { Account, AccountKind, Move } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { Condition, Measured } from "@/data/milestones";
-import type { Plan } from "@/data/plan";
+import type { Drawdown, Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 import type { CashFlow, Earned, Paid, Schedule } from "@/engine/cash-flow";
 
@@ -198,17 +198,27 @@ interface TaxYear {
   readonly taxable: number;
 }
 
-// The kinds a month's shortfall is drawn from, in the order it draws
-// them: cash, then the GIA, then the tax-free wrapper, then the
-// tax-deferred one. The three before the pension are the savings a
-// pension not marked droppable is kept paid out of, as far as they
-// reach.
+// The kinds a month's shortfall is drawn from, in the order a plan
+// drawing its savings first draws them: cash, then the GIA, then the
+// tax-free wrapper, then the tax-deferred one. The three before the
+// pension are the savings a pension not marked droppable is kept paid
+// out of, as far as they reach, and they stand in this order under
+// every drawdown.
 const drawOrder: readonly AccountKind[] = [
   "cash",
   "taxable",
   "tax-free",
   "tax-deferred",
 ];
+
+// The order each drawdown draws the kinds in, as drawnFrom gives the
+// reasons for: the savings first, as above; the pension after the GIA
+// and before the ISA; and the pension first, ahead of the cash.
+const drawOrders: Readonly<Record<Drawdown, readonly AccountKind[]>> = {
+  "pension-before-isa": ["cash", "taxable", "tax-deferred", "tax-free"],
+  "pension-first": ["tax-deferred", "cash", "taxable", "tax-free"],
+  "savings-first": drawOrder,
+};
 
 // A tax year the plan holds no months of yet: an owner's as April opens,
 // and one the plan has not entered.
@@ -556,7 +566,8 @@ export function movedYears(
 // is paid and fed, as far as the cash, the GIAs and the ISAs reach once the
 // spending is met from them: the flow is handed what they hold as the month
 // opens for that, and never keeps such a pension paid past it, so no
-// pension is drawn on to pay one. What no
+// pension is drawn on to pay one, under any drawdown, since what it
+// adds is drawn after the spending and out of those alone. What no
 // account covered is the year's uncovered shortfall, summed over its
 // months and reported on the point the year's balances are read off, so
 // the loop reads the balances entering the year, carries it, and emits
@@ -691,21 +702,22 @@ export function project(
           taxYears = new Map();
           used = new Map();
         }
-        const flow = cashFlow(carried.accounts, carried.schedule, {
+        const reading = {
           at,
           drawn,
           plan: carried.plan,
           reserve: reserveOf(held),
           settlement: settlement - due,
           used,
-        });
+        };
+        const flow = cashFlow(carried.accounts, carried.schedule, reading);
         used = new Map([
           ...used,
           ...[...flow.landed].map(
             ([held, landed]) => [held, (used.get(held) ?? 0) + landed] as const,
           ),
         ]);
-        const draw = drawnFrom(held, Math.max(0, -flow.left), {
+        const draw = drawnFrom(held, shortOf(carried, flow, reading), {
           allowances,
           at,
           drawn,
@@ -861,17 +873,27 @@ function carried(balance: number, paid: number, rate: number): number {
 // What a month's shortfall takes out of the savings, and what is left
 // of it after them, with what is left of each owner's lump sum
 // allowance, what each owner is taxed on once the draws on their
-// pensions are counted, and what it drew from a pension early. The
-// kinds are drawn cash first, since it is
-// spent as it stands and grows least; then the GIA, since what it
+// pensions are counted, and what it drew from a pension early. It comes
+// in two parts, what the spending and the debts' payments are short of
+// and what keeping the pensions not marked droppable paid adds to it,
+// and the spending is drawn first, its kinds in the order the plan's
+// drawdown names. Drawing the
+// savings first, which a plan naming none does, takes cash first, since
+// it is spent as it stands and grows least; then the GIA, since what it
 // earns is taxed and what an ISA earns is not, though the plan charges
-// a GIA nothing; then the tax-free wrapper, which
-// is reached at any age and owes nothing on the way out; then the
-// tax-deferred one. From its owner's pension age a pension is drawn as
-// income; before it, only once cash, the GIA and the ISA are
-// empty, as the last thing between the month and running out, and at
-// the charge on a payment the rules do not allow, 45p kept of each
-// pound, since the money can be had that way and at no other. Within a
+// a GIA nothing; then the tax-free wrapper, which is reached at any age
+// and owes nothing on the way out; then the tax-deferred one. Drawing
+// the pension before the ISA takes it after the GIA and ahead of the
+// ISA, so what it gives up as income fills its owner's personal
+// allowance and lower bands in the years before the ISA would have run
+// out, which can pay less tax over a life; drawing the pension first
+// takes it ahead of the cash as well. From its owner's pension age a
+// pension is drawn as income where its kind falls in the order; before
+// it, under every drawdown, only once every other kind is empty and
+// every pension drawable as income has been drawn, as the last thing
+// between the month and running out, and at the charge on a payment
+// the rules do not allow, 45p kept of each pound, since the money can
+// be had that way and at no other. Within a
 // kind the accounts are drawn in the
 // order they are listed, each giving up what it holds or what the month
 // is still short, whichever is the lesser, so an account is emptied and
@@ -884,9 +906,13 @@ function carried(balance: number, paid: number, rate: number): number {
 // the one owner's in the same month is taxed from where the first left
 // off, and another owner's from where their own income stands. One that
 // holds less than that gives up all it holds and covers
-// what that leaves once taxed. Taking the pension before the ISA to use
-// the personal allowance first would pay less tax over a life, and is a
-// second way of drawing down rather than this one. What the last of
+// what that leaves once taxed. What keeping a pension paid adds is
+// drawn after the spending, out of the cash, then the GIA, then the
+// ISA, and never out of a pension, as the flow pays it once the
+// spending is met: the flow keeps such a pension paid only while those
+// hold the two together, so what the spending leaves of them covers it,
+// and drawn before the spending it would push the spending on into a
+// pension the drawdown had not yet reached. What the last of
 // them leaves is uncovered: the plan is short by it, and the projection
 // says so rather than lending it. A draw as income is a flexible access
 // of the pension, which puts every pension of its owner's on the money
@@ -895,7 +921,7 @@ function carried(balance: number, paid: number, rate: number): number {
 // payment, and is no such access.
 function drawnFrom(
   held: readonly Held[],
-  shortfall: number,
+  { kept, spending }: { readonly kept: number; readonly spending: number },
   { allowances, at, drawn, earned, plan, uprating }: Drawing,
 ): {
   readonly allowances: ReadonlyMap<number, number>;
@@ -906,14 +932,16 @@ function drawnFrom(
   readonly uncovered: number;
 } {
   let carried = held;
-  let left = shortfall;
+  let left = spending;
   let early = 0;
   const allowanceOf = new Map(allowances);
   const accessed = new Set(drawn);
   const below = new Map(
     earned.map(({ owner, taxable }) => [owner, taxable] as const),
   );
-  for (const kind of drawOrder) {
+  const order = drawOrders[plan.drawdown ?? "savings-first"];
+  for (const [pass, kind] of [...order, "tax-deferred" as const].entries()) {
+    const isEarlyPass = pass === order.length;
     carried = carried.map(({ account, balance }) => {
       if (account.kind !== kind || !isPension(account)) {
         const taken =
@@ -929,6 +957,9 @@ function drawnFrom(
         months: 1,
         uprating,
       };
+      if (taxed.isEarly !== isEarlyPass) {
+        return { account, balance };
+      }
       const wanted = drawFor(left, taxed);
       const draw = wanted.gross <= balance ? wanted : drawOf(balance, taxed);
       left = draw === wanted ? 0 : Math.max(0, left - draw.net);
@@ -939,6 +970,17 @@ function drawnFrom(
       allowanceOf.set(owner.id, taxed.allowance - draw.taxFree);
       below.set(owner.id, taxed.below + draw.taxable);
       return { account, balance: balance - draw.gross };
+    });
+  }
+  left += kept;
+  for (const kind of kept > 0 ? drawOrder : []) {
+    carried = carried.map(({ account, balance }) => {
+      const taken =
+        account.kind === kind && isReserve(account)
+          ? Math.min(balance, left)
+          : 0;
+      left -= taken;
+      return { account, balance: balance - taken };
     });
   }
   return {
@@ -1351,6 +1393,33 @@ function settled(
     incomeTaxOn(taxable, { months, uprating }) -
     insuranceOn("self-employment", profit, { months, uprating })
   );
+}
+
+// What a month the flow leaves short draws, in two parts: what its
+// spending and its debts' payments are short of, and what keeping the
+// pensions not marked droppable paid adds to it. The second is what a
+// month end counts as kept, the whole less what the month is short of
+// with nothing kept paid out of the savings, read off the flow again
+// with no reserve to keep them paid out of. A plan drawing its savings
+// first takes the same from each account either way, so the whole is
+// its spending and no second flow is read for it.
+function shortOf(
+  { accounts, schedule }: Run,
+  flow: CashFlow,
+  reading: Parameters<typeof cashFlow>[2],
+): { readonly kept: number; readonly spending: number } {
+  const short = Math.max(0, -flow.left);
+  if (
+    flow.left >= 0 ||
+    (reading.plan.drawdown ?? "savings-first") === "savings-first"
+  ) {
+    return { kept: 0, spending: short };
+  }
+  const spending = Math.max(
+    0,
+    -cashFlow(accounts, schedule, { ...reading, reserve: 0 }).left,
+  );
+  return { kept: short - spending, spending };
 }
 
 // The wrapper's balance this year, whole pounds of today's money, read

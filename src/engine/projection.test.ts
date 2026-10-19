@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
-import type { Plan } from "@/data/plan";
+import type { Drawdown, Plan } from "@/data/plan";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
@@ -830,6 +830,155 @@ describe("project", () => {
       ),
       point(2027, { 3: 0, 6: 0, 7: 10444 }, { age: 47, deferred: 10444 }),
     ]);
+  });
+
+  // Born in 1960, so the SIPP is drawn as income, and read in December,
+  // so 2026 carries one month, £3,000 short. Drawing the savings first
+  // takes the £1,200 of cash and £1,800 of the ISA and leaves the SIPP
+  // whole. Drawing the pension before the ISA takes the cash and grosses
+  // the £1,800 left up to £1,871.18 out of the SIPP: £467.79 free and
+  // £1,403.38 taxed, the £355.88 of it past a twelfth of the personal
+  // allowance at 20%. Drawing the pension first grosses the whole £3,000
+  // up to £3,282.94 and leaves the cash and the ISA whole.
+  it("draws a shortfall in the order the plan's drawdown names", () => {
+    const drawnUnder = (
+      drawdown: Drawdown,
+    ): ProjectionPoint["balances"] | undefined =>
+      project(
+        [pocket, flatIsa, { ...sipp, balance: 50000 }],
+        { expenses: [{ ...household, amount: 3000 }], income: [] },
+        { ...bornIn(1960), drawdown, month: 11, years: 1 },
+      ).at(-1)?.balances;
+
+    expect(drawnUnder("savings-first")).toStrictEqual({
+      3: 0,
+      6: 18200,
+      7: 50000,
+    });
+    expect(drawnUnder("pension-before-isa")).toStrictEqual({
+      3: 0,
+      6: 20000,
+      7: 48129,
+    });
+    expect(drawnUnder("pension-first")).toStrictEqual({
+      3: 1200,
+      6: 20000,
+      7: 46717,
+    });
+  });
+
+  // The same month drawing the pension before the ISA from a SIPP of
+  // £500, which the cash leaves £1,800 short: the SIPP gives up all it
+  // holds, taxed nothing, and the ISA the £1,300 that leaves.
+  it("draws the ISA for what a pension drawn before it could not cover", () => {
+    expect(
+      project(
+        [pocket, flatIsa, { ...sipp, balance: 500 }],
+        { expenses: [{ ...household, amount: 3000 }], income: [] },
+        {
+          ...bornIn(1960),
+          drawdown: "pension-before-isa",
+          month: 11,
+          years: 1,
+        },
+      ).at(-1)?.balances,
+    ).toStrictEqual({ 3: 0, 6: 18700, 7: 0 });
+  });
+
+  // The pension drawn before the pension age above, with the plan
+  // drawing the pension first: it is still drawn last, once the cash and
+  // the ISA are empty, and at the charge, as under any drawdown.
+  it("draws a pension before the pension age last whatever the drawdown", () => {
+    expect(
+      project(
+        [{ ...sipp, balance: 30000 }, { ...flatIsa, balance: 2000 }, pocket],
+        short,
+        { ...bornIn(1980), drawdown: "pension-first", years: 1 },
+      ),
+    ).toStrictEqual([
+      point(
+        2026,
+        { 3: 1200, 6: 2000, 7: 30000 },
+        { age: 46, deferred: 30000, early: 19556, free: 2000 },
+      ),
+      point(2027, { 3: 0, 6: 0, 7: 10444 }, { age: 47, deferred: 10444 }),
+    ]);
+  });
+
+  // In 2047 the first owner is 57 and Sam 54. Sam's SIPP is listed first,
+  // but the first owner's is drawn as income for the whole year, £1,000
+  // a month taxed nothing, and Sam's, which only an early draw could
+  // reach, is left whole.
+  it("draws a pension at its owner's pension age before one drawn early, whatever order they are listed in", () => {
+    expect(
+      project(
+        [
+          { ...sipp, balance: 50000, id: 8, owner: sam.id },
+          { ...sipp, balance: 50000 },
+        ],
+        {
+          expenses: [{ ...household, amount: 1000, lastYear: null }],
+          income: [],
+        },
+        { ...plan, from: 2047, owners: [working, sam], years: 1 },
+      ).map(({ balances, early }) => ({ balances, early })),
+    ).toStrictEqual([
+      { balances: { 7: 50000, 8: 50000 }, early: 0 },
+      { balances: { 7: 38000, 8: 50000 }, early: 0 },
+    ]);
+  });
+
+  // Born in 1960 and read in December, one month £800 short of its
+  // spending with nothing coming in, and a SIPP kept paid £500, which
+  // lands as £560 with the £60 a non-earner is relieved. The spending is
+  // drawn first in the order the drawdown names, and what keeping the
+  // SIPP paid adds to it after, out of the cash and then the ISA and
+  // never out of a pension. Drawing the pension before the ISA, the cash
+  // covers the £800 of spending, so the SIPP is not drawn, and the £200
+  // of cash left and £300 of the ISA pay the £500.
+  it("pays a pension kept paid out of the savings after the spending, never out of the pension drawn before the ISA", () => {
+    expect(
+      project(
+        [
+          { ...pocket, balance: 1000 },
+          flatIsa,
+          {
+            ...sipp,
+            balance: 50000,
+            contribution: { amount: 500, cadence: "month", kind: "fixed" },
+          },
+        ],
+        { expenses: [{ ...household, amount: 800 }], income: [] },
+        {
+          ...bornIn(1960),
+          drawdown: "pension-before-isa",
+          month: 11,
+          years: 1,
+        },
+      ).at(-1)?.balances,
+    ).toStrictEqual({ 3: 0, 6: 19700, 7: 50560 });
+  });
+
+  // The same month drawing the pension first: the SIPP gives up the £800
+  // of spending, taxed nothing, a quarter of it free and the £600 left
+  // under a twelfth of the personal allowance, and the £500 keeping it
+  // paid comes out of the cash, so 50,000 − 800 + 560 = 49,760.
+  it("pays a pension kept paid out of the savings while the pension drawn first pays the spending", () => {
+    expect(
+      project(
+        [
+          { ...pocket, balance: 1000 },
+          flatIsa,
+          {
+            ...sipp,
+            balance: 50000,
+            contribution: { amount: 500, cadence: "month", kind: "fixed" },
+          },
+        ],
+        { expenses: [{ ...household, amount: 800 }], income: [] },
+        { ...bornIn(1960), drawdown: "pension-first", month: 11, years: 1 },
+      ).at(-1)?.balances,
+    ).toStrictEqual({ 3: 500, 6: 20000, 7: 49760 });
   });
 
   // Born in 1972, so 55 is reached in 2027, while the pension age is 55,

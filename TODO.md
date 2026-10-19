@@ -34,11 +34,9 @@ are figures to add as the plan needs them.
 The month's income pays income tax and the employee's NI, a pension draw is
 grossed up for its tax and each tax year is settled in the April after it, so
 what is spare is after tax, and a pension is counted as drawn at the basic rate,
-a quarter free of tax as far as its owner's lump sum allowance reaches. The draw
-order is not: it is the one that was right before tax, cash, then the GIA, then
-the ISA, then the pension, where filling the personal allowance from the pension
-before the ISA is touched pays less over a life; with draws taxed, the engine
-can now weigh the two, and does not.
+a quarter free of tax as far as its owner's lump sum allowance reaches. The plan
+chooses the order a shortfall is drawn in, and drawing the pension only as far
+as the basic rate band is a fourth drawdown not yet offered.
 
 Smaller gaps sit beside those. The employer's NI is credited at the full rate on
 the whole sacrifice, ignoring the threshold and what the scheme passes on, and
@@ -65,8 +63,7 @@ rate of the year it is taken in beside what else is earned then. A progress
 point's pensions are read gross, as the sheet summed them, since a point pools
 pensions without owners.
 
-Decide the order the plan draws in, so its drawdown is after tax as its worth
-is; the smaller gaps are figures to add as the plan needs them.
+The smaller gaps are figures to add as the plan needs them.
 
 ## Debt
 
