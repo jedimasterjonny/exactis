@@ -78,7 +78,7 @@ describe("AppFrame", () => {
     expect(signOut).toHaveBeenCalledOnce();
   });
 
-  it("offers what is open as a file, drawn as sign-out is", () => {
+  it("draws the export menu's button as sign-out is, in place of the link", () => {
     stubViewport(1024);
     render(
       <AppFrame banner={null}>
@@ -86,11 +86,10 @@ describe("AppFrame", () => {
       </AppFrame>,
     );
 
-    const link = screen.getByRole("link", { name: "Export as file" });
-
-    expect(link).toHaveAttribute("href", "/export");
-    expect(link).toHaveAttribute("data-slot", "sidebar-menu-button");
-    expect(link).toHaveClass("label");
+    expect(screen.getByRole("button", { name: "Export" })).toHaveClass("label");
+    expect(
+      screen.queryByRole("link", { name: /Export/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("offers to import a household file beside the export, drawn as sign-out is", () => {
