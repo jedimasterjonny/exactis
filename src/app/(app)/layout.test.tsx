@@ -8,6 +8,7 @@ import AppLayout from "./layout";
 
 vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
 vi.mock("@/actions/auth", () => ({ signOut: vi.fn() }));
+vi.mock("@/actions/household", () => ({ importHousehold: vi.fn() }));
 vi.mock("@/actions/scenarios", () => ({ leaveScenario: vi.fn() }));
 vi.mock("@/store/household", () => ({ getScenario: vi.fn() }));
 

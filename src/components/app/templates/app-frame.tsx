@@ -5,6 +5,7 @@ import { Download, LogOut } from "lucide-react";
 import { signOut } from "@/actions/auth";
 import { AppNav } from "@/components/app/atoms/app-nav";
 import { ScreenLabel } from "@/components/app/atoms/screen-label";
+import { HouseholdImport } from "@/components/app/molecules/household-import";
 import { ThemeToggle } from "@/components/app/molecules/theme-toggle";
 import {
   Sidebar,
@@ -22,8 +23,8 @@ interface AppFrameProps {
   readonly children: ReactNode;
 }
 
-// The shell every signed-in screen sits in: the ink sidebar with the
-// wordmark, the navigation, the theme toggle, export, sign-out and the motto,
+// The shell every signed-in screen sits in: the ink sidebar with the wordmark,
+// the navigation, the theme toggle, export and import, sign-out and the motto,
 // and the main column beside it. The inset is the page's one main landmark, so
 // screens render their content directly. On a phone the sidebar is off
 // canvas and a trigger above the screen opens it as a sheet, with the
@@ -38,9 +39,10 @@ interface AppFrameProps {
 // answers, so a redirect to the login screen, as an expired session
 // gets, shows that screen rather than being saved as the file. The link
 // is a plain one, so the browser follows it rather than the router
-// taking it for a screen. The banner, whatever the route hands it, runs
-// across the top of the main column above the phone's bar, so it heads
-// every screen at every width.
+// taking it for a screen. The import beside it is drawn the same way, and
+// asks before a file replaces what is open. The banner, whatever the
+// route hands it, runs across the top of the main column above the
+// phone's bar, so it heads every screen at every width.
 export function AppFrame({ banner, children }: AppFrameProps): JSX.Element {
   return (
     <SidebarProvider>
@@ -68,6 +70,7 @@ export function AppFrame({ banner, children }: AppFrameProps): JSX.Element {
               </a>
             }
           />
+          <HouseholdImport />
           <form action={signOut} aria-label="Sign out">
             <SidebarMenuButton
               className="-mx-2 label text-xs text-sidebar-foreground/60 [&_svg]:size-3.5"
