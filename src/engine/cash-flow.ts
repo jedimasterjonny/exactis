@@ -85,6 +85,8 @@ export interface Earned {
 // pension's allowance has, since the sacrifice is the employer's
 // contribution under the scheme and the scheme pays it in with its
 // match; what lands past the allowance is charged as the owner's income.
+// In a month that drops the sacrifice it is the employer's floor alone,
+// and the line gives up nothing.
 export interface Fed extends Paid {
   readonly line: IncomeLine;
   readonly sacrificed: number;
@@ -348,8 +350,11 @@ const nobody: ReadonlySet<number> = new Set();
 // owner at all, so the salary pays income tax and National Insurance
 // on what is left of it and the sacrifice costs the month less than it
 // puts in the pension; the match was never the owner's, so it comes
-// off nothing and is taxed on nothing, and lands with the sacrifice
-// or not at all. It is
+// off nothing and is taxed on nothing, and the share of it the
+// sacrifice earns lands with the sacrifice or not at all, while the
+// floor, which the employer pays whatever is given up and so costs the
+// month nothing, lands whether the month gives the sacrifice up or
+// not. It is
 // given up only while what is left of the income after the tax on it
 // still covers the expenses, the debts' payments and what a pension
 // always funded is fed and paid, a month short of them by less than a
@@ -360,7 +365,8 @@ const nobody: ReadonlySet<number> = new Set();
 // every sacrifice in every month of it over the residue of adding the
 // lines up. In a month that is really short, no line sacrifices at all,
 // every line is earned and taxed whole and every pension is fed
-// nothing. All of them or none, rather than a share of each or
+// nothing but the floor under its salary's match. All of them or none,
+// rather than a share of each or
 // the lines that fit, since a sacrifice a month cannot afford is a
 // drawdown by another name and the pension would be fed in the very
 // month a wrapper is sold to cover the spending. A salary feeding a
@@ -369,7 +375,8 @@ const nobody: ReadonlySet<number> = new Set();
 // ISAs have what the month is then short of, once the spending has been met
 // from them: the month is short by what it gave up too, for the
 // projection to draw. So a month that is short feeds nothing but a
-// pension always funded, pays no fixed sum but a debt's and such a
+// pension always funded and the floors, pays no fixed sum but a debt's
+// and such a
 // pension's, and hands over no spare money, and what is left is short
 // by the expenses, the debts' payments and what the pension is kept
 // paid that the income does not cover, and by nothing else. A salary
@@ -401,7 +408,8 @@ const nobody: ReadonlySet<number> = new Set();
 // feed each, then the fixed sums in the order the accounts are listed,
 // then the spare money's takes in the same order, each taking only
 // what the ones before it left. A sacrifice the month does not give up
-// takes none of it, so what a pension always funded is fed in a month
+// takes none of it, and its floor only what lands, so what a pension
+// always funded is fed in a month
 // short of the rest does not hang on which salary is listed first. A
 // wrapper naming no owner is refused
 // with the rest, since the store holds every wrapper to one and an
@@ -487,21 +495,31 @@ export function cashFlow(
         at.year < retirementYearOf(earnerOf(line, reading.plan), reading.plan)),
   );
   const income = payOf(running, [], reading);
-  const feedingInto = (isFed: (account: Account) => boolean): readonly Fed[] =>
+  // What each line feeding a listed pension lands in it, in the order
+  // the lines are listed: the whole of its feed where the month gives up
+  // the sacrifices into that account, and otherwise the employer's floor
+  // under its match alone, the line giving up nothing; a line landing
+  // nothing lands no entry.
+  const feedingInto = (
+    isGiving: (account: Account) => boolean,
+  ): readonly Fed[] =>
     running.flatMap((line) => {
       const account = accountAt(accounts, line.feeds);
-      const wanted = monthlyOf(line, contributionOf(line), reading);
-      if (account === undefined || !isFed(account) || wanted === 0) {
+      if (account === undefined) {
         return [];
       }
-      return [
-        {
-          account,
-          amount: wanted,
-          line,
-          sacrificed: monthlyOf(line, sacrificeOf(line), reading),
-        },
-      ];
+      const given = isGiving(account) ? line : { ...line, sacrifice: 0 };
+      const wanted = monthlyOf(line, contributionOf(given), reading);
+      return wanted === 0
+        ? []
+        : [
+            {
+              account,
+              amount: wanted,
+              line,
+              sacrificed: monthlyOf(line, sacrificeOf(given), reading),
+            },
+          ];
     });
   const spent = spentIn(accounts, schedule, reading);
   const expenses = total(spent);
@@ -528,7 +546,9 @@ export function cashFlow(
     Math.max(0, -leftWith([])),
     reading.reserve ?? Number.POSITIVE_INFINITY,
   );
-  const kept = feedingInto((account) => account.isAlwaysFunded === true);
+  const kept = feedingInto(() => true).filter(
+    ({ account }) => account.isAlwaysFunded === true,
+  );
   const isKeeping = kept.length > 0 && leftWith(kept) >= floor - nanopound;
   const feeding = feedingInto(
     (account) => isKeeping || account.isAlwaysFunded !== true,
@@ -583,12 +603,16 @@ export function cashFlow(
   };
   const sacrificing =
     others.length > 0 ? paidWith(feeding, Number.NEGATIVE_INFINITY) : undefined;
-  const keeping = isKeeping ? kept : [];
   const { fed, funded, month, purse, taxed } =
     sacrificing !== undefined &&
     sacrificing.month - total(sacrificing.funded) >= -nanopound
       ? sacrificing
-      : paidWith(keeping, floor);
+      : paidWith(
+          feedingInto(
+            (account) => isKeeping && account.isAlwaysFunded === true,
+          ),
+          floor,
+        );
   const { left: rest, sums: saved } = fixedSums(
     saving.filter((account) => account.isAlwaysFunded !== true),
     month - total(funded),
