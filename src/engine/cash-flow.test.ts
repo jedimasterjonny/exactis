@@ -529,6 +529,44 @@ describe("cashFlow", () => {
     expect(against(2000).left).toBeCloseTo(-430.22, 2);
   });
 
+  // Floored at three per cent of its base and matched to seven, the
+  // £60,000 salary against £1,500 of household still gives up none of
+  // its £500, and the employer's £150 floor lands all the same: it
+  // sacrifices nothing and costs the month nothing, so £69.78 is left as
+  // before, and the match above the floor goes with the sacrifice.
+  // Floored at nothing, the pension is fed nothing, as before.
+  it("lands the employer's floor of a sacrifice a month short of it gives up, at no cost to the month", () => {
+    const unpaid: Account = {
+      balance: 412880,
+      growth: { kind: "plan" },
+      id: pension.id,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+      owner: 1,
+    };
+    const flowWith = (floor: number): CashFlow =>
+      cashFlow(
+        [unpaid, mortgage],
+        {
+          expenses: [{ ...household, amount: 1500 }],
+          income: [{ ...lean, floor, match: 0.07 }],
+        },
+        { at: { month: 0, year: 2026 }, plan },
+      );
+
+    expect(pennies(flowWith(0.03).fed)).toStrictEqual([
+      {
+        account: unpaid,
+        amount: 150,
+        line: { ...lean, floor: 0.03, match: 0.07 },
+        sacrificed: 0,
+      },
+    ]);
+    expect(flowWith(0.03).left).toBeCloseTo(69.78, 2);
+    expect(flowWith(0).fed).toStrictEqual([]);
+    expect(flowWith(0).left).toBeCloseTo(69.78, 2);
+  });
+
   // 2049's consulting is £2,000 a month, £1,752.35 after £190.50 of
   // income tax and £57.15 of Class 4 NI, against the mortgage payment
   // and the retirement living, £8,201: the pension is paid nothing,
@@ -1575,6 +1613,100 @@ describe("cashFlow", () => {
     expect(flowOf().left).toBeCloseTo(-510.22, 2);
     expect(flowOf(300).fed).toStrictEqual([]);
     expect(flowOf(300).left).toBeCloseTo(-220.22, 2);
+  });
+
+  // The same month with the salary floored at three per cent of its
+  // base: with only £300 in the cash and the ISAs the sacrifice still
+  // goes, and the employer's £150 floor lands in the pension always
+  // funded all the same, sacrificing nothing, the month short by the
+  // £220.22 alone.
+  it("lands the employer's floor of an always funded pension's sacrifice the month gives up", () => {
+    const kept: Account = {
+      balance: 412880,
+      growth: { kind: "plan" },
+      id: pension.id,
+      isAlwaysFunded: true,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+      owner: 1,
+    };
+    const floored: IncomeLine = { ...lean, floor: 0.03 };
+    const flow = cashFlow(
+      [kept],
+      { expenses: [{ ...household, amount: 4000 }], income: [floored] },
+      { at: { month: 0, year: 2026 }, plan, reserve: 300 },
+    );
+
+    expect(pennies(flow.fed)).toStrictEqual([
+      { account: kept, amount: 150, line: floored, sacrificed: 0 },
+    ]);
+    expect(flow.left).toBeCloseTo(-220.22, 2);
+  });
+
+  // Against £4,200 of household the two salaries leave £159.78 earned
+  // whole. The £500 the £60,000 salary would give up into the pension
+  // always funded costs the month £290, and with nothing in the cash and
+  // the ISAs to carry it that sacrifice goes; the side job's £50 into the
+  // other pension costs £29, which the month covers, so it is given up.
+  // The employer's £150 floor still lands in the pension always funded,
+  // sacrificing nothing, and the month is left with £130.78. What lands
+  // is listed in the order the lines are, whichever of them gives up its
+  // sacrifice, so the rows a month shows keep their places.
+  it("lands the employer's floor of an always funded pension's sacrifice the month gives up while it keeps another's, in the order the lines are listed", () => {
+    const kept: Account = {
+      balance: 0,
+      growth: { kind: "plan" },
+      id: pension.id,
+      isAlwaysFunded: true,
+      kind: "tax-deferred",
+      name: "Workplace pension",
+      owner: 1,
+    };
+    const unmarked: Account = {
+      balance: 0,
+      growth: { kind: "plan" },
+      id: 7,
+      kind: "tax-deferred",
+      name: "SIPP",
+      owner: 1,
+    };
+    const floored: IncomeLine = { ...lean, floor: 0.03 };
+    const side: IncomeLine = {
+      ...plain,
+      amount: 12000,
+      feeds: unmarked.id,
+      id: 9,
+      name: "Side job",
+      sacrifice: 0.05,
+    };
+    const flowOf = (income: readonly IncomeLine[]): CashFlow =>
+      cashFlow(
+        [kept, unmarked],
+        { expenses: [{ ...household, amount: 4200 }], income },
+        { at: { month: 0, year: 2026 }, plan, reserve: 0 },
+      );
+    const floorLanded = {
+      account: kept,
+      amount: 150,
+      line: floored,
+      sacrificed: 0,
+    };
+    const sideFed = {
+      account: unmarked,
+      amount: 57.5,
+      line: side,
+      sacrificed: 50,
+    };
+
+    expect(pennies(flowOf([floored, side]).fed)).toStrictEqual([
+      floorLanded,
+      sideFed,
+    ]);
+    expect(pennies(flowOf([side, floored]).fed)).toStrictEqual([
+      sideFed,
+      floorLanded,
+    ]);
+    expect(flowOf([floored, side]).left).toBeCloseTo(130.78, 2);
   });
 
   // A salary feeding a pension that is not always funded still gives up
