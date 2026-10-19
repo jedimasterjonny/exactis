@@ -117,10 +117,11 @@ its owner retires at, and the assumptions screen types the rates, the deductions
 and the split of the savings into it, chooses the set of rates the plan runs on,
 pulls the inflation curve and the CMA into it, and imports the target allocation
 into it and maps its categories; the progress screen reads the progress points
-and pulls the house price index into them. `DATABASE_URL` names the database, as
-`.env.example` shows. Nothing reads it until a query runs, so a build needs no
-database. Locally, point it at a Neon branch of your own and apply the
-migrations once:
+and pulls the house price index into them. The sidebar hands the household, or
+the scenario open, out as a file, as a save would keep it. `DATABASE_URL` names
+the database, as `.env.example` shows. Nothing reads it until a query runs, so a
+build needs no database. Locally, point it at a Neon branch of your own and
+apply the migrations once:
 
 ```bash
 bun run db:migrate
