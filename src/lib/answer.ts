@@ -1,3 +1,5 @@
+import type { ZodError } from "zod";
+
 // What an action answers a save with: what it saved, or why it refused
 // to. A refusal is an answer rather than a throw, since a server
 // action's error reaches a production browser with its words withheld,
@@ -37,6 +39,15 @@ export function answerOf<TValue>(call: () => TValue): Answer<TValue> {
     }
     throw error;
   }
+}
+
+// A refusal in the words of every rule a parse found broken, each said
+// once however many records break it, as a save or a read of a kept
+// household is refused.
+export function refusalOf(error: ZodError): Refusal {
+  return new Refusal(
+    [...new Set(error.issues.map(({ message }) => message))].join("; "),
+  );
 }
 
 export function refused(reason: string): Answer<never> {

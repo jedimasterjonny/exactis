@@ -15,6 +15,7 @@ import { curve } from "@/data/inflation.fixture";
 import { sam } from "@/data/owners.fixture";
 import { planOf } from "@/data/plan";
 import { allInStocks, openingRates } from "@/data/rates";
+import { currentShape, stamped } from "@/data/shapes";
 import { getDb } from "@/db/client";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -169,6 +170,25 @@ describe("the household store", () => {
     );
   });
 
+  // Written raw, since a save stamps this app's shape: as a version a
+  // newer app kept, read once that app is rolled back.
+  it("carries the latest through the chain, refusing one a newer app kept in its words", async () => {
+    await db
+      .insert(householdVersions)
+      .values({
+        household: { ...reference, shape: currentShape + 1 },
+        scenario: "",
+        version: 1,
+      });
+
+    await expect(getHousehold()).rejects.toThrow(
+      "This household was saved by a newer app than this one",
+    );
+    expect(await amend(({ kept }) => ({ kept, result: null }))).toStrictEqual(
+      refused("This household was saved by a newer app than this one"),
+    );
+  });
+
   it("keeps the household an edit makes as the next version, draws the page again and hands back what the edit says", async () => {
     await keepAfter(db, { scenario: "", version: 0 }, reference);
 
@@ -199,7 +219,7 @@ describe("the household store", () => {
     await amend(({ kept }) => ({ kept, result: null }));
 
     expect(await readLatest(db, "")).toStrictEqual({
-      household: blank,
+      household: stamped(blank),
       version: 1,
     });
   });
@@ -378,11 +398,11 @@ describe("the household store", () => {
     ).resolves.toStrictEqual(saved(null));
 
     expect(await readLatest(db, "Retire early")).toStrictEqual({
-      household: { ...blank, ages: { ends: 95 } },
+      household: stamped({ ...blank, ages: { ends: 95 } }),
       version: 2,
     });
     expect(await readLatest(db, "")).toStrictEqual({
-      household: reference,
+      household: stamped(reference),
       version: 1,
     });
     expect(await getBaseline()).toMatchObject({

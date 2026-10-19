@@ -8,6 +8,7 @@ import type { Read, Version } from "@/db/household";
 import type { Answer } from "@/lib/answer";
 
 import { nothingKeptIn, soundKept, sourcesIn } from "@/data/household";
+import { upcast } from "@/data/shapes";
 import { getDb } from "@/db/client";
 import { keepAfter, listScenarios, readAsOf, readLatest } from "@/db/household";
 import { Refusal, refused, saved } from "@/lib/answer";
@@ -157,17 +158,22 @@ export async function readHeld(): Promise<Held & Read> {
   return heldIn(await readOpen(true));
 }
 
-// The latest version kept on a branch, or the household before anything
-// is saved, its balances as of the end of the month before this one, so
-// that its plan starts in this one, held to every rule as it is today,
-// so a version the rules have since tightened past is refused in their
-// words rather than handed to the engine to throw on, and with the
-// branch and the version it is, which a save writes the one after. The
-// month is read at request time, since the session is read before
-// anything that reads it.
+// The latest version kept on a branch, carried to this shape by the
+// chain, or the household before anything is saved, its balances as of
+// the end of the month before this one, so that its plan starts in this
+// one, which the app makes in memory and so never goes through the
+// chain; held to every rule as it is today, so a version the rules have
+// since tightened past is refused in their words rather than handed to
+// the engine to throw on, and with the branch and the version it is,
+// which a save writes the one after. The month is read at request time,
+// since the session is read before anything that reads it.
 function heldIn({ latest, scenario }: Open): Held & Read {
   return {
-    ...soundKept(latest?.household ?? nothingKeptIn(monthBefore(thisMonth()))),
+    ...soundKept(
+      latest === null
+        ? nothingKeptIn(monthBefore(thisMonth()))
+        : upcast(latest.household),
+    ),
     scenario,
     version: latest?.version ?? 0,
   };

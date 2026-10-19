@@ -5,6 +5,7 @@ import { and, asc, desc, eq, lte, ne, sql } from "drizzle-orm";
 import type { Kept } from "@/data/household";
 import type { Database } from "@/db/client";
 
+import { stamped } from "@/data/shapes";
 import { householdVersions } from "@/db/schema";
 import { Refusal } from "@/lib/answer";
 
@@ -53,10 +54,11 @@ export async function dropScenario(
 }
 
 // Keeps the household as the version after the one the save read on its
-// branch. When another save has kept that version first, the branch
-// changed under this one after it was read, and what this one worked
-// out is from a household that is gone, so it is refused and nothing is
-// written. A new scenario's first version is kept after none, so a
+// branch, stamped with the shape it is kept in, so a later app can carry
+// it into its own. When another save has kept that version first, the
+// branch changed under this one after it was read, and what this one
+// worked out is from a household that is gone, so it is refused and
+// nothing is written. A new scenario's first version is kept after none, so a
 // second scenario of the same name is refused the same way.
 export async function keepAfter(
   db: Database,
@@ -65,7 +67,7 @@ export async function keepAfter(
 ): Promise<void> {
   const rows = await db
     .insert(householdVersions)
-    .values({ household, scenario, version: version + 1 })
+    .values({ household: stamped(household), scenario, version: version + 1 })
     .onConflictDoNothing()
     .returning({ version: householdVersions.version });
   if (rows.length === 0) {
@@ -96,7 +98,10 @@ export async function listScenarios(db: Database): Promise<readonly string[]> {
 // allocation is not: its categories may not all have a class yet. Null
 // while none ran on them. A scenario with no version saved by the
 // moment did not exist then, so the household's version as of it is
-// read in its place, which is what the scenario was made from.
+// read in its place, which is what the scenario was made from. The
+// filter on rateSet reads the stored document in SQL, outside the chain
+// of shapes, so a step that renames or moves rateSet changes this query
+// too.
 export async function readAsOf(
   db: Database,
   scenario: string,
