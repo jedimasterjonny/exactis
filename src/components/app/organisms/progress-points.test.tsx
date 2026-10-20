@@ -84,6 +84,8 @@ describe("ProgressPoints", () => {
       "Month",
       "Pensions",
       "ISAs",
+      "GIAs",
+      "Cash",
       "Property & vehicles",
       "Secured loans",
       "Other debts",
@@ -98,6 +100,8 @@ describe("ProgressPoints", () => {
       "Mar 2025",
       "£108,000",
       "£54,000",
+      "—",
+      "—",
       "£296,000",
       "−£196,000",
       "−£2,000",
@@ -124,6 +128,8 @@ describe("ProgressPoints", () => {
     ).toStrictEqual([
       "Pensions£108,000",
       "ISAs£54,000",
+      "GIAs—",
+      "Cash—",
       "Property & vehicles£296,000",
       "Secured loans−£196,000",
       "Other debts−£2,000",
@@ -200,13 +206,74 @@ describe("ProgressPoints", () => {
     ).toStrictEqual(["11.11111111111111%", "33.33333333333333%"]);
   });
 
+  // April and May 2025 read off the accounts, with £8,000 and then
+  // £9,000 of cash and £3,000 in GIAs: the year is read from December,
+  // which the sheet gave, over the five balances it carries, £14,500,
+  // and so is each month in it, April £4,000 and May £3,000, the cash's
+  // £1,000 left out, so the months add up to the year; each ends where
+  // its own balances come to.
+  it("reads a year and its months over the balances both ends of the year carry, and ends each at every balance its point was read with", () => {
+    render(
+      <ProgressPoints
+        points={[
+          ...points,
+          {
+            ...pointOf(3, 2025, [296000, 110000, 55000, -195000, -2000]),
+            cash: 8000,
+            taxable: 3000,
+          },
+          {
+            ...pointOf(4, 2025, [296000, 111000, 56000, -194000, -2000]),
+            cash: 9000,
+            taxable: 3000,
+          },
+        ]}
+      />,
+    );
+
+    expect(yearRow("2025")).toHaveTextContent(
+      /^20255 months\+£14,500£279,000$/v,
+    );
+    expect(
+      within(yearRow("2025"))
+        .getAllByText(bySlot("segment-bar-part"), { suggest: false })
+        .map((part) => part.dataset["segment"]),
+    ).toStrictEqual(["assets", "unsecured", "deferred", "free", "loans"]);
+
+    const [, may] = within(screen.getByRole("table")).getAllByRole("row");
+
+    expect(cellsOf(may ?? document.body)).toStrictEqual([
+      "May 2025",
+      "£111,000",
+      "£56,000",
+      "£3,000",
+      "£9,000",
+      "£296,000",
+      "−£194,000",
+      "−£2,000",
+      "£279,000",
+    ]);
+    expect(
+      within(screen.getByRole("table"))
+        .getAllByRole("group")
+        .slice(0, 2)
+        .map(
+          (month) =>
+            within(month).getByText(/^\w{3} \d{4}$/v).parentElement
+              ?.textContent,
+        ),
+    ).toStrictEqual(["May 2025+£3,000£279,000", "Apr 2025+£4,000£275,000"]);
+  });
+
   it("draws what would fill the card before any point is kept", () => {
     render(<ProgressPoints points={[]} />);
 
     expect(screen.queryByRole("region")).not.toBeInTheDocument();
     expect(screen.getByText("No points yet")).toBeInTheDocument();
     expect(
-      screen.getByText("Month-ends come from the Home Accounts sheet."),
+      screen.getByText(
+        "Closing a month on the accounts screen records its point.",
+      ),
     ).toBeInTheDocument();
   });
 });

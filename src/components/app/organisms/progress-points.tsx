@@ -23,8 +23,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/kit/table";
-import { balances, movesOf, netWorthOf, sumOf, yearsOf } from "@/data/progress";
-import { balanceNames, balanceTones, partsOf } from "@/lib/balances";
+import {
+  balances,
+  movesOf,
+  netWorthOf,
+  sharedBy,
+  sumOf,
+  yearsOf,
+} from "@/data/progress";
+import {
+  balanceNames,
+  balanceTones,
+  formatBalance,
+  partsOf,
+} from "@/lib/balances";
 import { counted } from "@/lib/count";
 import { formatGbp } from "@/lib/money";
 import { formatMonthShort } from "@/lib/months";
@@ -50,11 +62,13 @@ interface Scale {
 // says how many months were kept in it where fewer than twelve were,
 // draws what each balance added to the right of a rule and what each
 // took away to the left of it, on one scale for every year, and gives
-// the move in net worth and where the year ended it, a narrow screen
+// the move in net worth, over the balances both ends of the year carry,
+// and where the year ended it, a narrow screen
 // laying the bar on a line of its own and leaving where the year ended
 // to the months beneath. A year opens to its months,
-// newest first, each balance as it was read and net worth beside them,
-// a debt below nothing as an account's is; a narrow table folds each
+// newest first, each balance as it was read, a dash for one its point
+// was not read with, and net worth beside them, a debt below nothing as
+// an account's is; a narrow table folds each
 // month to what net worth moved by since the point before it and where
 // it ended, a tap opening it to its balances a line apiece, each by a
 // dot in its tone. A household keeping no point yet draws what would
@@ -63,7 +77,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
   if (points.length === 0) {
     return (
       <EmptyState
-        description="Month-ends come from the Home Accounts sheet."
+        description="Closing a month on the accounts screen records its point."
         icon={History}
         title="No points yet"
       />
@@ -105,7 +119,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
                   <MoveBar moves={moves} scale={scale} />
                 </span>
                 <span className="text-right">
-                  <DeltaValue value={netWorthOf(to) - netWorthOf(from)} />
+                  <DeltaValue value={sumOf(moves, 1) - sumOf(moves, -1)} />
                 </span>
                 <span className="text-right figure max-sm:hidden">
                   {formatGbp(netWorthOf(to))}
@@ -126,7 +140,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {monthsOf(from, kept).map(({ move, point }) => (
+                  {monthsOf(from, kept, to).map(({ move, point }) => (
                     <TableRow key={point.month.month}>
                       <TableCell className="p-0 whitespace-normal unfolded:hidden">
                         <details className="group">
@@ -157,7 +171,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
                                   {balanceNames[key]}
                                 </span>
                                 <span className="figure">
-                                  {formatGbp(point[key])}
+                                  {formatBalance(point[key])}
                                 </span>
                                 <span className="size-4" />
                               </li>
@@ -173,7 +187,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
                           className="text-right figure folded:hidden"
                           key={key}
                         >
-                          {formatGbp(point[key])}
+                          {formatBalance(point[key])}
                         </TableCell>
                       ))}
                       <TableCell className="text-right figure font-medium folded:hidden">
@@ -192,19 +206,22 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
 }
 
 // A year's months, newest first, each with what net worth moved by from
-// the point before it, the year's first from the point the year is read
-// from, unless the year is read from that month itself, as the first
-// year is, which then has no move to give.
+// the point before it, over the balances both ends of the year carry, so
+// the months add up to the year's move, the year's first from the point
+// the year is read from, unless the year is read from that month itself,
+// as the first year is, which then has no move to give.
 function monthsOf(
   from: ProgressPoint,
   points: readonly ProgressPoint[],
+  to: ProgressPoint,
 ): { move: number | undefined; point: ProgressPoint }[] {
+  const over = sharedBy(from, to);
   return points
     .map((point, index) => {
       const prior = points[index - 1] ?? from;
+      const moves = movesOf(prior, point, over);
       return {
-        move:
-          prior === point ? undefined : netWorthOf(point) - netWorthOf(prior),
+        move: prior === point ? undefined : sumOf(moves, 1) - sumOf(moves, -1),
         point,
       };
     })

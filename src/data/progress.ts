@@ -48,20 +48,13 @@ export const holds: Readonly<
   unsecured: ({ kind, secures }) => kind === "debt" && secures === undefined,
 };
 
-// What a point's balances come to: the five summed, the debts taking
-// away. It leaves cash and the GIAs out, as the sheet's points do, where
-// the accounts screen's starting net worth counts them.
-export function netWorthOf(point: ProgressPoint): number {
-  return (
-    point.assets + point.deferred + point.free + point.loans + point.unsecured
-  );
-}
-
 // The balances the screens read off a point, what is held before what
-// is owed, in the order every screen lists them.
+// is owed, in the order the accounts screen lists the kinds.
 export const balances = [
   "deferred",
   "free",
+  "taxable",
+  "cash",
   "assets",
   "loans",
   "unsecured",
@@ -85,8 +78,11 @@ export interface KeptYear {
 // start later or that month was not kept; the latest point, which it is
 // read to; and, where it runs twelve months whole, what net worth moved
 // by over each year before it to the same month, the nearest first,
-// which is what the latest is held against. None while there is no
-// point before the latest to read a move from.
+// which is what the latest is held against: each read over the balances
+// both the latest's ends carry, and a year either end of which was not
+// read with every one of them passed over, so a year is held only
+// against years read alike. None while there is no point before the
+// latest to read a move from.
 export interface LatestYear {
   readonly before: readonly number[];
   readonly from: ProgressPoint;
@@ -114,17 +110,37 @@ export function latestYearOf(
   }
   return {
     before:
-      monthsBetween(from.month, to.month) === 12 ? yearsBefore(points, to) : [],
+      monthsBetween(from.month, to.month) === 12
+        ? yearsBefore(points, to, sharedBy(from, to))
+        : [],
     from,
     to,
   };
 }
 
-// What each balance moved net worth by from one point to another, in
-// the order the balances are listed: a debt paid down adds and one run
-// up takes away, as it moves net worth.
-export function movesOf(from: ProgressPoint, to: ProgressPoint): Move[] {
-  return balances.map((key) => ({ key, move: to[key] - from[key] }));
+// What each balance moved net worth by from one point to another, over
+// the balances both carry or those given, in the order the balances are
+// listed: a debt paid down adds and one run up takes away, as it moves
+// net worth. A move is the sum of its moves, what added less what took
+// away, and is read no other way.
+export function movesOf(
+  from: ProgressPoint,
+  to: ProgressPoint,
+  over: readonly Balance[] = sharedBy(from, to),
+): Move[] {
+  return over.map((key) => ({ key, move: (to[key] ?? 0) - (from[key] ?? 0) }));
+}
+
+// What a point's balances come to, the debts taking away: every balance
+// it was read with, so a point read off the accounts comes to what they
+// hold between them and one read off the sheet leaves cash and the GIAs
+// out, as the sheet did; or the balances given, such as those a move is
+// read over, when its two ends are named.
+export function netWorthOf(
+  point: ProgressPoint,
+  over: readonly Balance[] = balances,
+): number {
+  return over.reduce((sum, key) => sum + (point[key] ?? 0), 0);
 }
 
 // The household's balances as a point read off the accounts at the end
@@ -149,6 +165,15 @@ export function pointOf(
   };
 }
 
+// The balances both points were read with, in the order they are
+// listed: what a move between them is read over, so a balance first
+// counted at the later point is never read as what moved.
+export function sharedBy(from: ProgressPoint, to: ProgressPoint): Balance[] {
+  return balances.filter(
+    (key) => from[key] !== undefined && to[key] !== undefined,
+  );
+}
+
 // What the moves on one side came to: the sign picks the side, one for
 // what added and minus one for what took away.
 export function sumOf(moves: readonly Move[], sign: -1 | 1): number {
@@ -157,8 +182,9 @@ export function sumOf(moves: readonly Move[], sign: -1 | 1): number {
 
 // The points by the calendar year they fall in, oldest first, each read
 // from the last point of the year before so the years' moves add up to
-// the whole span's, a year with no December read from whatever month
-// ended it. A year after one that kept no point at all is read from its
+// the whole span's over the balances carried throughout, a year with no
+// December read from whatever month ended it. A year after one that
+// kept no point at all is read from its
 // own first point, as the first year is, so no row carries the move of
 // a year it does not name.
 export function yearsOf(points: readonly ProgressPoint[]): KeptYear[] {
@@ -185,11 +211,14 @@ export function yearsOf(points: readonly ProgressPoint[]): KeptYear[] {
 
 // What net worth moved by over each year to the month given before the
 // year to it, the nearest first, a year back from a point to the point
-// a year on. A year either end of which was not kept is passed over, so
-// each is read over twelve months whole.
+// a year on, over the balances given. A year either end of which was not
+// kept is passed over, so each is read over twelve months whole, and so
+// is one either end of which was not read with every balance given, so
+// each is read over the same balances.
 function yearsBefore(
   points: readonly ProgressPoint[],
   to: ProgressPoint,
+  over: readonly Balance[],
 ): number[] {
   const back = new Map(
     points.map((point) => [monthsBetween(point.month, to.month), point]),
@@ -202,6 +231,14 @@ function yearsBefore(
     .toReversed()
     .flatMap((from) => {
       const end = back.get(monthsBetween(from.month, to.month) - 12);
-      return end === undefined ? [] : [netWorthOf(end) - netWorthOf(from)];
+      if (end === undefined) {
+        return [];
+      }
+      const both = sharedBy(from, end);
+      if (!over.every((key) => both.includes(key))) {
+        return [];
+      }
+      const moves = movesOf(from, end, over);
+      return [sumOf(moves, 1) - sumOf(moves, -1)];
     });
 }
