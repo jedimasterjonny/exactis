@@ -121,7 +121,8 @@ owner retires at and the drawdown, and the assumptions screen types the rates,
 the deductions and the split of the savings into it, chooses the set of rates
 the plan runs on, pulls the inflation curve and the CMA into it, and imports the
 target allocation into it and maps its categories; the progress screen reads the
-progress points and pulls the house price index into them. The sidebar hands the
+progress points, which the accounts screen's month end records off the balances
+it closes, and pulls the house price index into them. The sidebar hands the
 household, or the scenario open, out as a file, as a save would keep it, and its
 balances as one row of the owner's balances sheet. A file is read back in as the
 next version of what is open, refused as any save is. `DATABASE_URL` names the
