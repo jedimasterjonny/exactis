@@ -135,7 +135,7 @@ export function MonthEnd({
                   setDraft(null);
                 },
                 success: (saved) => ({
-                  description: `${counted(checked.length, "balance")} set as of the end of ${formatMonth(saved)}`,
+                  description: `${counted(checked.length, "balance")} set as of the end of ${formatMonth(saved.asOf)}${saved.isRecorded ? ", its progress point recorded" : ""}`,
                   title: "Balances updated",
                 }),
               },
