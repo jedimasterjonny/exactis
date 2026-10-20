@@ -771,6 +771,14 @@ const held: readonly Case[] = [
     (given): Inputs => recorded(given, (point) => ({ ...point, house: -1 })),
   ],
   [
+    "A balance below nothing is a debt's",
+    (given): Inputs => recorded(given, (point) => ({ ...point, cash: -1 })),
+  ],
+  [
+    "A balance below nothing is a debt's",
+    (given): Inputs => recorded(given, (point) => ({ ...point, taxable: -1 })),
+  ],
+  [
     "A point's house is no more than its property and vehicles",
     (given): Inputs =>
       recorded(given, (point) => ({ ...point, house: point.assets + 1 })),
@@ -1471,6 +1479,23 @@ describe("soundKept", () => {
       }),
     ).toMatchObject({ floor: 0.045 });
     expect(salaryIn(kept)).not.toHaveProperty("floor");
+  });
+
+  // A point read off the sheet carries no cash or GIA figure, and one
+  // read off the accounts carries both.
+  it("keeps a point's cash and GIAs as read, or none", () => {
+    const [first] = points;
+    const firstIn = (value: unknown): ProgressPoint | undefined =>
+      soundKept(value).household.points[0];
+
+    expect(
+      firstIn({
+        ...kept,
+        points: [{ ...first, cash: 9000, taxable: 550 }, ...points.slice(1)],
+      }),
+    ).toMatchObject({ cash: 9000, taxable: 550 });
+    expect(firstIn(kept)).not.toHaveProperty("cash");
+    expect(firstIn(kept)).not.toHaveProperty("taxable");
   });
 
   // A household kept before the plan chose a drawdown holds none, which

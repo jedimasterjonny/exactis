@@ -377,17 +377,20 @@ const owners = z
   );
 
 // A progress point as the model lays it: each sum whole pounds, the
-// three balances nothing or more and the two debts nothing or less, in
-// the words an account is held to the same, and the house nothing or
-// more and no more than the property and vehicles it is a share of.
+// balances held nothing or more and the two debts nothing or less, in
+// the words an account is held to the same, cash and the GIAs absent on
+// a point not read with them rather than nothing, and the house nothing
+// or more and no more than the property and vehicles it is a share of.
 const point = z
   .object({
     assets: z.number().int().nonnegative(rules.belowNothing),
+    cash: z.number().int().nonnegative(rules.belowNothing).exactOptional(),
     deferred: z.number().int().nonnegative(rules.belowNothing),
     free: z.number().int().nonnegative(rules.belowNothing),
     house: z.number().int().nonnegative(rules.belowNothing),
     loans: z.number().int().nonpositive(rules.owes),
     month,
+    taxable: z.number().int().nonnegative(rules.belowNothing).exactOptional(),
     unsecured: z.number().int().nonpositive(rules.owes),
   })
   .refine(
