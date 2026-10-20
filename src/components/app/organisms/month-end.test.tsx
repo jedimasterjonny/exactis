@@ -9,9 +9,6 @@ import {
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Month } from "@/data/schedule";
-import type { Answer } from "@/lib/answer";
-
 import { closeBalances } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
@@ -118,7 +115,9 @@ describe("MonthEnd", () => {
   // £713 of interest, so the month leaves £908,892.
   it("checks a balance as it reads, and says what moved it", async () => {
     const sheet = openWorksheet();
-    vi.mocked(closeBalances).mockResolvedValue(saved({ month: 8, year: 2026 }));
+    vi.mocked(closeBalances).mockResolvedValue(
+      saved({ asOf: { month: 8, year: 2026 }, isRecorded: true }),
+    );
 
     fireEvent.click(
       within(sheet).getByRole("button", { name: "Check Workplace pension" }),
@@ -165,7 +164,7 @@ describe("MonthEnd", () => {
     expect(
       screen.getByRole("dialog", { name: "Balances updated" }),
     ).toHaveAccessibleDescription(
-      "2 balances set as of the end of September 2026",
+      "2 balances set as of the end of September 2026, its progress point recorded",
     );
   });
 
@@ -174,7 +173,9 @@ describe("MonthEnd", () => {
   // the pension again, so it is not sent.
   it("checks a balance typed, takes a debt typed as what is owed, and sends only what is checked", () => {
     const sheet = openWorksheet();
-    vi.mocked(closeBalances).mockResolvedValue(saved({ month: 8, year: 2026 }));
+    vi.mocked(closeBalances).mockResolvedValue(
+      saved({ asOf: { month: 8, year: 2026 }, isRecorded: true }),
+    );
 
     commit(field("Stocks & shares ISA"), "275,000");
     commit(field("Mortgage"), "175,000");
@@ -200,6 +201,22 @@ describe("MonthEnd", () => {
         { balance: -175000, id: 5 },
       ],
     });
+  });
+
+  // Closing onto March, before the latest point kept, moves the balances
+  // and records no point, so the toast says nothing of one.
+  it("says nothing of a point where the month closed records none", async () => {
+    const sheet = openWorksheet();
+    vi.mocked(closeBalances).mockResolvedValue(
+      saved({ asOf: { month: 2, year: 2026 }, isRecorded: false }),
+    );
+
+    fireEvent.change(select("Month"), { target: { value: "2" } });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByRole("dialog", { name: "Balances updated" }),
+    ).toHaveAccessibleDescription("0 balances set as of the end of March 2026");
   });
 
   // Closing onto August, the month the balances are already as of, runs
@@ -245,7 +262,8 @@ describe("MonthEnd", () => {
 
   it("keeps the worksheet open and says why when the store refuses", async () => {
     const sheet = openWorksheet();
-    const { promise, resolve: answer } = Promise.withResolvers<Answer<Month>>();
+    const { promise, resolve: answer } =
+      Promise.withResolvers<Awaited<ReturnType<typeof closeBalances>>>();
     vi.mocked(closeBalances).mockReturnValue(promise);
 
     fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));

@@ -31,9 +31,10 @@ import {
   toRecords as toCarRecords,
 } from "@/data/cars";
 import { isSound, statuses, toRecords } from "@/data/houses";
+import { pointOf } from "@/data/progress";
 import { month, named, pounds, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
-import { isOnOrBefore, thisMonth, today } from "@/lib/months";
+import { isOnOrBefore, monthsBetween, thisMonth, today } from "@/lib/months";
 import { found, replaced, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
@@ -187,21 +188,32 @@ const order = z
 
 // Closes the month: moves the month the household's balances are as
 // of, the one at whose end they were read and the one before the plan
-// starts in, and writes the balances checked against it, each dated
-// today, whether it moved or was confirmed as it stood, and hands back
-// the month as the household now has it. Every other balance stays as
-// it was, with the day it was set, so a balance nobody checked is never
-// taken for one somebody did, and none is made up for a month it was
-// not read in. A month that has not ended is refused, this one among
-// them, since a balance is what an account held at a month's end and a
-// month still running has none to read, and so is one before the plan's
+// starts in, writes the balances checked against it, each dated
+// today, whether it moved or was confirmed as it stood, records the
+// month's progress point off the accounts as they now stand, and hands
+// back the month as the household now has it and whether its point was
+// recorded. Every other balance stays as it was, with the day it was
+// set, so a balance nobody checked is never taken for one somebody did,
+// and none is made up for a month it was not read in. The point sums
+// every account, checked or not, since once the month is closed every
+// balance is as of it. It is recorded only for the month of the latest
+// point kept or one after it, or for any month where none is kept, and
+// is written over the latest where the months are the same and after
+// it otherwise; a month before the latest moves the balances and
+// records nothing, since the balances read now are not what the
+// accounts held then, and the points before the latest are never
+// touched. A month that has not ended is refused, this one among them,
+// since a balance is what an account held at a month's end and a month
+// still running has none to read, and so is one before the plan's
 // owner was born, since the plan would run from it; a balance against
 // an id no account has is refused as well, and so is a list naming one
-// twice, which the worksheet could not have sent. The month and the
-// balances land together or not at all, and a balance the household's
-// rules refuse, such as one below nothing on anything but a debt, is
-// refused in their words. Checked as a save is.
-export async function closeBalances(draft: Closed): Promise<Answer<Month>> {
+// twice, which the worksheet could not have sent. The month, the
+// balances and the point land together or not at all, and a balance
+// the household's rules refuse, such as one below nothing on anything
+// but a debt, is refused in their words. Checked as a save is.
+export async function closeBalances(
+  draft: Closed,
+): Promise<Answer<{ readonly asOf: Month; readonly isRecorded: boolean }>> {
   await requireSession();
   const { asOf, balances } = closed.parse(draft);
   return amend(({ household, kept }) => {
@@ -222,7 +234,20 @@ export async function closeBalances(draft: Closed): Promise<Answer<Month>> {
         }),
       kept.accounts,
     );
-    return { kept: { ...kept, accounts, asOf }, result: asOf };
+    const latest = kept.points.at(-1);
+    const isRecorded = latest === undefined || isOnOrBefore(latest.month, asOf);
+    const points = isRecorded
+      ? [
+          ...kept.points.filter(
+            (point) => monthsBetween(point.month, asOf) > 0,
+          ),
+          pointOf(accounts, asOf),
+        ]
+      : kept.points;
+    return {
+      kept: { ...kept, accounts, asOf, points },
+      result: { asOf, isRecorded },
+    };
   });
 }
 

@@ -994,12 +994,28 @@ describe("the account actions", () => {
       expect(await versions()).toBe(1);
     });
 
-    // The household's balances are as of September 2026; moved to
-    // March with none checked, every balance stays as it was, now
-    // March's, with the day it had.
-    it("moves the month the balances are as of, and no balance unchecked with it", async () => {
+    // The reference accounts as a point reads them: the home a real
+    // asset rather than a house, and the mortgage secured on nothing,
+    // so it is summed with the debts that are not, and no GIA held.
+    const read = {
+      assets: 397512,
+      cash: 16900,
+      deferred: 391640,
+      free: 271930,
+      house: 0,
+      loans: 0,
+      taxable: 0,
+      unsecured: -176520,
+    };
+
+    // The household's balances are as of August 2026, as its latest
+    // point is; moved to March with none checked, every balance stays
+    // as it was, now March's, with the day it had, and no point is
+    // recorded, since what the accounts hold now is not what they held
+    // then: the sheet's March stands.
+    it("moves the month the balances are as of, and no balance unchecked with it, recording no point for a month before the latest kept", async () => {
       expect(await moveTo({ month: 2, year: 2026 })).toStrictEqual(
-        saved({ month: 2, year: 2026 }),
+        saved({ asOf: { month: 2, year: 2026 }, isRecorded: false }),
       );
       expect(await latest()).toStrictEqual({
         ...kept,
@@ -1008,10 +1024,49 @@ describe("the account actions", () => {
       expect(refresh).toHaveBeenCalledOnce();
     });
 
+    // The household kept with no point for August 2026: August's is
+    // added after July's, the latest.
+    it("records a month's point after the latest kept", async () => {
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        { ...kept, points: kept.points.slice(0, -1) },
+      );
+
+      expect(await moveTo({ month: 7, year: 2026 })).toStrictEqual(
+        saved({ asOf: { month: 7, year: 2026 }, isRecorded: true }),
+      );
+      expect(await latest()).toMatchObject({
+        points: [
+          ...kept.points.slice(0, -1),
+          { ...read, month: { month: 7, year: 2026 } },
+        ],
+      });
+    });
+
+    // A household keeping no point records any month closed as its
+    // first.
+    it("records the first point where none is kept", async () => {
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        { ...kept, points: [] },
+      );
+
+      expect(await moveTo({ month: 2, year: 2026 })).toStrictEqual(
+        saved({ asOf: { month: 2, year: 2026 }, isRecorded: true }),
+      );
+      expect(await latest()).toMatchObject({
+        points: [{ ...read, month: { month: 2, year: 2026 } }],
+      });
+    });
+
     // The ISA's statement says £275,000 and the mortgage's £175,500, and
     // the current account is confirmed as it stood: all three are dated
     // today, with the month, in one version, and the rest are left.
-    it("writes each balance checked, dated today, with the month, in one version", async () => {
+    // August's point, the latest, is read again off every account, the
+    // pension and the home unchecked among them, over the sheet's.
+    it("writes each balance checked, dated today, with the month and its point over the latest, in one version", async () => {
       expect(
         await closeBalances({
           asOf: { month: 7, year: 2026 },
@@ -1021,7 +1076,9 @@ describe("the account actions", () => {
             { balance: 16900, id: 3 },
           ],
         }),
-      ).toStrictEqual(saved({ month: 7, year: 2026 }));
+      ).toStrictEqual(
+        saved({ asOf: { month: 7, year: 2026 }, isRecorded: true }),
+      );
       expect(await latest()).toStrictEqual({
         ...kept,
         accounts: kept.accounts.map((account) => {
@@ -1036,6 +1093,15 @@ describe("the account actions", () => {
               return account;
           }
         }),
+        points: [
+          ...kept.points.slice(0, -1),
+          {
+            ...read,
+            free: 275000,
+            month: { month: 7, year: 2026 },
+            unsecured: -175500,
+          },
+        ],
       });
       expect(await versions()).toBe(2);
     });
