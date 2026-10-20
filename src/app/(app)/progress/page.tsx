@@ -15,6 +15,7 @@ import { latestYearOf } from "@/data/progress";
 import { counted } from "@/lib/count";
 import { formatDay, formatMonthShort, monthsBetween } from "@/lib/months";
 import { progress, sectionLabel } from "@/lib/nav";
+import { plannedOf } from "@/lib/planned";
 import { getHousehold } from "@/store/household";
 
 // The progress points, read from the store behind the session, under a
@@ -26,12 +27,16 @@ import { getHousehold } from "@/store/household";
 // a year after the one before it has no year, but the months before it
 // still lay out. A household keeping no point yet draws the table's
 // empty state and no more, and one keeping a point alone has no year to
-// read and nothing to lay along a chart. The notes at the foot say what
-// net worth counts and what the house is held at, the index to the
-// month it ran to or the sheet before one is pulled. The page renders
-// behind the loading screen beside it.
+// read and nothing to lay along a chart. Where the chart is drawn it
+// runs the plan on a year from the latest point where it can. The notes
+// at the foot say what net worth counts, how the plan runs on where the
+// chart draws it, and what the house is held at, the index to the month
+// it ran to or the sheet before one is pulled. The page renders behind
+// the loading screen beside it.
 export default async function Progress(): Promise<JSX.Element> {
-  const { housePrices, points } = await getHousehold();
+  const household = await getHousehold();
+  const { housePrices, points } = household;
+  const planned = points.length > 1 ? plannedOf(household) : [];
   const year = latestYearOf(points);
   return (
     <>
@@ -44,12 +49,20 @@ export default async function Progress(): Promise<JSX.Element> {
       </ScreenHeader>
       <ScreenBody>
         {year !== undefined && <ProgressYear year={year} />}
-        {points.length > 1 && <ProgressChart points={points} />}
+        {points.length > 1 && (
+          <ProgressChart planned={planned} points={points} />
+        )}
         <ProgressPoints points={points} />
         <Note>
           Net worth counts every balance a point was read with; the sheet&apos;s
           points, before the first month closed here, left cash and GIAs out.
         </Note>
+        {planned.length > 0 && (
+          <Note>
+            The plan runs on from the latest point for a year, each month in its
+            own pounds, by what it pays in and what each account grows by.
+          </Note>
+        )}
         <Note>{houseNoteOf(housePrices)}</Note>
       </ScreenBody>
     </>

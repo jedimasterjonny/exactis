@@ -9,12 +9,14 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceLine,
   XAxis,
   YAxis,
 } from "recharts";
 
 import type { Balance, ProgressPoint } from "@/data/progress";
 import type { Month } from "@/data/schedule";
+import type { PlannedMonth } from "@/lib/planned";
 
 import { SectionCard } from "@/components/app/molecules/section-card";
 import { CardContent } from "@/components/kit/card";
@@ -32,19 +34,31 @@ import { formatMonthShort, monthsBetween } from "@/lib/months";
 import { progress, subsectionLabel } from "@/lib/nav";
 
 interface ProgressChartProps {
+  readonly planned: readonly PlannedMonth[];
   readonly points: readonly ProgressPoint[];
 }
 
 // A month along the chart: where it falls, as its year and the share of
-// the year before it, so a January falls on its year; whether a point
-// was kept for it; the month; and its point, the one kept or, for a
-// month not kept, one drawn between the months either side.
-interface Row {
-  readonly at: number;
-  readonly isKept: boolean;
-  readonly month: Month;
-  readonly point: ProgressPoint;
-}
+// the year before it, so a January falls on its year; the month; where
+// the plan's line stands in it, or null where it is not drawn; and
+// whether a point was kept for it, with its point, the one kept or, for
+// a month not kept, one drawn between the months either side, or that
+// it is a month past the latest point the plan carries net worth to,
+// with no point, its net worth where the plan's line stands.
+type Row =
+  | {
+      readonly at: number;
+      readonly month: Month;
+      readonly plan: null | number;
+      readonly point: ProgressPoint;
+      readonly state: "filled" | "kept";
+    }
+  | {
+      readonly at: number;
+      readonly month: Month;
+      readonly plan: number;
+      readonly state: "planned";
+    };
 
 type RowTooltipProps = TooltipContentProps & { readonly rows: readonly Row[] };
 
@@ -65,6 +79,14 @@ const owed: readonly Balance[] = ["loans", "unsecured"];
 
 const held = balances.filter((key) => !owed.includes(key));
 
+// What the crosshair says beneath a month's name: nothing for a month
+// kept.
+const states: Readonly<Record<Row["state"], string | undefined>> = {
+  filled: "Not kept, filled in",
+  kept: undefined,
+  planned: "Planned, not yet kept",
+};
+
 // What each balance stands at in a month, as recharts reads a series,
 // and net worth beside them. A debt owing nothing breaks, as the
 // dashboard's does: split by sign, a series of nothing counts as held,
@@ -73,16 +95,29 @@ const held = balances.filter((key) => !owed.includes(key));
 // recharts stacks as nothing, so what is stacked above it stays where
 // it is, and draws no line through. Made once, as the fan's bands are,
 // so each series keeps the dataKey it had and recharts does not register
-// it afresh on every render.
+// it afresh on every render. A month the plan carries has no point, so
+// no balance or net worth is drawn over it.
 const series = balances.map((key) => ({
   key,
-  valueAt: ({ point }: Row): null | number => {
-    const value = point[key] ?? null;
+  valueAt: (row: Row): null | number => {
+    if (row.state === "planned") {
+      return null;
+    }
+    const value = row.point[key] ?? null;
     return owed.includes(key) && value === 0 ? null : value;
   },
 }));
 
-const worthAt = ({ point }: Row): number => netWorthOf(point);
+const worthAt = (row: Row): null | number =>
+  row.state === "planned" ? null : netWorthOf(row.point);
+
+// The dot the crosshair draws on net worth, kept or planned.
+const worthDot = {
+  fill: "var(--foreground)",
+  r: 4,
+  stroke: "var(--card)",
+  strokeWidth: 2,
+};
 
 // The points laid month by month: what is held stacked up from nothing,
 // the pensions first, then the ISAs, the GIAs and the cash, then the
@@ -93,23 +128,46 @@ const worthAt = ({ point }: Row): number => netWorthOf(point);
 // nothing where one does not. A month not kept is drawn between the
 // months either side, each balance both carry an even step from the one
 // before to the one after, so the stack runs on unbroken; the crosshair
-// says it was not kept. The crosshair reads the month, each
-// balance and net worth, on hover and on the arrow keys, and is
-// announced to a screen reader as it moves.
-// The pounds reach below nothing only as far as the debts do, and the
-// years are marked at each January, or, over months that cross none,
-// each month by name, since a span with no January would otherwise
-// leave the axis unmarked.
-export function ProgressChart({ points }: ProgressChartProps): JSX.Element {
-  const rows = rowsOf(points);
+// says it was not kept. The months the plan carries, where it does,
+// run on from the latest point: net worth drawn dashed in ink from it,
+// and nothing else, with the latest month marked where the dash begins.
+// The crosshair reads the month, each balance and net worth, or net
+// worth alone for a month planned, on hover and on the arrow keys, and
+// is announced to a screen reader as it moves.
+// The pounds reach below nothing only as far as the debts or the plan
+// do, and above it as far as everything held or the plan does. The
+// years are marked at each January, the plan's among them, where the
+// months kept cross one, or otherwise every month by name, the plan's
+// too, since a span kept with no January would otherwise be marked by
+// no more than the year the plan runs into, or not at all.
+export function ProgressChart({
+  planned,
+  points,
+}: ProgressChartProps): JSX.Element {
+  const rows = rowsOf(points, planned);
   const januaries = rows.filter(({ month }) => month.month === 0);
+  const isByYear = januaries.some(({ state }) => state !== "planned");
   const axis = axisOf(
-    Math.min(0, ...points.map((point) => netWorthOf(point, owed))),
-    Math.max(0, ...points.map((point) => netWorthOf(point, held))),
+    Math.min(
+      0,
+      ...points.map((point) => netWorthOf(point, owed)),
+      ...planned.map(({ worth }) => worth),
+    ),
+    Math.max(
+      0,
+      ...points.map((point) => netWorthOf(point, held)),
+      ...planned.map(({ worth }) => worth),
+    ),
   );
+  const latest = points.at(-1);
+  const isPlanned = latest !== undefined && planned.length > 0;
   return (
     <SectionCard
-      caption="Held above the rule, owed below, net worth between"
+      caption={
+        isPlanned
+          ? "Held above the rule, owed below, net worth between, and the plan dashed ahead"
+          : "Held above the rule, owed below, net worth between"
+      }
       className="min-w-0 overflow-visible"
       label={subsectionLabel(progress, 1)}
       title="Month by month"
@@ -121,7 +179,11 @@ export function ProgressChart({ points }: ProgressChartProps): JSX.Element {
               data={rows}
               margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
               stackOffset="sign"
-              title="What each balance stood at as each month ended"
+              title={
+                isPlanned
+                  ? "What each balance stood at as each month ended, and where the plan carries net worth over the year ahead"
+                  : "What each balance stood at as each month ended"
+              }
             >
               <defs>
                 {series.map(({ key }) => (
@@ -155,9 +217,7 @@ export function ProgressChart({ points }: ProgressChartProps): JSX.Element {
                 tickFormatter={labelOf}
                 tickLine={false}
                 tickMargin={8}
-                ticks={(januaries.length > 0 ? januaries : rows).map(
-                  ({ at }) => at,
-                )}
+                ticks={(isByYear ? januaries : rows).map(({ at }) => at)}
                 type="number"
               />
               <YAxis
@@ -185,12 +245,7 @@ export function ProgressChart({ points }: ProgressChartProps): JSX.Element {
                 />
               ))}
               <Line
-                activeDot={{
-                  fill: "var(--foreground)",
-                  r: 4,
-                  stroke: "var(--card)",
-                  strokeWidth: 2,
-                }}
+                activeDot={worthDot}
                 dataKey={worthAt}
                 dot={false}
                 isAnimationActive={false}
@@ -198,6 +253,30 @@ export function ProgressChart({ points }: ProgressChartProps): JSX.Element {
                 strokeWidth={2}
                 type="monotone"
               />
+              {isPlanned && (
+                <>
+                  <ReferenceLine
+                    label={{
+                      fill: "var(--muted-foreground)",
+                      fontSize: 12,
+                      position: "insideTopLeft",
+                      value: formatMonthShort(latest.month),
+                    }}
+                    stroke="var(--border)"
+                    x={atOf(latest.month)}
+                  />
+                  <Line
+                    activeDot={worthDot}
+                    dataKey="plan"
+                    dot={false}
+                    isAnimationActive={false}
+                    stroke="var(--foreground)"
+                    strokeDasharray="4 4"
+                    strokeWidth={2}
+                    type="monotone"
+                  />
+                </>
+              )}
             </ComposedChart>
           </ChartContainer>
         </div>
@@ -227,39 +306,57 @@ function monthsBack({ month, year }: Month, count: number): Month {
 
 // The months the points span, each with the point kept for it, and
 // those between two points that were not kept with one drawn between
-// them.
-function rowsOf(points: readonly ProgressPoint[]): Row[] {
-  return points.flatMap((point, index) => {
-    const kept = {
-      at: atOf(point.month),
-      isKept: true,
-      month: point.month,
-      point,
-    };
-    const before = points[index - 1];
-    if (before === undefined) {
-      return [kept];
-    }
-    const steps = monthsBetween(before.month, point.month);
-    return [
-      ...Array.from({ length: steps - 1 }, (_, gap) => {
-        const month = monthsBack(point.month, steps - 1 - gap);
-        return {
-          at: atOf(month),
-          isKept: false,
-          month,
-          point: { ...stepOf(before, point, (gap + 1) / steps), month },
-        };
-      }),
-      kept,
-    ];
-  });
+// them; then the months planned, where the plan's line runs on from
+// the latest point's net worth.
+function rowsOf(
+  points: readonly ProgressPoint[],
+  planned: readonly PlannedMonth[],
+): Row[] {
+  return [
+    ...points.flatMap((point, index): Row[] => {
+      const kept = {
+        at: atOf(point.month),
+        month: point.month,
+        plan:
+          index === points.length - 1 && planned.length > 0
+            ? netWorthOf(point)
+            : null,
+        point,
+        state: "kept" as const,
+      };
+      const before = points[index - 1];
+      if (before === undefined) {
+        return [kept];
+      }
+      const steps = monthsBetween(before.month, point.month);
+      return [
+        ...Array.from({ length: steps - 1 }, (_, gap) => {
+          const month = monthsBack(point.month, steps - 1 - gap);
+          return {
+            at: atOf(month),
+            month,
+            plan: null,
+            point: { ...stepOf(before, point, (gap + 1) / steps), month },
+            state: "filled" as const,
+          };
+        }),
+        kept,
+      ];
+    }),
+    ...planned.map(({ month, worth }) => ({
+      at: atOf(month),
+      month,
+      plan: worth,
+      state: "planned" as const,
+    })),
+  ];
 }
 
 // The month under the crosshair, and for a month not kept that it was
 // not, then each balance, from the top of the stack down as the plot
 // reads, a dash for one its point was not read with, and net worth
-// beneath a rule. A status, so a
+// beneath a rule; for a month planned, that it was planned and net
+// worth alone. A status, so a
 // screen reader reads it out as the crosshair steps. The month is found
 // by where the crosshair stands rather than read out of the entry
 // recharts hands over, which is untyped.
@@ -272,34 +369,37 @@ function RowTooltip({
   if (!isActive || row === undefined) {
     return null;
   }
-  const { isKept, month, point } = row;
+  const state = states[row.state];
   return (
     <div
       className="grid min-w-48 gap-1.5 rounded-md border bg-popover px-2.5 py-2 text-xs text-popover-foreground shadow-md"
       role="status"
     >
       <span className="grid gap-0.5">
-        <span className="font-medium">{formatMonthShort(month)}</span>
-        {!isKept && (
-          <span className="text-muted-foreground">Not kept, filled in</span>
+        <span className="font-medium">{formatMonthShort(row.month)}</span>
+        {state !== undefined && (
+          <span className="text-muted-foreground">{state}</span>
         )}
       </span>
-      {[...held.toReversed(), ...owed].map((key) => (
-        <span className="flex items-center gap-2" key={key}>
-          <span
-            aria-hidden
-            className={cn("h-0.5 w-3 rounded-full", balanceTones[key])}
-          />
-          <span className="text-muted-foreground">{balanceNames[key]}</span>
-          <span className="ml-auto figure font-medium">
-            {formatBalance(point[key])}
+      {row.state !== "planned" &&
+        [...held.toReversed(), ...owed].map((key) => (
+          <span className="flex items-center gap-2" key={key}>
+            <span
+              aria-hidden
+              className={cn("h-0.5 w-3 rounded-full", balanceTones[key])}
+            />
+            <span className="text-muted-foreground">{balanceNames[key]}</span>
+            <span className="ml-auto figure font-medium">
+              {formatBalance(row.point[key])}
+            </span>
           </span>
-        </span>
-      ))}
+        ))}
       <span className="flex items-center gap-2 border-t pt-1.5">
         <span className="font-medium">Net worth</span>
         <span className="ml-auto figure font-medium">
-          {formatGbp(netWorthOf(point))}
+          {formatGbp(
+            row.state === "planned" ? row.plan : netWorthOf(row.point),
+          )}
         </span>
       </span>
     </div>
