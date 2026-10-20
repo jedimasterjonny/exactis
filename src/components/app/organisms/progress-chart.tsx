@@ -21,7 +21,12 @@ import { CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
 import { balances, netWorthOf } from "@/data/progress";
 import { axisOf } from "@/lib/axis";
-import { balanceColors, balanceNames, balanceTones } from "@/lib/balances";
+import {
+  balanceColors,
+  balanceNames,
+  balanceTones,
+  formatBalance,
+} from "@/lib/balances";
 import { formatAxisGbp, formatGbp } from "@/lib/money";
 import { formatMonthShort, monthsBetween } from "@/lib/months";
 import { progress, subsectionLabel } from "@/lib/nav";
@@ -54,31 +59,41 @@ const axisWidth = 57;
 // it a third of the card's width tall over an empty floor.
 const plotBox = "aspect-[3/1] min-h-72 w-full";
 
-// The balances the chart stacks down from nothing, the rest stacking up.
+// The balances the chart stacks down from nothing, and the rest, which
+// stack up.
 const owed: readonly Balance[] = ["loans", "unsecured"];
+
+const held = balances.filter((key) => !owed.includes(key));
 
 // What each balance stands at in a month, as recharts reads a series,
 // and net worth beside them. A debt owing nothing breaks, as the
 // dashboard's does: split by sign, a series of nothing counts as held,
-// and its line would leap to the top of the stack for the month. Made
-// once, as the fan's bands are, so each series keeps the dataKey it had
-// and recharts does not register it afresh on every render.
+// and its line would leap to the top of the stack for the month. A
+// balance the month's point was not read with is null too, which
+// recharts stacks as nothing, so what is stacked above it stays where
+// it is, and draws no line through. Made once, as the fan's bands are,
+// so each series keeps the dataKey it had and recharts does not register
+// it afresh on every render.
 const series = balances.map((key) => ({
   key,
-  valueAt: ({ point }: Row): null | number =>
-    owed.includes(key) && point[key] === 0 ? null : point[key],
+  valueAt: ({ point }: Row): null | number => {
+    const value = point[key] ?? null;
+    return owed.includes(key) && value === 0 ? null : value;
+  },
 }));
 
 const worthAt = ({ point }: Row): number => netWorthOf(point);
 
 // The points laid month by month: what is held stacked up from nothing,
-// the pensions first, then the ISAs, then the property and vehicles, and
-// what is owed stacked down from it, the loans secured on them nearest,
-// each in the colour the dashboard draws its family in under a wash of
-// it; net worth drawn over them as a line in ink. A month not kept is
-// drawn between the months either side, each balance an even step from
-// the one before to the one after, so the stack runs on unbroken; the
-// crosshair says it was not kept. The crosshair reads the month, each
+// the pensions first, then the ISAs, the GIAs and the cash, then the
+// property and vehicles, and what is owed stacked down from it, the
+// loans secured on them nearest, each in the colour the dashboard draws
+// its family in under a wash of it; net worth drawn over them as a line
+// in ink. A balance is drawn over the months whose points carry it, and
+// nothing where one does not. A month not kept is drawn between the
+// months either side, each balance both carry an even step from the one
+// before to the one after, so the stack runs on unbroken; the crosshair
+// says it was not kept. The crosshair reads the month, each
 // balance and net worth, on hover and on the arrow keys, and is
 // announced to a screen reader as it moves.
 // The pounds reach below nothing only as far as the debts do, and the
@@ -89,11 +104,8 @@ export function ProgressChart({ points }: ProgressChartProps): JSX.Element {
   const rows = rowsOf(points);
   const januaries = rows.filter(({ month }) => month.month === 0);
   const axis = axisOf(
-    Math.min(0, ...points.map(({ loans, unsecured }) => loans + unsecured)),
-    Math.max(
-      0,
-      ...points.map(({ assets, deferred, free }) => assets + deferred + free),
-    ),
+    Math.min(0, ...points.map((point) => netWorthOf(point, owed))),
+    Math.max(0, ...points.map((point) => netWorthOf(point, held))),
   );
   return (
     <SectionCard
@@ -246,7 +258,8 @@ function rowsOf(points: readonly ProgressPoint[]): Row[] {
 
 // The month under the crosshair, and for a month not kept that it was
 // not, then each balance, from the top of the stack down as the plot
-// reads, and net worth beneath a rule. A status, so a
+// reads, a dash for one its point was not read with, and net worth
+// beneath a rule. A status, so a
 // screen reader reads it out as the crosshair steps. The month is found
 // by where the crosshair stands rather than read out of the entry
 // recharts hands over, which is untyped.
@@ -271,10 +284,7 @@ function RowTooltip({
           <span className="text-muted-foreground">Not kept, filled in</span>
         )}
       </span>
-      {[
-        ...balances.filter((key) => !owed.includes(key)).toReversed(),
-        ...owed,
-      ].map((key) => (
+      {[...held.toReversed(), ...owed].map((key) => (
         <span className="flex items-center gap-2" key={key}>
           <span
             aria-hidden
@@ -282,7 +292,7 @@ function RowTooltip({
           />
           <span className="text-muted-foreground">{balanceNames[key]}</span>
           <span className="ml-auto figure font-medium">
-            {formatGbp(point[key])}
+            {formatBalance(point[key])}
           </span>
         </span>
       ))}
@@ -298,21 +308,27 @@ function RowTooltip({
 
 // The balances the share given of the way from one point to the next,
 // and the house's share of the property with them, each stepped evenly
-// and held to whole pounds as a point kept is.
+// and held to whole pounds as a point kept is; cash and the GIAs only
+// where both points carry them, and otherwise not at all.
 function stepOf(
   from: ProgressPoint,
   to: ProgressPoint,
   share: number,
 ): Omit<ProgressPoint, "month"> {
-  const at = (key: "house" | Balance): number =>
-    Math.round(from[key] + (to[key] - from[key]) * share);
+  const at = (one: number, other: number): number =>
+    Math.round(one + (other - one) * share);
+  const { cash, taxable } = from;
   return {
-    assets: at("assets"),
-    deferred: at("deferred"),
-    free: at("free"),
-    house: at("house"),
-    loans: at("loans"),
-    unsecured: at("unsecured"),
+    assets: at(from.assets, to.assets),
+    deferred: at(from.deferred, to.deferred),
+    free: at(from.free, to.free),
+    house: at(from.house, to.house),
+    loans: at(from.loans, to.loans),
+    unsecured: at(from.unsecured, to.unsecured),
+    ...(cash !== undefined &&
+      to.cash !== undefined && { cash: at(cash, to.cash) }),
+    ...(taxable !== undefined &&
+      to.taxable !== undefined && { taxable: at(taxable, to.taxable) }),
   };
 }
 

@@ -6,7 +6,15 @@ import type { ProgressPoint } from "./progress";
 import { accounts } from "./accounts.fixture";
 import { golf, golfLoan } from "./cars.fixture";
 import { house, houseLoan } from "./houses.fixture";
-import { latestYearOf, movesOf, pointOf, sumOf, yearsOf } from "./progress";
+import {
+  latestYearOf,
+  movesOf,
+  netWorthOf,
+  pointOf,
+  sharedBy,
+  sumOf,
+  yearsOf,
+} from "./progress";
 import { points } from "./progress.fixture";
 
 // The fixture's first point and its last, March and August 2026.
@@ -59,6 +67,30 @@ describe("latestYearOf", () => {
     expect(year?.before).toStrictEqual([24000, 12000]);
   });
 
+  // The same months with cash read, £100 a month over the months since
+  // January 2017, from February 2018 on: the latest year carries it at
+  // both ends, so the year to February 2019 is read with its £1,200 rise
+  // and the year to February 2018, February 2017 carrying none, is passed
+  // over. With cash read in February 2020 alone, the latest year is read
+  // over the five, and so is every year before it.
+  it("holds the latest year only against years read with every balance both its ends carry, over those balances", () => {
+    const kept = monthly(
+      Array.from({ length: 38 }, (_, index) =>
+        Array.from(
+          { length: index },
+          (_unused, month) => Math.ceil(month / 12) * 1000,
+        ).reduce((sum, rise) => sum + rise, 100000),
+      ),
+    );
+    const cashFrom = (first: number): ProgressPoint[] =>
+      kept.map((point, index) =>
+        index < first ? point : { ...point, cash: index * 100 },
+      );
+
+    expect(latestYearOf(cashFrom(13))?.before).toStrictEqual([25200]);
+    expect(latestYearOf(cashFrom(37))?.before).toStrictEqual([24000, 12000]);
+  });
+
   // The same months with February 2017 not kept, the year from it to
   // February 2018 has no start, and is passed over; with February 2018
   // not kept, that year has no end and the year after it no start.
@@ -105,6 +137,19 @@ describe("movesOf", () => {
     ]);
     expect(sumOf(moves, 1)).toBe(57342);
     expect(sumOf(moves, -1)).toBe(360);
+  });
+});
+
+describe("netWorthOf", () => {
+  // The fixture's August, off the sheet, and the reference accounts read
+  // off as August's point.
+  it("counts every balance a point was read with, or the balances given", () => {
+    const { to } = ends();
+    const read = pointOf(accounts, { month: 7, year: 2026 });
+
+    expect(netWorthOf(to)).toBe(930261);
+    expect(netWorthOf(read)).toBe(950771);
+    expect(netWorthOf(read, sharedBy(to, read))).toBe(932471);
   });
 });
 
@@ -155,6 +200,66 @@ describe("pointOf", () => {
       taxable: 0,
       unsecured: 0,
     });
+  });
+});
+
+describe("sharedBy and movesOf", () => {
+  // The fixture's August, off the sheet, against the reference accounts
+  // read off as September's point, the home the house it is with the
+  // mortgage secured on it and the cards cleared; then September against
+  // October with £1,700 more cash.
+  it("reads a move between a point off the sheet and one off the accounts over the five both carry, and between two off the accounts over all seven", () => {
+    const { to } = ends();
+    const [pension, isa, current] = accounts;
+    const september = pointOf([pension, isa, current, house, houseLoan], {
+      month: 8,
+      year: 2026,
+    });
+    const october = {
+      ...september,
+      cash: 20000,
+      month: { month: 9, year: 2026 },
+    };
+
+    expect(sharedBy(to, september)).toStrictEqual([
+      "deferred",
+      "free",
+      "assets",
+      "loans",
+      "unsecured",
+    ]);
+    expect(movesOf(to, september)).toStrictEqual([
+      { key: "deferred", move: 0 },
+      { key: "free", move: 0 },
+      { key: "assets", move: 0 },
+      { key: "loans", move: 0 },
+      { key: "unsecured", move: 2210 },
+    ]);
+    expect(movesOf(september, october)).toStrictEqual([
+      { key: "deferred", move: 0 },
+      { key: "free", move: 0 },
+      { key: "taxable", move: 0 },
+      { key: "cash", move: 1700 },
+      { key: "assets", move: 0 },
+      { key: "loans", move: 0 },
+      { key: "unsecured", move: 0 },
+    ]);
+  });
+
+  // August off the sheet and September off the accounts, over the cash
+  // and the GIAs given: the point not read with one reads nothing for
+  // it, either way about.
+  it("reads a balance given that a point was not read with as nothing at that point", () => {
+    const { to } = ends();
+    const september = pointOf(accounts, { month: 8, year: 2026 });
+
+    expect(movesOf(to, september, ["taxable", "cash"])).toStrictEqual([
+      { key: "taxable", move: 0 },
+      { key: "cash", move: 18300 },
+    ]);
+    expect(movesOf(september, to, ["cash"])).toStrictEqual([
+      { key: "cash", move: -18300 },
+    ]);
   });
 });
 

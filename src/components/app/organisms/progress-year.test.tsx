@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import type { LatestYear, ProgressPoint } from "@/data/progress";
 
+import { accounts } from "@/data/accounts.fixture";
+import { house, houseLoan } from "@/data/houses.fixture";
+import { pointOf } from "@/data/progress";
 import { points } from "@/data/progress.fixture";
 import { bySlot } from "@/test/dom";
 
@@ -75,6 +78,46 @@ describe("ProgressYear", () => {
       ["assets", "4966"],
       ["loans", "3572"],
       ["unsecured", "360"],
+    ]);
+  });
+
+  // March 2026 off the sheet to the reference accounts read off as
+  // August's point, the home the house it is with the mortgage secured
+  // on it and the cards cleared: the move is read over the five March
+  // carries, the £18,300 of cash read in August left out of it and of
+  // what each side came to, which the sentence naming them says.
+  it("reads a year from a point off the sheet to one off the accounts over the balances both carry, and says so", () => {
+    const [pension, isa, current] = accounts;
+    const [from] = points;
+    render(
+      <ProgressYear
+        year={{
+          before: [],
+          from,
+          to: pointOf([pension, isa, current, house, houseLoan], {
+            month: 7,
+            year: 2026,
+          }),
+        }}
+      />,
+    );
+
+    expect(
+      within(screen.getByRole("region", { name: "What the year came to" }))
+        .getAllByRole("paragraph")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual([
+      "+£59,192",
+      "5 months to Aug 2026",
+      "£59,192 added£0 taken away",
+      "From £873,279 in Mar 2026 to £932,471 in Aug 2026, over the balances both were read with.",
+    ]);
+    expect(rowsOf("Added · £59,192")).toStrictEqual([
+      ["Pensions £412,880 now", "+£28,660"],
+      ["ISAs £286,145 now", "+£20,144"],
+      ["Property & vehicles £416,386 now", "+£4,966"],
+      ["Secured loans −£182,940 now", "+£3,572"],
+      ["Other debts £0 now", "+£1,850"],
     ]);
   });
 

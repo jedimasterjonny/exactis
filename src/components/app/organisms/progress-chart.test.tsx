@@ -24,6 +24,26 @@ const points = Array.from({ length: 14 }, (_, index): ProgressPoint => ({
   unsecured: index === 8 ? 0 : -1000,
 })).filter((_point, index) => index !== 4);
 
+// Eight months of 2025 over the same balances, the first two read off
+// the accounts with £100,000 of cash and £60,000 in GIAs, the next two
+// off the sheet with neither, May not kept, June read off the accounts
+// again, July not kept, and August's cash £20,000 more than June's.
+const mixed = Array.from({ length: 8 }, (_, index): ProgressPoint => {
+  const point = {
+    assets: 300000,
+    deferred: 100000,
+    free: 50000,
+    house: 300000,
+    loans: -200000,
+    month: { month: index, year: 2025 },
+    unsecured: -1000,
+  };
+  if (index === 2 || index === 3) {
+    return point;
+  }
+  return { ...point, cash: index === 7 ? 120000 : 100000, taxable: 60000 };
+}).filter((_point, index) => index !== 4 && index !== 6);
+
 // What recharts draws with the class given. Nothing it draws has a role
 // or a label, so no query is more accessible than the class and none
 // can be suggested.
@@ -91,6 +111,56 @@ describe("ProgressChart", () => {
     expect(runsOf("var(--brand)")).toBe(2);
   });
 
+  // The cash is drawn over January and February and again from June, and
+  // breaks over the months the sheet gave and May, which is drawn
+  // between April and June and so carries no cash, where July, between
+  // June and August, carries it stepped between the two; and the pounds
+  // reach as high as everything held, the cash and the GIAs among it.
+  it("draws cash and the GIAs over the months whose points carry them, and nothing over the rest", async () => {
+    render(<ProgressChart points={mixed} />);
+
+    expect(runsOf("var(--chart-4)")).toBe(2);
+    expect(runsOf("var(--chart-6)")).toBe(2);
+    expect(runsOf("var(--chart-2)")).toBe(1);
+    expect(
+      drawn("recharts-cartesian-axis-tick-value")
+        .map(({ textContent }) => textContent)
+        .filter((text) => text.includes("£"))
+        .at(-1),
+    ).toBe("£800k");
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    expect(await screen.findByText("May 2025")).toHaveClass("font-medium");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "May 2025Not kept, filled inProperty & vehicles£300,000Cash—GIAs—",
+    );
+
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    expect(await screen.findByText("Jul 2025")).toHaveClass("font-medium");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      [
+        "Jul 2025",
+        "Not kept, filled in",
+        "Property & vehicles£300,000",
+        "Cash£110,000",
+        "GIAs£60,000",
+        "ISAs£50,000",
+        "Pensions£100,000",
+        "Secured loans−£200,000",
+        "Other debts−£1,000",
+        "Net worth£419,000",
+      ].join(""),
+    );
+  });
+
   // The crosshair moves on the arrow keys as it does under the pointer,
   // and recharts moves it a frame later.
   it("reads the month, each balance from the top of the stack down and net worth under the crosshair, saying where a month was not kept", async () => {
@@ -105,6 +175,8 @@ describe("ProgressChart", () => {
       [
         "Dec 2024",
         "Property & vehicles£300,000",
+        "Cash—",
+        "GIAs—",
         "ISAs£50,000",
         "Pensions£101,000",
         "Secured loans−£200,000",
@@ -125,6 +197,8 @@ describe("ProgressChart", () => {
         "Mar 2025",
         "Not kept, filled in",
         "Property & vehicles£300,000",
+        "Cash—",
+        "GIAs—",
         "ISAs£50,000",
         "Pensions£104,000",
         "Secured loans−£200,000",
