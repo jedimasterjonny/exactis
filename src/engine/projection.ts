@@ -67,8 +67,8 @@ export interface MovedYear {
 // each on its own; and each
 // wrapper's accounts are summed as well, under the name the progress
 // point gives the same balance, so a point recorded and a point
-// projected can be laid over each other, though the progress points
-// carry no cash or GIA figure. An account is rounded to the pound on its
+// projected can be laid over each other.
+// An account is rounded to the pound on its
 // own and a wrapper's sum is rounded whole, so two accounts of a kind can
 // add to a pound either side of their wrapper. Beside them is what the
 // year could not draw

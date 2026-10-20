@@ -304,7 +304,7 @@ function stepOf(
   to: ProgressPoint,
   share: number,
 ): Omit<ProgressPoint, "month"> {
-  const at = (key: Exclude<keyof ProgressPoint, "month">): number =>
+  const at = (key: "house" | Balance): number =>
     Math.round(from[key] + (to[key] - from[key]) * share);
   return {
     assets: at("assets"),

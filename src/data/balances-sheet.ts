@@ -1,8 +1,6 @@
 import type { Account, AccountKind } from "@/data/accounts";
-import type { Balance } from "@/data/progress";
 
-import { isAsset, isPension } from "@/data/accounts";
-import { balances } from "@/data/progress";
+import { holds } from "@/data/progress";
 
 // One column of the sheet: its heading, and what the row holds under it.
 type Column = readonly [heading: string, value: string];
@@ -25,31 +23,21 @@ const groups: readonly {
   { kinds: ["car", "real-asset"], sum: "Car Equity" },
 ];
 
-// The sheet's last columns are the five sums a progress point carries,
-// in the point's own order, under the sheet's words for them: the
+// The sheet's last columns are five of the sums a progress point
+// carries, in the sheet's order, under the sheet's words for them: the
 // pensions, the ISAs and not the GIAs, the property and vehicles, the
-// loans secured on them, and the debts secured on nothing.
-const summed: Readonly<
-  Record<
-    Balance,
-    { readonly heading: string; readonly holds: (account: Account) => boolean }
-  >
-> = {
-  assets: { heading: "Assets", holds: isAsset },
-  deferred: { heading: "Deferred", holds: isPension },
-  free: { heading: "Free", holds: ({ kind }) => kind === "tax-free" },
-  loans: {
-    heading: "Loans",
-    holds: ({ kind, secures }) => kind === "debt" && secures !== undefined,
-  },
-  unsecured: {
-    heading: "UnSec",
-    holds: ({ kind, secures }) => kind === "debt" && secures === undefined,
-  },
-};
+// loans secured on them, and the debts secured on nothing. Cash and the
+// GIAs have no column, since the sheet sums neither.
+const summed = [
+  ["deferred", "Deferred"],
+  ["free", "Free"],
+  ["assets", "Assets"],
+  ["loans", "Loans"],
+  ["unsecured", "UnSec"],
+] as const satisfies readonly (readonly [keyof typeof holds, string])[];
 
 // An account's balance and a group's sum are written to the penny, and
-// the five a point carries in whole pounds, as the sheet writes them,
+// the five sums in whole pounds, as the sheet writes them,
 // with the hyphen Intl signs a negative with, which the sheet reads,
 // rather than the minus the screens draw.
 const pence = new Intl.NumberFormat("en-GB", {
@@ -100,10 +88,10 @@ export function balancesSheet(
     }),
     ["Total", pence.format(sumOf(accounts))],
     gap,
-    ...balances.map((key): Column => {
-      const { heading, holds } = summed[key];
-      return [heading, pounds.format(sumOf(accounts.filter(holds)))];
-    }),
+    ...summed.map(([key, heading]): Column => [
+      heading,
+      pounds.format(sumOf(accounts.filter(holds[key]))),
+    ]),
   ];
   return [
     columns.map(([heading]) => heading),
