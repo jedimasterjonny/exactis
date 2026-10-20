@@ -1,40 +1,64 @@
+import type { Account } from "@/data/accounts";
 import type { Month } from "@/data/schedule";
 
+import { isAsset, isPension } from "@/data/accounts";
 import { monthsBetween } from "@/lib/months";
 
 // A progress point is the household's balances as they were read at the
-// end of a month, summed as the sheet they are read off sums them: the
-// pensions, the ISAs, what the property and vehicles were worth, the
-// loans secured on them and the debt secured on nothing, each whole
-// pounds, the two debts nothing or less as an account's is. Cash and
-// the GIAs are left out, as the sheet leaves them out, and a point carries
-// no account of its own, since the accounts a balance was summed over have
-// come and gone over the years the points span where the sums have not.
-// Beside the five it carries the house's share of what the property
-// and vehicles were worth, nothing before one was owned, so what the
-// house has been worth can be written again without the vehicles that
-// were summed beside it.
+// end of a month, each summed over the accounts it holds: the pensions,
+// the ISAs, the GIAs, the cash, what the property and vehicles were
+// worth, the loans secured on them and the debt secured on nothing, each
+// whole pounds, the two debts nothing or less as an account's is. A point
+// read off the owner's sheet carries no cash or GIA figure, since the
+// sheet summed neither, so the two are absent on a point not read with
+// them rather than nothing. A point carries no account of its own, since
+// the accounts a balance was summed over have come and gone over the
+// years the points span where the sums have not. Beside the balances it
+// carries the house's share of what the property and vehicles were
+// worth, nothing before one was owned, so what the house has been worth
+// can be written again without the vehicles that were summed beside it.
 export interface ProgressPoint {
   readonly assets: number;
+  readonly cash?: number;
   readonly deferred: number;
   readonly free: number;
   readonly house: number;
   readonly loans: number;
   readonly month: Month;
+  readonly taxable?: number;
   readonly unsecured: number;
 }
 
+// Which accounts each of a point's balances sums, as the accounts screen
+// groups them: the pensions, the ISAs, the GIAs, the cash, every house,
+// car and other real asset, the loans secured on one of them, and the
+// debts secured on nothing.
+export const holds: Readonly<
+  Record<
+    Exclude<keyof ProgressPoint, "house" | "month">,
+    (account: Account) => boolean
+  >
+> = {
+  assets: isAsset,
+  cash: ({ kind }) => kind === "cash",
+  deferred: isPension,
+  free: ({ kind }) => kind === "tax-free",
+  loans: ({ kind, secures }) => kind === "debt" && secures !== undefined,
+  taxable: ({ kind }) => kind === "taxable",
+  unsecured: ({ kind, secures }) => kind === "debt" && secures === undefined,
+};
+
 // What a point's balances come to: the five summed, the debts taking
-// away. It leaves cash and the GIAs out, as the point does, where the
-// accounts screen's starting net worth counts them.
+// away. It leaves cash and the GIAs out, as the sheet's points do, where
+// the accounts screen's starting net worth counts them.
 export function netWorthOf(point: ProgressPoint): number {
   return (
     point.assets + point.deferred + point.free + point.loans + point.unsecured
   );
 }
 
-// The balances a point carries, what is held before what is owed, in
-// the order every screen lists them.
+// The balances the screens read off a point, what is held before what
+// is owed, in the order every screen lists them.
 export const balances = [
   "deferred",
   "free",
@@ -101,6 +125,28 @@ export function latestYearOf(
 // up takes away, as it moves net worth.
 export function movesOf(from: ProgressPoint, to: ProgressPoint): Move[] {
   return balances.map((key) => ({ key, move: to[key] - from[key] }));
+}
+
+// The household's balances as a point read off the accounts at the end
+// of the month given: every account summed into the balance that holds
+// it, and the house the house's own accounts alone.
+export function pointOf(
+  accounts: readonly Account[],
+  month: Month,
+): ProgressPoint {
+  const sum = (held: (account: Account) => boolean): number =>
+    accounts.filter(held).reduce((total, { balance }) => total + balance, 0);
+  return {
+    assets: sum(holds.assets),
+    cash: sum(holds.cash),
+    deferred: sum(holds.deferred),
+    free: sum(holds.free),
+    house: sum(({ kind }) => kind === "house"),
+    loans: sum(holds.loans),
+    month,
+    taxable: sum(holds.taxable),
+    unsecured: sum(holds.unsecured),
+  };
 }
 
 // What the moves on one side came to: the sign picks the side, one for

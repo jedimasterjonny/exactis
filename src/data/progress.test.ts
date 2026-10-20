@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import type { ProgressPoint } from "./progress";
 
-import { latestYearOf, movesOf, sumOf, yearsOf } from "./progress";
+import { accounts } from "./accounts.fixture";
+import { golf, golfLoan } from "./cars.fixture";
+import { house, houseLoan } from "./houses.fixture";
+import { latestYearOf, movesOf, pointOf, sumOf, yearsOf } from "./progress";
 import { points } from "./progress.fixture";
 
 // The fixture's first point and its last, March and August 2026.
@@ -102,6 +105,56 @@ describe("movesOf", () => {
     ]);
     expect(sumOf(moves, 1)).toBe(57342);
     expect(sumOf(moves, -1)).toBe(360);
+  });
+});
+
+describe("pointOf", () => {
+  // The reference pension, ISA and current account, its home as the
+  // house it is with the mortgage secured on it, the Golf with its loan,
+  // a GIA and a credit card secured on nothing.
+  it("sums every account into the balance that holds it, and the house's own accounts alone into the house", () => {
+    const [pension, isa, current] = accounts;
+
+    expect(
+      pointOf(
+        [
+          pension,
+          isa,
+          current,
+          house,
+          houseLoan,
+          golf,
+          golfLoan,
+          { ...current, balance: 5500, id: 30, kind: "taxable", name: "GIA" },
+          { ...current, balance: -1250, id: 31, kind: "debt", name: "Cards" },
+        ],
+        { month: 7, year: 2026 },
+      ),
+    ).toStrictEqual({
+      assets: 434386,
+      cash: 18300,
+      deferred: 412880,
+      free: 286145,
+      house: 416386,
+      loans: -196940,
+      month: { month: 7, year: 2026 },
+      taxable: 5500,
+      unsecured: -1250,
+    });
+  });
+
+  it("reads nothing of a balance no account is held in, rather than leaving it out", () => {
+    expect(pointOf([], { month: 0, year: 2026 })).toStrictEqual({
+      assets: 0,
+      cash: 0,
+      deferred: 0,
+      free: 0,
+      house: 0,
+      loans: 0,
+      month: { month: 0, year: 2026 },
+      taxable: 0,
+      unsecured: 0,
+    });
   });
 });
 
