@@ -6,6 +6,7 @@ import type { ProgressPoint } from "@/data/progress";
 
 import { soundKept } from "@/data/household";
 import { blank, kept as reference } from "@/data/household.fixture";
+import { pointOf } from "@/data/progress";
 import { points } from "@/data/progress.fixture";
 import { getHousehold } from "@/store/household";
 
@@ -151,6 +152,49 @@ describe("Progress", () => {
     expect(screen.queryByText(/month-end/)).not.toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.getByText("No points yet")).toBeInTheDocument();
+  });
+
+  // The reference household closed to August 2026 off its accounts: the
+  // plan runs on from September to August 2027, so the chart's months
+  // run on to August 2027, and the foot says how it runs on.
+  it("runs the plan on a year from the latest point where the balances were closed to it, and says how", async () => {
+    const { household } = soundKept(reference);
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      points: [
+        ...points.slice(0, -1),
+        pointOf(household.accounts, reference.asOf),
+      ],
+    });
+    render(await Progress());
+
+    const chart = within(
+      screen.getByRole("region", { name: "Month by month" }),
+    ).getByRole("application", {
+      name: "What each balance stood at as each month ended, and where the plan carries net worth over the year ahead",
+    });
+
+    expect(within(chart).getByText("Aug 2027")).toBeInTheDocument();
+    expect(screen.getAllByRole("paragraph").at(-2)).toHaveTextContent(
+      "The plan runs on from the latest point for a year, each month in its own pounds, by what it pays in and what each account grows by.",
+    );
+  });
+
+  // August 2026 alone, closed off the accounts: a plan could run on
+  // from it, but there is no chart to draw it on, so neither it nor its
+  // note is drawn.
+  it("runs no plan on from a point alone, since no chart is drawn", async () => {
+    const { household } = soundKept(reference);
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      points: [pointOf(household.accounts, reference.asOf)],
+    });
+    render(await Progress());
+
+    expect(
+      screen.queryByRole("region", { name: "Month by month" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/^The plan runs on/)).not.toBeInTheDocument();
   });
 
   it("closes with the notes on what net worth counts and what the house is held at before an index is pulled", async () => {
