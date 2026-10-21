@@ -57,7 +57,10 @@ export default async function serve(
       "--port",
       String(port),
     ],
-    { env: serverEnv(password), stdio: ["ignore", "ignore", "pipe"] },
+    {
+      env: serverEnv(await hashPassword(password)),
+      stdio: ["ignore", "ignore", "pipe"],
+    },
   );
   let stderr = "";
   server.stderr.setEncoding("utf8").on("data", (chunk: string) => {
@@ -98,9 +101,9 @@ async function freePort(): Promise<number> {
 // The environment the server runs in: this one, with every variable the app
 // reads set for the run, and NODE_ENV as next start would set it had the
 // runner not already set it to test.
-function serverEnv(password: string): NodeJS.ProcessEnv {
+function serverEnv(hash: string): NodeJS.ProcessEnv {
   const env = { ...process.env };
-  env["APP_PASSWORD_HASH"] = hashPassword(password);
+  env["APP_PASSWORD_HASH"] = hash;
   env["DATABASE_URL"] = "postgresql://store.invalid/none";
   env.NODE_ENV = "production";
   env["SESSION_PASSWORD"] = randomBytes(32).toString("hex");

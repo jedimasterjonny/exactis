@@ -384,8 +384,11 @@ original, so Portfolio Performance and the store hold one allocation.
 
 One user, one password. The app holds a hash of it in `APP_PASSWORD_HASH` and
 seals the session into a cookie with `SESSION_PASSWORD`; there is no user table
-and no third party. `.env.example` describes both. To set the password without
-it showing on the terminal:
+and no third party. `.env.example` describes both. The hash is scrypt at OWASP's
+floor, and it names the cost it was made at, so one made at another, as every
+hash made before the cost was raised, fails sign-in by name rather than refusing
+the password. To set the password, or make the hash again, without it showing on
+the terminal:
 
 ```bash
 read -rs PASSWORD && printf %s "$PASSWORD" | bun run hash-password
