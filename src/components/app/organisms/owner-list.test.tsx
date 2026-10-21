@@ -145,6 +145,23 @@ describe("OwnerList", () => {
     });
   });
 
+  // A year typed a digit short or long is held to those the store takes.
+  it("holds the year born from 1900 to 2100", () => {
+    renderList([me]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Me" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Me" });
+
+    commit(field("Born", dialog), "199");
+
+    expect(field("Born", dialog)).toHaveValue("1900");
+
+    commit(field("Born", dialog), "19900");
+
+    expect(field("Born", dialog)).toHaveValue("2100");
+  });
+
   // Retiring on twenty-five years of expenses, in liquid net worth.
   it("offers no age to an owner retiring when conditions hold, and keeps what they retire on", async () => {
     const retirement = [

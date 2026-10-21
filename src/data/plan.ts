@@ -180,6 +180,16 @@ export function holderOf(
 // short of a plan of centuries.
 export const oldestAge = 120;
 
+// The years a plan's dates fall in, each owner's birth and every month
+// the household holds: from 1900, before anyone a plan is for was born,
+// to 2100, past anyone it is made for now. The plan runs a month at a
+// time from the month its balances are as of to the year its owner
+// reaches the age it ends at, and the progress points are drawn a month
+// at a time between them, so a year typed a digit long or short would
+// otherwise run either for millennia.
+export const earliestYear = 1900;
+export const latestYear = 2100;
+
 // The last year the plan runs to, which is the last year plotted, whose
 // point is the balance entering it, and the year an open-ended line
 // runs to. A fact about the plan rather than the engine, since a line's

@@ -31,6 +31,7 @@ import { TextField } from "@/components/app/molecules/text-field";
 import { LoanFields } from "@/components/app/organisms/loan-fields";
 import { Button } from "@/components/kit/button";
 import { openingMove, statuses } from "@/data/houses";
+import { earliestYear } from "@/data/plan";
 import { formatMonth } from "@/lib/months";
 import { optionsOf } from "@/lib/options";
 
@@ -84,9 +85,9 @@ const words: LoanWords = {
 // beneath them all. A mortgage in more than one sub-account names each
 // by its place, over its fields, with the press that removes it, so
 // the fields repeated are told apart and the last cannot be removed. The year bought is held
-// between the first year there is and the year the plan starts in,
-// since a house is bought in a year that has begun and the store takes
-// none before the first. The typed fields are uncontrolled, mount with
+// between the first year a plan's dates fall in and the year the plan
+// starts in, since a house is bought in a year that has begun and the
+// store takes none before the first. The typed fields are uncontrolled, mount with
 // the house as it opened and report each change to the dialog, whose
 // draft mirrors them; the month is a choice by value, as every month
 // field is, and shows the draft's. A house owned outright shows no
@@ -171,7 +172,7 @@ export function HouseFields({
           defaultValue={initial.bought.month.year}
           label="Year bought"
           max={plan.from}
-          min={1}
+          min={earliestYear}
           onValueCommitted={(year) => {
             onAmend({
               bought: {

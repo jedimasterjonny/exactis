@@ -6,6 +6,7 @@ import { cadences } from "@/data/accounts";
 import { bonusCadences } from "@/data/income";
 import { bases, measures } from "@/data/milestones";
 import { mostQualifyingYears } from "@/data/owners";
+import { earliestYear, latestYear } from "@/data/plan";
 import { lineGrowths } from "@/data/schedule";
 
 // The pieces the model's rules and the actions' parsing are both built
@@ -18,6 +19,15 @@ export const recordId = z.number().int().positive();
 
 // A month of the year, January being nought as the date gives it.
 export const monthOfYear = z.number().int().min(0).max(11);
+
+// A year a plan's dates fall in: whole, and from the earliest to the
+// latest.
+const inYears = `A year is from ${String(earliestYear)} to ${String(latestYear)}`;
+const year = z
+  .number()
+  .int()
+  .min(earliestYear, inYears)
+  .max(latestYear, inYears);
 
 // A name as typed less the space around it, which the forms also trim,
 // and never empty.
@@ -99,7 +109,8 @@ const conditions = z
 export const milestoneValues = { conditions, name: named };
 
 // What an owner holds: the name, the year they were born, whole, since
-// the plan reads an age off it and a fraction of a year is no year,
+// the plan reads an age off it and a fraction of a year is no year, and
+// one a plan's dates fall in,
 // the years they have qualified for the State Pension on, whole, from
 // nothing to the most an owner holds, and absent rather than nothing
 // until they are typed, so a household kept before there were any reads
@@ -109,7 +120,7 @@ export const milestoneValues = { conditions, name: named };
 // the household's to hold, since the order of the owners and the plan's
 // end are kept beside them.
 export const ownerValues = {
-  born: z.number().int(),
+  born: year,
   name: named,
   qualifyingYears: z
     .number()
@@ -136,10 +147,10 @@ export const categoryValues = {
   value: pounds.default(0),
 };
 
-// A month of a year.
+// A month of a year a plan's dates fall in.
 export const month = z.object({
   month: monthOfYear,
-  year: z.number().int().positive(),
+  year,
 }) satisfies z.ZodType<Month>;
 
 // The record a save writes over, by its id, or none for a new one,
