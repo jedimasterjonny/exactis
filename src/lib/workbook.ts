@@ -26,6 +26,15 @@ const valueTag = /<v>(.*?)<\/v>/s;
 const attribute = /\s([\w:]+)="([^"]*)"/g;
 const place = /^([A-Z]+)\d+$/;
 
+// The most the files a zip holds may unzip to, together, in bytes:
+// over ten times the 2.3 MB the largest of the Bank's workbooks unzips
+// to, and short of what a zip built to fill the memory unzips to.
+const ceiling = 32_000_000;
+
+// The most files a zip may list: nine times the 111 BlackRock's
+// workbook lists, the most of any file read.
+const mostFiles = 1000;
+
 // The five characters XML writes as entities, in a map rather than an
 // object, so a name an object inherits, constructor, is no entity.
 const entities: ReadonlyMap<string, string> = new Map([
@@ -55,12 +64,42 @@ export function readSheet(workbook: Uint8Array, name: string): readonly Row[] {
 
 // The files a zip holds by their paths, or a refusal in the words given
 // when it is no zip. The Bank's file is a zip of workbooks, and each
-// workbook a zip of its parts, so both are opened this way.
+// workbook a zip of its parts, so both are opened this way. A zip is
+// refused before another of its files is read once it lists more files
+// than the most, or once its files come to more than the ceiling, each
+// counted at the larger of its size in the zip and the size it says it
+// unzips to: a stored file is copied at the first, however many of the
+// zip's entries point at it, and a compressed one is unzipped into room
+// the size of the second, and cut off there whatever it unzips to.
+// ponytail: a compressed file is still inflated to its end past that
+// room, written nowhere, so the time is bounded only by deflate's
+// thousand to one over the 32 MB of compressed sizes the ceiling lets
+// through, some 33 GB inflated to nowhere, minutes for each zip; feed
+// fflate's streaming Inflate each file in slices and stop at what it
+// said, should a source ever send one.
 export function unzipped(file: Uint8Array, refusal: string): Unzipped {
+  let files = 0;
+  let size = 0;
   try {
-    return unzipSync(file);
-  } catch {
-    throw new Refusal(refusal);
+    return unzipSync(file, {
+      filter: (entry) => {
+        files += 1;
+        size += Math.max(entry.size, entry.originalSize);
+        if (files > mostFiles) {
+          throw new Refusal(
+            "The zip lists more than 1,000 files, far more than any read here",
+          );
+        }
+        if (size > ceiling) {
+          throw new Refusal(
+            "The zip unzips to more than 32 MB, far past any file read from one",
+          );
+        }
+        return true;
+      },
+    });
+  } catch (error) {
+    throw error instanceof Refusal ? error : new Refusal(refusal);
   }
 }
 
