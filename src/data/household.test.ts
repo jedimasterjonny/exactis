@@ -1362,6 +1362,19 @@ describe("soundKept", () => {
     ).toThrow("Invalid ISO date");
   });
 
+  // Counting on by one stays exact well past the most, so a file
+  // claiming the integer ceiling is refused rather than refusing every
+  // record added after it.
+  it("keeps the next id to a million, and refuses one past it", () => {
+    expect(soundKept({ ...kept, next: 1_000_000 }).kept.next).toBe(1_000_000);
+    expect(() => soundKept({ ...kept, next: 1_000_001 })).toThrow(
+      /^A record's id is below 1000000$/,
+    );
+    expect(() => soundKept({ ...kept, next: Number.MAX_SAFE_INTEGER })).toThrow(
+      /^A record's id is below 1000000$/,
+    );
+  });
+
   it("refuses a record whose id is not below the one the next is given", () => {
     expect(() => soundKept({ ...kept, next: 5 })).toThrow(
       "A record's id is below the one the next record is given",
