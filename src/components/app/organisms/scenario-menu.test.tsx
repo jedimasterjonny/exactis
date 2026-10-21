@@ -155,9 +155,11 @@ describe("ScenarioMenu", () => {
 
     expect(createScenario).toHaveBeenCalledExactlyOnceWith(" Move house ");
     await toasted("Move house made", "Edits are saved to the scenario");
-    expect(
-      screen.queryByRole("dialog", { name: "Move house" }),
-    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Move house" }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("makes a new scenario from the household while it is open", () => {
@@ -214,7 +216,9 @@ describe("ScenarioMenu", () => {
       "Retire early is the household",
       "Edits are saved to the household",
     );
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
   });
 
   it("deletes the scenario open once asked", async () => {

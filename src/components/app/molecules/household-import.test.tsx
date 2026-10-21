@@ -84,9 +84,11 @@ describe("HouseholdImport", () => {
 
     await toasted("File imported", "Kept as the next version of what is open");
     expect(importHousehold).toHaveBeenCalledExactlyOnceWith('{"shape":1}');
-    expect(
-      screen.queryByRole("alertdialog", { name: "Import this file?" }),
-    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("alertdialog", { name: "Import this file?" }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("keeps the question open and says why when the store refuses the file", async () => {
