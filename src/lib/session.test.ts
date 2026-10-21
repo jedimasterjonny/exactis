@@ -63,6 +63,21 @@ describe("session", () => {
     expect(await hasSession()).toBe(false);
   });
 
+  it("refuses by name a secret too short to seal with, rather than reading every seal as none", async () => {
+    sent.set(
+      "exactis_session",
+      await sealData({ signedInAt: 1 }, { password }),
+    );
+    vi.stubEnv("SESSION_PASSWORD", password.slice(0, 31));
+
+    await expect(hasSession()).rejects.toThrow(
+      "SESSION_PASSWORD is shorter than 32 characters",
+    );
+    await expect(startSession()).rejects.toThrow(
+      "SESSION_PASSWORD is shorter than 32 characters",
+    );
+  });
+
   it("starts a session the same deployment then honours", async () => {
     vi.stubEnv("NODE_ENV", "production");
 

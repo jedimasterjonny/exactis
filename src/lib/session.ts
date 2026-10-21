@@ -65,7 +65,7 @@ export async function holdsSession(seal: string | undefined): Promise<boolean> {
     return false;
   }
   const { signedInAt } = await unsealData<Partial<Session>>(seal, {
-    password: readEnv("SESSION_PASSWORD"),
+    password: sealedWith(),
     ttl,
   });
   return typeof signedInAt === "number";
@@ -85,12 +85,22 @@ export async function requireSession(): Promise<void> {
 // From a server action, as above.
 export async function startSession(): Promise<void> {
   const session: Session = { signedInAt: Date.now() };
-  const seal = await sealData(session, {
-    password: readEnv("SESSION_PASSWORD"),
-    ttl,
-  });
+  const seal = await sealData(session, { password: sealedWith(), ttl });
   (await cookies()).set(sessionCookie, seal, {
     ...cookieAttributes(),
     maxAge: ttl,
   });
+}
+
+// The secret every seal is made and opened with. iron refuses one under
+// 32 characters, but when opening a seal it reads the refusal as no
+// session, so a short secret would look like everyone signed out until
+// the sign-in failed in words that name no variable. It is held to the
+// length here, by name, before iron sees it.
+function sealedWith(): string {
+  const password = readEnv("SESSION_PASSWORD");
+  if (password.length < 32) {
+    throw new Error("SESSION_PASSWORD is shorter than 32 characters");
+  }
+  return password;
 }
