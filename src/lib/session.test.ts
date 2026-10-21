@@ -18,7 +18,7 @@ const password = "a session password of at least thirty-two characters";
 // is first imported.
 const { jar, sent } = vi.hoisted(() => ({
   jar: {
-    delete: vi.fn<(name: string) => void>(),
+    delete: vi.fn<(cookie: { name: string }) => void>(),
     get: vi.fn<(name: string) => undefined | { name: string; value: string }>(),
     set: vi.fn<(name: string, value: string, options: object) => void>(),
   },
@@ -34,8 +34,8 @@ vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 // Starts a session, and sends its seal back as the browser would.
 async function signIn(): Promise<void> {
   await startSession();
-  const [, seal] = jar.set.mock.lastCall ?? [];
-  sent.set("exactis_session", seal ?? "");
+  const [name = "", seal = ""] = jar.set.mock.lastCall ?? [];
+  sent.set(name, seal);
 }
 
 describe("session", () => {
@@ -103,13 +103,13 @@ describe("session", () => {
     expect(await hasSession()).toBe(false);
   });
 
-  it("starts a session the same deployment then honours", async () => {
+  it("starts a session the same deployment then honours, under the __Host- name in production", async () => {
     vi.stubEnv("NODE_ENV", "production");
 
     await startSession();
 
     expect(jar.set).toHaveBeenCalledExactlyOnceWith(
-      "exactis_session",
+      "__Host-exactis_session",
       expect.stringMatching(/^Fe26\.2/),
       {
         httpOnly: true,
@@ -120,13 +120,17 @@ describe("session", () => {
       },
     );
 
-    const [, seal] = jar.set.mock.calls[0] ?? [];
-    sent.set("exactis_session", seal ?? "");
+    const [, seal = ""] = jar.set.mock.calls[0] ?? [];
+    sent.set("exactis_session", seal);
+
+    expect(await hasSession()).toBe(false);
+
+    sent.set("__Host-exactis_session", seal);
 
     expect(await hasSession()).toBe(true);
   });
 
-  it("sends the cookie over plain HTTP outside production", async () => {
+  it("sends the cookie over plain HTTP outside production, under its bare name", async () => {
     vi.stubEnv("NODE_ENV", "development");
 
     await startSession();
@@ -138,10 +142,31 @@ describe("session", () => {
     );
   });
 
-  it("ends a session by deleting the cookie", async () => {
+  it("ends a session by deleting the cookie with the attributes it was set with", async () => {
+    await endSession();
+    vi.stubEnv("NODE_ENV", "production");
     await endSession();
 
-    expect(jar.delete).toHaveBeenCalledExactlyOnceWith("exactis_session");
+    expect(jar.delete.mock.calls).toStrictEqual([
+      [
+        {
+          httpOnly: true,
+          name: "exactis_session",
+          path: "/",
+          sameSite: "lax",
+          secure: false,
+        },
+      ],
+      [
+        {
+          httpOnly: true,
+          name: "__Host-exactis_session",
+          path: "/",
+          sameSite: "lax",
+          secure: true,
+        },
+      ],
+    ]);
   });
 
   it("requires a session by redirecting to the login screen without one", async () => {

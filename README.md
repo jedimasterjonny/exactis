@@ -85,7 +85,8 @@ household. The branch open is the browser's, shared by its tabs, so a form
 filled in one saves to whichever branch another has opened since. A page reads
 the branch once a request, through React's cache, and an action reads the cookie
 and the store afresh. The household itself is read beside a scenario for the
-dashboard to compare the two.
+dashboard to compare the two. In production the cookie carries the `__Host-`
+prefix, as `__Host-exactis_scenario`, for the reason "Signing in" gives.
 
 The actions in `src/actions/scenarios.ts` make a scenario, enter one kept, leave
 it for the household, delete one and adopt one, and the dashboard's header
@@ -405,6 +406,12 @@ of the hash it was made under and is honoured only while the deployment holds
 that hash, and on Vercel a changed variable reaches only a new deployment. A
 hash made again from the same password does as well as a new password, since its
 salt is new.
+
+Over HTTPS both cookies, the session's and the scenario's, are named with the
+`__Host-` prefix, under which a browser takes a cookie only from this host, for
+every path, so no other host under the same domain can set one in its place.
+Over plain HTTP, as the development server on the LAN is served, they keep their
+bare names, since a browser refuses a prefixed cookie there.
 
 On a development machine `.env.local` holds the hash of a throwaway password,
 with the throwaway itself on a `# password:` comment line above it, so an agent

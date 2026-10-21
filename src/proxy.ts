@@ -15,7 +15,7 @@ import { holdsSession, sessionCookie } from "@/lib/session";
 // it.
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const isSignedIn = await holdsSession(
-    request.cookies.get(sessionCookie)?.value,
+    request.cookies.get(sessionCookie())?.value,
   );
   const isLogin = request.nextUrl.pathname === "/login";
   if (!isLogin && !isSignedIn) {
