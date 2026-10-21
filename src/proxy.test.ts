@@ -1,11 +1,14 @@
 // @vitest-environment node
 import { sealData } from "iron-session";
 import { NextRequest } from "next/server";
+import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { config, proxy } from "./proxy";
 
 const password = "a session password of at least thirty-two characters";
+
+const hash = "the password's hash";
 
 vi.mock("server-only", () => ({}));
 
@@ -19,7 +22,13 @@ async function request(
 ): Promise<NextRequest> {
   const headers = new Headers();
   if (isSignedIn) {
-    const seal = await sealData({ signedInAt: Date.now() }, { password });
+    const seal = await sealData(
+      {
+        credential: createHash("sha256").update(hash).digest("base64url"),
+        signedInAt: Date.now(),
+      },
+      { password },
+    );
     headers.set("cookie", `exactis_session=${seal}`);
   }
   return new NextRequest(new URL(path, "https://exactis.test"), {
@@ -30,6 +39,7 @@ async function request(
 
 describe("proxy", () => {
   beforeEach(() => {
+    vi.stubEnv("APP_PASSWORD_HASH", hash);
     vi.stubEnv("SESSION_PASSWORD", password);
   });
 

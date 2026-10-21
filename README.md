@@ -396,8 +396,15 @@ read -rs PASSWORD && printf %s "$PASSWORD" | bun run hash-password
 
 Every route but `/login` sends anyone without a session there, from the proxy,
 and every screen and server action that reads the store checks the session again
-for itself. Sign out is at the foot of the sidebar; it ends the session and
-returns to `/login`.
+for itself. Sign out is at the foot of the sidebar; it clears the session's
+cookie from that browser and returns to `/login`. The server keeps no sessions
+to end, so a copy of the cookie taken before then still lets a request in until
+its week is out. To end every session at once, the copy's included, as after a
+stolen cookie, change `APP_PASSWORD_HASH` and redeploy. A seal carries a digest
+of the hash it was made under and is honoured only while the deployment holds
+that hash, and on Vercel a changed variable reaches only a new deployment. A
+hash made again from the same password does as well as a new password, since its
+salt is new.
 
 On a development machine `.env.local` holds the hash of a throwaway password,
 with the throwaway itself on a `# password:` comment line above it, so an agent
