@@ -5,7 +5,12 @@ import type { ProgressPoint } from "@/data/progress";
 import type { Month } from "@/data/schedule";
 
 import { Refusal } from "@/lib/answer";
-import { formatMonth, isOnOrBefore, monthsBetween } from "@/lib/months";
+import {
+  formatMonth,
+  isOnOrBefore,
+  isToCome,
+  monthsBetween,
+} from "@/lib/months";
 
 // The index as the household keeps it once pulled: the month of the
 // purchase the points were scaled from, since the points before it are
@@ -93,7 +98,7 @@ export function addressOf(from: Month): string {
 // for a region it does not know or a month it has not published, since
 // nothing scales from a month that is not there. The latest month is
 // found rather than taken from the end, so the answer's order is never
-// trusted.
+// trusted, and one after the month it is is refused.
 export function readIndex(file: Uint8Array, from: Month): Index {
   const parsed = answer.safeParse(jsonOf(file));
   if (!parsed.success) {
@@ -111,15 +116,17 @@ export function readIndex(file: Uint8Array, from: Month): Index {
       `The Land Registry's index has no ${formatMonth(from)}, the month the house was bought in`,
     );
   }
-  return {
-    base: base.index,
-    months,
-    to: months.reduce(
-      (latest, each) =>
-        monthsBetween(latest.month, each.month) > 0 ? each : latest,
-      base,
-    ).month,
-  };
+  const to = months.reduce(
+    (latest, each) =>
+      monthsBetween(latest.month, each.month) > 0 ? each : latest,
+    base,
+  ).month;
+  if (isToCome(to)) {
+    throw new Refusal(
+      `The Land Registry's index runs to ${formatMonth(to)}, after this month`,
+    );
+  }
+  return { base: base.index, months, to };
 }
 
 // The points with the house written again off the index: from the

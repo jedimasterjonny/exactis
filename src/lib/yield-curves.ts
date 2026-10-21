@@ -4,6 +4,7 @@ import type { Curve, Maturity } from "@/data/inflation";
 import type { Row } from "@/lib/workbook";
 
 import { Refusal } from "@/lib/answer";
+import { isToCome, monthIn } from "@/lib/months";
 import { readSheet, unzipped } from "@/lib/workbook";
 
 // A spot curve as its sheet gives it: each day's rates by the years to
@@ -38,6 +39,7 @@ const epoch = 25_569;
 // nominal less the real, so before anything is taken from the day read,
 // the two are held to it at every maturity it gives: a sheet read
 // wrongly breaks the difference, and is refused rather than planned on.
+// A latest day after the month it is is refused before any of that.
 export function readCurve(file: Uint8Array): Curve {
   const books = unzipped(file, "The Bank's file is not a zip");
   const implied = spotCurve(books, "GLC Inflation");
@@ -48,7 +50,11 @@ export function readCurve(file: Uint8Array): Curve {
   if (rates === undefined) {
     throw new Refusal("The implied inflation curve holds no day");
   }
-  const asOf = new Date((day - epoch) * 86_400_000).toISOString().slice(0, 10);
+  const date = new Date((day - epoch) * 86_400_000);
+  if (isToCome(monthIn(date))) {
+    throw new Refusal("The Bank's file runs to a day after this month");
+  }
+  const asOf = date.toISOString().slice(0, 10);
   const onDay = (spot: Spot, name: string): ReadonlyMap<number, number> => {
     const held = spot.get(day);
     if (held === undefined) {

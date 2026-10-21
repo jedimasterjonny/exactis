@@ -456,6 +456,19 @@ describe("readCma", () => {
     );
   });
 
+  it("refuses a vintage, or its data, dated after this month", () => {
+    for (const line of [
+      "August 2999, data as of 30 June 2026",
+      "August 2026, data as of 30 June 2999",
+    ]) {
+      expect(() => readCma(cmaFile(startingPointOf(priced, line)))).toThrow(
+        new Refusal(
+          `The Starting point sheet is dated ${line}, after this month`,
+        ),
+      );
+    }
+  });
+
   it("refuses data dated to a day the month does not have", () => {
     expect(() =>
       readCma(cmaFile(startingPointOf(priced, dated.replace("30", "31")))),
