@@ -8,8 +8,10 @@ import {
   formatMonth,
   formatMonthShort,
   isOnOrBefore,
+  isToCome,
   monthAfter,
   monthBefore,
+  monthIn,
   monthName,
   monthsBetween,
   thisMonth,
@@ -107,6 +109,25 @@ describe("isOnOrBefore", () => {
   });
 });
 
+describe("isToCome", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("takes a month after the month it is, and not the month it is or one before", () => {
+    vi.useFakeTimers({ now: new Date(2026, 8, 26), toFake: ["Date"] });
+
+    expect(isToCome({ month: 9, year: 2026 })).toBe(true);
+    expect(isToCome({ month: 0, year: 2027 })).toBe(true);
+    expect(isToCome({ month: 8, year: 2026 })).toBe(false);
+    expect(isToCome({ month: 11, year: 2025 })).toBe(false);
+  });
+
+  it("takes a month that is no month as to come", () => {
+    expect(isToCome(monthIn(new Date(Number.NaN)))).toBe(true);
+  });
+});
+
 describe("monthAfter", () => {
   it("steps a month on, December into the January of the next year", () => {
     expect(monthAfter({ month: 8, year: 2026 })).toStrictEqual({
@@ -129,6 +150,19 @@ describe("monthBefore", () => {
     expect(monthBefore({ month: 0, year: 2027 })).toStrictEqual({
       month: 11,
       year: 2026,
+    });
+  });
+});
+
+describe("monthIn", () => {
+  it("reads the month a moment falls in, in UTC, January being nought", () => {
+    expect(monthIn(new Date("2026-08-31"))).toStrictEqual({
+      month: 7,
+      year: 2026,
+    });
+    expect(monthIn(new Date("2026-12-31T23:30:00-01:00"))).toStrictEqual({
+      month: 0,
+      year: 2027,
     });
   });
 });

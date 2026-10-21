@@ -62,6 +62,14 @@ describe("readIndex", () => {
     }
   });
 
+  it("refuses an index running to a month after this one", () => {
+    expect(() =>
+      readIndex(registryAnswer([...quoted, ["2999-12", 287540]]), bought.month),
+    ).toThrow(
+      "The Land Registry's index runs to December 2999, after this month",
+    );
+  });
+
   // The Registry answers a region it does not know, or a month it has
   // not published, with no months at all, and a purchase further back
   // than one page of months reaches with a page that stops short of it.

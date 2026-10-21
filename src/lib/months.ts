@@ -78,6 +78,13 @@ export function isOnOrBefore(month: Month, other: Month): boolean {
   return monthsBetween(month, other) >= 0;
 }
 
+// Whether a month is still to come, falling after the month it is. A
+// month that is no month, as one read from a day past any a date can
+// hold is, falls on or before none, and is taken as to come.
+export function isToCome(month: Month): boolean {
+  return !isOnOrBefore(month, thisMonth());
+}
+
 // The month after a month, December's being the January of the year
 // after: the month a plan starts in, from the one its balances are as
 // of.
@@ -94,6 +101,12 @@ export function monthBefore({ month, year }: Month): Month {
   return month === 0
     ? { month: 11, year: year - 1 }
     : { month: month - 1, year };
+}
+
+// The month a moment falls in, in UTC, as an ISO date is read, January
+// being nought.
+export function monthIn(moment: Date): Month {
+  return { month: moment.getUTCMonth(), year: moment.getUTCFullYear() };
 }
 
 // The month's name, January being nought as the date gives it. The
