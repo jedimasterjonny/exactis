@@ -1,6 +1,16 @@
 // @vitest-environment node
+import { neon } from "@neondatabase/serverless";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { drizzle } from "drizzle-orm/neon-http";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { blank, kept as reference } from "@/data/household.fixture";
 import { sam } from "@/data/owners.fixture";
@@ -17,6 +27,10 @@ import {
 } from "./household";
 
 const { close, db, empty, ready } = inMemory();
+
+// How a read of a branch's latest version fails, as the statement it ran.
+const readFailed =
+  'Failed query: select "household", "version" from "household_versions" where "household_versions"."scenario" = $1 order by "household_versions"."version" desc limit $2';
 
 // The household before anything is saved with a second owner added.
 const named = { ...blank, next: 3, owners: [...blank.owners, sam] };
@@ -270,6 +284,94 @@ describe("household store", () => {
     });
     expect(await readAsOf(db, "Retire early", day("2026-09-15"))).toStrictEqual(
       { household: later, savedAt: day("2026-09-20"), version: 2 },
+    );
+  });
+
+  // Postgres refuses a NUL in jsonb, and the values bound to a save are
+  // the whole household, which a failure logged would carry.
+  it("fails a query with the statement and the driver's code and words, and none of the values bound to it", async () => {
+    await expect(
+      keepAfter(
+        db,
+        { scenario: "Retire early", version: 0 },
+        { ...named, owners: [...blank.owners, { ...sam, name: "Sam\u0000" }] },
+      ),
+    ).rejects.toStrictEqual(
+      new Error(
+        'Failed query: insert into "household_versions" ("household", "saved_at", "scenario", "version") values ($1, default, $2, $3) on conflict do nothing returning "version"',
+        {
+          cause: {
+            code: "22P05",
+            message: "unsupported Unicode escape sequence",
+          },
+        },
+      ),
+    );
+  });
+
+  // Neon's driver reads its URL on the first query, and quotes one it
+  // cannot read whole, password and all, as a URL built by hand and
+  // mistyped would be.
+  it("fails a query without a connection string the driver quotes", async () => {
+    const mistyped = drizzle({
+      client: neon("postgresql://app:hunter2@ep-example.neon.tech:port/neondb"),
+    });
+
+    await expect(readLatest(mistyped, "")).rejects.toStrictEqual(
+      new Error(readFailed, {
+        cause: {
+          code: undefined,
+          message:
+            "Database connection string provided to neon() is not a valid URL (connection string: [a URL]",
+          sourceError: undefined,
+        },
+      }),
+    );
+  });
+
+  it("fails a query with the code of the network failure beneath it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValue(
+          new TypeError("fetch failed", {
+            cause: Object.assign(new Error("getaddrinfo ENOTFOUND"), {
+              code: "ENOTFOUND",
+            }),
+          }),
+        ),
+    );
+    const unreached = drizzle({
+      client: neon("postgresql://app:hunter2@ep-example.neon.tech/neondb"),
+    });
+
+    await expect(readLatest(unreached, "")).rejects.toStrictEqual(
+      new Error(readFailed, {
+        cause: {
+          code: undefined,
+          message: "Error connecting to database: TypeError: fetch failed",
+          sourceError: { cause: { code: "ENOTFOUND" } },
+        },
+      }),
+    );
+  });
+
+  it("fails a query whose failure is in no shape a query's takes with that alone", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ code: 42, message: "x" }, { status: 400 }),
+        ),
+    );
+    const odd = drizzle({
+      client: neon("postgresql://app:hunter2@ep-example.neon.tech/neondb"),
+    });
+
+    await expect(readLatest(odd, "")).rejects.toStrictEqual(
+      new Error("Failed query, in no shape a query's failure takes"),
     );
   });
 

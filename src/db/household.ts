@@ -1,6 +1,7 @@
 import type { SQL } from "drizzle-orm";
 
 import { and, asc, desc, eq, lte, ne, sql } from "drizzle-orm";
+import * as z from "zod";
 
 import type { Kept } from "@/data/household";
 import type { Database } from "@/db/client";
@@ -24,9 +25,37 @@ export interface Version {
   readonly version: number;
 }
 
+// What a failed query keeps: the statement, its values left as
+// placeholders, the driver's code, its words with anything shaped as a
+// URL taken out, and the code of the network failure beneath them where
+// there is one, an address not found or a connection timed out. The rest
+// is dropped, since a failure is written to the server's log: Drizzle's
+// error carries the values bound to the statement, which are the whole
+// household on a save and a scenario's name as its cookie gave it on a
+// read, the driver's error what it was parsing when it failed, and the
+// driver's words quote a connection string it cannot read whole,
+// password and all.
+const failure = z.object({
+  cause: z.object({
+    code: z.string().optional(),
+    message: z.string().transform((words) =>
+      words
+        .split(/(\s+)/u)
+        .map((word) => (word.includes("://") ? "[a URL]" : word))
+        .join(""),
+    ),
+    sourceError: z
+      .object({ cause: z.object({ code: z.string() }) })
+      .optional()
+      .catch(undefined),
+  }),
+  query: z.string(),
+});
+
 // Every query below names the branch it reads or writes, the household
 // being the scenario with no name, and none defaults it, so a branch
 // forgotten is a type error rather than a save written to the household.
+// Each is run through queried, so none fails with its values.
 
 // Drops the versions of a scenario: every one, or those up to and
 // including the version given, so a version saved after the one an
@@ -41,16 +70,18 @@ export async function dropScenario(
   if (name === "") {
     throw new Error("The household is never dropped");
   }
-  await db
-    .delete(householdVersions)
-    .where(
-      and(
-        eq(householdVersions.scenario, name),
-        through === undefined
-          ? undefined
-          : lte(householdVersions.version, through),
+  await queried(
+    db
+      .delete(householdVersions)
+      .where(
+        and(
+          eq(householdVersions.scenario, name),
+          through === undefined
+            ? undefined
+            : lte(householdVersions.version, through),
+        ),
       ),
-    );
+  );
 }
 
 // Keeps the household as the version after the one the save read on its
@@ -65,11 +96,13 @@ export async function keepAfter(
   { scenario, version }: Read,
   household: Kept,
 ): Promise<void> {
-  const rows = await db
-    .insert(householdVersions)
-    .values({ household: stamped(household), scenario, version: version + 1 })
-    .onConflictDoNothing()
-    .returning({ version: householdVersions.version });
+  const rows = await queried(
+    db
+      .insert(householdVersions)
+      .values({ household: stamped(household), scenario, version: version + 1 })
+      .onConflictDoNothing()
+      .returning({ version: householdVersions.version }),
+  );
   if (rows.length === 0) {
     throw new Refusal(
       "The household changed while this was being saved, so nothing was",
@@ -80,11 +113,13 @@ export async function keepAfter(
 // The names of the scenarios kept, in order, the household not among
 // them.
 export async function listScenarios(db: Database): Promise<readonly string[]> {
-  const rows = await db
-    .selectDistinct({ scenario: householdVersions.scenario })
-    .from(householdVersions)
-    .where(ne(householdVersions.scenario, ""))
-    .orderBy(asc(householdVersions.scenario));
+  const rows = await queried(
+    db
+      .selectDistinct({ scenario: householdVersions.scenario })
+      .from(householdVersions)
+      .where(ne(householdVersions.scenario, ""))
+      .orderBy(asc(householdVersions.scenario)),
+  );
   return rows.map(({ scenario }) => scenario);
 }
 
@@ -114,31 +149,37 @@ export async function readAsOf(
   };
   const branch = eq(householdVersions.scenario, scenario);
   const derived: SQL = sql`${householdVersions.household} ->> 'rateSet' = 'cma'`;
-  const [kept] = await db
-    .select(columns)
-    .from(householdVersions)
-    .where(and(branch, derived, lte(householdVersions.savedAt, at)))
-    .orderBy(desc(householdVersions.version))
-    .limit(1);
+  const [kept] = await queried(
+    db
+      .select(columns)
+      .from(householdVersions)
+      .where(and(branch, derived, lte(householdVersions.savedAt, at)))
+      .orderBy(desc(householdVersions.version))
+      .limit(1),
+  );
   if (kept !== undefined) {
     return kept;
   }
   if (scenario !== "") {
-    const [since] = await db
-      .select({ version: householdVersions.version })
-      .from(householdVersions)
-      .where(and(branch, lte(householdVersions.savedAt, at)))
-      .limit(1);
+    const [since] = await queried(
+      db
+        .select({ version: householdVersions.version })
+        .from(householdVersions)
+        .where(and(branch, lte(householdVersions.savedAt, at)))
+        .limit(1),
+    );
     if (since === undefined) {
       return readAsOf(db, "", at);
     }
   }
-  const [first] = await db
-    .select(columns)
-    .from(householdVersions)
-    .where(and(branch, derived))
-    .orderBy(asc(householdVersions.version))
-    .limit(1);
+  const [first] = await queried(
+    db
+      .select(columns)
+      .from(householdVersions)
+      .where(and(branch, derived))
+      .orderBy(asc(householdVersions.version))
+      .limit(1),
+  );
   return first ?? null;
 }
 
@@ -147,14 +188,31 @@ export async function readLatest(
   db: Database,
   scenario: string,
 ): Promise<null | Version> {
-  const [row] = await db
-    .select({
-      household: householdVersions.household,
-      version: householdVersions.version,
-    })
-    .from(householdVersions)
-    .where(eq(householdVersions.scenario, scenario))
-    .orderBy(desc(householdVersions.version))
-    .limit(1);
+  const [row] = await queried(
+    db
+      .select({
+        household: householdVersions.household,
+        version: householdVersions.version,
+      })
+      .from(householdVersions)
+      .where(eq(householdVersions.scenario, scenario))
+      .orderBy(desc(householdVersions.version))
+      .limit(1),
+  );
   return row ?? null;
+}
+
+// A query run, and when it fails, failed again with only what a failure
+// keeps, or, for a failure in no shape a query's takes, with only that.
+async function queried<TResult>(query: PromiseLike<TResult>): Promise<TResult> {
+  try {
+    return await query;
+  } catch (error) {
+    const kept = failure.safeParse(error);
+    throw kept.success
+      ? new Error(`Failed query: ${kept.data.query}`, {
+          cause: kept.data.cause,
+        })
+      : new Error("Failed query, in no shape a query's failure takes");
+  }
 }
