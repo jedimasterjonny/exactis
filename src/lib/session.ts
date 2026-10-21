@@ -5,14 +5,17 @@ import { sealData, unsealData } from "iron-session";
 import { io } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { createHash } from "node:crypto";
 
 import { readEnv } from "@/lib/env";
 
 // The session is a sealed cookie and nothing else: one user, so being
 // signed in is having a seal this deployment made that has not expired,
-// and there is no session to look up. What the seal holds is when it was
-// made, which is all a single user's session has to say.
+// under the password it still holds, and there is no session to look up.
+// What the seal holds is when it was made and a digest of the password's
+// hash at the time, which is all a single user's session has to say.
 interface Session {
+  readonly credential: string;
   readonly signedInAt: number;
 }
 
@@ -57,18 +60,20 @@ export async function hasSession(): Promise<boolean> {
 }
 
 // Whether a cookie's value is a seal this deployment made and still
-// honours. A missing, forged or expired one unseals to nothing. Takes the
-// value rather than reading it, since the proxy has the request's cookies
-// and not the request-scoped store a page has.
+// honours. A missing, forged or expired one unseals to nothing, and one
+// made under another password, or before seals carried it, is refused,
+// so changing the password ends every session. Takes the value rather
+// than reading it, since the proxy has the request's cookies and not the
+// request-scoped store a page has.
 export async function holdsSession(seal: string | undefined): Promise<boolean> {
   if (seal === undefined) {
     return false;
   }
-  const { signedInAt } = await unsealData<Partial<Session>>(seal, {
+  const { credential, signedInAt } = await unsealData<Partial<Session>>(seal, {
     password: sealedWith(),
     ttl,
   });
-  return typeof signedInAt === "number";
+  return typeof signedInAt === "number" && credential === fingerprint();
 }
 
 // For a page or an action that only a signed-in user may reach: it goes on
@@ -84,12 +89,25 @@ export async function requireSession(): Promise<void> {
 // Seals a new session into the cookie, for as long as a session lasts.
 // From a server action, as above.
 export async function startSession(): Promise<void> {
-  const session: Session = { signedInAt: Date.now() };
+  const session: Session = {
+    credential: fingerprint(),
+    signedInAt: Date.now(),
+  };
   const seal = await sealData(session, { password: sealedWith(), ttl });
   (await cookies()).set(sessionCookie, seal, {
     ...cookieAttributes(),
     maxAge: ttl,
   });
+}
+
+// A digest of the password hash the deployment holds, which a seal
+// carries from the sign-in and has to match to be honoured. A digest
+// rather than the hash or a piece of it, so a seal opened with the
+// session's secret gives nothing away to guess the password against.
+function fingerprint(): string {
+  return createHash("sha256")
+    .update(readEnv("APP_PASSWORD_HASH"))
+    .digest("base64url");
 }
 
 // The secret every seal is made and opened with. iron refuses one under

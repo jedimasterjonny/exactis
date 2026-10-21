@@ -31,6 +31,13 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 
+// Starts a session, and sends its seal back as the browser would.
+async function signIn(): Promise<void> {
+  await startSession();
+  const [, seal] = jar.set.mock.lastCall ?? [];
+  sent.set("exactis_session", seal ?? "");
+}
+
 describe("session", () => {
   beforeEach(() => {
     sent.clear();
@@ -42,6 +49,7 @@ describe("session", () => {
     vi.mocked(redirect).mockImplementation(() => {
       throw new Error("redirected");
     });
+    vi.stubEnv("APP_PASSWORD_HASH", "the password's hash");
     vi.stubEnv("SESSION_PASSWORD", password);
   });
 
@@ -76,6 +84,23 @@ describe("session", () => {
     await expect(startSession()).rejects.toThrow(
       "SESSION_PASSWORD is shorter than 32 characters",
     );
+  });
+
+  it("honours a seal only while the password it was made under holds, and none made before seals said which", async () => {
+    sent.set(
+      "exactis_session",
+      await sealData({ signedInAt: Date.now() }, { password }),
+    );
+
+    expect(await hasSession()).toBe(false);
+
+    await signIn();
+
+    expect(await hasSession()).toBe(true);
+
+    vi.stubEnv("APP_PASSWORD_HASH", "the next password's hash");
+
+    expect(await hasSession()).toBe(false);
   });
 
   it("starts a session the same deployment then honours", async () => {
@@ -123,10 +148,7 @@ describe("session", () => {
     await expect(requireSession()).rejects.toThrow("redirected");
     expect(redirect).toHaveBeenCalledExactlyOnceWith("/login");
 
-    sent.set(
-      "exactis_session",
-      await sealData({ signedInAt: Date.now() }, { password }),
-    );
+    await signIn();
 
     await expect(requireSession()).resolves.toBeUndefined();
     expect(redirect).toHaveBeenCalledTimes(1);
