@@ -61,7 +61,8 @@ const gap: Column = ["", ""];
 // the sheet's day/month/year, and each group lists its accounts in the
 // order the household lists them, so the columns are made to match the
 // sheet's by ordering the accounts. A field holding a comma, a quote or
-// a line break is quoted, its quotes doubled, and nothing else is.
+// a line break is quoted, its quotes doubled, and nothing else is. A
+// heading a spreadsheet would read as a formula is written as text.
 export function balancesSheet(
   accounts: readonly Account[],
   date: string,
@@ -94,7 +95,7 @@ export function balancesSheet(
     ]),
   ];
   return [
-    columns.map(([heading]) => heading),
+    columns.map(([heading]) => textOf(heading)),
     columns.map(([, value]) => value),
   ]
     .map((line) => `${line.map(fieldOf).join(",")}\r\n`)
@@ -117,4 +118,14 @@ function placedAs(account: Account, accounts: readonly Account[]): AccountKind {
 
 function sumOf(accounts: readonly Account[]): number {
   return accounts.reduce((sum, { balance }) => sum + balance, 0);
+}
+
+// A heading, an account's name among them, as text a spreadsheet does
+// not run: one opening as a formula does, with =, +, - or @, or with a
+// tab or a carriage return, is written after an apostrophe, which marks
+// what follows it as text. Only the headings are, since the row beneath
+// holds the date and the figures, a negative balance's hyphen among
+// them, and pasted as they are they read as numbers.
+function textOf(heading: string): string {
+  return /^[=+\-@\t\r]/u.test(heading) ? `'${heading}` : heading;
 }
