@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { neon } from "@neondatabase/serverless";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import {
   afterAll,
@@ -375,7 +375,7 @@ describe("household store", () => {
     );
   });
 
-  it("never writes over a version it has kept, or deletes one of the household's", async () => {
+  it("never writes over a version it has kept, deletes one of the household's, or empties the table", async () => {
     await keepAfter(db, { scenario: "", version: 0 }, blank);
     await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
 
@@ -395,6 +395,9 @@ describe("household store", () => {
       db.update(householdVersions).set({ household: named }),
     ).rejects.toMatchObject(refused);
     await expect(db.delete(householdVersions)).rejects.toMatchObject(refused);
+    await expect(
+      db.execute(sql`TRUNCATE ${householdVersions}`),
+    ).rejects.toMatchObject(refused);
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped(blank),
       version: 1,
