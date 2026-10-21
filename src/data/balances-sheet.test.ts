@@ -122,6 +122,34 @@ describe("balancesSheet", () => {
     );
   });
 
+  // Pasted into a sheet, a name opening with =, +, - or @ is a formula,
+  // and one opening with a tab or a carriage return can start one past
+  // it; the apostrophe makes each text. The figures beneath keep their
+  // hyphens, since a negative balance is to paste as a number.
+  it("writes a name a spreadsheet would read as a formula after an apostrophe, and leaves the figures as they are", () => {
+    const names = [
+      '=HYPERLINK("https://example.com","Joint")',
+      "+44 saver",
+      "-Overdraft",
+      "@SUM",
+      "\tTabbed",
+      "\rReturned",
+    ];
+    const [heading, row] = balancesSheet(
+      names.map((name, index) =>
+        account({ balance: -1000, id: index + 1, kind: "debt", name }),
+      ),
+      "2026-09-25",
+    ).split("\r\n");
+
+    expect(heading).toBe(
+      `Date,,"'=HYPERLINK(""https://example.com"",""Joint"")",'+44 saver,'-Overdraft,'@SUM,'\tTabbed,"'\rReturned",Cash,,Investments,,Pension,,House Equity,,Car Equity,,Total,,Deferred,Free,Assets,Loans,UnSec`,
+    );
+    expect(row).toBe(
+      '25/09/2026,,"-£1,000.00","-£1,000.00","-£1,000.00","-£1,000.00","-£1,000.00","-£1,000.00","-£6,000.00",,£0.00,,£0.00,,£0.00,,£0.00,,"-£6,000.00",,£0,£0,£0,£0,"-£6,000"',
+    );
+  });
+
   it("lays out a household with no accounts as the sums' headings and a row of nothings", () => {
     expect(balancesSheet([], "2026-01-02")).toBe(
       "Date,,Cash,,Investments,,Pension,,House Equity,,Car Equity,,Total,,Deferred,Free,Assets,Loans,UnSec\r\n" +
