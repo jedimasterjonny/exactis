@@ -1,26 +1,49 @@
 import type { NextConfig } from "next";
 
-// Only directives that bite on a statically generated page. script-src and
-// style-src are deliberately absent: Next emits five inline bootstrap scripts
-// per document, and without a nonce or a hash for each one, `script-src 'self'`
+// Everything defaults to the app's own origin, as in the shipped
+// content-security-policy guide's policy without nonces. script-src carries
+// 'unsafe-inline' because Next emits five inline bootstrap scripts per
+// document, and without a nonce or a hash for each one `script-src 'self'`
 // blocks them and hydration dies with React error #412. A nonce cannot be the
-// answer either - the shipped content-security-policy guide states a nonce must
-// be regenerated per view, which forces every page dynamic and rules out PPR.
-// What is left still closes off base-tag injection, form exfiltration, plugin
-// embedding and clickjacking, and none of it needs a request to be served.
+// answer - the guide states a nonce must be regenerated per view, which forces
+// every page dynamic and rules out PPR - and nor can hashes, since those
+// scripts carry each render's flight data. style-src carries it for the
+// style attributes and <style> elements the server renders - the vendored
+// sidebar's and chart's, Base UI's - and the <style> next-themes writes.
+// next dev adds 'unsafe-eval', which React's development build uses to
+// rebuild server error stacks in the browser.
 //
-// upgrade-insecure-requests is deliberately absent as well. WebKit applies it
-// on http://localhost where the spec exempts it (bugs.webkit.org 250776), so
+// So an injected inline script or event handler still runs. What it cannot do
+// is reach another origin through a subresource or a request: fetch, beacons,
+// sockets, images, fonts, media, frames, prefetches, stylesheets and scripts
+// all stop at 'self'. form-action keeps a form from posting elsewhere,
+// base-uri keeps a <base> from re-pointing the relative chunk URLs, and
+// frame-ancestors stops clickjacking. What still leaves is a navigation - a
+// link, a location change, window.open - and a WebRTC connection, over
+// neither of which browsers enforce a directive. The policy is the same for
+// every response, so none of it needs a request to be served.
+//
+// 'self' admits the dev server's HMR socket, since CSP3 matches ws: against an
+// http page's own host and port, as WebKit has done since 2022
+// (bugs.webkit.org 235873), and the futures worker, a same-origin chunk that
+// script-src admits as worker-src's fallback; a blob: worker is refused.
+//
+// upgrade-insecure-requests is deliberately absent. WebKit applies it on
+// http://localhost where the spec exempts it (bugs.webkit.org 250776), so
 // every subresource of a dev or next start page is rewritten to https, nothing
 // answers, and fonts and chunks fail silently. Headers are baked at build
 // time, so a phase check could not spare next start. What the directive
 // guarded, an http reference in our own markup on an https page, every current
 // browser blocks or upgrades as mixed content, and HSTS covers navigations.
+const isDevelopment = process.env.NODE_ENV === "development";
 const contentSecurityPolicy = [
   "base-uri 'self'",
+  "default-src 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
+  `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
 ].join("; ");
 
 const nextConfig: NextConfig = {
