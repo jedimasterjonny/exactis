@@ -43,11 +43,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # actions: read is for looking up the tree's marker, as the range job
-    # does. Stated in full because a job's permissions replace the
-    # workflow's rather than adding to them.
+    # does, and pull-requests: read for asking where a marker came from.
+    # Stated in full because a job's permissions replace the workflow's
+    # rather than adding to them.
     permissions:
       actions: read
       contents: read
+      pull-requests: read
     steps:
       # Pinned to digests because renovate.json extends config:best-practices,
       # which includes helpers:pinGitHubActionDigests. Renovate keeps them
@@ -71,13 +73,32 @@ jobs:
       # audit reads an advisory database that moves, and commitlint reads
       # messages, which a rebase keeps but a marker says nothing about.
       # Both run every time, on an install that takes seconds.
+      #
+      # A marker counts only in a cache scope that code from this
+      # repository writes: main's, saved by a push to main, or a pull
+      # request's from a branch here. A fork's pull request runs its own
+      # copy of this workflow, so what it saves in its scope proves
+      # nothing; a run there that left a marker for the tree it pushes
+      # next would otherwise see that push skip every check. vendor.yml,
+      # the one workflow on main that runs code from outside, takes no
+      # cache. The range job applies the same rule.
       - id: proven
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          trusted() {
+            for ref in $(gh cache list --key "green-tree-$1" --json ref --jq '.[].ref' 2>/dev/null); do
+              case "$ref" in
+                refs/heads/main) return 0 ;;
+                refs/pull/*/merge)
+                  pr="${ref#refs/pull/}"
+                  [ "$(gh pr view "${pr%/merge}" --json isCrossRepository --jq .isCrossRepository 2>/dev/null)" = false ] && return 0 ;;
+              esac
+            done
+            return 1
+          }
           tree="$(git rev-parse 'HEAD^{tree}')"
-          found="$(gh cache list --key "green-tree-$tree" --limit 1 --json key --jq length 2>/dev/null || echo 0)"
-          if [ "$found" != "0" ]; then
+          if trusted "$tree"; then
             echo "Tree $tree is already proven green; running only the audit and commitlint."
             echo "proven=true" >> "$GITHUB_OUTPUT"
           else
@@ -351,11 +372,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # actions: read is for listing the cache, which is where the commit job
-    # leaves its markers. Stated in full because a job's permissions replace
-    # the workflow's rather than adding to them.
+    # leaves its markers, and pull-requests: read for asking where a marker
+    # came from. Stated in full because a job's permissions replace the
+    # workflow's rather than adding to them.
     permissions:
       actions: read
       contents: read
+      pull-requests: read
     outputs:
       commits: ${{ steps.list.outputs.commits }}
     steps:
@@ -412,20 +435,31 @@ jobs:
           # are looked up over the API rather than restored, since a
           # restore is one key a step and this is a list, and the API sees
           # every cache in the repository whichever branch wrote it, which
-          # is right for a fact about a tree. A marker unused for a week is
-          # evicted, and a rebase onto a moved main changes every tree;
-          # either way the commit is checked again, which costs a runner
-          # and nothing else. A lookup that fails is read as no marker, for
-          # the same reason.
+          # is right for a fact about a tree as long as the branch is ours:
+          # trusted, below, is the check job's rule for which scopes count.
+          # A marker unused for a week is evicted, and a rebase onto a moved
+          # main changes every tree; either way the commit is checked again,
+          # which costs a runner and nothing else. A lookup that fails is
+          # read as no marker, for the same reason.
           #
           # One entry per commit, as the matrix takes it: the sha to check
           # out, the tree to mark, and the short sha and the subject to name
           # the job by. An empty range is an empty list, which the commit
           # job reads as nothing to do.
+          trusted() {
+            for ref in $(gh cache list --key "green-tree-$1" --json ref --jq '.[].ref' 2>/dev/null); do
+              case "$ref" in
+                refs/heads/main) return 0 ;;
+                refs/pull/*/merge)
+                  pr="${ref#refs/pull/}"
+                  [ "$(gh pr view "${pr%/merge}" --json isCrossRepository --jq .isCrossRepository 2>/dev/null)" = false ] && return 0 ;;
+              esac
+            done
+            return 1
+          }
           list="$(for sha in $commits; do
             tree="$(git rev-parse "${sha}^{tree}")"
-            found="$(gh cache list --key "green-tree-$tree" --limit 1 --json key --jq length 2>/dev/null || echo 0)"
-            if [ "$found" != "0" ]; then
+            if trusted "$tree"; then
               echo "$(git rev-parse --short "$sha") is tree $tree, already proven green; skipped" >&2
               continue
             fi
