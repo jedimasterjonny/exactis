@@ -5,6 +5,7 @@ import type { ProgressPoint } from "@/data/progress";
 import type { Month } from "@/data/schedule";
 
 import { Refusal } from "@/lib/answer";
+import { formatGbp } from "@/lib/money";
 import {
   formatMonth,
   isOnOrBefore,
@@ -98,7 +99,12 @@ export function addressOf(from: Month): string {
 // for a region it does not know or a month it has not published, since
 // nothing scales from a month that is not there. The latest month is
 // found rather than taken from the end, so the answer's order is never
-// trusted, and one after the month it is is refused.
+// trusted, and one after the month it is is refused. A month priced
+// under a tenth or over ten times the month the house was bought in is
+// refused too, naming both figures, since Dorset's prices have moved
+// nothing like that far in the thirty years the index runs over, and
+// the house would be written at that over every point since it was
+// bought.
 export function readIndex(file: Uint8Array, from: Month): Index {
   const parsed = answer.safeParse(jsonOf(file));
   if (!parsed.success) {
@@ -114,6 +120,14 @@ export function readIndex(file: Uint8Array, from: Month): Index {
   if (base === undefined) {
     throw new Refusal(
       `The Land Registry's index has no ${formatMonth(from)}, the month the house was bought in`,
+    );
+  }
+  const strayed = months.find(
+    ({ index }) => index < base.index / 10 || index > base.index * 10,
+  );
+  if (strayed !== undefined) {
+    throw new Refusal(
+      `The Land Registry's index prices ${formatMonth(strayed.month)} at ${formatGbp(strayed.index)} against ${formatGbp(base.index)} in ${formatMonth(from)}, further than house prices move`,
     );
   }
   const to = months.reduce(
