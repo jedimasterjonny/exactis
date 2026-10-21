@@ -7,7 +7,7 @@ import type { Kept } from "@/data/household";
 import type { Answer } from "@/lib/answer";
 
 import { soundKept } from "@/data/household";
-import { named } from "@/data/schemas";
+import { scenarioName } from "@/data/schemas";
 import { upcast } from "@/data/shapes";
 import { getDb } from "@/db/client";
 import { dropScenario, keepAfter, readLatest } from "@/db/household";
@@ -15,10 +15,6 @@ import { Refusal, refused, saved } from "@/lib/answer";
 import { closeScenario, openedScenario, openScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 import { readHeld } from "@/store/household";
-
-// A scenario's name: as typed less the space around it, never empty,
-// and short enough for a menu to hold.
-const scenarioName = named.max(40);
 
 // Why a scenario named is not there to enter or adopt: none was ever
 // kept by that name, or it has been dropped since the screen was drawn.

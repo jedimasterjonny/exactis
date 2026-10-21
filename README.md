@@ -86,7 +86,10 @@ filled in one saves to whichever branch another has opened since. A page reads
 the branch once a request, through React's cache, and an action reads the cookie
 and the store afresh. The household itself is read beside a scenario for the
 dashboard to compare the two. In production the cookie carries the `__Host-`
-prefix, as `__Host-exactis_scenario`, for the reason "Signing in" gives.
+prefix, as `__Host-exactis_scenario`, for the reason "Signing in" gives. A
+cookie holding what no scenario could be named, a control character, a line
+break or a name past forty characters, counts as none before it reaches a query
+or a log line.
 
 The actions in `src/actions/scenarios.ts` make a scenario, enter one kept, leave
 it for the household, delete one and adopt one, and the dashboard's header
