@@ -4,7 +4,7 @@ import type { Cell, Row } from "@/lib/workbook";
 
 import { horizon } from "@/data/inflation";
 import { Refusal } from "@/lib/answer";
-import { monthName } from "@/lib/months";
+import { isToCome, monthName } from "@/lib/months";
 import { readSheet } from "@/lib/workbook";
 
 // The columns a row's asset class, the asset's name and its return over
@@ -257,7 +257,7 @@ function columnsOf(header: Row, labels: Row): Columns {
 }
 
 // The vintage and the day its data are as of, from the line above the
-// header dating them.
+// header dating them, either of them after the month it is refused.
 function datesOf(rows: readonly Row[]): Pick<Cma, "asOf" | "vintage"> {
   const line = rows
     .map((row) => dated.exec(textAt(row, 0)))
@@ -272,10 +272,13 @@ function datesOf(rows: readonly Row[]): Pick<Cma, "asOf" | "vintage"> {
   if (date.getUTCMonth() !== asOf.month) {
     throw new Refusal(`The ${sheet} sheet dates its data to no day there is`);
   }
-  return {
-    asOf: date.toISOString().slice(0, 10),
-    vintage: monthOf(month, year),
-  };
+  const vintage = monthOf(month, year);
+  if (isToCome(vintage) || isToCome(asOf)) {
+    throw new Refusal(
+      `The ${sheet} sheet is dated ${line[0]}, after this month`,
+    );
+  }
+  return { asOf: date.toISOString().slice(0, 10), vintage };
 }
 
 // The first column holding the text given, or none.

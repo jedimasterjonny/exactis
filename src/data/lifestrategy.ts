@@ -8,6 +8,7 @@ import { standingFor } from "@/data/class-table";
 import { sleeves } from "@/data/cma";
 import { Refusal } from "@/lib/answer";
 import { sumOf } from "@/lib/ledger";
+import { isToCome, monthIn } from "@/lib/months";
 
 // What LifeStrategy holds, as Vanguard says: the day it is as of, as an
 // ISO date, and its funds, as Vanguard lists them.
@@ -90,9 +91,9 @@ const answer = z.object({
 // its SEDOL with its weight of the whole, and the day they are as of. A
 // line with no SEDOL is the fund's cash, or a currency it holds, and is
 // left out, since the allocation is of funds and the cash is a sliver
-// either side of nothing. An answer that is not Vanguard's, or one
-// listing no fund, is refused in words saying so, since the screen says
-// why nothing was retargeted.
+// either side of nothing. An answer that is not Vanguard's, one listing
+// no fund, or one dated after the month it is, is refused in words
+// saying so, since the screen says why nothing was retargeted.
 export function readHoldings(sent: Uint8Array): Holdings {
   const parsed = answer.safeParse(jsonOf(sent));
   if (!parsed.success) {
@@ -118,6 +119,11 @@ export function readHoldings(sent: Uint8Array): Holdings {
   const [first] = items;
   if (first === undefined || funds.length === 0) {
     throw new Refusal(`Vanguard lists no fund held by ${fund.name}`);
+  }
+  if (isToCome(monthIn(new Date(first.effectiveDate)))) {
+    throw new Refusal(
+      `Vanguard dates what ${fund.name} holds to ${first.effectiveDate}, after this month`,
+    );
   }
   return { asOf: first.effectiveDate, funds };
 }

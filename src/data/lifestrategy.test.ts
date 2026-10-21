@@ -58,6 +58,14 @@ describe("readHoldings", () => {
       readHoldings(vanguardAnswer([["British Pound Sterling", null, 100]])),
     ).toThrow(refusal);
   });
+
+  it("refuses holdings dated after this month", () => {
+    expect(() => readHoldings(vanguardAnswer(lines, "2999-01-31"))).toThrow(
+      new Refusal(
+        "Vanguard dates what LifeStrategy 80% Equity holds to 2999-01-31, after this month",
+      ),
+    );
+  });
 });
 
 describe("retargeted", () => {

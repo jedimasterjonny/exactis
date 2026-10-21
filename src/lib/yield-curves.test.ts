@@ -73,6 +73,24 @@ describe("readCurve", () => {
     expect(readCurve(fileWith(impliedOf(moved))).asOf).toBe("2026-09-01");
   });
 
+  // The second day is past any a date can hold, as only a file that is
+  // not the Bank's would give.
+  it("refuses a latest day after this month", () => {
+    for (const file of [
+      fileWith({}, [before, { ...latest, day: "2999-01-04" }]),
+      fileWith(
+        impliedOf([
+          ["years:", 5],
+          [1e12, 3],
+        ]),
+      ),
+    ]) {
+      expect(() => readCurve(file)).toThrow(
+        new Refusal("The Bank's file runs to a day after this month"),
+      );
+    }
+  });
+
   it("refuses a day nominal less real does not give the implied rate on", () => {
     const off = {
       ...latest,
