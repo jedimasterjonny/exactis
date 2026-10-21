@@ -8,7 +8,7 @@ import { closeScenario, openedScenario, openScenario } from "./scenario";
 // Hoisted because the module mock below is.
 const { jar, sent } = vi.hoisted(() => ({
   jar: {
-    delete: vi.fn<(name: string) => void>(),
+    delete: vi.fn<(cookie: { name: string }) => void>(),
     get: vi.fn<(name: string) => undefined | { name: string; value: string }>(),
     set: vi.fn<(name: string, value: string, options: object) => void>(),
   },
@@ -38,19 +38,30 @@ describe("the scenario open", () => {
     expect(await openedScenario()).toBe("Retire early");
   });
 
-  it("opens a scenario for the browser's session, kept from scripts and sent over HTTPS in production", async () => {
+  it("reads the cookie under the __Host- name in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    sent.set("exactis_scenario", "Retire early");
+
+    expect(await openedScenario()).toBeNull();
+
+    sent.set("__Host-exactis_scenario", "Move house");
+
+    expect(await openedScenario()).toBe("Move house");
+  });
+
+  it("opens a scenario for the browser's session, kept from scripts and sent over HTTPS under the __Host- name in production", async () => {
     vi.stubEnv("NODE_ENV", "production");
 
     await openScenario("Retire early");
 
     expect(jar.set).toHaveBeenCalledExactlyOnceWith(
-      "exactis_scenario",
+      "__Host-exactis_scenario",
       "Retire early",
       { httpOnly: true, path: "/", sameSite: "lax", secure: true },
     );
   });
 
-  it("sends the cookie over plain HTTP outside production", async () => {
+  it("sends the cookie over plain HTTP outside production, under its bare name", async () => {
     vi.stubEnv("NODE_ENV", "development");
 
     await openScenario("Retire early");
@@ -62,9 +73,30 @@ describe("the scenario open", () => {
     );
   });
 
-  it("closes the scenario by deleting the cookie", async () => {
+  it("closes the scenario by deleting the cookie with the attributes it was set with", async () => {
+    await closeScenario();
+    vi.stubEnv("NODE_ENV", "production");
     await closeScenario();
 
-    expect(jar.delete).toHaveBeenCalledExactlyOnceWith("exactis_scenario");
+    expect(jar.delete.mock.calls).toStrictEqual([
+      [
+        {
+          httpOnly: true,
+          name: "exactis_scenario",
+          path: "/",
+          sameSite: "lax",
+          secure: false,
+        },
+      ],
+      [
+        {
+          httpOnly: true,
+          name: "__Host-exactis_scenario",
+          path: "/",
+          sameSite: "lax",
+          secure: true,
+        },
+      ],
+    ]);
   });
 });

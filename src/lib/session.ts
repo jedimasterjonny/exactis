@@ -19,9 +19,6 @@ interface Session {
   readonly signedInAt: number;
 }
 
-// Named for the proxy as well, which reads the request's cookies itself.
-export const sessionCookie = "exactis_session";
-
 // Seven days, then sign in again.
 const ttl = 60 * 60 * 24 * 7;
 
@@ -42,10 +39,22 @@ export function cookieAttributes(): Pick<
   };
 }
 
+// A cookie's name as the browser holds it. Where the cookie is Secure
+// the name carries the __Host- prefix, under which a browser takes the
+// cookie only from this host, over HTTPS and for every path, so no other
+// host under the same domain can set one that shadows it. Over plain
+// HTTP, the development server on the LAN, a browser would refuse a
+// prefixed cookie, so the name is bare.
+export function cookieName(name: string): string {
+  return cookieAttributes().secure === true ? `__Host-${name}` : name;
+}
+
 // Clears the seal. From a server action, since a cookie cannot be
-// written while a page renders.
+// written while a page renders. The deletion carries the attributes the
+// cookie was set with, since a browser ignores one for a __Host- cookie
+// that is not Secure for every path.
 export async function endSession(): Promise<void> {
-  (await cookies()).delete(sessionCookie);
+  (await cookies()).delete({ ...cookieAttributes(), name: sessionCookie() });
 }
 
 // Whether the request carries a session, read from the request's own
@@ -56,7 +65,7 @@ export async function endSession(): Promise<void> {
 // resolves at once.
 export async function hasSession(): Promise<boolean> {
   await io();
-  return holdsSession((await cookies()).get(sessionCookie)?.value);
+  return holdsSession((await cookies()).get(sessionCookie())?.value);
 }
 
 // Whether a cookie's value is a seal this deployment made and still
@@ -86,6 +95,12 @@ export async function requireSession(): Promise<void> {
   }
 }
 
+// The session cookie's name, for the proxy as well, which reads the
+// request's cookies itself.
+export function sessionCookie(): string {
+  return cookieName("exactis_session");
+}
+
 // Seals a new session into the cookie, for as long as a session lasts.
 // From a server action, as above.
 export async function startSession(): Promise<void> {
@@ -94,7 +109,7 @@ export async function startSession(): Promise<void> {
     signedInAt: Date.now(),
   };
   const seal = await sealData(session, { password: sealedWith(), ttl });
-  (await cookies()).set(sessionCookie, seal, {
+  (await cookies()).set(sessionCookie(), seal, {
     ...cookieAttributes(),
     maxAge: ttl,
   });

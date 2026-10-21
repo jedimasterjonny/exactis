@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 
-import { cookieAttributes } from "@/lib/session";
+import { cookieAttributes, cookieName } from "@/lib/session";
 
 // The scenario open is a cookie naming it, as typed, and nothing else.
 // It is not sealed, since it guards nothing: it only says which branch
@@ -14,19 +14,23 @@ const scenarioCookie = "exactis_scenario";
 
 // Clears the scenario open, so the household is read again. From a
 // server action, since a cookie cannot be written while a page renders.
+// The deletion carries the cookie's attributes, as the session's does.
 export async function closeScenario(): Promise<void> {
-  (await cookies()).delete(scenarioCookie);
+  (await cookies()).delete({
+    ...cookieAttributes(),
+    name: cookieName(scenarioCookie),
+  });
 }
 
 // The name of the scenario the request opens, or null for none. That
 // the store keeps a scenario by that name is the store's to say.
 export async function openedScenario(): Promise<null | string> {
-  return (await cookies()).get(scenarioCookie)?.value ?? null;
+  return (await cookies()).get(cookieName(scenarioCookie))?.value ?? null;
 }
 
 // Opens the scenario named. From a server action, as above. It carries
 // the attributes the session's cookie does, and no age, so it ends with
 // the browser's session.
 export async function openScenario(name: string): Promise<void> {
-  (await cookies()).set(scenarioCookie, name, cookieAttributes());
+  (await cookies()).set(cookieName(scenarioCookie), name, cookieAttributes());
 }
