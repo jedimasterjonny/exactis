@@ -10,7 +10,9 @@ import { householdVersions } from "@/db/schema";
 // A store in memory, for tests: a Postgres in the process, standing in
 // for the one the client opens. Booting and migrating one costs about a
 // second, so a file makes one and readies it once, and empties it before
-// each test, which a TRUNCATE does where the trigger refuses a DELETE.
+// each test, deleting every row with the triggers held off for the one
+// transaction, as a restore holds them off, since they refuse to delete
+// a version of the household or to truncate the table.
 export interface Memory {
   readonly close: () => Promise<void>;
   readonly db: Database;
@@ -27,7 +29,10 @@ export function inMemory(): Memory {
     },
     db,
     empty: async (): Promise<void> => {
-      await db.execute(sql`TRUNCATE ${householdVersions}`);
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`SET LOCAL session_replication_role = replica`);
+        await tx.delete(householdVersions);
+      });
     },
     ready: async (): Promise<void> => {
       await migrate(db, { migrationsFolder: "drizzle" });
