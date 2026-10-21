@@ -861,6 +861,13 @@ const sources = z.object({
   targets: targets.nullable().default(null),
 }) satisfies z.ZodType<Sources>;
 
+// The id no record reaches: a million, past any a household gives out a
+// save at a time, and far short of where counting on by one stops being
+// exact. The next id is held to it, so a household holding one past it,
+// as only a file could, is refused, and a record added past it is
+// refused in words rather than in a figure's.
+const idsBelow = 1_000_000;
+
 // The household as the store may keep it: its records sound on their
 // own, the end age the plan action holds it to, the first listed owner
 // retiring no later than it, since the plan is theirs and the chart can
@@ -897,7 +904,7 @@ const kept = z
     housePrices: housePrices.nullable(),
     mappings,
     milestones: z.array(milestone),
-    next: recordId,
+    next: recordId.max(idsBelow, `A record's id is below ${String(idsBelow)}`),
     owners,
     points,
     rates,
