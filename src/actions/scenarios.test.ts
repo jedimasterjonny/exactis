@@ -135,9 +135,13 @@ describe("createScenario", () => {
     expect(openScenario).not.toHaveBeenCalled();
   });
 
-  it("refuses a name of nothing but space, or past forty characters", async () => {
+  it("refuses a name of nothing but space, past forty characters, or holding a control character or line break", async () => {
     await expect(createScenario("   ")).rejects.toThrow(z.ZodError);
     await expect(createScenario("x".repeat(41))).rejects.toThrow(z.ZodError);
+    await expect(createScenario("Retire\r\nearly")).rejects.toThrow(z.ZodError);
+    await expect(createScenario("Retire\u2028early")).rejects.toThrow(
+      z.ZodError,
+    );
     expect(await listScenarios(db)).toStrictEqual([]);
 
     expect(await createScenario("x".repeat(40))).toStrictEqual(

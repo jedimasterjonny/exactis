@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 
+import { scenarioName } from "@/data/schemas";
 import { cookieAttributes, cookieName } from "@/lib/session";
 
 // The scenario open is a cookie naming it, as typed, and nothing else.
@@ -22,10 +23,14 @@ export async function closeScenario(): Promise<void> {
   });
 }
 
-// The name of the scenario the request opens, or null for none. That
+// The name of the scenario the request opens, or null for none, as it
+// is for a cookie holding anything a scenario could not be named. That
 // the store keeps a scenario by that name is the store's to say.
 export async function openedScenario(): Promise<null | string> {
-  return (await cookies()).get(cookieName(scenarioCookie))?.value ?? null;
+  const { data = null } = scenarioName.safeParse(
+    (await cookies()).get(cookieName(scenarioCookie))?.value,
+  );
+  return data;
 }
 
 // Opens the scenario named. From a server action, as above. It carries
