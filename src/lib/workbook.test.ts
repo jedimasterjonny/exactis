@@ -1,10 +1,11 @@
 // @vitest-environment node
+import { zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 
 import { Refusal } from "@/lib/answer";
 import { workbookFrom, workbookOf } from "@/lib/workbook.fixture";
 
-import { readSheet } from "./workbook";
+import { readSheet, unzipped } from "./workbook";
 
 // A workbook holding one sheet, Sheet1, of the XML given, and the
 // strings given kept once for it.
@@ -17,6 +18,53 @@ function oneSheet(sheetData: string, strings = ""): Uint8Array {
       '<workbook><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>',
     "xl/worksheets/sheet1.xml": `<worksheet><sheetData>${sheetData}</sheetData></worksheet>`,
   });
+}
+
+// A zip of one file stored as it is rather than compressed, its
+// directory listing the file the number of times given, each entry
+// pointing at the one copy and saying it unzips to nothing. The
+// directory's end is the last 22 bytes of a zip with no comment, and
+// gives the number of entries 8 and 10 bytes in, the directory's size
+// 12 and where it starts 16; an entry gives its file's unzipped size 24
+// bytes in.
+function storedListed(content: Uint8Array, times: number): Uint8Array {
+  const zip = zipSync({ part: content }, { level: 0 });
+  const view = new DataView(zip.buffer);
+  const end = zip.length - 22;
+  const start = view.getUint32(end + 16, true);
+  view.setUint32(start + 24, 0, true);
+  const entry = zip.subarray(start, end);
+  const listed = new Uint8Array(start + entry.length * times + 22);
+  listed.set(zip.subarray(0, start));
+  for (let at = 0; at < times; at++) {
+    listed.set(entry, start + at * entry.length);
+  }
+  listed.set(zip.subarray(end), listed.length - 22);
+  const tail = new DataView(listed.buffer, listed.length - 22);
+  tail.setUint16(8, times, true);
+  tail.setUint16(10, times, true);
+  tail.setUint32(12, entry.length * times, true);
+  return listed;
+}
+
+// A zip of the files given, its directory saying each unzips to the
+// size given, whatever it does. The directory's end is the last 22
+// bytes of a zip with no comment, and says where the directory starts
+// and how many files it lists; each file's entry gives its unzipped
+// size 24 bytes in, and runs 46 bytes and its name long.
+function zipSaying(
+  files: Readonly<Record<string, Uint8Array>>,
+  size: number,
+): Uint8Array {
+  const zip = zipSync(files);
+  const view = new DataView(zip.buffer);
+  const end = zip.length - 22;
+  let entry = view.getUint32(end + 16, true);
+  for (let left = view.getUint16(end + 10, true); left > 0; left--) {
+    view.setUint32(entry + 24, size, true);
+    entry += 46 + view.getUint16(entry + 28, true);
+  }
+  return zip;
 }
 
 describe("readSheet", () => {
@@ -232,5 +280,62 @@ describe("readSheet", () => {
     expect(() =>
       readSheet(oneSheet('<row r="1"><c r="4"><v>1</v></c></row>'), "Sheet1"),
     ).toThrow(new Refusal("The workbook has a cell in no column it names"));
+  });
+});
+
+describe("unzipped", () => {
+  it("refuses a zip whose files say they unzip to more than 32 MB together", () => {
+    const zip = zipSaying(
+      { one: new Uint8Array(8), two: new Uint8Array(8) },
+      16_000_001,
+    );
+
+    expect(() => unzipped(zip, "The file is not a zip")).toThrow(
+      new Refusal(
+        "The zip unzips to more than 32 MB, far past any file read from one",
+      ),
+    );
+  });
+
+  // A stored file is copied at its size in the zip, whatever it says
+  // it unzips to, so forty entries pointing at one megabyte would copy
+  // forty.
+  it("counts a stored file at its size in the zip, for each entry pointing at it", () => {
+    expect(() =>
+      unzipped(
+        storedListed(new Uint8Array(1_000_000), 40),
+        "The file is not a zip",
+      ),
+    ).toThrow(
+      new Refusal(
+        "The zip unzips to more than 32 MB, far past any file read from one",
+      ),
+    );
+  });
+
+  it("refuses a zip listing more than 1,000 files", () => {
+    const one = new Uint8Array([7]);
+
+    expect(
+      unzipped(storedListed(one, 1000), "The file is not a zip"),
+    ).toStrictEqual({ part: one });
+    expect(() =>
+      unzipped(storedListed(one, 1001), "The file is not a zip"),
+    ).toThrow(
+      new Refusal(
+        "The zip lists more than 1,000 files, far more than any read here",
+      ),
+    );
+  });
+
+  // The zip says its file unzips to a kilobyte, and it unzips to a
+  // megabyte, as one built to fill the memory under a size it does not
+  // say would.
+  it("cuts a file unzipping to more than its zip says off at what it says", () => {
+    const zip = zipSaying({ part: new Uint8Array(1_000_000) }, 1000);
+
+    expect(unzipped(zip, "The file is not a zip")).toStrictEqual({
+      part: new Uint8Array(1000),
+    });
   });
 });
