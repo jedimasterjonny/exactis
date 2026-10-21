@@ -44,9 +44,11 @@ const nextConfig: NextConfig = {
     // endpoint this enables, and switching it off leaves that server with
     // nothing to find.
     mcpServer: true,
-    // Emits integrity="sha512-..." on every external chunk, which the browser
-    // verifies independently of any CSP. Does not hash the inline scripts, so
-    // it does not unlock a strict script-src.
+    // Emits integrity="sha512-..." on the bootstrap chunks the build manifest
+    // lists, which the browser verifies independently of any CSP. A client
+    // component's chunk carries none, whether the HTML names it or the
+    // runtime loads it from the flight payload, and nor do the inline
+    // scripts, so it does not unlock a strict script-src.
     sri: { algorithm: "sha512" },
     // Type-checks props and return values of route files. Undocumented: no
     // page in the shipped docs, only JSDoc in config-shared.d.ts.
