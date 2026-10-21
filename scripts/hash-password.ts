@@ -12,4 +12,4 @@ import { hashPassword } from "@/lib/password";
 // One trailing line break is dropped, so an echo without -n is not
 // quietly hashed with a newline the sign-in form will never send.
 const password = (await text(stdin)).replace(/\r?\n$/, "");
-stdout.write(`${hashPassword(password)}\n`);
+stdout.write(`${await hashPassword(password)}\n`);

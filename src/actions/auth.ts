@@ -24,7 +24,7 @@ export async function signIn(
   const password = formData.get("password");
   if (
     typeof password !== "string" ||
-    !verifyPassword(password, readEnv("APP_PASSWORD_HASH"))
+    !(await verifyPassword(password, readEnv("APP_PASSWORD_HASH")))
   ) {
     return { error: "That is not the password." };
   }
