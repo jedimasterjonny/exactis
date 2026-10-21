@@ -42,6 +42,41 @@ describe("download", () => {
     );
   });
 
+  // A source that would send for ever is read no further than the
+  // limit, a megabyte at a time, and let go there.
+  it("stops reading a file running past 10 MB, and lets the rest go", async () => {
+    const cancel = vi.fn<() => void>();
+    sourceSends(
+      new Response(
+        new ReadableStream({
+          cancel,
+          pull: (controller): void => {
+            controller.enqueue(new Uint8Array(1_000_000));
+          },
+        }),
+      ),
+    );
+
+    expect(await download(address, "The source", "its file")).toBe(
+      "The source sent more than 10 MB, far past the size of its file",
+    );
+    expect(cancel).toHaveBeenCalledOnce();
+
+    sourceSends(new Response(new Uint8Array(10_000_000)));
+
+    expect(await download(address, "The source", "its file")).toHaveLength(
+      10_000_000,
+    );
+  });
+
+  it("hands back an empty file for an answer with no body", async () => {
+    sourceSends(new Response(null, { status: 204 }));
+
+    expect(await download(address, "The source", "its file")).toStrictEqual(
+      new Uint8Array(),
+    );
+  });
+
   // A fetch that runs out of time rejects, as one that finds nobody
   // does.
   it("says nothing was sent when the source does not answer in time", async () => {
