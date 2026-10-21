@@ -1,4 +1,6 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, inject, it } from "vitest";
+import * as z from "zod";
 
 const origin = inject("origin");
 
@@ -36,7 +38,9 @@ describe("the production server", () => {
 
     expect(response.status).toBe(303);
     expect(landing(response)).toBe("/");
-    expect(cookie).toMatch(/^exactis_session=[^;]+; /);
+    expect(cookie).toMatch(/^__Host-exactis_session=[^;]+; /);
+    expect(cookie).toMatch(/; Path=\/(;|$)/);
+    expect(cookie).not.toMatch(/; Domain=/);
     expect(cookie).toMatch(/; HttpOnly(;|$)/);
     expect(cookie).toMatch(/; Secure(;|$)/);
     expect(cookie).toMatch(/; SameSite=lax(;|$)/);
@@ -49,7 +53,52 @@ describe("the production server", () => {
     expect(revisit.status).toBe(307);
     expect(landing(revisit)).toBe("/");
   });
+
+  it("signs out by deleting both cookies under the names and attributes they were set with", async () => {
+    const [cookie = ""] = (
+      await signIn(inject("password"))
+    ).headers.getSetCookie();
+    const body = new FormData();
+    body.append(`$ACTION_ID_${await actionId("signOut")}`, "");
+    const response = await fetch(`${origin}/`, {
+      body,
+      headers: { cookie: cookie.split(";")[0] ?? "", origin },
+      method: "POST",
+      redirect: "manual",
+    });
+
+    expect(response.status).toBe(303);
+    expect(landing(response)).toBe("/login");
+    expect(response.headers.getSetCookie()).toStrictEqual([
+      "__Host-exactis_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; HttpOnly; SameSite=lax",
+      "__Host-exactis_scenario=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; HttpOnly; SameSite=lax",
+    ]);
+  });
 });
+
+// The id the build gave a server action, read from the manifest next
+// build writes. A form posting the action carries the id in a field React
+// names for it, as the sign-in form does; the form that signs out is
+// drawn on screens that read the store, which this server cannot reach,
+// so the id is read here rather than off the page.
+async function actionId(name: string): Promise<string> {
+  const { node } = z
+    .object({
+      node: z.record(z.string(), z.object({ exportedName: z.string() })),
+    })
+    .parse(
+      JSON.parse(
+        await readFile(".next/server/server-reference-manifest.json", "utf8"),
+      ),
+    );
+  const [id] =
+    Object.entries(node).find(([, action]) => action.exportedName === name) ??
+    [];
+  if (id === undefined) {
+    throw new Error(`The build has no server action named ${name}`);
+  }
+  return id;
+}
 
 // The hidden inputs of the form that holds the password field, as name and
 // value. React writes these into a form whose action is a server action,
