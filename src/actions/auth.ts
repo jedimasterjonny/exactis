@@ -2,7 +2,6 @@
 
 import { redirect } from "next/navigation";
 
-import { isDevSignInOpen } from "@/lib/dev-sign-in";
 import { readEnv } from "@/lib/env";
 import { verifyPassword } from "@/lib/password";
 import { closeScenario } from "@/lib/scenario";
@@ -28,18 +27,6 @@ export async function signIn(
     !verifyPassword(password, readEnv("APP_PASSWORD_HASH"))
   ) {
     return { error: "That is not the password." };
-  }
-  await startSession();
-  redirect("/");
-}
-
-// Starts the session with no password asked, for development. The door
-// is checked here and not only where the button is drawn, since an
-// action answers a POST from anywhere; a post at a closed door is a bug
-// or a forgery, and fails loudly rather than as a miss.
-export async function signInAsDeveloper(): Promise<void> {
-  if (!isDevSignInOpen()) {
-    throw new Error("The development sign-in is closed");
   }
   await startSession();
   redirect("/");
