@@ -55,11 +55,39 @@ describe("readIndex", () => {
       ),
       registryAnswer([["2021-13", 287540]]),
       registryAnswer([["2021-10", 0]]),
+      new TextEncoder().encode(
+        '{"result":{"items":[{"refMonth":"2021-10","averagePriceDetached":1e999}]}}',
+      ),
     ]) {
       expect(() => readIndex(file, bought.month)).toThrow(
         "The Land Registry's answer is not its house price index",
       );
     }
+  });
+
+  // A month priced at a pound would write the house at nothing over
+  // every point since it was bought.
+  it("refuses a month priced under a tenth or over ten times the month the house was bought in", () => {
+    for (const [price, said] of [
+      [28753, "£28,753"],
+      [2875401, "£2,875,401"],
+      [1, "£1"],
+    ] as const) {
+      expect(() =>
+        readIndex(
+          registryAnswer([...quoted, ["2026-08", price]]),
+          bought.month,
+        ),
+      ).toThrow(
+        `The Land Registry's index prices August 2026 at ${said} against £287,540 in October 2021, further than house prices move`,
+      );
+    }
+    expect(
+      readIndex(
+        registryAnswer([...quoted, ["2026-08", 28754], ["2026-09", 2875400]]),
+        bought.month,
+      ).to,
+    ).toStrictEqual({ month: 8, year: 2026 });
   });
 
   it("refuses an index running to a month after this one", () => {
