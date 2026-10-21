@@ -15,6 +15,9 @@ vi.mock("@/lib/session", () => ({
   startSession: vi.fn(),
 }));
 
+// Made once, since a derivation takes a good part of a second.
+const hash = await hashPassword("correct horse");
+
 function form(password?: string): FormData {
   const data = new FormData();
   if (password !== undefined) {
@@ -25,7 +28,7 @@ function form(password?: string): FormData {
 
 describe("signIn", () => {
   beforeEach(() => {
-    vi.stubEnv("APP_PASSWORD_HASH", hashPassword("correct horse"));
+    vi.stubEnv("APP_PASSWORD_HASH", hash);
     vi.mocked(redirect).mockImplementation(() => {
       throw new Error("redirected");
     });
