@@ -185,9 +185,11 @@ describe("AccountDialog", () => {
     expect(
       screen.getByRole("dialog", { name: "Account updated" }),
     ).toHaveAccessibleDescription("Workplace pension");
-    expect(
-      screen.queryByRole("dialog", { name: "Workplace pension" }),
-    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Workplace pension" }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   // The fields a contribution choice shows mount with what the account

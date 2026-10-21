@@ -176,9 +176,11 @@ describe("PlanAssumptions", () => {
         screen.getByRole("dialog", { name: "Assumptions updated" }),
       ).toHaveAccessibleDescription("Projected to age 91");
     });
-    expect(
-      screen.queryByRole("dialog", { name: /^Projected to age/ }),
-    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: /^Projected to age/ }),
+      ).not.toBeInTheDocument();
+    });
     expect(saveAges).not.toHaveBeenCalled();
   });
 
