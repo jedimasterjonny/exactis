@@ -33,6 +33,13 @@ const year = z
 // and never empty.
 export const named = z.string().trim().min(1);
 
+// A scenario's name: a name as above, short enough for a menu to hold,
+// and with no control character or line break in it. The name is what
+// the scenario's cookie carries, unsealed, into every query that reads
+// the branch and every log line a failed one writes, so a cookie that is
+// not such a name counts as none before it reaches either.
+export const scenarioName = named.max(40).regex(/^[^\p{Cc}\p{Zl}\p{Zp}]*$/u);
+
 // A sum of money: whole pounds, and never below nothing.
 export const pounds = z.number().int().nonnegative();
 

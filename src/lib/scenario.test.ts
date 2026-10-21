@@ -38,6 +38,20 @@ describe("the scenario open", () => {
     expect(await openedScenario()).toBe("Retire early");
   });
 
+  it("counts a cookie holding anything a scenario could not be named as none", async () => {
+    for (const value of [
+      'a";\r\nX-Injected: 1',
+      "Retire\u2028early",
+      "Retire\tearly",
+      "   ",
+      "x".repeat(41),
+    ]) {
+      sent.set("exactis_scenario", value);
+
+      expect(await openedScenario()).toBeNull();
+    }
+  });
+
   it("reads the cookie under the __Host- name in production", async () => {
     vi.stubEnv("NODE_ENV", "production");
     sent.set("exactis_scenario", "Retire early");
