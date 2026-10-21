@@ -15,7 +15,7 @@ function sourceSends(response: Response): Mock<typeof globalThis.fetch> {
 }
 
 describe("download", () => {
-  it("hands back the file, asked for fresh and in limited time", async () => {
+  it("hands back the file, asked for fresh, in limited time and following no redirect", async () => {
     const fetch = sourceSends(new Response(new Uint8Array([1, 2, 3])));
 
     expect(await download(address, "The source", "its file")).toStrictEqual(
@@ -23,13 +23,13 @@ describe("download", () => {
     );
     expect(fetch).toHaveBeenCalledWith(
       address,
-      expect.objectContaining({ cache: "no-store" }),
+      expect.objectContaining({ cache: "no-store", redirect: "manual" }),
     );
     expect(fetch.mock.lastCall?.[1]).not.toHaveProperty("method");
     expect(fetch.mock.lastCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it("sends a request given as it is, fresh and in limited time, and hands back what the source answers with", async () => {
+  it("sends a request given as it is, fresh, in limited time and following no redirect, and hands back what the source answers with", async () => {
     const fetch = sourceSends(new Response(new Uint8Array([4, 5])));
     const asked = new Request(address, { body: '{"ask":1}', method: "POST" });
 
@@ -38,7 +38,7 @@ describe("download", () => {
     );
     expect(fetch).toHaveBeenCalledWith(
       asked,
-      expect.objectContaining({ cache: "no-store" }),
+      expect.objectContaining({ cache: "no-store", redirect: "manual" }),
     );
   });
 
@@ -70,6 +70,17 @@ describe("download", () => {
 
     expect(await download(address, "The source", "its file")).toBe(
       "The source answered 503 rather than sending its file",
+    );
+
+    sourceSends(
+      new Response(null, {
+        headers: { location: "https://elsewhere.example.com/" },
+        status: 301,
+      }),
+    );
+
+    expect(await download(address, "The source", "its file")).toBe(
+      "The source answered 301 rather than sending its file",
     );
   });
 });
