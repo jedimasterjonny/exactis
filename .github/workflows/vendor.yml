@@ -31,6 +31,11 @@ on:
 permissions:
   contents: read
 
+# A scheduled or dispatched run may write to main's cache scope, which every
+# ci.yml run restores from, setup-bun's cached bun binary among it. Neither
+# job here needs a cache, so registry code gets no way to plant one.
+cache-mode: none
+
 # Never cancel a refresh: two runs racing on one branch would leave whichever
 # lost having force-pushed a half-built tree.
 concurrency:
