@@ -73,7 +73,7 @@ describe("session", () => {
       expect.stringMatching(/^Fe26\.2/),
       {
         httpOnly: true,
-        maxAge: 2592000,
+        maxAge: 604800,
         path: "/",
         sameSite: "lax",
         secure: true,

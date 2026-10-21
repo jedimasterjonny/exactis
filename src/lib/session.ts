@@ -19,8 +19,8 @@ interface Session {
 // Named for the proxy as well, which reads the request's cookies itself.
 export const sessionCookie = "exactis_session";
 
-// Thirty days, then sign in again.
-const ttl = 60 * 60 * 24 * 30;
+// Seven days, then sign in again.
+const ttl = 60 * 60 * 24 * 7;
 
 // The attributes every cookie the app writes carries, the session's and
 // the scenario's alike: kept from scripts, for every path, sent only
