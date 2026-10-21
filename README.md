@@ -63,10 +63,11 @@ of it to the rules in `src/data/household.ts`, and keeps it as the version after
 the one it read, in one statement. So a save lands whole or not at all, one the
 household changed under since it was read is refused rather than written over
 the other, and a save that breaks a rule is refused in the rule's words. No
-version is written over, and none of the household's is deleted, which the table
-holds with a trigger, so every household the store has held stays; a scenario
-can be dropped, every version of it at once, where the household never can. A
-read holds the latest version to the same rules before any screen draws from it.
+version is written over, none of the household's is deleted, and the table is
+never truncated, which it holds with triggers, so every household the store has
+held stays; a scenario can be dropped, every version of it at once, where the
+household never can. A read holds the latest version to the same rules before
+any screen draws from it.
 
 A scenario is a branch of the household in the same table: the household is the
 branch with no name, and a request opens a scenario by the `exactis_scenario`
