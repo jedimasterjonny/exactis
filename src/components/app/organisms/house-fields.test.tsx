@@ -173,7 +173,7 @@ describe("HouseFields", () => {
 
   // The fixture plan starts in September 2026, so a house is bought in
   // 2026 at the latest.
-  it("holds what is owed, paid and bought for at nothing or above, and the year bought between the first and the plan's", () => {
+  it("holds what is owed, paid and bought for at nothing or above, and the year bought between 1900 and the plan's", () => {
     const { onAmend, onAmendPart } = renderFields(home, "rate", 0.0537);
 
     commit(field("Loan balance"), "-300,000");
@@ -188,7 +188,7 @@ describe("HouseFields", () => {
     ]);
     expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
       { bought: { month: { month: 5, year: 2022 }, price: 0 } },
-      { bought: { month: { month: 5, year: 1 }, price: 380000 } },
+      { bought: { month: { month: 5, year: 1900 }, price: 380000 } },
       { bought: { month: { month: 5, year: 2026 }, price: 380000 } },
     ]);
   });

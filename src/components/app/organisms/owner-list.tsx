@@ -22,7 +22,7 @@ import { Button } from "@/components/kit/button";
 import { Table, TableBody, TableCell, TableRow } from "@/components/kit/table";
 import { ageOf, atAge } from "@/data/milestones";
 import { openingOwner } from "@/data/owners";
-import { oldestAge } from "@/data/plan";
+import { earliestYear, latestYear, oldestAge } from "@/data/plan";
 import { useEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { listed } from "@/lib/feeders";
@@ -43,7 +43,8 @@ const blank: OwnerValues = { ...openingOwner, name: "" };
 // owner a row of its name with a pencil and a bin, and a button in the
 // header adding another. An owner is a name, the year they were born
 // and the age they retire at, so its dialog is the name over the two
-// years side by side, the age typed with no slider, since it is set on
+// years side by side, the year held to those a plan's dates fall in, as
+// the store holds it, and the age typed with no slider, since it is set on
 // purpose here and dragged on the dashboard, and written as their
 // retirement's one condition; an owner retiring when conditions hold
 // has no age to type, the dialog saying where it is set in its place,
@@ -153,6 +154,8 @@ export function OwnerList({
             <YearField
               defaultValue={entry.initial.born}
               label="Born"
+              max={latestYear}
+              min={earliestYear}
               onValueCommitted={(born) => {
                 amend(entry, { born });
               }}

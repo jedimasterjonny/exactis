@@ -1575,6 +1575,36 @@ describe("soundKept", () => {
     ).toThrow("Too big: expected number to be <=11");
   });
 
+  // A year typed a digit long or short would run the plan, or the
+  // progress chart between two points, a month at a time for millennia.
+  // The partner is given the next id, as a store would give it.
+  it("keeps a year born and a month's year from 1900 to 2100, and refuses one outside", () => {
+    const withPartner = (born: number): Kept => ({
+      ...kept,
+      next: 21,
+      owners: [...owners, { ...sam, born, id: 20 }],
+    });
+    const asOf = (year: number): Kept => ({
+      ...kept,
+      asOf: { month: 7, year },
+    });
+
+    for (const year of [1900, 2100]) {
+      expect(soundKept(withPartner(year)).kept).toStrictEqual(
+        withPartner(year),
+      );
+      expect(soundKept(asOf(year)).kept).toStrictEqual(asOf(year));
+    }
+    for (const year of [1899, 2101]) {
+      expect(() => soundKept(withPartner(year))).toThrow(
+        /^A year is from 1900 to 2100$/,
+      );
+      expect(() => soundKept(asOf(year))).toThrow(
+        /^A year is from 1900 to 2100$/,
+      );
+    }
+  });
+
   it("refuses what is no kept household at all", () => {
     expect(() => soundKept({ accounts: [] })).toThrow(
       "Invalid input: expected object, received undefined",
