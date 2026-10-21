@@ -6,7 +6,7 @@ import { hashPassword } from "@/lib/password";
 import { closeScenario } from "@/lib/scenario";
 import { endSession, startSession } from "@/lib/session";
 
-import { signIn, signInAsDeveloper, signOut } from "./auth";
+import { signIn, signOut } from "./auth";
 
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/scenario", () => ({ closeScenario: vi.fn() }));
@@ -46,34 +46,6 @@ describe("signIn", () => {
     await expect(signIn({}, form("correct horse"))).rejects.toThrow(
       "redirected",
     );
-    expect(startSession).toHaveBeenCalledOnce();
-    expect(redirect).toHaveBeenCalledExactlyOnceWith("/");
-  });
-});
-
-describe("signInAsDeveloper", () => {
-  beforeEach(() => {
-    vi.mocked(redirect).mockImplementation(() => {
-      throw new Error("redirected");
-    });
-  });
-
-  it("refuses at a closed door without a session", async () => {
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("APP_DEV_SIGN_IN", "1");
-
-    await expect(signInAsDeveloper()).rejects.toThrow(
-      "The development sign-in is closed",
-    );
-    expect(startSession).not.toHaveBeenCalled();
-    expect(redirect).not.toHaveBeenCalled();
-  });
-
-  it("starts the session at an open door and goes to the dashboard", async () => {
-    vi.stubEnv("NODE_ENV", "development");
-    vi.stubEnv("APP_DEV_SIGN_IN", "1");
-
-    await expect(signInAsDeveloper()).rejects.toThrow("redirected");
     expect(startSession).toHaveBeenCalledOnce();
     expect(redirect).toHaveBeenCalledExactlyOnceWith("/");
   });
