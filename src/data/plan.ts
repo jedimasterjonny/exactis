@@ -269,8 +269,9 @@ export function marginOf(line: {
 // over. The rates, the split and the rebalancing are taken together,
 // as the household keeps them. A plan whose age is already
 // reached runs no years forward rather than a count below nothing. A
-// household with no owner has no plan to make, and the store refuses to
-// keep one, so a caller handing one here has skipped the model.
+// household with no owner has no plan to make, nor one whose owner
+// retires with themselves, and the store refuses to keep either, so a
+// caller handing one here has skipped the model.
 export function planOf(
   { ages, asOf, drawdown, owners }: Setting,
   {
@@ -287,6 +288,9 @@ export function planOf(
   const [owner] = owners;
   if (owner === undefined) {
     throw new Error(rules.somebodys);
+  }
+  if (owner.retirement === "retirement") {
+    throw new Error(rules.retiresWith);
   }
   const [only, ...rest] = owner.retirement;
   return {

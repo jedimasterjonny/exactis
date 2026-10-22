@@ -12,8 +12,8 @@ import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
 // What a save may carry: the name as typed less the space around it,
-// which the form also trims, and never empty, the year born and the age
-// retiring, each as the model holds them. The qualifying years are not
+// which the form also trims, and never empty, the year born and the
+// retirement, each as the model holds them. The qualifying years are not
 // among them, since the dialog does not hold them: they are typed on
 // the assumptions screen and written by saveQualifyingYears, and a save
 // here keeps them as they are.
@@ -27,7 +27,9 @@ const values = z
 // none, so the account or the line is given to another owner or
 // deleted first, and the refusal says so in words that say what to do.
 // The last owner is refused by the household in its own words, since a
-// plan is somebody's. Checked as a save is.
+// plan is somebody's, as is the plan's owner while the owner listed next
+// retires with them, since the plan would pass to an owner retiring with
+// themselves. Checked as a save is.
 export async function removeOwner(id: number): Promise<Answer<undefined>> {
   await requireSession();
   const at = recordId.parse(id);

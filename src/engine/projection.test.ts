@@ -4,12 +4,13 @@ import { describe, expect, it } from "vitest";
 import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeLine } from "@/data/income";
+import type { Owner } from "@/data/owners";
 import type { Drawdown, Plan } from "@/data/plan";
 
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines } from "@/data/income.fixture";
-import { retiringAt, timed } from "@/data/milestones";
+import { atAge, retiringAt, timed } from "@/data/milestones";
 import { sam, working } from "@/data/owners.fixture";
 import { endYear } from "@/data/plan";
 import { drawFor, drawOf, lumpSumAllowance } from "@/lib/tax";
@@ -2363,6 +2364,49 @@ describe("retiring when conditions hold", () => {
     expect(points).toStrictEqual(retiringFixed(37));
     expect(points).not.toStrictEqual(retiringFixed(47));
     expect(points[1]?.balances[saving.id]).toBeGreaterThan(300000);
+  });
+
+  // Sam, born in 1993, retires with the plan's owner, so their salary,
+  // tied to nothing, stops in 2027 as the conditions hold, as it would
+  // were they set to retire at 34, the age they reach then, rather than
+  // running to the end.
+  it("retires an owner retiring with the plan's owner in the year the conditions hold", () => {
+    const withSam = (retirement: Owner["retirement"]): Plan => ({
+      ...onConditions,
+      owners: [...onConditions.owners, { ...sam, retirement }],
+    });
+    const earning = {
+      ...lines,
+      income: [
+        ...lines.income,
+        {
+          ...salary,
+          amount: 60000,
+          bonus: 0,
+          feeds: null,
+          id: 3,
+          lastYear: null,
+          owner: sam.id,
+          rsu: 0,
+          sacrifice: 0,
+        },
+      ],
+    } as const;
+    const points = project([saving], earning, withSam("retirement"));
+
+    expect(
+      retirementIn(points, {
+        accounts: [saving],
+        plan: withSam("retirement"),
+        schedule: earning,
+      }),
+    ).toBe(2027);
+    expect(points).toStrictEqual(
+      project([saving], earning, withSam(atAge(34))),
+    );
+    expect(points).not.toStrictEqual(
+      project([saving], earning, withSam(atAge(60))),
+    );
   });
 
   // A hundred years of retired spending is £1,200,000, which ten years

@@ -77,7 +77,9 @@ export function OwnerList({
     remove: removeOwner,
   });
   const retires =
-    entry === null ? undefined : ageOf({ conditions: entry.draft.retirement });
+    entry === null || entry.draft.retirement === "retirement"
+      ? undefined
+      : ageOf({ conditions: entry.draft.retirement });
 
   return (
     <>
