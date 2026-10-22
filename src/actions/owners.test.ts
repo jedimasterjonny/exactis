@@ -137,6 +137,18 @@ describe("the owner actions", () => {
       );
     });
 
+    it("lets anyone but the plan's owner retire with them, refusing the plan's owner in the rule's words", async () => {
+      await expect(
+        saveOwner(1, { ...kid, retirement: "retirement" }),
+      ).resolves.toStrictEqual(
+        refused("Only someone else retires with the plan's owner"),
+      );
+      expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+      expect(
+        await saveOwner(20, { ...kid, retirement: "retirement" }),
+      ).toStrictEqual(saved({ ...kid, id: 20, retirement: "retirement" }));
+    });
+
     it("refuses a name of nothing but space, a year or an age that is not whole, an age below nothing, a retirement on nothing, an id the list could not have sent, and one no owner has", async () => {
       await expect(saveOwner(null, { ...kid, name: "   " })).rejects.toThrow(
         z.ZodError,
@@ -204,6 +216,25 @@ describe("the owner actions", () => {
 
       await expect(removeOwner(20)).resolves.toStrictEqual(
         refused("An owner who earns an income line stays"),
+      );
+      expect(await readLatest(db, "")).toMatchObject({ version: 2 });
+    });
+
+    // The partner listed first, holding and earning nothing, with the
+    // reference owner retiring with them: deleting the partner would
+    // leave the reference owner retiring with themselves.
+    it("refuses to delete the plan's owner while the next listed retires with them, in the household's words, and writes nothing", async () => {
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        {
+          ...shared,
+          owners: [partner, { ...owners[0], retirement: "retirement" }],
+        },
+      );
+
+      await expect(removeOwner(20)).resolves.toStrictEqual(
+        refused("Only someone else retires with the plan's owner"),
       );
       expect(await readLatest(db, "")).toMatchObject({ version: 2 });
     });

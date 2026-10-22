@@ -122,7 +122,7 @@ describe("planOf", () => {
 
   // Sam, born in 1995, listed first: the plan is theirs, so it reaches
   // 91 three years later and retires when they do.
-  it("is the first listed owner's, and nobody's is refused", () => {
+  it("is the first listed owner's, and nobody's, or one retiring with themselves, is refused", () => {
     expect(
       planOf(
         { ...setting, owners: [{ ...sam, retirement: atAge(67) }, ...owners] },
@@ -132,6 +132,12 @@ describe("planOf", () => {
     expect(() => planOf({ ...setting, owners: [] }, opening)).toThrow(
       "A plan is somebody's",
     );
+    expect(() =>
+      planOf(
+        { ...setting, owners: [{ ...sam, retirement: "retirement" }] },
+        opening,
+      ),
+    ).toThrow("Only someone else retires with the plan's owner");
   });
 
   // Twenty-five years of expenses, in liquid net worth, which no year of

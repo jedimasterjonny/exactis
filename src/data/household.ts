@@ -366,15 +366,17 @@ const owner = z.object({
 
 // The owners, one at least, since the plan is the first listed owner's
 // and a household with none has no plan to make, and anyone but the
-// plan's owner retiring at an age, in the rule's words, since the
-// engine refuses the same.
+// plan's owner retiring at an age or with them, and the plan's owner
+// not with themselves, each in the rule's words, since the engine
+// refuses the same.
 const owners = z
   .array(owner)
   .min(1, rules.somebodys)
   .refine(
-    (listed) => listed.slice(1).every(isRetiringAtAge),
+    (listed) => !listed.slice(1).some(isRetiringOnConditions),
     rules.retiresAtAge,
-  );
+  )
+  .refine(([first]) => first?.retirement !== "retirement", rules.retiresWith);
 
 // A progress point as the model lays it: each sum whole pounds, the
 // balances held nothing or more and the two debts nothing or less, in
@@ -916,8 +918,9 @@ const kept = z
     targets: targets.nullable(),
   })
   .refine(
-    ({ ages, owners }) =>
-      (ageOf({ conditions: owners[0]?.retirement ?? [] }) ?? 0) <= ages.ends,
+    ({ ages, owners: [owner] }) =>
+      owner?.retirement === "retirement" ||
+      (ageOf({ conditions: owner?.retirement ?? [] }) ?? 0) <= ages.ends,
     "A plan's owner retires no later than it ends",
   )
   .refine(
@@ -1199,10 +1202,13 @@ function isListedOnce(records: readonly { readonly id: number }[]): boolean {
   return new Set(records.map((record) => record.id)).size === records.length;
 }
 
-// Whether an owner retires at an age, their retirement's one condition
-// on it.
-function isRetiringAtAge({ retirement }: Owner): boolean {
-  return ageOf({ conditions: retirement }) !== undefined;
+// Whether an owner retires when conditions of their own hold, rather
+// than at an age or with the plan's owner.
+function isRetiringOnConditions({ retirement }: Owner): boolean {
+  return (
+    retirement !== "retirement" &&
+    ageOf({ conditions: retirement }) === undefined
+  );
 }
 
 // The rates and the split the plan runs on: those typed, or those the

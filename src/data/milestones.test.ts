@@ -166,13 +166,16 @@ describe("moving", () => {
 });
 
 describe("retiresOn", () => {
-  it("reads what the plan's owner retires on where it is conditions, and nothing where it is an age or there is no owner", () => {
+  it("reads what the plan's owner retires on where it is conditions, and nothing where it is an age, with themselves, or there is no owner", () => {
     expect(
       retiresOn({
         owners: [{ ...owners[0], retirement: independence.conditions }],
       }),
     ).toStrictEqual(independence.conditions);
     expect(retiresOn(retiring)).toBeUndefined();
+    expect(
+      retiresOn({ owners: [{ ...owners[0], retirement: "retirement" }] }),
+    ).toBeUndefined();
     expect(retiresOn({ owners: [] })).toBeUndefined();
   });
 });
@@ -197,6 +200,23 @@ describe("retirementYearOf", () => {
     expect(() =>
       retirementYearOf({ ...sam, retirement: onConditions }, plan),
     ).toThrow("Only the plan's owner retires when conditions hold");
+  });
+
+  // Sam retires with the plan's owner: in 2053 where the owner retires
+  // at 61, and past the end of a plan to 91 where they retire on
+  // financial independence, until a run says otherwise.
+  it("reads the plan's year for anyone retiring with its owner, refusing its owner retiring with themselves", () => {
+    const withSam = { ...sam, retirement: "retirement" } as const;
+    const plan = { ...retiring, owners: [owners[0], withSam] };
+
+    expect(retirementYearOf(withSam, plan)).toBe(2053);
+    expect(retirementYearOf(withSam, { ...plan, retires: 92 })).toBe(2084);
+    expect(() =>
+      retirementYearOf(
+        { ...owners[0], retirement: "retirement" },
+        { ...plan, owners: [{ ...owners[0], retirement: "retirement" }] },
+      ),
+    ).toThrow("Only someone else retires with the plan's owner");
   });
 });
 

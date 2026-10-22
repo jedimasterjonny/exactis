@@ -17,16 +17,17 @@ export interface Owner extends OwnerValues {
 // name the accounts screen lists an owner by, the year they were born,
 // which turns a year of the plan into an age of theirs, and their
 // retirement, from which they earn nothing by working, held as a
-// milestone's conditions are: one on the age, for a retirement reached
-// at an age. The years of National Insurance they have qualified for
-// the State Pension on are absent rather than nothing until they are
-// typed, as the model has them, and are typed on the assumptions screen
-// rather than in the dialog.
+// milestone's conditions are, one on the age for a retirement reached
+// at an age, or tied to Retirement, as a line's end is, for an owner
+// retiring with the plan's owner. The years of National Insurance they
+// have qualified for the State Pension on are absent rather than
+// nothing until they are typed, as the model has them, and are typed
+// on the assumptions screen rather than in the dialog.
 export interface OwnerValues {
   readonly born: number;
   readonly name: string;
   readonly qualifyingYears?: number;
-  readonly retirement: readonly Condition[];
+  readonly retirement: "retirement" | readonly Condition[];
 }
 
 // The most qualifying years an owner holds: more than a working life

@@ -6,7 +6,7 @@ import type { Condition, Milestone, MilestoneValues } from "@/data/milestones";
 import type { Answer } from "@/lib/answer";
 
 import { untied } from "@/data/milestones";
-import { milestoneValues, ownerValues, recordId, target } from "@/data/schemas";
+import { milestoneValues, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { found, removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
@@ -83,14 +83,14 @@ export async function saveMilestone(
 // whose plan it is, and hands it back as the plan lays it out among the
 // milestones: named Retirement, reached on what was sent. An action
 // answers a POST from anywhere, so it checks the session for itself and
-// parses what it was sent, as an owner's retirement is parsed, rather
-// than trusting the dialog. The household holds a retirement at an age
+// parses what it was sent, as a milestone's conditions are parsed,
+// rather than trusting the dialog. The household holds a retirement at an age
 // to the plan's end, in its words.
 export async function saveRetirement(
   conditions: readonly Condition[],
 ): Promise<Answer<MilestoneValues>> {
   await requireSession();
-  const parsed = ownerValues.retirement.parse(conditions);
+  const parsed = milestoneValues.conditions.parse(conditions);
   return amend(({ kept }) => ({
     kept: {
       ...kept,
