@@ -3,6 +3,7 @@
 import type { JSX } from "react";
 
 import { UserPlus, Users } from "lucide-react";
+import { useRef } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
@@ -17,6 +18,7 @@ import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { YearField } from "@/components/app/molecules/figure-field";
 import { RowActions } from "@/components/app/molecules/row-actions";
 import { SectionCard } from "@/components/app/molecules/section-card";
+import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { Button } from "@/components/kit/button";
 import { Table, TableBody, TableCell, TableRow } from "@/components/kit/table";
@@ -48,10 +50,14 @@ const blank: OwnerValues = { ...openingOwner, name: "" };
 // purpose here and dragged on the dashboard, and written as their
 // retirement's one condition; an owner retiring when conditions hold
 // has no age to type, the dialog saying where it is set in its place,
-// and keeps what they retire on as it is. The section holds its own
-// dialog and question rather than handing them up to the ledger, as
-// the payment order holds its reordering. The rows are the store's, handed down by
-// the page, and a save or a deletion comes back with the page re-read.
+// and keeps what they retire on as it is. Anyone but the plan's owner
+// chooses between an age and retiring with the plan's owner, named,
+// between the two years, and retiring with them has no age to type
+// either, while turning back finds the age they last held. The section
+// holds its own dialog and question rather than handing them up to the
+// ledger, as the payment order holds its reordering. The rows are the
+// store's, handed down by the page, and a save or a deletion comes back
+// with the page re-read.
 // A section holding no owners draws its empty state instead of the
 // table. An owner an account names, or an income line is earned by,
 // says which beneath its name and has its bin held, since the store
@@ -80,6 +86,24 @@ export function OwnerList({
     entry === null || entry.draft.retirement === "retirement"
       ? undefined
       : ageOf({ conditions: entry.draft.retirement });
+  const [planOwner] = owners;
+  const withWhom =
+    entry === null || planOwner === undefined || entry.id === planOwner.id
+      ? undefined
+      : planOwner;
+  // The age the owner in the dialog last held, which turning them back
+  // from retiring with the plan's owner restores: the age typed when
+  // they turned, else the age they were opened with, or a new owner's
+  // for one opened retiring with them.
+  const agedRef = useRef(openingOwner.retirement);
+
+  function openOwner(values: OwnerValues, id: null | number): void {
+    agedRef.current =
+      values.retirement === "retirement"
+        ? openingOwner.retirement
+        : values.retirement;
+    open(values, id);
+  }
 
   return (
     <>
@@ -87,7 +111,7 @@ export function OwnerList({
         actions={
           <Button
             onClick={() => {
-              open(blank, null);
+              openOwner(blank, null);
             }}
             size="sm"
             variant="outline"
@@ -126,7 +150,7 @@ export function OwnerList({
                       name={owner.name}
                       onDelete={ask}
                       onEdit={({ born, id, name, retirement }) => {
-                        open({ born, name, retirement }, id);
+                        openOwner({ born, name, retirement }, id);
                       }}
                       row={owner}
                     />
@@ -152,7 +176,13 @@ export function OwnerList({
             }}
             placeholder="Me, a partner…"
           />
-          <FieldRow layout="pair">
+          <FieldRow
+            layout={
+              withWhom === undefined || entry.draft.retirement === "retirement"
+                ? "pair"
+                : "triple"
+            }
+          >
             <YearField
               defaultValue={entry.initial.born}
               label="Born"
@@ -162,22 +192,45 @@ export function OwnerList({
                 amend(entry, { born });
               }}
             />
-            {retires === undefined ? (
-              <p className="text-sm text-muted-foreground">
-                {`Retires when conditions hold, set among the milestones on ${planScreen.label}`}
-              </p>
-            ) : (
-              <AgeField
-                hasSlider={false}
-                label="Retires at"
-                max={oldestAge}
-                min={0}
-                onValueCommitted={(age) => {
-                  amend(entry, { retirement: atAge(age) });
+            {withWhom !== undefined && (
+              <SelectField
+                defaultValue={
+                  entry.initial.retirement === "retirement" ? "with" : "age"
+                }
+                label="Retires"
+                onValueChange={(choice) => {
+                  const { retirement } = entry.draft;
+                  if (retirement !== "retirement") {
+                    agedRef.current = retirement;
+                  }
+                  amend(entry, {
+                    retirement:
+                      choice === "with" ? "retirement" : agedRef.current,
+                  });
                 }}
-                value={retires}
+                options={[
+                  { label: "At an age", value: "age" },
+                  { label: `With ${withWhom.name}`, value: "with" },
+                ]}
               />
             )}
+            {entry.draft.retirement !== "retirement" &&
+              (retires === undefined ? (
+                <p className="text-sm text-muted-foreground">
+                  {`Retires when conditions hold, set among the milestones on ${planScreen.label}`}
+                </p>
+              ) : (
+                <AgeField
+                  hasSlider={false}
+                  label="Retires at"
+                  max={oldestAge}
+                  min={0}
+                  onValueCommitted={(age) => {
+                    amend(entry, { retirement: atAge(age) });
+                  }}
+                  value={retires}
+                />
+              ))}
           </FieldRow>
         </EditDialog>
       )}
@@ -203,9 +256,10 @@ function Beneath({ children }: { readonly children: string }): JSX.Element {
 
 // Why an owner's bin is held, if it is: the accounts naming them and
 // the income lines they earn are given to another owner or deleted
-// first, or another owner is added first, since the plan is the last
-// owner's. An owner holding and earning nothing, with another listed,
-// can go.
+// first, the owner the plan would pass to is set to retire at an age
+// first, where they retire with the plan's owner, or another owner is
+// added first, since the plan is the last owner's. An owner holding
+// and earning nothing, with another listed, can go.
 function deleteLockOf(
   owner: Owner,
   {
@@ -217,6 +271,10 @@ function deleteLockOf(
   const theirs = [...heldBy(owner, accounts), ...earnedBy(owner, lines)];
   if (theirs.length > 0) {
     return `Give ${listed.format(theirs)} to another owner first`;
+  }
+  const [first, next] = owners;
+  if (owner.id === first?.id && next?.retirement === "retirement") {
+    return `Set ${next.name} to retire at an age first`;
   }
   return owners.length === 1
     ? "Add another owner first, since a plan is somebody's"
