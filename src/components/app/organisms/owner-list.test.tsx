@@ -90,6 +90,9 @@ describe("OwnerList", () => {
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(field("Born", dialog)).toHaveValue("1992");
     expect(field("Retires at", dialog)).toHaveValue("61");
+    expect(
+      within(dialog).queryByRole("combobox", { name: "Retires" }),
+    ).not.toBeInTheDocument();
 
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: " Me " },
@@ -192,6 +195,139 @@ describe("OwnerList", () => {
       expect(
         screen.getByRole("dialog", { name: "Owner updated" }),
       ).toBeInTheDocument();
+    });
+  });
+
+  // Sam is not the plan's owner, so may retire with them; Me is, and is
+  // offered no such choice.
+  it("lets anyone but the plan's owner retire with them, offering no age, and saves the tie", async () => {
+    renderList([me, sam]);
+    vi.mocked(saveOwner).mockResolvedValue(
+      saved({ ...sam, retirement: "retirement" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Me" }));
+
+    expect(
+      within(screen.getByRole("dialog", { name: "Me" })).queryByRole(
+        "combobox",
+        { name: "Retires" },
+      ),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Sam" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Sam" });
+    const retires = within(dialog).getByRole("combobox", { name: "Retires" });
+    // The row the choice sits in, three wide while the age sits beside it.
+    const label = within(dialog).getByText("Retires");
+    // eslint-disable-next-line testing-library/no-node-access -- the row is a layout box with no role or text of its own to query by
+    const row = label.parentElement?.parentElement;
+
+    expect(retires).toHaveValue("age");
+    expect(
+      within(retires)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual(["At an age", "With Me"]);
+    expect(row).toHaveClass("sm:grid-cols-3");
+
+    fireEvent.change(retires, { target: { value: "with" } });
+
+    expect(
+      within(dialog).queryByRole("textbox", { name: "Retires at" }),
+    ).not.toBeInTheDocument();
+    expect(row).toHaveClass("sm:grid-cols-2");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(sam.id, {
+      born: sam.born,
+      name: sam.name,
+      retirement: "retirement",
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Owner updated" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("offers a new owner the choice once the household has an owner", () => {
+    renderList([me]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add owner" }));
+
+    const retires = within(
+      screen.getByRole("dialog", { name: "Unnamed owner" }),
+    ).getByRole("combobox", { name: "Retires" });
+
+    expect(retires).toHaveValue("age");
+    expect(
+      within(retires)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual(["At an age", "With Me"]);
+  });
+
+  // Sam opened retiring with Me goes back to the age a new owner opens
+  // on, 61, and not to the age Kid held when turned in a dialog
+  // cancelled before.
+  it("opens an owner retiring with the plan's owner on the tie, and turns them back to a new owner's age", () => {
+    renderList([
+      me,
+      { ...sam, retirement: "retirement" },
+      { ...sam, id: 30, name: "Kid", retirement: atAge(54) },
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Kid" }));
+    fireEvent.change(
+      within(screen.getByRole("dialog", { name: "Kid" })).getByRole(
+        "combobox",
+        { name: "Retires" },
+      ),
+      { target: { value: "with" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Sam" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Sam" });
+    const retires = within(dialog).getByRole("combobox", { name: "Retires" });
+
+    expect(retires).toHaveValue("with");
+    expect(
+      within(dialog).queryByRole("textbox", { name: "Retires at" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(retires, { target: { value: "age" } });
+
+    expect(field("Retires at", dialog)).toHaveValue("61");
+  });
+
+  // Sam opened at 54 turns back to 54, and typed to 62 back to 62.
+  it("turns an owner back to the age they last held, opened with or typed", () => {
+    renderList([me, { ...sam, retirement: atAge(54) }]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Sam" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Sam" });
+    const retires = within(dialog).getByRole("combobox", { name: "Retires" });
+
+    fireEvent.change(retires, { target: { value: "with" } });
+    fireEvent.change(retires, { target: { value: "age" } });
+
+    expect(field("Retires at", dialog)).toHaveValue("54");
+
+    commit(field("Retires at", dialog), "62");
+    fireEvent.change(retires, { target: { value: "with" } });
+    fireEvent.change(retires, { target: { value: "age" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(sam.id, {
+      born: sam.born,
+      name: sam.name,
+      retirement: atAge(62),
     });
   });
 
@@ -309,6 +445,32 @@ describe("OwnerList", () => {
     expect(
       screen.getByRole("img", { name: "Give Salary to another owner first" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Me" })).toBeEnabled();
+  });
+
+  // Deleting Me would leave the plan Sam's, retiring with themselves, so
+  // the store refuses it; Sam can still go.
+  it("holds the bin of the plan's owner while the next listed retires with them", () => {
+    renderList([me, { ...sam, retirement: "retirement" }]);
+
+    expect(
+      screen.queryByRole("button", { name: "Delete Me" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Set Sam to retire at an age first" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Sam" })).toBeEnabled();
+  });
+
+  // Deleting Me leaves the plan Sam's, retiring at an age, with Kid
+  // retiring with Sam.
+  it("leaves the bin of the plan's owner free where the plan passes to someone retiring at an age", () => {
+    renderList([
+      me,
+      sam,
+      { ...sam, id: 30, name: "Kid", retirement: "retirement" },
+    ]);
+
     expect(screen.getByRole("button", { name: "Delete Me" })).toBeEnabled();
   });
 
