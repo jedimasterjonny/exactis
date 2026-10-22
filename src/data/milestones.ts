@@ -197,17 +197,25 @@ export function moving(
 }
 
 // The year an owner the plan carries retires in: the year they reach
-// the age, for a retirement reached at an age, and for the plan's owner
-// one reached when conditions hold, the year the plan lays it out in.
-// Only the plan's owner retires when conditions hold, so anyone else's
-// retirement on conditions is refused in the rule's words, as the model
-// refuses to keep one.
+// the age, for a retirement reached at an age, and the year the plan
+// lays its owner's retirement out in, for the plan's owner retiring
+// when conditions hold and for anyone else retiring with them. Only the
+// plan's owner retires when conditions hold, and only someone else
+// retires with them, so either broken is refused in the rule's words,
+// as the model refuses to keep it.
 export function retirementYearOf(owner: Owner, plan: Plan): number {
+  const isPlans = owner.id === plan.owners[0]?.id;
+  if (owner.retirement === "retirement") {
+    if (isPlans) {
+      throw new Error(rules.retiresWith);
+    }
+    return retirementYear(plan);
+  }
   const age = ageOf({ conditions: owner.retirement });
   if (age !== undefined) {
     return yearAt(age, owner);
   }
-  if (owner.id !== plan.owners[0]?.id) {
+  if (!isPlans) {
     throw new Error(rules.retiresAtAge);
   }
   return retirementYear(plan);
@@ -217,12 +225,14 @@ export function retirementYearOf(owner: Owner, plan: Plan): number {
 // where they retire at an age, or the plan has no owner to retire: a
 // retirement reached at an age falls in the year the plan lays it out
 // in, and one reached when conditions hold only a run of the plan can
-// place.
+// place. The plan's owner retiring with themselves is refused where the
+// plan is made, so it is read as no conditions here.
 export function retiresOn(
   plan: Pick<Plan, "owners">,
 ): readonly Condition[] | undefined {
   const [owner] = plan.owners;
   return owner === undefined ||
+    owner.retirement === "retirement" ||
     ageOf({ conditions: owner.retirement }) !== undefined
     ? undefined
     : owner.retirement;

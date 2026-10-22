@@ -87,12 +87,12 @@ unpaid or paid twice. Retirement is a milestone of its own, the year the plan's
 owner, the first the household lists, retires in, so a line tied to it moves
 with the retirement age.
 
-A salary or a self-employed profit stops when the owner who earns it retires, at
-their own age, whatever its line says, since money earned by working is not
-earned once the work stops: the plan's owner's at Retirement, and another
-owner's at the age they retire at, since the milestone is the plan's owner's
-alone. A line ending before then ends where it says, and a pension or any other
-income runs on.
+A salary or a self-employed profit stops when the owner who earns it retires,
+whatever its line says, since money earned by working is not earned once the
+work stops: the plan's owner's at Retirement, and another owner's at the age
+they retire at, since the milestone is the plan's owner's alone, or at
+Retirement where they retire with the plan's owner. A line ending before then
+ends where it says, and a pension or any other income runs on.
 
 A milestone moved past the other end of a line tied to it leaves the line
 running no years, rather than the milestone being refused over a line tied to
@@ -450,6 +450,12 @@ and a year's expenses as they would be were the owner to retire then. Until then
 they earn, a line starting at retirement has not started and one ending at it
 runs on, and from then the year is carried as a plan retiring at the age they
 reach in it.
+
+Another owner may still retire with the plan's owner rather than at an age of
+their own, as a household retiring together does, and then retires at
+Retirement, whatever it is reached on. So where it is reached when conditions
+hold they earn until the run retires the plan's owner, and stop in that year
+too. The plan's owner cannot retire with themselves, since Retirement is theirs.
 
 ## The draw
 
