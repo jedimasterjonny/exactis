@@ -60,6 +60,24 @@ describe("saveAges", () => {
     expect(await readLatest(db, "")).toBeNull();
   });
 
+  // The dashboard was drawn in a scenario that was left before the age
+  // it held back was sent; then one drawn on the household.
+  it("refuses a save naming a branch other than the one open, and keeps one naming the branch open", async () => {
+    await expect(
+      saveAges({ retires: 55 }, "Retire early"),
+    ).resolves.toStrictEqual(
+      refused(
+        "Another branch was opened before this was saved, so nothing was; make the change again",
+      ),
+    );
+    expect(await readLatest(db, "")).toBeNull();
+
+    expect(await saveAges({ retires: 55 }, null)).toStrictEqual(
+      saved({ ends: 91, retires: 55 }),
+    );
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+  });
+
   // The plan is the first listed owner's, so the retirement age is
   // written onto them and nobody else.
   it("writes the retirement age onto the first listed owner, keeping the end age, and draws the page again", async () => {
