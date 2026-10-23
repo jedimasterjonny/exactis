@@ -136,10 +136,11 @@ progress points, which the accounts screen's month end records off the balances
 it closes, and pulls the house price index into them. The sidebar hands the
 household, or the scenario open, out as a file, as a save would keep it, and its
 balances as one row of the owner's balances sheet. A file is read back in as the
-next version of what is open, refused as any save is. `DATABASE_URL` names the
-database, as `.env.example` shows. Nothing reads it until a query runs, so a
-build needs no database. Locally, point it at a Neon branch of your own and
-apply the migrations once:
+next version of what is open, refused as any save is, and gives its next record
+no id below the one the branch would, since an id is never given out twice.
+`DATABASE_URL` names the database, as `.env.example` shows. Nothing reads it
+until a query runs, so a build needs no database. Locally, point it at a Neon
+branch of your own and apply the migrations once:
 
 ```bash
 bun run db:migrate

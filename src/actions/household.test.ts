@@ -64,6 +64,19 @@ describe("importHousehold", () => {
     });
   });
 
+  // A file saved before an account was added, as a backup restored: the
+  // id the household gives its next record stays where the account moved
+  // it, so no id is given out twice.
+  it("holds the next record's id at the household's where the file's is lower", async () => {
+    expect(await importHousehold(fileOf(blank))).toStrictEqual(
+      saved(undefined),
+    );
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped({ ...blank, next: reference.next }),
+      version: 2,
+    });
+  });
+
   it("refuses text that is no JSON, and writes nothing", async () => {
     expect(await importHousehold("exactis")).toStrictEqual(
       refused("That is not a household file"),
