@@ -46,8 +46,9 @@ import { amend } from "@/store/household";
 // finance's rate no lower than nothing, a financed car owing and paying
 // something, a PCP owing more than a balloon of something and a loan no
 // balloon, a car owned outright owing, paying and charged nothing,
-// since the form zeroes what its agreement hides, and the name as typed
-// less the space around it.
+// since the form zeroes what its agreement hides, the name as typed
+// less the space around it, and the loan the finance was opened from
+// by its id, or none.
 const car = z
   .object({
     agreement: z.enum(agreements),
@@ -55,6 +56,7 @@ const car = z
     balloon: pounds,
     depreciation: z.number().max(1),
     floor: pounds,
+    loan: recordId.nullable(),
     name: named,
     payment: pounds,
     rate: z.number().nonnegative(),
@@ -74,15 +76,17 @@ const car = z
 // own soundness so the two cannot drift: the figures whole and never
 // negative, the ceiling among them, the house's growth no lower than
 // losing everything, as an account's rate is, each sub-account's rate
-// no lower than nothing, a mortgaged house held in a sub-account at
-// least, each owing and paying something, a house owned outright in
-// none, since the form drops what its status hides, the month it was
-// bought in and the price, which its soundness holds to something, the
-// name as typed less the space around it, and a move or none: at a
-// milestone by its id, in a whole year, its figures whole and never
-// negative, the share borrowed no more than the whole price and the
-// rate no lower than nothing. That the milestone is one the household
-// lists, reached at an age, is the household's to hold.
+// no lower than nothing and the loan it was opened from by its id, or
+// none, no two opened from one, since the dialog opens one a loan and
+// two would write the same loan twice, a mortgaged house held in a
+// sub-account at least, each owing and paying something, a house owned
+// outright in none, since the form drops what its status hides, the
+// month it was bought in and the price, which its soundness holds to
+// something, the name as typed less the space around it, and a move or
+// none: at a milestone by its id, in a whole year, its figures whole
+// and never negative, the share borrowed no more than the whole price
+// and the rate no lower than nothing. That the milestone is one the
+// household lists, reached at an age, is the household's to hold.
 const house = z
   .object({
     bought: z.object({ month, price: pounds }),
@@ -103,6 +107,7 @@ const house = z
     parts: z.array(
       z.object({
         balance: pounds,
+        loan: recordId.nullable(),
         payment: pounds,
         rate: z.number().nonnegative(),
       }),
@@ -111,9 +116,13 @@ const house = z
     value: pounds,
   })
   .refine(isSound)
-  .refine(
-    (draft) => draft.status === "mortgaged" || draft.parts.length === 0,
-  ) satisfies z.ZodType<HouseValues>;
+  .refine((draft) => draft.status === "mortgaged" || draft.parts.length === 0)
+  .refine((draft) => {
+    const opened = draft.parts.flatMap(({ loan }) =>
+      loan === null ? [] : [loan],
+    );
+    return new Set(opened).size === opened.length;
+  }) satisfies z.ZodType<HouseValues>;
 
 // What a save may carry, checked against the model's own lists so the
 // two cannot drift: the figures whole, a contribution, a cap and a
@@ -406,9 +415,8 @@ function dated(account: Account, listed: Account | undefined): Account {
 }
 
 // A loan secured on an asset and the line of its payments, written over
-// the loan the asset had in its place, which keeps its id, and so does
-// the line paying it; what is added takes the next, the loan before its
-// line.
+// the loan given, which keeps its id, and so does the line paying it;
+// what is added takes the next, the loan before its line.
 function loanIn(
   kept: Kept,
   { account, line: paying }: SecuredRecords["loans"][number],
@@ -464,10 +472,13 @@ function sacrificed(
 // An asset and the loans secured on it, written: the asset as a new
 // account when the id is null and over the one with that id otherwise,
 // and hands back the asset's account. An edit finds the loans by the
-// asset and writes each over the one in its place, in the order they
-// are listed, adding what is not there, and sends the loans past the
-// last away with their lines; an asset with no loan against it now
-// sends every loan away. The whole lands together or not at all.
+// asset and writes each loan sent over the one it was opened from, by
+// its id, wherever it is listed, adds one opened from none, and sends
+// the loans none was opened from away with their lines; an asset with
+// no loan against it now sends every loan away. An id naming no loan
+// secured on the asset, as one sent away since the form was drawn or
+// another account altogether, is refused, so a save never writes one
+// loan's figures over another. The whole lands together or not at all.
 function securedIn(
   { kept }: Held,
   at: null | number,
@@ -477,7 +488,10 @@ function securedIn(
   const { accounts, schedule } = entered.kept;
   const secures = entered.result.id;
   const had = accounts.filter((account) => account.secures === secures);
-  const gone = new Set(had.slice(loans.length).map(({ id }) => id));
+  const sent = new Set(loans.map(({ loan }) => loan));
+  const gone = new Set(
+    had.filter(({ id }) => !sent.has(id)).map(({ id }) => id),
+  );
   const left: Kept = {
     ...entered.kept,
     accounts: accounts.filter(({ id }) => !gone.has(id)),
@@ -489,11 +503,13 @@ function securedIn(
     },
   };
   return {
-    kept: loans.reduce(
-      (written, borrowing, place) =>
-        loanIn(written, borrowing, { loan: had[place], secures }),
-      left,
-    ),
+    kept: loans.reduce((written, borrowing) => {
+      const loan = had.find(({ id }) => id === borrowing.loan);
+      if (borrowing.loan !== null && loan === undefined) {
+        throw new Refusal("No loan secured on the asset has the id");
+      }
+      return loanIn(written, borrowing, { loan, secures });
+    }, left),
     result: entered.result,
   };
 }

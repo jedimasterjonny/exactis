@@ -1744,7 +1744,10 @@ describe("a line paying a loan", () => {
   // end of February, whatever year the line was saved from.
   it("counts the payments from the month after the one the balances are as of, so the end moves with it", () => {
     const flat = toHouseRecords(
-      { ...homeValues, parts: [{ balance: 114000, payment: 1000, rate: 0 }] },
+      {
+        ...homeValues,
+        parts: [{ balance: 114000, loan: null, payment: 1000, rate: 0 }],
+      },
       { from: 2026 },
     );
 

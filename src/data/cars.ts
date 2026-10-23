@@ -28,13 +28,16 @@ export interface CarDraft extends CarValues {
 // what is owed, whole pounds and positive, the rate it is charged at,
 // what is paid a month, whole pounds, and on a PCP the balloon, the
 // final payment the agreement puts off to its end, which a loan leaves
-// at nothing. A car owned outright owes and pays nothing.
+// at nothing. A car owned outright owes and pays nothing. The finance
+// carries the id of the loan it was opened from, or none for finance
+// not yet held, so a save writes it back over that loan.
 export interface CarValues {
   readonly agreement: Agreement;
   readonly balance: number;
   readonly balloon: number;
   readonly depreciation: number;
   readonly floor: number;
+  readonly loan: null | number;
   readonly name: string;
   readonly payment: number;
   readonly rate: number;
@@ -51,8 +54,9 @@ export const agreements = ["pcp", "loan", "outright"] as const;
 // owed, so it comes back positive, its rate is the finance's, its
 // contribution the payment, a month as the records lay it, and its
 // balloon the agreement's, which says whether the agreement is a PCP or
-// a loan. A car with no loan against it is owned outright and owes
-// nothing; the store holds a car to one.
+// a loan, and its id is the one the finance was opened from. A car with
+// no loan against it is owned outright and owes nothing; the store
+// holds a car to one.
 export function carOf({ asset, loans: [loan] }: Secured): CarValues {
   const held = toValues(asset);
   const owed = loan === undefined ? null : toValues(loan);
@@ -62,6 +66,7 @@ export function carOf({ asset, loans: [loan] }: Secured): CarValues {
     balloon: owed === null ? 0 : owed.balloon,
     depreciation: negated(held.rate),
     floor: asset.limit ?? 0,
+    loan: loan?.id ?? null,
     name: held.name,
     payment: owed === null ? 0 : owed.contribution,
     rate: owed === null ? 0 : owed.rate,
@@ -130,6 +135,7 @@ export function toRecords(
           {
             balance: car.balance,
             balloon: car.balloon,
+            loan: car.loan,
             name: `${car.name} ${car.agreement === "pcp" ? "PCP" : "loan"}`,
             payment: car.payment,
             rate: car.rate,

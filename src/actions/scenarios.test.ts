@@ -7,6 +7,7 @@ import type { Kept } from "@/data/household";
 import type { Answer } from "@/lib/answer";
 
 import { blank, kept as reference, today } from "@/data/household.fixture";
+import { homePart, homeValues } from "@/data/houses.fixture";
 import { currentShape, stamped } from "@/data/shapes";
 import { keepAfter, listScenarios, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -16,6 +17,7 @@ import { refused, saved } from "@/lib/answer";
 import { closeScenario, openedScenario, openScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 
+import { closeBalances, saveHouse } from "./accounts";
 import {
   adoptScenario,
   createScenario,
@@ -399,6 +401,46 @@ describe("adoptScenario", () => {
         points: reference.points,
       }),
       version: 2,
+    });
+  });
+
+  // The home's mortgage in two sub-accounts, the first, 21, owing
+  // £234,670 at 4.85% and the second, 23, £100,000 at 4.2%; the
+  // scenario takes the first away, and the household then reads the
+  // second at £99,460. The second is laid over by its own id, so it
+  // carries the household's balance at its own rate, with its own
+  // payments, and the first is gone with its payments.
+  it("lays a sub-account the scenario kept over its own loan, and keeps none it took away", async () => {
+    const second = { balance: 100000, loan: null, payment: 540, rate: 0.042 };
+    await keepFirst("", reference);
+    await saveHouse(null, {
+      ...homeValues,
+      parts: [{ ...homePart, balance: 234670 }, second],
+    });
+    await createScenario("Retire early");
+    vi.mocked(openedScenario).mockResolvedValue("Retire early");
+    await saveHouse(20, { ...homeValues, parts: [{ ...second, loan: 23 }] });
+    vi.mocked(openedScenario).mockResolvedValue(null);
+    await closeBalances({
+      asOf: reference.asOf,
+      balances: [{ balance: -99_460, id: 23 }],
+    });
+
+    expect(await adoptScenario("Retire early")).toStrictEqual(saved(undefined));
+    expect(await readLatest(db, "")).toMatchObject({
+      household: {
+        accounts: [
+          ...reference.accounts,
+          { id: 20 },
+          { balance: -99_460, growth: { rate: 0.042 }, id: 23 },
+        ],
+        schedule: {
+          expenses: [
+            ...reference.schedule.expenses,
+            { amount: 540, id: 24, pays: 23 },
+          ],
+        },
+      },
     });
   });
 

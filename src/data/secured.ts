@@ -45,18 +45,22 @@ interface Asset {
 // A loan secured on an asset and the line of its payments: the loan
 // carries what is owed and the rate it is charged at, the line what is
 // paid and until when. The store holds them apart and every asset's
-// model writes them together, so they travel as one.
+// model writes them together, so they travel as one, with the id of the
+// loan they are written over, or none for a new one.
 interface Borrowing {
   readonly account: AccountValues;
   readonly line: LineValues;
+  readonly loan: null | number;
 }
 
 // The loan as its asset's model hands it to be written: its name, what
 // is owed, whole pounds and positive, the balloon the payments leave
-// standing, the rate it is charged at and what is paid a month.
+// standing, the rate it is charged at, what is paid a month, and the id
+// of the loan it was opened from, or none for a new one.
 interface Loan {
   readonly balance: number;
   readonly balloon: number;
+  readonly loan: null | number;
   readonly name: string;
   readonly payment: number;
   readonly rate: number;
@@ -135,6 +139,7 @@ export function securedRecords(
         name: loan.name,
         startsAt: null,
       },
+      loan: loan.loan,
     })),
   };
 }

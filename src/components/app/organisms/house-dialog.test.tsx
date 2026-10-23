@@ -140,7 +140,7 @@ describe("HouseDialog", () => {
       growth: 0,
       move: null,
       name: "Home",
-      parts: [{ balance: 334670, payment: 1889, rate: 0.0485 }],
+      parts: [{ balance: 334670, loan: null, payment: 1889, rate: 0.0485 }],
       status: "mortgaged",
       value: 397512,
     });
@@ -212,7 +212,9 @@ describe("HouseDialog", () => {
       growth: 0.021,
       move: null,
       name: "Home",
-      parts: [{ balance: 176520, payment: 2180, rate: 0.0485 }],
+      parts: [
+        { balance: 176520, loan: houseLoan.id, payment: 2180, rate: 0.0485 },
+      ],
       status: "mortgaged",
       value: 420000,
     });
@@ -285,7 +287,9 @@ describe("HouseDialog", () => {
       growth: 0.021,
       move: null,
       name: "Home",
-      parts: [{ balance: 176520, payment: 2180, rate: 0.0485 }],
+      parts: [
+        { balance: 176520, loan: houseLoan.id, payment: 2180, rate: 0.0485 },
+      ],
       status: "mortgaged",
       value: 397512,
     });
@@ -383,7 +387,7 @@ describe("HouseDialog", () => {
       growth: 0,
       move: null,
       name: "Home",
-      parts: [{ balance: 334670, payment: 1000, rate: 0.0485 }],
+      parts: [{ balance: 334670, loan: null, payment: 1000, rate: 0.0485 }],
       status: "mortgaged",
       value: 0,
     });
@@ -468,12 +472,39 @@ describe("HouseDialog", () => {
       move: null,
       name: "Home",
       parts: [
-        { balance: 176520, payment: 2180, rate: 0.0485 },
-        { balance: 60000, payment: 500, rate: 0.039 },
+        { balance: 176520, loan: houseLoan.id, payment: 2180, rate: 0.0485 },
+        { balance: 60000, loan: further.id, payment: 500, rate: 0.039 },
       ],
       status: "mortgaged",
       value: 397512,
     });
+  });
+
+  // Taking the first sub-account away leaves the second carrying the
+  // loan it was opened from, so the store writes it back over that loan
+  // and not over the first's.
+  it("saves a sub-account left once the one before it is taken away with the loan it was opened from", async () => {
+    const onSaved = vi.fn<() => void>();
+    saved(houseAsset);
+    renderDialog({ house: { ...house, loans: [houseLoan, further] }, onSaved });
+    const dialog = openDialog();
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Remove sub-account 1" }),
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(
+      home.id,
+      expect.objectContaining({
+        parts: [
+          { balance: 60000, loan: further.id, payment: 400, rate: 0.039 },
+        ],
+      }),
+    );
   });
 
   // A sub-account added owes nothing yet, so the save holds until it owes
@@ -522,7 +553,7 @@ describe("HouseDialog", () => {
     expect(saveHouse).toHaveBeenCalledExactlyOnceWith(
       home.id,
       expect.objectContaining({
-        parts: [{ balance: 60000, payment: 313, rate: 0.039 }],
+        parts: [{ balance: 60000, loan: null, payment: 313, rate: 0.039 }],
       }),
     );
   });
@@ -655,7 +686,9 @@ describe("HouseDialog", () => {
         year: 2040,
       },
       name: "Home",
-      parts: [{ balance: 176520, payment: 2180, rate: 0.0485 }],
+      parts: [
+        { balance: 176520, loan: houseLoan.id, payment: 2180, rate: 0.0485 },
+      ],
       status: "mortgaged",
       value: 397512,
     });

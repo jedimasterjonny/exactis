@@ -89,7 +89,7 @@ const parted = {
   ...house,
   parts: [
     { ...homePart, balance: 234670 },
-    { balance: 100000, payment: 540, rate: 0.042 },
+    { balance: 100000, loan: null, payment: 540, rate: 0.042 },
   ],
 };
 
@@ -571,7 +571,7 @@ describe("the account actions", () => {
         await saveHouse(20, {
           ...house,
           ceiling: 600000,
-          parts: [{ ...homePart, payment: 3000 }],
+          parts: [{ ...homePart, loan: 21, payment: 3000 }],
           value: 450000,
         }),
       ).toStrictEqual(saved({ ...home, balance: 450000, limit: 600000 }));
@@ -598,7 +598,7 @@ describe("the account actions", () => {
         { ...kept, accounts: [...kept.accounts, home, mortgage], next: 22 },
       );
 
-      await saveHouse(20, house);
+      await saveHouse(20, { ...house, parts: [{ ...homePart, loan: 21 }] });
 
       expect(await latest()).toMatchObject({
         accounts: [...kept.accounts, home, mortgage],
@@ -676,17 +676,63 @@ describe("the account actions", () => {
       });
     });
 
-    // The sub-accounts are matched by place, so the first keeps its
-    // records and the one past the last goes with its payments.
-    it("writes over the sub-accounts in their places, and sends those past the last away with their payments", async () => {
+    // Each sub-account is matched by the loan it was opened from, not by
+    // its place: with the first taken away, the second is written back
+    // over its own loan, which keeps its id and its payments, now named
+    // as the only one, and the first goes with its payments, rather than
+    // the second's figures landing on the first's id.
+    it("writes each sub-account over the loan it was opened from, and sends those none was opened from away with their payments", async () => {
       await saveHouse(null, parted);
-      await saveHouse(20, house);
+      await saveHouse(20, {
+        ...house,
+        parts: [{ balance: 100000, loan: 23, payment: 540, rate: 0.042 }],
+      });
 
       expect(await latest()).toMatchObject({
-        accounts: [...kept.accounts, home, mortgage],
+        accounts: [
+          ...kept.accounts,
+          home,
+          {
+            balance: -100000,
+            contribution: { amount: 540 },
+            growth: { rate: 0.042 },
+            id: 23,
+            name: "Home mortgage",
+            secures: 20,
+          },
+        ],
         next: 25,
-        schedule: { expenses: [...kept.schedule.expenses, payments] },
+        schedule: {
+          expenses: [
+            ...kept.schedule.expenses,
+            { amount: 540, id: 24, name: "Home mortgage", pays: 23 },
+          ],
+        },
       });
+    });
+
+    // A sub-account opened from a loan the house does not hold, as one
+    // sent away since the dialog was drawn, the house itself, a debt
+    // secured on nothing or a car's finance, would write its figures
+    // over that account, so it is refused; so is a new house claiming
+    // the mortgage of one held already.
+    it("refuses a sub-account opened from a loan not secured on the house, and writes nothing", async () => {
+      await saveHouse(null, house);
+      await saveCar(null, golf);
+
+      for (const loan of [99, 20, 5, 24]) {
+        await expect(
+          saveHouse(20, { ...house, parts: [{ ...homePart, loan }] }),
+        ).resolves.toStrictEqual(
+          refused("No loan secured on the asset has the id"),
+        );
+      }
+      await expect(
+        saveHouse(null, { ...house, parts: [{ ...homePart, loan: 21 }] }),
+      ).resolves.toStrictEqual(
+        refused("No loan secured on the asset has the id"),
+      );
+      expect(await versions()).toBe(3);
     });
 
     // The move up as the children leave home is written on the house's
@@ -751,7 +797,7 @@ describe("the account actions", () => {
     it("keeps a mortgage whose payment only meets its interest, paid through an open-ended line", async () => {
       await saveHouse(null, {
         ...house,
-        parts: [{ balance: 200000, payment: 750, rate: 0.045 }],
+        parts: [{ balance: 200000, loan: null, payment: 750, rate: 0.045 }],
       });
 
       expect(await latest()).toMatchObject({
@@ -781,6 +827,14 @@ describe("the account actions", () => {
         { ...house, parts: [{ ...homePart, rate: -0.01 }] },
         { ...house, parts: [{ ...homePart, balance: 0 }] },
         { ...parted, parts: [homePart, { ...homePart, payment: 0 }] },
+        { ...house, parts: [{ ...homePart, loan: 0 }] },
+        {
+          ...parted,
+          parts: [
+            { ...homePart, loan: 21 },
+            { ...homePart, loan: 21 },
+          ],
+        },
         { ...outright, parts: [homePart] },
         ...[
           { loanToValue: 1.1 },
@@ -845,11 +899,13 @@ describe("the account actions", () => {
       expect(refresh).toHaveBeenCalledOnce();
     });
 
+    // The finance is written back over the loan it was opened from, and
+    // a car owned outright sends it away, whatever loan it names.
     it("writes over a car and the finance secured on it, and sends the finance away when the car is owned outright now", async () => {
       await saveCar(null, golf);
 
       expect(
-        await saveCar(20, { ...golf, floor: 3000, value: 17000 }),
+        await saveCar(20, { ...golf, floor: 3000, loan: 21, value: 17000 }),
       ).toStrictEqual(saved({ ...car, balance: 17000, limit: 3000 }));
       expect(await latest()).toMatchObject({
         accounts: [
@@ -865,6 +921,7 @@ describe("the account actions", () => {
         agreement: "outright",
         balance: 0,
         balloon: 0,
+        loan: 21,
         payment: 0,
         rate: 0,
       });
@@ -891,6 +948,7 @@ describe("the account actions", () => {
         { ...golf, balloon: 14000 },
         { ...golf, agreement: "loan" },
         { ...golf, agreement: "outright", balance: 0, balloon: 0, rate: 0 },
+        { ...golf, loan: 0 },
       ] as const) {
         await expect(saveCar(null, draft)).rejects.toThrow(z.ZodError);
       }

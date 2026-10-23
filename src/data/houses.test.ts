@@ -243,12 +243,18 @@ describe("mortgageLine", () => {
 describe("houseOf", () => {
   // The fixture's home as a house, with its mortgage secured on it: the
   // loan's £176,520 owed comes back positive and its £2,180 a month is
-  // the payment; a second loan is a second sub-account, after the first;
-  // without a loan the house is owned outright; and its limit is its
-  // ceiling, nothing where it has none.
+  // the payment, each sub-account opened from its loan's id; a second
+  // loan is a second sub-account, after the first; without a loan the
+  // house is owned outright; and its limit is its ceiling, nothing where
+  // it has none.
   it("reads a house's values back off its records", () => {
     const pair = { asset: house, loans: [houseLoan] };
-    const owed = { balance: 176520, payment: 2180, rate: 0.0485 };
+    const owed = {
+      balance: 176520,
+      loan: houseLoan.id,
+      payment: 2180,
+      rate: 0.0485,
+    };
 
     expect(houseOf(pair, plan)).toStrictEqual({
       bought: { month: { month: 9, year: 2021 }, price: 380000 },
@@ -277,7 +283,10 @@ describe("houseOf", () => {
         },
         plan,
       ).parts,
-    ).toStrictEqual([owed, { balance: 60000, payment: 400, rate: 0.039 }]);
+    ).toStrictEqual([
+      owed,
+      { balance: 60000, loan: 6, payment: 400, rate: 0.039 },
+    ]);
     expect(houseOf({ ...pair, loans: [] }, plan)).toStrictEqual({
       bought: { month: { month: 9, year: 2021 }, price: 380000 },
       ceiling: 0,
@@ -410,6 +419,7 @@ describe("toRecords", () => {
           name: "Home mortgage",
           startsAt: null,
         },
+        loan: null,
       },
     ]);
   });
@@ -420,7 +430,10 @@ describe("toRecords", () => {
     const { loans } = toRecords(
       {
         ...home,
-        parts: [homePart, { balance: 60000, payment: 400, rate: 0.039 }],
+        parts: [
+          homePart,
+          { balance: 60000, loan: null, payment: 400, rate: 0.039 },
+        ],
       },
       plan,
     );

@@ -77,9 +77,12 @@ export interface MoveValues {
 // whole pounds and positive, the rate it is charged at, a fraction as
 // every rate is, and what is paid a month, whole pounds. Each is a loan
 // of its own to the store, paid down at its own rate and cleared in its
-// own time.
+// own time, and carries the id of the loan it was opened from, or none
+// for one added since, so a save writes it back over that loan wherever
+// it is listed.
 export interface Part {
   readonly balance: number;
+  readonly loan: null | number;
   readonly payment: number;
   readonly rate: number;
 }
@@ -169,9 +172,10 @@ export function drawnAsMortgages<TItem>(
 // one a house opens on before it is typed, and each loan is a
 // sub-account, its balance owed, so it comes back positive, its rate
 // the sub-account's and its contribution the payment, a month as the
-// records lay it. A house with no loan against it is owned outright and
-// owes nothing. A move is read flat, a ceiling and a mortgage it does
-// not carry as nothing, with the term a mortgage opens on beside them.
+// records lay it, carrying the loan's id. A house with no loan against
+// it is owned outright and owes nothing. A move is read flat, a ceiling
+// and a mortgage it does not carry as nothing, with the term a mortgage
+// opens on beside them.
 export function houseOf(
   { asset, loans }: Secured,
   plan: PlanMonth,
@@ -183,13 +187,15 @@ export function houseOf(
     growth: held.rate,
     move: asset.move === undefined ? null : moveValuesOf(asset.move),
     name: held.name,
-    parts: loans
-      .map(toValues)
-      .map((owed) => ({
+    parts: loans.map((loan) => {
+      const owed = toValues(loan);
+      return {
         balance: negated(owed.balance),
+        loan: loan.id,
         payment: owed.contribution,
         rate: owed.rate,
-      })),
+      };
+    }),
     status: loans.length === 0 ? "outright" : "mortgaged",
     value: held.balance,
   };
