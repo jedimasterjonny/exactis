@@ -10,6 +10,7 @@ import type { Answer } from "@/lib/answer";
 import { atAge } from "@/data/milestones";
 import { ageIn, drawdowns, oldestAge } from "@/data/plan";
 import { rateSets } from "@/data/rates";
+import { scenarioName } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { today } from "@/lib/months";
 import { requireSession } from "@/lib/session";
@@ -23,6 +24,11 @@ const patch = z.object({
   ends: z.number().int().nonnegative().optional(),
   retires: z.number().int().nonnegative().optional(),
 });
+
+// The branch a save of the ages names as the one its page was drawn on,
+// the household as null or a scenario by name, or none, for a save kept
+// on whichever is open.
+const branch = scenarioName.nullable().optional();
 
 // What a save of the rates may carry: any of them, each a number, and
 // whichever is not sent is kept as the household has it, so the
@@ -83,12 +89,16 @@ export async function removeAnchor(age: number): Promise<Answer<undefined>> {
 // since the chart can mark a retirement only within the plan. A
 // retirement already past is sound, since it says only that nothing is
 // earned by working. Each refusal says why, since the screen says so
-// under a toast.
+// under a toast. The dashboard holds a retirement age back a moment
+// before saving it, so it names the branch it was drawn on, and the
+// save is refused where another has been opened since.
 export async function saveAges(
   draft: Partial<PlanAges>,
+  on?: null | string,
 ): Promise<Answer<PlanAges>> {
   await requireSession();
   const parsed = patch.parse(draft);
+  const drawnOn = branch.parse(on);
   return amend(({ household, kept }) => {
     const { plan } = household;
     if (
@@ -115,7 +125,7 @@ export async function saveAges(
       },
       result: ages,
     };
-  });
+  }, drawnOn);
 }
 
 // Writes how the savings are split, and hands it back as written. An

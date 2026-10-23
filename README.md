@@ -84,13 +84,15 @@ household on a page, but a save under it is refused, so an edit meant for a
 scenario never lands in the household; the banner names the scenario as gone and
 offers leaving it, which clears the cookie. The branch open is the browser's,
 shared by its tabs, so a form filled in one saves to whichever branch another
-has opened since. A page reads the branch once a request, through React's cache,
-and an action reads the cookie and the store afresh. The household itself is
-read beside a scenario for the dashboard to compare the two. In production the
-cookie carries the `__Host-` prefix, as `__Host-exactis_scenario`, for the
-reason "Signing in" gives. A cookie holding what no scenario could be named, a
-control character, a line break or a name past forty characters, counts as none
-before it reaches a query or a log line.
+has opened since; the dashboard's retirement age is the exception, since it is
+held back a moment before it is saved, so it names the branch it was dragged on
+and is refused where another has been opened meanwhile. A page reads the branch
+once a request, through React's cache, and an action reads the cookie and the
+store afresh. The household itself is read beside a scenario for the dashboard
+to compare the two. In production the cookie carries the `__Host-` prefix, as
+`__Host-exactis_scenario`, for the reason "Signing in" gives. A cookie holding
+what no scenario could be named, a control character, a line break or a name
+past forty characters, counts as none before it reaches a query or a log line.
 
 The actions in `src/actions/scenarios.ts` make a scenario, enter one kept, leave
 it for the household, delete one and adopt one, and the dashboard's header

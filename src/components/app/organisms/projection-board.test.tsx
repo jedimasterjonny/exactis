@@ -98,10 +98,12 @@ function board(
   {
     listed = [],
     owned = accounts,
+    scenario = null,
     spread = short,
   }: {
     readonly listed?: readonly Milestone[];
     readonly owned?: readonly Account[];
+    readonly scenario?: null | string;
     readonly spread?: Shortfall | Spread;
   } = {},
 ): JSX.Element {
@@ -110,6 +112,7 @@ function board(
       accounts={owned}
       milestones={listed}
       plan={held}
+      scenario={scenario}
       schedule={lines}
       spread={spread}
     />
@@ -325,7 +328,44 @@ describe("ProjectionBoard", () => {
       vi.advanceTimersByTime(settle);
     });
 
-    expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 60 });
+    expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 60 }, null);
+  });
+
+  // Drawn in a scenario, so the age names it, and a save that lands
+  // after the scenario is left is refused rather than kept elsewhere.
+  it("saves the age to the branch the board was drawn on, by name", () => {
+    vi.useFakeTimers();
+    render(board(retiring, schedule, { scenario: "Retire early" }));
+
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
+    act(() => {
+      vi.advanceTimersByTime(settle);
+    });
+
+    expect(saveAges).toHaveBeenCalledExactlyOnceWith(
+      { retires: 60 },
+      "Retire early",
+    );
+  });
+
+  // The menu opens another scenario while an age stepped in the first
+  // waits to be saved: the age names the scenario it was stepped in.
+  it("saves a waiting age to the branch it was stepped in, not one opened since", () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      board(retiring, schedule, { scenario: "Retire early" }),
+    );
+
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
+    rerender(board(retiring, schedule, { scenario: "Move house" }));
+    act(() => {
+      vi.advanceTimersByTime(settle);
+    });
+
+    expect(saveAges).toHaveBeenCalledExactlyOnceWith(
+      { retires: 60 },
+      "Retire early",
+    );
   });
 
   it("saves a run of arrow steps once, at the age they stop on", () => {
@@ -340,7 +380,7 @@ describe("ProjectionBoard", () => {
     });
 
     expect(screen.getByText("Net worth · 2052 · age 62")).toBeInTheDocument();
-    expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 62 });
+    expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 62 }, null);
   });
 
   // Retiring at 55 stops the salary four years sooner, so the plan
@@ -361,7 +401,7 @@ describe("ProjectionBoard", () => {
     expect(marks()).toStrictEqual(["2045"]);
     expect(moved).not.toBe(worthIn(retiring, 2079));
     expect(screen.getByText(moved)).toHaveClass("figure");
-    expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 55 });
+    expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 55 }, null);
   });
 
   // Moved to 60 over the store's 59, the board is handed 62, saved from
@@ -408,7 +448,7 @@ describe("ProjectionBoard", () => {
     fireEvent.keyDown(slider("Retirement age"), { key: "ArrowLeft" });
     unmount();
 
-    expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 58 });
+    expect(saveAges).toHaveBeenCalledExactlyOnceWith({ retires: 58 }, null);
 
     vi.advanceTimersByTime(settle);
 
@@ -424,6 +464,7 @@ describe("ProjectionBoard", () => {
         accounts={[]}
         milestones={milestones}
         plan={retiring}
+        scenario={null}
         schedule={schedule}
         spread={short}
       />,
@@ -779,6 +820,7 @@ describe("ProjectionBoard", () => {
         }}
         milestones={[]}
         plan={retiring}
+        scenario={null}
         schedule={schedule}
         spread={short}
       />,
@@ -827,6 +869,7 @@ describe("ProjectionBoard", () => {
         }}
         milestones={[]}
         plan={scenario}
+        scenario={null}
         schedule={schedule}
         spread={short}
       />
