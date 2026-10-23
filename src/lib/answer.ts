@@ -16,6 +16,12 @@ export type Answer<TValue> =
 // Anything else thrown on the way stays a failure.
 export class Refusal extends Error {}
 
+// A refusal of a save from a page drawn before another save changed what
+// it opened on: answered as any refusal is, and the page is drawn again
+// from what is held now, so a dialog opened again opens on that rather
+// than on what was refused.
+export class Stale extends Refusal {}
+
 // What a saved answer holds, or the refusal thrown in the browser in its
 // own words, for a caller that reports either under the one toast.
 export function acceptedOf<TValue>(answer: Answer<TValue>): TValue {

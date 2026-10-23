@@ -91,7 +91,9 @@ const blank = {
 // account dialog; what is the house's own is each sub-account's figure
 // worked out on each amendment, the sub-accounts added, changed and
 // taken away, and the values the save sends, which are the draft with
-// each figure worked out in place of its own. The caller is told when the house has
+// each figure worked out in place of its own, sent beside the house as
+// it opened, so the store refuses a save over a house changed meanwhile.
+// The caller is told when the house has
 // been saved, so the screen can close the dialog and bring the assets
 // forward. Given a delete handler, the dialog of a house the store holds
 // offers a Delete, which reports the house's own account, for the caller to ask about with the mortgage that goes with
@@ -115,7 +117,7 @@ export function HouseDialog({
     noun: "House",
     onSaved,
     opening: openingOf(house, plan),
-    save: async (id, draft) => saveHouse(id, workedOut(draft).values),
+    save: async (id, draft) => saveHouse(id, workedOut(draft).values, house),
   });
   if (entry === null) {
     return null;

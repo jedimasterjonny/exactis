@@ -69,7 +69,9 @@ const blank: Draft = {
 // the entry, the save and the toast, as it does for the account dialog;
 // what is the car's own is the figure worked out on each amendment and
 // the values the save sends, which are the draft with the figure worked
-// out in place of its own. The caller is told when the car has been saved, so the screen
+// out in place of its own, sent beside the car as it opened, so the
+// store refuses a save over a car changed meanwhile. The caller is told
+// when the car has been saved, so the screen
 // can close the dialog and bring the assets forward. Given a delete
 // handler, the dialog of a car the store holds offers a Delete, which
 // reports the car's own account for the caller
@@ -90,7 +92,7 @@ export function CarDialog({
     noun: "Car",
     onSaved,
     opening: openingOf(car),
-    save: async (id, draft) => saveCar(id, workedOut(draft).values),
+    save: async (id, draft) => saveCar(id, workedOut(draft).values, car),
   });
   if (entry === null) {
     return null;

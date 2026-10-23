@@ -74,7 +74,9 @@ const blank: Draft = {
 // account's own contribution is said to be on top of it; an account
 // nothing feeds shows neither. Only a share that was changed here goes
 // to the store, since a share sent as it opened would write over an
-// edit made to the salary on the plan screen meanwhile. The owners are
+// edit made to the salary on the plan screen meanwhile; the account the
+// dialog opened on goes with the save, so the store refuses a save over
+// an account changed meanwhile rather than writing it back. The owners are
 // handed down for an ISA or a pension to name its own, a new one
 // opening on the first. The save holds while the account is unnamed,
 // while it is a wrapper with no owner, which is only while the plan has
@@ -106,10 +108,11 @@ export function AccountDialog({
     onSaved,
     opening,
     save: async (id, draft) =>
-      saveAccount(id, {
-        ...draft,
-        shares: changedOf(draft.shares, opening.initial.shares),
-      }),
+      saveAccount(
+        id,
+        { ...draft, shares: changedOf(draft.shares, opening.initial.shares) },
+        account,
+      ),
   });
 
   // The contribution choice: the fields the new choice shows mount with

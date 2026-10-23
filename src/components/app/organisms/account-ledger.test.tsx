@@ -274,21 +274,25 @@ describe("AccountLedger", () => {
     vi.mocked(saveAccount).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(null, {
-      balance: 4000,
-      balloon: 0,
-      cadence: "month",
-      cap: 0,
-      contribution: 333,
-      funding: "fixed",
-      growth: "fixed",
-      isDroppable: false,
-      kind: "tax-free",
-      name: "Lifetime ISA",
-      owner: 1,
-      rate: 0.03,
-      shares: [],
-    });
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        balance: 4000,
+        balloon: 0,
+        cadence: "month",
+        cap: 0,
+        contribution: 333,
+        funding: "fixed",
+        growth: "fixed",
+        isDroppable: false,
+        kind: "tax-free",
+        name: "Lifetime ISA",
+        owner: 1,
+        rate: 0.03,
+        shares: [],
+      },
+      null,
+    );
     expect(
       within(dialog).getByRole("button", { name: "Save" }),
     ).toHaveAttribute("aria-busy", "true");
@@ -352,21 +356,25 @@ describe("AccountLedger", () => {
     expect(
       screen.getByRole("dialog", { name: "Account added" }),
     ).toHaveAccessibleDescription("Car");
-    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(null, {
-      balance: 12500,
-      balloon: 0,
-      cadence: "year",
-      cap: 0,
-      contribution: 0,
-      funding: "fixed",
-      growth: "plan",
-      isDroppable: false,
-      kind: "real-asset",
-      name: "Car",
-      owner: null,
-      rate: 0,
-      shares: [],
-    });
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        balance: 12500,
+        balloon: 0,
+        cadence: "year",
+        cap: 0,
+        contribution: 0,
+        funding: "fixed",
+        growth: "plan",
+        isDroppable: false,
+        kind: "real-asset",
+        name: "Car",
+        owner: null,
+        rate: 0,
+        shares: [],
+      },
+      null,
+    );
     expect(rowsOf("Property & vehicles")).toHaveLength(1);
   });
 
@@ -514,21 +522,25 @@ describe("AccountLedger", () => {
     expect(
       screen.getByRole("dialog", { name: "Account updated" }),
     ).toHaveAccessibleDescription("Home");
-    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(4, {
-      balance: 420000,
-      balloon: 0,
-      cadence: "year",
-      cap: 0,
-      contribution: 0,
-      funding: "fixed",
-      growth: "fixed",
-      isDroppable: false,
-      kind: "real-asset",
-      name: "Home",
-      owner: null,
-      rate: 0.021,
-      shares: [],
-    });
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(
+      4,
+      {
+        balance: 420000,
+        balloon: 0,
+        cadence: "year",
+        cap: 0,
+        contribution: 0,
+        funding: "fixed",
+        growth: "fixed",
+        isDroppable: false,
+        kind: "real-asset",
+        name: "Home",
+        owner: null,
+        rate: 0.021,
+        shares: [],
+      },
+      home,
+    );
   });
 
   it("opens a wrapper with its contribution and no rate, and writes a new contribution back", async () => {
@@ -567,21 +579,25 @@ describe("AccountLedger", () => {
     expect(
       screen.getByRole("dialog", { name: "Account updated" }),
     ).toHaveAccessibleDescription("Workplace pension");
-    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(6, {
-      balance: 412880,
-      balloon: 0,
-      cadence: "year",
-      cap: 0,
-      contribution: 30000,
-      funding: "fixed",
-      growth: "plan",
-      isDroppable: false,
-      kind: "tax-deferred",
-      name: "Workplace pension",
-      owner: 1,
-      rate: 0,
-      shares: [],
-    });
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(
+      6,
+      {
+        balance: 412880,
+        balloon: 0,
+        cadence: "year",
+        cap: 0,
+        contribution: 30000,
+        funding: "fixed",
+        growth: "plan",
+        isDroppable: false,
+        kind: "tax-deferred",
+        name: "Workplace pension",
+        owner: 1,
+        rate: 0,
+        shares: [],
+      },
+      pension,
+    );
   });
 
   it("pays a wrapper the spare money up to a cap, and drops the sum with the choice", async () => {
@@ -619,21 +635,25 @@ describe("AccountLedger", () => {
         screen.queryByRole("dialog", { name: "Stocks & shares ISA" }),
       ).not.toBeInTheDocument();
     });
-    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(2, {
-      balance: 286145,
-      balloon: 0,
-      cadence: "year",
-      cap: 4000,
-      contribution: 0,
-      funding: "spare",
-      growth: "plan",
-      isDroppable: false,
-      kind: "tax-free",
-      name: "Stocks & shares ISA",
-      owner: 1,
-      rate: 0,
-      shares: [],
-    });
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(
+      2,
+      {
+        balance: 286145,
+        balloon: 0,
+        cadence: "year",
+        cap: 4000,
+        contribution: 0,
+        funding: "spare",
+        growth: "plan",
+        isDroppable: false,
+        kind: "tax-free",
+        name: "Stocks & shares ISA",
+        owner: 1,
+        rate: 0,
+        shares: [],
+      },
+      isa,
+    );
   });
 
   it("opens a spare-money account as it is and brings its sum back with the fixed choice", () => {
@@ -744,21 +764,25 @@ describe("AccountLedger", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(2, {
-      balance: 286145,
-      balloon: 0,
-      cadence: "year",
-      cap: 0,
-      contribution: 250,
-      funding: "fixed",
-      growth: "plan",
-      isDroppable: false,
-      kind: "tax-free",
-      name: "Stocks & shares ISA",
-      owner: 1,
-      rate: 0,
-      shares: [],
-    });
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(
+      2,
+      {
+        balance: 286145,
+        balloon: 0,
+        cadence: "year",
+        cap: 0,
+        contribution: 250,
+        funding: "fixed",
+        growth: "plan",
+        isDroppable: false,
+        kind: "tax-free",
+        name: "Stocks & shares ISA",
+        owner: 1,
+        rate: 0,
+        shares: [],
+      },
+      { ...isa, contribution: { cap: 4000, kind: "spare" } },
+    );
   });
 
   // The names down the money's flow, the savings alone since a debt is

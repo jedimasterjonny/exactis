@@ -121,18 +121,22 @@ describe("CarDialog", () => {
     vi.mocked(saveCar).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveCar).toHaveBeenCalledExactlyOnceWith(null, {
-      agreement: "pcp",
-      balance: 14000,
-      balloon: 6000,
-      depreciation: 0.15,
-      floor: 0,
-      loan: null,
-      name: "Golf",
-      payment: 290,
-      rate: 0.079,
-      value: 18000,
-    });
+    expect(saveCar).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        agreement: "pcp",
+        balance: 14000,
+        balloon: 6000,
+        depreciation: 0.15,
+        floor: 0,
+        loan: null,
+        name: "Golf",
+        payment: 290,
+        rate: 0.079,
+        value: 18000,
+      },
+      null,
+    );
     expect(
       within(dialog).getByRole("button", { name: "Save" }),
     ).toHaveAttribute("aria-busy", "true");
@@ -191,18 +195,22 @@ describe("CarDialog", () => {
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
-    expect(saveCar).toHaveBeenCalledExactlyOnceWith(golf.id, {
-      agreement: "pcp",
-      balance: 14000,
-      balloon: 6000,
-      depreciation: 0.15,
-      floor: 3000,
-      loan: finance.id,
-      name: "Golf",
-      payment: 290,
-      rate: 0.079,
-      value: 16000,
-    });
+    expect(saveCar).toHaveBeenCalledExactlyOnceWith(
+      golf.id,
+      {
+        agreement: "pcp",
+        balance: 14000,
+        balloon: 6000,
+        depreciation: 0.15,
+        floor: 3000,
+        loan: finance.id,
+        name: "Golf",
+        payment: 290,
+        rate: 0.079,
+        value: 16000,
+      },
+      { asset: golf, loans: [finance] },
+    );
     expect(
       screen.getByRole("dialog", { name: "Car updated" }),
     ).toHaveAccessibleDescription("Golf · with its PCP and payments");
@@ -229,18 +237,22 @@ describe("CarDialog", () => {
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
-    expect(saveCar).toHaveBeenCalledExactlyOnceWith(golf.id, {
-      agreement: "loan",
-      balance: 14000,
-      balloon: 0,
-      depreciation: 0.15,
-      floor: 0,
-      loan: loan.id,
-      name: "Golf",
-      payment: 438,
-      rate: 0.079,
-      value: 18000,
-    });
+    expect(saveCar).toHaveBeenCalledExactlyOnceWith(
+      golf.id,
+      {
+        agreement: "loan",
+        balance: 14000,
+        balloon: 0,
+        depreciation: 0.15,
+        floor: 0,
+        loan: loan.id,
+        name: "Golf",
+        payment: 438,
+        rate: 0.079,
+        value: 18000,
+      },
+      { asset: golf, loans: [loan] },
+    );
     expect(
       screen.getByRole("dialog", { name: "Car updated" }),
     ).toHaveAccessibleDescription("Golf · with its loan and payments");
@@ -336,18 +348,22 @@ describe("CarDialog", () => {
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
-    expect(saveCar).toHaveBeenCalledExactlyOnceWith(null, {
-      agreement: "pcp",
-      balance: 14000,
-      balloon: 6000,
-      depreciation: 0,
-      floor: 0,
-      loan: null,
-      name: "Golf",
-      payment: 90,
-      rate: 0.079,
-      value: 0,
-    });
+    expect(saveCar).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        agreement: "pcp",
+        balance: 14000,
+        balloon: 6000,
+        depreciation: 0,
+        floor: 0,
+        loan: null,
+        name: "Golf",
+        payment: 90,
+        rate: 0.079,
+        value: 0,
+      },
+      null,
+    );
   });
 
   // A choice alone changes no figure: the £290 a month worked out is kept
@@ -419,18 +435,22 @@ describe("CarDialog", () => {
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
-    expect(saveCar).toHaveBeenCalledExactlyOnceWith(null, {
-      agreement: "outright",
-      balance: 0,
-      balloon: 0,
-      depreciation: 0.2,
-      floor: 0,
-      loan: null,
-      name: "Polo",
-      payment: 0,
-      rate: 0,
-      value: 12000,
-    });
+    expect(saveCar).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        agreement: "outright",
+        balance: 0,
+        balloon: 0,
+        depreciation: 0.2,
+        floor: 0,
+        loan: null,
+        name: "Polo",
+        payment: 0,
+        rate: 0,
+        value: 12000,
+      },
+      null,
+    );
     expect(
       screen.getByRole("dialog", { name: "Car added" }),
     ).toHaveAccessibleDescription("Polo");
