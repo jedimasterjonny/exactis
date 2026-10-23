@@ -5,10 +5,15 @@ import { accounts } from "@/data/accounts.fixture";
 
 const [, , , home, mortgage] = accounts;
 
-// The reference kit's mortgage as one sub-account: £341,810 owed at
-// 5.15% and £2,210 paid a month, which clears it in 21.2 years. For
-// tests.
-export const homePart: Part = { balance: 341810, payment: 2210, rate: 0.0515 };
+// The reference kit's mortgage as one new sub-account, opened from no
+// loan: £341,810 owed at 5.15% and £2,210 paid a month, which clears it
+// in 21.2 years. For tests.
+export const homePart: Part = {
+  balance: 341810,
+  loan: null,
+  payment: 2210,
+  rate: 0.0515,
+};
 
 // The reference kit's house as its dialog takes it: bought in June 2022
 // for £380,000, worth £416,386, growing at 2.1% with no ceiling, with
