@@ -25,7 +25,11 @@ const unread = "That is not a household file";
 // object with the wrong fields is refused in the rules' words as any
 // save is. It is saved as any edit is, under the check that nothing was
 // saved to the branch since it was read, and it replaces the household
-// open whole, its bookkeeping as much as its plan.
+// open whole, its bookkeeping as much as its plan, save the id its next
+// record is given, which is held at the branch's own where the file's
+// is lower: an id only ever counts up, so one a record held is never
+// given to another, and a file saved before a record was added would
+// give its id out again.
 export async function importHousehold(
   text: string,
 ): Promise<Answer<undefined>> {
@@ -39,8 +43,11 @@ export async function importHousehold(
   if (typeof read !== "object" || read === null || Array.isArray(read)) {
     return refused(unread);
   }
-  return amend(() => ({
-    kept: soundKept(upcast(read)).kept,
-    result: undefined,
-  }));
+  return amend(({ kept: open }) => {
+    const file = soundKept(upcast(read)).kept;
+    return {
+      kept: { ...file, next: Math.max(file.next, open.next) },
+      result: undefined,
+    };
+  });
 }

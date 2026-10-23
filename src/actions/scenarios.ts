@@ -195,9 +195,9 @@ async function closeIfOpen(name: string): Promise<void> {
 // go unsaid too. A household holding an account with an id from that
 // one on is refused, so the operator takes the account out of the
 // household and puts it back after. The merged household gives its next
-// record the higher of the two ids, since an id only ever counts up:
-// the household's next stays where an account it took out had moved it,
-// and a file imported into the scenario can set the scenario's lower.
+// record the higher of the two ids, since an id only ever counts up and
+// each branch's next stands where its own additions moved it, an
+// account since taken out among them.
 function planOver(household: Kept, scenario: Kept, forkedAt: number): Kept {
   if (household.accounts.some(({ id }) => id >= forkedAt)) {
     throw new Refusal(
