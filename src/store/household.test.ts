@@ -29,6 +29,7 @@ import {
   amend,
   getBaseline,
   getHousehold,
+  getOpened,
   getScenario,
   getScenarios,
   getSourcesDaysAgo,
@@ -367,6 +368,7 @@ describe("the household store", () => {
 
   it("opens on the household without a scenario's cookie, and lists the scenarios kept", async () => {
     expect(await getScenario()).toBeNull();
+    expect(await getOpened()).toBeNull();
     expect(await getScenarios()).toStrictEqual([]);
     expect(await getBaseline()).toStrictEqual(await getHousehold());
 
@@ -385,6 +387,10 @@ describe("the household store", () => {
     vi.mocked(openedScenario).mockResolvedValue("Retire early");
 
     expect(await getScenario()).toBe("Retire early");
+    expect(await getOpened()).toStrictEqual({
+      isKept: true,
+      name: "Retire early",
+    });
     expect(await getHousehold()).toMatchObject({
       accounts: [],
       owners: blank.owners,
@@ -411,13 +417,14 @@ describe("the household store", () => {
     });
   });
 
-  // A cookie naming a scenario dropped since, as from another tab: the
-  // page reads the household, so its banner goes.
-  it("reads the household where the cookie names no scenario kept", async () => {
+  // A cookie naming a scenario dropped since, as from another device: the
+  // page reads the household, and its banner says the scenario is gone.
+  it("reads the household where the cookie names no scenario kept, and says so", async () => {
     await keepAfter(db, { scenario: "", version: 0 }, reference);
     vi.mocked(openedScenario).mockResolvedValue("Dropped");
 
     expect(await getScenario()).toBeNull();
+    expect(await getOpened()).toStrictEqual({ isKept: false, name: "Dropped" });
     expect(await getHousehold()).toMatchObject({
       accounts: reference.accounts,
     });
@@ -496,6 +503,7 @@ describe("the household store", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(getScenario()).rejects.toThrow("redirected");
+    await expect(getOpened()).rejects.toThrow("redirected");
     await expect(getScenarios()).rejects.toThrow("redirected");
     await expect(getBaseline()).rejects.toThrow("redirected");
     expect(getDb).not.toHaveBeenCalled();

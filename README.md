@@ -79,17 +79,18 @@ untouched: bookkeeping belongs in the household, and what-ifs in a scenario. The
 cookie names a branch and guards nothing, so it is not sealed: the session's
 cookie is what lets a request in, and the cookie ends with the browser's session
 or its sign-out, so the next visit opens on the household. A name no scenario is
-kept under, as one dropped since, reads as the household on a page, but a save
-under it is refused, so an edit meant for a scenario never lands in the
-household. The branch open is the browser's, shared by its tabs, so a form
-filled in one saves to whichever branch another has opened since. A page reads
-the branch once a request, through React's cache, and an action reads the cookie
-and the store afresh. The household itself is read beside a scenario for the
-dashboard to compare the two. In production the cookie carries the `__Host-`
-prefix, as `__Host-exactis_scenario`, for the reason "Signing in" gives. A
-cookie holding what no scenario could be named, a control character, a line
-break or a name past forty characters, counts as none before it reaches a query
-or a log line.
+kept under, as one adopted or dropped from another device, reads as the
+household on a page, but a save under it is refused, so an edit meant for a
+scenario never lands in the household; the banner names the scenario as gone and
+offers leaving it, which clears the cookie. The branch open is the browser's,
+shared by its tabs, so a form filled in one saves to whichever branch another
+has opened since. A page reads the branch once a request, through React's cache,
+and an action reads the cookie and the store afresh. The household itself is
+read beside a scenario for the dashboard to compare the two. In production the
+cookie carries the `__Host-` prefix, as `__Host-exactis_scenario`, for the
+reason "Signing in" gives. A cookie holding what no scenario could be named, a
+control character, a line break or a name past forty characters, counts as none
+before it reaches a query or a log line.
 
 The actions in `src/actions/scenarios.ts` make a scenario, enter one kept, leave
 it for the household, delete one and adopt one, and the dashboard's header
