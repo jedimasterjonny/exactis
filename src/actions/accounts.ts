@@ -13,7 +13,7 @@ import type { Kept } from "@/data/household";
 import type { HouseValues } from "@/data/houses";
 import type { IncomeLine } from "@/data/income";
 import type { Month } from "@/data/schedule";
-import type { SecuredRecords } from "@/data/secured";
+import type { Secured, SecuredRecords } from "@/data/secured";
 import type { Answer } from "@/lib/answer";
 import type { Held } from "@/store/household";
 
@@ -30,12 +30,14 @@ import {
   isSound as isSoundCar,
   toRecords as toCarRecords,
 } from "@/data/cars";
+import { account as heldAccount } from "@/data/household";
 import { isSound, statuses, toRecords } from "@/data/houses";
+import { moving } from "@/data/milestones";
 import { pointOf } from "@/data/progress";
 import { month, named, pounds, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { isOnOrBefore, monthsBetween, thisMonth, today } from "@/lib/months";
-import { found, replaced, written } from "@/lib/records";
+import { found, holdUnchanged, replaced, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
@@ -166,6 +168,24 @@ const values = z
       new Set(draft.shares.map((share) => share.line)).size ===
       draft.shares.length,
   ) satisfies z.ZodType<AccountDraft>;
+
+// Where a save of an asset writes, over the asset with the id or as a
+// new one for none, the asset with its loans as the dialog opened on
+// them, or none for a new one, and the word the asset is called by.
+interface Opening {
+  readonly at: null | number;
+  readonly noun: string;
+  readonly opened: null | Secured;
+}
+
+// A record as its dialog opened on it, or none for a new one, parsed as
+// the household parses its accounts so the record opened and the one
+// held now compare key for key: an account, and an asset with the loans
+// secured on it.
+const openedAccount = heldAccount.nullable();
+const openedAsset = z
+  .object({ asset: heldAccount, loans: z.array(heldAccount) })
+  .nullable() satisfies z.ZodType<null | Secured>;
 
 // A month end as the worksheet sends it: the month the balances are now
 // as of, and each balance checked against it, by the account's id.
@@ -334,16 +354,28 @@ export async function removeAccount(id: number): Promise<Answer<undefined>> {
 // payments sent away first. The shares the dialog holds for the salaries
 // feeding the account are written over theirs with it, each held to a
 // line feeding the account; a new account is fed by nothing, so a share
-// sent with one is refused. The account and its shares land together or
-// not at all.
+// sent with one is refused. The dialog sends the account as it opened
+// on it beside the draft, and an edit of one changed since, as by a
+// month end on another device, is refused rather than written back over
+// the change; the shares are no part of that, since only those changed
+// are sent. The account and its shares land together or not at all.
 export async function saveAccount(
   id: null | number,
   draft: AccountDraft,
+  opened: Account | null,
 ): Promise<Answer<Account>> {
   await requireSession();
   const at = target.parse(id);
   const { shares, ...parsed } = values.parse(draft);
-  return amend(({ kept }) => {
+  const asOpened = openedAccount.parse(opened);
+  return amend(({ household, kept }) => {
+    if (at !== null) {
+      holdUnchanged(
+        asOpened,
+        found(household.accounts, at, "account"),
+        "account",
+      );
+    }
     const entered = writtenIn(kept, at, parsed);
     return {
       kept: {
@@ -368,16 +400,23 @@ export async function saveAccount(
 // the finance appears among the accounts and its payments among the
 // expenses with no more asked of the form, and hands back the car's own
 // account. Checked as a save is, the payments laid from the month the
-// plan starts in, the one after the balances' month.
+// plan starts in, the one after the balances' month, and refused where
+// the car or its finance changed since the dialog opened on them.
 export async function saveCar(
   id: null | number,
   draft: CarValues,
+  opened: null | Secured,
 ): Promise<Answer<Account>> {
   await requireSession();
   const at = target.parse(id);
   const parsed = car.parse(draft);
+  const asOpened = openedAsset.parse(opened);
   return amend((held) =>
-    securedIn(held, at, toCarRecords(parsed, held.household.plan)),
+    securedIn(
+      held,
+      { at, noun: "car", opened: asOpened },
+      toCarRecords(parsed, held.household.plan),
+    ),
   );
 }
 
@@ -387,17 +426,30 @@ export async function saveCar(
 // its payments, so the mortgage appears among the accounts and its
 // payments among the expenses with no more asked of the form, and hands back the
 // house's own account. Checked as a save is, the payments laid from the
-// month the plan starts in, the one after the balances' month.
+// month the plan starts in, the one after the balances' month, and
+// refused where the house or its loans changed since the dialog opened
+// on them, as a pull of its prices would change it.
 export async function saveHouse(
   id: null | number,
   draft: HouseValues,
+  opened: null | Secured,
 ): Promise<Answer<Account>> {
   await requireSession();
   const at = target.parse(id);
   const parsed = house.parse(draft);
+  const asOpened = openedAsset.parse(opened);
   return amend((held) =>
-    securedIn(held, at, toRecords(parsed, held.household.plan)),
+    securedIn(
+      held,
+      { at, noun: "house", opened: asOpened },
+      toRecords(parsed, held.household.plan),
+    ),
   );
+}
+
+// Two accounts in the order of their ids.
+function byId(first: Account, second: Account): number {
+  return first.id - second.id;
 }
 
 // An account as written, dated with the day its balance was set: today
@@ -478,12 +530,33 @@ function sacrificed(
 // no loan against it now sends every loan away. An id naming no loan
 // secured on the asset, as one sent away since the form was drawn or
 // another account altogether, is refused, so a save never writes one
-// loan's figures over another. The whole lands together or not at all.
+// loan's figures over another. An edit is refused as well where the
+// asset or a loan secured on it changed since its dialog opened on
+// them, as the household reads them, or a loan was added or sent away,
+// the loans compared by id, since the order they are listed in is no
+// part of what the dialog edits. The whole lands together or not at
+// all.
 function securedIn(
-  { kept }: Held,
-  at: null | number,
+  { household, kept }: Held,
+  { at, noun, opened }: Opening,
   { asset, loans }: SecuredRecords,
 ): { readonly kept: Kept; readonly result: Account } {
+  if (at !== null) {
+    holdUnchanged(
+      opened && {
+        ...opened,
+        asset: moving(opened.asset, kept.milestones, household.plan),
+        loans: opened.loans.toSorted(byId),
+      },
+      {
+        asset: found(household.accounts, at, "account"),
+        loans: household.accounts
+          .filter(({ secures }) => secures === at)
+          .toSorted(byId),
+      },
+      noun,
+    );
+  }
   const entered = writtenIn(kept, at, asset);
   const { accounts, schedule } = entered.kept;
   const secures = entered.result.id;

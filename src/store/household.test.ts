@@ -21,7 +21,7 @@ import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { householdVersions } from "@/db/schema";
 import { standUp } from "@/db/store.fixture";
-import { refused, saved } from "@/lib/answer";
+import { refused, saved, Stale } from "@/lib/answer";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 
@@ -232,6 +232,23 @@ describe("the household store", () => {
     ).toStrictEqual(saved(null));
     expect(await readLatest(db, "Retire early")).toMatchObject({ version: 2 });
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+  });
+
+  // A dialog opened on a record another save changed since: refused in
+  // its words, and the page drawn again from what is held now, so the
+  // dialog opened again opens on that.
+  it("answers a save from a stale dialog as refused, and draws the page again", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+
+    await expect(
+      amend(() => {
+        throw new Stale("The owner changed since this was opened");
+      }),
+    ).resolves.toStrictEqual(
+      refused("The owner changed since this was opened"),
+    );
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+    expect(refresh).toHaveBeenCalledOnce();
   });
 
   it("keeps the household an edit makes as the next version, draws the page again and hands back what the edit says", async () => {

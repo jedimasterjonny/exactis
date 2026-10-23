@@ -210,7 +210,7 @@ const move = z.object({
 // balloon, a limit, a move, an owner, a link, the mark and the day its
 // balance was set are absent rather than nothing, as the model has
 // them.
-const account = z
+export const account = z
   .object({
     balance: z.number().int(),
     balloon: z.number().int().positive().exactOptional(),

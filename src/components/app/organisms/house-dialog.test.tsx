@@ -134,16 +134,20 @@ describe("HouseDialog", () => {
     vi.mocked(saveHouse).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(null, {
-      bought: { month: { month: 8, year: 2026 }, price: 380000 },
-      ceiling: 0,
-      growth: 0,
-      move: null,
-      name: "Home",
-      parts: [{ balance: 334670, loan: null, payment: 1889, rate: 0.0485 }],
-      status: "mortgaged",
-      value: 397512,
-    });
+    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        bought: { month: { month: 8, year: 2026 }, price: 380000 },
+        ceiling: 0,
+        growth: 0,
+        move: null,
+        name: "Home",
+        parts: [{ balance: 334670, loan: null, payment: 1889, rate: 0.0485 }],
+        status: "mortgaged",
+        value: 397512,
+      },
+      null,
+    );
     expect(
       within(dialog).getByRole("button", { name: "Save" }),
     ).toHaveAttribute("aria-busy", "true");
@@ -206,18 +210,22 @@ describe("HouseDialog", () => {
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
-    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
-      bought: { month: { month: 9, year: 2021 }, price: 380000 },
-      ceiling: 600000,
-      growth: 0.021,
-      move: null,
-      name: "Home",
-      parts: [
-        { balance: 176520, loan: houseLoan.id, payment: 2180, rate: 0.0485 },
-      ],
-      status: "mortgaged",
-      value: 420000,
-    });
+    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(
+      home.id,
+      {
+        bought: { month: { month: 9, year: 2021 }, price: 380000 },
+        ceiling: 600000,
+        growth: 0.021,
+        move: null,
+        name: "Home",
+        parts: [
+          { balance: 176520, loan: houseLoan.id, payment: 2180, rate: 0.0485 },
+        ],
+        status: "mortgaged",
+        value: 420000,
+      },
+      { asset: houseAsset, loans: [houseLoan] },
+    );
     expect(
       screen.getByRole("dialog", { name: "House updated" }),
     ).toHaveAccessibleDescription("Home · with its mortgage and payments");
@@ -281,18 +289,22 @@ describe("HouseDialog", () => {
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
-    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
-      bought: { month: { month: 9, year: 2021 }, price: 380000 },
-      ceiling: 0,
-      growth: 0.021,
-      move: null,
-      name: "Home",
-      parts: [
-        { balance: 176520, loan: houseLoan.id, payment: 2180, rate: 0.0485 },
-      ],
-      status: "mortgaged",
-      value: 397512,
-    });
+    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(
+      home.id,
+      {
+        bought: { month: { month: 9, year: 2021 }, price: 380000 },
+        ceiling: 0,
+        growth: 0.021,
+        move: null,
+        name: "Home",
+        parts: [
+          { balance: 176520, loan: houseLoan.id, payment: 2180, rate: 0.0485 },
+        ],
+        status: "mortgaged",
+        value: 397512,
+      },
+      house,
+    );
   });
 
   it("opens a house owned outright with no loan fields", () => {
@@ -381,16 +393,20 @@ describe("HouseDialog", () => {
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
-    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(null, {
-      bought: { month: { month: 8, year: 2026 }, price: 380000 },
-      ceiling: 0,
-      growth: 0,
-      move: null,
-      name: "Home",
-      parts: [{ balance: 334670, loan: null, payment: 1000, rate: 0.0485 }],
-      status: "mortgaged",
-      value: 0,
-    });
+    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        bought: { month: { month: 8, year: 2026 }, price: 380000 },
+        ceiling: 0,
+        growth: 0,
+        move: null,
+        name: "Home",
+        parts: [{ balance: 334670, loan: null, payment: 1000, rate: 0.0485 }],
+        status: "mortgaged",
+        value: 0,
+      },
+      null,
+    );
   });
 
   // The figure chosen is the one worked out, read-only, whichever of the
@@ -465,19 +481,23 @@ describe("HouseDialog", () => {
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
-    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
-      bought: { month: { month: 9, year: 2021 }, price: 380000 },
-      ceiling: 0,
-      growth: 0.021,
-      move: null,
-      name: "Home",
-      parts: [
-        { balance: 176520, loan: houseLoan.id, payment: 2180, rate: 0.0485 },
-        { balance: 60000, loan: further.id, payment: 500, rate: 0.039 },
-      ],
-      status: "mortgaged",
-      value: 397512,
-    });
+    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(
+      home.id,
+      {
+        bought: { month: { month: 9, year: 2021 }, price: 380000 },
+        ceiling: 0,
+        growth: 0.021,
+        move: null,
+        name: "Home",
+        parts: [
+          { balance: 176520, loan: houseLoan.id, payment: 2180, rate: 0.0485 },
+          { balance: 60000, loan: further.id, payment: 500, rate: 0.039 },
+        ],
+        status: "mortgaged",
+        value: 397512,
+      },
+      { asset: houseAsset, loans: [houseLoan, further] },
+    );
   });
 
   // Taking the first sub-account away leaves the second carrying the
@@ -504,6 +524,7 @@ describe("HouseDialog", () => {
           { balance: 60000, loan: further.id, payment: 400, rate: 0.039 },
         ],
       }),
+      { asset: houseAsset, loans: [houseLoan, further] },
     );
   });
 
@@ -555,6 +576,7 @@ describe("HouseDialog", () => {
       expect.objectContaining({
         parts: [{ balance: 60000, loan: null, payment: 313, rate: 0.039 }],
       }),
+      house,
     );
   });
 
@@ -593,16 +615,20 @@ describe("HouseDialog", () => {
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
-    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(null, {
-      bought: { month: { month: 9, year: 2021 }, price: 230000 },
-      ceiling: 0,
-      growth: 0.02,
-      move: null,
-      name: "Flat",
-      parts: [],
-      status: "outright",
-      value: 250000,
-    });
+    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        bought: { month: { month: 9, year: 2021 }, price: 230000 },
+        ceiling: 0,
+        growth: 0.02,
+        move: null,
+        name: "Flat",
+        parts: [],
+        status: "outright",
+        value: 250000,
+      },
+      null,
+    );
     expect(
       screen.getByRole("dialog", { name: "House added" }),
     ).toHaveAccessibleDescription("Flat");
@@ -672,26 +698,30 @@ describe("HouseDialog", () => {
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
-    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(home.id, {
-      bought: { month: { month: 9, year: 2021 }, price: 380000 },
-      ceiling: 0,
-      growth: 0.021,
-      move: {
-        at: 7,
-        ceiling: 800000,
-        loanToValue: 0.9,
-        price: 700000,
-        rate: 0.05,
-        term: 25,
-        year: 2040,
+    expect(saveHouse).toHaveBeenCalledExactlyOnceWith(
+      home.id,
+      {
+        bought: { month: { month: 9, year: 2021 }, price: 380000 },
+        ceiling: 0,
+        growth: 0.021,
+        move: {
+          at: 7,
+          ceiling: 800000,
+          loanToValue: 0.9,
+          price: 700000,
+          rate: 0.05,
+          term: 25,
+          year: 2040,
+        },
+        name: "Home",
+        parts: [
+          { balance: 176520, loan: houseLoan.id, payment: 2180, rate: 0.0485 },
+        ],
+        status: "mortgaged",
+        value: 397512,
       },
-      name: "Home",
-      parts: [
-        { balance: 176520, loan: houseLoan.id, payment: 2180, rate: 0.0485 },
-      ],
-      status: "mortgaged",
-      value: 397512,
-    });
+      { asset: { ...houseAsset, move }, loans: [houseLoan] },
+    );
   });
 
   it("keeps a refused save open and says why", async () => {

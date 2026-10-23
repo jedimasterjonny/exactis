@@ -1,7 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { found, removed, replaced, written } from "./records";
+import { Stale } from "@/lib/answer";
+
+import { found, holdUnchanged, removed, replaced, written } from "./records";
 
 const owners = [
   { id: 1, name: "Me" },
@@ -12,6 +14,22 @@ describe("found", () => {
   it("finds the record with the id, and refuses an id none has, naming what", () => {
     expect(found(owners, 3, "owner")).toBe(owners[1]);
     expect(() => found(owners, 2, "owner")).toThrow("No owner has the id");
+  });
+});
+
+describe("holdUnchanged", () => {
+  it("lets a record through as it opened, and refuses one changed since, naming what", () => {
+    expect(() => {
+      holdUnchanged(owners[0], { id: 1, name: "Me" }, "owner");
+    }).not.toThrow();
+    expect(() => {
+      holdUnchanged(owners[0], { id: 1, name: "Jo" }, "owner");
+    }).toThrow(
+      "The owner changed since this was opened, so nothing was saved; close it and open it again",
+    );
+    expect(() => {
+      holdUnchanged(owners[0], { id: 1, name: "Jo" }, "owner");
+    }).toThrow(Stale);
   });
 });
 

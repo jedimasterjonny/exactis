@@ -3,10 +3,13 @@ import { refresh } from "next/cache";
 import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
+import type { Account } from "@/data/accounts";
 import type { Kept } from "@/data/household";
 import type { Month } from "@/data/schedule";
+import type { Secured } from "@/data/secured";
 
 import { golfPcp, golfValues, golf as owned } from "@/data/cars.fixture";
+import { soundKept } from "@/data/household";
 import { kept, today } from "@/data/household.fixture";
 import { homePart, homeValues } from "@/data/houses.fixture";
 import { incomeLines } from "@/data/income.fixture";
@@ -15,6 +18,7 @@ import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
+import { found } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 
 import {
@@ -171,8 +175,25 @@ const paid: Kept = {
   },
 };
 
+// The account with the id as a dialog opened on it now holds it, which
+// is as the household reads it.
+async function accountOn(id: number): Promise<Account> {
+  return found(soundKept(await latest()).household.accounts, id, "account");
+}
+
 async function latest(): Promise<unknown> {
   return upcast((await readLatest(db, ""))?.household);
+}
+
+// The asset with the id and the loans secured on it, as the ledger hands
+// them to a dialog opened on it now: as the household reads them, the
+// loans in the order they are listed.
+async function securedOn(id: number): Promise<Secured> {
+  const { accounts } = soundKept(await latest()).household;
+  return {
+    asset: found(accounts, id, "account"),
+    loans: accounts.filter(({ secures }) => secures === id),
+  };
 }
 
 async function versions(): Promise<number | undefined> {
@@ -186,12 +207,14 @@ describe("the account actions", () => {
     it("writes nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(saveAccount(null, values)).rejects.toThrow("redirected");
+      await expect(saveAccount(null, values, null)).rejects.toThrow(
+        "redirected",
+      );
       expect(await versions()).toBe(1);
     });
 
     it("adds a new account with the name trimmed, given the next id, and draws the page again", async () => {
-      expect(await saveAccount(null, values)).toStrictEqual(
+      expect(await saveAccount(null, values, null)).toStrictEqual(
         saved({ ...lifetime, id: 20 }),
       );
       expect(await latest()).toMatchObject({
@@ -214,11 +237,15 @@ describe("the account actions", () => {
         },
       );
 
-      expect(await saveAccount(2, values)).toStrictEqual(
+      expect(await saveAccount(2, values, await accountOn(2))).toStrictEqual(
         saved({ ...lifetime, id: 2 }),
       );
       expect(
-        await saveAccount(5, { ...owing, contribution: 2180, rate: 0.0485 }),
+        await saveAccount(
+          5,
+          { ...owing, contribution: 2180, rate: 0.0485 },
+          await accountOn(5),
+        ),
       ).toMatchObject(saved({ id: 5, secures: 4 }));
       expect(await latest()).toMatchObject({
         accounts: [
@@ -264,10 +291,10 @@ describe("the account actions", () => {
         rate: 0,
       } as const;
 
-      expect(await saveAccount(2, isa)).toMatchObject(
+      expect(await saveAccount(2, isa, await accountOn(2))).toMatchObject(
         saved({ name: "ISA", setOn: "2026-08-31" }),
       );
-      expect(await saveAccount(3, cash)).toStrictEqual(
+      expect(await saveAccount(3, cash, await accountOn(3))).toStrictEqual(
         saved({
           balance: 16900,
           growth: { kind: "fixed", rate: 0 },
@@ -276,35 +303,67 @@ describe("the account actions", () => {
           name: "Cash",
         }),
       );
-      expect(await saveAccount(2, { ...isa, balance: 275000 })).toMatchObject(
-        saved({ balance: 275000, setOn: "2026-09-15" }),
-      );
+      expect(
+        await saveAccount(2, { ...isa, balance: 275000 }, await accountOn(2)),
+      ).toMatchObject(saved({ balance: 275000, setOn: "2026-09-15" }));
+    });
+
+    // The workplace pension is opened on one device at £391,640, and the
+    // month end on another writes its statement's £421,300. The
+    // contribution changed on the first would put the balance back,
+    // dated today, so the save is refused and the month end's stands;
+    // so is one naming the pension and carrying no account opened.
+    it("refuses a save from a dialog opened on an account changed since, and writes nothing", async () => {
+      const opened = await accountOn(6);
+      await closeBalances({
+        asOf: kept.asOf,
+        balances: [{ balance: 421300, id: 6 }],
+      });
+      const closed = await latest();
+      const pension = {
+        ...values,
+        balance: 391640,
+        cadence: "year",
+        contribution: 30000,
+        growth: "plan",
+        kind: "tax-deferred",
+        name: "Workplace pension",
+      } as const;
+
+      for (const stale of [opened, null]) {
+        await expect(saveAccount(6, pension, stale)).resolves.toStrictEqual(
+          refused(
+            "The account changed since this was opened, so nothing was saved; close it and open it again",
+          ),
+        );
+      }
+      expect(await latest()).toStrictEqual(closed);
+      expect(await versions()).toBe(2);
     });
 
     it("refuses to make a pension a salary feeds anything else, and writes nothing", async () => {
-      await expect(saveAccount(6, values)).resolves.toStrictEqual(
-        refused("A salary feeds a pension alone"),
-      );
+      await expect(
+        saveAccount(6, values, await accountOn(6)),
+      ).resolves.toStrictEqual(refused("A salary feeds a pension alone"));
       expect(await versions()).toBe(1);
     });
 
     it("refuses to make a debt a line pays anything else, and writes nothing", async () => {
       await keepAfter(db, { scenario: "", version: 1 }, paid);
 
-      await expect(saveAccount(5, values)).resolves.toStrictEqual(
-        refused("A line pays a debt alone"),
-      );
+      await expect(
+        saveAccount(5, values, await accountOn(5)),
+      ).resolves.toStrictEqual(refused("A line pays a debt alone"));
       expect(await versions()).toBe(2);
     });
 
     it("takes the spare money into an account that takes it", async () => {
       expect(
-        await saveAccount(null, {
-          ...values,
-          cap: 5000,
-          contribution: 0,
-          funding: "spare",
-        }),
+        await saveAccount(
+          null,
+          { ...values, cap: 5000, contribution: 0, funding: "spare" },
+          null,
+        ),
       ).toMatchObject(saved({ contribution: { cap: 5000, kind: "spare" } }));
     });
 
@@ -322,11 +381,12 @@ describe("the account actions", () => {
         shares: [{ line: 16, sacrifice: 0.05 }],
       } as const;
 
-      await saveAccount(6, pension);
-      await saveAccount(6, {
-        ...pension,
-        shares: [{ line: 16, sacrifice: 1 }],
-      });
+      await saveAccount(6, pension, await accountOn(6));
+      await saveAccount(
+        6,
+        { ...pension, shares: [{ line: 16, sacrifice: 1 }] },
+        await accountOn(6),
+      );
 
       expect(await latest()).toMatchObject({
         schedule: {
@@ -346,14 +406,17 @@ describe("the account actions", () => {
         shares: [{ line: 17, sacrifice: 0.12 }],
       } as const;
 
-      await expect(saveAccount(6, pension)).resolves.toStrictEqual(
+      await expect(
+        saveAccount(6, pension, await accountOn(6)),
+      ).resolves.toStrictEqual(
         refused("No salary feeding the account has the id"),
       );
       await expect(
-        saveAccount(null, {
-          ...pension,
-          shares: [{ line: 16, sacrifice: 0.12 }],
-        }),
+        saveAccount(
+          null,
+          { ...pension, shares: [{ line: 16, sacrifice: 0.12 }] },
+          null,
+        ),
       ).resolves.toStrictEqual(
         refused("No salary feeding the account has the id"),
       );
@@ -364,45 +427,44 @@ describe("the account actions", () => {
       const yearly = { ...values, cadence: "year" } as const;
 
       await expect(
-        saveAccount(null, { ...yearly, contribution: 20001 }),
+        saveAccount(null, { ...yearly, contribution: 20001 }, null),
       ).resolves.toStrictEqual(
         refused("A fixed sum lands within its allowance"),
       );
       await expect(
-        saveAccount(null, {
-          ...yearly,
-          contribution: 48001,
-          kind: "tax-deferred",
-        }),
+        saveAccount(
+          null,
+          { ...yearly, contribution: 48001, kind: "tax-deferred" },
+          null,
+        ),
       ).resolves.toStrictEqual(
         refused("A fixed sum lands within its allowance"),
       );
       expect(await versions()).toBe(1);
 
-      await saveAccount(null, { ...yearly, contribution: 20000 });
-      await saveAccount(null, {
-        ...yearly,
-        contribution: 48000,
-        kind: "tax-deferred",
-      });
+      await saveAccount(null, { ...yearly, contribution: 20000 }, null);
+      await saveAccount(
+        null,
+        { ...yearly, contribution: 48000, kind: "tax-deferred" },
+        null,
+      );
 
       expect(await versions()).toBe(3);
     });
 
     it("refuses a balance below nothing on anything but a debt", async () => {
       await expect(
-        saveAccount(null, { ...values, balance: -1 }),
+        saveAccount(null, { ...values, balance: -1 }, null),
       ).resolves.toStrictEqual(refused("A balance below nothing is a debt's"));
       await expect(
-        saveAccount(null, {
-          ...values,
-          balance: -1,
-          kind: "real-asset",
-          owner: null,
-        }),
+        saveAccount(
+          null,
+          { ...values, balance: -1, kind: "real-asset", owner: null },
+          null,
+        ),
       ).resolves.toStrictEqual(refused("A balance below nothing is a debt's"));
 
-      expect(await saveAccount(null, owing)).toMatchObject(
+      expect(await saveAccount(null, owing, null)).toMatchObject(
         saved({ balance: -5000 }),
       );
     });
@@ -411,14 +473,18 @@ describe("the account actions", () => {
     // a month, or £50 a year, never clears it and £250 a month does.
     it("refuses a debt its own payments never clear", async () => {
       await expect(
-        saveAccount(null, { ...owing, contribution: 50 }),
+        saveAccount(null, { ...owing, contribution: 50 }, null),
       ).resolves.toStrictEqual(refused("A debt's payments end"));
       await expect(
-        saveAccount(null, { ...owing, cadence: "year", contribution: 50 }),
+        saveAccount(
+          null,
+          { ...owing, cadence: "year", contribution: 50 },
+          null,
+        ),
       ).resolves.toStrictEqual(refused("A debt's payments end"));
       expect(await versions()).toBe(1);
 
-      await saveAccount(null, { ...owing, contribution: 250 });
+      await saveAccount(null, { ...owing, contribution: 250 }, null);
 
       expect(await versions()).toBe(2);
     });
@@ -435,9 +501,9 @@ describe("the account actions", () => {
         rate: 0,
       } as const;
 
-      await saveAccount(null, planned);
+      await saveAccount(null, planned, null);
       await expect(
-        saveAccount(null, { ...planned, balance: -100000 }),
+        saveAccount(null, { ...planned, balance: -100000 }, null),
       ).resolves.toStrictEqual(refused("A debt's payments end"));
 
       expect(await versions()).toBe(2);
@@ -452,19 +518,19 @@ describe("the account actions", () => {
         { ...values, kind: "tax-deferred", owner: null },
         { ...values, kind: "cash", owner: 1 },
       ] as const) {
-        await expect(saveAccount(null, draft)).resolves.toStrictEqual(
+        await expect(saveAccount(null, draft, null)).resolves.toStrictEqual(
           refused("An ISA or a pension belongs to an owner, and nothing else"),
         );
       }
       await expect(
-        saveAccount(null, { ...values, owner: 99 }),
+        saveAccount(null, { ...values, owner: 99 }, null),
       ).resolves.toStrictEqual(
         refused("An ISA or a pension belongs to an owner the household lists"),
       );
       expect(await versions()).toBe(1);
 
       expect(
-        await saveAccount(null, { ...values, kind: "cash", owner: null }),
+        await saveAccount(null, { ...values, kind: "cash", owner: null }, null),
       ).toStrictEqual(
         saved({
           balance: 4000,
@@ -482,22 +548,22 @@ describe("the account actions", () => {
     // may: the mark is written onto a pension and refused on an ISA.
     it("marks a pension droppable, and refuses the mark on anything else", async () => {
       await expect(
-        saveAccount(null, { ...values, isDroppable: true }),
+        saveAccount(null, { ...values, isDroppable: true }, null),
       ).resolves.toStrictEqual(refused("Only a pension is dropped when short"));
       expect(await versions()).toBe(1);
 
       expect(
-        await saveAccount(null, {
-          ...values,
-          isDroppable: true,
-          kind: "tax-deferred",
-        }),
+        await saveAccount(
+          null,
+          { ...values, isDroppable: true, kind: "tax-deferred" },
+          null,
+        ),
       ).toMatchObject(saved({ isDroppable: true, kind: "tax-deferred" }));
     });
 
     it("refuses the spare money into a debt, in the household's words", async () => {
       await expect(
-        saveAccount(null, { ...owing, funding: "spare" }),
+        saveAccount(null, { ...owing, funding: "spare" }, null),
       ).resolves.toStrictEqual(
         refused("A real asset or a debt takes no spare money"),
       );
@@ -526,10 +592,10 @@ describe("the account actions", () => {
           ],
         },
       ] as const) {
-        await expect(saveAccount(1, draft)).rejects.toThrow(z.ZodError);
+        await expect(saveAccount(1, draft, null)).rejects.toThrow(z.ZodError);
       }
-      await expect(saveAccount(0, values)).rejects.toThrow(z.ZodError);
-      await expect(saveAccount(99, values)).resolves.toStrictEqual(
+      await expect(saveAccount(0, values, null)).rejects.toThrow(z.ZodError);
+      await expect(saveAccount(99, values, null)).resolves.toStrictEqual(
         refused("No account has the id"),
       );
       expect(await versions()).toBe(1);
@@ -540,12 +606,12 @@ describe("the account actions", () => {
     it("writes nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(saveHouse(null, house)).rejects.toThrow("redirected");
+      await expect(saveHouse(null, house, null)).rejects.toThrow("redirected");
       expect(await versions()).toBe(1);
     });
 
     it("writes a new house owned outright as one account", async () => {
-      expect(await saveHouse(null, outright)).toStrictEqual(saved(home));
+      expect(await saveHouse(null, outright, null)).toStrictEqual(saved(home));
       expect(await latest()).toMatchObject({
         accounts: [...kept.accounts, home],
         next: 21,
@@ -555,7 +621,7 @@ describe("the account actions", () => {
     });
 
     it("writes a new mortgaged house as the house, the loan secured on it and its payments, in one version", async () => {
-      expect(await saveHouse(null, house)).toStrictEqual(saved(home));
+      expect(await saveHouse(null, house, null)).toStrictEqual(saved(home));
       expect(await latest()).toMatchObject({
         accounts: [...kept.accounts, home, mortgage],
         next: 23,
@@ -565,15 +631,19 @@ describe("the account actions", () => {
     });
 
     it("writes over a house, the loan secured on it and its payments, keeping their ids", async () => {
-      await saveHouse(null, house);
+      await saveHouse(null, house, null);
 
       expect(
-        await saveHouse(20, {
-          ...house,
-          ceiling: 600000,
-          parts: [{ ...homePart, loan: 21, payment: 3000 }],
-          value: 450000,
-        }),
+        await saveHouse(
+          20,
+          {
+            ...house,
+            ceiling: 600000,
+            parts: [{ ...homePart, loan: 21, payment: 3000 }],
+            value: 450000,
+          },
+          await securedOn(20),
+        ),
       ).toStrictEqual(saved({ ...home, balance: 450000, limit: 600000 }));
       expect(await latest()).toMatchObject({
         accounts: [
@@ -598,7 +668,11 @@ describe("the account actions", () => {
         { ...kept, accounts: [...kept.accounts, home, mortgage], next: 22 },
       );
 
-      await saveHouse(20, { ...house, parts: [{ ...homePart, loan: 21 }] });
+      await saveHouse(
+        20,
+        { ...house, parts: [{ ...homePart, loan: 21 }] },
+        await securedOn(20),
+      );
 
       expect(await latest()).toMatchObject({
         accounts: [...kept.accounts, home, mortgage],
@@ -608,8 +682,8 @@ describe("the account actions", () => {
     });
 
     it("mortgages a house owned outright", async () => {
-      await saveHouse(null, outright);
-      await saveHouse(20, house);
+      await saveHouse(null, outright, null);
+      await saveHouse(20, house, await securedOn(20));
 
       expect(await latest()).toMatchObject({
         accounts: [...kept.accounts, home, mortgage],
@@ -619,8 +693,8 @@ describe("the account actions", () => {
     });
 
     it("sends a loan and its payments away when the house is owned outright now", async () => {
-      await saveHouse(null, house);
-      await saveHouse(20, outright);
+      await saveHouse(null, house, null);
+      await saveHouse(20, outright, await securedOn(20));
 
       expect(await latest()).toStrictEqual({
         ...kept,
@@ -636,8 +710,8 @@ describe("the account actions", () => {
         { ...kept, accounts: [...kept.accounts, home, mortgage], next: 22 },
       );
 
-      await saveHouse(20, outright);
-      await saveHouse(20, outright);
+      await saveHouse(20, outright, await securedOn(20));
+      await saveHouse(20, outright, await securedOn(20));
 
       expect(await latest()).toStrictEqual({
         ...kept,
@@ -650,7 +724,7 @@ describe("the account actions", () => {
     // the loans taking the next ids before their lines and named by
     // their places.
     it("writes a mortgage in sub-accounts as a loan each, secured on the house, with the payments of each", async () => {
-      expect(await saveHouse(null, parted)).toStrictEqual(saved(home));
+      expect(await saveHouse(null, parted, null)).toStrictEqual(saved(home));
       expect(await latest()).toMatchObject({
         accounts: [
           ...kept.accounts,
@@ -682,11 +756,15 @@ describe("the account actions", () => {
     // as the only one, and the first goes with its payments, rather than
     // the second's figures landing on the first's id.
     it("writes each sub-account over the loan it was opened from, and sends those none was opened from away with their payments", async () => {
-      await saveHouse(null, parted);
-      await saveHouse(20, {
-        ...house,
-        parts: [{ balance: 100000, loan: 23, payment: 540, rate: 0.042 }],
-      });
+      await saveHouse(null, parted, null);
+      await saveHouse(
+        20,
+        {
+          ...house,
+          parts: [{ balance: 100000, loan: 23, payment: 540, rate: 0.042 }],
+        },
+        await securedOn(20),
+      );
 
       expect(await latest()).toMatchObject({
         accounts: [
@@ -711,24 +789,141 @@ describe("the account actions", () => {
       });
     });
 
+    // A dialog opened on the house with its one loan, 21, while another
+    // device adds a second sub-account, 23, would send the second away
+    // with its payments, since it names no loan the first opened on, so
+    // the save is refused and the second stands; so is one naming the
+    // house and carrying no house opened.
+    it("refuses a save from a dialog opened on a house whose loans changed since, and writes nothing", async () => {
+      await saveHouse(null, house, null);
+      const opened = await securedOn(20);
+      const first = { ...homePart, loan: 21 };
+      await saveHouse(
+        20,
+        {
+          ...house,
+          parts: [
+            first,
+            { balance: 100000, loan: null, payment: 540, rate: 0.042 },
+          ],
+        },
+        opened,
+      );
+      const added = await latest();
+
+      for (const stale of [opened, null]) {
+        await expect(
+          saveHouse(20, { ...house, ceiling: 600000, parts: [first] }, stale),
+        ).resolves.toStrictEqual(
+          refused(
+            "The house changed since this was opened, so nothing was saved; close it and open it again",
+          ),
+        );
+      }
+      expect(await latest()).toStrictEqual(added);
+      expect(await versions()).toBe(3);
+    });
+
+    // A house is held to as the household reads it, which is as its
+    // dialog opens on it: its loans by id, so the two reordered on the
+    // ledger since are no change, and its move in the year its milestone
+    // falls in, 2040 at 48, whatever year was kept with it.
+    it("holds a house to its loans by id and its move's year as the household reads them", async () => {
+      await saveHouse(null, parted, null);
+      const opened = await securedOn(20);
+      const ids = kept.accounts.map(({ id }) => id);
+      await placeAccountsInOrder([...ids, 20, 23, 21]);
+
+      expect(
+        await saveHouse(
+          20,
+          {
+            ...parted,
+            parts: [
+              { ...homePart, balance: 234670, loan: 21 },
+              { balance: 100000, loan: 23, payment: 540, rate: 0.042 },
+            ],
+          },
+          opened,
+        ),
+      ).toStrictEqual(saved(home));
+
+      const move = { at: 7, price: 650000 };
+      await keepAfter(
+        db,
+        { scenario: "", version: 4 },
+        {
+          ...kept,
+          accounts: [
+            ...kept.accounts,
+            { ...home, move: { ...move, year: 2033 } },
+          ],
+          next: 21,
+        },
+      );
+      const moving = {
+        ...outright,
+        move: {
+          ...move,
+          ceiling: 0,
+          loanToValue: 0,
+          rate: 0,
+          term: 0,
+          year: 2040,
+        },
+      };
+
+      expect(await saveHouse(20, moving, await securedOn(20))).toMatchObject(
+        saved({ move: { year: 2040 } }),
+      );
+
+      // The milestone moved to 52 while a dialog was open on the house:
+      // the house itself is as it was, so the save goes through.
+      const reopened = await securedOn(20);
+      const now = soundKept(await latest()).kept;
+      await keepAfter(
+        db,
+        { scenario: "", version: (await versions()) ?? 0 },
+        {
+          ...now,
+          milestones: now.milestones.map((milestone) =>
+            milestone.id === 7
+              ? {
+                  ...milestone,
+                  conditions: [{ measure: "age", of: "years", times: 52 }],
+                }
+              : milestone,
+          ),
+        },
+      );
+
+      expect(await saveHouse(20, moving, reopened)).toMatchObject({
+        kind: "saved",
+      });
+    });
+
     // A sub-account opened from a loan the house does not hold, as one
     // sent away since the dialog was drawn, the house itself, a debt
     // secured on nothing or a car's finance, would write its figures
     // over that account, so it is refused; so is a new house claiming
     // the mortgage of one held already.
     it("refuses a sub-account opened from a loan not secured on the house, and writes nothing", async () => {
-      await saveHouse(null, house);
-      await saveCar(null, golf);
+      await saveHouse(null, house, null);
+      await saveCar(null, golf, null);
 
       for (const loan of [99, 20, 5, 24]) {
         await expect(
-          saveHouse(20, { ...house, parts: [{ ...homePart, loan }] }),
+          saveHouse(
+            20,
+            { ...house, parts: [{ ...homePart, loan }] },
+            await securedOn(20),
+          ),
         ).resolves.toStrictEqual(
           refused("No loan secured on the asset has the id"),
         );
       }
       await expect(
-        saveHouse(null, { ...house, parts: [{ ...homePart, loan: 21 }] }),
+        saveHouse(null, { ...house, parts: [{ ...homePart, loan: 21 }] }, null),
       ).resolves.toStrictEqual(
         refused("No loan secured on the asset has the id"),
       );
@@ -738,18 +933,22 @@ describe("the account actions", () => {
     // The move up as the children leave home is written on the house's
     // own account, as the records keep it.
     it("writes a house's move on its account", async () => {
-      await saveHouse(null, {
-        ...house,
-        move: {
-          at: 7,
-          ceiling: 800000,
-          loanToValue: 0.9,
-          price: 650000,
-          rate: 0.045,
-          term: 25,
-          year: 2040,
+      await saveHouse(
+        null,
+        {
+          ...house,
+          move: {
+            at: 7,
+            ceiling: 800000,
+            loanToValue: 0.9,
+            price: 650000,
+            rate: 0.045,
+            term: 25,
+            year: 2040,
+          },
         },
-      });
+        null,
+      );
 
       expect(await latest()).toMatchObject({
         accounts: [
@@ -771,18 +970,22 @@ describe("the account actions", () => {
 
     it("refuses a move at a milestone reached when conditions hold, in the household's words, and writes nothing", async () => {
       await expect(
-        saveHouse(null, {
-          ...house,
-          move: {
-            at: 9,
-            ceiling: 0,
-            loanToValue: 0,
-            price: 650000,
-            rate: 0,
-            term: 25,
-            year: 2040,
+        saveHouse(
+          null,
+          {
+            ...house,
+            move: {
+              at: 9,
+              ceiling: 0,
+              loanToValue: 0,
+              price: 650000,
+              rate: 0,
+              term: 25,
+              year: 2040,
+            },
           },
-        }),
+          null,
+        ),
       ).resolves.toStrictEqual(
         refused(
           "A move is at a milestone the household lists, reached at an age",
@@ -795,10 +998,14 @@ describe("the account actions", () => {
     // line runs to the end of the plan and carries it, and the loan's own
     // sum is never charged.
     it("keeps a mortgage whose payment only meets its interest, paid through an open-ended line", async () => {
-      await saveHouse(null, {
-        ...house,
-        parts: [{ balance: 200000, loan: null, payment: 750, rate: 0.045 }],
-      });
+      await saveHouse(
+        null,
+        {
+          ...house,
+          parts: [{ balance: 200000, loan: null, payment: 750, rate: 0.045 }],
+        },
+        null,
+      );
 
       expect(await latest()).toMatchObject({
         schedule: {
@@ -811,9 +1018,9 @@ describe("the account actions", () => {
     });
 
     it("refuses to write a house over a pension a salary feeds, and writes nothing", async () => {
-      await expect(saveHouse(6, house)).resolves.toStrictEqual(
-        refused("A salary feeds a pension alone"),
-      );
+      await expect(
+        saveHouse(6, house, await securedOn(6)),
+      ).resolves.toStrictEqual(refused("A salary feeds a pension alone"));
       expect(await versions()).toBe(1);
     });
 
@@ -870,10 +1077,10 @@ describe("the account actions", () => {
           },
         },
       ] as const) {
-        await expect(saveHouse(null, draft)).rejects.toThrow(z.ZodError);
+        await expect(saveHouse(null, draft, null)).rejects.toThrow(z.ZodError);
       }
-      await expect(saveHouse(0, house)).rejects.toThrow(z.ZodError);
-      await expect(saveHouse(99, house)).resolves.toStrictEqual(
+      await expect(saveHouse(0, house, null)).rejects.toThrow(z.ZodError);
+      await expect(saveHouse(99, house, null)).resolves.toStrictEqual(
         refused("No account has the id"),
       );
       expect(await versions()).toBe(1);
@@ -884,12 +1091,12 @@ describe("the account actions", () => {
     it("writes nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(saveCar(null, golf)).rejects.toThrow("redirected");
+      await expect(saveCar(null, golf, null)).rejects.toThrow("redirected");
       expect(await versions()).toBe(1);
     });
 
     it("writes a new car on a PCP as the car, the finance secured on it and its payments, in one version", async () => {
-      expect(await saveCar(null, golf)).toStrictEqual(saved(car));
+      expect(await saveCar(null, golf, null)).toStrictEqual(saved(car));
       expect(await latest()).toMatchObject({
         accounts: [...kept.accounts, car, finance],
         next: 23,
@@ -902,10 +1109,14 @@ describe("the account actions", () => {
     // The finance is written back over the loan it was opened from, and
     // a car owned outright sends it away, whatever loan it names.
     it("writes over a car and the finance secured on it, and sends the finance away when the car is owned outright now", async () => {
-      await saveCar(null, golf);
+      await saveCar(null, golf, null);
 
       expect(
-        await saveCar(20, { ...golf, floor: 3000, loan: 21, value: 17000 }),
+        await saveCar(
+          20,
+          { ...golf, floor: 3000, loan: 21, value: 17000 },
+          await securedOn(20),
+        ),
       ).toStrictEqual(saved({ ...car, balance: 17000, limit: 3000 }));
       expect(await latest()).toMatchObject({
         accounts: [
@@ -916,15 +1127,19 @@ describe("the account actions", () => {
         next: 23,
       });
 
-      await saveCar(20, {
-        ...golf,
-        agreement: "outright",
-        balance: 0,
-        balloon: 0,
-        loan: 21,
-        payment: 0,
-        rate: 0,
-      });
+      await saveCar(
+        20,
+        {
+          ...golf,
+          agreement: "outright",
+          balance: 0,
+          balloon: 0,
+          loan: 21,
+          payment: 0,
+          rate: 0,
+        },
+        await securedOn(20),
+      );
 
       expect(await latest()).toStrictEqual({
         ...kept,
@@ -933,8 +1148,32 @@ describe("the account actions", () => {
       });
     });
 
+    // The Golf is opened on one device owing £14,000, and the month end
+    // on another writes its finance's statement of £13,710. The car's
+    // value changed on the first would put the finance back, so the save
+    // is refused and the month end's stands.
+    it("refuses a save from a dialog opened on a car changed since, and writes nothing", async () => {
+      await saveCar(null, golf, null);
+      const opened = await securedOn(20);
+      await closeBalances({
+        asOf: kept.asOf,
+        balances: [{ balance: -13710, id: 21 }],
+      });
+      const closed = await latest();
+
+      await expect(
+        saveCar(20, { ...golf, loan: 21, value: 17000 }, opened),
+      ).resolves.toStrictEqual(
+        refused(
+          "The car changed since this was opened, so nothing was saved; close it and open it again",
+        ),
+      );
+      expect(await latest()).toStrictEqual(closed);
+      expect(await versions()).toBe(3);
+    });
+
     it("refuses to write a car over a pension a salary feeds, and writes nothing", async () => {
-      await expect(saveCar(6, golf)).resolves.toStrictEqual(
+      await expect(saveCar(6, golf, await securedOn(6))).resolves.toStrictEqual(
         refused("A salary feeds a pension alone"),
       );
       expect(await versions()).toBe(1);
@@ -950,9 +1189,9 @@ describe("the account actions", () => {
         { ...golf, agreement: "outright", balance: 0, balloon: 0, rate: 0 },
         { ...golf, loan: 0 },
       ] as const) {
-        await expect(saveCar(null, draft)).rejects.toThrow(z.ZodError);
+        await expect(saveCar(null, draft, null)).rejects.toThrow(z.ZodError);
       }
-      await expect(saveCar(0, golf)).rejects.toThrow(z.ZodError);
+      await expect(saveCar(0, golf, null)).rejects.toThrow(z.ZodError);
       expect(await versions()).toBe(1);
     });
   });
@@ -1010,7 +1249,7 @@ describe("the account actions", () => {
     });
 
     it("deletes a house with the loan secured on it and that loan's payments, and a loan with its payments", async () => {
-      await saveHouse(null, house);
+      await saveHouse(null, house, null);
       await removeAccount(20);
 
       expect(await latest()).toStrictEqual({ ...kept, next: 23 });

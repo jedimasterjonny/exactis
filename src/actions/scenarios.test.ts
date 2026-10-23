@@ -6,14 +6,16 @@ import * as z from "zod";
 import type { Kept } from "@/data/household";
 import type { Answer } from "@/lib/answer";
 
+import { soundKept } from "@/data/household";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { homePart, homeValues } from "@/data/houses.fixture";
-import { currentShape, stamped } from "@/data/shapes";
+import { currentShape, stamped, upcast } from "@/data/shapes";
 import { keepAfter, listScenarios, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { householdVersions } from "@/db/schema";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
+import { found } from "@/lib/records";
 import { closeScenario, openedScenario, openScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 
@@ -413,13 +415,24 @@ describe("adoptScenario", () => {
   it("lays a sub-account the scenario kept over its own loan, and keeps none it took away", async () => {
     const second = { balance: 100000, loan: null, payment: 540, rate: 0.042 };
     await keepFirst("", reference);
-    await saveHouse(null, {
-      ...homeValues,
-      parts: [{ ...homePart, balance: 234670 }, second],
-    });
+    await saveHouse(
+      null,
+      { ...homeValues, parts: [{ ...homePart, balance: 234670 }, second] },
+      null,
+    );
+    const { accounts } = soundKept(
+      upcast((await readLatest(db, ""))?.household),
+    ).household;
     await createScenario("Retire early");
     vi.mocked(openedScenario).mockResolvedValue("Retire early");
-    await saveHouse(20, { ...homeValues, parts: [{ ...second, loan: 23 }] });
+    await saveHouse(
+      20,
+      { ...homeValues, parts: [{ ...second, loan: 23 }] },
+      {
+        asset: found(accounts, 20, "account"),
+        loans: accounts.filter(({ secures }) => secures === 20),
+      },
+    );
     vi.mocked(openedScenario).mockResolvedValue(null);
     await closeBalances({
       asOf: reference.asOf,

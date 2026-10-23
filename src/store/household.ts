@@ -11,7 +11,7 @@ import { nothingKeptIn, soundKept, sourcesIn } from "@/data/household";
 import { upcast } from "@/data/shapes";
 import { getDb } from "@/db/client";
 import { keepAfter, listScenarios, readAsOf, readLatest } from "@/db/household";
-import { Refusal, refused, saved } from "@/lib/answer";
+import { Refusal, refused, saved, Stale } from "@/lib/answer";
 import { dayOf, monthBefore, thisMonth } from "@/lib/months";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
@@ -85,9 +85,11 @@ const readScenarios = cache(async (): Promise<readonly string[]> =>
 // has been opened since, so an edit meant for a scenario never lands in
 // the household, nor the other way; one naming none is kept on whichever
 // is open, as a save sent as it is made is. The page the save was made
-// from is drawn again from the version written. An action answers a POST
-// from anywhere, so this checks the session for itself, as every read
-// does.
+// from is drawn again from the version written; and from what is held
+// now after a refusal of a save from a dialog opened on a record changed
+// since, so the dialog opened again opens on that, where any other
+// refusal leaves the page as it is. An action answers a POST from
+// anywhere, so this checks the session for itself, as every read does.
 export async function amend<TResult>(
   edit: (held: Held) => Amended<TResult>,
   on?: null | string,
@@ -106,6 +108,9 @@ export async function amend<TResult>(
     return saved(result);
   } catch (error: unknown) {
     if (error instanceof Refusal) {
+      if (error instanceof Stale) {
+        refresh();
+      }
       return refused(error.message);
     }
     throw error;
