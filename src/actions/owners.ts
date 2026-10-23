@@ -7,7 +7,13 @@ import type { Answer } from "@/lib/answer";
 
 import { ownerValues, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
-import { found, removed, replaced, written } from "@/lib/records";
+import {
+  found,
+  holdUnchanged,
+  removed,
+  replaced,
+  written,
+} from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
@@ -20,6 +26,12 @@ import { amend } from "@/store/household";
 const values = z
   .object(ownerValues)
   .omit({ qualifyingYears: true }) satisfies z.ZodType<OwnerValues>;
+
+// An owner as the dialog opened on it, as the household parses its
+// owners, less the qualifying years, which are saved on their own, so an
+// edit of them elsewhere is no change to what the dialog holds. The
+// owner held now is parsed the same way, so the two compare key for key.
+const opening = values.extend({ id: recordId });
 
 // Deletes the owner with that id, unless an account or an income line
 // names it: an ISA or a pension belongs to an owner, and an income line
@@ -49,15 +61,28 @@ export async function removeOwner(id: number): Promise<Answer<undefined>> {
 // next id, else over the one with that id, keeping the qualifying years
 // it holds, and hands back the owner as the household now has it. An
 // action answers a POST from anywhere, so it checks the session for
-// itself and parses what it was sent rather than trusting the form.
+// itself and parses what it was sent rather than trusting the form. The
+// dialog sends the owner as it opened on it beside the draft, and an
+// edit of one changed since, as by a retirement age dragged on the
+// dashboard meanwhile, is refused rather than written back over the
+// change.
 export async function saveOwner(
   id: null | number,
   draft: OwnerValues,
+  opened: null | Owner,
 ): Promise<Answer<Owner>> {
   await requireSession();
   const at = target.parse(id);
   const parsed = values.parse(draft);
+  const asOpened = opening.nullable().parse(opened);
   return amend(({ kept }) => {
+    if (at !== null) {
+      holdUnchanged(
+        asOpened,
+        opening.parse(found(kept.owners, at, "owner")),
+        "owner",
+      );
+    }
     const {
       next,
       records,
