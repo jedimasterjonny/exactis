@@ -64,12 +64,12 @@ the one it read, in one statement. So a save lands whole or not at all, one the
 household changed under since it was read is refused rather than written over
 the other, and a save that breaks a rule is refused in the rule's words. A
 dialog holds its record for as long as it is open, longer than that read, so the
-account, house, car, owner and line dialogs send the record as they opened on
-it, and a save over one changed since, on another device say, is refused rather
-than written back over the change. No version is written over, none of the
-household's is deleted, and the table is never truncated, which it holds with
-triggers, so every household the store has held stays; a scenario can be
-dropped, every version of it at once, where the household never can. A read
+account, house, car, owner, line and milestone dialogs send the record as they
+opened on it, and a save over one changed since, on another device say, is
+refused rather than written back over the change. No version is written over,
+none of the household's is deleted, and the table is never truncated, which it
+holds with triggers, so every household the store has held stays; a scenario can
+be dropped, every version of it at once, where the household never can. A read
 holds the latest version to the same rules before any screen draws from it.
 
 A scenario is a branch of the household in the same table: the household is the

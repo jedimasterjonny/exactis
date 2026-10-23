@@ -127,7 +127,9 @@ const twentyFiveYears: readonly Condition[] = [
 // The editor hook holds the entry, the save and the toast, as it does
 // for every dialog; what is the milestone's own is the draft the two
 // ways share and the values the save sends, which are the one
-// condition on the age or the conditions as typed. The caller is told
+// condition on the age or the conditions as typed, sent beside the
+// milestone as it opened, so the store refuses a save over a milestone
+// changed meanwhile. The caller is told
 // when the dialog is done with, saved, deleted or dismissed, so it can
 // drop it.
 // A milestone lines are tied to is held to its age: the choice of
@@ -161,7 +163,7 @@ export function MilestoneDialog({
     save: async (id, draft) =>
       isRetirement
         ? saveRetirement(valuesOf(draft).conditions)
-        : saveMilestone(id, valuesOf(draft)),
+        : saveMilestone(id, valuesOf(draft), record),
   });
   const { ask, doomed, questionOf } = useRemover<Milestone>({
     describe: ({ name }) => name,

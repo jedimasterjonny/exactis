@@ -137,10 +137,11 @@ describe("MilestoneDialog", () => {
     vi.mocked(saveMilestone).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(null, {
-      conditions: atAge(50),
-      name: "Sabbatical",
-    });
+    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(
+      null,
+      { conditions: atAge(50), name: "Sabbatical" },
+      null,
+    );
     expect(
       within(dialog).getByRole("button", { name: "Save" }),
     ).toHaveAttribute("aria-busy", "true");
@@ -215,10 +216,14 @@ describe("MilestoneDialog", () => {
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(null, {
-      conditions: [{ measure: "worth", of: "debt", times: 10 }],
-      name: "Independence",
-    });
+    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        conditions: [{ measure: "worth", of: "debt", times: 10 }],
+        name: "Independence",
+      },
+      null,
+    );
     expect(
       await screen.findByRole("dialog", { name: "Milestone added" }),
     ).toHaveAccessibleDescription(
@@ -411,10 +416,14 @@ describe("MilestoneDialog", () => {
     commit(field("At least", dialog), "2,000,000");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(firstMillion.id, {
-      conditions: [{ measure: "worth", of: "pounds", times: 2000000 }],
-      name: "First million",
-    });
+    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(
+      firstMillion.id,
+      {
+        conditions: [{ measure: "worth", of: "pounds", times: 2000000 }],
+        name: "First million",
+      },
+      firstMillion,
+    );
     expect(
       await screen.findByRole("dialog", { name: "Milestone updated" }),
     ).toHaveAccessibleDescription("First million · Net worth ≥ £2,000,000");
