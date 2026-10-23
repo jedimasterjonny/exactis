@@ -1,16 +1,17 @@
 "use server";
 
 import { refresh } from "next/cache";
+import * as z from "zod";
 
 import type { Account } from "@/data/accounts";
 import type { Kept } from "@/data/household";
 import type { Answer } from "@/lib/answer";
 
 import { soundKept } from "@/data/household";
-import { scenarioName } from "@/data/schemas";
+import { recordId, scenarioName } from "@/data/schemas";
 import { upcast } from "@/data/shapes";
 import { getDb } from "@/db/client";
-import { dropScenario, keepAfter, readLatest } from "@/db/household";
+import { dropScenario, keepAfter, readFirst, readLatest } from "@/db/household";
 import { Refusal, refused, saved } from "@/lib/answer";
 import { closeScenario, openedScenario, openScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
@@ -19,6 +20,11 @@ import { readHeld } from "@/store/household";
 // Why a scenario named is not there to enter or adopt: none was ever
 // kept by that name, or it has been dropped since the screen was drawn.
 const unkept = "No scenario is kept under that name";
+
+// The id the next record is given, read off the copy a scenario was made
+// from and nothing else: the copy was sound when it was kept, and a rule
+// tightened since would otherwise refuse an adoption it has no part in.
+const fork = z.object({ next: recordId });
 
 // Every action here answers a POST from anywhere, so it checks the
 // session for itself and parses the name it was sent rather than
@@ -40,17 +46,22 @@ const unkept = "No scenario is kept under that name";
 // Both, and what they make, are held to every rule as any save is, so
 // one kept before a rule tightened, or a merge breaking one, is refused
 // in the rule's words.
+// An account added to the household since the scenario was made is
+// refused rather than merged, as the merge below says, and the
+// scenario's first version, the copy it was made from, is read for the
+// id its next record was given to tell.
 // The store runs no transaction, so the write comes first: a drop that
 // fails after it leaves a scenario already adopted, and nothing lost.
 export async function adoptScenario(name: string): Promise<Answer<undefined>> {
   await requireSession();
   const scenario = scenarioName.parse(name);
   const db = getDb();
-  const [adopted, household] = await Promise.all([
+  const [adopted, forked, household] = await Promise.all([
     readLatest(db, scenario),
+    readFirst(db, scenario),
     readLatest(db, ""),
   ]);
-  if (adopted === null) {
+  if (adopted === null || forked === null) {
     return refused(unkept);
   }
   try {
@@ -61,7 +72,11 @@ export async function adoptScenario(name: string): Promise<Answer<undefined>> {
       soundKept(
         household === null
           ? plan
-          : planOver(soundKept(upcast(household.household)).kept, plan),
+          : planOver(
+              soundKept(upcast(household.household)).kept,
+              plan,
+              fork.parse(upcast(forked.household)).next,
+            ),
       ).kept,
     );
   } catch (error: unknown) {
@@ -171,8 +186,24 @@ async function closeIfOpen(name: string): Promise<void> {
 // allocation and its mappings, and the next record's id. Balances go by
 // the account's id: an account in both takes the household's balance,
 // one only the scenario holds keeps its own, and one only the household
-// holds is gone, since the scenario deleted it.
-function planOver(household: Kept, scenario: Kept): Kept {
+// holds is gone, since the scenario deleted it. That holds only while
+// the household holds no account added since the scenario was made:
+// each branch gives its next record the id the household's next stood
+// at when the scenario was made, so an account added to each would be
+// read as one, the scenario's taking the household's balance and the
+// household's gone unsaid, and one added to the household alone would
+// go unsaid too. A household holding an account with an id from that
+// one on is refused, so the operator takes the account out of the
+// household and puts it back after. The merged household gives its next
+// record the higher of the two ids, since an id only ever counts up:
+// the household's next stays where an account it took out had moved it,
+// and a file imported into the scenario can set the scenario's lower.
+function planOver(household: Kept, scenario: Kept, forkedAt: number): Kept {
+  if (household.accounts.some(({ id }) => id >= forkedAt)) {
+    throw new Refusal(
+      "An account was added to the household since this scenario was made, so the scenario cannot be laid over it; delete it from the household first, and add it again after",
+    );
+  }
   return {
     ...scenario,
     accounts: scenario.accounts.map((account) => {
@@ -183,6 +214,7 @@ function planOver(household: Kept, scenario: Kept): Kept {
     cma: household.cma,
     curve: household.curve,
     housePrices: household.housePrices,
+    next: Math.max(household.next, scenario.next),
     points: household.points,
   };
 }

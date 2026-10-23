@@ -183,23 +183,25 @@ export async function readAsOf(
   return first ?? null;
 }
 
+// The first version kept on the branch, or null before anything is. A
+// scenario's is the copy it was made from, which stays until the
+// scenario is adopted or dropped, so what it was made from is read back
+// off it; one saved to the scenario while it was being adopted outlives
+// the drop and stands as its first after, so a scenario left that way
+// reads as made from a later copy than it was.
+export async function readFirst(
+  db: Database,
+  scenario: string,
+): Promise<null | Version> {
+  return readEnd(db, scenario, asc);
+}
+
 // The latest version kept on the branch, or null before anything is.
 export async function readLatest(
   db: Database,
   scenario: string,
 ): Promise<null | Version> {
-  const [row] = await queried(
-    db
-      .select({
-        household: householdVersions.household,
-        version: householdVersions.version,
-      })
-      .from(householdVersions)
-      .where(eq(householdVersions.scenario, scenario))
-      .orderBy(desc(householdVersions.version))
-      .limit(1),
-  );
-  return row ?? null;
+  return readEnd(db, scenario, desc);
 }
 
 // A query run, and when it fails, failed again with only what a failure
@@ -215,4 +217,25 @@ async function queried<TResult>(query: PromiseLike<TResult>): Promise<TResult> {
         })
       : new Error("Failed query, in no shape a query's failure takes");
   }
+}
+
+// The version at one end of the branch, the versions ordered as given,
+// or null before anything is kept there.
+async function readEnd(
+  db: Database,
+  scenario: string,
+  ordered: typeof asc,
+): Promise<null | Version> {
+  const [row] = await queried(
+    db
+      .select({
+        household: householdVersions.household,
+        version: householdVersions.version,
+      })
+      .from(householdVersions)
+      .where(eq(householdVersions.scenario, scenario))
+      .orderBy(ordered(householdVersions.version))
+      .limit(1),
+  );
+  return row ?? null;
 }

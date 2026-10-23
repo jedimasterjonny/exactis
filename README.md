@@ -109,10 +109,15 @@ accounts and what pays into them, the milestones, both schedules, the ages, the
 rates typed and which set is live, the split, the glide path, the deductions,
 and the target allocation and its mappings. Balances go by account: an account
 in both takes the household's, one the scenario added keeps its own, and one
-only the household holds is gone, since the scenario deleted it. The merge is
-held to every rule, as any save is. The versions of the scenario up to the one
-adopted are then dropped, so one saved to it since stays. The store runs no
-transaction, so the write comes first and the drop second: a drop that fails
+only the household holds is gone, since the scenario deleted it. An account
+added to the household since the scenario was made is refused rather than
+merged: each branch gives its next record the id the household's next stood at
+when the scenario was made, so one added to each would be read as one. Take it
+out of the household and put it back after. The merged household gives its next
+record the higher of the two ids, since an id is never given out twice. The
+merge is held to every rule, as any save is. The versions of the scenario up to
+the one adopted are then dropped, so one saved to it since stays. The store runs
+no transaction, so the write comes first and the drop second: a drop that fails
 leaves a scenario already adopted, and nothing lost. While a scenario is open, a
 banner naming it heads every screen, with a button that leaves it for the
 household, so nothing is edited without saying where it is saved.

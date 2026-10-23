@@ -304,6 +304,104 @@ describe("adoptScenario", () => {
     expect(refresh).toHaveBeenCalledOnce();
   });
 
+  // A cash ISA opened in the household after the scenario was made, which
+  // the household gave the id the scenario gave its premium bonds; then
+  // closed again, the household's next id staying where the ISA moved it.
+  it("refuses to adopt over an account the household added since the scenario was made, until it is taken out", async () => {
+    await keepFirst("", branched);
+    await keepAfter(
+      db,
+      { scenario: "", version: 1 },
+      {
+        ...recorded,
+        accounts: [
+          ...recorded.accounts,
+          { ...bonds, balance: 40_000, name: "Cash ISA" },
+        ],
+        next: 21,
+      },
+    );
+    await keepFirst("Retire early", branched);
+    await keepAfter(db, { scenario: "Retire early", version: 1 }, planned);
+
+    await expect(adoptScenario("Retire early")).resolves.toStrictEqual(
+      refused(
+        "An account was added to the household since this scenario was made, so the scenario cannot be laid over it; delete it from the household first, and add it again after",
+      ),
+    );
+    expect(await readLatest(db, "")).toMatchObject({ version: 2 });
+    expect(await listScenarios(db)).toStrictEqual(["Retire early"]);
+
+    await keepAfter(
+      db,
+      { scenario: "", version: 2 },
+      { ...recorded, next: 21 },
+    );
+
+    expect(await adoptScenario("Retire early")).toStrictEqual(saved(undefined));
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped({
+        ...planned,
+        accounts: [...recorded.accounts, bonds],
+        points: reference.points,
+      }),
+      version: 4,
+    });
+  });
+
+  // An account opened in the household since the scenario was made and
+  // closed again, while the scenario added nothing: an id is never given
+  // out twice, so the household's next id is the one kept.
+  it("gives the merged household's next record the higher of the two ids", async () => {
+    await keepFirst("", reference);
+    await keepAfter(
+      db,
+      { scenario: "", version: 1 },
+      {
+        ...reference,
+        accounts: [
+          ...reference.accounts,
+          { ...bonds, balance: 40_000, name: "Cash ISA" },
+        ],
+        next: 21,
+      },
+    );
+    await keepAfter(
+      db,
+      { scenario: "", version: 2 },
+      { ...reference, next: 21 },
+    );
+    await keepFirst("Retire early", reference);
+
+    expect(await adoptScenario("Retire early")).toStrictEqual(saved(undefined));
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped({ ...reference, next: 21 }),
+      version: 4,
+    });
+  });
+
+  // The copy the scenario was made from lists an account twice, as a
+  // version kept before a rule tightened would break it, while the
+  // scenario since and the household are sound.
+  it("reads the copy the scenario was made from for its next id alone, so a rule it breaks refuses nothing", async () => {
+    await keepFirst("", reference);
+    await keepFirst("Retire early", {
+      ...reference,
+      accounts: [...reference.accounts, ...reference.accounts.slice(0, 1)],
+    });
+    await keepAfter(db, { scenario: "Retire early", version: 1 }, planned);
+
+    expect(await adoptScenario("Retire early")).toStrictEqual(saved(undefined));
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped({
+        ...planned,
+        accounts: [...reference.accounts, bonds],
+        points: reference.points,
+      }),
+      version: 2,
+    });
+  });
+
   // The scenario turned the current account into an overdraft owing a
   // thousand pounds, while the household still holds the account's
   // £18,300 in credit, which no debt can carry.
