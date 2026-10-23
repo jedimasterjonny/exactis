@@ -3,15 +3,21 @@ import { refresh } from "next/cache";
 import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
+import type { ExpenseLine } from "@/data/expenses";
+import type { Household } from "@/data/household";
 import type { IncomeLine, IncomeLineDraft } from "@/data/income";
 
+import { soundKept } from "@/data/household";
 import { kept, today } from "@/data/household.fixture";
+import { upcast } from "@/data/shapes";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
+import { found } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 
+import { saveAccount } from "./accounts";
 import {
   removeExpenseLine,
   removeIncomeLine,
@@ -65,6 +71,16 @@ const values = {
   startsAt: null,
 } as const;
 
+// The expense line and the income line with the id as a dialog opened
+// on them now holds them, which is as the household reads them.
+async function expenseOn(id: number): Promise<ExpenseLine> {
+  return found((await shown()).schedule.expenses, id, "expense line");
+}
+
+async function incomeOn(id: number): Promise<IncomeLine> {
+  return found((await shown()).schedule.income, id, "income line");
+}
+
 // The line the household is handed of a draft: the draft less the
 // pension it opens, the name trimmed as the action trims it, and an id.
 // Spelled out key by key, since a rest destructure would bind the
@@ -92,6 +108,11 @@ function lineOf(draft: IncomeLineDraft, id: number): IncomeLine {
   };
 }
 
+// The household as a dialog opened now reads it.
+async function shown(): Promise<Household> {
+  return soundKept(upcast((await readLatest(db, ""))?.household)).household;
+}
+
 describe("the schedule actions", () => {
   standUp(memory, { seed: kept, today });
 
@@ -99,12 +120,14 @@ describe("the schedule actions", () => {
     it("writes nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(saveIncomeLine(null, values)).rejects.toThrow("redirected");
+      await expect(saveIncomeLine(null, values, null)).rejects.toThrow(
+        "redirected",
+      );
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     });
 
     it("adds a new line with the name trimmed, given the next id, and draws the page again", async () => {
-      expect(await saveIncomeLine(null, values)).toStrictEqual(
+      expect(await saveIncomeLine(null, values, null)).toStrictEqual(
         saved(lineOf(values, 20)),
       );
       expect(await readLatest(db, "")).toMatchObject({
@@ -125,7 +148,7 @@ describe("the schedule actions", () => {
         rsu: 7500,
       } as const;
 
-      expect(await saveIncomeLine(null, employment)).toStrictEqual(
+      expect(await saveIncomeLine(null, employment, null)).toStrictEqual(
         saved(lineOf(employment, 20)),
       );
     });
@@ -138,11 +161,11 @@ describe("the schedule actions", () => {
       } as const;
 
       expect(
-        await saveIncomeLine(null, {
-          ...employment,
-          bonusCadence: "year",
-          bonusMonth: 1,
-        }),
+        await saveIncomeLine(
+          null,
+          { ...employment, bonusCadence: "year", bonusMonth: 1 },
+          null,
+        ),
       ).toStrictEqual(
         saved({
           ...lineOf(employment, 20),
@@ -151,7 +174,11 @@ describe("the schedule actions", () => {
         }),
       );
       expect(
-        await saveIncomeLine(null, { ...employment, bonusCadence: "quarter" }),
+        await saveIncomeLine(
+          null,
+          { ...employment, bonusCadence: "quarter" },
+          null,
+        ),
       ).toStrictEqual(
         saved({ ...lineOf(employment, 21), bonusCadence: "quarter" }),
       );
@@ -165,11 +192,11 @@ describe("the schedule actions", () => {
         sacrifice: 0.12,
       } as const;
 
-      expect(await saveIncomeLine(null, sacrificing)).toStrictEqual(
+      expect(await saveIncomeLine(null, sacrificing, null)).toStrictEqual(
         saved(lineOf(sacrificing, 20)),
       );
       expect(
-        await saveIncomeLine(null, { ...sacrificing, sacrifice: 1 }),
+        await saveIncomeLine(null, { ...sacrificing, sacrifice: 1 }, null),
       ).toStrictEqual(saved(lineOf({ ...sacrificing, sacrifice: 1 }, 21)));
     });
 
@@ -182,7 +209,7 @@ describe("the schedule actions", () => {
         match: 0.06,
       } as const;
 
-      expect(await saveIncomeLine(null, floored)).toStrictEqual(
+      expect(await saveIncomeLine(null, floored, null)).toStrictEqual(
         saved({ ...lineOf(floored, 20), floor: 0.045 }),
       );
     });
@@ -191,12 +218,11 @@ describe("the schedule actions", () => {
     it("refuses a pension that is no account or an account of another kind, and writes nothing", async () => {
       for (const feeds of [2, 3, 99]) {
         await expect(
-          saveIncomeLine(null, {
-            ...values,
-            feeds,
-            kind: "employment",
-            sacrifice: 0.12,
-          }),
+          saveIncomeLine(
+            null,
+            { ...values, feeds, kind: "employment", sacrifice: 0.12 },
+            null,
+          ),
         ).resolves.toStrictEqual(refused("A salary feeds a pension alone"));
       }
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });
@@ -225,7 +251,7 @@ describe("the schedule actions", () => {
         setOn: "2026-09-15",
       });
 
-      expect(await saveIncomeLine(null, opening)).toStrictEqual(
+      expect(await saveIncomeLine(null, opening, null)).toStrictEqual(
         saved({ ...lineOf(opening, 21), feeds: 20 }),
       );
       expect(await readLatest(db, "")).toMatchObject({
@@ -242,9 +268,9 @@ describe("the schedule actions", () => {
         version: 2,
       });
 
-      expect(await saveIncomeLine(18, opening)).toStrictEqual(
-        saved({ ...lineOf(opening, 18), feeds: 22 }),
-      );
+      expect(
+        await saveIncomeLine(18, opening, await incomeOn(18)),
+      ).toStrictEqual(saved({ ...lineOf(opening, 18), feeds: 22 }));
       expect(await readLatest(db, "")).toMatchObject({
         household: {
           accounts: [...kept.accounts, aviva(20), aviva(22)],
@@ -255,7 +281,11 @@ describe("the schedule actions", () => {
 
     it("writes over the line with the id, open-ended, in its place", async () => {
       expect(
-        await saveIncomeLine(18, { ...values, lastYear: null }),
+        await saveIncomeLine(
+          18,
+          { ...values, lastYear: null },
+          await incomeOn(18),
+        ),
       ).toStrictEqual(saved(lineOf({ ...values, lastYear: null }, 18)));
       expect(await readLatest(db, "")).toMatchObject({
         household: {
@@ -268,6 +298,46 @@ describe("the schedule actions", () => {
           },
         },
       });
+    });
+
+    // The salary is opened on one device giving up 12% of its base,
+    // and the pension's dialog on another sets the share to a twentieth.
+    // The pay rise typed on the first would put the 12% back, so the
+    // save is refused and the twentieth stands; so is one naming the
+    // line and carrying no line opened.
+    it("refuses a save from a dialog opened on a line changed since, and writes nothing", async () => {
+      const opened = await incomeOn(16);
+      await saveAccount(
+        6,
+        {
+          balance: 391640,
+          balloon: 0,
+          cadence: "year",
+          cap: 0,
+          contribution: 28512,
+          funding: "fixed",
+          growth: "plan",
+          isDroppable: false,
+          kind: "tax-deferred",
+          name: "Workplace pension",
+          owner: 1,
+          rate: 0,
+          shares: [{ line: 16, sacrifice: 0.05 }],
+        },
+        found((await shown()).accounts, 6, "account"),
+      );
+      const shared = await readLatest(db, "");
+
+      for (const stale of [opened, null]) {
+        await expect(
+          saveIncomeLine(16, { ...opened, amount: 125000, opens: null }, stale),
+        ).resolves.toStrictEqual(
+          refused(
+            "The income line changed since this was opened, so nothing was saved; close it and open it again",
+          ),
+        );
+      }
+      expect(await readLatest(db, "")).toStrictEqual(shared);
     });
 
     it("refuses what the form could not have sent", async () => {
@@ -304,9 +374,11 @@ describe("the schedule actions", () => {
           opens: { balance: 0, name: "Aviva", owner: null },
         },
       ] as const) {
-        await expect(saveIncomeLine(null, draft)).rejects.toThrow(z.ZodError);
+        await expect(saveIncomeLine(null, draft, null)).rejects.toThrow(
+          z.ZodError,
+        );
       }
-      await expect(saveIncomeLine(0, values)).rejects.toThrow(z.ZodError);
+      await expect(saveIncomeLine(0, values, null)).rejects.toThrow(z.ZodError);
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     });
 
@@ -354,11 +426,11 @@ describe("the schedule actions", () => {
           "A State Pension is paid on its owner's qualifying years, not typed as a line",
         ],
       ] as const) {
-        await expect(saveIncomeLine(null, draft)).resolves.toStrictEqual(
+        await expect(saveIncomeLine(null, draft, null)).resolves.toStrictEqual(
           refused(refusal),
         );
       }
-      await expect(saveIncomeLine(99, values)).resolves.toStrictEqual(
+      await expect(saveIncomeLine(99, values, null)).resolves.toStrictEqual(
         refused("No income line has the id"),
       );
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });
@@ -450,7 +522,7 @@ describe("the schedule actions", () => {
     it("writes nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(saveExpenseLine(null, expense)).rejects.toThrow(
+      await expect(saveExpenseLine(null, expense, null)).rejects.toThrow(
         "redirected",
       );
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });
@@ -459,7 +531,7 @@ describe("the schedule actions", () => {
     it("adds a new line with the name trimmed, given the next id, and draws the page again", async () => {
       const written = { ...expense, id: 20, name: "Nursery" };
 
-      expect(await saveExpenseLine(null, expense)).toStrictEqual(
+      expect(await saveExpenseLine(null, expense, null)).toStrictEqual(
         saved(written),
       );
       expect(await readLatest(db, "")).toMatchObject({
@@ -477,7 +549,7 @@ describe("the schedule actions", () => {
 
     it("takes a line ending in a month of its last year", async () => {
       expect(
-        await saveExpenseLine(null, { ...expense, lastMonth: 2 }),
+        await saveExpenseLine(null, { ...expense, lastMonth: 2 }, null),
       ).toStrictEqual(
         saved({ ...expense, id: 20, lastMonth: 2, name: "Nursery" }),
       );
@@ -487,7 +559,11 @@ describe("the schedule actions", () => {
       const written = { ...expense, id: 14, lastYear: null, name: "Nursery" };
 
       expect(
-        await saveExpenseLine(14, { ...expense, lastYear: null }),
+        await saveExpenseLine(
+          14,
+          { ...expense, lastYear: null },
+          await expenseOn(14),
+        ),
       ).toStrictEqual(saved(written));
       expect(await readLatest(db, "")).toMatchObject({
         household: {
@@ -513,9 +589,55 @@ describe("the schedule actions", () => {
         },
       );
 
-      expect(await saveExpenseLine(13, expense)).toStrictEqual(
-        saved({ ...expense, id: 13, name: "Nursery", pays: 5 }),
+      expect(
+        await saveExpenseLine(13, expense, await expenseOn(13)),
+      ).toStrictEqual(saved({ ...expense, id: 13, name: "Nursery", pays: 5 }));
+    });
+
+    // Retirement living is opened on one device, and raised on another;
+    // the name changed on the first would put the old amount back, so
+    // the save is refused and the raise stands; so is one naming the
+    // line and carrying no line opened.
+    it("refuses a save from a dialog opened on a line changed since, and writes nothing", async () => {
+      const opened = await expenseOn(14);
+      await saveExpenseLine(14, { ...opened, amount: 3000 }, opened);
+      const raised = await readLatest(db, "");
+
+      for (const stale of [opened, null]) {
+        await expect(
+          saveExpenseLine(14, { ...opened, name: "Later life" }, stale),
+        ).resolves.toStrictEqual(
+          refused(
+            "The expense line changed since this was opened, so nothing was saved; close it and open it again",
+          ),
+        );
+      }
+      expect(await readLatest(db, "")).toStrictEqual(raised);
+    });
+
+    // Retirement living starts as the children leave home, in 2040, and
+    // was kept starting in 2030 before the milestone moved. A tied end's
+    // year is the milestone's, read alike on both sides, so neither the
+    // year kept nor the one a screen laid the line out at is a change.
+    it("holds a line to what it holds itself, reading a tied end's year off its milestone", async () => {
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        {
+          ...kept,
+          schedule: {
+            ...kept.schedule,
+            expenses: kept.schedule.expenses.map((line) =>
+              line.id === 14 ? { ...line, firstYear: 2030, startsAt: 7 } : line,
+            ),
+          },
+        },
       );
+      const opened = { ...(await expenseOn(14)), firstYear: 2044 };
+
+      expect(
+        await saveExpenseLine(14, { ...opened, amount: 3000 }, opened),
+      ).toMatchObject(saved({ amount: 3000, firstYear: 2044, id: 14 }));
     });
 
     it("refuses what the form could not have sent", async () => {
@@ -525,9 +647,13 @@ describe("the schedule actions", () => {
         { ...expense, lastMonth: 12 },
         { ...expense, lastMonth: -1 },
       ] as const) {
-        await expect(saveExpenseLine(null, draft)).rejects.toThrow(z.ZodError);
+        await expect(saveExpenseLine(null, draft, null)).rejects.toThrow(
+          z.ZodError,
+        );
       }
-      await expect(saveExpenseLine(0, expense)).rejects.toThrow(z.ZodError);
+      await expect(saveExpenseLine(0, expense, null)).rejects.toThrow(
+        z.ZodError,
+      );
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     });
 
@@ -540,7 +666,7 @@ describe("the schedule actions", () => {
     it("ties a line's end some years after a milestone", async () => {
       const draft = { ...expense, endsAfter: 2, endsAt: 7, lastYear: 2041 };
 
-      expect(await saveExpenseLine(null, draft)).toStrictEqual(
+      expect(await saveExpenseLine(null, draft, null)).toStrictEqual(
         saved({ ...draft, id: 20, name: "Nursery" }),
       );
     });
@@ -549,7 +675,7 @@ describe("the schedule actions", () => {
       const written = { ...expense, endsAt: 7, id: 20, name: "Nursery" };
 
       expect(
-        await saveExpenseLine(null, { ...expense, endsAt: 7 }),
+        await saveExpenseLine(null, { ...expense, endsAt: 7 }, null),
       ).toStrictEqual(saved(written));
       expect(await readLatest(db, "")).toMatchObject({
         household: {
@@ -558,38 +684,42 @@ describe("the schedule actions", () => {
         version: 2,
       });
       await expect(
-        saveExpenseLine(null, { ...expense, startsAt: 8 }),
+        saveExpenseLine(null, { ...expense, startsAt: 8 }, null),
       ).resolves.toStrictEqual(
         refused("A line ends no earlier than it starts"),
       );
       await expect(
-        saveExpenseLine(null, { ...expense, endsAt: 99 }),
+        saveExpenseLine(null, { ...expense, endsAt: 99 }, null),
       ).resolves.toStrictEqual(
         refused("A line is tied to a milestone the household lists"),
       );
       await expect(
-        saveExpenseLine(null, { ...expense, endsAfter: 2 }),
+        saveExpenseLine(null, { ...expense, endsAfter: 2 }, null),
       ).resolves.toStrictEqual(
         refused("A line ends years after a milestone only"),
       );
       await expect(
-        saveExpenseLine(null, { ...expense, endsAfter: -1, endsAt: 1 }),
+        saveExpenseLine(null, { ...expense, endsAfter: -1, endsAt: 1 }, null),
       ).rejects.toThrow(z.ZodError);
       expect(await readLatest(db, "")).toMatchObject({ version: 2 });
     });
 
     it("refuses a line the household cannot hold, in its words, and an id no line has", async () => {
       await expect(
-        saveExpenseLine(null, { ...expense, lastYear: 2026 }),
+        saveExpenseLine(null, { ...expense, lastYear: 2026 }, null),
       ).resolves.toStrictEqual(
         refused("A line ends no earlier than it starts"),
       );
       await expect(
-        saveExpenseLine(null, { ...expense, lastMonth: 3, lastYear: null }),
+        saveExpenseLine(
+          null,
+          { ...expense, lastMonth: 3, lastYear: null },
+          null,
+        ),
       ).resolves.toStrictEqual(
         refused("A line ends in a month only of a year it ends in"),
       );
-      await expect(saveExpenseLine(99, expense)).resolves.toStrictEqual(
+      await expect(saveExpenseLine(99, expense, null)).resolves.toStrictEqual(
         refused("No expense line has the id"),
       );
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });

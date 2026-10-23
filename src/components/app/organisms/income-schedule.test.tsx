@@ -413,27 +413,31 @@ describe("IncomeSchedule", () => {
         screen.queryByRole("dialog", { name: "New job" }),
       ).not.toBeInTheDocument();
     });
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(null, {
-      amount: 80000,
-      bonus: 0,
-      cadence: "year",
-      endsAfter: 0,
-      endsAt: "retirement",
-      feeds: 6,
-      firstYear: 2026,
-      floor: 0.045,
-      growth: "inflation",
-      kind: "employment",
-      lastMonth: null,
-      lastYear: 2083,
-      match: 0.06,
-      name: "New job",
-      opens: null,
-      owner: 1,
-      rsu: 0,
-      sacrifice: 0.08,
-      startsAt: null,
-    });
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        amount: 80000,
+        bonus: 0,
+        cadence: "year",
+        endsAfter: 0,
+        endsAt: "retirement",
+        feeds: 6,
+        firstYear: 2026,
+        floor: 0.045,
+        growth: "inflation",
+        kind: "employment",
+        lastMonth: null,
+        lastYear: 2083,
+        match: 0.06,
+        name: "New job",
+        opens: null,
+        owner: 1,
+        rsu: 0,
+        sacrifice: 0.08,
+        startsAt: null,
+      },
+      null,
+    );
   });
 
   // A salary may open its pension with the save: the choice asks the
@@ -500,26 +504,30 @@ describe("IncomeSchedule", () => {
         screen.queryByRole("dialog", { name: "New job" }),
       ).not.toBeInTheDocument();
     });
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(null, {
-      amount: 80000,
-      bonus: 0,
-      cadence: "year",
-      endsAfter: 0,
-      endsAt: "retirement",
-      feeds: null,
-      firstYear: 2026,
-      growth: "inflation",
-      kind: "employment",
-      lastMonth: null,
-      lastYear: 2083,
-      match: 0,
-      name: "New job",
-      opens: { balance: 2500, name: " Aviva ", owner: 1 },
-      owner: 1,
-      rsu: 0,
-      sacrifice: 0.05,
-      startsAt: null,
-    });
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        amount: 80000,
+        bonus: 0,
+        cadence: "year",
+        endsAfter: 0,
+        endsAt: "retirement",
+        feeds: null,
+        firstYear: 2026,
+        growth: "inflation",
+        kind: "employment",
+        lastMonth: null,
+        lastYear: 2083,
+        match: 0,
+        name: "New job",
+        opens: { balance: 2500, name: " Aviva ", owner: 1 },
+        owner: 1,
+        rsu: 0,
+        sacrifice: 0.05,
+        startsAt: null,
+      },
+      null,
+    );
   });
 
   // The salary opens on its pension and its share. Choosing none takes
@@ -586,27 +594,31 @@ describe("IncomeSchedule", () => {
         screen.queryByRole("dialog", { name: "Salary" }),
       ).not.toBeInTheDocument();
     });
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(16, {
-      amount: 120000,
-      bonus: 16500,
-      cadence: "year",
-      endsAfter: 0,
-      endsAt: null,
-      feeds: sipp.id,
-      firstYear: 2026,
-      floor: 0,
-      growth: "inflation-plus-1",
-      kind: "employment",
-      lastMonth: null,
-      lastYear: 2052,
-      match: 0,
-      name: "Salary",
-      opens: null,
-      owner: 1,
-      rsu: 7500,
-      sacrifice: 0.05,
-      startsAt: null,
-    });
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      16,
+      {
+        amount: 120000,
+        bonus: 16500,
+        cadence: "year",
+        endsAfter: 0,
+        endsAt: null,
+        feeds: sipp.id,
+        firstYear: 2026,
+        floor: 0,
+        growth: "inflation-plus-1",
+        kind: "employment",
+        lastMonth: null,
+        lastYear: 2052,
+        match: 0,
+        name: "Salary",
+        opens: null,
+        owner: 1,
+        rsu: 7500,
+        sacrifice: 0.05,
+        startsAt: null,
+      },
+      salary,
+    );
   });
 
   // Born in 1992 and retiring at 28, the owner retired in 2020, before
@@ -783,27 +795,31 @@ describe("IncomeSchedule", () => {
     vi.mocked(saveIncomeLine).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(null, {
-      amount: 12000,
-      bonus: 0,
-      cadence: "month",
-      endsAfter: 0,
-      endsAt: null,
-      feeds: null,
-      firstYear: 2030,
-      floor: 0,
-      growth: "inflation-plus-2",
-      kind: "self-employment",
-      lastMonth: null,
-      lastYear: 2035,
-      match: 0,
-      name: "Bonus scheme",
-      opens: null,
-      owner: 1,
-      rsu: 0,
-      sacrifice: 0,
-      startsAt: null,
-    });
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        amount: 12000,
+        bonus: 0,
+        cadence: "month",
+        endsAfter: 0,
+        endsAt: null,
+        feeds: null,
+        firstYear: 2030,
+        floor: 0,
+        growth: "inflation-plus-2",
+        kind: "self-employment",
+        lastMonth: null,
+        lastYear: 2035,
+        match: 0,
+        name: "Bonus scheme",
+        opens: null,
+        owner: 1,
+        rsu: 0,
+        sacrifice: 0,
+        startsAt: null,
+      },
+      null,
+    );
     expect(
       within(dialog).getByRole("button", { name: "Save" }),
     ).toHaveAttribute("aria-busy", "true");
@@ -932,26 +948,30 @@ describe("IncomeSchedule", () => {
     expect(
       screen.getByRole("dialog", { name: "Income line updated" }),
     ).toHaveAccessibleDescription("Annuity · 2060–2070");
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(annuity.id, {
-      amount: 23400,
-      bonus: 0,
-      cadence: "year",
-      endsAfter: 0,
-      endsAt: null,
-      feeds: null,
-      firstYear: 2060,
-      growth: "inflation",
-      kind: "pension",
-      lastMonth: null,
-      lastYear: 2070,
-      match: 0,
-      name: "Annuity",
-      opens: null,
-      owner: 1,
-      rsu: 0,
-      sacrifice: 0,
-      startsAt: null,
-    });
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      annuity.id,
+      {
+        amount: 23400,
+        bonus: 0,
+        cadence: "year",
+        endsAfter: 0,
+        endsAt: null,
+        feeds: null,
+        firstYear: 2060,
+        growth: "inflation",
+        kind: "pension",
+        lastMonth: null,
+        lastYear: 2070,
+        match: 0,
+        name: "Annuity",
+        opens: null,
+        owner: 1,
+        rsu: 0,
+        sacrifice: 0,
+        startsAt: null,
+      },
+      annuity,
+    );
   });
 
   // The salary matched to six per cent of its base and floored at
@@ -1017,27 +1037,31 @@ describe("IncomeSchedule", () => {
     expect(
       screen.getByRole("dialog", { name: "Income line updated" }),
     ).toHaveAccessibleDescription("Salary · 2026–2052");
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(16, {
-      amount: 120000,
-      bonus: 16500,
-      cadence: "year",
-      endsAfter: 0,
-      endsAt: null,
-      feeds: 6,
-      firstYear: 2026,
-      floor: 0.045,
-      growth: "inflation-plus-1",
-      kind: "employment",
-      lastMonth: null,
-      lastYear: 2052,
-      match: 0.06,
-      name: "Salary",
-      opens: null,
-      owner: 1,
-      rsu: 20000,
-      sacrifice: 0.12,
-      startsAt: null,
-    });
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      16,
+      {
+        amount: 120000,
+        bonus: 16500,
+        cadence: "year",
+        endsAfter: 0,
+        endsAt: null,
+        feeds: 6,
+        firstYear: 2026,
+        floor: 0.045,
+        growth: "inflation-plus-1",
+        kind: "employment",
+        lastMonth: null,
+        lastYear: 2052,
+        match: 0.06,
+        name: "Salary",
+        opens: null,
+        owner: 1,
+        rsu: 20000,
+        sacrifice: 0.12,
+        startsAt: null,
+      },
+      { ...salary, floor: 0.045, match: 0.06 },
+    );
   });
 
   // February is month one, January being nought. A line naming no
@@ -1083,13 +1107,17 @@ describe("IncomeSchedule", () => {
         screen.queryByRole("dialog", { name: "Salary" }),
       ).not.toBeInTheDocument();
     });
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(id, {
-      ...salaryValues,
-      bonusCadence: "year",
-      bonusMonth: 1,
-      floor: 0,
-      opens: null,
-    });
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      id,
+      {
+        ...salaryValues,
+        bonusCadence: "year",
+        bonusMonth: 1,
+        floor: 0,
+        opens: null,
+      },
+      salary,
+    );
   });
 
   it("drops the month of a bonus moved off once a year, and the cadence of one moved to every month", async () => {
@@ -1113,10 +1141,11 @@ describe("IncomeSchedule", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(id, {
-        ...salaryValues,
-        opens: null,
-      });
+      expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(
+        id,
+        { ...salaryValues, opens: null },
+        { ...salary, bonusCadence: "year", bonusMonth: 1 },
+      );
     });
   });
 
@@ -1157,26 +1186,30 @@ describe("IncomeSchedule", () => {
     expect(
       screen.getByRole("dialog", { name: "Income line updated" }),
     ).toHaveAccessibleDescription("Salary · 2026 on");
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(16, {
-      amount: 120000,
-      bonus: 16500,
-      cadence: "year",
-      endsAfter: 0,
-      endsAt: null,
-      feeds: 6,
-      firstYear: 2054,
-      growth: "inflation-plus-1",
-      kind: "employment",
-      lastMonth: null,
-      lastYear: null,
-      match: 0,
-      name: "Salary",
-      opens: null,
-      owner: 1,
-      rsu: 7500,
-      sacrifice: 0.12,
-      startsAt: null,
-    });
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      16,
+      {
+        amount: 120000,
+        bonus: 16500,
+        cadence: "year",
+        endsAfter: 0,
+        endsAt: null,
+        feeds: 6,
+        firstYear: 2054,
+        growth: "inflation-plus-1",
+        kind: "employment",
+        lastMonth: null,
+        lastYear: null,
+        match: 0,
+        name: "Salary",
+        opens: null,
+        owner: 1,
+        rsu: 7500,
+        sacrifice: 0.12,
+        startsAt: null,
+      },
+      salary,
+    );
   });
 
   // Every line is somebody's: the salary opens on its owner, and is
@@ -1210,11 +1243,11 @@ describe("IncomeSchedule", () => {
 
     const { id, ...values } = salary;
 
-    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(id, {
-      ...values,
-      opens: null,
-      owner: sam.id,
-    });
+    expect(saveIncomeLine).toHaveBeenCalledExactlyOnceWith(
+      id,
+      { ...values, opens: null, owner: sam.id },
+      salary,
+    );
     await waitFor(() => {
       expect(
         screen.queryByRole("dialog", { name: "Salary" }),

@@ -292,7 +292,7 @@ export const account = z
 // An expense line adds the debt it pays, if it pays one, and then pays
 // it something, since a line paying a debt nothing clears none of it and
 // the debt stands as it is for the whole plan.
-const expenseLine = z
+export const expenseLine = z
   .object({ ...line, pays: recordId.exactOptional() })
   .refine(isInOrder, "A line ends no earlier than it starts")
   .refine(endsAfterATie, "A line ends years after a milestone only")
@@ -309,7 +309,7 @@ const expenseLine = z
 // a pension, each a fraction of the base at most, in the engine's words
 // for a share outside it, the floor absent for none. That the owner is
 // one the household lists is the household's to hold.
-const incomeLine = z
+export const incomeLine = z
   .object({
     ...line,
     ...bonusValues,
