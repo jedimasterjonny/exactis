@@ -3,6 +3,7 @@
 import type { JSX } from "react";
 
 import { Plus } from "lucide-react";
+import { useRef } from "react";
 
 import type { Summary } from "@/components/app/organisms/schedule-rows";
 import type { Account } from "@/data/accounts";
@@ -104,10 +105,16 @@ export function IncomeSchedule({
   plan,
 }: IncomeScheduleProps): JSX.Element {
   const markers = markersOf(milestones, plan);
-  const { amend, dialogOf, dismiss, entry, open } = useEditor({
+  // The line the dialog opened on, or none for a new one, which goes
+  // with the save, so the store refuses one over a line changed since.
+  const openedRef = useRef<IncomeLine | null>(null);
+  const { amend, dialogOf, dismiss, entry, open } = useEditor<
+    Draft,
+    IncomeLine
+  >({
     describe: (line) => `${line.name} · ${spanOf(line)}`,
     noun: "Income line",
-    save: saveIncomeLine,
+    save: async (id, values) => saveIncomeLine(id, values, openedRef.current),
   });
   const { ask, doomed, questionOf } = useRemover<IncomeLine>({
     describe: (line) => line.name,
@@ -171,6 +178,7 @@ export function IncomeSchedule({
   // it. A saved line feeds its pension by id, so it opens none.
   function edit(line: IncomeLine): void {
     const { id, ...values } = line;
+    openedRef.current = line;
     open({ ...values, opens: null }, id);
   }
 
@@ -180,6 +188,7 @@ export function IncomeSchedule({
         actions={
           <Button
             onClick={() => {
+              openedRef.current = null;
               open(blank(plan, firstOwnerOf(owners)), null);
             }}
             size="sm"
