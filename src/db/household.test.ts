@@ -23,6 +23,7 @@ import {
   keepAfter,
   listScenarios,
   readAsOf,
+  readFirst,
   readLatest,
 } from "./household";
 
@@ -86,7 +87,7 @@ describe("household store", () => {
 
   // The household kept twice, then a scenario branched from it and
   // saved twice in turn, then the household saved again.
-  it("counts a scenario's versions from one on their own, and leaves the household's as they were", async () => {
+  it("counts a scenario's versions from one on their own, reads its first back, and leaves the household's as they were", async () => {
     await keepAfter(db, { scenario: "", version: 0 }, blank);
     await keepAfter(db, { scenario: "", version: 1 }, named);
     await keepAfter(db, { scenario: "Retire early", version: 0 }, named);
@@ -100,6 +101,11 @@ describe("household store", () => {
       household: stamped(reference),
       version: 2,
     });
+    expect(await readFirst(db, "Retire early")).toStrictEqual({
+      household: stamped(named),
+      version: 1,
+    });
+    expect(await readFirst(db, "Never kept")).toBeNull();
 
     await keepAfter(db, { scenario: "", version: 2 }, blank);
 
