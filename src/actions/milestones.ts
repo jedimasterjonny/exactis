@@ -5,10 +5,11 @@ import * as z from "zod";
 import type { Condition, Milestone, MilestoneValues } from "@/data/milestones";
 import type { Answer } from "@/lib/answer";
 
+import { milestone as heldMilestone } from "@/data/household";
 import { untied } from "@/data/milestones";
 import { milestoneValues, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
-import { found, removed, written } from "@/lib/records";
+import { found, holdUnchanged, removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
@@ -16,6 +17,11 @@ import { amend } from "@/store/household";
 // which the dialog also trims, and never empty, and the conditions, as
 // the model holds them.
 const values = z.object(milestoneValues) satisfies z.ZodType<MilestoneValues>;
+
+// A milestone as its dialog opened on it, or none for a new one, parsed
+// as the household parses its milestones, so the milestone opened and
+// the one held now compare key for key.
+const opening = heldMilestone.nullable();
 
 // Deletes the milestone with that id, and cuts every line's tie to it,
 // each end tied to it fixed in the year it falls in now, so the lines
@@ -56,16 +62,28 @@ export async function removeMilestone(id: number): Promise<Answer<undefined>> {
 // household's next id, else over the one with that id, and hands back
 // the milestone as the household now has it. An action answers a POST
 // from anywhere, so it checks the session for itself and parses what it
-// was sent rather than trusting the dialog. Retirement is no record and
-// no id names it; it is written by saveRetirement.
+// was sent rather than trusting the dialog. The dialog sends the
+// milestone as it opened on it beside the draft, and an edit of one
+// changed since, as on another device meanwhile, is refused rather than
+// written back over the change. Retirement is no record and no id names
+// it; it is written by saveRetirement.
 export async function saveMilestone(
   id: null | number,
   draft: MilestoneValues,
+  opened: Milestone | null,
 ): Promise<Answer<Milestone>> {
   await requireSession();
   const at = target.parse(id);
   const parsed = values.parse(draft);
-  return amend(({ kept }) => {
+  const asOpened = opening.parse(opened);
+  return amend(({ household, kept }) => {
+    if (at !== null) {
+      holdUnchanged(
+        asOpened,
+        found(household.milestones, at, "milestone"),
+        "milestone",
+      );
+    }
     const {
       next,
       records,

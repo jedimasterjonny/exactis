@@ -352,7 +352,7 @@ export const incomeLine = z
 
 // A milestone as the model lays it: what the actions take, and the id
 // it is listed by.
-const milestone = z.object({
+export const milestone = z.object({
   ...milestoneValues,
   id: recordId,
 }) satisfies z.ZodType<Milestone>;

@@ -328,10 +328,11 @@ describe("MilestoneList", () => {
     commit(field("Age", dialog), "50");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(null, {
-      conditions: atAge(50),
-      name: "Sabbatical",
-    });
+    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(
+      null,
+      { conditions: atAge(50), name: "Sabbatical" },
+      null,
+    );
     await waitFor(() => {
       expect(
         screen.queryByRole("dialog", { name: "Sabbatical" }),
@@ -358,10 +359,11 @@ describe("MilestoneList", () => {
     commit(field("Age", dialog), "67");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(downsize.id, {
-      conditions: atAge(67),
-      name: "Downsize",
-    });
+    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(
+      downsize.id,
+      { conditions: atAge(67), name: "Downsize" },
+      downsize,
+    );
     await waitFor(() => {
       expect(
         screen.queryByRole("dialog", { name: "Downsize" }),
