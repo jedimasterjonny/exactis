@@ -3,6 +3,7 @@
 import type { JSX } from "react";
 
 import { Plus } from "lucide-react";
+import { useRef } from "react";
 
 import type { Summary } from "@/components/app/organisms/schedule-rows";
 import type { Account } from "@/data/accounts";
@@ -70,10 +71,16 @@ export function ExpenseSchedule({
     merged: (paying, mortgage) =>
       mortgageLine(paying, mortgage, { month: plan.month, year: plan.from }),
   });
-  const { amend, dialogOf, dismiss, entry, open } = useEditor({
+  // The line the dialog opened on, or none for a new one, which goes
+  // with the save, so the store refuses one over a line changed since.
+  const openedRef = useRef<ExpenseLine | null>(null);
+  const { amend, dialogOf, dismiss, entry, open } = useEditor<
+    Draft,
+    ExpenseLine
+  >({
     describe: (line) => `${line.name} · ${spanOf(line)}`,
     noun: "Expense line",
-    save: saveExpenseLine,
+    save: async (id, values) => saveExpenseLine(id, values, openedRef.current),
   });
   const { ask, doomed, questionOf } = useRemover<ExpenseLine>({
     describe: (line) => line.name,
@@ -99,6 +106,7 @@ export function ExpenseSchedule({
   // it.
   function edit(line: ExpenseLine): void {
     const { id, ...values } = line;
+    openedRef.current = line;
     open(values, id);
   }
 
@@ -108,6 +116,7 @@ export function ExpenseSchedule({
         actions={
           <Button
             onClick={() => {
+              openedRef.current = null;
               open(blank(plan), null);
             }}
             size="sm"

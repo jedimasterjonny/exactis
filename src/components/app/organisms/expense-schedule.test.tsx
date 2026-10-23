@@ -151,18 +151,22 @@ describe("ExpenseSchedule", () => {
     vi.mocked(saveExpenseLine).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(null, {
-      amount: 1150,
-      cadence: "month",
-      endsAfter: 0,
-      endsAt: null,
-      firstYear: 2027,
-      growth: "inflation-plus-2",
-      lastMonth: null,
-      lastYear: 2035,
-      name: "Nursery",
-      startsAt: null,
-    });
+    expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        amount: 1150,
+        cadence: "month",
+        endsAfter: 0,
+        endsAt: null,
+        firstYear: 2027,
+        growth: "inflation-plus-2",
+        lastMonth: null,
+        lastYear: 2035,
+        name: "Nursery",
+        startsAt: null,
+      },
+      null,
+    );
     expect(
       within(dialog).getByRole("button", { name: "Save" }),
     ).toHaveAttribute("aria-busy", "true");
@@ -282,18 +286,22 @@ describe("ExpenseSchedule", () => {
     expect(
       screen.getByRole("dialog", { name: "Expense line updated" }),
     ).toHaveAccessibleDescription("Retirement living · 2048 on");
-    expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(14, {
-      amount: 65000,
-      cadence: "year",
-      endsAfter: 0,
-      endsAt: null,
-      firstYear: 2048,
-      growth: "inflation",
-      lastMonth: null,
-      lastYear: null,
-      name: "Retirement living",
-      startsAt: null,
-    });
+    expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(
+      14,
+      {
+        amount: 65000,
+        cadence: "year",
+        endsAfter: 0,
+        endsAt: null,
+        firstYear: 2048,
+        growth: "inflation",
+        lastMonth: null,
+        lastYear: null,
+        name: "Retirement living",
+        startsAt: null,
+      },
+      retirement,
+    );
   });
 
   // A line that is a loan's payments is written by the dialog of the
@@ -435,18 +443,22 @@ describe("ExpenseSchedule", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(null, {
-      amount: 0,
-      cadence: "month",
-      endsAfter: 3,
-      endsAt: "retirement",
-      firstYear: 2026,
-      growth: "inflation",
-      lastMonth: null,
-      lastYear: 2051,
-      name: "Household",
-      startsAt: null,
-    });
+    expect(saveExpenseLine).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        amount: 0,
+        cadence: "month",
+        endsAfter: 3,
+        endsAt: "retirement",
+        firstYear: 2026,
+        growth: "inflation",
+        lastMonth: null,
+        lastYear: 2051,
+        name: "Household",
+        startsAt: null,
+      },
+      null,
+    );
     await waitFor(() => {
       expect(
         screen.queryByRole("dialog", { name: "Household" }),

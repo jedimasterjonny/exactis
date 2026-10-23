@@ -9,6 +9,10 @@ import type { Answer } from "@/lib/answer";
 import type { Held } from "@/store/household";
 
 import { toAccount } from "@/data/accounts";
+import {
+  expenseLine as heldExpenseLine,
+  incomeLine as heldIncomeLine,
+} from "@/data/household";
 import { incomeKinds, toPension } from "@/data/income";
 import { timed } from "@/data/milestones";
 import {
@@ -22,7 +26,7 @@ import {
 import { Refusal } from "@/lib/answer";
 import { endsAfterItStarts } from "@/lib/lines";
 import { today } from "@/lib/months";
-import { found, removed, written } from "@/lib/records";
+import { found, holdUnchanged, removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
@@ -69,6 +73,12 @@ const incomeValues = z
     (values) => values.feeds === null || values.opens === null,
   ) satisfies z.ZodType<IncomeLineDraft>;
 
+// A line as its dialog opened on it, or none for a new one, parsed as
+// the household parses its lines, so the line opened and the one held
+// now compare key for key.
+const openedExpenseLine = heldExpenseLine.nullable();
+const openedIncomeLine = heldIncomeLine.nullable();
+
 // Deletes the expense line with that id, checked as a save is. Nothing
 // hangs on a line, so it goes alone, but a line paying a loan is
 // refused: it is written by the dialog of the house or car the loan is
@@ -113,18 +123,28 @@ export async function removeIncomeLine(id: number): Promise<Answer<undefined>> {
   }));
 }
 
-// Writes an expense line, as an income line is written below. A line
+// Writes an expense line, as an income line is written below, refused
+// as it is where the line changed since its dialog opened on it. A line
 // written over keeps the loan it pays, since only the house and car
 // dialogs link a line to its loan.
 export async function saveExpenseLine(
   id: null | number,
   draft: LineValues,
+  opened: ExpenseLine | null,
 ): Promise<Answer<ExpenseLine>> {
   await requireSession();
   const at = target.parse(id);
   const parsed = expenseValues.parse(draft);
+  const asOpened = openedExpenseLine.parse(opened);
   return amend((held) => {
-    const { kept } = held;
+    const { household, kept } = held;
+    if (at !== null) {
+      holdUnchanged(
+        asOpened && asRead(asOpened, held),
+        asRead(found(household.schedule.expenses, at, "expense line"), held),
+        "expense line",
+      );
+    }
     const {
       next,
       records,
@@ -163,16 +183,28 @@ export async function saveExpenseLine(
 // next id, its balance dated today as every new account's is, and the
 // line feeds it by that id, so the pension appears among the accounts
 // with no more asked of the form, and the two land together or not at
-// all.
+// all. The dialog sends the line as it opened on it beside the draft,
+// and an edit of one changed since, as by a share of its salary
+// sacrificed from the pension's dialog meanwhile, is refused rather than
+// written back over the change.
 export async function saveIncomeLine(
   id: null | number,
   draft: IncomeLineDraft,
+  opened: IncomeLine | null,
 ): Promise<Answer<IncomeLine>> {
   await requireSession();
   const at = target.parse(id);
   const { opens, ...parsed } = incomeValues.parse(draft);
+  const asOpened = openedIncomeLine.parse(opened);
   return amend((held) => {
-    const { kept } = held;
+    const { household, kept } = held;
+    if (at !== null) {
+      holdUnchanged(
+        asOpened && asRead(asOpened, held),
+        asRead(found(household.schedule.income, at, "income line"), held),
+        "income line",
+      );
+    }
     const pension =
       opens === null
         ? null
@@ -202,6 +234,19 @@ export async function saveIncomeLine(
       result: line,
     };
   });
+}
+
+// A line with each end tied to a milestone or to retirement read off it
+// again, as the household reads it, which is how the line a dialog
+// opened on is compared with the one the household reads now: the
+// screen lays a line tied to a retirement reached when conditions hold
+// out at the year the projection reaches them, so the year a tied end
+// opened with is the screen's rather than the line's, and no change.
+function asRead<TLine extends LineValues>(
+  line: TLine,
+  { household, kept }: Held,
+): TLine {
+  return timed(line, kept.milestones, household.plan);
 }
 
 // The line as written, once it is held to ending no earlier than it
