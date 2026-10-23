@@ -9,7 +9,7 @@ vi.mock("@/actions/scenarios", () => ({ leaveScenario: vi.fn() }));
 
 describe("ScenarioBanner", () => {
   it("names the scenario open in the caution tone", () => {
-    render(<ScenarioBanner name="Retire early" />);
+    render(<ScenarioBanner isKept name="Retire early" />);
 
     const banner = screen.getByRole("note");
 
@@ -19,8 +19,16 @@ describe("ScenarioBanner", () => {
     );
   });
 
+  it("names a scenario the store no longer keeps as gone", () => {
+    render(<ScenarioBanner isKept={false} name="Retire early" />);
+
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Scenario gone, household shown · Retire early",
+    );
+  });
+
   it("offers leaving as a form posting to its action", () => {
-    render(<ScenarioBanner name="Retire early" />);
+    render(<ScenarioBanner isKept name="Retire early" />);
 
     const form = screen.getByRole("form", { name: "Leave the scenario" });
     const button = within(form).getByRole("button", { name: "Leave" });

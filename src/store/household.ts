@@ -23,6 +23,13 @@ export interface Held {
   readonly kept: Kept;
 }
 
+// The scenario a request's cookie names, and whether the store keeps
+// one by that name.
+export interface Opened {
+  readonly isKept: boolean;
+  readonly name: string;
+}
+
 // What a save makes of the household: the kept household to write, and
 // what the action hands back, which is the record it wrote.
 interface Amended<TResult> {
@@ -103,6 +110,21 @@ export async function getBaseline(): Promise<Household> {
 export async function getHousehold(): Promise<Household> {
   await requireSession();
   return readHousehold();
+}
+
+// The scenario the cookie names, or null while the household is open,
+// with whether the store keeps one by that name, which it does not once
+// the scenario is adopted or dropped from another device: this one's
+// pages then read the household while its cookie still names the
+// scenario and every save is refused, so the banner says so and offers
+// the way back.
+export async function getOpened(): Promise<null | Opened> {
+  await requireSession();
+  const [{ scenario }, name] = await Promise.all([
+    readPage(),
+    openedScenario(),
+  ]);
+  return name === null ? null : { isKept: scenario === name, name };
 }
 
 // The name of the scenario open, or null while the household is.
@@ -191,10 +213,11 @@ function heldIn({ latest, scenario }: Open): Held & Read {
 
 // The branch open and its latest version, read afresh: the scenario the
 // cookie names where the store keeps one by that name, and the household
-// where it names none. A name no scenario is kept under, as one dropped
-// in another tab, reads as the household for a page, so its banner goes
-// on the next render; but a save from a page drawn in it is refused, so
-// what was meant for a scenario is never kept in the household.
+// where it names none. A name no scenario is kept under, as one adopted
+// or dropped from another device, reads as the household for a page,
+// under a banner naming it as gone; but a save from a page drawn in it
+// is refused, so what was meant for a scenario is never kept in the
+// household.
 async function readOpen(isSaving: boolean): Promise<Open> {
   const db = getDb();
   const name = await openedScenario();
