@@ -101,11 +101,11 @@ describe("OwnerList", () => {
     commit(field("Retires at", dialog), "62");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(null, {
-      born: 1988,
-      name: "Me",
-      retirement: atAge(60),
-    });
+    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(
+      null,
+      { born: 1988, name: "Me", retirement: atAge(62) },
+      null,
+    );
     await waitFor(() => {
       expect(
         screen.queryByRole("dialog", { name: "Me" }),
@@ -136,11 +136,11 @@ describe("OwnerList", () => {
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(sam.id, {
-      born: sam.born,
-      name: "Samira",
-      retirement: sam.retirement,
-    });
+    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(
+      sam.id,
+      { born: sam.born, name: "Samira", retirement: sam.retirement },
+      sam,
+    );
     await waitFor(() => {
       expect(
         screen.getByRole("dialog", { name: "Owner updated" }),
@@ -186,11 +186,11 @@ describe("OwnerList", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(me.id, {
-      born: me.born,
-      name: me.name,
-      retirement,
-    });
+    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(
+      me.id,
+      { born: me.born, name: me.name, retirement },
+      { ...me, retirement },
+    );
     await waitFor(() => {
       expect(
         screen.getByRole("dialog", { name: "Owner updated" }),
@@ -242,11 +242,11 @@ describe("OwnerList", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(sam.id, {
-      born: sam.born,
-      name: sam.name,
-      retirement: "retirement",
-    });
+    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(
+      sam.id,
+      { born: sam.born, name: sam.name, retirement: "retirement" },
+      sam,
+    );
     await waitFor(() => {
       expect(
         screen.getByRole("dialog", { name: "Owner updated" }),
@@ -324,11 +324,11 @@ describe("OwnerList", () => {
     fireEvent.change(retires, { target: { value: "age" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(sam.id, {
-      born: sam.born,
-      name: sam.name,
-      retirement: atAge(62),
-    });
+    expect(saveOwner).toHaveBeenCalledExactlyOnceWith(
+      sam.id,
+      { born: sam.born, name: sam.name, retirement: atAge(62) },
+      { ...sam, retirement: atAge(54) },
+    );
   });
 
   it("drops a cancelled draft and saves nothing", () => {

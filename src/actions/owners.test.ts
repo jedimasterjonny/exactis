@@ -3,16 +3,22 @@ import { refresh } from "next/cache";
 import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
+import type { Owner } from "@/data/owners";
+
+import { soundKept } from "@/data/household";
 import { blank, kept } from "@/data/household.fixture";
 import { atAge } from "@/data/milestones";
 import { owners, sam } from "@/data/owners.fixture";
+import { upcast } from "@/data/shapes";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
+import { found } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 
 import { removeOwner, saveOwner, saveQualifyingYears } from "./owners";
+import { saveAges } from "./plan";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -30,6 +36,12 @@ const shared = { ...kept, next: 21, owners: [...kept.owners, partner] };
 // A third, born in 2020 and retiring at 68.
 const kid = { born: 2020, name: "Kid", retirement: atAge(68) };
 
+// The owner with the id as a dialog opened on it now holds it.
+async function ownerOn(id: number): Promise<Owner> {
+  const read = upcast((await readLatest(db, ""))?.household);
+  return found(soundKept(read).household.owners, id, "owner");
+}
+
 describe("the owner actions", () => {
   standUp(memory, { seed: shared });
 
@@ -37,14 +49,14 @@ describe("the owner actions", () => {
     it("writes nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(saveOwner(null, kid)).rejects.toThrow("redirected");
+      await expect(saveOwner(null, kid, null)).rejects.toThrow("redirected");
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     });
 
     it("adds a new owner with the name trimmed, given the next id, and draws the page again", async () => {
-      expect(await saveOwner(null, { ...kid, name: "  Kid  " })).toStrictEqual(
-        saved({ ...kid, id: 21 }),
-      );
+      expect(
+        await saveOwner(null, { ...kid, name: "  Kid  " }, null),
+      ).toStrictEqual(saved({ ...kid, id: 21 }));
       expect(await readLatest(db, "")).toMatchObject({
         household: { next: 22, owners: [...shared.owners, { ...kid, id: 21 }] },
         version: 2,
@@ -54,7 +66,11 @@ describe("the owner actions", () => {
 
     it("writes over the owner with the id, in its place", async () => {
       expect(
-        await saveOwner(1, { born: 1988, name: "Jo", retirement: atAge(60) }),
+        await saveOwner(
+          1,
+          { born: 1988, name: "Jo", retirement: atAge(60) },
+          await ownerOn(1),
+        ),
       ).toStrictEqual(
         saved({
           born: 1988,
@@ -82,19 +98,21 @@ describe("the owner actions", () => {
     });
 
     // The partner has thirty qualifying years, typed on the assumptions
-    // screen; the dialog holds none, and a save from it sends none.
+    // screen once the dialog was open; the dialog holds none, and a save
+    // from it sends none, so the years typed are no change to it.
     it("keeps the qualifying years of the owner it writes over, and writes none it is sent", async () => {
+      const opened = await ownerOn(20);
       await keepAfter(
         db,
         { scenario: "", version: 1 },
         { ...shared, owners: [owners[0], { ...partner, qualifyingYears: 30 }] },
       );
 
-      expect(await saveOwner(20, kid)).toStrictEqual(
+      expect(await saveOwner(20, kid, opened)).toStrictEqual(
         saved({ ...kid, id: 20, qualifyingYears: 30 }),
       );
       expect(
-        await saveOwner(null, { ...kid, qualifyingYears: 12 }),
+        await saveOwner(null, { ...kid, qualifyingYears: 12 }, null),
       ).toStrictEqual(saved({ ...kid, id: 21 }));
       expect(await readLatest(db, "")).toMatchObject({
         household: {
@@ -108,15 +126,45 @@ describe("the owner actions", () => {
       });
     });
 
+    // The plan's owner is opened on one device retiring at 61, and the
+    // dashboard on another drags the retirement to 57. The name changed
+    // on the first would put 61 back, so the save is refused and the
+    // drag stands; so is one naming the owner and carrying no owner
+    // opened.
+    it("refuses a save from a dialog opened on an owner changed since, and writes nothing", async () => {
+      const opened = await ownerOn(1);
+      await saveAges({ retires: 57 });
+      const dragged = await readLatest(db, "");
+
+      for (const stale of [opened, null]) {
+        await expect(
+          saveOwner(
+            1,
+            { born: 1992, name: "Jo", retirement: atAge(61) },
+            stale,
+          ),
+        ).resolves.toStrictEqual(
+          refused(
+            "The owner changed since this was opened, so nothing was saved; close it and open it again",
+          ),
+        );
+      }
+      expect(await readLatest(db, "")).toStrictEqual(dragged);
+    });
+
     // The plan is the first listed owner's, and it ends at 91.
     it("holds the first listed owner to retiring no later than the plan ends, in the household's words", async () => {
       await expect(
-        saveOwner(1, { ...kid, retirement: atAge(92) }),
+        saveOwner(1, { ...kid, retirement: atAge(92) }, await ownerOn(1)),
       ).resolves.toStrictEqual(
         refused("A plan's owner retires no later than it ends"),
       );
       expect(
-        await saveOwner(20, { ...kid, retirement: atAge(92) }),
+        await saveOwner(
+          20,
+          { ...kid, retirement: atAge(92) },
+          await ownerOn(20),
+        ),
       ).toStrictEqual(saved({ ...kid, id: 20, retirement: atAge(92) }));
     });
 
@@ -127,46 +175,52 @@ describe("the owner actions", () => {
       ] as const;
 
       await expect(
-        saveOwner(20, { ...kid, retirement }),
+        saveOwner(20, { ...kid, retirement }, await ownerOn(20)),
       ).resolves.toStrictEqual(
         refused("Only the plan's owner retires when conditions hold"),
       );
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });
-      expect(await saveOwner(1, { ...kid, retirement })).toStrictEqual(
+      expect(
+        await saveOwner(1, { ...kid, retirement }, await ownerOn(1)),
+      ).toStrictEqual(
         saved({ ...kid, id: 1, qualifyingYears: 35, retirement }),
       );
     });
 
     it("lets anyone but the plan's owner retire with them, refusing the plan's owner in the rule's words", async () => {
       await expect(
-        saveOwner(1, { ...kid, retirement: "retirement" }),
+        saveOwner(1, { ...kid, retirement: "retirement" }, await ownerOn(1)),
       ).resolves.toStrictEqual(
         refused("Only someone else retires with the plan's owner"),
       );
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });
       expect(
-        await saveOwner(20, { ...kid, retirement: "retirement" }),
+        await saveOwner(
+          20,
+          { ...kid, retirement: "retirement" },
+          await ownerOn(20),
+        ),
       ).toStrictEqual(saved({ ...kid, id: 20, retirement: "retirement" }));
     });
 
     it("refuses a name of nothing but space, a year or an age that is not whole, an age below nothing, a retirement on nothing, an id the list could not have sent, and one no owner has", async () => {
-      await expect(saveOwner(null, { ...kid, name: "   " })).rejects.toThrow(
-        z.ZodError,
-      );
-      await expect(saveOwner(null, { ...kid, born: 2020.5 })).rejects.toThrow(
-        z.ZodError,
-      );
       await expect(
-        saveOwner(null, { ...kid, retirement: atAge(67.5) }),
+        saveOwner(null, { ...kid, name: "   " }, null),
       ).rejects.toThrow(z.ZodError);
       await expect(
-        saveOwner(null, { ...kid, retirement: atAge(-1) }),
+        saveOwner(null, { ...kid, born: 2020.5 }, null),
       ).rejects.toThrow(z.ZodError);
-      await expect(saveOwner(null, { ...kid, retirement: [] })).rejects.toThrow(
-        z.ZodError,
-      );
-      await expect(saveOwner(0, kid)).rejects.toThrow(z.ZodError);
-      await expect(saveOwner(99, kid)).resolves.toStrictEqual(
+      await expect(
+        saveOwner(null, { ...kid, retirement: atAge(67.5) }, null),
+      ).rejects.toThrow(z.ZodError);
+      await expect(
+        saveOwner(null, { ...kid, retirement: atAge(-1) }, null),
+      ).rejects.toThrow(z.ZodError);
+      await expect(
+        saveOwner(null, { ...kid, retirement: [] }, null),
+      ).rejects.toThrow(z.ZodError);
+      await expect(saveOwner(0, kid, null)).rejects.toThrow(z.ZodError);
+      await expect(saveOwner(99, kid, null)).resolves.toStrictEqual(
         refused("No owner has the id"),
       );
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });
