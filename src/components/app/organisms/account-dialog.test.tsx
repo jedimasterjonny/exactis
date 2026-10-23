@@ -112,21 +112,25 @@ describe("AccountDialog", () => {
     vi.mocked(saveAccount).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(null, {
-      balance: 4000,
-      balloon: 0,
-      cadence: "year",
-      cap: 0,
-      contribution: 0,
-      funding: "fixed",
-      growth: "plan",
-      isDroppable: false,
-      kind: "tax-free",
-      name: "Lifetime ISA",
-      owner: 1,
-      rate: 0,
-      shares: [],
-    });
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        balance: 4000,
+        balloon: 0,
+        cadence: "year",
+        cap: 0,
+        contribution: 0,
+        funding: "fixed",
+        growth: "plan",
+        isDroppable: false,
+        kind: "tax-free",
+        name: "Lifetime ISA",
+        owner: 1,
+        rate: 0,
+        shares: [],
+      },
+      null,
+    );
     expect(
       within(dialog).getByRole("button", { name: "Save" }),
     ).toHaveAttribute("aria-busy", "true");
@@ -167,21 +171,25 @@ describe("AccountDialog", () => {
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
-    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(pension.id, {
-      balance: 420000,
-      balloon: 0,
-      cadence: "year",
-      cap: 0,
-      contribution: 27195,
-      funding: "fixed",
-      growth: "plan",
-      isDroppable: false,
-      kind: "tax-deferred",
-      name: "Workplace pension",
-      owner: 1,
-      rate: 0,
-      shares: [],
-    });
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(
+      pension.id,
+      {
+        balance: 420000,
+        balloon: 0,
+        cadence: "year",
+        cap: 0,
+        contribution: 27195,
+        funding: "fixed",
+        growth: "plan",
+        isDroppable: false,
+        kind: "tax-deferred",
+        name: "Workplace pension",
+        owner: 1,
+        rate: 0,
+        shares: [],
+      },
+      pension,
+    );
     expect(
       screen.getByRole("dialog", { name: "Account updated" }),
     ).toHaveAccessibleDescription("Workplace pension");
@@ -392,21 +400,25 @@ describe("AccountDialog", () => {
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledOnce();
     });
-    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(pension.id, {
-      balance: 412880,
-      balloon: 0,
-      cadence: "year",
-      cap: 0,
-      contribution: 27195,
-      funding: "fixed",
-      growth: "plan",
-      isDroppable: false,
-      kind: "tax-deferred",
-      name: "Workplace pension",
-      owner: 1,
-      rate: 0,
-      shares: [{ line: 16, sacrifice: 0.08 }],
-    });
+    expect(saveAccount).toHaveBeenCalledExactlyOnceWith(
+      pension.id,
+      {
+        balance: 412880,
+        balloon: 0,
+        cadence: "year",
+        cap: 0,
+        contribution: 27195,
+        funding: "fixed",
+        growth: "plan",
+        isDroppable: false,
+        kind: "tax-deferred",
+        name: "Workplace pension",
+        owner: 1,
+        rate: 0,
+        shares: [{ line: 16, sacrifice: 0.08 }],
+      },
+      pension,
+    );
   });
 
   // A share sent as it opened would write the opening back over an
@@ -430,6 +442,7 @@ describe("AccountDialog", () => {
     expect(saveAccount).toHaveBeenCalledExactlyOnceWith(
       pension.id,
       expect.objectContaining({ balance: 420000, shares: [] }),
+      pension,
     );
   });
 

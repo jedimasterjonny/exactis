@@ -1,4 +1,4 @@
-import { Refusal } from "@/lib/answer";
+import { Refusal, Stale } from "@/lib/answer";
 
 // Where a save writes a record: over the one listed with the id, or as
 // a new one given the household's next id when there is none, and the
@@ -22,6 +22,24 @@ export function found<TRecord extends { readonly id: number }>(
     throw new Refusal(`No ${noun} has the id`);
   }
   return record;
+}
+
+// Refuses a save from a dialog opened on a record another save has
+// changed since, in the words of what the record is. A dialog sends
+// the whole record as it opened, so a save over a change it never saw,
+// as one made on another device meanwhile, would write what it opened
+// with back over the change. The two are compared as they are written
+// down, key for key, so each is to be parsed alike first.
+export function holdUnchanged(
+  opened: unknown,
+  now: unknown,
+  noun: string,
+): void {
+  if (JSON.stringify(opened) !== JSON.stringify(now)) {
+    throw new Stale(
+      `The ${noun} changed since this was opened, so nothing was saved; close it and open it again`,
+    );
+  }
 }
 
 // The records with the one listed with the id taken off, or a refusal
