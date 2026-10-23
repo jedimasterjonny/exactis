@@ -47,6 +47,7 @@ import { formatGbp } from "@/lib/money";
 interface BoardProps extends Planned {
   readonly against?: Compared | undefined;
   readonly run: Run;
+  readonly scenario: null | string;
 }
 
 // The household a scenario is set against, and its run of the futures.
@@ -114,6 +115,7 @@ interface Projected {
 interface ProjectionBoardProps extends Planned {
   readonly against?:
     (Pick<ProjectionBoardProps, "spread"> & Planned) | undefined;
+  readonly scenario: null | string;
   readonly spread: Shortfall | Spread;
 }
 
@@ -198,9 +200,12 @@ export const settle = 400;
 // chance of success, in percentage points, once both runs are drawn;
 // and the net worth at the end of each plan, in pounds. The chart draws
 // the household's line over the scenario's stack. The retirement age
-// dragged here is the scenario's, and saves to it.
+// dragged here is the scenario's, and saves to it by name, so one held
+// back as the scenario is left is refused rather than kept in the
+// household.
 export function ProjectionBoard({
   against,
+  scenario,
   spread,
   ...props
 }: ProjectionBoardProps): JSX.Element {
@@ -208,7 +213,7 @@ export function ProjectionBoard({
     <Futures {...props} spread={spread}>
       {(run) =>
         against === undefined ? (
-          <Board {...props} run={run} />
+          <Board {...props} run={run} scenario={scenario} />
         ) : (
           <Futures {...against}>
             {(theirs) => (
@@ -216,6 +221,7 @@ export function ProjectionBoard({
                 {...props}
                 against={{ household: against, run: theirs }}
                 run={run}
+                scenario={scenario}
               />
             )}
           </Futures>
@@ -233,6 +239,7 @@ function Board({
   milestones,
   plan,
   run,
+  scenario,
   schedule,
 }: BoardProps): JSX.Element {
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -338,7 +345,7 @@ function Board({
       : `Last working year ${String(projected.retired - 1)}`;
 
   function save(age: number): void {
-    send(async () => saveAges({ retires: age }), {
+    send(async () => saveAges({ retires: age }, scenario), {
       failure: "Retirement age not saved",
       onRejected: () => {
         setDraft(null);

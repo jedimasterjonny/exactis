@@ -190,6 +190,50 @@ describe("the household store", () => {
     );
   });
 
+  // A save held back a moment names the branch its page was drawn on,
+  // and the scenario was left before it was sent.
+  it("refuses a save naming a branch other than the one open, and writes nothing", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+
+    await expect(
+      amend(({ kept }) => ({ kept, result: null }), "Retire early"),
+    ).resolves.toStrictEqual(
+      refused(
+        "Another branch was opened before this was saved, so nothing was; make the change again",
+      ),
+    );
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+    expect(refresh).not.toHaveBeenCalled();
+
+    expect(
+      await amend(({ kept }) => ({ kept, result: null }), null),
+    ).toStrictEqual(saved(null));
+    expect(await readLatest(db, "")).toMatchObject({ version: 2 });
+  });
+
+  // A scenario open: a save naming the household was drawn before it was
+  // entered, and one naming the scenario is kept there.
+  it("refuses a save naming the household while a scenario is open, and keeps one naming the scenario", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
+    vi.mocked(openedScenario).mockResolvedValue("Retire early");
+
+    await expect(
+      amend(({ kept }) => ({ kept, result: null }), null),
+    ).resolves.toStrictEqual(
+      refused(
+        "Another branch was opened before this was saved, so nothing was; make the change again",
+      ),
+    );
+    expect(await readLatest(db, "Retire early")).toMatchObject({ version: 1 });
+
+    expect(
+      await amend(({ kept }) => ({ kept, result: null }), "Retire early"),
+    ).toStrictEqual(saved(null));
+    expect(await readLatest(db, "Retire early")).toMatchObject({ version: 2 });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+  });
+
   it("keeps the household an edit makes as the next version, draws the page again and hands back what the edit says", async () => {
     await keepAfter(db, { scenario: "", version: 0 }, reference);
 

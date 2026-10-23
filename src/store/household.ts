@@ -79,15 +79,27 @@ const readScenarios = cache(async (): Promise<readonly string[]> =>
 // an edit made in a scenario is kept in the scenario, and one made from
 // a page drawn in a scenario dropped since is refused rather than kept
 // in the household; so is one read from a version the rules have since
-// tightened past, in their words. The page the save was made from is
-// drawn again from the version written. An action answers a POST from
-// anywhere, so this checks the session for itself, as every read does.
+// tightened past, in their words. A save that names the branch its page
+// was drawn on, the household as null or a scenario by name, as one held
+// back a moment before it is sent does, is refused where another branch
+// has been opened since, so an edit meant for a scenario never lands in
+// the household, nor the other way; one naming none is kept on whichever
+// is open, as a save sent as it is made is. The page the save was made
+// from is drawn again from the version written. An action answers a POST
+// from anywhere, so this checks the session for itself, as every read
+// does.
 export async function amend<TResult>(
   edit: (held: Held) => Amended<TResult>,
+  on?: null | string,
 ): Promise<Answer<TResult>> {
   await requireSession();
   try {
     const { scenario, version, ...held } = heldIn(await readOpen(true));
+    if (on !== undefined && scenario !== (on ?? "")) {
+      throw new Refusal(
+        "Another branch was opened before this was saved, so nothing was; make the change again",
+      );
+    }
     const { kept, result } = edit(held);
     await keepAfter(getDb(), { scenario, version }, soundKept(kept).kept);
     refresh();

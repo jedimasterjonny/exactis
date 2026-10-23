@@ -85,6 +85,7 @@ export default async function Dashboard(): Promise<JSX.Element> {
           }
           milestones={milestones}
           plan={plan}
+          scenario={scenario}
           schedule={schedule}
           spread={spread}
         />
