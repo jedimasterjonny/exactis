@@ -89,10 +89,17 @@ describe("carOf", () => {
   // The loan's £14,000 owed comes back positive, its £6,000 balloon says
   // it is a PCP, and the car's rate comes back as the depreciation it
   // is; a loan with no balloon is a loan, and no loan is a car owned
-  // outright; and its limit is its floor, nothing where it has none.
+  // outright; the finance is opened from the loan's id; and its limit is
+  // its floor, nothing where it has none.
   it("reads a car's values back off its records", () => {
-    expect(carOf({ asset, loans: [pcp] })).toStrictEqual(golf);
-    expect(carOf({ asset, loans: [loan] })).toStrictEqual(financed);
+    expect(carOf({ asset, loans: [pcp] })).toStrictEqual({
+      ...golf,
+      loan: pcp.id,
+    });
+    expect(carOf({ asset, loans: [loan] })).toStrictEqual({
+      ...financed,
+      loan: loan.id,
+    });
     expect(carOf({ asset, loans: [] })).toStrictEqual(outright);
     expect(carOf({ asset: { ...asset, limit: 3000 }, loans: [] }).floor).toBe(
       3000,
@@ -168,6 +175,7 @@ describe("toRecords", () => {
           name: "Golf PCP",
           startsAt: null,
         },
+        loan: null,
       },
     ]);
   });

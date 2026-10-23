@@ -47,12 +47,13 @@ interface Working extends PartDraft {
   readonly worked: LoanFigure;
 }
 
-// A new sub-account: owing nothing yet, over a term of twenty-five years
-// at no rate, working out the payment from the rate and the term until
-// another figure is chosen.
+// A new sub-account: opened from no loan and owing nothing yet, over a
+// term of twenty-five years at no rate, working out the payment from
+// the rate and the term until another figure is chosen.
 const blankPart = {
   balance: 0,
   isHeld: false,
+  loan: null,
   payment: 0,
   rate: 0,
   term: 25,
@@ -198,7 +199,9 @@ export function HouseDialog({
 // the blank term standing by beside them, or for a house owned outright
 // a blank sub-account standing by, so the loan's fields are there the
 // moment it is mortgaged; or the blank draft, bought in the plan's month
-// for nothing yet, under no id for a new one.
+// for nothing yet, under no id for a new one. Each sub-account carries
+// the loan it was opened from, so a save writes it back over that loan
+// whatever was taken away before it.
 function openingOf(house: null | Secured, plan: PlanMonth): Entry<Draft> {
   if (house === null) {
     const draft: Draft = { ...blank, bought: openingPurchase(plan) };
@@ -250,8 +253,8 @@ function workedOut(draft: Draft): {
     move: draft.move,
     name: draft.name.trim(),
     parts: isMortgaged
-      ? parts.map(({ balance, figure, payment, rate, worked }) =>
-          settled({ balance, payment, rate }, true, { figure, worked }),
+      ? parts.map(({ balance, figure, loan, payment, rate, worked }) =>
+          settled({ balance, loan, payment, rate }, true, { figure, worked }),
         )
       : [],
     status: draft.status,
