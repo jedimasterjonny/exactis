@@ -72,10 +72,16 @@ export function OwnerList({
   lines,
   owners,
 }: OwnerListProps): JSX.Element {
-  const { amend, dialogOf, dismiss, entry, open } = useEditor({
+  // The owner the dialog opened on, or none for a new one, which goes
+  // with the save, so the store refuses one over an owner changed since.
+  const openedRef = useRef<null | Owner>(null);
+  const { amend, dialogOf, dismiss, entry, open } = useEditor<
+    OwnerValues,
+    Owner
+  >({
     describe: (owner) => owner.name,
     noun: "Owner",
-    save: saveOwner,
+    save: async (id, values) => saveOwner(id, values, openedRef.current),
   });
   const { ask, doomed, questionOf } = useRemover<Owner>({
     describe: (owner) => owner.name,
@@ -97,12 +103,13 @@ export function OwnerList({
   // for one opened retiring with them.
   const agedRef = useRef(openingOwner.retirement);
 
-  function openOwner(values: OwnerValues, id: null | number): void {
+  function openOwner(values: OwnerValues, owner: null | Owner): void {
     agedRef.current =
       values.retirement === "retirement"
         ? openingOwner.retirement
         : values.retirement;
-    open(values, id);
+    openedRef.current = owner;
+    open(values, owner?.id ?? null);
   }
 
   return (
@@ -149,8 +156,9 @@ export function OwnerList({
                       })}
                       name={owner.name}
                       onDelete={ask}
-                      onEdit={({ born, id, name, retirement }) => {
-                        openOwner({ born, name, retirement }, id);
+                      onEdit={(row) => {
+                        const { born, name, retirement } = row;
+                        openOwner({ born, name, retirement }, row);
                       }}
                       row={owner}
                     />
