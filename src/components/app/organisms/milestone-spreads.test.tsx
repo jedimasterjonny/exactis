@@ -411,10 +411,14 @@ describe("MilestoneSpreads", () => {
     vi.mocked(saveMilestone).mockReturnValue(promise);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(null, {
-      conditions: [{ measure: "worth", of: "pounds", times: 1000000 }],
-      name: "Independence",
-    });
+    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(
+      null,
+      {
+        conditions: [{ measure: "worth", of: "pounds", times: 1000000 }],
+        name: "Independence",
+      },
+      null,
+    );
     expect(
       within(dialog).getByRole("button", { name: "Save" }),
     ).toHaveAttribute("aria-busy", "true");
