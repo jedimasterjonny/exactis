@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getScenario } from "@/store/household";
+import { getOpened } from "@/store/household";
 import { stubViewport } from "@/test/dom";
 
 import AppLayout from "./layout";
@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
 vi.mock("@/actions/auth", () => ({ signOut: vi.fn() }));
 vi.mock("@/actions/household", () => ({ importHousehold: vi.fn() }));
 vi.mock("@/actions/scenarios", () => ({ leaveScenario: vi.fn() }));
-vi.mock("@/store/household", () => ({ getScenario: vi.fn() }));
+vi.mock("@/store/household", () => ({ getOpened: vi.fn() }));
 
 // The scenario open as reads already answered: the household, and a
 // scenario. Each is marked the way React marks a promise it has seen
@@ -21,9 +21,10 @@ const household = Object.assign(Promise.resolve(null), {
   status: "fulfilled",
   value: null,
 });
-const retiringEarly = Object.assign(Promise.resolve("Retire early"), {
+const opened = { isKept: true, name: "Retire early" };
+const retiringEarly = Object.assign(Promise.resolve(opened), {
   status: "fulfilled",
-  value: "Retire early",
+  value: opened,
 });
 
 // The layout with a screen in it.
@@ -42,7 +43,7 @@ describe("AppLayout", () => {
   });
 
   it("frames its children in the sidebar shell, with no banner while the household is open", () => {
-    vi.mocked(getScenario).mockReturnValue(household);
+    vi.mocked(getOpened).mockReturnValue(household);
 
     renderLayout();
 
@@ -56,7 +57,7 @@ describe("AppLayout", () => {
   });
 
   it("heads the main column with the scenario open", () => {
-    vi.mocked(getScenario).mockReturnValue(retiringEarly);
+    vi.mocked(getOpened).mockReturnValue(retiringEarly);
 
     renderLayout();
 

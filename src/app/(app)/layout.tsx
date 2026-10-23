@@ -2,12 +2,14 @@ import type { JSX } from "react";
 
 import { Suspense, use } from "react";
 
+import type { Opened } from "@/store/household";
+
 import { ScenarioBanner } from "@/components/app/atoms/scenario-banner";
 import { AppFrame } from "@/components/app/templates/app-frame";
-import { getScenario } from "@/store/household";
+import { getOpened } from "@/store/household";
 
 interface OpenScenarioProps {
-  readonly scenario: Promise<null | string>;
+  readonly scenario: Promise<null | Opened>;
 }
 
 // The signed-in screens share the frame: the sidebar with the navigation
@@ -24,7 +26,7 @@ export default function AppLayout({ children }: LayoutProps<"/">): JSX.Element {
     <AppFrame
       banner={
         <Suspense fallback={null}>
-          <OpenScenario scenario={getScenario()} />
+          <OpenScenario scenario={getOpened()} />
         </Suspense>
       }
     >
@@ -36,6 +38,6 @@ export default function AppLayout({ children }: LayoutProps<"/">): JSX.Element {
 // The banner naming the scenario open, or nothing while the household
 // is.
 function OpenScenario({ scenario }: OpenScenarioProps): JSX.Element | null {
-  const name = use(scenario);
-  return name === null ? null : <ScenarioBanner name={name} />;
+  const opened = use(scenario);
+  return opened === null ? null : <ScenarioBanner {...opened} />;
 }
