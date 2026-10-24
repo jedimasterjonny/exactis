@@ -103,6 +103,16 @@ on is not deleted, since the milestone would then fall in no year; it is
 measured on someone else, or deleted, first. A retirement is reached at its
 owner's own age and never at anyone else's, since it is when they stop working.
 
+Leaving school is a child's milestone the milestone dialog fills in, not a
+condition of its own: choosing a child offers the age they finish Year 13 in
+England at, by the year born, 19 for a child born from September to December and
+18 for one born from January to August, since the school year runs from 1
+September to 31 August. It is offered only where that year falls within the
+plan's, as any age typed is held to them, since a child who has left already or
+leaves after the plan ends has no year of the plan to mark. It is kept as an
+ordinary age on that child, so the month of birth decides it once, where it is
+filled in, and the plan reads it as it reads every other age.
+
 A salary or a self-employed profit stops when the owner who earns it retires,
 whatever its line says, since money earned by working is not earned once the
 work stops: the plan's owner's at Retirement, and another owner's at the age

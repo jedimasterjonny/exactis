@@ -29,6 +29,7 @@ import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { Button } from "@/components/kit/button";
 import { RadioGroup } from "@/components/kit/radio-group";
+import { schoolLeavingAge } from "@/data/children";
 import {
   ageOf,
   atAge,
@@ -128,7 +129,9 @@ const twentyFiveYears: readonly Condition[] = [
 // plan's owner's, whoever that is, another owner's or a child's born by
 // the year it falls in, and choosing another keeps that year, so a
 // milestone typed at the plan's owner's age can be measured on a
-// child's without moving. The age is bounded
+// child's without moving, and a child's offers the age they leave
+// school at, filled in with a press, beside the age typed, where they
+// leave within the plan's years. The age is bounded
 // by the plan's years as whoever's it is reaches them, and says beneath
 // it which year it falls in, since the lists lay the milestone out by
 // year. It is open for as long as
@@ -201,6 +204,7 @@ export function MilestoneDialog({
   const { draft } = entry;
   const born = bornOf(plan, draft.whose);
   const isShared = plan.owners.length + (plan.children?.length ?? 0) > 1;
+  const leaving = leavingOf(plan, draft.whose);
   return (
     <EditDialog
       {...dialogOf(entry)}
@@ -278,6 +282,17 @@ export function MilestoneDialog({
             }}
             value={draft.age}
           />
+          {leaving !== undefined && (
+            <Button
+              className="self-end"
+              onClick={() => {
+                amend(entry, { age: leaving });
+              }}
+              variant="outline"
+            >
+              {`Leaves school at ${String(leaving)}`}
+            </Button>
+          )}
         </div>
       ) : (
         <ConditionFields
@@ -454,6 +469,19 @@ function heldBy(tied: number): string {
 // The conditions as the dialog holds them, each keyed by its place.
 function keyed(conditions: readonly Condition[]): Keyed[] {
   return conditions.map((condition, key) => ({ ...condition, key }));
+}
+
+// The age the child whose id is given leaves school at, where the plan
+// carries them and the year they leave in falls within the plan's years,
+// as the age field holds it, or none.
+function leavingOf(plan: Plan, whose: number | undefined): number | undefined {
+  const child = plan.children?.find(({ id }) => id === whose);
+  if (child === undefined) {
+    return undefined;
+  }
+  const age = schoolLeavingAge(child.born);
+  const year = child.born.year + age;
+  return year >= plan.from && year <= endYear(plan) ? age : undefined;
 }
 
 // The entry the dialog mounts open on: a new milestone under no id,
