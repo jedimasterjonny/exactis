@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
 
+import { children } from "@/data/children.fixture";
 import { atAge } from "@/data/milestones";
 import { owners, sam } from "@/data/owners.fixture";
 import { allInStocks, openingRates, planRate } from "@/data/rates";
@@ -161,6 +162,15 @@ describe("planOf", () => {
       planOf({ ...setting, drawdown: "pension-first" }, opening).drawdown,
     ).toBe("pension-first");
     expect(planOf(setting, opening)).not.toHaveProperty("drawdown");
+  });
+
+  // The milestones read the plan, and one may be reached at a child's
+  // age.
+  it("carries the children kept, and none where none are", () => {
+    expect(planOf({ ...setting, children }, opening).children).toStrictEqual(
+      children,
+    );
+    expect(planOf(setting, opening)).not.toHaveProperty("children");
   });
 
   // Born in 1990, a plan to 30 has run its course by 2026, and runs no

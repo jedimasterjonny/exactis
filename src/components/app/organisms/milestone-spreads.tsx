@@ -36,9 +36,10 @@ import {
   conditionOf,
   markersOf,
   retiresOn,
+  yearOf,
   yearsOf,
 } from "@/data/milestones";
-import { ageIn, endYear, yearAt } from "@/data/plan";
+import { ageIn, endYear } from "@/data/plan";
 import { reachedIn, yearBy } from "@/engine/futures";
 import { formatWholePercent } from "@/lib/money";
 import { chance, plan as planScreen, subsectionLabel } from "@/lib/nav";
@@ -143,8 +144,8 @@ export function MilestoneSpreads({
   const markers = markersOf(milestones, plan);
   const pinned = milestones
     .flatMap((milestone) => {
-      const age = ageOf(milestone);
-      return age === undefined ? [] : [{ milestone, year: yearAt(age, plan) }];
+      const year = yearOf(milestone, plan);
+      return year === undefined ? [] : [{ milestone, year }];
     })
     .sort((first, second) => first.year - second.year);
   const reached = milestones.filter(

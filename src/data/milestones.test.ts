@@ -1,7 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import type { Plan } from "@/data/plan";
+
 import { accounts } from "@/data/accounts.fixture";
+import { children } from "@/data/children.fixture";
 import { house, move } from "@/data/houses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
 import { owners, sam } from "@/data/owners.fixture";
@@ -11,7 +14,9 @@ import type { Measured } from "./milestones";
 import {
   ageOf,
   atAge,
+  bornIn,
   conditionOf,
+  isMeasuredOn,
   isReached,
   isTiedTo,
   markersOf,
@@ -21,6 +26,7 @@ import {
   retiringAt,
   timed,
   untied,
+  yearOf,
   yearsOf,
 } from "./milestones";
 import { milestones } from "./milestones.fixture";
@@ -30,6 +36,19 @@ const [salary] = incomeLines;
 
 // A sabbatical at 59, the age the owner retires at.
 const sabbatical = { conditions: atAge(59), id: 5, name: "Sabbatical" };
+
+const [ada, ben, cleo] = children;
+
+// The plan carrying Sam, born in 1993, beside its owner, born in 1990,
+// and the three children, born in 2015, 2016 and 2028.
+const raising: Plan = {
+  ...retiring,
+  children,
+  owners: [...retiring.owners, sam],
+};
+
+// Ada at 18, which she reaches in 2033.
+const adaAt18 = { conditions: atAge(18, ada.id), id: 11, name: "Ada at 18" };
 
 // A year worth a million, half of it the house, spending £30,000 and
 // owing £40,000, at 36.
@@ -53,10 +72,48 @@ describe("ageOf", () => {
 });
 
 describe("atAge", () => {
-  it("is the one condition, on the age", () => {
+  it("is the one condition, on the age, the plan's owner's or that of whoever the id names", () => {
     expect(atAge(46)).toStrictEqual([
       { measure: "age", of: "years", times: 46 },
     ]);
+    expect(atAge(18, 20)).toStrictEqual([
+      { measure: "age", of: "years", times: 18, whose: 20 },
+    ]);
+  });
+});
+
+describe("bornIn", () => {
+  it("reads the year born of the plan's owner for none, of an owner, or of a child, and none for an id the plan carries nobody under", () => {
+    expect(bornIn(raising, undefined)).toBe(1990);
+    expect(bornIn(raising, sam.id)).toBe(1993);
+    expect(bornIn(raising, cleo.id)).toBe(2028);
+    expect(bornIn(raising, 99)).toBeUndefined();
+    expect(bornIn(retiring, ada.id)).toBeUndefined();
+  });
+});
+
+describe("isMeasuredOn", () => {
+  it("says whether a milestone is reached at the age of whoever the id names", () => {
+    expect(isMeasuredOn(adaAt18, ada.id)).toBe(true);
+    expect(isMeasuredOn(adaAt18, ben.id)).toBe(false);
+    expect(isMeasuredOn(kidsLeave, owners[0].id)).toBe(false);
+  });
+});
+
+describe("yearOf", () => {
+  // The plan's owner reaches 46 in 2036 and Sam in 2039; Ada, born in
+  // March 2015, reaches 18 in 2033, and Ben, born in October 2016, 19
+  // in 2035, the month born read nowhere.
+  it("reads the year whoever's age a milestone is reached at reaches it, the plan's owner's where it names nobody", () => {
+    expect(yearOf(kidsLeave, raising)).toBe(2036);
+    expect(yearOf({ conditions: atAge(46, sam.id) }, raising)).toBe(2039);
+    expect(yearOf(adaAt18, raising)).toBe(2033);
+    expect(yearOf({ conditions: atAge(19, ben.id) }, raising)).toBe(2035);
+  });
+
+  it("reads none for a milestone reached when conditions hold, or one measured on someone the plan does not carry", () => {
+    expect(yearOf(firstMillion, raising)).toBeUndefined();
+    expect(yearOf(adaAt18, retiring)).toBeUndefined();
   });
 });
 
@@ -115,6 +172,16 @@ describe("markersOf", () => {
     ]);
   });
 
+  // Ada reaches 18 in 2033, before the children leave home at the plan's
+  // owner's 46.
+  it("lays a milestone reached at someone else's age out in the year they reach it", () => {
+    expect(markersOf([kidsLeave, adaAt18], raising)).toStrictEqual([
+      { id: 11, name: "Ada at 18", year: 2033 },
+      { id: 7, name: "Kids leave home", year: 2036 },
+      { id: "retirement", name: "Retirement", year: 2049 },
+    ]);
+  });
+
   it("has retirement alone for a household listing none, and first of two in its year", () => {
     const retirement = { id: "retirement", name: "Retirement", year: 2049 };
 
@@ -152,6 +219,20 @@ describe("moving", () => {
     expect(
       moving({ ...house, move: { ...move, year: 2040 } }, milestones, retiring),
     ).toStrictEqual({ ...house, move });
+  });
+
+  // Ada reaches 18 in 2033.
+  it("reads the year of a move at someone else's age off theirs", () => {
+    expect(
+      moving(
+        { ...house, move: { ...move, at: adaAt18.id } },
+        [adaAt18],
+        raising,
+      ),
+    ).toStrictEqual({
+      ...house,
+      move: { ...move, at: adaAt18.id, year: 2033 },
+    });
   });
 
   it("leaves an account with no move as it is, and one moving at a milestone the household does not list or reached when conditions hold", () => {
@@ -254,6 +335,13 @@ describe("timed", () => {
     ).toStrictEqual({ ...salary, firstYear: 2036, startsAt: 7 });
   });
 
+  // Ada reaches 18 in 2033, so a line ending then runs the whole of 2032.
+  it("reads an end tied to a milestone at someone else's age off theirs", () => {
+    expect(
+      timed({ ...salary, endsAt: adaAt18.id }, [adaAt18], raising),
+    ).toMatchObject({ lastMonth: null, lastYear: 2032 });
+  });
+
   // Three years after retirement in 2049 is the end of 2051.
   it("runs an end tied some years after its milestone the whole of the last of them", () => {
     expect(
@@ -313,6 +401,12 @@ describe("untied", () => {
       lastYear: 2057,
     });
     expect(untied(salary, downsize, retiring)).toStrictEqual(salary);
+  });
+
+  it("fixes an end tied to a milestone at someone else's age in the year they reach it", () => {
+    expect(
+      untied({ ...salary, startsAt: adaAt18.id }, adaAt18, raising),
+    ).toStrictEqual({ ...salary, firstYear: 2033, startsAt: null });
   });
 
   // Nothing is tied to a milestone reached when conditions hold, and

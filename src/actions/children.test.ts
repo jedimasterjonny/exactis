@@ -7,6 +7,7 @@ import type { ChildValues } from "@/data/children";
 
 import { children } from "@/data/children.fixture";
 import { kept } from "@/data/household.fixture";
+import { atAge } from "@/data/milestones";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
@@ -133,6 +134,27 @@ describe("the child actions", () => {
         version: 3,
       });
       expect(refresh).toHaveBeenCalledOnce();
+    });
+
+    // The children leaving home measured on Ben's 19.
+    it("refuses to delete a child a milestone is measured on, and writes nothing", async () => {
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        {
+          ...raising,
+          milestones: raising.milestones.map((milestone) =>
+            milestone.id === 7
+              ? { ...milestone, conditions: atAge(19, ben.id) }
+              : milestone,
+          ),
+        },
+      );
+
+      await expect(removeChild(ben.id)).resolves.toStrictEqual(
+        refused("A child a milestone is measured on stays"),
+      );
+      expect(await readLatest(db, "")).toMatchObject({ version: 2 });
     });
 
     it("refuses an id the list could not have sent, and one no child has, in a household listing none", async () => {
