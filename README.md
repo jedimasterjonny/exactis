@@ -433,12 +433,21 @@ signs in as anyone would by reading that one line rather than the file.
 
 ## Deploying
 
-The app is built for Vercel with Neon behind it. Adding Neon from the Vercel
-Marketplace sets `DATABASE_URL` on the project; `SESSION_PASSWORD` and
-`APP_PASSWORD_HASH` are set by hand, as `.env.example` describes. A build needs
-none of the three. The migrations are applied from a terminal with the
-production URL in `DATABASE_URL`, before any deploy that adds one, so no deploy
-runs against a store that lacks what it reads:
+The app runs on Vercel with Neon behind it, as two projects on this repository:
+`exactis`, deployed from `main`, and `exactis-dev`, deployed from `dev`, each a
+Hobby project with Vercel Authentication on all its deployments, which is the
+door the app's one password stands behind, its functions in `fra1` beside the
+store in `eu-central-1`, and `bun install --frozen-lockfile` as its Install
+Command, so a lockfile Vercel's bun would re-resolve fails the build rather than
+deploying a tree CI never saw. Neon is a project of its own rather than the
+Vercel Marketplace's: its `main` branch holds the household and `dev` a copy of
+it, and each Vercel project reads its branch. `DATABASE_URL`, `SESSION_PASSWORD`
+and `APP_PASSWORD_HASH` are set by hand on each, for Production only and
+Sensitive, as `.env.example` describes. A build needs none of the three, and a
+deployment keeps the variables it was built with, so a change to one takes a
+redeploy. The migrations are applied from a terminal with the branch's owner URL
+exported as `DATABASE_URL`, before any deploy that adds one, so no deploy runs
+against a store that lacks what it reads:
 
 ```bash
 bun run db:migrate
@@ -450,60 +459,33 @@ relies on. A column it does not write lands open or with a default, and a column
 is dropped, renamed or closed only by a later migration, once no deployed code
 reads or writes it.
 
-The URL the integration sets is the owner role's, which can alter the table,
-turn its triggers off or drop it, so production runs as a role of its own that
-can do only what `src/db/household.ts` does: read the versions, keep one, and
-drop a scenario's, which alone the trigger lets go. A role made in SQL is not a
-member of `neon_superuser`, as one made in Neon's Console, CLI or API is, so it
-is made in SQL. This assumes the Vercel-managed integration, whose database is
-listed under Storage in the Vercel dashboard. A database added from the Neon
-Console is the Neon-managed one, disconnected under Integrations there instead,
-and its guide does not say that disconnecting takes its variables off the
-project, so the check in step 4 is what makes sure. In order:
+The owner role can alter the table, turn its triggers off or drop it, so each
+project runs as a role of its own on its branch, `exactis_app`, that can do only
+what `src/db/household.ts` does: read the versions, keep one, and drop a
+scenario's, which alone the trigger lets go. A role made in SQL is not a member
+of `neon_superuser`, as one made in Neon's Console, CLI or API is, so it is made
+in SQL, as the owner on the branch, with a password from `openssl rand -hex 24`
+in place of the placeholder:
 
-1. Take the owner's URL from the Neon Console, under Connect on the production
-   branch, as the owner role with pooling on, since Vercel shows none once the
-   connection is removed. A URL is pasted bare wherever it goes, with no quotes
-   and no `DATABASE_URL=` in front.
-2. As the owner on the production branch, from Neon's SQL Editor or `psql` with
-   the owner's URL, make the role, with a password from `openssl rand -hex 24`
-   in place of the placeholder:
+```sql
+CREATE ROLE exactis_app WITH LOGIN PASSWORD '<password>';
+GRANT USAGE ON SCHEMA public TO exactis_app;
+GRANT SELECT, INSERT, DELETE ON household_versions TO exactis_app;
+```
 
-   ```sql
-   CREATE ROLE exactis_app WITH LOGIN PASSWORD '<password>';
-   GRANT USAGE ON SCHEMA public TO exactis_app;
-   GRANT SELECT, INSERT, DELETE ON household_versions TO exactis_app;
-   ```
+The app's URL is the owner's pooled URL with `exactis_app` and its password in
+place of the owner's, pasted bare wherever it goes, with no quotes and no
+`DATABASE_URL=` in front. It is read through before anything runs on it, with
+the store's own driver, since `psql` is not assumed, and should answer as the
+app role with the versions the branch holds:
 
-3. Make the app's URL from the owner's, with `exactis_app` and its password in
-   place of the owner's, and read through it before anything runs on it, which
-   only counts the versions:
+```bash
+( read -rs URL && URL="$URL" bun -e 'import { neon } from "@neondatabase/serverless"; console.log(await neon(process.env.URL)`SELECT current_user, count(*) AS versions FROM household_versions`)' )
+```
 
-   ```bash
-   ( read -rs APP_URL && psql "$APP_URL" -c 'SELECT count(*) FROM household_versions' )
-   ```
-
-4. Remove the project's connection to the database, under the database's
-   Projects tab in Vercel, which takes the integration's variables off the
-   project and leaves the database as it is. Never delete the database itself,
-   under its Settings, which deletes the Neon project and every version in it.
-   Then check the project's environment variables for any of the integration's
-   left, `DATABASE_URL_UNPOOLED`, the `PG` ones such as `PGUSER` and
-   `PGPASSWORD`, and the `POSTGRES_` ones such as `POSTGRES_URL`, each of which
-   carries the owner's credentials, and delete any there is.
-5. Add `DATABASE_URL` by hand, for Production, as a sensitive variable, set to
-   the app's URL.
-6. Redeploy production, since a deployment already running keeps the variables
-   it was built with, and check that a page draws and a save lands.
-
-A connection kept for a preview branch could instead be given a custom prefix,
-which moves its variables off `DATABASE_URL`, but leaves the owner's URL in the
-environment every build runs in. `db:migrate` keeps running as the owner, with
-the owner's URL exported as `DATABASE_URL` in the terminal it runs from. A Neon
-branch copies the roles and their passwords, so one made from production after
-this holds `exactis_app` with production's password, and has the role dropped,
-or its password reset with `ALTER ROLE exactis_app WITH PASSWORD`, before
-anything uses it. Bringing a development branch back in line with its parent is
+A Neon branch copies the roles and their passwords, so one made from `main`
+holds `exactis_app` with `main`'s password, and has its password reset before
+anything uses it. Bringing `dev` back in line with `main` is
 `bun run db:reset-dev`, which says what it would do, and with `-- --reset` does
 it: it resets the branch the `DATABASE_URL` in `.env.local` names to its parent,
 resets the owner's password on it, since the reset puts the parent's back, and
