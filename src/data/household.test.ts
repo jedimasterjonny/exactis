@@ -1442,6 +1442,23 @@ describe("soundKept", () => {
     );
   });
 
+  // The fixture's owner holds 35 years; Sam holds none. A household kept
+  // before the tax year was asked holds none, and reads as it was.
+  it("keeps the tax year an owner's years run through beside them, and refuses one alone, in its words", () => {
+    const through = (owner: Owner): Kept => ({
+      ...kept,
+      next: 21,
+      owners: [{ ...owner, qualifiedThrough: 2025 }],
+    });
+
+    expect(soundKept(through(owners[0])).household.owners).toStrictEqual([
+      { ...owners[0], qualifiedThrough: 2025 },
+    ]);
+    expect(() => soundKept(through({ ...sam, id: 1 }))).toThrow(
+      /^A tax year is held beside the qualifying years it ends$/,
+    );
+  });
+
   // A household kept before a bonus's cadence was asked holds a salary
   // naming none, which is paid every month and reads as it was.
   it("keeps how a salary's bonus is paid as typed, or not at all, and refuses a month that is none of the twelve or a cadence not offered", () => {
