@@ -522,5 +522,15 @@ DO $$ BEGIN
 END $$;
 ```
 
+Under Settings → Git, each project's Ignored Build Step is
+`bash scripts/vercel-ignore.sh` rather than a preset: it builds the project's
+production branch alone, and only for a change that reaches what is built. A
+dev-tooling bump, a test, a document, a workflow or a migration deploys nothing,
+where each deployed a byte-identical build before; a dependency, a source file,
+the Next or TypeScript configuration, a lock file refresh, or a dev dependency
+the build reads, as shadcn's stylesheet is, builds. The script says what it
+reads from and what it leaves to build, and `scripts/vercel-ignore.test.ts`
+holds it to each case.
+
 [AGENTS.md](AGENTS.md) is the source of truth for how work is done here: code
 style, commit rules, and what has to be green before anything lands.
