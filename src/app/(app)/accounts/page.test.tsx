@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ExpenseLine } from "@/data/expenses";
 
 import { accounts } from "@/data/accounts.fixture";
+import { children } from "@/data/children.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
@@ -19,6 +20,10 @@ vi.mock("@/actions/accounts", () => ({
   removeAccount: vi.fn(),
   saveAccount: vi.fn(),
 }));
+vi.mock("@/actions/children", () => ({
+  removeChild: vi.fn(),
+  saveChild: vi.fn(),
+}));
 vi.mock("@/actions/owners", () => ({
   removeOwner: vi.fn(),
   saveOwner: vi.fn(),
@@ -32,6 +37,7 @@ async function renderAccounts({
   vi.mocked(getHousehold).mockResolvedValue({
     ...soundKept(blank).household,
     accounts: [...accounts],
+    children,
     owners,
     plan,
     schedule: { expenses, income: [...incomeLines] },
@@ -76,7 +82,7 @@ describe("Accounts", () => {
   // month the plan is read in, which the flow says as £1,150 a month;
   // the plan's rate is what the savings grow at, and the expense line
   // paying the mortgage says when it clears.
-  it("hands the store's accounts, lines, owners and plan to the ledger", async () => {
+  it("hands the store's accounts, lines, owners, children and plan to the ledger", async () => {
     await renderAccounts({
       expenses: [{ ...expenseLines[0], lastMonth: 6, lastYear: 2047, pays: 5 }],
     });
@@ -92,6 +98,12 @@ describe("Accounts", () => {
       within(screen.getByRole("region", { name: "Owners" })).getByRole("row", {
         name: /Me/,
       }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Children" })).getByRole(
+        "row",
+        { name: /Cleo/ },
+      ),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Workplace pension" }));

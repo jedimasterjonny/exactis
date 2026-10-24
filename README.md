@@ -42,21 +42,22 @@ nvm install "$(cat .node-version)" && nvm alias default "$(cat .node-version)"
 ## The store
 
 The household, its owners, each with the year they were born and the age they
-retire at, its accounts, milestones, income lines, each naming the owner who
-earns it, and expense lines, the month at whose end its balances were read, the
-progress points its balances were read at month by month and when the Land
-Registry's house price index was last written into them, the age the plan runs
-to, the rates and the split of the savings the plan runs on, the inflation curve
-last pulled from the Bank of England, the vintages of BlackRock's capital market
-assumptions last pulled and the target allocation last imported from Portfolio
-Performance, lives in Postgres as one document, a version of it a save, reached
-through [Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. Every
-version is kept on a branch, the household itself or a scenario by its name,
-each counting its versions from one. The table is `src/db/schema.ts`, the
-migrations generated from it are in `drizzle/`, and the queries, each naming the
-branch it reads or writes, are in `src/db/household.ts`: reading the latest
-version, keeping the next, reading the version the rates stood at on a day,
-listing the scenarios and dropping one.
+retire at, its children, each with the month they were born, its accounts,
+milestones, income lines, each naming the owner who earns it, and expense lines,
+the month at whose end its balances were read, the progress points its balances
+were read at month by month and when the Land Registry's house price index was
+last written into them, the age the plan runs to, the rates and the split of the
+savings the plan runs on, the inflation curve last pulled from the Bank of
+England, the vintages of BlackRock's capital market assumptions last pulled and
+the target allocation last imported from Portfolio Performance, lives in
+Postgres as one document, a version of it a save, reached through
+[Drizzle](https://orm.drizzle.team) over Neon's HTTP driver. Every version is
+kept on a branch, the household itself or a scenario by its name, each counting
+its versions from one. The table is `src/db/schema.ts`, the migrations generated
+from it are in `drizzle/`, and the queries, each naming the branch it reads or
+writes, are in `src/db/household.ts`: reading the latest version, keeping the
+next, reading the version the rates stood at on a day, listing the scenarios and
+dropping one.
 
 A save reads the latest version, makes the household it leaves, holds the whole
 of it to the rules in `src/data/household.ts`, and keeps it as the version after
@@ -64,8 +65,8 @@ the one it read, in one statement. So a save lands whole or not at all, one the
 household changed under since it was read is refused rather than written over
 the other, and a save that breaks a rule is refused in the rule's words. A
 dialog holds its record for as long as it is open, longer than that read, so the
-account, house, car, owner, line and milestone dialogs send the record as they
-opened on it, and a save over one changed since, on another device say, is
+account, house, car, owner, child, line and milestone dialogs send the record as
+they opened on it, and a save over one changed since, on another device say, is
 refused rather than written back over the change. No version is written over,
 none of the household's is deleted, and the table is never truncated, which it
 holds with triggers, so every household the store has held stays; a scenario can
@@ -111,16 +112,16 @@ is not rolled back. The bookkeeping is the household's: each account's balance
 and the day it was set, the month the balances are as of, the progress points,
 and what was pulled from outside, the house price index, the CMA and the
 inflation curve. The rest is the plan, and the scenario's: the owners, the
-accounts and what pays into them, the milestones, both schedules, the ages, the
-rates typed and which set is live, the split, the glide path, the deductions,
-and the target allocation and its mappings. Balances go by account: an account
-in both takes the household's, one the scenario added keeps its own, and one
-only the household holds is gone, since the scenario deleted it. An account
-added to the household since the scenario was made is refused rather than
-merged: each branch gives its next record the id the household's next stood at
-when the scenario was made, so one added to each would be read as one. Take it
-out of the household and put it back after. The merged household gives its next
-record the higher of the two ids, since an id is never given out twice. The
+children, the accounts and what pays into them, the milestones, both schedules,
+the ages, the rates typed and which set is live, the split, the glide path, the
+deductions, and the target allocation and its mappings. Balances go by account:
+an account in both takes the household's, one the scenario added keeps its own,
+and one only the household holds is gone, since the scenario deleted it. An
+account added to the household since the scenario was made is refused rather
+than merged: each branch gives its next record the id the household's next stood
+at when the scenario was made, so one added to each would be read as one. Take
+it out of the household and put it back after. The merged household gives its
+next record the higher of the two ids, since an id is never given out twice. The
 merge is held to every rule, as any save is. The versions of the scenario up to
 the one adopted are then dropped, so one saved to it since stays. The store runs
 no transaction, so the write comes first and the drop second: a drop that fails
@@ -159,22 +160,25 @@ in to this app's before the model's rules are held to it. A household kept
 before shapes were numbered carries no stamp and is in the first. A change to
 the model that a household kept before it cannot be read under is a step
 appended there, taking the shape before to the new one, which counts
-`currentShape` up by itself. So a version kept in an older shape is read as it
-stands rather than refused, nothing is rewritten to carry it forward, and the
-store is never emptied; a version stamped by a newer app than the one reading it
-is refused, since it may hold what this one cannot read, and one the steps
-cannot carry into a household the rules hold is refused in their words, the way
-through being a step. Only the latest version is read whole. An older one is
-read only for the sources its rates rest on, to show what moved them, through a
-schema of their own that defaults what a version too old to hold them lacks. A
-change to the table is a new migration, written with `db:generate` and committed
-with the change, with whatever drizzle-kit cannot write, such as the trigger,
-written into it by hand. A migration is applied before the app that needs it is
-deployed, so the app already running has to run on the migrated table in
-between: the scenario column defaults to the household, so that app reads and
-writes the household's versions as it did. The tests apply the migrations to an
-in-process Postgres ([PGlite](https://pglite.dev)), so a migration that does not
-apply fails the suite before it reaches a database.
+`currentShape` up by itself. So is one an older app would read wrongly rather
+than refuse, as it drops a key it does not hold: the step then carries the shape
+before as it is, and is there so that an older app refuses the new one. So a
+version kept in an older shape is read as it stands rather than refused, nothing
+is rewritten to carry it forward, and the store is never emptied; a version
+stamped by a newer app than the one reading it is refused, since it may hold
+what this one cannot read, and one the steps cannot carry into a household the
+rules hold is refused in their words, the way through being a step. Only the
+latest version is read whole. An older one is read only for the sources its
+rates rest on, to show what moved them, through a schema of their own that
+defaults what a version too old to hold them lacks. A change to the table is a
+new migration, written with `db:generate` and committed with the change, with
+whatever drizzle-kit cannot write, such as the trigger, written into it by hand.
+A migration is applied before the app that needs it is deployed, so the app
+already running has to run on the migrated table in between: the scenario column
+defaults to the household, so that app reads and writes the household's versions
+as it did. The tests apply the migrations to an in-process Postgres
+([PGlite](https://pglite.dev)), so a migration that does not apply fails the
+suite before it reaches a database.
 
 ## The projection
 
