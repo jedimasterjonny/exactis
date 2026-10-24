@@ -1,4 +1,5 @@
 import type { Account } from "@/data/accounts";
+import type { Child } from "@/data/children";
 import type { Owner } from "@/data/owners";
 import type { Allocation, Rates } from "@/data/rates";
 import type { LineGrowth, Month } from "@/data/schedule";
@@ -49,7 +50,9 @@ export interface Path {
 // the household lists is carried with it, since the engine taxes each
 // owner's income on its own, stops it when they retire and draws their
 // pensions at their age, so the first's years are written twice and
-// retiringAt moves both. It sits
+// retiringAt moves both. So is every child the household lists, since
+// a milestone may be reached at a child's age and the milestones read
+// the plan, and a household listing none carries none. It sits
 // beside the accounts and the lines rather than inside the engine,
 // since the flow and the projection each read it and the flow is what
 // the projection is built on. A plan run over one future of the markets
@@ -62,6 +65,7 @@ export interface Path {
 export interface Plan {
   readonly born: number;
   readonly byYear?: readonly number[];
+  readonly children?: readonly Child[];
   readonly drawdown?: Drawdown;
   readonly from: number;
   readonly inflation: number;
@@ -105,11 +109,12 @@ type Priced = Pick<Plan, "from" | "inflation" | "month" | "path">;
 
 // What the plan is set by, as the store keeps it: the age it runs to,
 // the month its balances are as of, which its first year opens with,
-// the owners, the first listed of whom it is, and the drawdown, where
-// one is chosen.
+// the owners, the first listed of whom it is, the children, where any
+// are kept, and the drawdown, where one is chosen.
 interface Setting {
   readonly ages: Pick<PlanAges, "ends">;
   readonly asOf: Month;
+  readonly children?: readonly Child[];
   readonly drawdown?: Drawdown;
   readonly owners: readonly Owner[];
 }
@@ -264,7 +269,8 @@ export function marginOf(line: {
 // is reached when conditions hold, growing at the rate the rates given
 // make with the savings split as the allocation given splits them and
 // what rebalancing earns over it, taking the rates' inflation, and
-// drawn down as the household chose, where it chose:
+// drawn down as the household chose, where it chose, carrying the
+// children kept, where any are:
 // what the projection runs on and what the plan screen lays its lines
 // over. The rates, the split and the rebalancing are taken together,
 // as the household keeps them. A plan whose age is already
@@ -273,7 +279,7 @@ export function marginOf(line: {
 // retires with themselves, and the store refuses to keep either, so a
 // caller handing one here has skipped the model.
 export function planOf(
-  { ages, asOf, drawdown, owners }: Setting,
+  { ages, asOf, children, drawdown, owners }: Setting,
   {
     allocation,
     rates,
@@ -295,6 +301,7 @@ export function planOf(
   const [only, ...rest] = owner.retirement;
   return {
     born: owner.born,
+    ...(children !== undefined && { children }),
     ...(drawdown !== undefined && { drawdown }),
     from: start.year,
     inflation: rates.inflation,

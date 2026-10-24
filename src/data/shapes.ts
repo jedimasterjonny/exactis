@@ -26,11 +26,14 @@ type Step = (document: Record<string, unknown>) => Record<string, unknown>;
 // droppable, since the old default was the wrong way round: every
 // pension is kept paid until its owner marks the ones to drop.
 //
-// 2 to 3: a household may list children. One kept in the second shape
-// lists none, so the step carries it as it is. It is taken so that a
-// build of the second shape refuses a household of the third rather
-// than reading it with its children dropped, as it drops any key it
-// does not hold, and saving it back without them.
+// 2 to 3: a household may list children, and a milestone reached at an
+// age may name whose age it is. One kept in the second shape lists none
+// and names nobody, so the step carries it as it is. It is taken so
+// that a build of the second shape refuses a household of the third
+// rather than reading it with its children dropped and every age read
+// as the plan's owner's, as it drops any key it does not hold, so a
+// child's milestone falls in a year of the owner's, and saving it back
+// that way.
 const steps: readonly Step[] = [
   (document): Record<string, unknown> => {
     const { accounts } = document;

@@ -5,6 +5,7 @@ import * as z from "zod";
 import type { Owner, OwnerValues } from "@/data/owners";
 import type { Answer } from "@/lib/answer";
 
+import { isMeasuredOn } from "@/data/milestones";
 import { withRecord } from "@/data/owners";
 import { ownerValues, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
@@ -41,11 +42,13 @@ const values = z
 // compare key for key.
 const opening = values.extend({ id: recordId });
 
-// Deletes the owner with that id, unless an account or an income line
-// names it: an ISA or a pension belongs to an owner, and an income line
-// is earned by one, and the household refuses to leave either with
-// none, so the account or the line is given to another owner or
-// deleted first, and the refusal says so in words that say what to do.
+// Deletes the owner with that id, unless an account, an income line or
+// a milestone names it: an ISA or a pension belongs to an owner, an
+// income line is earned by one, and a milestone may be reached at one's
+// age, and the household refuses to leave any of them with none, so the
+// account or the line is given to another owner or deleted first, and
+// the milestone measured on someone else, and the refusal says so in
+// words that say what to do.
 // The last owner is refused by the household in its own words, since a
 // plan is somebody's, as is the plan's owner while the owner listed next
 // retires with them, since the plan would pass to an owner retiring with
@@ -60,6 +63,9 @@ export async function removeOwner(id: number): Promise<Answer<undefined>> {
     }
     if (kept.schedule.income.some(({ owner }) => owner === at)) {
       throw new Refusal("An owner who earns an income line stays");
+    }
+    if (kept.milestones.some((milestone) => isMeasuredOn(milestone, at))) {
+      throw new Refusal("An owner a milestone is measured on stays");
     }
     return { kept: { ...kept, owners }, result: undefined };
   });

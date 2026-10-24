@@ -15,7 +15,7 @@ import type { ExpenseLine } from "@/data/expenses";
 import type { HousePrices } from "@/data/house-prices";
 import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
-import type { Milestone } from "@/data/milestones";
+import type { Condition, Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan, Spread } from "@/data/plan";
 import type { ProgressPoint } from "@/data/progress";
@@ -1415,6 +1415,66 @@ describe("soundKept", () => {
         children: [...children, { ...children[0], id: 7 }],
       }),
     ).toThrow(/^A record's id is held by no other record$/);
+  });
+
+  // The children leaving home measured on Ada's 18, which she reaches in
+  // 2033, rather than on the plan's owner's 46, and on the partner's 46,
+  // which Sam, born in 1993, reaches in 2039; the plan carries the
+  // children, and the line tied to end there runs to the year before.
+  it("keeps a milestone reached at a child's or another owner's age, and reads the lines tied to it off theirs", () => {
+    const [household, ...expenses] = expenseLines;
+    const partner = { ...sam, id: 23 };
+    const measured = (age: number, whose: number): Kept => ({
+      ...kept,
+      children,
+      milestones: kept.milestones.map((milestone) =>
+        milestone.id === 7
+          ? { ...milestone, conditions: atAge(age, whose) }
+          : milestone,
+      ),
+      next: 24,
+      owners: [...owners, partner],
+      schedule: {
+        ...kept.schedule,
+        expenses: [{ ...household, endsAt: 7, lastYear: 2040 }, ...expenses],
+      },
+    });
+    const { household: read } = soundKept(measured(18, children[0].id));
+
+    expect(read.plan.children).toStrictEqual(children);
+    expect(read.schedule.expenses[0]).toMatchObject({ lastYear: 2032 });
+    expect(
+      soundKept(measured(46, partner.id)).household.schedule.expenses[0],
+    ).toMatchObject({ lastYear: 2038 });
+  });
+
+  // An id no owner or child holds, the downsize's own among them, is
+  // nobody's age; an age is someone's, and nothing else is; and an
+  // owner retires at their own.
+  it("refuses a milestone measured on someone the household does not list, anything but an age measured on someone, and a retirement at anyone's age, in their words", () => {
+    const measured = (conditions: readonly Condition[]): Kept => ({
+      ...kept,
+      milestones: [...kept.milestones, { conditions, id: 20, name: "Theirs" }],
+      next: 21,
+    });
+
+    expect(() => soundKept(measured(atAge(18, 99)))).toThrow(
+      /^A milestone is measured on someone the household lists$/,
+    );
+    expect(() => soundKept(measured(atAge(18, 8)))).toThrow(
+      /^A milestone is measured on someone the household lists$/,
+    );
+    expect(() =>
+      soundKept(
+        measured([{ measure: "worth", of: "pounds", times: 1, whose: 1 }]),
+      ),
+    ).toThrow(/^Only an age is someone's$/);
+    expect(() =>
+      soundKept({
+        ...kept,
+        owners: [{ ...owners[0], retirement: atAge(59, 1) }],
+      }),
+    ).toThrow(/^A retirement is at its owner's own age$/);
   });
 
   // A line the household lays for a record takes that record's id, so
