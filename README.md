@@ -504,9 +504,15 @@ the owner's URL exported as `DATABASE_URL` in the terminal it runs from. A Neon
 branch copies the roles and their passwords, so one made from production after
 this holds `exactis_app` with production's password, and has the role dropped,
 or its password reset with `ALTER ROLE exactis_app WITH PASSWORD`, before
-anything uses it. A migration that adds a table grants the app role what its
-queries need on it, in the same migration, and only where the role exists, since
-PGlite and a branch made before it have none:
+anything uses it. Bringing a development branch back in line with its parent is
+`bun run db:reset-dev`, which says what it would do, and with `-- --reset` does
+it: it resets the branch the `DATABASE_URL` in `.env.local` names to its parent,
+resets the owner's password on it, since the reset puts the parent's back, and
+makes `exactis_app` again with the password that URL carries, so nothing holding
+the URL changes. It reads `NEON_API_KEY` from the environment, as the comment at
+the top of `scripts/reset-dev.ts` shows. A migration that adds a table grants
+the app role what its queries need on it, in the same migration, and only where
+the role exists, since PGlite and a branch made before it have none:
 
 ```sql
 DO $$ BEGIN
