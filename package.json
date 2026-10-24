@@ -19,6 +19,7 @@
     "cycles": "bash scripts/cycles.sh",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:reset-dev": "bun scripts/reset-dev.ts",
     "hash-password": "bun scripts/hash-password.ts",
     "mcp:next": "next-devtools-mcp",
     "mcp:shadcn": "shadcn mcp",
