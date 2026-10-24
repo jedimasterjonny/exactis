@@ -25,6 +25,12 @@ type Step = (document: Record<string, unknown>) => Record<string, unknown>;
 // droppable. The old mark comes off every account and nothing is marked
 // droppable, since the old default was the wrong way round: every
 // pension is kept paid until its owner marks the ones to drop.
+//
+// 2 to 3: a household may list children. One kept in the second shape
+// lists none, so the step carries it as it is. It is taken so that a
+// build of the second shape refuses a household of the third rather
+// than reading it with its children dropped, as it drops any key it
+// does not hold, and saving it back without them.
 const steps: readonly Step[] = [
   (document): Record<string, unknown> => {
     const { accounts } = document;
@@ -32,6 +38,7 @@ const steps: readonly Step[] = [
       ? { ...document, accounts: accounts.map(unmarked) }
       : document;
   },
+  (document): Record<string, unknown> => document,
 ];
 
 // The shape a household is kept in now, which every save stamps on it:

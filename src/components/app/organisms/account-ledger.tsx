@@ -6,6 +6,7 @@ import { CarFront, HousePlus, Plus } from "lucide-react";
 import { useOptimistic, useState } from "react";
 
 import type { Account, AccountKind } from "@/data/accounts";
+import type { Child } from "@/data/children";
 import type { ExpenseLine } from "@/data/expenses";
 import type { MoveChoice } from "@/data/houses";
 import type { IncomeLine } from "@/data/income";
@@ -20,6 +21,7 @@ import { SectionCard } from "@/components/app/molecules/section-card";
 import { AccountDialog } from "@/components/app/organisms/account-dialog";
 import { BalanceSheet } from "@/components/app/organisms/balance-sheet";
 import { CarDialog } from "@/components/app/organisms/car-dialog";
+import { ChildList } from "@/components/app/organisms/child-list";
 import { HouseDialog } from "@/components/app/organisms/house-dialog";
 import { MoneyFlow } from "@/components/app/organisms/money-flow";
 import { OwnerList } from "@/components/app/organisms/owner-list";
@@ -35,6 +37,7 @@ import { accountsAndAssets, subsectionLabel } from "@/lib/nav";
 interface AccountLedgerProps {
   readonly accounts: readonly Account[];
   readonly expenses: readonly ExpenseLine[];
+  readonly kids: readonly Child[];
   readonly lines: readonly IncomeLine[];
   readonly milestones: readonly MoveChoice[];
   readonly owners: readonly Owner[];
@@ -82,11 +85,14 @@ type AssetOpening = "new" | Secured;
 // their own beneath the flow, and are handed to the sheet and the flow,
 // to say whose each wrapper is, and to the account dialog, to choose
 // it; the income lines are handed to the owners too, to say who earns
-// what and why they stay. The milestones a house may move at are
-// handed to the house dialog, for the one it moves at.
+// what and why they stay. The children follow the owners, a section of
+// their own, a new one opening as born in the month the plan starts in.
+// The milestones a house may move at are handed to the house dialog, for
+// the one it moves at.
 export function AccountLedger({
   accounts,
   expenses,
+  kids,
   lines,
   milestones,
   owners,
@@ -251,6 +257,11 @@ export function AccountLedger({
         label={subsectionLabel(accountsAndAssets, ownersPlace)}
         lines={lines}
         owners={owners}
+      />
+      <ChildList
+        kids={kids}
+        label={subsectionLabel(accountsAndAssets, ownersPlace + 1)}
+        opens={{ month: plan.month, year: plan.from }}
       />
       {account !== null && (
         <AccountDialog

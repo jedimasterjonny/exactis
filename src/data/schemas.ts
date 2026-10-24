@@ -166,6 +166,10 @@ export const month = z.object({
   year,
 }) satisfies z.ZodType<Month>;
 
+// What a child holds: the name, and the month they were born in, one a
+// plan's dates fall in, whether it has come yet or not.
+export const childValues = { born: month, name: named };
+
 // The record a save writes over, by its id, or none for a new one,
 // which the household gives the next id.
 export const target = recordId.nullable();

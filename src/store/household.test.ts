@@ -64,6 +64,7 @@ describe("the household store", () => {
     expect(await getHousehold()).toStrictEqual({
       accounts: [],
       allocation: allInStocks,
+      children: [],
       cma: null,
       curve: null,
       deductions: { dividends: 0.02, fees: 0.002 },
@@ -91,6 +92,7 @@ describe("the household store", () => {
     expect(await getHousehold()).toStrictEqual({
       accounts: reference.accounts,
       allocation: reference.allocation,
+      children: [],
       cma: reference.cma,
       curve: reference.curve,
       deductions: reference.deductions,

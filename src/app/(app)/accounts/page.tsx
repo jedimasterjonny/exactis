@@ -19,9 +19,10 @@ import { getHousehold } from "@/store/household";
 // other. The page reads the accounts from the store, the income lines
 // with them, so the ledger can name the salaries feeding a pension
 // before it goes and say what they feed it, the expense lines, so it
-// can say when each loan's payments clear it, and the owners, for the
-// section listing them; the read checks the session first, so the page
-// renders behind the loading screen beside it and the rest of the shell
+// can say when each loan's payments clear it, and the owners and the
+// children, for the sections listing them; the read checks the session
+// first, so the page renders behind the loading screen beside it and
+// the rest of the shell
 // does not wait for any of them. The plan is read beside them, for the
 // month the ledger counts the salaries in, which is the month the plan
 // starts in, and the rate the savings grow at, laid out as its own
@@ -69,6 +70,7 @@ export default async function Accounts(): Promise<JSX.Element> {
         <AccountLedger
           accounts={accounts}
           expenses={schedule.expenses}
+          kids={household.children}
           lines={schedule.income}
           milestones={moveChoices(
             markersOf(household.milestones, plan),
