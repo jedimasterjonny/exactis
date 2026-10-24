@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -10,7 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
 // The step is run against a repository made here, a commit a case, with
@@ -45,12 +46,33 @@ function commit(files: Readonly<Record<string, string>>): string {
   return before;
 }
 
+// The environment git and the step run in here: the runner's own less
+// every GIT_ variable, then who commits and whatever else is given. A git
+// hook exports GIT_DIR and its siblings, naming the repository being
+// pushed, and under one git would otherwise run on that repository rather
+// than on the one made here. A variable set to undefined is left out of
+// the child's environment.
+function environment(
+  extra: Readonly<Record<string, string>> = {},
+): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    ...Object.fromEntries(
+      Object.keys(process.env)
+        .filter((key) => key.startsWith("GIT_"))
+        .map((key): [string, undefined] => [key, undefined]),
+    ),
+    ...identity,
+    ...extra,
+  };
+}
+
 function git(...args: readonly string[]): string {
   // eslint-disable-next-line sonarjs/no-os-command-from-path -- git is whatever the runner has, as the hooks and CI run it
   const run = spawnSync("git", args, {
     cwd: repo,
     encoding: "utf8",
-    env: { ...process.env, ...identity },
+    env: environment(),
   });
   if (run.status !== 0) {
     throw new Error(run.stderr);
@@ -90,7 +112,7 @@ function verdict(
   return spawnSync("bash", [script], {
     cwd: repo,
     encoding: "utf8",
-    env: { ...process.env, ...identity, ...vercel },
+    env: environment(vercel),
   }).status;
 }
 
@@ -198,6 +220,21 @@ describe("the Ignored Build Step", () => {
     expect(verdict(git("rev-parse", "HEAD"))).toBe(1);
     expect(verdict(undefined)).toBe(1);
     expect(verdict("0000000000000000000000000000000000000000")).toBe(1);
+  });
+
+  // The suite runs under the pre-push hook, and a hook exports GIT_DIR
+  // naming the repository being pushed. Git run here must still reach the
+  // repository made here, and leave the path the variable names alone. That
+  // path is out of the work tree, so should the leak come back, what it
+  // makes there fails this case and no other.
+  it("keeps to the repository made here whatever repository GIT_DIR names", () => {
+    const elsewhere = join(repo, ".git", "elsewhere.git");
+    vi.stubEnv("GIT_DIR", elsewhere);
+    git("init", "--quiet");
+    const before = commit({ "README.md": "# App\n\nElsewhere.\n" });
+
+    expect(verdict(before)).toBe(0);
+    expect(existsSync(elsewhere)).toBe(false);
   });
 
   it("skips anything but the production branch", () => {
