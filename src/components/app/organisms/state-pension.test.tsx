@@ -6,6 +6,8 @@ import type { Answer } from "@/lib/answer";
 
 import { saveQualifyingYears } from "@/actions/owners";
 import { Toaster } from "@/components/kit/toast";
+import { retiring } from "@/data/income.fixture";
+import { retiringAt } from "@/data/milestones";
 import { owners, sam } from "@/data/owners.fixture";
 import { refused, saved } from "@/lib/answer";
 import { commit, field } from "@/test/dom";
@@ -14,10 +16,12 @@ import { StatePension } from "./state-pension";
 
 vi.mock("@/actions/owners", () => ({ saveQualifyingYears: vi.fn() }));
 
-// The owners fixture's one, born in 1990, with thirty qualifying years
-// typed through 2024/25, and Sam, born in 1993, with none. A save
-// reports through the toast manager, which needs its Toaster mounted.
-const me = { ...owners[0], qualifiedThrough: 2024, qualifyingYears: 30 };
+// The owners fixture's one, born in 1990 and retiring at 59 in 2049,
+// with ten qualifying years typed through 2024/25, so 2025/26 to 2048/49
+// count on to 34, and Sam, born in 1993, with none, on the plan whose
+// owner retires at 59. A save reports through the toast manager, which
+// needs its Toaster mounted.
+const me = { ...owners[0], qualifiedThrough: 2024, qualifyingYears: 10 };
 
 // The two figures of an owner's row, by the owner's name.
 const years = (name: string): HTMLElement =>
@@ -26,12 +30,14 @@ const through = (name: string): HTMLElement =>
   field(`Tax year the qualifying years for ${name} run through`);
 
 function renderTab(): void {
-  render(<StatePension owners={[me, sam]} />, { wrapper: Toaster });
+  render(<StatePension owners={[me, sam]} plan={retiring} />, {
+    wrapper: Toaster,
+  });
 }
 
 describe("StatePension", () => {
-  // Both reach 68, in 2058 and 2061, and thirty years earn £10,755 a
-  // year; Sam earns nothing on none.
+  // Both reach 68, in 2058 and 2061, and 34 years earn £12,189 a year;
+  // Sam earns nothing on none.
   it("lists each owner with the State Pension age their year of birth gives, the years typed, the tax year they run through and what they earn", () => {
     renderTab();
 
@@ -43,10 +49,10 @@ describe("StatePension", () => {
       screen.getAllByRole("row").map((row) => row.textContent),
     ).toStrictEqual([
       "OwnerQualifying yearsThrough tax yearA year",
-      "MeBorn 1990 · State Pension age 68£10,755 from 2058",
+      "MeBorn 1990 · State Pension age 68£12,189 from 2058",
       "SamBorn 1993 · State Pension age 68None",
     ]);
-    expect(years("Me")).toHaveValue("30");
+    expect(years("Me")).toHaveValue("10");
     expect(through("Me")).toHaveValue("2024");
     expect(years("Sam")).toHaveValue("");
     expect(through("Sam")).toHaveValue("");
@@ -84,26 +90,29 @@ describe("StatePension", () => {
     });
   });
 
-  // Thirty-one years written under 2024/25 would count 2025/26 twice
-  // once the years are counted on, so the tax year goes with the change
-  // and is typed again for the new record. The answer is given before
-  // the test ends, since React holds every optimistic figure until the
-  // last save still waiting lands.
+  // Eleven years written under 2024/25 would count 2025/26 twice, so
+  // the tax year goes with the change and is typed again for the new
+  // record; until it is, the eleven are taken as they stand and earn
+  // £3,944. The answer is given before the test ends, since React holds
+  // every optimistic figure until the last save still waiting lands.
   it("clears the tax year at once when the years are typed afresh", async () => {
     const answer = Promise.withResolvers<Answer<Owner>>();
     vi.mocked(saveQualifyingYears).mockReturnValue(answer.promise);
     renderTab();
 
-    commit(years("Me"), "31");
+    commit(years("Me"), "11");
 
+    expect(
+      await screen.findByRole("cell", { name: "£3,944 from 2058" }),
+    ).toBeInTheDocument();
     expect(through("Me")).toHaveValue("");
     expect(saveQualifyingYears).toHaveBeenCalledExactlyOnceWith(
       me.id,
-      31,
+      11,
       null,
     );
 
-    answer.resolve(saved({ ...me, qualifyingYears: 31 }));
+    answer.resolve(saved({ ...me, qualifyingYears: 11 }));
 
     await waitFor(() => {
       expect(through("Me")).toHaveValue("2024");
@@ -135,28 +144,36 @@ describe("StatePension", () => {
   it("sends nothing for a figure typed back to what it was, or a tax year left empty", () => {
     renderTab();
 
-    commit(years("Me"), "30");
+    commit(years("Me"), "10");
     commit(through("Me"), "2024");
     commit(through("Sam"), "");
 
     expect(saveQualifyingYears).not.toHaveBeenCalled();
   });
 
+  // Through 2025/26 the ten years count on to 33, which earn £11,831;
   // Sam's none are written as nothing beside the tax year.
-  it("saves a tax year with the years shown, none being nothing, as the focus leaves it", async () => {
-    vi.mocked(saveQualifyingYears).mockResolvedValue(
-      saved({ ...me, qualifiedThrough: 2025 }),
-    );
+  it("saves a tax year with the years shown, none being nothing, as the focus leaves it, what they earn following at once", async () => {
+    const answer = Promise.withResolvers<Answer<Owner>>();
+    vi.mocked(saveQualifyingYears).mockReturnValue(answer.promise);
     renderTab();
 
     commit(through("Me"), "2025");
+
+    expect(
+      await screen.findByRole("cell", { name: "£11,831 from 2058" }),
+    ).toBeInTheDocument();
+
     commit(through("Sam"), "2025");
 
     expect(through("Me")).toHaveValue("2025");
     expect(vi.mocked(saveQualifyingYears).mock.calls).toStrictEqual([
-      [me.id, 30, 2025],
+      [me.id, 10, 2025],
       [sam.id, 0, 2025],
     ]);
+
+    answer.resolve(saved({ ...me, qualifiedThrough: 2025 }));
+
     await waitFor(() => {
       expect(
         screen.getAllByRole("dialog", {
@@ -176,11 +193,11 @@ describe("StatePension", () => {
     expect(through("Me")).toHaveValue("");
     expect(saveQualifyingYears).toHaveBeenCalledExactlyOnceWith(
       me.id,
-      30,
+      10,
       null,
     );
 
-    answer.resolve(saved({ ...owners[0], qualifyingYears: 30 }));
+    answer.resolve(saved({ ...owners[0], qualifyingYears: 10 }));
 
     await waitFor(() => {
       expect(through("Me")).toHaveValue("2024");
@@ -226,8 +243,33 @@ describe("StatePension", () => {
     });
     expect(saveQualifyingYears).toHaveBeenCalledExactlyOnceWith(me.id, 9, null);
     await waitFor(() => {
-      expect(years("Me")).toHaveValue("30");
+      expect(years("Me")).toHaveValue("10");
     });
     expect(through("Me")).toHaveValue("2024");
+  });
+
+  // Sam retires with the plan's owner, so none through 2025/26 count on
+  // to 23 through 2048/49 with them retiring at 59, which earn £8,246,
+  // and to four, which earn nothing, with them retiring at 40.
+  it("counts an owner retiring with the plan's owner to the retirement the plan lays out", () => {
+    const partner = {
+      ...sam,
+      qualifiedThrough: 2025,
+      qualifyingYears: 0,
+      retirement: "retirement",
+    } as const;
+    const { rerender } = render(
+      <StatePension owners={[partner]} plan={retiring} />,
+    );
+
+    expect(
+      screen.getByRole("cell", { name: "£8,246 from 2061" }),
+    ).toBeInTheDocument();
+
+    rerender(
+      <StatePension owners={[partner]} plan={retiringAt(retiring, 40)} />,
+    );
+
+    expect(screen.getByRole("cell", { name: "None" })).toBeInTheDocument();
   });
 });

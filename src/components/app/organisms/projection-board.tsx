@@ -544,6 +544,10 @@ function projectionOf({
   plan,
   schedule,
 }: Planned): Projected {
+  // ponytail: a dragged age re-times the lines but leaves each State
+  // Pension counted to the age saved, until the save lands and the
+  // household is read again; recount them here as carriedBy does if the
+  // drag should move them at once.
   const lines = {
     expenses: schedule.expenses.map((line) => timed(line, milestones, plan)),
     income: schedule.income.map((line) => timed(line, milestones, plan)),

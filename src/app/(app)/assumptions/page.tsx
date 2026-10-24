@@ -11,6 +11,7 @@ import { InflationSource } from "@/components/app/organisms/inflation-source";
 import { RateSet } from "@/components/app/organisms/rate-set";
 import { StatePension } from "@/components/app/organisms/state-pension";
 import { TargetAllocation } from "@/components/app/organisms/target-allocation";
+import { laidOut } from "@/engine/projection";
 import { formatPercent } from "@/lib/money";
 import { today } from "@/lib/months";
 import { assumptions, sectionLabel } from "@/lib/nav";
@@ -37,7 +38,9 @@ const setNames: Record<Chosen, string> = {
 // allocation last imported from Portfolio Performance, with the class
 // of the latest CMA each category is mapped onto. The third holds the
 // glide path, the bond share by age it sets. The fourth holds the State
-// Pension, each owner's qualifying years and what they earn. The header says what
+// Pension, each owner's qualifying years and what they earn, counted to
+// the retirement the plan lays out as its own projection has it, as the
+// plan screen lays it out. The header says what
 // the plan grows at and what its prices rise by, made from the rates
 // live, and which set those are, so the screen answers its question
 // before a card is read, whichever tab is open. The tab the address
@@ -51,6 +54,7 @@ export default async function Assumptions({
 }>): Promise<JSX.Element> {
   const [
     {
+      accounts,
       allocation,
       cma,
       curve,
@@ -61,6 +65,7 @@ export default async function Assumptions({
       plan,
       rates,
       rateSet,
+      schedule,
       split,
       targets,
     },
@@ -119,7 +124,12 @@ export default async function Assumptions({
               label: "Glide path",
             },
             {
-              children: <StatePension owners={owners} />,
+              children: (
+                <StatePension
+                  owners={owners}
+                  plan={laidOut(accounts, schedule, plan).plan}
+                />
+              ),
               label: "State pension",
             },
           ]}

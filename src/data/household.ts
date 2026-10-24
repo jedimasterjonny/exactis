@@ -1138,8 +1138,9 @@ function glidedOf(
 // for the first listed owner, each line's tied ends and each move's
 // year read off the milestones they are tied to, each line paying a
 // loan running as the loan's payments do, and each owner whose
-// qualifying years earn a State Pension paid it from their State
-// Pension age, on a line of the household's own after the lines kept.
+// qualifying years, counted to the retirement the plan lays out, earn a
+// State Pension paid it from their State Pension age, on a line of the
+// household's own after the lines kept.
 function householdOf(kept: Kept): Household {
   const live = liveOf(kept);
   const { plan, split, spread } = glidedOf(kept, planOf(kept, live), live);
@@ -1169,7 +1170,7 @@ function householdOf(kept: Kept): Household {
         ...kept.schedule.income.map((line) =>
           timed(line, kept.milestones, plan),
         ),
-        ...kept.owners.flatMap(statePensionLines),
+        ...kept.owners.flatMap((owner) => statePensionLines(owner, plan)),
       ],
     },
     split,
