@@ -647,6 +647,103 @@ describe("MilestoneDialog", () => {
     });
   });
 
+  // Ben, born in October 2016, leaves school at 19, in 2035, and Ada,
+  // born in March 2015, at 18, in 2033; the plan's owner and Sam are
+  // offered no such thing.
+  it("offers a child's milestone the age they leave school at, filled in with a press, and saves it as an age on them", async () => {
+    renderDialog({ plan: raising });
+    const dialog = openDialog();
+
+    expect(
+      within(dialog).queryByRole("button", { name: /^Leaves school/ }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(select("Whose age"), {
+      target: { value: String(sam.id) },
+    });
+
+    expect(
+      within(dialog).queryByRole("button", { name: /^Leaves school/ }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(select("Whose age"), {
+      target: { value: String(ada.id) },
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Leaves school at 18" }),
+    );
+
+    expect(field("Age", dialog)).toHaveValue("18");
+    expect(field("Age", dialog)).toHaveAccessibleDescription("In 2033");
+
+    fireEvent.change(select("Whose age"), {
+      target: { value: String(ben.id) },
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Leaves school at 19" }),
+    );
+
+    expect(field("Age", dialog)).toHaveValue("19");
+    expect(field("Age", dialog)).toHaveAccessibleDescription("In 2035");
+
+    fireEvent.change(field("Name", dialog), {
+      target: { value: "Ben leaves school" },
+    });
+    vi.mocked(saveMilestone).mockResolvedValue(
+      saved({
+        conditions: atAge(19, ben.id),
+        id: 11,
+        name: "Ben leaves school",
+      }),
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(
+      null,
+      { conditions: atAge(19, ben.id), name: "Ben leaves school" },
+      null,
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Milestone added" }),
+      ).toHaveAccessibleDescription("Ben leaves school · 2035");
+    });
+  });
+
+  // The plan runs from 2026 to 2079. Dot, born in March 2008, leaves in
+  // 2026 and Fay, born in October 2060, in 2079, each within it; Eli,
+  // born in March 2007, left in 2025, and Gus, born in October 2061,
+  // leaves in 2080, past it. The milestone is moved to 2061 first, so
+  // all four are offered.
+  it("offers leaving school only where the child leaves within the plan's years", () => {
+    renderDialog({
+      plan: {
+        ...retiring,
+        children: [
+          { born: { month: 2, year: 2008 }, id: 30, name: "Dot" },
+          { born: { month: 2, year: 2007 }, id: 31, name: "Eli" },
+          { born: { month: 9, year: 2060 }, id: 32, name: "Fay" },
+          { born: { month: 9, year: 2061 }, id: 33, name: "Gus" },
+        ],
+      },
+    });
+    const dialog = openDialog();
+    const offers = (id: number): null | string => {
+      fireEvent.change(select("Whose age"), { target: { value: String(id) } });
+      return (
+        within(dialog).queryByRole("button", { name: /^Leaves school/ })
+          ?.textContent ?? null
+      );
+    };
+
+    commit(field("Age", dialog), "71");
+
+    expect(offers(30)).toBe("Leaves school at 18");
+    expect(offers(31)).toBeNull();
+    expect(offers(32)).toBe("Leaves school at 19");
+    expect(offers(33)).toBeNull();
+  });
+
   // Retirement is the plan's owner's own, whoever else the plan carries.
   it("offers retirement no choice of whose age it is", () => {
     renderDialog({ milestone: { retirement: atAge(59) }, plan: raising });

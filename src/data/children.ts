@@ -16,3 +16,11 @@ export interface ChildValues {
   readonly born: Month;
   readonly name: string;
 }
+
+// The age a child finishes Year 13 at in England, by the year born: 19
+// for one born from September to December, and 18 for one born from
+// January to August. What the milestone dialog fills in for a child
+// leaving school, under Lines and milestones.
+export function schoolLeavingAge(born: Month): number {
+  return born.month >= 8 ? 19 : 18;
+}
