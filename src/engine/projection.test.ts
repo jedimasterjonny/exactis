@@ -13,8 +13,10 @@ import { incomeLines } from "@/data/income.fixture";
 import { atAge, retiringAt, timed } from "@/data/milestones";
 import { sam, working } from "@/data/owners.fixture";
 import { endYear } from "@/data/plan";
+import { statePensionLines } from "@/data/state-pension";
 import { drawFor, drawOf, lumpSumAllowance } from "@/lib/tax";
 
+import type { Schedule } from "./cash-flow";
 import type { ProjectionPoint, Run } from "./projection";
 
 import { cashFlow } from "./cash-flow";
@@ -2470,6 +2472,82 @@ describe("retiring when conditions hold", () => {
       plan: fixed,
       schedule: lines,
     });
+  });
+
+  // At 35 the owner retires in 2027, having worked 2026/27 alone past
+  // the twelve years through 2025/26, so thirteen earn £4,661 a year;
+  // read with the plan retiring past its end they counted on to
+  // 2036/37, 23 years. Eight years laid out as nine earn nothing, and go.
+  it("lays each State Pension out counted to the retirement the run reaches, or drops one counted below ten years", () => {
+    const pensioned = (years: number): Run => {
+      const dated = {
+        ...onConditions.owners[0],
+        qualifiedThrough: 2025,
+        qualifyingYears: years,
+      };
+      const held = { ...onConditions, owners: [dated] };
+      return {
+        accounts: [saving],
+        plan: held,
+        schedule: {
+          ...lines,
+          income: [...lines.income, ...statePensionLines(dated, held)],
+        },
+      };
+    };
+    const laid = (run: Run): Run["schedule"]["income"] =>
+      laidOut(run.accounts, run.schedule, run.plan).schedule.income;
+
+    expect(pensioned(12).schedule.income.at(-1)).toMatchObject({
+      amount: 8246,
+    });
+    expect(laid(pensioned(12))).toHaveLength(2);
+    expect(laid(pensioned(12)).at(-1)).toMatchObject({
+      amount: 4661,
+      kind: "state-pension",
+    });
+    expect(laid(pensioned(8))).toHaveLength(1);
+  });
+
+  // Born in 1961, the owner reaches their State Pension age of 67 in
+  // 2028, inside the plan, and the run retires them at 66 in 2027, so
+  // from 2028 it pays the thirteen years that retirement earns, £4,661,
+  // rather than the fourteen, £5,019, counted to the pension age before it
+  // was placed: what the plan retiring at 66 pays, and not what it would
+  // pay on the line as read.
+  it("pays a State Pension on the years counted to the retirement the run reaches", () => {
+    const dated = {
+      ...onConditions.owners[0],
+      born: 1961,
+      qualifiedThrough: 2025,
+      qualifyingYears: 12,
+    };
+    const held = { ...onConditions, born: 1961, owners: [dated], retires: 76 };
+    const read = statePensionLines(dated, held);
+    const fixed = retiringAt(held, 66);
+    const counted = statePensionLines(
+      { ...dated, retirement: atAge(66) },
+      fixed,
+    );
+    const laid = (pensions: readonly IncomeLine[]): Schedule => ({
+      expenses: lines.expenses.map((line) => timed(line, [], fixed)),
+      income: [
+        ...lines.income.map((line) => timed(line, [], fixed)),
+        ...pensions,
+      ],
+    });
+    const run = {
+      accounts: [saving],
+      plan: held,
+      schedule: { ...lines, income: [...lines.income, ...read] },
+    };
+    const points = project([saving], run.schedule, held);
+
+    expect(retirementIn(points, run)).toBe(2027);
+    expect(read).toMatchObject([{ amount: 5019, firstYear: 2028 }]);
+    expect(counted).toMatchObject([{ amount: 4661, firstYear: 2028 }]);
+    expect(points).toStrictEqual(project([saving], laid(counted), fixed));
+    expect(points).not.toStrictEqual(project([saving], laid(read), fixed));
   });
 
   it("reads the year a plan retiring at an age lays out", () => {

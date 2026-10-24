@@ -1,6 +1,8 @@
 import type { IncomeLine } from "@/data/income";
 import type { Owner } from "@/data/owners";
+import type { Plan } from "@/data/plan";
 
+import { retirementYearOf } from "@/data/milestones";
 import { yearAt } from "@/data/plan";
 
 // The full new State Pension for 2026/27, £241.30 a week, as a year of
@@ -15,6 +17,29 @@ const fullStatePension = 12_548;
 // earn any.
 const fullYears = 35;
 const fewestYears = 10;
+
+// The qualifying years an owner is paid the State Pension on: those
+// typed, none where none are, taken as they stand; or, where they are
+// dated by the tax year they run through, one more for each tax year
+// after it that opens before the year the owner retires in, as the plan
+// given lays it out, and before the year they reach their State Pension
+// age.
+export function qualifyingYearsOf(owner: Owner, plan: Plan): number {
+  const years = owner.qualifyingYears ?? 0;
+  if (owner.qualifiedThrough === undefined) {
+    return years;
+  }
+  // ponytail: every tax year before retirement counts as a qualifying
+  // one, so a year at home, part-time below the Lower Earnings Limit or
+  // credited for Child Benefit or caring is not told apart from a year
+  // worked; holding which years an owner works, and above what, is the
+  // upgrade.
+  const stops = Math.min(
+    retirementYearOf(owner, plan),
+    statePensionFrom(owner),
+  );
+  return years + Math.max(0, stops - 1 - owner.qualifiedThrough);
+}
 
 // The State Pension age of an owner born in the year given, whatever
 // their sex, since the ages were equalised in 2018: 66 for one born in
@@ -39,18 +64,20 @@ export function statePensionFrom(owner: Pick<Owner, "born">): number {
 }
 
 // The line paying an owner the State Pension their qualifying years
-// earn, a year at a time from the year they reach their State Pension
-// age to the end of the plan, rising with inflation; or none for an
-// owner whose years earn nothing, none typed among them. It is the
-// household's own rather than a line kept, made whenever the household
-// is read, so it moves with the owner's year of birth and their years.
+// earn, counted as the plan given lays their retirement out, a year at
+// a time from the year they reach their State Pension age to the end of
+// the plan, rising with inflation; or none for an owner whose years earn
+// nothing, none typed among them. It is the household's own rather than
+// a line kept, made whenever the household is read and again wherever
+// a run places a retirement on conditions, so it moves with the owner's
+// year of birth, their years and their retirement.
 // Its id is the owner's, which no line holds, since the kept household
 // refuses an id held by more than one record, as the line paying a
 // move's mortgage is given its loan's. It is no salary, so it feeds no
 // pension and pays no National Insurance, and it is tied to no
 // milestone, since the law says when it starts.
-export function statePensionLines(owner: Owner): IncomeLine[] {
-  const amount = statePensionOn(owner.qualifyingYears ?? 0);
+export function statePensionLines(owner: Owner, plan: Plan): IncomeLine[] {
+  const amount = statePensionOn(qualifyingYearsOf(owner, plan));
   return amount === 0
     ? []
     : [

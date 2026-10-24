@@ -1574,6 +1574,31 @@ describe("soundKept", () => {
     ).toStrictEqual([...incomeLines, statePension]);
   });
 
+  // The partner retires with the plan's owner, in 2053, so two years
+  // through 2025/26 count on through 2052/53 to 29, which earn £10,397 a
+  // year.
+  it("pays a State Pension on years counted forward to the retirement the plan lays out", () => {
+    const partner = {
+      ...sam,
+      id: 20,
+      qualifiedThrough: 2025,
+      qualifyingYears: 2,
+      retirement: "retirement",
+    } as const;
+    const { household: read } = soundKept({
+      ...kept,
+      next: 21,
+      owners: [...owners, partner],
+    });
+
+    expect(read.schedule.income.at(-1)).toMatchObject({
+      amount: 10397,
+      firstYear: 2063,
+      id: 20,
+      kind: "state-pension",
+    });
+  });
+
   // The line the household makes, kept, would be paid beside the one it
   // makes again on the owner's years.
   it("refuses an income line kept as the State Pension, in its words", () => {

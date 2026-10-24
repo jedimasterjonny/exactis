@@ -120,8 +120,31 @@ An owner's years may be dated by the tax year they run through, held as the year
 it opens in, and the two are written together as one record, since each is right
 only with the other. A tax year is held only beside the years, and one that has
 not ended is refused where it is typed, since its year is not yet earned; a tax
-year cleared goes. The years are still taken as they stand rather than counted
-forward from it to the years the plan has an owner work, which is deferred.
+year cleared goes. Years with no tax year are taken as they stand. Dated years
+are counted forward from it: each tax year after it that opens before the year
+the owner retires in adds one, since the year before retirement is the last one
+worked, and none opening in or after the year they reach their State Pension age
+does, since no year is earned past that age. A record of thirteen years through
+2025/26 for an owner retiring in 2053 is counted on through 2052/53 to 40, which
+earns the full amount, as 35 does. Every year before retirement is taken to be
+worked and to qualify: a year at home, a part-time year below the Lower Earnings
+Limit and a year credited for Child Benefit or caring are not told apart, and
+none is checked against what the owner earns.
+
+The retirement counted to is the one the plan lays out. For an owner retiring at
+an age, or with a plan's owner who does, the household knows it when it is read,
+and the line is made then. For a retirement on conditions the plan read lays the
+retirement in the year after it ends, so the line made on the read counts to the
+earlier of that year and the year the owner reaches their State Pension age, and
+a run counts again once it retires them, as it reads every line tied to
+retirement again, so the plan at its own rates and each future pay the State
+Pension their own retirement earns, and a count that falls below ten years drops
+the line. The run that finds the year pays the State Pension as well, and
+nothing is run twice to settle it: the count stops at the State Pension age and
+the pension is paid only from it, so a retirement placed before that age is
+placed before any of it is paid, and one placed after leaves the count where it
+was. What the State Pension pays can therefore never move the year it is counted
+to.
 
 ## Salaries and what they feed
 
