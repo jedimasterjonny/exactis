@@ -228,6 +228,33 @@ describe("Assumptions", () => {
     ).toBeInTheDocument();
   });
 
+  // The owner retires once the liquid net worth is anything at all, which
+  // a household holding nothing reaches as the plan opens in 2026, so the
+  // fifteen years through 2025/26 count on by none and earn £5,378 a
+  // year, where counted to the State Pension age, as the plan read
+  // leaves them, they would earn the full amount.
+  it("hands the State Pension the plan laid out as its own projection retires its owner", async () => {
+    vi.mocked(getHousehold).mockResolvedValue(
+      soundKept({
+        ...blank,
+        owners: [
+          {
+            ...owners[0],
+            qualifiedThrough: 2025,
+            qualifyingYears: 15,
+            retirement: [{ measure: "liquid", of: "pounds", times: 0 }],
+          },
+        ],
+      }).household,
+    );
+
+    render(await page({ tab: "state-pension" }));
+
+    expect(
+      screen.getByRole("cell", { name: "£5,378 from 2058" }),
+    ).toBeInTheDocument();
+  });
+
   it("hands the rates typed the split typed while there is no glide path", async () => {
     render(await page());
 

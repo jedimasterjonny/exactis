@@ -9,6 +9,7 @@ import { isAsset, isPension } from "@/data/accounts";
 import { isReached, retiresOn, retiringAt, timed } from "@/data/milestones";
 import {
   ageIn,
+  earnerOf,
   endYear,
   holderOf,
   pricesIn,
@@ -18,6 +19,7 @@ import {
   risenBy,
 } from "@/data/plan";
 import { rules } from "@/data/rules";
+import { statePensionLines } from "@/data/state-pension";
 import { cashFlow, spentIn } from "@/engine/cash-flow";
 import { clearsIn, paymentOf } from "@/lib/loans";
 import { isOnOrBefore, monthAfter } from "@/lib/months";
@@ -251,10 +253,15 @@ export function balanceIn(
 // A run as it is carried once the plan's owner has retired in the year
 // given, or before they have, for none: the plan retiring them at the
 // age they reach in it, and every line tied to retirement read off it,
-// starting there or ending the year before; and before then the lines
-// read off the plan as given, which lays a retirement on conditions
-// past its end, so a line starting at it has not started and one ending
-// at it runs on. A plan retiring at an age is carried as it is given.
+// starting there or ending the year before, and each State Pension
+// counted to the retirement it lays out, or dropped where its years
+// then earn nothing; and before then the lines read off the plan as
+// given, which lays a retirement on conditions past its end, so a line
+// starting at it has not started and one ending at it runs on, and a
+// State Pension is counted to the year after the plan ends or to its
+// owner's State Pension age, whichever comes first. A plan retiring at
+// an age is carried as it is given. The State Pension is under The
+// State Pension in README.md beside this file.
 export function carriedBy(run: Run, year: null | number): Run {
   if (retiresOn(run.plan) === undefined) {
     return run;
@@ -266,7 +273,11 @@ export function carriedBy(run: Run, year: null | number): Run {
     plan,
     schedule: {
       expenses: run.schedule.expenses.map((line) => timed(line, [], plan)),
-      income: run.schedule.income.map((line) => timed(line, [], plan)),
+      income: run.schedule.income.flatMap((line) =>
+        line.kind === "state-pension"
+          ? statePensionLines(earnerOf(line, plan), plan)
+          : [timed(line, [], plan)],
+      ),
     },
   };
 }
@@ -507,7 +518,8 @@ export function movedYears(
 // a time, from the month the plan starts in; the last year is not
 // carried. Each year opens by moving any house moving in it and, for an
 // owner retiring on conditions, retiring them if its opening holds
-// them. Each month then, in April, settles the tax year before it and
+// them, each State Pension counted again to that retirement. Each month
+// then, in April, settles the tax year before it and
 // opens the allowances afresh; reads its cash flow over the run as
 // carried, handed what the cash, the GIAs and the ISAs hold, the owners
 // who have drawn on a pension and what the tax year has used; draws what
@@ -518,9 +530,9 @@ export function movedYears(
 // landed under each allowance since April and each owner's tax year. A
 // point is the balances entering its year, with what the year went
 // short and drew early, in today's money. The rules, and why, are under
-// The tax on the month, Debts, The allowances and relief, The run,
-// Moves, Retirement on conditions, The draw, Today's money and What is
-// refused, and where in README.md beside this file.
+// The State Pension, The tax on the month, Debts, The allowances and
+// relief, The run, Moves, Retirement on conditions, The draw, Today's
+// money and What is refused, and where in README.md beside this file.
 export function project(
   accounts: readonly Account[],
   schedule: Schedule,
