@@ -22,6 +22,7 @@ import {
 import { Toaster } from "@/components/kit/toast";
 import { accounts } from "@/data/accounts.fixture";
 import { golfPcp as finance, golf } from "@/data/cars.fixture";
+import { children } from "@/data/children.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { moveChoices } from "@/data/houses";
 import { house, houseLoan as loan } from "@/data/houses.fixture";
@@ -40,6 +41,10 @@ vi.mock("@/actions/accounts", () => ({
   saveAccount: vi.fn(),
   saveCar: vi.fn(),
   saveHouse: vi.fn(),
+}));
+vi.mock("@/actions/children", () => ({
+  removeChild: vi.fn(),
+  saveChild: vi.fn(),
 }));
 vi.mock("@/actions/owners", () => ({
   removeOwner: vi.fn(),
@@ -80,6 +85,7 @@ function renderLedger(
     <AccountLedger
       accounts={accounts}
       expenses={[]}
+      kids={children}
       lines={[]}
       milestones={moveChoices(markersOf(milestones, retiring), retiring, [])}
       owners={owners}
@@ -116,8 +122,9 @@ describe("AccountLedger", () => {
   // at in its caption. The fixture's mortgage is secured on nothing, so
   // it is listed with the other debts rather than with the savings, and
   // the month's money is drawn down the savings in the order they are
-  // paid in a section of its own beneath, then the owners.
-  it("lays everything owned and owed out as one balance sheet, with the money's flow and the owners beneath", () => {
+  // paid in a section of its own beneath, then the owners, then the
+  // children.
+  it("lays everything owned and owed out as one balance sheet, with the money's flow, the owners and the children beneath", () => {
     renderLedger();
 
     expect(within(sheet()).getByText("Sect. III.i")).toHaveClass("label");
@@ -157,6 +164,27 @@ describe("AccountLedger", () => {
         "Sect. III.iii",
       ),
     ).toHaveClass("label");
+    expect(
+      within(screen.getByRole("region", { name: "Children" })).getByText(
+        "Sect. III.iv",
+      ),
+    ).toHaveClass("label");
+  });
+
+  // The plan starts in September 2026, so a new child opens as born then.
+  it("lists the children handed to it, a new one opening as born in the month the plan starts in", () => {
+    renderLedger();
+
+    expect(
+      within(screen.getByRole("region", { name: "Children" })).getAllByRole(
+        "row",
+      ),
+    ).toHaveLength(3);
+    expect(
+      within(openEntry("Add child")).getByRole("combobox", {
+        name: "Month born",
+      }),
+    ).toHaveValue("8");
   });
 
   // No savings is no money to draw down them, so the owners take the
@@ -171,6 +199,11 @@ describe("AccountLedger", () => {
     expect(
       within(screen.getByRole("region", { name: "Owners" })).getByText(
         "Sect. III.ii",
+      ),
+    ).toHaveClass("label");
+    expect(
+      within(screen.getByRole("region", { name: "Children" })).getByText(
+        "Sect. III.iii",
       ),
     ).toHaveClass("label");
   });

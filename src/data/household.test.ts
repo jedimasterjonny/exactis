@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account, Move } from "@/data/accounts";
+import type { Child } from "@/data/children";
 import type {
   Cma,
   Deductions,
@@ -27,6 +28,7 @@ import { toAccount, toValues } from "@/data/accounts";
 import { accounts } from "@/data/accounts.fixture";
 import { toRecords as toCarRecords } from "@/data/cars";
 import { golfValues } from "@/data/cars.fixture";
+import { children } from "@/data/children.fixture";
 import { derivedSet, spreadOf } from "@/data/cma";
 import { cma, mappings } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
@@ -73,6 +75,7 @@ type Case = readonly [string, Break];
 interface Inputs {
   readonly accounts: readonly Account[];
   readonly allocation: Allocation;
+  readonly children: readonly Child[];
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
@@ -105,6 +108,7 @@ type Thrown = readonly [string, string, Break];
 const sound: Inputs = {
   accounts,
   allocation,
+  children: [],
   cma: { latest: cma, previous: null },
   curve,
   deductions: { dividends: 0.02, fees: 0.002 },
@@ -914,6 +918,7 @@ describe("soundKept", () => {
       household: {
         accounts: [],
         allocation: { stocks: 1 },
+        children: [],
         cma: null,
         curve: null,
         deductions: { dividends: 0.02, fees: 0.002 },
@@ -1385,6 +1390,31 @@ describe("soundKept", () => {
         milestones: [...kept.milestones, { ...milestones[0], id: 20 }],
       }),
     ).toThrow("A record's id is below the one the next record is given");
+  });
+
+  // A household kept before there were children lists none, which reads
+  // as none, and keeps none once the last child added is deleted. A
+  // child is a record like any other, given the next id.
+  it("keeps the children as added, or none, each under an id no other record holds below the next", () => {
+    const raising: Kept = { ...kept, children, next: 23 };
+
+    expect(soundKept(raising)).toMatchObject({
+      household: { children },
+      kept: raising,
+    });
+    expect(soundKept(kept).household.children).toStrictEqual([]);
+    expect(
+      soundKept({ ...kept, children: [] }).household.children,
+    ).toStrictEqual([]);
+    expect(() => soundKept({ ...raising, next: 22 })).toThrow(
+      /^A record's id is below the one the next record is given$/,
+    );
+    expect(() =>
+      soundKept({
+        ...raising,
+        children: [...children, { ...children[0], id: 7 }],
+      }),
+    ).toThrow(/^A record's id is held by no other record$/);
   });
 
   // A line the household lays for a record takes that record's id, so

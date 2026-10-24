@@ -64,6 +64,12 @@ describe("shapes", () => {
     expect(upcast({ ...first, shape: 2 })).toStrictEqual(first);
   });
 
+  // The second shape lists no children, so the third reads it as it is;
+  // the step is there so that a build of the second refuses the third.
+  it("carries a household kept in the second shape to the third as it is", () => {
+    expect(upcast({ ...kept, shape: 2 })).toStrictEqual(kept);
+  });
+
   // A step carries what it finds and leaves what it does not: an entry
   // that is no account, and a household with no list of accounts, are
   // left for the household's own rules to refuse.

@@ -1,6 +1,7 @@
 import * as z from "zod";
 
 import type { Account, Move } from "@/data/accounts";
+import type { Child } from "@/data/children";
 import type {
   Asset,
   Cma,
@@ -55,6 +56,7 @@ import { rules } from "@/data/rules";
 import {
   bonusValues,
   categoryValues,
+  childValues,
   lineValues,
   milestoneValues,
   month,
@@ -74,7 +76,8 @@ import { monthsBetween } from "@/lib/months";
 import { isWithinAllowance } from "@/lib/tax";
 
 // Everything the projection runs on, the owners the wrappers name, the
-// milestones the plan is laid out by and read against, the progress
+// children, none for a household kept listing none, the milestones the
+// plan is laid out by and read against, the progress
 // points the
 // balances were read at month by month, the house price index last
 // pulled from the Land Registry to write the house into them, or none
@@ -94,6 +97,7 @@ import { isWithinAllowance } from "@/lib/tax";
 export interface Household {
   readonly accounts: readonly Account[];
   readonly allocation: Allocation;
+  readonly children: readonly Child[];
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
@@ -116,8 +120,9 @@ export interface Household {
   readonly targets: null | Targets;
 }
 
-// The household as the store keeps it: the records, the month their
-// balances are as of, one for the whole household since they are
+// The household as the store keeps it: the records, the children absent
+// rather than none until one is added, the month their balances are as
+// of, one for the whole household since they are
 // recorded together, the progress points and when the house price
 // index was last written into them, the age the plan runs to rather
 // than the plan it makes with the first listed owner's years, the
@@ -138,6 +143,7 @@ export interface Kept {
   readonly ages: Pick<PlanAges, "ends">;
   readonly allocation: Allocation;
   readonly asOf: Month;
+  readonly children?: readonly Child[];
   readonly cma: null | Vintages;
   readonly curve: Curve | null;
   readonly deductions: Deductions;
@@ -349,6 +355,13 @@ export const incomeLine = z
       (line.sacrifice === 0 && line.match === 0 && (line.floor ?? 0) === 0),
     "A salary gives up a share, and is matched or paid one, only into a pension it feeds",
   ) satisfies z.ZodType<IncomeLine>;
+
+// A child as the model lays it: what the actions take, and the id they
+// are listed by.
+export const child = z.object({
+  ...childValues,
+  id: recordId,
+}) satisfies z.ZodType<Child>;
 
 // A milestone as the model lays it: what the actions take, and the id
 // it is listed by.
@@ -689,6 +702,7 @@ export const household = z
   .object({
     accounts: z.array(account),
     allocation,
+    children: z.array(child),
     cma: vintages.nullable(),
     curve: curve.nullable(),
     deductions,
@@ -878,9 +892,9 @@ const idsBelow = 1_000_000;
 // own, the end age the plan action holds it to, the first listed owner
 // retiring no later than it, since the plan is theirs and the chart can
 // mark a retirement only within it, every record's id below the one the
-// next is given and held by no other record, owner, account, milestone
-// or line, since a line the household lays for a record takes that
-// record's id, as the line paying a move's mortgage takes its loan's,
+// next is given and held by no other record, owner, child, account,
+// milestone or line, since a line the household lays for a record
+// takes that record's id, as the line paying a move's mortgage takes its loan's,
 // and no income line the State Pension, which the household pays on
 // the owners' qualifying years rather than keeps, so one typed would be
 // paid twice. Every save writes the household as read here, stamped
@@ -902,6 +916,7 @@ const kept = z
       ),
     allocation,
     asOf: month,
+    children: z.array(child).exactOptional(),
     cma: vintages.nullable(),
     curve: curve.nullable(),
     deductions,
@@ -1139,7 +1154,8 @@ function glidedOf(
 // loan running as the loan's payments do, and each owner whose
 // qualifying years, counted to the retirement the plan lays out, earn a
 // State Pension paid it from their State Pension age, on a line of the
-// household's own after the lines kept.
+// household's own after the lines kept, and the children kept, or none
+// where none are.
 function householdOf(kept: Kept): Household {
   const live = liveOf(kept);
   const { plan, split, spread } = glidedOf(kept, planOf(kept, live), live);
@@ -1148,6 +1164,7 @@ function householdOf(kept: Kept): Household {
       moving(account, kept.milestones, plan),
     ),
     allocation: kept.allocation,
+    children: kept.children ?? [],
     cma: kept.cma,
     curve: kept.curve,
     deductions: kept.deductions,
@@ -1318,17 +1335,20 @@ function paidOver(
 }
 
 // Every record a kept household lists by an id the store hands out:
-// its accounts, milestones, owners and lines.
+// its accounts, children, milestones, owners and lines.
 function recordsIn({
   accounts,
+  children = [],
   milestones,
   owners,
   schedule,
-}: Pick<Kept, "accounts" | "milestones" | "owners" | "schedule">): readonly {
-  readonly id: number;
-}[] {
+}: Pick<
+  Kept,
+  "accounts" | "children" | "milestones" | "owners" | "schedule"
+>): readonly { readonly id: number }[] {
   return [
     ...accounts,
+    ...children,
     ...milestones,
     ...owners,
     ...schedule.expenses,
