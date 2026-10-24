@@ -6,7 +6,9 @@ import type { Child, ChildValues } from "@/data/children";
 import type { Answer } from "@/lib/answer";
 
 import { child as heldChild } from "@/data/household";
+import { isMeasuredOn } from "@/data/milestones";
 import { childValues, recordId, target } from "@/data/schemas";
+import { Refusal } from "@/lib/answer";
 import { found, holdUnchanged, removed, written } from "@/lib/records";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
@@ -21,14 +23,20 @@ const values = z.object(childValues) satisfies z.ZodType<ChildValues>;
 // held now compare key for key.
 const opening = heldChild.nullable();
 
-// Deletes the child with that id. Checked as a save is.
+// Deletes the child with that id, unless a milestone is reached at
+// their age, which the household refuses to leave measured on nobody,
+// so it is measured on someone else or deleted first, and the refusal
+// says so in words that say what to do. Checked as a save is.
 export async function removeChild(id: number): Promise<Answer<undefined>> {
   await requireSession();
   const at = recordId.parse(id);
-  return amend(({ kept }) => ({
-    kept: { ...kept, children: removed(kept.children ?? [], at, "child") },
-    result: undefined,
-  }));
+  return amend(({ kept }) => {
+    const children = removed(kept.children ?? [], at, "child");
+    if (kept.milestones.some((milestone) => isMeasuredOn(milestone, at))) {
+      throw new Refusal("A child a milestone is measured on stays");
+    }
+    return { kept: { ...kept, children }, result: undefined };
+  });
 }
 
 // Writes a child: a new one when the id is null, given the household's

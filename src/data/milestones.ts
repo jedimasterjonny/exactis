@@ -10,11 +10,14 @@ import { formatGbp } from "@/lib/money";
 // One condition of a milestone: a measure of a year of the plan is at
 // least so many times a basis, which is a pound or a year, so the
 // multiple is a sum or an age, or another measure, so twenty-five years
-// of expenses is twenty-five times a year's expenses.
+// of expenses is twenty-five times a year's expenses. An age is
+// someone's: the plan's owner's where it names nobody, or that of the
+// owner or the child whose id it names.
 export interface Condition {
   readonly measure: Measure;
   readonly of: Basis;
   readonly times: number;
+  readonly whose?: number;
 }
 
 // A milestone as the plan lays it out: one the household lists that is
@@ -47,7 +50,8 @@ export type Measured = Readonly<Record<Measure, number>>;
 // home, a move, the last of a mortgage, the first million. It is
 // reached in whichever year its conditions first all hold. One reached
 // at an age, whose one condition is on the age, falls in a year the
-// plan can say, born plus the age, and it is the first year of
+// plan can say, the year whoever's age it is was born plus the age,
+// under Lines and milestones, and it is the first year of
 // whatever it marks, so a line tied to start at it starts in its year
 // and a line tied to end at it runs to the year before, and two lines
 // tied to it, one each way, hand over there with no year left unpaid
@@ -119,9 +123,30 @@ export function ageOf({
 }
 
 // The conditions of a milestone reached at an age: the one, on the
-// age.
-export function atAge(age: number): readonly Condition[] {
-  return [{ measure: "age", of: "years", times: age }];
+// age, the plan's owner's, or that of whoever the id given names.
+export function atAge(age: number, whose?: number): readonly Condition[] {
+  return [
+    {
+      measure: "age",
+      of: "years",
+      times: age,
+      ...(whose !== undefined && { whose }),
+    },
+  ];
+}
+
+// The year someone the plan carries was born, by the id a condition
+// names them by: the plan's owner's for none, an owner's, or a child's,
+// whose month is not read. None for an id the plan carries nobody
+// under.
+export function bornIn(
+  plan: Pick<Plan, "born" | "children" | "owners">,
+  whose: number | undefined,
+): number | undefined {
+  return whose === undefined
+    ? plan.born
+    : (plan.owners.find(({ id }) => id === whose)?.born ??
+        plan.children?.find(({ id }) => id === whose)?.born.year);
 }
 
 // A condition in words, "Net worth ≥ £1,000,000", "Liquid net worth ≥
@@ -133,6 +158,14 @@ export function conditionOf({ measure, of, times }: Condition): string {
       ? formatGbp(times)
       : `${multiple.format(times)} ${basisNames[of]}`;
   return `${measureNames[measure]} ≥ ${held}`;
+}
+
+// Whether the milestone is reached at the age of whoever the id names.
+export function isMeasuredOn(
+  { conditions }: Pick<MilestoneValues, "conditions">,
+  whose: number,
+): boolean {
+  return conditions.some((condition) => condition.whose === whose);
 }
 
 // Whether a milestone is reached in a year measured so: every condition
@@ -156,9 +189,9 @@ export function isTiedTo(line: LineValues, tie: Tie): boolean {
 
 // The milestones the plan is laid out by, in the order their years come
 // in: retirement, in the year the plan's owner retires in, and those the
-// household lists that are reached at an age, each in the year the age
-// is reached. One reached when conditions hold falls in no year the
-// plan can say, so it is not among them, and nor is retirement reached
+// household lists that are reached at an age, each in the year
+// whoever's age it is reaches it. One reached when conditions hold falls
+// in no year the plan can say, so it is not among them, and nor is retirement reached
 // so. Two in the one year keep the order they are given in, retirement
 // first.
 export function markersOf(
@@ -309,21 +342,24 @@ export function untied<TLine extends LineValues>(
   };
 }
 
+// The year a milestone reached at an age falls in, the year whoever's
+// age it is reaches the age, or none for one reached when conditions
+// hold, or one measured on someone the plan does not carry, for the
+// household to refuse.
+export function yearOf(
+  milestone: Pick<MilestoneValues, "conditions">,
+  plan: Pick<Plan, "born" | "children" | "owners">,
+): number | undefined {
+  const age = ageOf(milestone);
+  const born = bornIn(plan, milestone.conditions[0]?.whose);
+  return age === undefined || born === undefined ? undefined : born + age;
+}
+
 // The years the milestones fall in, each once, in the order they come,
 // for the rules every bar on the plan's span draws across its track: two
 // milestones in the one year rule it once.
 export function yearsOf(markers: readonly Marker[]): number[] {
   return [...new Set(markers.map(({ year }) => year))];
-}
-
-// The year a milestone reached at an age falls in, the year the plan's
-// owner reaches the age, or none for one reached when conditions hold.
-function yearOf(
-  milestone: Pick<MilestoneValues, "conditions">,
-  plan: Plan,
-): number | undefined {
-  const age = ageOf(milestone);
-  return age === undefined ? undefined : yearAt(age, plan);
 }
 
 // The year a tie falls in: retirement's, or the listed milestone's, or

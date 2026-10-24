@@ -645,7 +645,8 @@ const glide = z
 // years forward, the plan rate no lower than losing everything, in each
 // year of a glide path as for life, prices
 // falling by less than everything, the owners it carries for the
-// engine, one at least, and the ages the plan action holds,
+// engine, one at least, the children it carries for the milestones, and
+// the ages the plan action holds,
 // its owner retiring no later than it ends, where they retire at an age
 // rather than past its end on conditions, and it ending by the oldest
 // age a plan may run to. That it ends after
@@ -656,6 +657,7 @@ const plan = z
   .object({
     born: z.number().int(),
     byYear: z.array(z.number().min(-1, rules.beyondLoss)).exactOptional(),
+    children: z.array(child).exactOptional(),
     drawdown: z.enum(drawdowns).exactOptional(),
     from: z.number().int(),
     inflation: z.number().gt(-1, rules.inflation),
@@ -685,9 +687,10 @@ const plan = z
 // line or a move the milestone it is tied to, which is reached at an
 // age, since one reached when conditions hold falls in a year that
 // depends on the lines, in the engine's words where the engine refuses
-// the same link. A move borrows on a loan already secured on the house,
-// which carries the mortgage on through it, since it is the loan the
-// screens draw.
+// the same link, and a milestone reached at someone's age the owner or
+// the child it names. A move borrows on a loan already secured on the
+// house, which carries the mortgage on through it, since it is the loan
+// the screens draw.
 // An asset has
 // one loan and a debt one line paying it, since the house and car
 // dialogs read the one they find. And a debt paying its own fixed sum,
@@ -838,6 +841,17 @@ export const household = z
           ),
       ),
     "A move is at a milestone the household lists, reached at an age",
+  )
+  .refine(
+    ({ children, milestones, owners }) =>
+      new Set(
+        milestones.flatMap(({ conditions }) =>
+          conditions.map(({ whose }) => whose),
+        ),
+      ).isSubsetOf(
+        new Set([undefined, ...[...owners, ...children].map(({ id }) => id)]),
+      ),
+    "A milestone is measured on someone the household lists",
   )
   .refine(
     ({ accounts }) =>

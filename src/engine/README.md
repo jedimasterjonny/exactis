@@ -14,12 +14,14 @@ run wherever they are read.
 
 A household has one or more owners, each taxed as a person; one is the plan's
 owner, whose age the plan runs to and whose retirement is the milestone
-Retirement. The wrappers are the ISAs and the pensions, and the savings are
-those with the cash and the GIAs. A run reads a point a year, the balances
-entering it. A month can also be read on its own, without the run around it, and
-where it then knows less than the run, the section says what it assumes. The
-futures the chance of success reads, in `futures.ts`, carry the run along paths
-of the markets and are specified beside that code, not here.
+Retirement. It may list children as well, who hold nothing and earn nothing, and
+at whose ages a milestone may be reached. The wrappers are the ISAs and the
+pensions, and the savings are those with the cash and the GIAs. A run reads a
+point a year, the balances entering it. A month can also be read on its own,
+without the run around it, and where it then knows less than the run, the
+section says what it assumes. The futures the chance of success reads, in
+`futures.ts`, carry the run along paths of the markets and are specified beside
+that code, not here.
 
 ## The month
 
@@ -86,6 +88,20 @@ line says; two lines tied to it, one each way, hand over there with no year left
 unpaid or paid twice. Retirement is a milestone of its own, the year the plan's
 owner, the first the household lists, retires in, so a line tied to it moves
 with the retirement age.
+
+A milestone reached at an age is reached at someone's: the plan's owner's, as
+one naming nobody is, so a milestone kept before an age could name anyone keeps
+its year; another owner's; or a child's. It falls in the year that person was
+born plus the age, read off the year born as every age the plan reads is, so a
+child's month of birth is not read and the whole of the year counts as reaching
+it. A milestone for a child measured on the plan's owner's age instead falls in
+the same year only by arithmetic, and moves if the plan passes to another owner.
+Whatever reads the milestone's year reads that person's: a line tied to it, a
+move made at it, the plan screen's list and the chance of success, which places
+it in the same year of every future. An owner or a child a milestone is measured
+on is not deleted, since the milestone would then fall in no year; it is
+measured on someone else, or deleted, first. A retirement is reached at its
+owner's own age and never at anyone else's, since it is when they stop working.
 
 A salary or a self-employed profit stops when the owner who earns it retires,
 whatever its line says, since money earned by working is not earned once the

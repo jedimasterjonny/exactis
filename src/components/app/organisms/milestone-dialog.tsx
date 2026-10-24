@@ -9,6 +9,7 @@ import type { Condition, Milestone, MilestoneValues } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { Entry } from "@/hooks/use-editor";
+import type { Option } from "@/lib/options";
 
 import {
   removeMilestone,
@@ -32,12 +33,14 @@ import {
   ageOf,
   atAge,
   basisNames,
+  bornIn,
   conditionOf,
   isTiedTo,
   measureNames,
   sums,
+  yearOf,
 } from "@/data/milestones";
-import { ageIn, endAge, endYear, yearAt } from "@/data/plan";
+import { ageIn, endAge, endYear } from "@/data/plan";
 import { useMountedEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { optionsOf } from "@/lib/options";
@@ -57,7 +60,8 @@ interface ConditionRowProps {
 
 // What the dialog holds while it is open: the name; how the milestone
 // is reached, at an age or when conditions hold, which the choice
-// sets; the age, for the one; and the conditions, for the other, each
+// sets; the age, and whose it is, by their id, none for the plan's
+// owner's, for the one; and the conditions, for the other, each
 // carrying a key of its own, so a row keeps its fields as the rows
 // before it are removed. Both are held whichever is chosen, so a
 // choice turned and turned back finds what was typed. The key is the
@@ -67,6 +71,7 @@ interface Draft {
   readonly conditions: readonly Keyed[];
   readonly kind: Kind;
   readonly name: string;
+  readonly whose: number | undefined;
 }
 
 interface Keyed extends Condition {
@@ -118,9 +123,15 @@ const twentyFiveYears: readonly Condition[] = [
 // screen's list and from the chance of success alike, since the two
 // list the one record: the name, then how the milestone is reached, a
 // choice between an age and conditions, with the age's field or the
-// conditions' rows beneath whichever is chosen. The age is bounded by
-// the plan's years and says beneath it which year it falls in, since
-// the lists lay the milestone out by year. It is open for as long as
+// conditions' rows beneath whichever is chosen. The age is someone's,
+// chosen beside it where the plan carries anyone but its owner: the
+// plan's owner's, whoever that is, another owner's or a child's born by
+// the year it falls in, and choosing another keeps that year, so a
+// milestone typed at the plan's owner's age can be measured on a
+// child's without moving. The age is bounded
+// by the plan's years as whoever's it is reaches them, and says beneath
+// it which year it falls in, since the lists lay the milestone out by
+// year. It is open for as long as
 // it is mounted, so a list renders it while it holds a milestone to
 // open on, or a new one, and the entry mounts from that, opening a new
 // one reached as the caller says, at an age unless it says otherwise.
@@ -188,6 +199,8 @@ export function MilestoneDialog({
     return null;
   }
   const { draft } = entry;
+  const born = bornOf(plan, draft.whose);
+  const isShared = plan.owners.length + (plan.children?.length ?? 0) > 1;
   return (
     <EditDialog
       {...dialogOf(entry)}
@@ -237,13 +250,29 @@ export function MilestoneDialog({
         </RadioChoice>
       </RadioGroup>
       {draft.kind === "age" ? (
-        <div className="grid sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-3">
+          {!isRetirement && isShared && (
+            <SelectField
+              defaultValue={
+                draft.whose === undefined ? "" : String(draft.whose)
+              }
+              label="Whose age"
+              onValueChange={(chosen) => {
+                const whose = chosen === "" ? undefined : Number(chosen);
+                amend(entry, {
+                  age: born + draft.age - bornOf(plan, whose),
+                  whose,
+                });
+              }}
+              options={peopleOf(plan, born + draft.age)}
+            />
+          )}
           <AgeField
             hasSlider={false}
-            hint={`In ${String(yearAt(draft.age, plan))}`}
+            hint={`In ${String(born + draft.age)}`}
             label="Age"
-            max={endAge(plan)}
-            min={ageIn(plan.from, plan)}
+            max={endYear(plan) - born}
+            min={Math.max(0, plan.from - born)}
             onValueCommitted={(age) => {
               amend(entry, { age });
             }}
@@ -260,6 +289,14 @@ export function MilestoneDialog({
       )}
     </EditDialog>
   );
+}
+
+// The year whoever's age a milestone is reached at was born, the plan's
+// owner's for one measured on someone the plan does not carry, as only
+// a page drawn before they went could hand it, for the store to refuse
+// once it is saved.
+function bornOf(plan: Plan, whose: number | undefined): number {
+  return bornIn(plan, whose) ?? plan.born;
 }
 
 // The rows a milestone reached when conditions hold takes: a row for
@@ -387,11 +424,11 @@ function ConditionRow({
 // it is reached in for one reached at an age, or its conditions in
 // words.
 function describeOf(saved: MilestoneValues, plan: Plan): string {
-  const age = ageOf(saved);
+  const year = yearOf(saved, plan);
   const when =
-    age === undefined
+    year === undefined
       ? saved.conditions.map(conditionOf).join(" · ")
-      : String(yearAt(age, plan));
+      : String(year);
   return `${saved.name} · ${when}`;
 }
 
@@ -420,14 +457,14 @@ function keyed(conditions: readonly Condition[]): Keyed[] {
 }
 
 // The entry the dialog mounts open on: a new milestone under no id,
-// unnamed, reached as the caller says, at the age reached ten years
-// into the plan, or at its end if that is sooner, as a new expense
-// line runs for, and at the first million; the milestone under its
-// id, reached as it is, with the other way's fields standing by at
-// those opening values; or retirement, named so, reached as the owner
-// retires, its age standing by at the age the plan lays it out at, held
-// to the plan's end, and its conditions at twenty-five years of
-// expenses. Retirement is no record and is opened under nought, which
+// unnamed, reached as the caller says, at the age the plan's owner
+// reaches ten years into the plan, or at its end if that is sooner, as
+// a new expense line runs for, and at the first million; the milestone
+// under its id, reached as it is, at whoever's age it names, with the
+// other way's fields standing by at those opening values; or
+// retirement, named so, reached as the owner retires, its age standing
+// by at the age the plan lays it out at, held to the plan's end, and its
+// conditions at twenty-five years of expenses. Retirement is no record and is opened under nought, which
 // no record's id is, so it is edited rather than added.
 function openingOf(
   milestone: Milestone | null | Retirement,
@@ -443,6 +480,7 @@ function openingOf(
       ),
       kind: age === undefined ? "conditions" : "age",
       name: "Retirement",
+      whose: undefined,
     };
     return { draft, id: 0, initial: draft };
   }
@@ -453,6 +491,7 @@ function openingOf(
       conditions: keyed(firstMillion),
       kind,
       name: "",
+      whose: undefined,
     };
     return { draft, id: null, initial: draft };
   }
@@ -462,8 +501,31 @@ function openingOf(
     conditions: keyed(age === undefined ? milestone.conditions : firstMillion),
     kind: age === undefined ? "conditions" : "age",
     name: milestone.name,
+    whose: milestone.conditions[0]?.whose,
   };
   return { draft, id: milestone.id, initial: draft };
+}
+
+// Whose age a milestone falling in the year given may be reached at, as
+// the choice offers them: the plan's owner first, named as the plan's,
+// under no id, since a milestone naming nobody is theirs whoever the
+// plan's owner is, then every other owner and every child born by the
+// year, each by their id, so choosing any of them keeps the year.
+function peopleOf(plan: Plan, year: number): readonly Option<string>[] {
+  const people = [
+    ...plan.owners,
+    ...(plan.children ?? []).map(({ born, id, name }) => ({
+      born: born.year,
+      id,
+      name,
+    })),
+  ];
+  return people.flatMap(({ born, id, name }, place) => {
+    if (place === 0) {
+      return [{ label: `${name} (the plan's owner)`, value: "" }];
+    }
+    return born <= year ? [{ label: name, value: String(id) }] : [];
+  });
 }
 
 // What the choice of conditions says beneath it: for retirement, that
@@ -477,13 +539,13 @@ function reachedOf(isRetirement: boolean, tied: number): string {
   return tied === 0 ? "Read by the chance of success" : heldBy(tied);
 }
 
-// The draft as the store takes it: the one condition on the age, or the
-// conditions with the keys left behind.
+// The draft as the store takes it: the one condition on the age,
+// whoever's it is, or the conditions with the keys left behind.
 function valuesOf(draft: Draft): MilestoneValues {
   return {
     conditions:
       draft.kind === "age"
-        ? atAge(draft.age)
+        ? atAge(draft.age, draft.whose)
         : draft.conditions.map(({ measure, of, times }) => ({
             measure,
             of,

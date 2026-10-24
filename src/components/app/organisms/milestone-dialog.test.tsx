@@ -10,6 +10,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { Milestone } from "@/data/milestones";
+import type { Plan } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { Answer } from "@/lib/answer";
 
@@ -19,10 +20,12 @@ import {
   saveRetirement,
 } from "@/actions/milestones";
 import { Toaster } from "@/components/kit/toast";
+import { children } from "@/data/children.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
 import { atAge } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
+import { sam } from "@/data/owners.fixture";
 import { refused, saved } from "@/lib/answer";
 import { commit, field, openDialog, select } from "@/test/dom";
 
@@ -37,6 +40,15 @@ vi.mock("@/actions/milestones", () => ({
 const [kidsLeave, downsize, firstMillion, independence] = milestones;
 const [, stepUp] = incomeLines;
 const [, childcare, mortgage] = expenseLines;
+const [ada, finn] = children;
+
+// The plan carrying Sam, born in 1995, beside its owner, born in 1992,
+// and the three children, born in 2015, 2016 and 2028.
+const raising: Plan = {
+  ...retiring,
+  children,
+  owners: [...retiring.owners, sam],
+};
 
 // Nothing coming in or going out, so nothing tied to any milestone.
 const nothing: Schedule = { expenses: [], income: [] };
@@ -517,6 +529,141 @@ describe("MilestoneDialog", () => {
     fireEvent.click(radio("At an age"));
 
     expect(field("Age", dialog)).toHaveValue("91");
+  });
+
+  // Ten years in is the plan's owner's 44, in 2036, which is Ada's 21;
+  // she is 11 as the plan opens in 2026 and 68 as it ends in 2083, and
+  // reaches 18 in 2033.
+  it("measures a milestone on anyone the plan carries, keeping the year it falls in as the choice turns, and saves whose age it is", async () => {
+    renderDialog({ plan: raising });
+    const dialog = openDialog();
+    const whose = select("Whose age");
+
+    expect(whose).toHaveValue("");
+    expect(
+      within(whose)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual(["Me (the plan's owner)", "Sam", "Ada", "Finn", "Cleo"]);
+
+    fireEvent.change(whose, { target: { value: String(ada.id) } });
+
+    expect(field("Age", dialog)).toHaveValue("21");
+    expect(field("Age", dialog)).toHaveAccessibleDescription("In 2036");
+
+    commit(field("Age", dialog), "5");
+
+    expect(field("Age", dialog)).toHaveValue("11");
+
+    commit(field("Age", dialog), "70");
+
+    expect(field("Age", dialog)).toHaveValue("68");
+
+    commit(field("Age", dialog), "18");
+
+    expect(field("Age", dialog)).toHaveAccessibleDescription("In 2033");
+
+    fireEvent.change(field("Name", dialog), { target: { value: "Ada at 18" } });
+    vi.mocked(saveMilestone).mockResolvedValue(
+      saved({ conditions: atAge(18, ada.id), id: 11, name: "Ada at 18" }),
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(
+      null,
+      { conditions: atAge(18, ada.id), name: "Ada at 18" },
+      null,
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Milestone added" }),
+      ).toHaveAccessibleDescription("Ada at 18 · 2033");
+    });
+  });
+
+  it("offers another owner's age where the plan carries no child", () => {
+    renderDialog({ plan: { ...retiring, owners: [...retiring.owners, sam] } });
+
+    expect(
+      within(select("Whose age"))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual(["Me (the plan's owner)", "Sam"]);
+  });
+
+  // Cleo is expected in 2028, so a milestone as the plan opens in 2026,
+  // the plan's owner's 34, could not keep its year at her age, and she
+  // is offered from 2028.
+  it("offers no one born after the year the milestone falls in", () => {
+    renderDialog({ plan: raising });
+    const dialog = openDialog();
+    const offered = (): (null | string)[] =>
+      within(select("Whose age"))
+        .getAllByRole("option")
+        .map((option) => option.textContent);
+
+    commit(field("Age", dialog), "34");
+
+    expect(offered()).toStrictEqual([
+      "Me (the plan's owner)",
+      "Sam",
+      "Ada",
+      "Finn",
+    ]);
+
+    commit(field("Age", dialog), "36");
+
+    expect(offered()).toContain("Cleo");
+  });
+
+  // Finn, born in 2016, is 19 in 2035, which is the plan's owner's 43.
+  it("opens a milestone on whoever's age it is measured on, and turned back to the plan's owner's saves it naming nobody", async () => {
+    const atFinns = { conditions: atAge(19, finn.id), id: 11, name: "Finn" };
+    renderDialog({ milestone: atFinns, plan: raising });
+    const dialog = screen.getByRole("dialog", { name: "Finn" });
+
+    expect(select("Whose age")).toHaveValue(String(finn.id));
+    expect(field("Age", dialog)).toHaveValue("19");
+    expect(field("Age", dialog)).toHaveAccessibleDescription("In 2035");
+
+    fireEvent.change(select("Whose age"), { target: { value: "" } });
+
+    expect(field("Age", dialog)).toHaveValue("43");
+
+    vi.mocked(saveMilestone).mockResolvedValue(
+      saved({ ...atFinns, conditions: atAge(43) }),
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(saveMilestone).toHaveBeenCalledExactlyOnceWith(
+      11,
+      { conditions: atAge(43), name: "Finn" },
+      atFinns,
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Milestone updated" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // Retirement is the plan's owner's own, whoever else the plan carries.
+  it("offers retirement no choice of whose age it is", () => {
+    renderDialog({ milestone: { retirement: atAge(61) }, plan: raising });
+
+    expect(
+      screen.queryByRole("combobox", { name: "Whose age" }),
+    ).not.toBeInTheDocument();
+  });
+
+  // Only a page drawn before someone went could hand the dialog a
+  // milestone measured on them, which the store refuses on its save.
+  it("opens a milestone measured on someone the plan does not carry on the plan's owner's years", () => {
+    renderDialog({
+      milestone: { conditions: atAge(18, 99), id: 11, name: "Gone" },
+    });
+
+    expect(field("Age", openDialog())).toHaveAccessibleDescription("In 2010");
   });
 
   it("tells the caller on Cancel, saving nothing", () => {

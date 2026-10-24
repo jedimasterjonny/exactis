@@ -74,6 +74,38 @@ describe("the milestone actions", () => {
       expect(refresh).toHaveBeenCalledOnce();
     });
 
+    // Sam, given the next id, and a child, Ada.
+    it("adds one reached at another owner's or a child's age, and refuses one measured on someone the household does not list, in its words", async () => {
+      const ada = { born: { month: 2, year: 2015 }, id: 20, name: "Ada" };
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        {
+          ...kept,
+          children: [ada],
+          next: 22,
+          owners: [...kept.owners, { ...sam, id: 21 }],
+        },
+      );
+      const atTheirs = (whose: number): MilestoneValues => ({
+        ...sabbatical,
+        conditions: atAge(18, whose),
+      });
+
+      expect(await saveMilestone(null, atTheirs(21), null)).toStrictEqual(
+        saved({ ...atTheirs(21), id: 22 }),
+      );
+      expect(await saveMilestone(null, atTheirs(20), null)).toStrictEqual(
+        saved({ ...atTheirs(20), id: 23 }),
+      );
+      await expect(
+        saveMilestone(null, atTheirs(99), null),
+      ).resolves.toStrictEqual(
+        refused("A milestone is measured on someone the household lists"),
+      );
+      expect(await readLatest(db, "")).toMatchObject({ version: 4 });
+    });
+
     it("adds one reached when conditions hold the same way", async () => {
       expect(await saveMilestone(null, debtFree, null)).toStrictEqual(
         saved({ ...debtFree, id: 20 }),
@@ -347,10 +379,13 @@ describe("the milestone actions", () => {
       });
     });
 
-    // The plan runs to 91.
-    it("holds a retirement at an age to the plan's end, in the household's words, and refuses no condition", async () => {
+    // The plan runs to 91, and its owner retires at their own age.
+    it("holds a retirement at an age to the plan's end and to its owner's own age, in the household's words, and refuses no condition", async () => {
       await expect(saveRetirement(atAge(92))).resolves.toStrictEqual(
         refused("A plan's owner retires no later than it ends"),
+      );
+      await expect(saveRetirement(atAge(61, 1))).resolves.toStrictEqual(
+        refused("A retirement is at its owner's own age"),
       );
       await expect(saveRetirement([])).rejects.toThrow(z.ZodError);
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });

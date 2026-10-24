@@ -81,12 +81,16 @@ export const bonusValues = {
 // to nothing, a liquid net worth above nothing say. An age is held to
 // years, since a year is what an age counts, and no sum is, and it is
 // whole, since the year it falls in is born plus the age and a fraction
-// of a year is no year.
+// of a year is no year. An age may name whose it is by their id, absent
+// for the plan's owner's, and nothing else is anyone's; that the id is
+// an owner's or a child's the household lists is the household's to
+// hold.
 const condition = z
   .object({
     measure: z.enum(measures),
     of: z.enum(bases),
     times: z.number().nonnegative(),
+    whose: recordId.exactOptional(),
   })
   .refine(
     (held) => (held.measure === "age") === (held.of === "years"),
@@ -95,6 +99,10 @@ const condition = z
   .refine(
     (held) => held.measure !== "age" || Number.isInteger(held.times),
     "An age is whole years",
+  )
+  .refine(
+    (held) => held.whose === undefined || held.measure === "age",
+    "Only an age is someone's",
   );
 
 // What a milestone is reached on: a condition at least, since a
@@ -124,9 +132,9 @@ export const milestoneValues = { conditions, name: named };
 // as it was, the tax year they run through, by the year it opens in and
 // one a plan's dates fall in, absent for years taken as they stand, and
 // what they retire on, as a milestone is reached, an age
-// being whole years and nothing or more, or Retirement, for an owner
-// retiring with the plan's owner. Who may retire on what, and
-// that the first listed owner retires no later than the plan ends, are
+// being whole years and nothing or more and their own, or Retirement,
+// for an owner retiring with the plan's owner. Who may retire on what,
+// and that the first listed owner retires no later than the plan ends, are
 // the household's to hold, since the order of the owners and the plan's
 // end are kept beside them, and so is that a tax year is held only
 // beside the years; that it has ended is the action's, since the clock
@@ -141,7 +149,13 @@ export const ownerValues = {
     .nonnegative()
     .max(mostQualifyingYears)
     .exactOptional(),
-  retirement: z.union([z.literal("retirement"), conditions]),
+  retirement: z
+    .union([z.literal("retirement"), conditions])
+    .refine(
+      (held) =>
+        held === "retirement" || held.every(({ whose }) => whose === undefined),
+      "A retirement is at its owner's own age",
+    ),
 };
 
 // What a category of the target allocation holds, as the file gave it:

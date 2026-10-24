@@ -276,6 +276,27 @@ describe("the owner actions", () => {
       expect(await readLatest(db, "")).toMatchObject({ version: 2 });
     });
 
+    // The children leaving home measured on the partner's 48.
+    it("refuses to delete an owner a milestone is measured on, and writes nothing", async () => {
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        {
+          ...shared,
+          milestones: shared.milestones.map((milestone) =>
+            milestone.id === 7
+              ? { ...milestone, conditions: atAge(48, partner.id) }
+              : milestone,
+          ),
+        },
+      );
+
+      await expect(removeOwner(20)).resolves.toStrictEqual(
+        refused("An owner a milestone is measured on stays"),
+      );
+      expect(await readLatest(db, "")).toMatchObject({ version: 2 });
+    });
+
     // The partner listed first, holding and earning nothing, with the
     // reference owner retiring with them: deleting the partner would
     // leave the reference owner retiring with themselves.

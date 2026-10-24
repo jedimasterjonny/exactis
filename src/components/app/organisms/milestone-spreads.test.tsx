@@ -15,7 +15,9 @@ import type { Answer } from "@/lib/answer";
 
 import { removeMilestone, saveMilestone } from "@/actions/milestones";
 import { Toaster } from "@/components/kit/toast";
+import { children } from "@/data/children.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
+import { atAge } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { working } from "@/data/owners.fixture";
 import { saved } from "@/lib/answer";
@@ -210,6 +212,31 @@ describe("MilestoneSpreads", () => {
     expect(
       within(card).getAllByText(bySlot("spread-bar-mark"), { suggest: false }),
     ).toHaveLength(12);
+  });
+
+  // Ada, born in 2015, reaches 18 in 2033, when the plan's owner is 41.
+  it("pins a milestone reached at a child's age in the year they reach it", () => {
+    const [ada] = children;
+    render(
+      <MilestoneSpreads
+        futures={futures}
+        milestones={[
+          { conditions: atAge(18, ada.id), id: 11, name: "Ada at 18" },
+        ]}
+        plan={{ ...plan, children }}
+        schedule={nothing}
+      />,
+      { wrapper: Toaster },
+    );
+
+    expect(
+      screen
+        .getAllByText(bySlot("pin-bar-pin"), { suggest: false })
+        .map(({ style }) => style.left),
+    ).toStrictEqual(
+      [2033, 2033].map((year) => `${String(placed(year, plan))}%`),
+    );
+    expect(screen.getAllByText("Age 41")).toHaveLength(2);
   });
 
   it("says never for a share the run never reaches a milestone by, with no dot, and says nothing before the first futures are drawn", () => {
