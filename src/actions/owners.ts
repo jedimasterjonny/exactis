@@ -5,8 +5,10 @@ import * as z from "zod";
 import type { Owner, OwnerValues } from "@/data/owners";
 import type { Answer } from "@/lib/answer";
 
+import { withRecord } from "@/data/owners";
 import { ownerValues, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
+import { thisMonth } from "@/lib/months";
 import {
   found,
   holdUnchanged,
@@ -15,22 +17,28 @@ import {
   written,
 } from "@/lib/records";
 import { requireSession } from "@/lib/session";
+import { taxYearOf } from "@/lib/tax";
 import { amend } from "@/store/household";
 
 // What a save may carry: the name as typed less the space around it,
 // which the form also trims, and never empty, the year born and the
-// retirement, each as the model holds them. The qualifying years are not
-// among them, since the dialog does not hold them: they are typed on
-// the assumptions screen and written by saveQualifyingYears, and a save
-// here keeps them as they are.
+// retirement, each as the model holds them. The qualifying years and the
+// tax year they run through are not among them, since the dialog does
+// not hold them: they are typed on the assumptions screen and written
+// together by saveQualifyingYears, and a save here keeps them as they
+// are.
 const values = z
   .object(ownerValues)
-  .omit({ qualifyingYears: true }) satisfies z.ZodType<OwnerValues>;
+  .omit({
+    qualifiedThrough: true,
+    qualifyingYears: true,
+  }) satisfies z.ZodType<OwnerValues>;
 
 // An owner as the dialog opened on it, as the household parses its
-// owners, less the qualifying years, which are saved on their own, so an
-// edit of them elsewhere is no change to what the dialog holds. The
-// owner held now is parsed the same way, so the two compare key for key.
+// owners, less the qualifying years and their tax year, which are saved
+// on their own, so an edit of them elsewhere is no change to what the
+// dialog holds. The owner held now is parsed the same way, so the two
+// compare key for key.
 const opening = values.extend({ id: recordId });
 
 // Deletes the owner with that id, unless an account or an income line
@@ -59,13 +67,13 @@ export async function removeOwner(id: number): Promise<Answer<undefined>> {
 
 // Writes an owner: a new one when the id is null, given the household's
 // next id, else over the one with that id, keeping the qualifying years
-// it holds, and hands back the owner as the household now has it. An
-// action answers a POST from anywhere, so it checks the session for
-// itself and parses what it was sent rather than trusting the form. The
-// dialog sends the owner as it opened on it beside the draft, and an
-// edit of one changed since, as by a retirement age dragged on the
-// dashboard meanwhile, is refused rather than written back over the
-// change.
+// and the tax year it holds, and hands back the owner as the household
+// now has it. An action answers a POST from anywhere, so it checks the
+// session for itself and parses what it was sent rather than trusting
+// the form. The dialog sends the owner as it opened on it beside the
+// draft, and an edit of one changed since, as by a retirement age
+// dragged on the dashboard meanwhile, is refused rather than written
+// back over the change.
 export async function saveOwner(
   id: null | number,
   draft: OwnerValues,
@@ -90,34 +98,50 @@ export async function saveOwner(
     } = written(
       kept.owners,
       { at, next: kept.next, noun: "owner" },
-      (id, listed) => ({
-        ...parsed,
-        id,
-        ...(listed?.qualifyingYears !== undefined && {
-          qualifyingYears: listed.qualifyingYears,
-        }),
-      }),
+      (id, listed) => ({ ...listed, ...parsed, id }),
     );
     return { kept: { ...kept, next, owners: records }, result: owner };
   });
 }
 
-// Writes the years of National Insurance the owner with that id has
-// qualified for the State Pension on, and hands back the owner as the
-// household now has it. Only the years are written, over the owner as
-// the store holds it, so a name or a retirement saved on another screen
-// since is kept rather than written over. An action answers a POST from
-// anywhere, so it checks the session for itself and parses what it was
-// sent, as the model holds the years, rather than trusting the figure.
+// Writes the National Insurance record of the owner with that id, the
+// years they have qualified for the State Pension on and the tax year
+// those run through, by the year it opens in, or none for years taken as
+// they stand, and hands back the owner as the household now has it. The
+// two are written together, since the tax year dates the years and
+// neither is right without the other. Only the record is written, over
+// the owner as the store holds it, so a name or a retirement saved on
+// another screen since is kept rather than written over. A tax year that
+// has not ended, this one among them, is refused, since its year is not
+// yet qualified for. An action answers a POST from anywhere, so it checks
+// the session for itself and parses what it was sent, as the model holds
+// the record, rather than trusting the figures.
 export async function saveQualifyingYears(
   id: number,
   years: number,
+  through: null | number,
 ): Promise<Answer<Owner>> {
   await requireSession();
   const at = recordId.parse(id);
   const qualifyingYears = ownerValues.qualifyingYears.parse(years);
+  const qualifiedThrough = ownerValues.qualifiedThrough
+    .unwrap()
+    .nullable()
+    .parse(through);
   return amend(({ kept }) => {
-    const owner = { ...found(kept.owners, at, "owner"), qualifyingYears };
+    if (
+      qualifiedThrough !== null &&
+      qualifiedThrough >= taxYearOf(thisMonth())
+    ) {
+      throw new Refusal(
+        "The qualifying years run through a tax year that has ended",
+      );
+    }
+    const owner = withRecord(
+      found(kept.owners, at, "owner"),
+      qualifyingYears,
+      qualifiedThrough,
+    );
     return {
       kept: { ...kept, owners: replaced(kept.owners, owner) },
       result: owner,

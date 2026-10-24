@@ -22,6 +22,7 @@ type FigureInputProps = Figure & {
   readonly largeStep: number;
   readonly max?: number | undefined;
   readonly min?: number | undefined;
+  readonly onCleared?: (() => void) | undefined;
   readonly onValueCommitted?: ((value: number) => void) | undefined;
   readonly step: number;
 };
@@ -33,8 +34,9 @@ type FigureInputProps = Figure & {
 // value commits on blur, as fields do in the product, and never on the
 // wheel: a balance changing under a scroll is a hazard. A figure cleared
 // to nothing commits null, which is dropped here rather than reported: a
-// cleared figure is left as it was, never written as nothing, and every
-// caller wanted the same. A figure with bounds is held inside them:
+// cleared figure is left as it was, never written as nothing, unless the
+// caller takes a clearing, as a figure that may go back to none does. A
+// figure with bounds is held inside them:
 // the number field clamps what is typed to the nearest bound when it
 // commits, so a share of the base is never more than the whole of it.
 // A figure worked out elsewhere and only shown here is read-only: it can
@@ -54,6 +56,7 @@ export function FigureInput({
   largeStep,
   max,
   min,
+  onCleared,
   onValueCommitted,
   step,
   value,
@@ -67,7 +70,9 @@ export function FigureInput({
       max={max}
       min={min}
       onValueCommitted={(committed) => {
-        if (committed !== null) {
+        if (committed === null) {
+          onCleared?.();
+        } else {
           onValueCommitted?.(committed);
         }
       }}

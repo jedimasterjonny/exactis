@@ -89,6 +89,44 @@ describe("FigureInput", () => {
     expect(input).toHaveValue("");
   });
 
+  // A figure going back to none says so where its caller takes that, and
+  // a figure left empty commits nothing, cleared or not.
+  it("reports a figure cleared to nothing to a caller that takes a clearing", () => {
+    const onCleared = vi.fn<() => void>();
+    const onValueCommitted = vi.fn<(value: number) => void>();
+    const { rerender } = render(
+      <FigureInput
+        format={plain}
+        largeStep={10}
+        onCleared={onCleared}
+        onValueCommitted={onValueCommitted}
+        step={1}
+        value={2025}
+      />,
+    );
+
+    const input = screen.getByRole("textbox");
+
+    commit(input, "");
+
+    expect(onCleared).toHaveBeenCalledOnce();
+    expect(onValueCommitted).not.toHaveBeenCalled();
+
+    rerender(
+      <FigureInput
+        format={plain}
+        largeStep={10}
+        onCleared={onCleared}
+        onValueCommitted={onValueCommitted}
+        step={1}
+        value={null}
+      />,
+    );
+    commit(input, "");
+
+    expect(onCleared).toHaveBeenCalledOnce();
+  });
+
   // A figure given a value shows it, nothing for null, and follows it as
   // it changes; what is typed over it still commits, and the caller says
   // what the figure shows next.

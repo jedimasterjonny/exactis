@@ -121,15 +121,20 @@ export const milestoneValues = { conditions, name: named };
 // the years they have qualified for the State Pension on, whole, from
 // nothing to the most an owner holds, and absent rather than nothing
 // until they are typed, so a household kept before there were any reads
-// as it was, and what they retire on, as a milestone is reached, an age
+// as it was, the tax year they run through, by the year it opens in and
+// one a plan's dates fall in, absent for years taken as they stand, and
+// what they retire on, as a milestone is reached, an age
 // being whole years and nothing or more, or Retirement, for an owner
 // retiring with the plan's owner. Who may retire on what, and
 // that the first listed owner retires no later than the plan ends, are
 // the household's to hold, since the order of the owners and the plan's
-// end are kept beside them.
+// end are kept beside them, and so is that a tax year is held only
+// beside the years; that it has ended is the action's, since the clock
+// is no part of what is kept.
 export const ownerValues = {
   born: year,
   name: named,
+  qualifiedThrough: year.exactOptional(),
   qualifyingYears: z
     .number()
     .int()

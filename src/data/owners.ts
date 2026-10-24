@@ -21,11 +21,14 @@ export interface Owner extends OwnerValues {
 // at an age, or tied to Retirement, as a line's end is, for an owner
 // retiring with the plan's owner. The years of National Insurance they
 // have qualified for the State Pension on are absent rather than
-// nothing until they are typed, as the model has them, and are typed
-// on the assumptions screen rather than in the dialog.
+// nothing until they are typed, as the model has them, and so is the
+// tax year they run through, held as the year it opens in, 2025 for
+// 2025/26, and absent for years taken as they stand; both are typed on
+// the assumptions screen rather than in the dialog.
 export interface OwnerValues {
   readonly born: number;
   readonly name: string;
+  readonly qualifiedThrough?: number;
   readonly qualifyingYears?: number;
   readonly retirement: "retirement" | readonly Condition[];
 }
@@ -35,6 +38,23 @@ export interface OwnerValues {
 // earned on fewer. The figure typing them and the store keeping them
 // hold them to the same.
 export const mostQualifyingYears = 50;
+
+// The owner with the National Insurance record given: the years, and
+// the tax year they run through, or none for years taken as they stand.
+export function withRecord(
+  owner: Owner,
+  years: number,
+  through: null | number,
+): Owner {
+  return {
+    born: owner.born,
+    id: owner.id,
+    name: owner.name,
+    qualifyingYears: years,
+    retirement: owner.retirement,
+    ...(through !== null && { qualifiedThrough: through }),
+  };
+}
 
 // The owner a household opens with, before anyone is named: "Me", born
 // in 1990 and retiring at 59, the ages the dashboard has shown, so a

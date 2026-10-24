@@ -114,9 +114,14 @@ for those born by 1960, 67 for those born from 1961 to 1977 and 68 from 1978,
 read off the year born as the pension age is, so the months by which the age
 phases up are not held. It rises with inflation, which the triple lock pays at
 least; what the lock pays above prices is not modelled, nor deferring it, nor
-the starting amount of years before 2016. The years are taken as they stand
-rather than counted forward from the years the plan has an owner work, which is
-deferred.
+the starting amount of years before 2016.
+
+An owner's years may be dated by the tax year they run through, held as the year
+it opens in, and the two are written together as one record, since each is right
+only with the other. A tax year is held only beside the years, and one that has
+not ended is refused where it is typed, since its year is not yet earned; a tax
+year cleared goes. The years are still taken as they stand rather than counted
+forward from it to the years the plan has an owner work, which is deferred.
 
 ## Salaries and what they feed
 
