@@ -6,7 +6,7 @@ import * as z from "zod";
 import type { Owner } from "@/data/owners";
 
 import { soundKept } from "@/data/household";
-import { blank, kept } from "@/data/household.fixture";
+import { blank, kept, today } from "@/data/household.fixture";
 import { atAge } from "@/data/milestones";
 import { owners, sam } from "@/data/owners.fixture";
 import { upcast } from "@/data/shapes";
@@ -43,7 +43,7 @@ async function ownerOn(id: number): Promise<Owner> {
 }
 
 describe("the owner actions", () => {
-  standUp(memory, { seed: shared });
+  standUp(memory, { seed: shared, today });
 
   describe("saveOwner", () => {
     it("writes nothing without a session", async () => {
@@ -97,30 +97,32 @@ describe("the owner actions", () => {
       });
     });
 
-    // The partner has thirty qualifying years, typed on the assumptions
-    // screen once the dialog was open; the dialog holds none, and a save
-    // from it sends none, so the years typed are no change to it.
-    it("keeps the qualifying years of the owner it writes over, and writes none it is sent", async () => {
+    // The partner has thirty qualifying years through 2025/26, typed on
+    // the assumptions screen once the dialog was open; the dialog holds
+    // neither, and a save from it sends neither, so what was typed is no
+    // change to it.
+    it("keeps the qualifying years and their tax year of the owner it writes over, and writes neither it is sent", async () => {
       const opened = await ownerOn(20);
+      const years = { qualifiedThrough: 2025, qualifyingYears: 30 };
       await keepAfter(
         db,
         { scenario: "", version: 1 },
-        { ...shared, owners: [owners[0], { ...partner, qualifyingYears: 30 }] },
+        { ...shared, owners: [owners[0], { ...partner, ...years }] },
       );
 
       expect(await saveOwner(20, kid, opened)).toStrictEqual(
-        saved({ ...kid, id: 20, qualifyingYears: 30 }),
+        saved({ ...kid, id: 20, ...years }),
       );
       expect(
-        await saveOwner(null, { ...kid, qualifyingYears: 12 }, null),
+        await saveOwner(
+          null,
+          { ...kid, qualifiedThrough: 2020, qualifyingYears: 12 },
+          null,
+        ),
       ).toStrictEqual(saved({ ...kid, id: 21 }));
       expect(await readLatest(db, "")).toMatchObject({
         household: {
-          owners: [
-            owners[0],
-            { ...kid, id: 20, qualifyingYears: 30 },
-            { ...kid, id: 21 },
-          ],
+          owners: [owners[0], { ...kid, id: 20, ...years }, { ...kid, id: 21 }],
         },
         version: 4,
       });
@@ -313,16 +315,19 @@ describe("the owner actions", () => {
     });
   });
 
+  // The fixture's day is 15 September 2026, in the tax year 2026/27.
   describe("saveQualifyingYears", () => {
     it("writes nothing without a session", async () => {
       vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-      await expect(saveQualifyingYears(20, 30)).rejects.toThrow("redirected");
+      await expect(saveQualifyingYears(20, 30, null)).rejects.toThrow(
+        "redirected",
+      );
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     });
 
     it("writes the owner's years alone, over the owner as the store holds it, and draws the page again", async () => {
-      expect(await saveQualifyingYears(20, 30)).toStrictEqual(
+      expect(await saveQualifyingYears(20, 30, null)).toStrictEqual(
         saved({ ...partner, qualifyingYears: 30 }),
       );
       expect(await readLatest(db, "")).toMatchObject({
@@ -335,22 +340,64 @@ describe("the owner actions", () => {
       expect(refresh).toHaveBeenCalledOnce();
     });
 
+    // Thirteen years through 2025/26, then fourteen sent with no tax year,
+    // as the screen sends years typed afresh, which go as they stand.
+    it("writes the years with the tax year they run through, and drops the tax year sent none", async () => {
+      expect(await saveQualifyingYears(20, 13, 2025)).toStrictEqual(
+        saved({ ...partner, qualifiedThrough: 2025, qualifyingYears: 13 }),
+      );
+      expect(await saveQualifyingYears(20, 14, null)).toStrictEqual(
+        saved({ ...partner, qualifyingYears: 14 }),
+      );
+      expect(await readLatest(db, "")).toMatchObject({
+        household: { owners: [owners[0], { ...partner, qualifyingYears: 14 }] },
+        version: 3,
+      });
+    });
+
     // Typed back to nothing, the years are nothing rather than absent:
     // the owner has been asked, and has none.
     it("writes years typed back to nothing as nothing, rather than as none typed", async () => {
-      await saveQualifyingYears(20, 30);
+      await saveQualifyingYears(20, 30, null);
 
-      expect(await saveQualifyingYears(20, 0)).toStrictEqual(
+      expect(await saveQualifyingYears(20, 0, null)).toStrictEqual(
         saved({ ...partner, qualifyingYears: 0 }),
       );
     });
 
-    it("refuses years that are not whole, below nothing or above fifty, an id the screen could not have sent, and one no owner has", async () => {
-      await expect(saveQualifyingYears(20, 30.5)).rejects.toThrow(z.ZodError);
-      await expect(saveQualifyingYears(20, -1)).rejects.toThrow(z.ZodError);
-      await expect(saveQualifyingYears(20, 51)).rejects.toThrow(z.ZodError);
-      await expect(saveQualifyingYears(0, 30)).rejects.toThrow(z.ZodError);
-      await expect(saveQualifyingYears(99, 30)).resolves.toStrictEqual(
+    // On 31 March 2026 the tax year 2025/26 is still running.
+    it("refuses a tax year that has not ended, this one and one before April among them, and writes nothing", async () => {
+      for (const through of [2026, 2027]) {
+        await expect(
+          saveQualifyingYears(1, 35, through),
+        ).resolves.toStrictEqual(
+          refused("The qualifying years run through a tax year that has ended"),
+        );
+      }
+      vi.setSystemTime(new Date(2026, 2, 31, 12));
+
+      await expect(saveQualifyingYears(1, 35, 2025)).resolves.toStrictEqual(
+        refused("The qualifying years run through a tax year that has ended"),
+      );
+      expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+    });
+
+    it("refuses years that are not whole, below nothing or above fifty, a tax year not whole or outside the plan's years, an id the screen could not have sent, and one no owner has", async () => {
+      for (const [years, through] of [
+        [30.5, null],
+        [-1, null],
+        [51, null],
+        [30, 2025.5],
+        [30, 1899],
+      ] as const) {
+        await expect(saveQualifyingYears(20, years, through)).rejects.toThrow(
+          z.ZodError,
+        );
+      }
+      await expect(saveQualifyingYears(0, 30, null)).rejects.toThrow(
+        z.ZodError,
+      );
+      await expect(saveQualifyingYears(99, 30, null)).resolves.toStrictEqual(
         refused("No owner has the id"),
       );
       expect(await readLatest(db, "")).toMatchObject({ version: 1 });

@@ -17,7 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/kit/table";
-import { mostQualifyingYears } from "@/data/owners";
+import { mostQualifyingYears, withRecord } from "@/data/owners";
+import { earliestYear, latestYear } from "@/data/plan";
 import {
   statePensionAge,
   statePensionFrom,
@@ -31,49 +32,48 @@ interface StatePensionProps {
   readonly owners: readonly Owner[];
 }
 
-// Years typed for an owner, by the owner's id.
-interface Typed {
-  readonly id: number;
-  readonly years: number;
-}
-
 // The assumptions screen's State Pension: a row for each owner, their
 // name over the year they were born and the State Pension age it gives
-// them, the qualifying years they have, typed in the row, and what those
-// earn a year in today's money and from which year, or none under ten.
-// The household pays each owner what the row says, on a line of its own
-// the plan screen lists locked.
+// them, the qualifying years they have and the tax year those run
+// through, each typed in the row, and what the years earn a year in
+// today's money and from which year, or none under ten. The household
+// pays each owner what the row says, on a line of its own the plan
+// screen lists locked.
 //
-// The years are typed where they are shown, with no dialog, and saved
-// as the focus leaves them, for that owner alone, so a name or a
-// retirement saved elsewhere since is kept. Years typed back to what
-// they were are not sent, since a whole figure that reads as it did is
-// no change and the field commits none. The figure shows what was typed at once, and what it
-// earns follows it, while the store is asked; the store's answer draws
-// the screen again from what it kept, with a toast saying what the
-// owner is now paid, or puts the figure back and says why under a toast
-// when it is refused. An owner with none typed shows none.
+// The years and the tax year are typed where they are shown, with no
+// dialog, and saved together as the focus leaves either, for that owner
+// alone, so a name or a retirement saved elsewhere since is kept. Years
+// typed afresh clear the tax year, which is then typed again for the
+// new record, since years written under the tax year of the record
+// before would count the years between twice; a tax year typed keeps
+// the years shown, none being nothing, and one cleared goes, the years
+// then taken as they stand. A figure typed back to what it was is not
+// sent, since a whole figure that reads as it did is no change and the
+// field commits none. The figures show what was typed at once, and what
+// they earn follows them, while the store is asked; the store's answer
+// draws the screen again from what it kept, with a toast saying what
+// the owner is now paid, or puts the figures back and says why under a
+// toast when it is refused, as a tax year that has not ended is. An
+// owner with none typed shows none, and no tax year.
 export function StatePension({ owners }: StatePensionProps): JSX.Element {
   const [shown, show] = useOptimistic(
     owners,
-    (current: readonly Owner[], { id, years }: Typed) =>
-      current.map((owner) =>
-        owner.id === id ? { ...owner, qualifyingYears: years } : owner,
-      ),
+    (current: readonly Owner[], typed: Owner) =>
+      current.map((owner) => (owner.id === typed.id ? typed : owner)),
   );
   const { send } = useSender();
 
-  function save(owner: Owner, years: number): void {
+  function save(owner: Owner, years: number, through: null | number): void {
     send(
       async () => {
-        show({ id: owner.id, years });
-        return saveQualifyingYears(owner.id, years);
+        show(withRecord(owner, years, through));
+        return saveQualifyingYears(owner.id, years, through);
       },
       {
-        failure: "Qualifying years not saved",
+        failure: "National Insurance record not saved",
         success: (saved) => ({
           description: `${saved.name} · ${paidOf(saved)}`,
-          title: "Qualifying years saved",
+          title: "National Insurance record saved",
         }),
       },
     );
@@ -81,7 +81,7 @@ export function StatePension({ owners }: StatePensionProps): JSX.Element {
 
   return (
     <SectionCard
-      caption="The new State Pension, in today's money and rising with inflation. Thirty-five qualifying years earn the full amount, and fewer than ten earn nothing."
+      caption="The new State Pension, in today's money and rising with inflation. Thirty-five qualifying years earn the full amount, and fewer than ten earn nothing. The tax year the years run through is typed after them, by the year it opens in, 2025 for 2025/26, and cleared for years taken as they stand."
       className="pb-0"
       label={subsectionLabel(assumptions, 5)}
       title="State pension"
@@ -91,6 +91,7 @@ export function StatePension({ owners }: StatePensionProps): JSX.Element {
           <TableRow>
             <TableHead>Owner</TableHead>
             <TableHead className="text-right">Qualifying years</TableHead>
+            <TableHead className="text-right">Through tax year</TableHead>
             <TableHead className="text-right">A year</TableHead>
           </TableRow>
         </TableHeader>
@@ -109,9 +110,23 @@ export function StatePension({ owners }: StatePensionProps): JSX.Element {
                   max={mostQualifyingYears}
                   min={0}
                   onValueCommitted={(years) => {
-                    save(owner, years);
+                    save(owner, years, null);
                   }}
-                  value={yearsOf(owner)}
+                  value={owner.qualifyingYears ?? null}
+                />
+              </TableCell>
+              <TableCell className="w-24 py-1">
+                <YearsInput
+                  label={`Tax year the qualifying years for ${owner.name} run through`}
+                  max={latestYear}
+                  min={earliestYear}
+                  onCleared={() => {
+                    save(owner, yearsOf(owner), null);
+                  }}
+                  onValueCommitted={(through) => {
+                    save(owner, yearsOf(owner), through);
+                  }}
+                  value={owner.qualifiedThrough ?? null}
                 />
               </TableCell>
               <TableCell className="text-right figure">

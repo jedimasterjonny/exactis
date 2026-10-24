@@ -321,6 +321,12 @@ export function stampDutyOn(price: number): number {
   return chargedOn(stampDuty, price, 1);
 }
 
+// The year a month's tax year opens in: the month's own from April, and
+// the one before until then.
+export function taxYearOf({ month, year }: Month): number {
+  return month < april ? year - 1 : year;
+}
+
 // How far the bands have risen by the tax year a month falls in, as a
 // multiple of the figures above: not at all while they are frozen, and
 // by the plan's inflation a whole year at a time, each April, from the
@@ -431,10 +437,4 @@ function grossFor(net: number, standing: Standing): number {
 // twelfth a month of the figures as they have risen.
 function shareOf({ months, uprating }: Stretch): number {
   return (months / 12) * uprating;
-}
-
-// The year a month's tax year opens in: the month's own from April, and
-// the one before until then.
-function taxYearOf({ month, year }: Month): number {
-  return month < april ? year - 1 : year;
 }

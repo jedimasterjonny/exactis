@@ -358,11 +358,15 @@ export const milestone = z.object({
 }) satisfies z.ZodType<Milestone>;
 
 // An owner as the model lays it: what the owner save holds it to, and
-// the id it is listed by.
-const owner = z.object({
-  ...ownerValues,
-  id: recordId,
-}) satisfies z.ZodType<Owner>;
+// the id it is listed by, and a tax year held only beside the years it
+// is the last of, since without them it dates nothing.
+const owner = z
+  .object({ ...ownerValues, id: recordId })
+  .refine(
+    (held) =>
+      held.qualifiedThrough === undefined || held.qualifyingYears !== undefined,
+    "A tax year is held beside the qualifying years it ends",
+  ) satisfies z.ZodType<Owner>;
 
 // The owners, one at least, since the plan is the first listed owner's
 // and a household with none has no plan to make, and anyone but the

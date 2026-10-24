@@ -21,6 +21,7 @@ interface Forwarded {
   readonly label: string;
   readonly max?: number;
   readonly min?: number;
+  readonly onCleared?: () => void;
   readonly onValueCommitted?: (value: number) => void;
 }
 
@@ -104,12 +105,14 @@ export function YearField(
   return <FigureField {...props} {...presets.year} />;
 }
 
-// A count of whole years with no field of its own, for a cell of a
-// table, where there is no room for a label: written as a year is,
-// whole and with no separator, named for a screen reader by what it
-// counts, and held inside the bounds it is given.
+// A count of whole years, or a year, with no field of its own, for a
+// cell of a table, where there is no room for a label: written as a year
+// is, whole and with no separator, named for a screen reader by what it
+// counts, held inside the bounds it is given, and cleared to none where
+// the caller takes a clearing.
 export function YearsInput(
-  props: Figure & Pick<Forwarded, "label" | "max" | "min" | "onValueCommitted">,
+  props: Figure &
+    Pick<Forwarded, "label" | "max" | "min" | "onCleared" | "onValueCommitted">,
 ): JSX.Element {
   return <FigureInput {...props} {...presets.year} />;
 }
