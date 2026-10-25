@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { refresh } from "next/cache";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { readIndex, revalued, worthIn } from "@/data/house-prices";
 import { quoted, registryAnswer } from "@/data/house-prices.fixture";
@@ -55,6 +55,10 @@ function registrySends(response: Response): ReturnType<typeof vi.fn> {
 
 describe("pullHousePrices", () => {
   standUp(memory, { today });
+
+  beforeEach(() => {
+    vi.stubEnv("HOUSE_PRICE_REGION", "shropshire");
+  });
 
   it("sends for nothing and writes nothing without a session", async () => {
     const fetch = registrySends(new Response(file));

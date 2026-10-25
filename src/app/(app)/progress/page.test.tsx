@@ -1,5 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HousePrices } from "@/data/house-prices";
 import type { ProgressPoint } from "@/data/progress";
@@ -30,6 +30,10 @@ async function renderProgress(
 }
 
 describe("Progress", () => {
+  beforeEach(() => {
+    vi.stubEnv("HOUSE_PRICE_REGION", "shropshire");
+  });
+
   // The points are loaded rather than typed, so the header's one
   // action is the pull that writes the house into them.
   it("opens with the progress header and the pull of the house price index", async () => {

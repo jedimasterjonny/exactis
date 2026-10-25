@@ -78,7 +78,7 @@ function houseNoteOf(housePrices: HousePrices | null): string {
   if (housePrices === null) {
     return "The house is as the sheet gave it, until house prices are pulled.";
   }
-  return `The house is at the UK House Price Index for ${indexedAs} from ${formatMonthShort(housePrices.from)} to ${formatMonthShort(housePrices.to)}, pulled ${formatDay(housePrices.pulledOn)}.`;
+  return `The house is at the UK House Price Index for ${indexedAs()} from ${formatMonthShort(housePrices.from)} to ${formatMonthShort(housePrices.to)}, pulled ${formatDay(housePrices.pulledOn)}.`;
 }
 
 // What the points span, as the header says it: how many, from the

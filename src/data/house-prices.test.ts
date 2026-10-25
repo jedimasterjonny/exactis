@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { quoted, registryAnswer } from "@/data/house-prices.fixture";
 import { homeValues } from "@/data/houses.fixture";

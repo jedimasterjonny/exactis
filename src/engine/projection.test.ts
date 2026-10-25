@@ -2318,7 +2318,7 @@ describe("retiring when conditions hold", () => {
       {
         ...household,
         amount: 1000,
-        firstYear: 2040,
+        firstYear: 2036,
         id: 2,
         lastYear: null,
         name: "Retired",

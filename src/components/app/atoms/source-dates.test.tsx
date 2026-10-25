@@ -9,10 +9,10 @@ import { targets } from "@/data/targets.fixture";
 
 import { SourceDates } from "./source-dates";
 
-// The strip on the fourth of September over the fixtures' sources:
+// The strip on the eighth of September over the fixtures' sources:
 // August's vintage with its data as of the end of June, the first of
-// September's curve, the allocation imported on the third, and fees and
-// yield set that day; with what is given in their place.
+// September's curve, the allocation imported on the seventh, and fees
+// and yield set that day; with what is given in their place.
 function renderStrip(
   given: Partial<ComponentProps<typeof SourceDates>> = {},
 ): void {

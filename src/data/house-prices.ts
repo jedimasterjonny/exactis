@@ -5,6 +5,7 @@ import type { ProgressPoint } from "@/data/progress";
 import type { Month } from "@/data/schedule";
 
 import { Refusal } from "@/lib/answer";
+import { readEnv } from "@/lib/env";
 import { formatGbp } from "@/lib/money";
 import {
   formatMonth,
@@ -51,20 +52,33 @@ interface IndexedMonth {
 }
 
 // The index as the Land Registry publishes it for the house: the
-// region, as the id the Registry gives it names it in an address, the
-// figure for the house's type, as the Registry names it among a
-// month's figures, and the two as a screen says them. All three stand
-// here rather than in the store, as the inflation premium does, since
-// the household has one house and nothing else reads them; a second
-// house in another county, or of another type, is the day they move
-// onto the house. The figure is the average price rather than the
-// index, since the index is that price over January 2015's, published
-// to a tenth: the ratio of two months' prices is the index's own, and
-// to the pound, where the index's tenth moved a house £400 or so at a
-// step.
-const region = "shropshire";
+// region, as the id the Registry gives it names it in an address, read
+// from the environment, since it is the deployment's rather than the
+// code's, and the figure for the house's type, as the Registry names it
+// among a month's figures. Both stand here rather than in the store, as the
+// inflation premium does, since the household has one house and nothing
+// else reads them; a second house in another region, or of another
+// type, is the day they move onto the house. The figure is the average
+// price rather than the index, since the index is that price over
+// January 2015's, published to a tenth: the ratio of two months' prices
+// is the index's own, and to the pound, where the index's tenth moved a
+// house £400 or so at a step.
 const indexed = "averagePriceDetached";
-export const indexedAs = "a detached house in Shropshire";
+
+// The index as a screen says it, the region's id read as its name:
+// ponytail: "isle-of-wight" reads "Isle Of Wight"; keep a name beside
+// the id if a region of more than one word ever reads wrong.
+export function indexedAs(): string {
+  const name = regionOf()
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+  return `a detached house in ${name}`;
+}
+
+function regionOf(): string {
+  return readEnv("HOUSE_PRICE_REGION");
+}
 
 // The Registry's answer, as much of it as is read: the months it lists,
 // each with the month it is for, as the Registry writes a month, one of
@@ -90,7 +104,7 @@ const answer = z.object({
 // ponytail: one page of 200 months reaches back to about 2010; follow
 // the answer's next page for a house bought before that.
 export function addressOf(from: Month): string {
-  return `https://landregistry.data.gov.uk/data/ukhpi/region/${region}.json?min-refMonth=${refMonthOf(from)}&_pageSize=200&_sort=-refMonth&_properties=refMonth,${indexed}`;
+  return `https://landregistry.data.gov.uk/data/ukhpi/region/${regionOf()}.json?min-refMonth=${refMonthOf(from)}&_pageSize=200&_sort=-refMonth&_properties=refMonth,${indexed}`;
 }
 
 // The index read out of the Registry's answer from the month the house

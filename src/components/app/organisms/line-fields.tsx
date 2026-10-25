@@ -279,7 +279,7 @@ function endingOf(line: LineValues): string {
 }
 
 // Where a line ending the years given after a milestone runs to: the
-// year before it for none, or that many years on, "Runs to 2051".
+// year before it for none, or that many years on, "Runs to 2055".
 function runsTo(until: Marker, after: number): string {
   return `Runs to ${String(until.year - 1 + after)}.`;
 }

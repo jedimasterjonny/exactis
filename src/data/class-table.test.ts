@@ -14,7 +14,7 @@ import { cma, mappings } from "./cma.fixture";
 import { targets } from "./targets.fixture";
 
 // August's vintage as the fixture prices it, with the sterling classes
-// the fixture leaves out that the household's taxonomy needs.
+// the fixture leaves out that the taxonomy below needs.
 const august: Cma = {
   ...cma,
   assets: [
