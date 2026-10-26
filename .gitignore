@@ -28,3 +28,8 @@ next-env.d.ts
 # exports, the suite runs its tests, prettier checks its vendored files.
 # Ignored, so the tree the gates see is the tree that is committed.
 /.claude/worktrees/
+
+# The household's real names, places and figures, read by scripts/private-terms.sh.
+.private-terms
+# Claude Code's personal instructions for this checkout, never shared.
+CLAUDE.local.md

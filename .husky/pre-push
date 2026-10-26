@@ -1,4 +1,7 @@
 #!/bin/sh -e
+# What is pushed against the local list of household terms; git's stdin passes through.
+bash scripts/private-terms.sh push
+
 # The suite under coverage, once per push rather than once per commit. It was 83s
 # of an 88s pre-commit, and AGENTS.md asks for one decision per commit, so a
 # five-commit series paid for it five times over to be pushed once. Every other

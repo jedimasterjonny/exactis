@@ -1,3 +1,5 @@
 #!/bin/sh -e
 export PATH="node_modules/.bin:$PATH"
 commitlint --edit "$1"
+# The message against the local list of household terms, scripts/private-terms.sh.
+bash scripts/private-terms.sh message "$1"
