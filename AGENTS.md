@@ -217,6 +217,14 @@ rejects a scope that is missing or upper-case. That the type and the scope are
 the right ones is not machine-enforced, and no scope enum is set to make it so,
 because the vocabulary is open by design.
 
+The hooks also hold every commit message, every added line, every push and
+Claude's `gh` and `git` commands against `.private-terms`, a local, gitignored
+list at the root of the main checkout, one term per line. Keep it current with
+every real name, place and figure the household's data holds, since a value
+missing from it passes. It catches literal values only, so the "VERY IMPORTANT"
+rules on this repository being public still apply in full. Never commit the
+list, and never print it.
+
 - One decision per commit. Split scaffolding from the deliberate change layered
   on top.
 - Minimum diff surface. Formatter sweeps, drive-by renames and unrelated tidying
