@@ -12,12 +12,49 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- prettier-ignore-end -->
 
+# VERY IMPORTANT: this repository is public
+
+Everything that reaches GitHub is published for good: code, comments, tests,
+fixtures, docs, screenshots, commit messages, branch names, issues, pull
+requests, reviews and comments, anything a bot posts on your behalf, and the CI
+logs, which print every commit message in full. These rules come before every
+other rule in this file.
+
+- Nothing about a real person or the real household goes into the repository or
+  onto GitHub: identity, ages or birth years, places, property, vehicles,
+  employers, pension schemes, providers, funds, or any money figure. Nothing
+  derived from them either: sums, monthly or yearly splits, payoff months, plan
+  lengths, years worked out from an age, or ratios.
+- Invent every fixture, test value and piece of seed or demo data from scratch.
+  Never copy real figures, and never round, scale, shift or otherwise transform
+  them into test data: a transformed real value is still real, so a series moved
+  by a constant keeps its real steps and a rounded total is still the real
+  total. Do not open the live store, the balances sheet, an export or another
+  planning tool while writing fixtures, tests or seed data. Published data that
+  is the same for every household, such as tax bands or a price index, may be
+  real; which of it applies to this household may not. Fictional people get
+  names and birth years with no link to anyone real.
+- A check against the real household is done read only, on this machine, and
+  reported as pass or fail only, with no counts. Figures, logs and errors from
+  the real store go to the owner in the session, never into a commit message,
+  PR, comment or anything else that is pushed.
+- Screenshots use fixture data only. A branch pushed just to deliver a file is
+  public, and deleting it unpublishes nothing.
+- A value that belongs to the deployment rather than the code, such as the house
+  price region, is read from the environment. Its value never appears in the
+  code, a test or a comment; `.env.example` lists it empty.
+- If real data is already on GitHub, stop and tell the owner in the session. Do
+  not commit, comment or open an issue about it.
+- Before every commit and every PR, read the diff, the message and the PR body
+  for anything above. When unsure whether something is real, leave it out and
+  ask the owner.
+
 # Working agreements
 
 This file is the source of truth for how work is done here. It is checked in, so
 it travels between machines; agent memory does not. Never let a convention that
 matters live only in memory — put it here, or in a skill under `.claude/skills/`
-when it applies only sometimes.
+when it applies only sometimes. Conventions only, never household facts.
 
 - Propose the commit split before starting work that spans more than one
   decision.
@@ -197,7 +234,8 @@ because the vocabulary is open by design.
 - Drop verification artefacts before the work lands: smoke-test files, scratch
   scripts, probe commits. Never fold them into a real commit.
 - The body says what was decided, what was rejected and why, and what was
-  verified. Not a restatement of the diff.
+  verified (against the real household: pass or fail only). Not a restatement of
+  the diff.
 - Fix a wrong commit by amending or rebasing it, not with a follow-up `fix:`.
   Ask first before rewriting a commit you did not create in this session.
 
