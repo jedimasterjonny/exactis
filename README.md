@@ -107,3 +107,7 @@ This repository is public. [`AGENTS.md`](AGENTS.md) puts what it must never hold
 before every other rule, then says how work is done: code style, commits, and
 what has to be green before anything lands. [`TODO.md`](TODO.md) lists what the
 model does not yet hold.
+
+## Licence
+
+GPL-3.0. See `LICENSE`.
