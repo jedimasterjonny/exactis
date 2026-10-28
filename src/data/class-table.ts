@@ -1,6 +1,8 @@
 import type { Cma, Mapping, Sleeve } from "@/data/cma";
 import type { Target, Targets } from "@/data/targets";
 
+import { globalBonds } from "@/data/cma";
+
 // An entry of the table: the names a category goes by, the classes it
 // is suggested onto, the first a vintage prices taken, and the fund of
 // Vanguard's LifeStrategy range it stands for, if it stands for one.
@@ -124,7 +126,7 @@ const table: readonly Entry[] = [
   // Vanguard Global Bond Index Fund, hedged to sterling.
   [
     ["Global Bonds", "Global bonds, hedged", "Global Aggregate"],
-    ["Global aggregate bonds (GBP hedged)", "Global aggregate bonds"],
+    globalBonds,
     { sedol: "B50W2R1", sleeve: "bonds" },
   ],
   // Vanguard UK Government Bond Index Fund.

@@ -29,6 +29,15 @@ const unread: Cma = {
   vintage: cma.vintage,
 };
 
+// The vintage pricing no global bonds, hedged or not, so nothing stands
+// in for bonds the target allocation holds none of.
+const unbonded: Cma = {
+  ...cma,
+  assets: cma.assets.filter(
+    ({ name }) => !name.startsWith("Global aggregate bonds"),
+  ),
+};
+
 // The blends the vintage, allocation and mappings given make, the
 // reference ones unless given, or a failure naming why they make none.
 function blended(
@@ -82,7 +91,7 @@ describe("blendsOf", () => {
     expect(stocks.hedging).toBe(0);
     expect(
       stocks.parts.map(({ asset, category, weight }) => [
-        category.name,
+        category?.name,
         asset.name,
         weight,
       ]),
@@ -123,7 +132,7 @@ describe("blendsOf", () => {
   it("leaves out a category asking for nothing, mapped or not", () => {
     const { stocks } = blended();
 
-    expect(stocks.parts.map(({ category }) => category.name)).not.toContain(
+    expect(stocks.parts.map(({ category }) => category?.name)).not.toContain(
       "FTSE All-Share",
     );
   });
@@ -205,10 +214,84 @@ describe("blendsOf", () => {
     ).toStrictEqual({ short: "Global small cap has no CMA class" });
   });
 
-  // UK equity alone is all in equities, at UK large caps' 8.156%, and
-  // short-dated gilts alone all in bonds, at cash's 3.574%.
-  it("stands a sleeve nothing blends into in at the other's return, with no parts and none of the whole", () => {
-    const equities = blended(cma, onlyIn("UK equity"));
+  // UK equity alone is all in equities, at UK large caps' 8.156%, with
+  // bonds standing in at hedged global bonds: 4.563% before the hedging,
+  // which takes 0.021 of a point off.
+  it("stands bonds nothing blends into in at hedged global bonds, the whole of the sleeve and none of the whole", () => {
+    const hedged = cma.assets.find(
+      ({ name }) => name === "Global aggregate bonds (GBP hedged)",
+    );
+    const { bonds, stocks } = blended(cma, onlyIn("UK equity"));
+
+    expect(stocks.share).toBeCloseTo(1, 12);
+    expect(stocks.rate).toBeCloseTo(0.08156, 12);
+    expect(bonds).toStrictEqual({
+      hedging: (hedged?.rate ?? 0) - 0.04563,
+      parts: [{ asset: hedged, weight: 1 }],
+      rate: 0.04563,
+      share: 0,
+    });
+  });
+
+  // A vintage pricing no hedged form stands bonds in at the unhedged
+  // class's 4.563%, with nothing for hedging.
+  it("stands bonds in at unhedged global bonds where the vintage prices no hedged form", () => {
+    const unhedged = cma.assets.find(
+      ({ name }) => name === "Global aggregate bonds",
+    );
+    const { bonds } = blended(
+      {
+        ...cma,
+        assets: cma.assets.filter(
+          ({ name }) => name !== "Global aggregate bonds (GBP hedged)",
+        ),
+      },
+      onlyIn("UK equity"),
+    );
+
+    expect(bonds).toStrictEqual({
+      hedging: 0,
+      parts: [{ asset: unhedged, weight: 1 }],
+      rate: 0.04563,
+      share: 0,
+    });
+  });
+
+  // The hedged class giving no volatility while others give one, the
+  // unhedged class stands in; neither giving one, nothing does, and
+  // bonds stand in at stocks' return. A vintage pulled before any
+  // volatility was read stands in at the hedged class all the same.
+  it("stands bonds in only at a class saying how far it strays, where the vintage says it of any", () => {
+    const unrisked = (...names: readonly string[]): Cma => ({
+      ...cma,
+      assets: cma.assets.map((asset) =>
+        names.includes(asset.name)
+          ? { name: asset.name, rate: asset.rate, sleeve: asset.sleeve }
+          : asset,
+      ),
+    });
+    const standIn = (vintage: Cma): string | undefined =>
+      blended(vintage, onlyIn("UK equity")).bonds.parts[0]?.asset.name;
+
+    expect(standIn(unrisked("Global aggregate bonds (GBP hedged)"))).toBe(
+      "Global aggregate bonds",
+    );
+    expect(
+      standIn(
+        unrisked(
+          "Global aggregate bonds (GBP hedged)",
+          "Global aggregate bonds",
+        ),
+      ),
+    ).toBeUndefined();
+    expect(standIn(unread)).toBe("Global aggregate bonds (GBP hedged)");
+  });
+
+  // With no global bonds priced, UK equity alone stands bonds in at UK
+  // large caps' 8.156%; short-dated gilts alone is all in bonds, at
+  // cash's 3.574%, and stocks stand in at that.
+  it("stands a sleeve nothing blends into in at the other's return, with no parts and none of the whole, where no class stands in for it", () => {
+    const equities = blended(unbonded, onlyIn("UK equity"));
     const bonds = blended(cma, onlyIn("Short-dated gilts"));
 
     expect(equities.stocks.share).toBeCloseTo(1, 12);
@@ -288,14 +371,15 @@ describe("derivedSet", () => {
   });
 
   // All in UK equities, the plan holds everything in stocks, and bonds'
-  // rate is stocks' return in all less the fees, which weighs nothing;
-  // one class in one sleeve, nothing is rebalanced, and nothing earned.
+  // rate is hedged global bonds' 4.542% in all less the fees, which
+  // weighs nothing; one class in each sleeve, nothing is rebalanced, and
+  // nothing earned.
   it("derives a set for an allocation with nothing in one sleeve, splitting everything into the other", () => {
     const derived = derivedSet({ ...sources, targets: onlyIn("UK equity") });
     const all = "short" in derived ? null : derived;
 
     expect(all?.allocation.stocks).toBeCloseTo(1, 12);
-    expect(all?.rates.bonds).toBeCloseTo(0.08156 - 0.002, 12);
+    expect(all?.rates.bonds).toBeCloseTo(0.04542 - 0.002, 12);
     expect(all?.rates.stocks).toBeCloseTo(0.08156 - 0.002 - 0.02, 12);
     expect(all?.rebalancing).toBe(0);
   });
@@ -326,14 +410,39 @@ describe("derivedSet", () => {
 
   // All in UK equities, nothing says what the 40% the glide path holds
   // in bonds returns; all in stocks, it holds nothing in them.
-  it("derives none at a split holding a sleeve the target allocation holds none of", () => {
+  it("derives the bonds a split holds at the class standing in for them where the target allocation holds none", () => {
     const equities = { ...sources, targets: onlyIn("UK equity") };
 
-    expect(derivedSet(equities, { stocks: 0.6 })).toStrictEqual({
+    const derived = derivedSet(equities, { stocks: 0.6 });
+
+    expect(derived).toMatchObject({ allocation: { stocks: 0.6 } });
+    expect("short" in derived ? null : derived.rates.bonds).toBeCloseTo(
+      0.04542 - 0.002,
+      12,
+    );
+  });
+
+  // All in short-dated gilts, nothing says what the 40% the glide path
+  // holds in stocks returns; all in UK equities under a vintage pricing
+  // no global bonds, nothing says what its 40% in bonds does, and all in
+  // stocks it holds nothing in them.
+  it("derives none at a split holding stocks the target allocation holds none of, or bonds no class stands in for", () => {
+    const gilts = { ...sources, targets: onlyIn("Short-dated gilts") };
+    const unpriced = {
+      ...sources,
+      cma: { latest: unbonded, previous: null },
+      targets: onlyIn("UK equity"),
+    };
+
+    expect(derivedSet(gilts, { stocks: 0.6 })).toStrictEqual({
+      short:
+        "The glide path holds stocks the target allocation holds none of, so nothing says what they return",
+    });
+    expect(derivedSet(unpriced, { stocks: 0.6 })).toStrictEqual({
       short:
         "The glide path holds bonds the target allocation holds none of, so nothing says what they return",
     });
-    expect(derivedSet(equities, { stocks: 1 })).not.toHaveProperty("short");
+    expect(derivedSet(unpriced, { stocks: 1 })).not.toHaveProperty("short");
   });
 
   // A vintage pulled before volatilities were read gives the same rates
@@ -377,11 +486,13 @@ describe("riskOf", () => {
   // correlated with, at 19%, which UK equities move with by their own
   // 0.8: 0.25 × 0.16² + 0.25 × 0.19² + 2 × 0.25 × 0.16 × 0.19 × 0.8 is
   // 0.027585, 16.61% a year, under the 17.5% of the two apart. Nothing
-  // is in bonds, so they stray by nothing and move with nothing.
+  // is in bonds, so they stray as hedged global bonds standing in for
+  // them do, by 3.5%.
   it("blends a sleeve's classes by their weights and how far they move together", () => {
-    expect(
-      risked(onlyIn("UK equity", "FTSE Global All Cap ex-UK")),
-    ).toStrictEqual({ bonds: 0, correlation: 0, stocks: Math.sqrt(0.027585) });
+    const risk = risked(onlyIn("UK equity", "FTSE Global All Cap ex-UK"));
+
+    expect(risk).toMatchObject({ stocks: Math.sqrt(0.027585) });
+    expect("bonds" in risk && risk.bonds).toBeCloseTo(0.035, 12);
   });
 
   // FTSE All-Share and UK equity are both mapped onto UK equities, which
@@ -620,7 +731,11 @@ describe("spreadOf", () => {
     });
     expect(
       spreadOf(
-        { cma: vintages, mappings, targets: onlyIn("UK equity") },
+        {
+          cma: { latest: unbonded, previous: null },
+          mappings,
+          targets: onlyIn("UK equity"),
+        },
         live(0.6),
       ),
     ).toStrictEqual({

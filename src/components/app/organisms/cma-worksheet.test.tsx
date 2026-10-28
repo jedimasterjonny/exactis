@@ -125,23 +125,23 @@ describe("CmaWorksheet", () => {
     ]);
   });
 
-  // All in equities, bonds stand in at stocks' return and weigh nothing,
-  // so their column is dashed and the portfolio is stocks alone, earning
-  // by rebalancing what stocks earn within themselves and nothing
-  // between the sleeves. Nothing hedged is held, so there is no hedging
-  // row.
-  it("dashes a sleeve nothing in the target allocation blends into", () => {
+  // All in equities, bonds stand in at hedged global bonds and weigh
+  // nothing, so their column is the class's own and the portfolio is
+  // stocks alone, earning by rebalancing what stocks earn within
+  // themselves and nothing between the sleeves; the hedging the class
+  // makes moves nothing held, so there is no hedging row.
+  it("works bonds out at the class standing in for them when nothing in the target allocation blends into them", () => {
     renderSheet({ targets: targetsUnder("Equity") });
 
     expect(worksheet(sheet)).toStrictEqual([
       ["Target weight", "100.00%", "0.00%", "100.00%"],
-      ["Blended 20y GBP return", "8.044%", "—", "8.044%"],
-      ["Fee drag", "−0.200pp", "—", "−0.200pp"],
-      ["Rebalancing", "0.205pp", "—", "0.205pp"],
-      ["Return", "7.84%", "—", "8.05%"],
-      ["Growth", "5.84%", "—", "6.05%"],
+      ["Blended 20y GBP return", "8.044%", "4.563%", "8.044%"],
+      ["Fee drag", "−0.200pp", "−0.200pp", "−0.200pp"],
+      ["Rebalancing", "0.205pp", "0.000pp", "0.205pp"],
+      ["Return", "7.84%", "4.34%", "8.05%"],
+      ["Growth", "5.84%", "4.34%", "6.05%"],
       ["Dividend yield", "2.00%", "—", "2.00%"],
-      ["Real return", "4.75%", "—", "4.95%"],
+      ["Real return", "4.75%", "1.35%", "4.95%"],
     ]);
   });
 

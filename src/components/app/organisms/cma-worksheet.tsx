@@ -84,7 +84,8 @@ const sourceNames: Record<Source, string> = {
 // target allocation holds of them, but for the rebalancing, which the
 // portfolio earns between the sleeves as well as within each, so its
 // return stands over the sleeves' weighted by as much. A sleeve nothing
-// blends into is dashed. Under the worksheet, every
+// blends into is dashed, unless a class stands in for it, as one can for
+// bonds, when it is worked out at that class. Under the worksheet, every
 // category's share of the whole, under the sleeve it blends into.
 // Beneath the worksheet, what has moved the rates since the household
 // as it stood a while ago, given as its sources then: the plan rate, the
@@ -257,13 +258,15 @@ function Moved({
 
 // The worksheet's rows, from the weights to the real return, the
 // weights named as the caller names them. Each sleeve's figure is
-// dashed where nothing blends into it, and the portfolio's is the
-// sleeves' in the shares the blends are held in, which leaves out the
-// sleeve that holds none. The hedging row is there
-// only while a class is hedged to sterling, and dashed for a sleeve with
-// none hedged. The rebalancing row is there only while the vintage gives
-// the risk it is worked from, and without it the return is the blend
-// alone, as the plan then runs. Bonds pay no yield, so theirs is dashed.
+// dashed where nothing blends into it and nothing stands in for it, and
+// the portfolio's is the sleeves' in the shares the blends are held in,
+// which leaves out the sleeve that holds none. The hedging row is there
+// only while a sleeve held has a class hedged to sterling, and dashed for
+// a sleeve with none hedged or none held, since one held at nothing
+// moves nothing. The rebalancing row is there only while the vintage
+// gives the risk it is worked from, and without it the return is the
+// blend alone, as the plan then runs. Bonds pay no yield, so theirs is
+// dashed.
 // Before a curve is pulled there is no inflation to read the return
 // over, and the real return is dashed.
 function rowsOf(
@@ -290,6 +293,7 @@ function rowsOf(
     rebalancing === null ? 0 : rebalancing.portfolio,
   );
   const isHedged = (blend: Blend): boolean =>
+    blend.share > 0 &&
     blend.parts.some(({ asset }) => asset.hedges !== undefined);
   const figuresOf = (
     format: (value: number) => string,

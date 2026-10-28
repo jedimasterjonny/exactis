@@ -441,14 +441,20 @@ from the capital market assumptions: what stocks return in all, their growth and
 the dividend yield on top, which every account reinvests, and what bonds return,
 each in the share of the savings the split holds in it, typed or the target
 allocation's; under the derived set it also earns what rebalancing adds over
-that blend, as `rebalancingOf` in `src/data/cma.ts` works it out. A glide path
-moves the split with the plan's owner's age, so a plan on one carries the plan
-rate year by year, each year's at the split the path holds at the age reached in
-it, and its own rate is its first year's. Along a glide path or a future of the
-markets, a saving or an asset on the plan rate takes the year's rate. An account
-on a fixed rate keeps its own, and so does a debt on the plan rate, since its
-payment and the term it clears in are worked out against the plan's own rate,
-and charged at another it would be left owing when the payments stop.
+that blend, as `rebalancingOf` in `src/data/cma.ts` works it out. Under the
+derived set, bonds return what the target allocation's bond categories blend to,
+and where it asks nothing of bonds, what the vintage expects of global bonds
+hedged to sterling, or unhedged where it prices no hedged form: an allocation
+all in equities can still sit under a glide path that holds bonds in later
+years, and those years need a return and a risk that the allocation cannot give.
+A glide path moves the split with the plan's owner's age, so a plan on one
+carries the plan rate year by year, each year's at the split the path holds at
+the age reached in it, and its own rate is its first year's. Along a glide path
+or a future of the markets, a saving or an asset on the plan rate takes the
+year's rate. An account on a fixed rate keeps its own, and so does a debt on the
+plan rate, since its payment and the term it clears in are worked out against
+the plan's own rate, and charged at another it would be left owing when the
+payments stop.
 
 Each account is carried on its own, and the point sums the wrappers as well.
 Cash and the GIAs are carried beside the wrappers, so a short month can be drawn
