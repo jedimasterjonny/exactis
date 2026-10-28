@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { ScreenHeader } from "@/components/app/atoms/screen-header";
+import { Screen } from "@/components/app/templates/screen";
 import { assumptions, sectionLabel } from "@/lib/nav";
 
 // What the assumptions screen shows while the store answers: its
@@ -8,8 +8,10 @@ import { assumptions, sectionLabel } from "@/lib/nav";
 // a curve to lay out.
 export default function Loading(): JSX.Element {
   return (
-    <ScreenHeader label={sectionLabel(assumptions)} title={assumptions.title}>
-      Reading the store…
-    </ScreenHeader>
+    <Screen
+      label={sectionLabel(assumptions)}
+      meta="Reading the store…"
+      title={assumptions.title}
+    />
   );
 }

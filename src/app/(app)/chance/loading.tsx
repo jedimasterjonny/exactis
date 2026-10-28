@@ -1,13 +1,15 @@
 import type { JSX } from "react";
 
-import { ScreenHeader } from "@/components/app/atoms/screen-header";
+import { Screen } from "@/components/app/templates/screen";
 import { chance, sectionLabel } from "@/lib/nav";
 
 // The chance of success's header while the store answers, saying so.
 export default function Loading(): JSX.Element {
   return (
-    <ScreenHeader label={sectionLabel(chance)} title={chance.title}>
-      Reading the store…
-    </ScreenHeader>
+    <Screen
+      label={sectionLabel(chance)}
+      meta="Reading the store…"
+      title={chance.title}
+    />
   );
 }

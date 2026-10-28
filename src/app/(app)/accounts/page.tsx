@@ -1,10 +1,9 @@
 import type { JSX } from "react";
 
 import { BalanceDates } from "@/components/app/atoms/balance-dates";
-import { ScreenBody } from "@/components/app/atoms/screen-body";
-import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { AccountLedger } from "@/components/app/organisms/account-ledger";
 import { MonthEnd } from "@/components/app/organisms/month-end";
+import { Screen } from "@/components/app/templates/screen";
 import { moveChoices } from "@/data/houses";
 import { markersOf } from "@/data/milestones";
 import { laidOut } from "@/engine/projection";
@@ -49,38 +48,34 @@ export default async function Accounts(): Promise<JSX.Element> {
   );
   const day = today();
   return (
-    <>
-      <ScreenHeader
-        actions={
-          <MonthEnd
-            accounts={accounts}
-            month={monthBefore(thisMonth())}
-            plan={plan}
-            schedule={schedule}
-            today={day}
-          />
-        }
-        label={sectionLabel(accountsAndAssets)}
-        title={accountsAndAssets.title}
-      >
-        {`Starting net worth ${formatGbp(balanceOf(accounts) - drawingTaxOf(accounts))} · balances as of the end of ${formatMonth(monthBefore({ month: plan.month, year: plan.from }))}`}
-      </ScreenHeader>
-      <ScreenBody>
-        <BalanceDates accounts={accounts} today={day} />
-        <AccountLedger
+    <Screen
+      actions={
+        <MonthEnd
           accounts={accounts}
-          expenses={schedule.expenses}
-          kids={household.children}
-          lines={schedule.income}
-          milestones={moveChoices(
-            markersOf(household.milestones, plan),
-            plan,
-            accounts,
-          )}
-          owners={owners}
+          month={monthBefore(thisMonth())}
           plan={plan}
+          schedule={schedule}
+          today={day}
         />
-      </ScreenBody>
-    </>
+      }
+      label={sectionLabel(accountsAndAssets)}
+      meta={`Starting net worth ${formatGbp(balanceOf(accounts) - drawingTaxOf(accounts))} · balances as of the end of ${formatMonth(monthBefore({ month: plan.month, year: plan.from }))}`}
+      title={accountsAndAssets.title}
+    >
+      <BalanceDates accounts={accounts} today={day} />
+      <AccountLedger
+        accounts={accounts}
+        expenses={schedule.expenses}
+        kids={household.children}
+        lines={schedule.income}
+        milestones={moveChoices(
+          markersOf(household.milestones, plan),
+          plan,
+          accounts,
+        )}
+        owners={owners}
+        plan={plan}
+      />
+    </Screen>
   );
 }

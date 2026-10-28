@@ -5,12 +5,11 @@ import type { Plan as Planned } from "@/data/plan";
 import type { Schedule, Totals } from "@/engine/cash-flow";
 import type { MovedYear, ProjectionPoint } from "@/engine/projection";
 
-import { ScreenBody } from "@/components/app/atoms/screen-body";
-import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { CashFlowCard } from "@/components/app/organisms/cash-flow-card";
 import { ExpenseSchedule } from "@/components/app/organisms/expense-schedule";
 import { IncomeSchedule } from "@/components/app/organisms/income-schedule";
 import { MilestoneList } from "@/components/app/organisms/milestone-list";
+import { Screen } from "@/components/app/templates/screen";
 import { retiresOn } from "@/data/milestones";
 import { endAge, endYear } from "@/data/plan";
 import { cashFlow, inTodaysMoney, totalsOf } from "@/engine/cash-flow";
@@ -64,39 +63,38 @@ export default async function Plan(): Promise<JSX.Element> {
   const points = project(accounts, schedule, plan);
   const years = movedYears(points, run);
   return (
-    <>
-      <ScreenHeader label={sectionLabel(planScreen)} title={planScreen.title}>
-        {headlineOf(run, { points, years })}
-      </ScreenHeader>
-      <ScreenBody>
-        <MilestoneList
-          milestones={milestones}
-          onConditions={retiresOn(household.plan)}
-          plan={plan}
-          sales={years.flatMap(({ sales }) => sales)}
-          schedule={schedule}
-        />
-        <IncomeSchedule
-          accounts={accounts}
-          lines={schedule.income}
-          milestones={milestones}
-          owners={owners}
-          plan={plan}
-        />
-        <ExpenseSchedule
-          accounts={accounts}
-          lines={schedule.expenses}
-          milestones={milestones}
-          plan={plan}
-        />
-        <CashFlowCard
-          accounts={accounts}
-          milestones={milestones}
-          plan={plan}
-          schedule={schedule}
-        />
-      </ScreenBody>
-    </>
+    <Screen
+      label={sectionLabel(planScreen)}
+      meta={headlineOf(run, { points, years })}
+      title={planScreen.title}
+    >
+      <MilestoneList
+        milestones={milestones}
+        onConditions={retiresOn(household.plan)}
+        plan={plan}
+        sales={years.flatMap(({ sales }) => sales)}
+        schedule={schedule}
+      />
+      <IncomeSchedule
+        accounts={accounts}
+        lines={schedule.income}
+        milestones={milestones}
+        owners={owners}
+        plan={plan}
+      />
+      <ExpenseSchedule
+        accounts={accounts}
+        lines={schedule.expenses}
+        milestones={milestones}
+        plan={plan}
+      />
+      <CashFlowCard
+        accounts={accounts}
+        milestones={milestones}
+        plan={plan}
+        schedule={schedule}
+      />
+    </Screen>
   );
 }
 

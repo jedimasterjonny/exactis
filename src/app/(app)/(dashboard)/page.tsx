@@ -1,10 +1,9 @@
 import type { JSX } from "react";
 
-import { ScreenBody } from "@/components/app/atoms/screen-body";
-import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { PlanAssumptions } from "@/components/app/organisms/plan-assumptions";
 import { ProjectionBoard } from "@/components/app/organisms/projection-board";
 import { ScenarioMenu } from "@/components/app/organisms/scenario-menu";
+import { Screen } from "@/components/app/templates/screen";
 import { Badge } from "@/components/kit/badge";
 import { vintageMonth } from "@/data/cma";
 import { endAge } from "@/data/plan";
@@ -57,39 +56,39 @@ export default async function Dashboard(): Promise<JSX.Element> {
       ? `CMA-derived rates · ${vintageMonth(cma.latest)}`
       : "Custom rates";
   return (
-    <>
-      <ScreenHeader
-        actions={
-          <>
-            <ScenarioMenu names={scenarios} scenario={scenario} />
-            <PlanAssumptions plan={plan} />
-          </>
-        }
-        label={sectionLabel(dashboard)}
-        title={`${dashboard.title} ${age}`}
-      >
-        <Badge variant="secondary">{rates}</Badge>
-        {"Figures in today's money"}
-      </ScreenHeader>
-      <ScreenBody>
-        <ProjectionBoard
-          accounts={accounts}
-          against={
-            baseline && {
-              accounts: baseline.accounts,
-              milestones: baseline.milestones,
-              plan: baseline.plan,
-              schedule: baseline.schedule,
-              spread: baseline.spread,
-            }
+    <Screen
+      actions={
+        <>
+          <ScenarioMenu names={scenarios} scenario={scenario} />
+          <PlanAssumptions plan={plan} />
+        </>
+      }
+      label={sectionLabel(dashboard)}
+      meta={
+        <>
+          <Badge variant="secondary">{rates}</Badge>
+          {"Figures in today's money"}
+        </>
+      }
+      title={`${dashboard.title} ${age}`}
+    >
+      <ProjectionBoard
+        accounts={accounts}
+        against={
+          baseline && {
+            accounts: baseline.accounts,
+            milestones: baseline.milestones,
+            plan: baseline.plan,
+            schedule: baseline.schedule,
+            spread: baseline.spread,
           }
-          milestones={milestones}
-          plan={plan}
-          scenario={scenario}
-          schedule={schedule}
-          spread={spread}
-        />
-      </ScreenBody>
-    </>
+        }
+        milestones={milestones}
+        plan={plan}
+        scenario={scenario}
+        schedule={schedule}
+        spread={spread}
+      />
+    </Screen>
   );
 }
