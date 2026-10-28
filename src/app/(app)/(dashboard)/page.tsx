@@ -1,7 +1,6 @@
 import type { JSX } from "react";
 
 import { PlanAssumptions } from "@/components/app/organisms/plan-assumptions";
-import { ProjectionBoard } from "@/components/app/organisms/projection-board";
 import { ScenarioMenu } from "@/components/app/organisms/scenario-menu";
 import { Screen } from "@/components/app/templates/screen";
 import { Badge } from "@/components/kit/badge";
@@ -14,6 +13,8 @@ import {
   getScenario,
   getScenarios,
 } from "@/store/household";
+
+import { ProjectionBoard } from "./projection-board";
 
 // The dashboard, over the accounts, the lines, the milestones, the plan
 // and the spread its rates carry, read from the store behind the

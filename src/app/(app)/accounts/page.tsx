@@ -1,7 +1,6 @@
 import type { JSX } from "react";
 
 import { BalanceDates } from "@/components/app/atoms/balance-dates";
-import { AccountLedger } from "@/components/app/organisms/account-ledger";
 import { MonthEnd } from "@/components/app/organisms/month-end";
 import { Screen } from "@/components/app/templates/screen";
 import { moveChoices } from "@/data/houses";
@@ -12,6 +11,8 @@ import { formatGbp } from "@/lib/money";
 import { formatMonth, monthBefore, thisMonth, today } from "@/lib/months";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
+
+import { AccountLedger } from "./account-ledger";
 
 // The reference's plan screen opened on its accounts tab, with that tab
 // split in two: the wrappers, cash and the loans on one, the real assets on the
