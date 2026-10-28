@@ -1,5 +1,7 @@
 # exactis
 
+Certitudo in numeris
+
 A financial planner for one UK household. It projects savings, pensions,
 property and debts month by month, after each owner's own tax, through
 retirement to a chosen end age.
