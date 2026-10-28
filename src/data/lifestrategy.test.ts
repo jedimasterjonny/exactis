@@ -4,7 +4,13 @@ import { describe, expect, it } from "vitest";
 
 import { Refusal } from "@/lib/answer";
 
-import { readHoldings, requestOf, retargeted } from "./lifestrategy";
+import {
+  range,
+  readHoldings,
+  requestOf,
+  retargeted,
+  splitFor,
+} from "./lifestrategy";
 import { holdings, lines, vanguardAnswer } from "./lifestrategy.fixture";
 import { targets } from "./targets.fixture";
 
@@ -23,8 +29,8 @@ const idOf = (name: string): string =>
   targets.categories.find((category) => category.name === name)?.id ?? "";
 
 describe("requestOf", () => {
-  it("posts Vanguard's site the question of what LifeStrategy 80% Equity holds, each holding with its day, weight, name and SEDOL", async () => {
-    const asked = requestOf();
+  it("posts Vanguard's site the question of what the fund given holds, by its id, each holding with its day, weight, name and SEDOL", async () => {
+    const asked = requestOf(range[1]);
     const body: unknown = JSON.parse(await asked.text());
 
     expect(asked.url).toBe("https://www.vanguardinvestor.co.uk/gpx/graphql");
@@ -36,22 +42,25 @@ describe("requestOf", () => {
         "borHoldings(portIds: $portIds) { holdings(limit: 100) { items { effectiveDate marketValuePercentage securityLongDescription sedol1 } } }",
       ),
     );
-    expect(body).toHaveProperty("variables", { portIds: ["9244"] });
+    expect(body).toHaveProperty("variables", { portIds: ["9232"] });
   });
 });
 
 describe("readHoldings", () => {
   it("reads each fund by its SEDOL with its weight of the whole, and the day they are as of, leaving the cash out", () => {
-    expect(readHoldings(vanguardAnswer())).toStrictEqual(holdings);
+    expect(readHoldings(vanguardAnswer(), range[0])).toStrictEqual(holdings);
     expect(holdings.funds).toHaveLength(6);
   });
 
   it("refuses an answer that is not JSON, or not Vanguard's", () => {
-    expect(() => readHoldings(strToU8("<html>"))).toThrow(
+    expect(() => readHoldings(strToU8("<html>"), range[0])).toThrow(
       new Refusal("Vanguard's answer is not JSON"),
     );
     expect(() =>
-      readHoldings(strToU8('{"errors":[{"message":"no such fund"}]}')),
+      readHoldings(
+        strToU8('{"errors":[{"message":"no such fund"}]}'),
+        range[0],
+      ),
     ).toThrow(
       new Refusal(
         "Vanguard answered with something other than what LifeStrategy 80% Equity holds",
@@ -64,14 +73,19 @@ describe("readHoldings", () => {
       "Vanguard lists no fund held by LifeStrategy 80% Equity",
     );
 
-    expect(() => readHoldings(vanguardAnswer([]))).toThrow(refusal);
+    expect(() => readHoldings(vanguardAnswer([]), range[0])).toThrow(refusal);
     expect(() =>
-      readHoldings(vanguardAnswer([["British Pound Sterling", null, 100]])),
+      readHoldings(
+        vanguardAnswer([["British Pound Sterling", null, 100]]),
+        range[0],
+      ),
     ).toThrow(refusal);
   });
 
   it("refuses holdings dated after this month", () => {
-    expect(() => readHoldings(vanguardAnswer(lines, "2999-01-31"))).toThrow(
+    expect(() =>
+      readHoldings(vanguardAnswer(lines, "2999-01-31"), range[0]),
+    ).toThrow(
       new Refusal(
         "Vanguard dates what LifeStrategy 80% Equity holds to 2999-01-31, after this month",
       ),
@@ -132,6 +146,7 @@ describe("retargeted", () => {
           isBond(sedol) ? 0 : weight,
         ]),
       ),
+      range[0],
     );
     const hedged = targets.categories.filter(
       ({ name }) => name === "Global bonds, hedged",
@@ -219,9 +234,11 @@ describe("retargeted", () => {
           isBond(sedol) ? 0 : weight,
         ]),
       ),
+      range[0],
     );
     const unlisted = readHoldings(
       vanguardAnswer(lines.filter(([, sedol]) => !isBond(sedol))),
+      range[0],
     );
 
     expect(() => retargeted(targets.categories, weightless, split)).toThrow(
@@ -230,5 +247,36 @@ describe("retargeted", () => {
     expect(() => retargeted(targets.categories, unlisted, split)).toThrow(
       refusal,
     );
+  });
+
+  // The fixture's four equity funds, as a fund all in equities holds
+  // them, laid over the categories at three fifths in stocks: equities'
+  // 80 scaled to the whole, the developed world 50 of 80, the US 20 and
+  // the UK and emerging markets 5 each, and the bonds asked for nothing.
+  it("lays a fund all in equities over the categories all in equities, whatever the plan's split", () => {
+    const equities = readHoldings(vanguardAnswer(lines.slice(0, 4)), range[1]);
+
+    expect(retargeted(targets.categories, equities, split)).toStrictEqual(
+      new Map([
+        [idOf("FTSE All-Share"), 0],
+        [idOf("FTSE Global All Cap ex-UK"), 0.625],
+        [idOf("FTSE USA"), 0.25],
+        [idOf("Global bonds, hedged"), 0],
+        [idOf("Global emerging markets"), 0.0625],
+        [idOf("Global small cap"), 0],
+        [idOf("Index-linked gilts"), 0],
+        [idOf("Short-dated gilts"), 0],
+        [idOf("UK equity"), 0.0625],
+      ]),
+    );
+  });
+});
+
+describe("splitFor", () => {
+  it("lays a fund holding bonds at the plan's split, or its own where the plan has none, and one all in equities all in equities", () => {
+    expect(splitFor(range[0], split)).toBe(split);
+    expect(splitFor(range[0], null)).toStrictEqual({ stocks: 0.8 });
+    expect(splitFor(range[1], split)).toStrictEqual({ stocks: 1 });
+    expect(splitFor(range[1], null)).toStrictEqual({ stocks: 1 });
   });
 });
