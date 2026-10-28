@@ -45,7 +45,7 @@ const vendoredPattern = {
 // and reads the store, and nothing beneath it reaches back up. The server
 // actions and the stores live under src/actions and src/store rather than
 // beside the routes for this reason, since an organism saves through an
-// action and a template signs out through one.
+// action and the sidebar signs out through one.
 const routesPattern = {
   group: ["@/app/*"],
   message:
