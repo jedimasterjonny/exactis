@@ -46,6 +46,20 @@ describe("CogitatorBoard", () => {
     );
     expect(screen.getByText("Imported 7 Sep 2026")).toBeInTheDocument();
     expect(screen.getByText("£5,450 held")).toBeInTheDocument();
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("cautions that the trades buy toward the target allocation's split while the plan holds another in bonds", () => {
+    render(
+      <CogitatorBoard
+        bonds={{ now: 0.4, targeted: 0.3 }}
+        targets={reference}
+      />,
+    );
+
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "The target allocation holds 30% in bonds; the plan holds 40% nowThe trades buy toward the target allocation's split. Retarget on Assumptions › Target allocation to buy toward the plan's.",
+    );
   });
 
   it("says no allocation is imported yet, pointing to where one is, and takes no amount", () => {

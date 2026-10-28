@@ -11,6 +11,7 @@ import { useState } from "react";
 import type { Target, Targets } from "@/data/targets";
 import type { Ladder, Rung } from "@/lib/trades";
 
+import { Caution } from "@/components/app/atoms/caution";
 import { DeltaValue } from "@/components/app/atoms/delta-value";
 import { EmptyState } from "@/components/app/atoms/empty-state";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
@@ -31,7 +32,12 @@ import {
   TableRow,
 } from "@/components/kit/table";
 import { counted } from "@/lib/count";
-import { formatGbp, formatPercent, formatPoints } from "@/lib/money";
+import {
+  formatGbp,
+  formatPercent,
+  formatPoints,
+  formatWholePercent,
+} from "@/lib/money";
 import { formatDay } from "@/lib/months";
 import {
   assumptions,
@@ -42,6 +48,7 @@ import {
 import { ladderOf, minimumTrade } from "@/lib/trades";
 
 interface CogitatorBoardProps {
+  readonly bonds?: { readonly now: number; readonly targeted: number };
   readonly targets: null | Targets;
 }
 
@@ -73,11 +80,19 @@ const unimplemented = "No fund assigned";
 // recommended trades leave each category against its target. Before
 // the amount is typed the tile says so, and the ledger reads as the
 // allocation stands.
+// While the plan holds a share in bonds now other than the target
+// allocation's, as one retargeted from a fund all in equities leaves it
+// once the glide path reaches bonds, a caution above everything says
+// both, since every trade then buys toward a split the plan no longer
+// holds; there is none unless the two are given.
 // There is nothing to lay out until an allocation is imported, until
 // what it holds has been read, which an older import has not, and
 // while no category has both a fund and a share to fill, and the
 // screen says which, pointing to where the allocation is imported.
-export function CogitatorBoard({ targets }: CogitatorBoardProps): JSX.Element {
+export function CogitatorBoard({
+  bonds,
+  targets,
+}: CogitatorBoardProps): JSX.Element {
   const [amount, setAmount] = useState(0);
   const categories = targets?.categories ?? [];
   const held = categories.reduce((sum, { value }) => sum + value, 0);
@@ -111,6 +126,13 @@ export function CogitatorBoard({ targets }: CogitatorBoardProps): JSX.Element {
         )}
       </ScreenHeader>
       <ScreenBody>
+        {bonds !== undefined && (
+          <Caution
+            title={`The target allocation holds ${formatWholePercent(bonds.targeted)} in bonds; the plan holds ${formatWholePercent(bonds.now)} now`}
+          >
+            {`The trades buy toward the target allocation's split. Retarget on ${assumptions.label} › Target allocation to buy toward the plan's.`}
+          </Caution>
+        )}
         {targets === null && (
           <Unready
             description="Import a Portfolio Performance file."
