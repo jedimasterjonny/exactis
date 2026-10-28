@@ -14,11 +14,11 @@ import type { LineValues } from "@/data/schedule";
 import type { Entry } from "@/hooks/use-editor";
 
 import { removeExpenseLine, saveExpenseLine } from "@/actions/schedule";
-import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
-import { EditDialog } from "@/components/app/molecules/edit-dialog";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
+import { EditDialog } from "@/components/app/organisms/edit-dialog";
 import { LineFields } from "@/components/app/organisms/line-fields";
 import { ScheduleRows } from "@/components/app/organisms/schedule-rows";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { drawnAsMortgages, mortgageLine } from "@/data/houses";

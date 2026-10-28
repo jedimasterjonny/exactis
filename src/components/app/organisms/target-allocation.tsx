@@ -20,8 +20,8 @@ import type { Targets } from "@/data/targets";
 
 import { pullLifeStrategy } from "@/actions/lifestrategy";
 import { importTargets, mapByName } from "@/actions/targets";
-import { EmptyState } from "@/components/app/atoms/empty-state";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { EmptyState } from "@/components/app/molecules/empty-state";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { TargetTable } from "@/components/app/organisms/target-table";
 import { Button, buttonVariants } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";

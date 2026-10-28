@@ -9,9 +9,9 @@ import type { Curve } from "@/data/inflation";
 
 import { pullCurve } from "@/actions/inflation";
 import { CurveChart } from "@/components/app/atoms/curve-chart";
-import { EmptyState } from "@/components/app/atoms/empty-state";
 import { Ledger } from "@/components/app/atoms/ledger";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { EmptyState } from "@/components/app/molecules/empty-state";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";

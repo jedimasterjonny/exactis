@@ -3,7 +3,7 @@ import type { JSX } from "react";
 import type { Plan, Spread } from "@/data/plan";
 
 import { Worksheet } from "@/components/app/atoms/worksheet";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { CardContent } from "@/components/kit/card";
 import { statedSpread } from "@/data/plan";
 import { formatPercent } from "@/lib/money";

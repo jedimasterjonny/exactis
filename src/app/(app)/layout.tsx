@@ -4,7 +4,7 @@ import { Suspense, use } from "react";
 
 import type { Opened } from "@/store/household";
 
-import { ScenarioBanner } from "@/components/app/atoms/scenario-banner";
+import { ScenarioBanner } from "@/components/app/molecules/scenario-banner";
 import { AppFrame } from "@/components/app/templates/app-frame";
 import { getOpened } from "@/store/household";
 

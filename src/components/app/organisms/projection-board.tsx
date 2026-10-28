@@ -16,9 +16,9 @@ import type { Future } from "@/engine/futures";
 import type { ProjectionPoint } from "@/engine/projection";
 
 import { saveAges } from "@/actions/plan";
-import { MilestoneChips } from "@/components/app/atoms/milestone-chips";
 import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { AgeField } from "@/components/app/molecules/age-field";
+import { MilestoneChips } from "@/components/app/molecules/milestone-chips";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ChanceTile } from "@/components/app/organisms/chance-tile";
 import { ProjectionChart } from "@/components/app/organisms/projection-chart";

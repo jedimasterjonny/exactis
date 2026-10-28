@@ -26,8 +26,8 @@ import type { Plan } from "@/data/plan";
 import type { Tie } from "@/data/schedule";
 import type { ProjectionPoint } from "@/engine/projection";
 
-import { EmptyState } from "@/components/app/atoms/empty-state";
-import { LabelledSwitch } from "@/components/app/atoms/labelled-switch";
+import { EmptyState } from "@/components/app/molecules/empty-state";
+import { LabelledSwitch } from "@/components/app/molecules/labelled-switch";
 import { buttonVariants } from "@/components/kit/button";
 import { Card, CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";

@@ -4,7 +4,7 @@ import { useId } from "react";
 
 import type { Slot } from "@/lib/slot";
 
-import { SectionHeader } from "@/components/app/atoms/section-header";
+import { SectionHeader } from "@/components/app/molecules/section-header";
 import { Card, CardHeader } from "@/components/kit/card";
 
 interface SectionCardProps {

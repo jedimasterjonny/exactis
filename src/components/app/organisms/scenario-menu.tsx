@@ -11,9 +11,9 @@ import {
   enterScenario,
   leaveScenario,
 } from "@/actions/scenarios";
-import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
-import { EditDialog } from "@/components/app/molecules/edit-dialog";
+import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { TextField } from "@/components/app/molecules/text-field";
+import { EditDialog } from "@/components/app/organisms/edit-dialog";
 import {
   NativeSelect,
   NativeSelectOptGroup,

@@ -3,11 +3,11 @@ import type { JSX, ReactNode } from "react";
 import { LogOut } from "lucide-react";
 
 import { signOut } from "@/actions/auth";
-import { AppNav } from "@/components/app/atoms/app-nav";
 import { ScreenLabel } from "@/components/app/atoms/screen-label";
+import { AppNav } from "@/components/app/molecules/app-nav";
 import { ExportMenu } from "@/components/app/molecules/export-menu";
-import { HouseholdImport } from "@/components/app/molecules/household-import";
-import { ThemeToggle } from "@/components/app/molecules/theme-toggle";
+import { HouseholdImport } from "@/components/app/organisms/household-import";
+import { ThemeToggle } from "@/components/app/organisms/theme-toggle";
 import {
   Sidebar,
   SidebarContent,

@@ -4,8 +4,8 @@ import type { RateSet as Chosen } from "@/data/rates";
 
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
-import { ScreenTabs } from "@/components/app/atoms/screen-tabs";
 import { SourceDates } from "@/components/app/atoms/source-dates";
+import { ScreenTabs } from "@/components/app/molecules/screen-tabs";
 import { GlidePath } from "@/components/app/organisms/glide-path";
 import { InflationSource } from "@/components/app/organisms/inflation-source";
 import { RateSet } from "@/components/app/organisms/rate-set";

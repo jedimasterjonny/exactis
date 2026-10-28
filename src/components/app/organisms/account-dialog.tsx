@@ -14,8 +14,8 @@ import type { Owner } from "@/data/owners";
 import type { Entry } from "@/hooks/use-editor";
 
 import { saveAccount } from "@/actions/accounts";
-import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { AccountFields } from "@/components/app/organisms/account-fields";
+import { EditDialog } from "@/components/app/organisms/edit-dialog";
 import { SacrificeFields } from "@/components/app/organisms/sacrifice-fields";
 import { isOwned, isPension, takesSpare, toValues } from "@/data/accounts";
 import { useMountedEditor } from "@/hooks/use-editor";

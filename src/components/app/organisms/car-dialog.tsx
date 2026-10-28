@@ -10,8 +10,8 @@ import type { LoanFigure, WorkedOut } from "@/lib/figures";
 import type { PlanMonth } from "@/lib/loans";
 
 import { saveCar } from "@/actions/accounts";
-import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { CarFields } from "@/components/app/organisms/car-fields";
+import { EditDialog } from "@/components/app/organisms/edit-dialog";
 import { carOf, clearsAfter, derive, isSound } from "@/data/cars";
 import { useMountedEditor } from "@/hooks/use-editor";
 import { isSettled, kept, movesLoan, settled, workedOn } from "@/lib/figures";

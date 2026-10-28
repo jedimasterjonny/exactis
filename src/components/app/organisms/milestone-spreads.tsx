@@ -13,7 +13,6 @@ import type { Plan } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { Future } from "@/engine/futures";
 
-import { EmptyState } from "@/components/app/atoms/empty-state";
 import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { PinBar } from "@/components/app/atoms/pin-bar";
 import { RowLock } from "@/components/app/atoms/row-lock";
@@ -21,8 +20,9 @@ import { RowOpener } from "@/components/app/atoms/row-opener";
 import { SpanRuler } from "@/components/app/atoms/span-ruler";
 import { SpreadBar } from "@/components/app/atoms/spread-bar";
 import { YearAge } from "@/components/app/atoms/year-age";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { EmptyState } from "@/components/app/molecules/empty-state";
 import { MilestoneDialog } from "@/components/app/organisms/milestone-dialog";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import {

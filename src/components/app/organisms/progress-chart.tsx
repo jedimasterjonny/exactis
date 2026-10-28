@@ -18,7 +18,7 @@ import type { Balance, ProgressPoint } from "@/data/progress";
 import type { Month } from "@/data/schedule";
 import type { PlannedMonth } from "@/lib/planned";
 
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
 import { balances, netWorthOf } from "@/data/progress";

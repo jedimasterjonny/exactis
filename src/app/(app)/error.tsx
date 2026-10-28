@@ -5,8 +5,8 @@ import type { JSX } from "react";
 
 import { TriangleAlert } from "lucide-react";
 
-import { EmptyState } from "@/components/app/atoms/empty-state";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
+import { EmptyState } from "@/components/app/molecules/empty-state";
 import { Button } from "@/components/kit/button";
 import { reasonOf } from "@/lib/errors";
 

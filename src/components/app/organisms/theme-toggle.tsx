@@ -6,7 +6,7 @@ import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
 
-import { LabelledSwitch } from "@/components/app/atoms/labelled-switch";
+import { LabelledSwitch } from "@/components/app/molecules/labelled-switch";
 
 // Daylight is the default and the intended theme; night watch is opt-in,
 // as the reference has it. The switch takes the sidebar tone, since it

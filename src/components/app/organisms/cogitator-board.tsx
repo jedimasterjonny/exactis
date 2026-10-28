@@ -11,16 +11,16 @@ import { useState } from "react";
 import type { Target, Targets } from "@/data/targets";
 import type { Ladder, Rung } from "@/lib/trades";
 
-import { Caution } from "@/components/app/atoms/caution";
 import { DeltaValue } from "@/components/app/atoms/delta-value";
-import { EmptyState } from "@/components/app/atoms/empty-state";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { TileGrid } from "@/components/app/atoms/tile-grid";
+import { Caution } from "@/components/app/molecules/caution";
+import { EmptyState } from "@/components/app/molecules/empty-state";
 import { MoneyField } from "@/components/app/molecules/figure-field";
 import { FoldedCell } from "@/components/app/molecules/folded-cell";
-import { SectionCard } from "@/components/app/molecules/section-card";
 import { StatTile } from "@/components/app/molecules/stat-tile";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { Badge } from "@/components/kit/badge";
 import { CardContent, CardFooter } from "@/components/kit/card";
 import {

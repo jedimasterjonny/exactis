@@ -16,17 +16,17 @@ import {
   saveMilestone,
   saveRetirement,
 } from "@/actions/milestones";
-import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
-import { RadioChoice } from "@/components/app/atoms/radio-choice";
 import { RowAction } from "@/components/app/atoms/row-action";
 import { AgeField } from "@/components/app/molecules/age-field";
-import { EditDialog } from "@/components/app/molecules/edit-dialog";
+import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import {
   MoneyField,
   MultipleField,
 } from "@/components/app/molecules/figure-field";
+import { RadioChoice } from "@/components/app/molecules/radio-choice";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
+import { EditDialog } from "@/components/app/organisms/edit-dialog";
 import { Button } from "@/components/kit/button";
 import { RadioGroup } from "@/components/kit/radio-group";
 import { schoolLeavingAge } from "@/data/children";

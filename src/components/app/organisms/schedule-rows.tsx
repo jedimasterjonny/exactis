@@ -9,12 +9,12 @@ import type { Marker } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { LineValues, Side, Tie } from "@/data/schedule";
 
-import { EmptyState } from "@/components/app/atoms/empty-state";
 import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { RowLock } from "@/components/app/atoms/row-lock";
 import { RowOpener } from "@/components/app/atoms/row-opener";
 import { SpanBar } from "@/components/app/atoms/span-bar";
 import { YearAge } from "@/components/app/atoms/year-age";
+import { EmptyState } from "@/components/app/molecules/empty-state";
 import { Badge } from "@/components/kit/badge";
 import { yearsOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";

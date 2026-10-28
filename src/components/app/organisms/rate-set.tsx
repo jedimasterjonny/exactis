@@ -13,13 +13,13 @@ import type { Targets } from "@/data/targets";
 
 import { pullCma } from "@/actions/cma";
 import { saveDeductions, saveRateSet } from "@/actions/plan";
-import { Caution } from "@/components/app/atoms/caution";
 import { FieldRow } from "@/components/app/atoms/field-row";
-import { RadioChoice } from "@/components/app/atoms/radio-choice";
+import { Caution } from "@/components/app/molecules/caution";
 import { RateField } from "@/components/app/molecules/figure-field";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { RadioChoice } from "@/components/app/molecules/radio-choice";
 import { CmaWorksheet } from "@/components/app/organisms/cma-worksheet";
 import { CustomRates } from "@/components/app/organisms/custom-rates";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { RadioGroup } from "@/components/kit/radio-group";

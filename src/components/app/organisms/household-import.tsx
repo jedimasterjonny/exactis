@@ -6,7 +6,7 @@ import { Upload } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { importHousehold } from "@/actions/household";
-import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
+import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { SidebarMenuButton } from "@/components/kit/sidebar";
 import { useSender } from "@/hooks/use-sender";
 
