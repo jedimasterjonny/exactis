@@ -3,7 +3,7 @@ import type { JSX, ReactNode } from "react";
 import type { Slot } from "@/lib/slot";
 
 import { ScreenBody } from "@/components/app/atoms/screen-body";
-import { ScreenHeader } from "@/components/app/atoms/screen-header";
+import { ScreenHeader } from "@/components/app/organisms/screen-header";
 
 interface ScreenProps {
   readonly actions?: Slot;
