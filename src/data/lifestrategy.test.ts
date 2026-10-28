@@ -4,9 +4,20 @@ import { describe, expect, it } from "vitest";
 
 import { Refusal } from "@/lib/answer";
 
-import { readHoldings, requestOf, retargeted, split } from "./lifestrategy";
+import { readHoldings, requestOf, retargeted } from "./lifestrategy";
 import { holdings, lines, vanguardAnswer } from "./lifestrategy.fixture";
 import { targets } from "./targets.fixture";
+
+// The split the plan holds, three fifths in stocks.
+const split = { stocks: 0.6 };
+
+// What the shares given come to across the categories beneath the top
+// class named.
+function beneath(shares: ReadonlyMap<string, number>, top: string): number {
+  return targets.categories
+    .filter(({ classes }) => classes[0] === top)
+    .reduce((sum, { id }) => sum + (shares.get(id) ?? 0), 0);
+}
 
 const idOf = (name: string): string =>
   targets.categories.find((category) => category.name === name)?.id ?? "";
@@ -69,50 +80,91 @@ describe("readHoldings", () => {
 });
 
 describe("retargeted", () => {
-  // Equities' 80 scaled to 90 and bonds' 20 to 10: the developed world
-  // 50 of 80 of 90, the US 20, the UK and emerging markets 5 each; the
-  // global bonds 15 of 20 of 10 and the linkers 5. FTSE All-Share stands
+  // Equities' 80 scaled to 60 and bonds' 20 to 40: the developed world
+  // 50 of 80 of 60, the US 20, the UK and emerging markets 5 each; the
+  // global bonds 15 of 20 of 40 and the linkers 5. FTSE All-Share stands
   // for the UK beside UK equity and asks for nothing, so UK equity takes it;
   // small caps and short-dated gilts stand for nothing LifeStrategy
   // holds.
   it("gives each fund's weight of its sleeve, at the sleeve's share of the whole, to the category standing for it, and the rest nothing", () => {
-    expect(retargeted(targets.categories, holdings)).toStrictEqual(
+    expect(retargeted(targets.categories, holdings, split)).toStrictEqual(
       new Map([
         [idOf("FTSE All-Share"), 0],
-        [idOf("FTSE Global All Cap ex-UK"), 0.5625],
-        [idOf("FTSE USA"), 0.225],
-        [idOf("Global bonds, hedged"), 0.075],
-        [idOf("Global emerging markets"), 0.05625],
+        [idOf("FTSE Global All Cap ex-UK"), 0.375],
+        [idOf("FTSE USA"), 0.15],
+        [idOf("Global bonds, hedged"), 0.3],
+        [idOf("Global emerging markets"), 0.0375],
         [idOf("Global small cap"), 0],
-        [idOf("Index-linked gilts"), 0.025],
+        [idOf("Index-linked gilts"), 0.1],
         [idOf("Short-dated gilts"), 0],
-        [idOf("UK equity"), 0.05625],
+        [idOf("UK equity"), 0.0375],
       ]),
     );
   });
 
   // The categories beneath Equity add up to the split's stocks, and
-  // those beneath Bonds to its bonds.
+  // those beneath Bonds to its bonds, whatever the split.
   it("scales each sleeve to its share of the split", () => {
-    const shares = retargeted(targets.categories, holdings);
-    const beneath = (top: string): number =>
-      targets.categories
-        .filter(({ classes }) => classes[0] === top)
-        .reduce((sum, { id }) => sum + (shares.get(id) ?? 0), 0);
+    const shares = retargeted(targets.categories, holdings, { stocks: 0.35 });
 
-    expect(beneath("Equity")).toBeCloseTo(split.stocks, 12);
-    expect(beneath("Bonds")).toBeCloseTo(split.bonds, 12);
+    expect(beneath(shares, "Equity")).toBeCloseTo(0.35, 12);
+    expect(beneath(shares, "Bonds")).toBeCloseTo(0.65, 12);
+  });
+
+  it("lays the fund at its own split where none is given", () => {
+    const shares = retargeted(targets.categories, holdings, null);
+
+    expect(beneath(shares, "Equity")).toBeCloseTo(0.8, 12);
+    expect(beneath(shares, "Bonds")).toBeCloseTo(0.2, 12);
+  });
+
+  // All in stocks, the bond funds weighing nothing, and two categories
+  // standing alike for global bonds, are given nothing rather than
+  // refused, since the sleeve is given nothing whichever takes them.
+  it("passes over the funds in a sleeve the split gives nothing", () => {
+    const isBond = (sedol: null | string): boolean =>
+      sedol === "B50W2R1" || sedol === "B45Q903";
+    const weightless = readHoldings(
+      vanguardAnswer(
+        lines.map(([name, sedol, weight]) => [
+          name,
+          sedol,
+          isBond(sedol) ? 0 : weight,
+        ]),
+      ),
+    );
+    const hedged = targets.categories.filter(
+      ({ name }) => name === "Global bonds, hedged",
+    );
+    const alike = [
+      ...targets.categories,
+      ...hedged.map((category) => ({
+        ...category,
+        id: "Global Aggregate",
+        name: "Global Aggregate",
+      })),
+    ];
+    const shares = retargeted(alike, weightless, { stocks: 1 });
+
+    expect(shares.get(idOf("Global bonds, hedged"))).toBe(0);
+    expect(shares.get("Global Aggregate")).toBe(0);
+    expect(shares.get(idOf("Index-linked gilts"))).toBe(0);
+    expect(shares.get(idOf("FTSE Global All Cap ex-UK"))).toBe(0.625);
   });
 
   it("refuses a fund the table does not hold, by name", () => {
     expect(() =>
-      retargeted(targets.categories, {
-        ...holdings,
-        funds: [
-          ...holdings.funds,
-          { name: "Vanguard Gold Fund", sedol: "B000000", weight: 0.01 },
-        ],
-      }),
+      retargeted(
+        targets.categories,
+        {
+          ...holdings,
+          funds: [
+            ...holdings.funds,
+            { name: "Vanguard Gold Fund", sedol: "B000000", weight: 0.01 },
+          ],
+        },
+        split,
+      ),
     ).toThrow(
       new Refusal(
         "LifeStrategy 80% Equity holds Vanguard Gold Fund, which no category is known to stand for",
@@ -127,6 +179,7 @@ describe("retargeted", () => {
           ({ name }) => name !== "Global emerging markets",
         ),
         holdings,
+        split,
       ),
     ).toThrow(
       new Refusal(
@@ -142,7 +195,7 @@ describe("retargeted", () => {
         : category,
     );
 
-    expect(() => retargeted(alike, holdings)).toThrow(
+    expect(() => retargeted(alike, holdings, split)).toThrow(
       new Refusal(
         "UK equity and FTSE All-Share both stand for Vanguard FTSE UK All Share Index Unit Trust, and neither asks for more",
       ),
@@ -171,7 +224,11 @@ describe("retargeted", () => {
       vanguardAnswer(lines.filter(([, sedol]) => !isBond(sedol))),
     );
 
-    expect(() => retargeted(targets.categories, weightless)).toThrow(refusal);
-    expect(() => retargeted(targets.categories, unlisted)).toThrow(refusal);
+    expect(() => retargeted(targets.categories, weightless, split)).toThrow(
+      refusal,
+    );
+    expect(() => retargeted(targets.categories, unlisted, split)).toThrow(
+      refusal,
+    );
   });
 });

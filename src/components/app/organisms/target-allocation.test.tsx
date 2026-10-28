@@ -43,9 +43,15 @@ vi.mock("@/actions/targets", () => ({
 const saved80 = portfolioFile(clientOf([["Asset Allocation", reference]]));
 const chosen = new File([saved80], "PortfolioPerformance.portfolio");
 
-// The file retargeted from what the fixture's LifeStrategy holds, as
-// the card writes it.
-const saved90 = reweighted(saved80, retargeted(readTargets(saved80), holdings));
+// The split the plan holds now, seven tenths in stocks.
+const split = { stocks: 0.7 };
+
+// The file retargeted from what the fixture's LifeStrategy holds, at
+// the split, as the card writes it.
+const saved70 = reweighted(
+  saved80,
+  retargeted(readTargets(saved80), holdings, split),
+);
 
 // The files this browser has been given to hold, in turn.
 const held: Blob[] = [];
@@ -77,7 +83,12 @@ function choose(files: null | readonly File[]): HTMLInputElement {
 // through the toast manager, which needs its Toaster mounted.
 function renderCard(held: null | Targets = targets): RenderResult {
   return render(
-    <TargetAllocation cma={cma} mappings={mappings} targets={held} />,
+    <TargetAllocation
+      cma={cma}
+      mappings={mappings}
+      split={split}
+      targets={held}
+    />,
     { wrapper: Toaster },
   );
 }
@@ -267,7 +278,7 @@ describe("TargetAllocation", () => {
     retargetWith(chosen);
 
     await waitFor(() => {
-      expect(importTargets).toHaveBeenCalledWith(readTargets(saved90));
+      expect(importTargets).toHaveBeenCalledWith(readTargets(saved70));
     });
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(
@@ -280,7 +291,7 @@ describe("TargetAllocation", () => {
       expect(
         screen.getByRole("dialog", { name: "Target allocation retargeted" }),
       ).toHaveAccessibleDescription(
-        "LifeStrategy 80% Equity as at 31 Aug 2026, at 90% equity and 10% bonds",
+        "LifeStrategy 80% Equity as at 31 Aug 2026, at 70% equity and 30% bonds",
       );
     });
     const link = await screen.findByRole("link", {
@@ -295,7 +306,7 @@ describe("TargetAllocation", () => {
       unzipSync(
         new Uint8Array(await (held.at(-1) ?? new Blob()).arrayBuffer()),
       ),
-    ).toStrictEqual(unzipSync(saved90));
+    ).toStrictEqual(unzipSync(saved70));
     expect(StubUrl.revokeObjectURL).not.toHaveBeenCalled();
 
     // Retargeted again, the offer is replaced and the first file let go.
@@ -349,6 +360,40 @@ describe("TargetAllocation", () => {
     });
     expect(StubUrl.revokeObjectURL).toHaveBeenCalledWith(
       link.getAttribute("href"),
+    );
+  });
+
+  // The plan's split being the target allocation's own, the fund is
+  // laid at its own four fifths in equities.
+  it("retargets at the fund's own split while the plan's is the target allocation's own", async () => {
+    vi.stubGlobal("URL", StubUrl);
+    vi.mocked(pullLifeStrategy).mockResolvedValue(saved(holdings));
+    vi.mocked(importTargets).mockResolvedValue(
+      saved({ ...targets, importedOn: "2026-09-15" }),
+    );
+    render(
+      <TargetAllocation
+        cma={cma}
+        mappings={mappings}
+        split={null}
+        targets={targets}
+      />,
+      { wrapper: Toaster },
+    );
+
+    retargetWith(chosen);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Target allocation retargeted" }),
+      ).toHaveAccessibleDescription(
+        "LifeStrategy 80% Equity as at 31 Aug 2026, at 80% equity and 20% bonds",
+      );
+    });
+    expect(importTargets).toHaveBeenCalledWith(
+      readTargets(
+        reweighted(saved80, retargeted(readTargets(saved80), holdings, null)),
+      ),
     );
   });
 
@@ -469,9 +514,15 @@ describe("TargetAllocation", () => {
   // has no name for.
   it("counts every category without a class its name suggests one for, and says how many it mapped", async () => {
     vi.mocked(mapByName).mockResolvedValue(saved(mappings));
-    render(<TargetAllocation cma={cma} mappings={[]} targets={targets} />, {
-      wrapper: Toaster,
-    });
+    render(
+      <TargetAllocation
+        cma={cma}
+        mappings={[]}
+        split={split}
+        targets={targets}
+      />,
+      { wrapper: Toaster },
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Map 8 by name" }));
 
@@ -508,6 +559,7 @@ describe("TargetAllocation", () => {
           ...mappings,
           { asset: "US large cap equities", category: ftseUsa?.id ?? "" },
         ]}
+        split={split}
         targets={targets}
       />,
     );
@@ -516,13 +568,22 @@ describe("TargetAllocation", () => {
       screen.queryByRole("button", { name: /by name$/ }),
     ).not.toBeInTheDocument();
 
-    rerender(<TargetAllocation cma={null} mappings={[]} targets={targets} />);
+    rerender(
+      <TargetAllocation
+        cma={null}
+        mappings={[]}
+        split={split}
+        targets={targets}
+      />,
+    );
 
     expect(
       screen.queryByRole("button", { name: /by name$/ }),
     ).not.toBeInTheDocument();
 
-    rerender(<TargetAllocation cma={cma} mappings={[]} targets={null} />);
+    rerender(
+      <TargetAllocation cma={cma} mappings={[]} split={split} targets={null} />,
+    );
 
     expect(
       screen.queryByRole("button", { name: /by name$/ }),

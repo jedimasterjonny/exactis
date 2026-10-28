@@ -36,7 +36,9 @@ const setNames: Record<Chosen, string> = {
 // pulled from the Bank, which the derived rates take and the rates typed
 // by hand set aside. The second holds the target
 // allocation last imported from Portfolio Performance, with the class
-// of the latest CMA each category is mapped onto. The third holds the
+// of the latest CMA each category is mapped onto, retargeted at the
+// split the plan holds now unless that is the target allocation's own,
+// as under the CMA's rates with no glide path. The third holds the
 // glide path, the bond share by age it sets. The fourth holds the State
 // Pension, each owner's qualifying years and what they earn, counted to
 // the retirement the plan lays out as its own projection has it, as the
@@ -114,6 +116,7 @@ export default async function Assumptions({
                 <TargetAllocation
                   cma={cma?.latest ?? null}
                   mappings={mappings}
+                  split={rateSet === "cma" && !hasGlide ? null : split}
                   targets={targets}
                 />
               ),

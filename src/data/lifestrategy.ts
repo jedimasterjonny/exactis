@@ -2,6 +2,7 @@ import { strFromU8 } from "fflate";
 import * as z from "zod";
 
 import type { Sleeve } from "@/data/cma";
+import type { Allocation } from "@/data/rates";
 import type { Target } from "@/data/targets";
 
 import { standingFor } from "@/data/class-table";
@@ -35,17 +36,15 @@ interface Placed {
 
 // The fund the allocation is retargeted from: Vanguard's LifeStrategy
 // 80% Equity, its accumulation shares, by the id Vanguard's site asks
-// about a fund under.
-export const fund = { name: "LifeStrategy 80% Equity", portId: "9244" };
+// about a fund under, and its own split, four fifths in equities.
+export const fund = {
+  name: "LifeStrategy 80% Equity",
+  portId: "9244",
+  split: { stocks: 0.8 },
+};
 
 // Where Vanguard's site asks what a fund holds.
 const address = "https://www.vanguardinvestor.co.uk/gpx/graphql";
-
-// What the allocation is retargeted to: the fund's equities scaled to
-// nine tenths of the whole, and its bonds to a tenth.
-// ponytail: one split for one fund; a field for each when another is
-// wanted.
-export const split: Record<Sleeve, number> = { bonds: 0.1, stocks: 0.9 };
 
 // The question Vanguard's site asks of what a fund holds, posted as its
 // own page posts it: each holding's day, weight, name and SEDOL, the
@@ -129,30 +128,39 @@ export function readHoldings(sent: Uint8Array): Holdings {
 }
 
 // The share of the whole each category is to hold, by its id, for the
-// allocation to hold what LifeStrategy holds at the split: each fund's
-// weight of the sleeve it is in, by the sleeve's share of the whole,
-// given to the category standing for it, and every other category
-// asking for nothing, since it stands for nothing LifeStrategy holds.
+// allocation to hold what LifeStrategy holds at the split given, or at
+// its own where none is, as none is while the plan's split is the target
+// allocation's own: each fund's weight of the sleeve it is in, by the
+// sleeve's share of the whole, given to the category standing for it,
+// and every other category asking for nothing, since it stands for
+// nothing LifeStrategy holds. A fund in a sleeve the split gives nothing
+// is passed over, since it is given nothing whichever category takes it.
 // Where more than one category stands for a fund, as one for the index
 // a fund tracks and one for the fund it replaced do, the one asking
 // for the largest share now takes it, since the others are the ones
 // being wound down; two asking alike are refused by name, since
 // nothing says which. A fund the table does not hold is refused by
 // name, as is one no category stands for, since the allocation cannot
-// then hold what the fund does; and a sleeve the fund holds nothing in,
-// whether its funds weigh nothing or it lists none, is refused, since
-// nothing could be scaled to the sleeve's share and the split would be
-// quietly lost.
+// then hold what the fund does; and a sleeve the split asks a share of
+// that the fund holds nothing in, whether its funds weigh nothing or it
+// lists none, is refused, since nothing could be scaled to the sleeve's
+// share and the split would be quietly lost.
 export function retargeted(
   categories: readonly Target[],
   { funds }: Holdings,
+  split: Allocation | null,
 ): ReadonlyMap<string, number> {
-  const placed: readonly Placed[] = funds.map((holding) => {
+  const { stocks } = split ?? fund.split;
+  const shares: Record<Sleeve, number> = { bonds: 1 - stocks, stocks };
+  const placed: readonly Placed[] = funds.flatMap((holding) => {
     const standing = standingFor(holding.sedol, categories);
     if (standing === undefined) {
       throw new Refusal(
         `${fund.name} holds ${holding.name}, which no category is known to stand for`,
       );
+    }
+    if (shares[standing.sleeve] === 0) {
+      return [];
     }
     const [first, second] = standing.categories.toSorted(
       (one, other) => other.share - one.share,
@@ -167,7 +175,7 @@ export function retargeted(
         `${first.name} and ${second.name} both stand for ${holding.name}, and neither asks for more`,
       );
     }
-    return { category: first, holding, sleeve: standing.sleeve };
+    return [{ category: first, holding, sleeve: standing.sleeve }];
   });
   const heldIn = (sleeve: Sleeve): number =>
     sumOf(
@@ -175,12 +183,12 @@ export function retargeted(
       (each) => each.holding.weight,
     );
   for (const sleeve of sleeves) {
-    if (heldIn(sleeve) <= 0) {
+    if (shares[sleeve] > 0 && heldIn(sleeve) <= 0) {
       throw new Refusal(`${fund.name} holds nothing in ${sleeve}`);
     }
   }
   const shareOf = ({ holding, sleeve }: Placed): number =>
-    (holding.weight / heldIn(sleeve)) * split[sleeve];
+    (holding.weight / heldIn(sleeve)) * shares[sleeve];
   return new Map(
     categories.map(({ id }) => [
       id,
