@@ -72,35 +72,44 @@
 }
 
 :root {
-  /* The shades a token borrows from the other theme, named once: the
-     inverse tile takes the dark theme's on paper and the light theme's on
-     ink, and a shade written in both places could be changed in one */
+  /* Every shade written more than once is named here, once, so a change
+     to it is one edit; a shade used once stays a literal at its token,
+     and so does white. Some cross themes: the inverse tile takes the dark
+     theme's on paper and the light theme's on ink */
+  --grey-25: #fafaf8;
+  --grey-50: #f4f5f3;
+  --grey-100: #e8eae6;
   --grey-300: #b8bdb8;
   --grey-500: #6b716d;
+  --grey-700: #363a37;
+  --grey-800: #232624;
+  --grey-900: #151716;
   --jade-300: #8fcfaf;
   --jade-500: #1f6b4f;
+  --ochre-300: #d3a557;
   --red-300: #ffa2a2;
   --red-700: #c10007;
   /* Exactis greys: cool with a faint warm cast in the paper tints */
-  --background: #fafaf8; /* grey-25 paper */
-  --foreground: #232624; /* grey-800 ink */
+  --background: var(--grey-25); /* paper */
+  --foreground: var(--grey-800); /* ink */
   --card: #ffffff;
-  --card-foreground: #232624;
+  --card-foreground: var(--grey-800);
   --popover: #ffffff;
-  --popover-foreground: #232624;
-  --primary: #232624; /* ink, not brand: commit actions are not brand moments */
-  --primary-foreground: #fafaf8;
-  --secondary: #f4f5f3; /* grey-50 sunken */
-  --secondary-foreground: #232624;
-  --muted: #f4f5f3;
+  --popover-foreground: var(--grey-800);
+  /* Ink, not brand: commit actions are not brand moments */
+  --primary: var(--grey-800);
+  --primary-foreground: var(--grey-25);
+  --secondary: var(--grey-50); /* sunken */
+  --secondary-foreground: var(--grey-800);
+  --muted: var(--grey-50);
   --muted-foreground: var(--grey-500);
-  --accent: #f4f5f3;
-  --accent-foreground: #232624;
+  --accent: var(--grey-50);
+  --accent-foreground: var(--grey-800);
   /* Losses and destructive actions. 6.1:1 on paper */
   --destructive: var(--red-700);
-  --border: #e8eae6; /* grey-100 hairline */
+  --border: var(--grey-100); /* hairline */
   --input: #d6d9d4; /* grey-200 control border */
-  --ring: #151716; /* grey-900 focus ink */
+  --ring: var(--grey-900); /* focus ink */
   /* Chart series by meaning: equity, bonds, property, cash, debt, and
      money invested outside a wrapper. That last is slate, stacked between
      the ISA's petrol and the cash's stone: ΔE 21.8 from the petrol, its
@@ -113,14 +122,14 @@
   --chart-6: #536f9d;
   --radius: 0.5rem; /* controls on the lg step at 8px; the card takes xl, about 11px */
   /* Ink sidebar, identical in both themes, so the dark scope leaves it be */
-  --sidebar: #151716;
-  --sidebar-foreground: #fafaf8;
+  --sidebar: var(--grey-900);
+  --sidebar-foreground: var(--grey-25);
   --sidebar-primary: #ac5348; /* oxide-400: active rail, 3.5:1 on ink */
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: rgb(255 255 255 / 6%);
-  --sidebar-accent-foreground: #fafaf8;
+  --sidebar-accent-foreground: var(--grey-25);
   --sidebar-border: rgb(255 255 255 / 8%);
-  --sidebar-ring: #fafaf8;
+  --sidebar-ring: var(--grey-25);
   /* Exactis additions */
   --brand: #8c2f27; /* oxide-500: wordmark dot, active tab, milestone markers */
   --brand-foreground: #ffffff;
@@ -144,38 +153,39 @@
 }
 
 .dark {
-  --background: #151716; /* grey-900 */
-  --foreground: #e8eae6; /* grey-100 */
-  --card: #232624; /* grey-800 */
-  --card-foreground: #e8eae6;
-  --popover: #232624;
-  --popover-foreground: #e8eae6;
-  --primary: #fafaf8;
-  --primary-foreground: #151716;
-  --secondary: #363a37; /* grey-700 */
-  --secondary-foreground: #e8eae6;
-  --muted: #363a37;
+  --background: var(--grey-900);
+  --foreground: var(--grey-100);
+  --card: var(--grey-800);
+  --card-foreground: var(--grey-100);
+  --popover: var(--grey-800);
+  --popover-foreground: var(--grey-100);
+  --primary: var(--grey-25);
+  --primary-foreground: var(--grey-900);
+  --secondary: var(--grey-700);
+  --secondary-foreground: var(--grey-100);
+  --muted: var(--grey-700);
   /* grey-400 fails AA on the muted surface */
   --muted-foreground: var(--grey-300);
-  --accent: #363a37;
-  --accent-foreground: #e8eae6;
+  --accent: var(--grey-700);
+  --accent-foreground: var(--grey-100);
   --destructive: var(--red-300); /* red-400 fails AA on the muted surface */
   --border: rgb(255 255 255 / 8%);
   --input: rgb(255 255 255 / 14%);
-  --ring: #fafaf8;
+  --ring: var(--grey-25);
   /* Series lighten in the dark scope; light-scope petrol reads as mud on ink */
   --chart-1: #7fb8a8;
   --chart-2: #43897a;
-  --chart-3: #d3a557;
+  --chart-3: var(--ochre-300);
   --chart-4: #8a867b;
   --chart-5: var(--red-300);
   /* Lifted in chroma rather than lightness, since lighter it meets the
      petrol: ΔE 15.8 from the stone and 14.0 under protanopia */
   --chart-6: #436eb4;
   --brand: #d18a7f; /* oxide-300 */
-  --brand-foreground: #151716;
+  --brand-foreground: var(--grey-900);
   --positive: var(--jade-300);
-  --caution: #d3a557; /* ochre-300: ochre-100 is indistinguishable from foreground */
+  /* ochre-100 is indistinguishable from foreground */
+  --caution: var(--ochre-300);
   /* Lifted for ink with each arm's order kept; ΔE 10.5 where they meet
      under deuteranopia, 15.7 for the nearest pair */
   --outcome-surplus: #2b7357;
