@@ -5,7 +5,7 @@ import type { Target, Targets } from "@/data/targets";
 
 import { commit, field } from "@/test/dom";
 
-import { CogitatorBoard } from "./cogitator-board";
+import { CogitatorScreen } from "./cogitator-screen";
 
 // An allocation of the categories given, imported on the seventh of
 // September 2026.
@@ -36,9 +36,9 @@ function invest(amount: string): void {
   commit(field("Amount to invest"), amount);
 }
 
-describe("CogitatorBoard", () => {
+describe("CogitatorScreen", () => {
   it("heads the screen as the seventh, saying when the targets were imported and what they hold", () => {
-    render(<CogitatorBoard targets={reference} />);
+    render(<CogitatorScreen targets={reference} />);
 
     expect(screen.getByText("Sect. VII · Cogitator")).toHaveClass("label");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -51,7 +51,7 @@ describe("CogitatorBoard", () => {
 
   it("cautions that the trades buy toward the target allocation's split while the plan holds another in bonds", () => {
     render(
-      <CogitatorBoard
+      <CogitatorScreen
         bonds={{ now: 0.4, targeted: 0.3 }}
         targets={reference}
       />,
@@ -63,7 +63,7 @@ describe("CogitatorBoard", () => {
   });
 
   it("says no allocation is imported yet, pointing to where one is, and takes no amount", () => {
-    render(<CogitatorBoard targets={null} />);
+    render(<CogitatorScreen targets={null} />);
 
     expect(screen.getByText("No allocation imported yet")).toBeInTheDocument();
     expect(
@@ -74,7 +74,7 @@ describe("CogitatorBoard", () => {
 
   it("says nothing is held yet while every category holds nothing, as an older import left them", () => {
     render(
-      <CogitatorBoard
+      <CogitatorScreen
         targets={allocation([target("A", 0.6, 0), target("B", 0.4, 0)])}
       />,
     );
@@ -85,7 +85,7 @@ describe("CogitatorBoard", () => {
 
   it("says there is nothing to buy toward while no category has both a fund and a share", () => {
     render(
-      <CogitatorBoard
+      <CogitatorScreen
         targets={allocation([
           target("A", 0, 1000),
           { ...target("B", 1, 0), isImplemented: false },
@@ -97,7 +97,7 @@ describe("CogitatorBoard", () => {
   });
 
   it("asks for the amount before any is typed, and reads the allocation as it stands", () => {
-    render(<CogitatorBoard targets={reference} />);
+    render(<CogitatorScreen targets={reference} />);
 
     expect(screen.getAllByText("Type an amount to invest.")).toHaveLength(1);
     expect(screen.getAllByText("No trade")).toHaveLength(3);
@@ -108,7 +108,7 @@ describe("CogitatorBoard", () => {
   });
 
   it("tiles the trades recommended, the largest set apart, and lays the ladder with the rung recommended flagged and those past it muted", () => {
-    render(<CogitatorBoard targets={reference} />);
+    render(<CogitatorScreen targets={reference} />);
     invest("2000");
 
     const toned = (tone: string): HTMLElement =>
@@ -144,7 +144,7 @@ describe("CogitatorBoard", () => {
   });
 
   it("recommends no trade for an amount under the minimum, saying what the first would put in", () => {
-    render(<CogitatorBoard targets={reference} />);
+    render(<CogitatorScreen targets={reference} />);
     invest("50");
 
     expect(
@@ -156,7 +156,7 @@ describe("CogitatorBoard", () => {
 
   it("names the first of trades the next rung would put the same into", () => {
     render(
-      <CogitatorBoard
+      <CogitatorScreen
         targets={allocation([target("A", 0.5, 1000), target("B", 0.5, 1000)])}
       />,
     );
@@ -171,7 +171,7 @@ describe("CogitatorBoard", () => {
 
   it("says the next trade would buy nothing where every other category holds its target", () => {
     render(
-      <CogitatorBoard
+      <CogitatorScreen
         targets={allocation([target("A", 0.5, 2000), target("B", 0.5, 3000)])}
       />,
     );
@@ -184,7 +184,7 @@ describe("CogitatorBoard", () => {
 
   it("ledgers each category's holding, its share now and after the trades, and its target, flagging one with no fund and muting a target of nothing", () => {
     render(
-      <CogitatorBoard
+      <CogitatorScreen
         targets={allocation([
           target("A", 0.5, 2000),
           target("B", 0, 1000),

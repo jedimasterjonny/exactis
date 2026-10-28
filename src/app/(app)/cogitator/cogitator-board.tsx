@@ -6,18 +6,14 @@ import type { JSX } from "react";
 import { cn } from "cn";
 import { Ban, ChartPie, Flag, FolderSync, TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 
 import type { Target, Targets } from "@/data/targets";
 import type { Ladder, Rung } from "@/lib/trades";
 
 import { DeltaValue } from "@/components/app/atoms/delta-value";
-import { ScreenBody } from "@/components/app/atoms/screen-body";
-import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { Caution } from "@/components/app/molecules/caution";
 import { EmptyState } from "@/components/app/molecules/empty-state";
-import { MoneyField } from "@/components/app/molecules/figure-field";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { FoldedCell } from "@/components/app/organisms/folded-cell";
 import { SectionCard } from "@/components/app/organisms/section-card";
@@ -38,17 +34,14 @@ import {
   formatPoints,
   formatWholePercent,
 } from "@/lib/money";
-import { formatDay } from "@/lib/months";
-import {
-  assumptions,
-  cogitator,
-  sectionLabel,
-  subsectionLabel,
-} from "@/lib/nav";
+import { assumptions, cogitator, subsectionLabel } from "@/lib/nav";
 import { ladderOf, minimumTrade } from "@/lib/trades";
 
 interface CogitatorBoardProps {
+  readonly amount: number;
   readonly bonds?: { readonly now: number; readonly targeted: number };
+  readonly held: number;
+  readonly isReady: boolean;
   readonly targets: null | Targets;
 }
 
@@ -66,10 +59,9 @@ const unimplemented = "No fund assigned";
 
 // The next best trades: what to buy, buying only, to bring the
 // allocation nearest its targets for the pounds typed in the header.
-// The header says when the targets were imported and what they hold in
-// all, and takes the amount to invest, which is the screen's own and
-// forgotten when it is left, since it is typed afresh at each visit to
-// the broker. Beneath, a tile a trade of the rung recommended, the
+// The screen holds the amount and hands it down, with what the
+// allocation holds in all and whether any of it can be bought
+// toward. Beneath, a tile a trade of the rung recommended, the
 // largest first and set apart, each saying what it puts into its
 // category and where that takes its share; then the ladder, a row a
 // count of trades, saying what each count buys, how far off target it
@@ -90,74 +82,45 @@ const unimplemented = "No fund assigned";
 // while no category has both a fund and a share to fill, and the
 // screen says which, pointing to where the allocation is imported.
 export function CogitatorBoard({
+  amount,
   bonds,
+  held,
+  isReady,
   targets,
 }: CogitatorBoardProps): JSX.Element {
-  const [amount, setAmount] = useState(0);
-  const categories = targets?.categories ?? [];
-  const held = categories.reduce((sum, { value }) => sum + value, 0);
-  const isReady =
-    held > 0 &&
-    categories.some(({ isImplemented, share }) => isImplemented && share > 0);
   return (
     <>
-      <ScreenHeader
-        actions={
-          isReady ? (
-            <MoneyField
-              defaultValue={0}
-              label="Amount to invest"
-              min={0}
-              onValueCommitted={setAmount}
-            />
-          ) : undefined
-        }
-        label={sectionLabel(cogitator)}
-        title={cogitator.title}
-      >
-        {targets === null ? undefined : (
-          <>
-            <Badge variant="secondary">
-              <FolderSync aria-hidden />
-              {`Imported ${formatDay(targets.importedOn)}`}
-            </Badge>
-            {`${formatGbp(held)} held`}
-          </>
-        )}
-      </ScreenHeader>
-      <ScreenBody>
-        {bonds !== undefined && (
-          <Caution
-            title={`The target allocation holds ${formatWholePercent(bonds.targeted)} in bonds; the plan holds ${formatWholePercent(bonds.now)} now`}
-          >
-            {`The trades buy toward the target allocation's split. Retarget on ${assumptions.label} › Target allocation to buy toward the plan's.`}
-          </Caution>
-        )}
-        {targets === null && (
-          <Unready
-            description="Import a Portfolio Performance file."
-            icon={ChartPie}
-            title="No allocation imported yet"
-          />
-        )}
-        {targets !== null && held === 0 && (
-          <Unready
-            description="Reload the Portfolio Performance file."
-            icon={FolderSync}
-            title="Nothing held yet"
-          />
-        )}
-        {targets !== null && held > 0 && !isReady && (
-          <Unready
-            description="No category has both a fund and a target."
-            icon={Ban}
-            title="Nothing to buy toward"
-          />
-        )}
-        {isReady && (
-          <Trades amount={amount} categories={categories} held={held} />
-        )}
-      </ScreenBody>
+      {bonds !== undefined && (
+        <Caution
+          title={`The target allocation holds ${formatWholePercent(bonds.targeted)} in bonds; the plan holds ${formatWholePercent(bonds.now)} now`}
+        >
+          {`The trades buy toward the target allocation's split. Retarget on ${assumptions.label} › Target allocation to buy toward the plan's.`}
+        </Caution>
+      )}
+      {targets === null && (
+        <Unready
+          description="Import a Portfolio Performance file."
+          icon={ChartPie}
+          title="No allocation imported yet"
+        />
+      )}
+      {targets !== null && held === 0 && (
+        <Unready
+          description="Reload the Portfolio Performance file."
+          icon={FolderSync}
+          title="Nothing held yet"
+        />
+      )}
+      {targets !== null && held > 0 && !isReady && (
+        <Unready
+          description="No category has both a fund and a target."
+          icon={Ban}
+          title="Nothing to buy toward"
+        />
+      )}
+      {targets !== null && isReady && (
+        <Trades amount={amount} categories={targets.categories} held={held} />
+      )}
     </>
   );
 }
