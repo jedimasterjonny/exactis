@@ -28,7 +28,7 @@ describe("Chance", () => {
     forget();
   });
 
-  it("hands the store's spread to the board, which says why there is nothing to draw", async () => {
+  it("hands the store's spread to the screen, which says why there is nothing to draw", async () => {
     vi.mocked(getHousehold).mockResolvedValue(household);
 
     render(await Chance());
@@ -47,7 +47,7 @@ describe("Chance", () => {
     ).toBeInTheDocument();
   });
 
-  it("hands the store's accounts, lines and plan to the board, which starts drawing the futures", async () => {
+  it("hands the store's accounts, lines and plan to the screen, which starts drawing the futures", async () => {
     vi.mocked(getHousehold).mockResolvedValue({
       ...household,
       accounts: [...accounts],
