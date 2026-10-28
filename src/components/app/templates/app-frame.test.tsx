@@ -1,24 +1,21 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { signOut } from "@/actions/auth";
 import { stubViewport } from "@/test/dom";
 
 import { AppFrame } from "./app-frame";
 
 vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
-vi.mock("@/actions/auth", () => ({ signOut: vi.fn() }));
-vi.mock("@/actions/household", () => ({ importHousehold: vi.fn() }));
 
 describe("AppFrame", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("frames the screen in the main landmark beside the wordmark, nav and motto", () => {
+  it("frames the screen in the main landmark beside the sidebar it is handed", () => {
     stubViewport(1024);
     render(
-      <AppFrame banner={null}>
+      <AppFrame banner={null} sidebar={<span>Sidebar</span>}>
         <p>Screen</p>
       </AppFrame>,
     );
@@ -29,23 +26,14 @@ describe("AppFrame", () => {
     expect(
       within(main).getByRole("button", { name: "Toggle Sidebar" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Exactis")).toHaveClass(
-      "font-heading",
-      "uppercase",
-    );
-    expect(screen.getByRole("link", { name: /^Dashboard/ })).toHaveAttribute(
-      "data-active",
-    );
-    expect(
-      screen.getByRole("switch", { name: "Daylight" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Certitudo in numeris")).toHaveClass("label");
+    expect(screen.getByText("Sidebar")).toBeInTheDocument();
+    expect(within(main).queryByText("Sidebar")).not.toBeInTheDocument();
   });
 
   it("names the current screen's section in the bar above it on a phone", () => {
     stubViewport(390);
     render(
-      <AppFrame banner={null}>
+      <AppFrame banner={null} sidebar={null}>
         <p>Screen</p>
       </AppFrame>,
     );
@@ -58,62 +46,10 @@ describe("AppFrame", () => {
     expect(within(main).getByText("Sect. I · Dashboard")).toHaveClass("label");
   });
 
-  it("offers sign-out as a form posting to its action", () => {
-    stubViewport(1024);
-    render(
-      <AppFrame banner={null}>
-        <p>Screen</p>
-      </AppFrame>,
-    );
-
-    const form = screen.getByRole("form", { name: "Sign out" });
-    const button = within(form).getByRole("button", { name: "Sign out" });
-
-    expect(button).toHaveAttribute("type", "submit");
-    expect(button).toHaveAttribute("data-slot", "sidebar-menu-button");
-    expect(button).toHaveClass("label");
-
-    fireEvent.click(button);
-
-    expect(signOut).toHaveBeenCalledOnce();
-  });
-
-  it("draws the export menu's button as sign-out is, in place of the link", () => {
-    stubViewport(1024);
-    render(
-      <AppFrame banner={null}>
-        <p>Screen</p>
-      </AppFrame>,
-    );
-
-    expect(screen.getByRole("button", { name: "Export" })).toHaveClass("label");
-    expect(
-      screen.queryByRole("link", { name: /Export/ }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("offers to import a household file beside the export, drawn as sign-out is", () => {
-    stubViewport(1024);
-    render(
-      <AppFrame banner={null}>
-        <p>Screen</p>
-      </AppFrame>,
-    );
-
-    const button = screen.getByRole("button", { name: "Import file…" });
-
-    expect(button).toHaveAttribute("data-slot", "sidebar-menu-button");
-    expect(button).toHaveClass("label");
-    expect(screen.getByLabelText("Household file")).toHaveAttribute(
-      "type",
-      "file",
-    );
-  });
-
   it("heads the main column with the banner it is handed, above the phone's bar", () => {
     stubViewport(390);
     render(
-      <AppFrame banner={<p>Banner</p>}>
+      <AppFrame banner={<p>Banner</p>} sidebar={null}>
         <p>Screen</p>
       </AppFrame>,
     );
