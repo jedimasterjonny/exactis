@@ -41,7 +41,7 @@ const vendoredPattern = {
     "Only src/components/kit may import a vendored component. Import the wrapper from @/components/kit instead.",
 };
 
-// The routes are the top tier: a page composes organisms and templates
+// The routes are the top tier: a page composes from any tier beneath it
 // and reads the store, and nothing beneath it reaches back up. The server
 // actions and the stores live under src/actions and src/store rather than
 // beside the routes for this reason, since an organism saves through an
@@ -334,7 +334,7 @@ const eslintConfig = defineConfig([
   },
   // Every tier bans something now, templates included, so none of them falls
   // through to the block above. src/app is the tier none of these names: it
-  // composes organisms and templates and sits above both.
+  // composes from any of them and sits above them all.
   //
   // Two blocks per tier, because flat config replaces a rule's options rather
   // than merging them, so the narrower one has to restate what it keeps. The
