@@ -151,9 +151,9 @@ downwards:
   than correctness.
 - `kit/` is ours, and is the only thing allowed to import from `ui/`. A wrapper
   re-exports exactly the names the app uses, so upstream churn in the rest
-  cannot reach a screen. Most are one line; one becomes a real component when it
-  has something to add, as `badge` does for the `positive` and `caution` tones.
-  Held to every gate, at 100% coverage.
+  cannot reach a screen. Most are one re-export; one becomes a real component
+  when it has something to add, as `badge` does for the `positive` and `caution`
+  tones. Held to every gate, at 100% coverage.
 - `app/` is the app's own composed components, tiered by atomic design into
   `atoms/`, `molecules/`, `organisms/` and `templates/`, with the routes in
   `src/app` as the fifth tier. A component composes what is below it, never
@@ -169,7 +169,7 @@ vendored boundary, the tier direction, and the same-tier edge that only
 organisms get - and it bars a relative import in a component so that `@/` is the
 one spelling those bans have to read. `bun run cycles` covers the loop that the
 organisms' freedom makes possible. That check is oxlint rather than an ESLint
-rule, because `import/no-cycle` cost 76% of the entire lint run; it carries a
+rule, because `import/no-cycle` cost 76% of the lint's rule time; it carries a
 canary proving it can still fail, since a cycle checker that resolves nothing
 reports a clean tree. A customisation that has to survive belongs in the
 wrapper, never in the vendored file, and taking a component by hand means
