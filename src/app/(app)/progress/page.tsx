@@ -5,11 +5,10 @@ import type { ProgressPoint } from "@/data/progress";
 
 import { HousePricesPull } from "@/components/app/atoms/house-prices-pull";
 import { Note } from "@/components/app/atoms/note";
-import { ScreenBody } from "@/components/app/atoms/screen-body";
-import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { ProgressChart } from "@/components/app/organisms/progress-chart";
 import { ProgressPoints } from "@/components/app/organisms/progress-points";
 import { ProgressYear } from "@/components/app/organisms/progress-year";
+import { Screen } from "@/components/app/templates/screen";
 import { indexedAs } from "@/data/house-prices";
 import { latestYearOf } from "@/data/progress";
 import { counted } from "@/lib/count";
@@ -39,33 +38,27 @@ export default async function Progress(): Promise<JSX.Element> {
   const planned = points.length > 1 ? plannedOf(household) : [];
   const year = latestYearOf(points);
   return (
-    <>
-      <ScreenHeader
-        actions={<HousePricesPull />}
-        label={sectionLabel(progress)}
-        title={progress.title}
-      >
-        {spanOf(points)}
-      </ScreenHeader>
-      <ScreenBody>
-        {year !== undefined && <ProgressYear year={year} />}
-        {points.length > 1 && (
-          <ProgressChart planned={planned} points={points} />
-        )}
-        <ProgressPoints points={points} />
+    <Screen
+      actions={<HousePricesPull />}
+      label={sectionLabel(progress)}
+      meta={spanOf(points)}
+      title={progress.title}
+    >
+      {year !== undefined && <ProgressYear year={year} />}
+      {points.length > 1 && <ProgressChart planned={planned} points={points} />}
+      <ProgressPoints points={points} />
+      <Note>
+        Net worth counts every balance a point was read with; the sheet&apos;s
+        points, before the first month closed here, left cash and GIAs out.
+      </Note>
+      {planned.length > 0 && (
         <Note>
-          Net worth counts every balance a point was read with; the sheet&apos;s
-          points, before the first month closed here, left cash and GIAs out.
+          The plan runs on from the latest point for a year, each month in its
+          own pounds, by what it pays in and what each account grows by.
         </Note>
-        {planned.length > 0 && (
-          <Note>
-            The plan runs on from the latest point for a year, each month in its
-            own pounds, by what it pays in and what each account grows by.
-          </Note>
-        )}
-        <Note>{houseNoteOf(housePrices)}</Note>
-      </ScreenBody>
-    </>
+      )}
+      <Note>{houseNoteOf(housePrices)}</Note>
+    </Screen>
   );
 }
 

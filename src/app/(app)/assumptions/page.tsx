@@ -2,8 +2,6 @@ import type { JSX } from "react";
 
 import type { RateSet as Chosen } from "@/data/rates";
 
-import { ScreenBody } from "@/components/app/atoms/screen-body";
-import { ScreenHeader } from "@/components/app/atoms/screen-header";
 import { SourceDates } from "@/components/app/atoms/source-dates";
 import { ScreenTabs } from "@/components/app/molecules/screen-tabs";
 import { GlidePath } from "@/components/app/organisms/glide-path";
@@ -11,6 +9,7 @@ import { InflationSource } from "@/components/app/organisms/inflation-source";
 import { RateSet } from "@/components/app/organisms/rate-set";
 import { StatePension } from "@/components/app/organisms/state-pension";
 import { TargetAllocation } from "@/components/app/organisms/target-allocation";
+import { Screen } from "@/components/app/templates/screen";
 import { laidOut } from "@/engine/projection";
 import { formatPercent } from "@/lib/money";
 import { today } from "@/lib/months";
@@ -76,68 +75,67 @@ export default async function Assumptions({
   ] = await Promise.all([getHousehold(), getSourcesDaysAgo(30), searchParams]);
   const hasGlide = glide.length > 0;
   return (
-    <>
-      <ScreenHeader label={sectionLabel(assumptions)} title={assumptions.title}>
-        {`Plan rate ${formatPercent(plan.rate)} · inflation ${formatPercent(plan.inflation)} · ${setNames[rateSet]}`}
-      </ScreenHeader>
-      <ScreenBody>
-        <SourceDates
-          cma={cma}
-          curve={curve}
-          deductions={deductions}
-          targets={targets}
-          today={today()}
-        />
-        <ScreenTabs
-          open={typeof tab === "string" ? tab : undefined}
-          tabs={[
-            {
-              children: (
-                <>
-                  <RateSet
-                    allocation={hasGlide ? split : allocation}
-                    before={rateSet === "cma" ? before : null}
-                    cma={cma}
-                    curve={curve}
-                    deductions={deductions}
-                    hasGlide={hasGlide}
-                    mappings={mappings}
-                    rates={rates}
-                    rateSet={rateSet}
-                    targets={targets}
-                  />
-                  <InflationSource curve={curve} />
-                </>
-              ),
-              label: "Rates",
-            },
-            {
-              children: (
-                <TargetAllocation
-                  cma={cma?.latest ?? null}
+    <Screen
+      label={sectionLabel(assumptions)}
+      meta={`Plan rate ${formatPercent(plan.rate)} · inflation ${formatPercent(plan.inflation)} · ${setNames[rateSet]}`}
+      title={assumptions.title}
+    >
+      <SourceDates
+        cma={cma}
+        curve={curve}
+        deductions={deductions}
+        targets={targets}
+        today={today()}
+      />
+      <ScreenTabs
+        open={typeof tab === "string" ? tab : undefined}
+        tabs={[
+          {
+            children: (
+              <>
+                <RateSet
+                  allocation={hasGlide ? split : allocation}
+                  before={rateSet === "cma" ? before : null}
+                  cma={cma}
+                  curve={curve}
+                  deductions={deductions}
+                  hasGlide={hasGlide}
                   mappings={mappings}
-                  split={rateSet === "cma" && !hasGlide ? null : split}
+                  rates={rates}
+                  rateSet={rateSet}
                   targets={targets}
                 />
-              ),
-              label: "Target allocation",
-            },
-            {
-              children: <GlidePath glide={glide} plan={plan} split={split} />,
-              label: "Glide path",
-            },
-            {
-              children: (
-                <StatePension
-                  owners={owners}
-                  plan={laidOut(accounts, schedule, plan).plan}
-                />
-              ),
-              label: "State pension",
-            },
-          ]}
-        />
-      </ScreenBody>
-    </>
+                <InflationSource curve={curve} />
+              </>
+            ),
+            label: "Rates",
+          },
+          {
+            children: (
+              <TargetAllocation
+                cma={cma?.latest ?? null}
+                mappings={mappings}
+                split={rateSet === "cma" && !hasGlide ? null : split}
+                targets={targets}
+              />
+            ),
+            label: "Target allocation",
+          },
+          {
+            children: <GlidePath glide={glide} plan={plan} split={split} />,
+            label: "Glide path",
+          },
+          {
+            children: (
+              <StatePension
+                owners={owners}
+                plan={laidOut(accounts, schedule, plan).plan}
+              />
+            ),
+            label: "State pension",
+          },
+        ]}
+      />
+    </Screen>
   );
 }
