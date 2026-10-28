@@ -11,12 +11,12 @@ import type { Month } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
 
 import { closeBalances } from "@/actions/accounts";
-import { DialogFrame } from "@/components/app/atoms/dialog-frame";
 import { Field } from "@/components/app/atoms/field";
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { Ledger } from "@/components/app/atoms/ledger";
 import { Note } from "@/components/app/atoms/note";
 import { RowAction } from "@/components/app/atoms/row-action";
+import { DialogFrame } from "@/components/app/molecules/dialog-frame";
 import { MoneyInput, YearField } from "@/components/app/molecules/figure-field";
 import { MonthField } from "@/components/app/molecules/month-field";
 import { Button } from "@/components/kit/button";

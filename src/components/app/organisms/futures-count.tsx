@@ -6,7 +6,7 @@ import type { Plan } from "@/data/plan";
 import type { Reading } from "@/engine/futures";
 
 import { Ledger } from "@/components/app/atoms/ledger";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { CardContent } from "@/components/kit/card";
 import { retiresOn } from "@/data/milestones";
 import { ageIn, endAge } from "@/data/plan";

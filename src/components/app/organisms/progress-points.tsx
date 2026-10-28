@@ -6,9 +6,9 @@ import { ChevronDown, History } from "lucide-react";
 import type { Move, ProgressPoint } from "@/data/progress";
 
 import { DeltaValue } from "@/components/app/atoms/delta-value";
-import { EmptyState } from "@/components/app/atoms/empty-state";
 import { SegmentBar } from "@/components/app/atoms/segment-bar";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { EmptyState } from "@/components/app/molecules/empty-state";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import {
   Accordion,
   AccordionContent,

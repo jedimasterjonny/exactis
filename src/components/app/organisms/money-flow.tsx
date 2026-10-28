@@ -12,7 +12,7 @@ import type { CashFlow, Paid, Schedule } from "@/engine/cash-flow";
 
 import { RowAction } from "@/components/app/atoms/row-action";
 import { ShareBar } from "@/components/app/atoms/share-bar";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { allowanceOf, isOwned } from "@/data/accounts";

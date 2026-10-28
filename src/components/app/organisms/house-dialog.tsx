@@ -15,7 +15,7 @@ import type { LoanFigure, WorkedOut } from "@/lib/figures";
 import type { PlanMonth } from "@/lib/loans";
 
 import { saveHouse } from "@/actions/accounts";
-import { EditDialog } from "@/components/app/molecules/edit-dialog";
+import { EditDialog } from "@/components/app/organisms/edit-dialog";
 import { HouseFields } from "@/components/app/organisms/house-fields";
 import { derive, houseOf, isSound, openingPurchase } from "@/data/houses";
 import { useMountedEditor } from "@/hooks/use-editor";

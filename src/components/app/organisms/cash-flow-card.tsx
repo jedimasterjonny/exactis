@@ -13,12 +13,12 @@ import type { Plan } from "@/data/plan";
 import type { Fed, Paid, Schedule, Spent, Take } from "@/engine/cash-flow";
 import type { MovedYear, ProjectionPoint } from "@/engine/projection";
 
-import { MilestoneChips } from "@/components/app/atoms/milestone-chips";
 import { RowAction } from "@/components/app/atoms/row-action";
 import { SpanRuler } from "@/components/app/atoms/span-ruler";
 import { YearAge } from "@/components/app/atoms/year-age";
 import { YearStrip } from "@/components/app/atoms/year-strip";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { MilestoneChips } from "@/components/app/molecules/milestone-chips";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import {
   Accordion,
   AccordionContent,

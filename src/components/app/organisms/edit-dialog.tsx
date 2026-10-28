@@ -2,7 +2,7 @@ import type { JSX, ReactNode } from "react";
 
 import { Trash2 } from "lucide-react";
 
-import { DialogFrame } from "@/components/app/atoms/dialog-frame";
+import { DialogFrame } from "@/components/app/molecules/dialog-frame";
 import { Button } from "@/components/kit/button";
 
 interface EditDialogProps {

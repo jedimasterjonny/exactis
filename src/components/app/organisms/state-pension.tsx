@@ -9,7 +9,7 @@ import type { Plan } from "@/data/plan";
 
 import { saveQualifyingYears } from "@/actions/owners";
 import { YearsInput } from "@/components/app/molecules/figure-field";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import {
   Table,
   TableBody,

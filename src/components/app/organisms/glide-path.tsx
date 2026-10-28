@@ -9,15 +9,15 @@ import type { Plan } from "@/data/plan";
 import type { Allocation, Anchor } from "@/data/rates";
 
 import { removeAnchor, saveAnchor } from "@/actions/plan";
-import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
-import { EmptyState } from "@/components/app/atoms/empty-state";
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { GlideChart } from "@/components/app/atoms/glide-chart";
 import { AgeField } from "@/components/app/molecules/age-field";
-import { EditDialog } from "@/components/app/molecules/edit-dialog";
+import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
+import { EmptyState } from "@/components/app/molecules/empty-state";
 import { RateField } from "@/components/app/molecules/figure-field";
 import { RowActions } from "@/components/app/molecules/row-actions";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { EditDialog } from "@/components/app/organisms/edit-dialog";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import {

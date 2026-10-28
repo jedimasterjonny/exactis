@@ -20,8 +20,8 @@ import type { Plan } from "@/data/plan";
 import type { Tie } from "@/data/schedule";
 import type { Future, FutureYear } from "@/engine/futures";
 
-import { MilestoneChips } from "@/components/app/atoms/milestone-chips";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { MilestoneChips } from "@/components/app/molecules/milestone-chips";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
 import { ageOf } from "@/data/milestones";

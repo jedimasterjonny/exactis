@@ -20,10 +20,10 @@ import type { Before, Moves, Source } from "@/data/moves";
 import type { Across, Allocation } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 
-import { Caution } from "@/components/app/atoms/caution";
-import { EmptyState } from "@/components/app/atoms/empty-state";
 import { Note } from "@/components/app/atoms/note";
 import { Worksheet } from "@/components/app/atoms/worksheet";
+import { Caution } from "@/components/app/molecules/caution";
+import { EmptyState } from "@/components/app/molecules/empty-state";
 import { CardContent } from "@/components/kit/card";
 import { blendsOf, cmaRates, heldAt, rebalancingOf, riskOf } from "@/data/cma";
 import { inflationOf } from "@/data/inflation";

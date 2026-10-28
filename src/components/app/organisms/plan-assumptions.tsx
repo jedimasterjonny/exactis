@@ -9,8 +9,8 @@ import type { Drawdown, Plan, PlanAges } from "@/data/plan";
 
 import { saveAges, saveDrawdown } from "@/actions/plan";
 import { AgeField } from "@/components/app/molecules/age-field";
-import { EditDialog } from "@/components/app/molecules/edit-dialog";
 import { SelectField } from "@/components/app/molecules/select-field";
+import { EditDialog } from "@/components/app/organisms/edit-dialog";
 import { Button } from "@/components/kit/button";
 import { retiresOn } from "@/data/milestones";
 import { ageIn, endAge, oldestAge } from "@/data/plan";

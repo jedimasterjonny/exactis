@@ -3,10 +3,10 @@ import type { JSX } from "react";
 import type { HousePrices } from "@/data/house-prices";
 import type { ProgressPoint } from "@/data/progress";
 
+import { HousePricesPull } from "@/components/app/atoms/house-prices-pull";
 import { Note } from "@/components/app/atoms/note";
 import { ScreenBody } from "@/components/app/atoms/screen-body";
 import { ScreenHeader } from "@/components/app/atoms/screen-header";
-import { HousePricesPull } from "@/components/app/molecules/house-prices-pull";
 import { ProgressChart } from "@/components/app/organisms/progress-chart";
 import { ProgressPoints } from "@/components/app/organisms/progress-points";
 import { ProgressYear } from "@/components/app/organisms/progress-year";

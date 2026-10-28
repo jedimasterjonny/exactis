@@ -16,8 +16,7 @@ import type { Secured } from "@/data/secured";
 import type { PlanMonth } from "@/lib/loans";
 
 import { placeAccountsInOrder, removeAccount } from "@/actions/accounts";
-import { ConfirmDialog } from "@/components/app/atoms/confirm-dialog";
-import { SectionCard } from "@/components/app/molecules/section-card";
+import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { AccountDialog } from "@/components/app/organisms/account-dialog";
 import { BalanceSheet } from "@/components/app/organisms/balance-sheet";
 import { CarDialog } from "@/components/app/organisms/car-dialog";
@@ -25,6 +24,7 @@ import { ChildList } from "@/components/app/organisms/child-list";
 import { HouseDialog } from "@/components/app/organisms/house-dialog";
 import { MoneyFlow } from "@/components/app/organisms/money-flow";
 import { OwnerList } from "@/components/app/organisms/owner-list";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { isAsset } from "@/data/accounts";
