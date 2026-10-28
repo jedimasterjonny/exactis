@@ -3,7 +3,8 @@ import type { JSX, ReactNode } from "react";
 
 import { cn } from "cn";
 import { ChevronRight } from "lucide-react";
-import Link from "next/link";
+
+import { RowOpener } from "@/components/app/atoms/row-opener";
 
 interface FoldedLinesProps {
   readonly children?: ReactNode;
@@ -14,11 +15,6 @@ interface FoldedLinesProps {
   readonly name: string;
   readonly onOpen?: (() => void) | undefined;
 }
-
-// What makes the name open the row: its press covers the nearest box the
-// caller positions, and its focus ring is drawn around what it covers.
-const opener =
-  "flex-1 text-left font-medium after:absolute after:inset-0 focus-visible:outline-hidden focus-visible:after:ring-3 focus-visible:after:ring-ring/50 focus-visible:after:ring-inset";
 
 // A row of a ledger as a narrow width draws it: the name and the figure
 // that matters most across the first line and the rest beneath, faint,
@@ -57,17 +53,17 @@ export function FoldedLines({
     <>
       <div className="flex items-baseline gap-3">
         {onOpen === undefined && href !== undefined && (
-          <Link className={opener} href={href}>
+          <RowOpener className="flex-1" href={href}>
             {name}
-          </Link>
+          </RowOpener>
         )}
         {onOpen === undefined && href === undefined && (
           <span className="flex-1 font-medium">{name}</span>
         )}
         {onOpen !== undefined && (
-          <button className={opener} onClick={onOpen} type="button">
+          <RowOpener className="flex-1" onOpen={onOpen}>
             {name}
-          </button>
+          </RowOpener>
         )}
         <span
           className={cn(

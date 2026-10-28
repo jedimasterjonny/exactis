@@ -12,7 +12,7 @@ import type { Target } from "@/data/targets";
 
 import { mapCategory } from "@/actions/targets";
 import { CellSelect } from "@/components/app/atoms/cell-select";
-import { FoldedCell } from "@/components/app/molecules/folded-cell";
+import { FoldedCell } from "@/components/app/organisms/folded-cell";
 import { Badge } from "@/components/kit/badge";
 import {
   Table,

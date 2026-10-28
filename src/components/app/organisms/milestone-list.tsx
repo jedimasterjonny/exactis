@@ -12,11 +12,11 @@ import type { LineValues } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
 import type { Sale } from "@/engine/projection";
 
-import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { PinBar } from "@/components/app/atoms/pin-bar";
 import { RowOpener } from "@/components/app/atoms/row-opener";
 import { SpanRuler } from "@/components/app/atoms/span-ruler";
 import { YearAge } from "@/components/app/atoms/year-age";
+import { FoldedLines } from "@/components/app/molecules/folded-lines";
 import { MilestoneDialog } from "@/components/app/organisms/milestone-dialog";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";

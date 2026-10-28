@@ -1,11 +1,16 @@
 import type { Route } from "next";
 import type { JSX } from "react";
 
+import { cn } from "cn";
 import Link from "next/link";
 
 // What the row opens: a handler, for a row edited here, or the screen a
-// row held here is set on.
-type RowOpenerProps = { readonly children: string } & (
+// row held here is set on. The class is the caller's, for how its line
+// lays the name out, as the folded lines stretch it across theirs.
+type RowOpenerProps = {
+  readonly children: string;
+  readonly className?: string;
+} & (
   | { readonly href: Route; readonly onOpen?: never }
   | { readonly href?: never; readonly onOpen: () => void }
 );
@@ -27,15 +32,16 @@ const covering =
 // which is the caller's, at the row's end.
 export function RowOpener({
   children,
+  className,
   href,
   onOpen,
 }: RowOpenerProps): JSX.Element {
   return href === undefined ? (
-    <button className={covering} onClick={onOpen} type="button">
+    <button className={cn(covering, className)} onClick={onOpen} type="button">
       {children}
     </button>
   ) : (
-    <Link className={covering} href={href}>
+    <Link className={cn(covering, className)} href={href}>
       {children}
     </Link>
   );

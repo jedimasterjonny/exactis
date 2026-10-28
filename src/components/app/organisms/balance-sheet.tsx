@@ -9,10 +9,10 @@ import type { ExpenseLine } from "@/data/expenses";
 import type { Owner } from "@/data/owners";
 import type { Secured } from "@/data/secured";
 
-import { FoldedLines } from "@/components/app/atoms/folded-lines";
 import { Ledger } from "@/components/app/atoms/ledger";
 import { ShareBar } from "@/components/app/atoms/share-bar";
 import { EmptyState } from "@/components/app/molecules/empty-state";
+import { FoldedLines } from "@/components/app/molecules/folded-lines";
 import { Button } from "@/components/kit/button";
 import { isPension, kindLabels } from "@/data/accounts";
 import { mortgageOn } from "@/data/houses";
