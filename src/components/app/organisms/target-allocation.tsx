@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import type { Cma, Mapping } from "@/data/cma";
+import type { Allocation } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 
 import { pullLifeStrategy } from "@/actions/lifestrategy";
@@ -22,7 +23,7 @@ import { TargetTable } from "@/components/app/organisms/target-table";
 import { Button, buttonVariants } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";
 import { suggestedMappings } from "@/data/class-table";
-import { fund, retargeted, split } from "@/data/lifestrategy";
+import { fund, retargeted } from "@/data/lifestrategy";
 import { useSender } from "@/hooks/use-sender";
 import { acceptedOf, saved } from "@/lib/answer";
 import { formatWholePercent } from "@/lib/money";
@@ -44,11 +45,9 @@ interface Rewritten {
 interface TargetAllocationProps {
   readonly cma: Cma | null;
   readonly mappings: readonly Mapping[];
+  readonly split: Allocation | null;
   readonly targets: null | Targets;
 }
-
-// What the split reads as, "90% equity and 10% bonds".
-const splitSaid = `${formatWholePercent(split.stocks)} equity and ${formatWholePercent(split.bonds)} bonds`;
 
 // The assumptions screen's target allocation: the categories Portfolio
 // Performance's Asset Allocation taxonomy holds, the share of the whole
@@ -73,7 +72,9 @@ const splitSaid = `${formatWholePercent(split.stocks)} equity and ${formatWholeP
 // Equity, from a file chosen the same way: what the fund holds is
 // pulled from Vanguard by the store, since Vanguard answers only its
 // own site from a browser, and laid over the file's categories here, at
-// 90% equity and 10% bonds in the fund's own ratios; the weights are
+// the split the plan holds now in the fund's own ratios, or at the
+// fund's own split where the plan's is none but the target allocation's,
+// as under the CMA's rates with no glide path; the weights are
 // written into the file, and the file as rewritten is read and imported
 // as a chosen file is, so the targets kept are the ones the file now
 // holds. The file is read before Vanguard is asked, so one that cannot
@@ -94,6 +95,7 @@ const splitSaid = `${formatWholePercent(split.stocks)} equity and ${formatWholeP
 export function TargetAllocation({
   cma,
   mappings,
+  split,
   targets,
 }: TargetAllocationProps): JSX.Element {
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -152,12 +154,13 @@ export function TargetAllocation({
   }
 
   function retarget(file: File): void {
+    const at = split ?? fund.split;
     sendRetarget(
       async () => {
         const bytes = new Uint8Array(await file.arrayBuffer());
         const held = readTargets(bytes);
         const holdings = acceptedOf(await pullLifeStrategy());
-        const written = reweighted(bytes, retargeted(held, holdings));
+        const written = reweighted(bytes, retargeted(held, holdings, split));
         const imported = await importTargets(readTargets(written));
         return imported.kind === "saved"
           ? saved({ asOf: holdings.asOf, written })
@@ -172,7 +175,7 @@ export function TargetAllocation({
           });
         },
         success: ({ asOf }) => ({
-          description: `${fund.name} as at ${formatDay(asOf)}, at ${splitSaid}`,
+          description: `${fund.name} as at ${formatDay(asOf)}, at ${formatWholePercent(at.stocks)} equity and ${formatWholePercent(1 - at.stocks)} bonds`,
           title: "Target allocation retargeted",
         }),
       },
