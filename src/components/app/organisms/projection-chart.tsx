@@ -621,6 +621,7 @@ function Placeholder({ children }: { readonly children: string }): JSX.Element {
 // entry recharts hands over, which is untyped. Beneath the total, where
 // a scenario is set against the household, what the household comes to
 // that year on the same basis, keyed by a dashed stroke as its line is.
+// A status, so a screen reader reads it out as the crosshair steps.
 function ProjectionTooltip({
   active: isActive,
   household,
@@ -644,10 +645,7 @@ function ProjectionTooltip({
     .map(({ name }) => name);
   const theirs = household?.(point) ?? null;
   return (
-    <div
-      className="grid min-w-44 gap-1.5 rounded-md border bg-popover px-2.5 py-2 text-xs text-popover-foreground shadow-md"
-      data-slot="projection-tooltip"
-    >
+    <div className="grid min-w-44 gap-1.5 chart-tip" role="status">
       <span className="grid gap-0.5">
         <span className="font-medium">
           {`${String(point.year)} · Age ${String(point.age)}`}

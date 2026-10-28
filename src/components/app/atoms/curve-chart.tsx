@@ -123,7 +123,8 @@ export function CurveChart({ curve, derived }: CurveChartProps): JSX.Element {
 }
 
 // What the pointer or the arrow keys rest on: the maturity and the rate
-// the curve implies there.
+// the curve implies there. A status, so a screen reader reads it out at
+// each step.
 function CurveTooltip({
   active: isActive,
   curve,
@@ -134,10 +135,7 @@ function CurveTooltip({
     return null;
   }
   return (
-    <div
-      className="rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
-      data-slot="curve-tooltip"
-    >
+    <div className="chart-tip" role="status">
       <span className="figure">{`${String(years)}y ${formatCurveRate(curve.implied[years])}`}</span>
     </div>
   );

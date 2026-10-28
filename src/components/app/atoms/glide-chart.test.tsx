@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import type { Plan } from "@/data/plan";
 
 import { plan, retiring } from "@/data/income.fixture";
-import { bySlot } from "@/test/dom";
 
 import { GlideChart } from "./glide-chart";
 
@@ -106,9 +105,7 @@ describe("GlideChart", () => {
     chart.focus();
     fireEvent.keyDown(chart, { key: "ArrowRight" });
 
-    const tooltip = await screen.findByText(bySlot("glide-tooltip"), {
-      suggest: false,
-    });
+    const tooltip = await screen.findByRole("status");
 
     expect(within(tooltip).getByText("Bonds 0.00%")).toBeInTheDocument();
     expect(within(tooltip).getByText("Equities 100.00%")).toBeInTheDocument();
@@ -138,9 +135,7 @@ describe("GlideChart", () => {
     chart.focus();
     fireEvent.keyDown(chart, { key: "ArrowRight" });
 
-    const tooltip = await screen.findByText(bySlot("glide-tooltip"), {
-      suggest: false,
-    });
+    const tooltip = await screen.findByRole("status");
 
     expect(within(tooltip).getByText("Age 35 · 2027")).toBeInTheDocument();
     expect(within(tooltip).getByText("Bonds 7.27%")).toHaveClass("figure");

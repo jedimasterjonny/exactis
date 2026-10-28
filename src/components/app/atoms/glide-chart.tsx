@@ -153,7 +153,8 @@ export function GlideChart({ glide, plan }: GlideChartProps): JSX.Element {
 }
 
 // What the pointer or the arrow keys rest on: the age, the year it falls
-// in, and the split the glide path holds at it.
+// in, and the split the glide path holds at it. A status, so a screen
+// reader reads it out at each step.
 function RowTooltip({
   active: isActive,
   label,
@@ -165,10 +166,7 @@ function RowTooltip({
     return null;
   }
   return (
-    <div
-      className="grid gap-0.5 rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
-      data-slot="glide-tooltip"
-    >
+    <div className="grid gap-0.5 chart-tip" role="status">
       <span className="label text-muted-foreground">{`Age ${String(row.age)} · ${String(yearAt(row.age, plan))}`}</span>
       <span className="figure">{`Bonds ${formatPercent(row.bonds)}`}</span>
       <span className="figure">{`Equities ${formatPercent(row.stocks)}`}</span>
