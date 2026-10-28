@@ -10,13 +10,13 @@ import type { Allocation, Anchor } from "@/data/rates";
 
 import { removeAnchor, saveAnchor } from "@/actions/plan";
 import { FieldRow } from "@/components/app/atoms/field-row";
-import { GlideChart } from "@/components/app/atoms/glide-chart";
 import { AgeField } from "@/components/app/molecules/age-field";
 import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { RateField } from "@/components/app/molecules/figure-field";
 import { RowActions } from "@/components/app/molecules/row-actions";
 import { EditDialog } from "@/components/app/organisms/edit-dialog";
+import { GlideChart } from "@/components/app/organisms/glide-chart";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
