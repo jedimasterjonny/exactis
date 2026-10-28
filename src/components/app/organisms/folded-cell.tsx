@@ -1,6 +1,6 @@
 import type { ComponentProps, JSX } from "react";
 
-import { FoldedLines } from "@/components/app/atoms/folded-lines";
+import { FoldedLines } from "@/components/app/molecules/folded-lines";
 import { TableCell } from "@/components/kit/table";
 
 // A row of a ledger table as a narrow table draws it: one cell in place
