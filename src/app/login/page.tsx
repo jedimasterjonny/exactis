@@ -1,8 +1,7 @@
 import type { JSX } from "react";
 
+import { LoginForm } from "@/components/app/molecules/login-form";
 import { Card, CardContent, CardHeader } from "@/components/kit/card";
-
-import { LoginForm } from "./login-form";
 
 // The screen the app sends anyone to who is not signed in, and the only
 // one that asks nothing of the session. One card, centred on a bare page:

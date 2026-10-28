@@ -11,13 +11,17 @@ src/components/
          atoms/ molecules/ organisms/ templates/
 ```
 
-The routes in `src/app` are the fifth tier, pages, and compose from any tier
-beneath them. A client component that draws a whole screen, as `chance-screen`
-and `cogitator-screen` do, sits beside its route in the page tier rather than
-under `src/components`. A screen's body that only its own route draws is part of
-that page, and sits beside the route rather than in `organisms/`, since it is a
-whole screen's body rather than a distinct section of one, which is what the
-second question below makes an organism.
+The routes in `src/app` are the fifth tier, pages. Most fill a template with
+organisms, reaching below them where a screen needs one part beside them, as for
+a note at a screen's foot. Not all take a template: the sign-in page draws the
+login form in a card, and the error screen, which cannot tell which screen it
+stands in for, draws an empty state in the screen's body alone. A client
+component that draws a whole screen, as `chance-screen` and `cogitator-screen`
+do, sits beside its route in the page tier rather than under `src/components`. A
+screen's body that only its own route draws is part of that page, and sits
+beside the route rather than in `organisms/`, since it is a whole screen's body
+rather than a distinct section of one, which is what the second question below
+makes an organism.
 
 ## Provenance: ui and kit
 
@@ -44,7 +48,7 @@ in the vendored file works until the next refresh silently discards it.
 | tier         | what it is                                                   | here                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `atoms/`     | whole: one control, graphic, text, table or box              | `balance-dates`, `cell-select`, `delta-value`, `field`, `field-row`, `figure-input`, `house-prices-pull`, `ledger`, `legend-table`, `note`, `pin-bar`, `row-action`, `row-lock`, `row-opener`, `screen-body`, `screen-label`, `segment-bar`, `share-bar`, `source-dates`, `span-bar`, `span-ruler`, `spread-bar`, `tile-grid`, `worksheet`, `year-age`, `year-strip`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `molecules/` | atoms joined to do one job together                          | `age-field`, `app-nav`, `caution`, `confirm-dialog`, `dialog-frame`, `empty-state`, `export-menu`, `figure-field`, `folded-lines`, `labelled-switch`, `milestone-chips`, `month-field`, `radio-choice`, `row-actions`, `scenario-banner`, `screen-tabs`, `section-header`, `select-field`, `stat-tile`, `text-field`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `molecules/` | atoms joined to do one job together                          | `age-field`, `app-nav`, `caution`, `confirm-dialog`, `dialog-frame`, `empty-state`, `export-menu`, `figure-field`, `folded-lines`, `labelled-switch`, `login-form`, `milestone-chips`, `month-field`, `radio-choice`, `row-actions`, `scenario-banner`, `screen-tabs`, `section-header`, `select-field`, `stat-tile`, `text-field`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `organisms/` | a distinct section: a region, a dialog and its form, a chart | `account-dialog`, `account-fields`, `account-ledger`, `balance-sheet`, `car-dialog`, `car-fields`, `cash-flow-card`, `chance-tile`, `child-list`, `cma-worksheet`, `curve-chart`, `custom-rates`, `edit-dialog`, `employment-fields`, `expense-schedule`, `folded-cell`, `futures-count`, `futures-drawn`, `futures-fan`, `futures-outcomes`, `glide-chart`, `glide-path`, `house-dialog`, `house-fields`, `household-import`, `income-schedule`, `inflation-source`, `line-fields`, `loan-fields`, `milestone-dialog`, `milestone-list`, `milestone-spreads`, `money-flow`, `month-end`, `owner-list`, `plan-assumptions`, `progress-chart`, `progress-points`, `progress-year`, `projection-board`, `projection-chart`, `rate-set`, `sacrifice-fields`, `scenario-menu`, `schedule-rows`, `screen-header`, `section-card`, `state-pension`, `target-allocation`, `target-table`, `theme-toggle` |
 | `templates/` | a page's layout: what goes where, not what it shows          | `app-frame`, `screen`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
@@ -96,12 +100,13 @@ Ask these in order and stop at the first yes.
    his search form the label names the input and the button submits it, so the
    three search together. It need hold no control of its own. Several controls
    acting as one are a molecule: a nav's links, a button and its menu, a row of
-   tabs or chips, a pencil and a bin, or a dialog's Cancel and confirm. So is a
-   label with its input, as a field with its control or a radio with its
-   description, and so is a surface whose parts say one thing: an icon over a
-   title and a sentence, a scenario's name beside the way back out of it, a
-   label over a figure, a card's label, title and line, or a dialog frame's
-   eyebrow, title, body and footer.
+   tabs or chips, a pencil and a bin, a dialog's Cancel and confirm, or a
+   password and the button that signs in with it. So is a label with its input,
+   as a field with its control or a radio with its description, and so is a
+   surface whose parts say one thing: an icon over a title and a sentence, a
+   scenario's name beside the way back out of it, a label over a figure, a
+   card's label, title and line, or a dialog frame's eyebrow, title, body and
+   footer.
 4. Otherwise it is an atom, what Frost calls an element that "can't be broken
    down any further without ceasing to be functional": one control, one graphic,
    one block of text, one table or list of the caller's rows, or one layout box.
