@@ -77,9 +77,7 @@ Changing the household's shape needs no migration. A change older versions
 cannot be read under appends a step to `src/data/shapes.ts`, which carries them
 forward on read. So does one an older build would misread by dropping what it
 adds; the step makes that build refuse the new shape instead. The table itself
-changes only by migrations from `db:generate`, with anything drizzle-kit cannot
-write, such as a trigger, added by hand. The suite applies every migration to
-PGlite.
+changes only by migration, as `AGENTS.md` sets out.
 
 ## Signing in
 

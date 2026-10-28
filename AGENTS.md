@@ -192,6 +192,34 @@ section, since a rule stated in four places drifted in the one a change missed.
 `README.md` and `TODO.md` point at it rather than restating it: the one tours
 the app around the engine, and the other lists what the model does not yet hold.
 
+# Migrations
+
+A change to the table is a migration, written with `bun run db:generate` and
+committed with the change. Whatever drizzle-kit cannot write, such as a trigger,
+is written into it by hand, with `db:generate --custom` for a migration that
+holds nothing else. The suite applies every migration to PGlite, so one that
+does not apply fails before it reaches a database.
+
+A migration is applied before the deploy that needs it, as `docs/deploying.md`
+sets out, so the code already deployed runs against the migrated table in
+between. A migration therefore never takes away or tightens what that code
+relies on. A new column is nullable or defaulted. A column is dropped or renamed
+only once no deployed code uses it, and constrained only once all deployed code
+meets the constraint, each in a later migration.
+
+The deployed app connects as `exactis_app`, which holds only the grants its
+queries need. A migration that adds a table grants the role what its queries
+need on it, in the same migration, and only where the role exists, since PGlite
+and branches older than the role have none:
+
+```sql
+DO $$ BEGIN
+	IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'exactis_app') THEN
+		GRANT SELECT, INSERT ON "a_new_table" TO exactis_app;
+	END IF;
+END $$;
+```
+
 # Commit hygiene
 
 Conventional Commits, and every commit carries a scope. A bare `type:` header

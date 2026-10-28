@@ -29,11 +29,8 @@ them. The owner's URL, given at the prompt, wins over the one in `.env.local`:
 ( read -rs DATABASE_URL && export DATABASE_URL && bun run db:migrate )
 ```
 
-The deployed code runs against the migrated table until that deploy lands, so a
-migration never takes away or tightens what it relies on. A new column is
-nullable or defaulted. A column is dropped or renamed only once no deployed code
-uses it, and constrained only once all deployed code meets the constraint, each
-in a later migration.
+`AGENTS.md` says how a migration is written so that the code already deployed
+survives it.
 
 ### The app role
 
@@ -57,18 +54,6 @@ before anything runs on it:
 
 ```bash
 ( read -rs URL && URL="$URL" bun -e 'import { neon } from "@neondatabase/serverless"; console.log(await neon(process.env.URL)`SELECT current_user, count(*) AS versions FROM household_versions`)' )
-```
-
-A migration that adds a table grants the role what its queries need on it, in
-the same migration, and only where the role exists, since PGlite and branches
-older than the role have none:
-
-```sql
-DO $$ BEGIN
-	IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'exactis_app') THEN
-		GRANT SELECT, INSERT ON "a_new_table" TO exactis_app;
-	END IF;
-END $$;
 ```
 
 ### Resetting `dev`
