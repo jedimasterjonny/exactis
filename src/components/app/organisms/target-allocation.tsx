@@ -2,8 +2,10 @@
 
 import type { ChangeEvent, JSX } from "react";
 
+import { cn } from "cn";
 import {
   ChartPie,
+  ChevronDown,
   Crosshair,
   Download,
   RefreshCw,
@@ -12,6 +14,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import type { Cma, Mapping } from "@/data/cma";
+import type { Fund } from "@/data/lifestrategy";
 import type { Allocation } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 
@@ -22,18 +25,20 @@ import { SectionCard } from "@/components/app/molecules/section-card";
 import { TargetTable } from "@/components/app/organisms/target-table";
 import { Button, buttonVariants } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/kit/dropdown-menu";
 import { suggestedMappings } from "@/data/class-table";
-import { fund, retargeted } from "@/data/lifestrategy";
+import { range, retargeted, splitFor } from "@/data/lifestrategy";
 import { useSender } from "@/hooks/use-sender";
 import { acceptedOf, saved } from "@/lib/answer";
 import { formatWholePercent } from "@/lib/money";
 import { formatDay } from "@/lib/months";
 import { assumptions, subsectionLabel } from "@/lib/nav";
 import { readTargets, reweighted, taxonomy } from "@/lib/portfolio-file";
-
-// What the file picker was opened for: to import the file as it is, or
-// to retarget it from LifeStrategy first.
-type Purpose = "import" | "retarget";
 
 // The file as retargeted, to be saved over the original: its name, and
 // the address its bytes are held at in this browser.
@@ -68,14 +73,17 @@ interface TargetAllocationProps {
 // to lay out, and the card says so. The footer says what leaves the
 // file, since it holds more than the store is sent.
 //
-// The header also retargets the allocation from LifeStrategy 80%
-// Equity, from a file chosen the same way: what the fund holds is
-// pulled from Vanguard by the store, since Vanguard answers only its
-// own site from a browser, and laid over the file's categories here, at
-// the split the plan holds now in the fund's own ratios, or at the
-// fund's own split where the plan's is none but the target allocation's,
-// as under the CMA's rates with no glide path; the weights are
-// written into the file, and the file as rewritten is read and imported
+// The header also retargets the allocation from a LifeStrategy fund
+// chosen from a menu, from a file chosen the same way: what the fund
+// holds is pulled from Vanguard by the store, since Vanguard answers
+// only its own site from a browser, and laid over the file's categories
+// here, at the split the plan holds now in the fund's own ratios, or at
+// the fund's own split for a fund holding no bonds, or where the plan's
+// is none but the target allocation's, as under the CMA's rates with no
+// glide path. Each fund in the menu says the split it would be laid at,
+// and one holding no bonds says so in the caution tone while the plan
+// holds bonds now, as the toast does after. The weights are written into
+// the file, and the file as rewritten is read and imported
 // as a chosen file is, so the targets kept are the ones the file now
 // holds. The file is read before Vanguard is asked, so one that cannot
 // be read asks for nothing. Once it is imported the header offers the
@@ -99,7 +107,7 @@ export function TargetAllocation({
   targets,
 }: TargetAllocationProps): JSX.Element {
   const pickerRef = useRef<HTMLInputElement>(null);
-  const purposeRef = useRef<Purpose>("import");
+  const fundRef = useRef<Fund | null>(null);
   const [rewritten, setRewritten] = useState<null | Rewritten>(null);
   const { isSending: isImporting, send } = useSender();
   const { isSending: isMapping, send: sendMapping } = useSender();
@@ -148,18 +156,18 @@ export function TargetAllocation({
     });
   }
 
-  function pick(purpose: Purpose): void {
-    purposeRef.current = purpose;
+  function pick(fund: Fund | null): void {
+    fundRef.current = fund;
     pickerRef.current?.click();
   }
 
-  function retarget(file: File): void {
-    const at = split ?? fund.split;
+  function retarget(file: File, fund: Fund): void {
+    const flag = flagOf(fund, split);
     sendRetarget(
       async () => {
         const bytes = new Uint8Array(await file.arrayBuffer());
         const held = readTargets(bytes);
-        const holdings = acceptedOf(await pullLifeStrategy());
+        const holdings = acceptedOf(await pullLifeStrategy(fund.portId));
         const written = reweighted(bytes, retargeted(held, holdings, split));
         const imported = await importTargets(readTargets(written));
         return imported.kind === "saved"
@@ -175,7 +183,10 @@ export function TargetAllocation({
           });
         },
         success: ({ asOf }) => ({
-          description: `${fund.name} as at ${formatDay(asOf)}, at ${formatWholePercent(at.stocks)} equity and ${formatWholePercent(1 - at.stocks)} bonds`,
+          description: [
+            `${fund.name} as at ${formatDay(asOf)}, at ${splitSaid(splitFor(fund, split))}`,
+            ...(flag === undefined ? [] : [flag]),
+          ].join(". "),
           title: "Target allocation retargeted",
         }),
       },
@@ -189,10 +200,11 @@ export function TargetAllocation({
     if (file === undefined) {
       return;
     }
-    if (purposeRef.current === "retarget") {
-      retarget(file);
-    } else {
+    const fund = fundRef.current;
+    if (fund === null) {
       importFile(file);
+    } else {
+      retarget(file, fund);
     }
   }
 
@@ -229,21 +241,47 @@ export function TargetAllocation({
               Download the retargeted file
             </a>
           )}
-          <Button
-            isBusy={isRetargeting}
-            onClick={() => {
-              pick("retarget");
-            }}
-            size="sm"
-            variant="outline"
-          >
-            <Crosshair aria-hidden />
-            {`Retarget from ${fund.name}`}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button isBusy={isRetargeting} size="sm" variant="outline" />
+              }
+            >
+              <Crosshair aria-hidden />
+              Retarget from LifeStrategy
+              <ChevronDown aria-hidden />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-auto max-w-80">
+              {range.map((fund) => {
+                const flag = flagOf(fund, split);
+                return (
+                  <DropdownMenuItem
+                    className="flex-col items-start gap-0.5"
+                    key={fund.portId}
+                    onClick={() => {
+                      pick(fund);
+                    }}
+                  >
+                    {fund.name}
+                    <span
+                      className={cn(
+                        "text-xs",
+                        flag === undefined
+                          ? "text-muted-foreground"
+                          : "text-caution",
+                      )}
+                    >
+                      {flag ?? `At ${splitSaid(splitFor(fund, split))}`}
+                    </span>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             isBusy={isImporting}
             onClick={() => {
-              pick("import");
+              pick(null);
             }}
             size="sm"
             variant="outline"
@@ -279,4 +317,18 @@ export function TargetAllocation({
       </CardFooter>
     </SectionCard>
   );
+}
+
+// What says a fund holding no bonds sets the plan's split aside, and how
+// much the plan holds in bonds now, or nothing where the fund is laid at
+// the plan's split or the plan has none of its own.
+function flagOf(fund: Fund, split: Allocation | null): string | undefined {
+  return split === null || splitFor(fund, split).stocks === split.stocks
+    ? undefined
+    : `Holds no bonds; the plan holds ${formatWholePercent(1 - split.stocks)} now`;
+}
+
+// What a split reads as, "90% equity and 10% bonds".
+function splitSaid({ stocks }: Allocation): string {
+  return `${formatWholePercent(stocks)} equity and ${formatWholePercent(1 - stocks)} bonds`;
 }

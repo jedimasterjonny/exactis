@@ -11,10 +11,20 @@ import { Refusal } from "@/lib/answer";
 import { sumOf } from "@/lib/ledger";
 import { isToCome, monthIn } from "@/lib/months";
 
-// What LifeStrategy holds, as Vanguard says: the day it is as of, as an
-// ISO date, and its funds, as Vanguard lists them.
+// A fund of Vanguard's LifeStrategy range the allocation can be
+// retargeted from, its accumulation shares: its name, the id Vanguard's
+// site asks about it under, and its own split, which its name gives.
+export interface Fund {
+  readonly name: string;
+  readonly portId: string;
+  readonly split: Allocation;
+}
+
+// What a LifeStrategy fund holds, as Vanguard says: the fund, the day
+// it is as of, as an ISO date, and its funds, as Vanguard lists them.
 export interface Holdings {
   readonly asOf: string;
+  readonly fund: Fund;
   readonly funds: readonly Holding[];
 }
 
@@ -34,24 +44,22 @@ interface Placed {
   readonly sleeve: Sleeve;
 }
 
-// The fund the allocation is retargeted from: Vanguard's LifeStrategy
-// 80% Equity, its accumulation shares, by the id Vanguard's site asks
-// about a fund under, and its own split, four fifths in equities.
-export const fund = {
-  name: "LifeStrategy 80% Equity",
-  portId: "9244",
-  split: { stocks: 0.8 },
-};
+// The funds the allocation can be retargeted from, the first offered
+// first, each with its own split.
+export const range = [
+  { name: "LifeStrategy 80% Equity", portId: "9244", split: { stocks: 0.8 } },
+  { name: "LifeStrategy 100% Equity", portId: "9232", split: { stocks: 1 } },
+] as const satisfies readonly Fund[];
 
 // Where Vanguard's site asks what a fund holds.
 const address = "https://www.vanguardinvestor.co.uk/gpx/graphql";
 
 // The question Vanguard's site asks of what a fund holds, posted as its
 // own page posts it: each holding's day, weight, name and SEDOL, the
-// fund by its id. LifeStrategy holds eleven funds and a few lines of
-// cash, so a hundred is every one of them. A request is sent once, so
-// each is made afresh.
-export function requestOf(): Request {
+// fund by its id. A LifeStrategy fund holds a dozen funds at most and a
+// few lines of cash, so a hundred is every one of them. A request is
+// sent once, so each is made afresh.
+export function requestOf(fund: Fund): Request {
   return new Request(address, {
     body: JSON.stringify({
       query:
@@ -86,14 +94,14 @@ const answer = z.object({
   }),
 });
 
-// What LifeStrategy holds, read out of Vanguard's answer: each fund by
+// What the fund given holds, read out of Vanguard's answer: each fund by
 // its SEDOL with its weight of the whole, and the day they are as of. A
 // line with no SEDOL is the fund's cash, or a currency it holds, and is
 // left out, since the allocation is of funds and the cash is a sliver
 // either side of nothing. An answer that is not Vanguard's, one listing
 // no fund, or one dated after the month it is, is refused in words
 // saying so, since the screen says why nothing was retargeted.
-export function readHoldings(sent: Uint8Array): Holdings {
+export function readHoldings(sent: Uint8Array, fund: Fund): Holdings {
   const parsed = answer.safeParse(jsonOf(sent));
   if (!parsed.success) {
     throw new Refusal(
@@ -124,17 +132,17 @@ export function readHoldings(sent: Uint8Array): Holdings {
       `Vanguard dates what ${fund.name} holds to ${first.effectiveDate}, after this month`,
     );
   }
-  return { asOf: first.effectiveDate, funds };
+  return { asOf: first.effectiveDate, fund, funds };
 }
 
 // The share of the whole each category is to hold, by its id, for the
-// allocation to hold what LifeStrategy holds at the split given, or at
-// its own where none is, as none is while the plan's split is the target
-// allocation's own: each fund's weight of the sleeve it is in, by the
-// sleeve's share of the whole, given to the category standing for it,
-// and every other category asking for nothing, since it stands for
-// nothing LifeStrategy holds. A fund in a sleeve the split gives nothing
-// is passed over, since it is given nothing whichever category takes it.
+// allocation to hold what a LifeStrategy fund holds at the split it is
+// laid over the categories at, from the plan's split given or none:
+// each fund's weight of the sleeve it is in, by the sleeve's share of
+// the whole, given to the category standing for it, and every other
+// category asking for nothing, since it stands for nothing the fund
+// holds. A fund in a sleeve the split gives nothing is passed over,
+// since it is given nothing whichever category takes it.
 // Where more than one category stands for a fund, as one for the index
 // a fund tracks and one for the fund it replaced do, the one asking
 // for the largest share now takes it, since the others are the ones
@@ -147,10 +155,10 @@ export function readHoldings(sent: Uint8Array): Holdings {
 // share and the split would be quietly lost.
 export function retargeted(
   categories: readonly Target[],
-  { funds }: Holdings,
+  { fund, funds }: Holdings,
   split: Allocation | null,
 ): ReadonlyMap<string, number> {
-  const { stocks } = split ?? fund.split;
+  const { stocks } = splitFor(fund, split);
   const shares: Record<Sleeve, number> = { bonds: 1 - stocks, stocks };
   const placed: readonly Placed[] = funds.flatMap((holding) => {
     const standing = standingFor(holding.sedol, categories);
@@ -198,6 +206,15 @@ export function retargeted(
       ),
     ]),
   );
+}
+
+// The split a fund is laid over the categories at: the plan's split
+// given, unless none is, as none is while the plan's split is the
+// target allocation's own, or the fund holds no bonds, when it is the
+// fund's own, since a fund all in equities has no bonds of its own to
+// be scaled to the plan's share.
+export function splitFor(fund: Fund, split: Allocation | null): Allocation {
+  return split === null || fund.split.stocks === 1 ? fund.split : split;
 }
 
 // What was sent, read as JSON, or a refusal when it is none.

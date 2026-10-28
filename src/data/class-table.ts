@@ -33,7 +33,8 @@ interface Standing {
 // by its name, as the manual method mapped Portfolio Performance's
 // categories and as that mapping stood up to the August 2026 workbook,
 // and the LifeStrategy fund the category stands for, as LifeStrategy
-// 80% Equity held its eleven funds in August 2026. Where no class is
+// 80% Equity held its eleven funds in August 2026, LifeStrategy 100%
+// Equity's seven among them in September. Where no class is
 // the category's own, the nearest is named, and where the vintage may
 // or may not price the better one, both are, the better first. A name
 // the table does not hold is suggested onto nothing, since a guess from

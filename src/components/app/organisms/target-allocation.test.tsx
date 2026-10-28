@@ -18,7 +18,7 @@ import { pullLifeStrategy } from "@/actions/lifestrategy";
 import { importTargets, mapByName } from "@/actions/targets";
 import { Toaster } from "@/components/kit/toast";
 import { cma, mappings } from "@/data/cma.fixture";
-import { retargeted } from "@/data/lifestrategy";
+import { range, retargeted } from "@/data/lifestrategy";
 import { holdings } from "@/data/lifestrategy.fixture";
 import { targets } from "@/data/targets.fixture";
 import { refused, saved } from "@/lib/answer";
@@ -93,12 +93,18 @@ function renderCard(held: null | Targets = targets): RenderResult {
   );
 }
 
-// The retarget button pressed, then the file picker chosen from with
-// the file given.
-function retargetWith(file: File): void {
+// The retarget menu opened and the fund named chosen from it, then the
+// file picker chosen from with the file given.
+async function retargetWith(
+  file: File,
+  fund = "LifeStrategy 80% Equity",
+): Promise<void> {
   fireEvent.click(
-    screen.getByRole("button", {
-      name: "Retarget from LifeStrategy 80% Equity",
+    screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+  );
+  fireEvent.click(
+    await screen.findByRole("menuitem", {
+      name: (name) => name.startsWith(fund),
     }),
   );
   choose([file]);
@@ -272,14 +278,15 @@ describe("TargetAllocation", () => {
     vi.mocked(importTargets).mockReturnValue(answer.promise);
     const { unmount } = renderCard();
     const button = screen.getByRole("button", {
-      name: "Retarget from LifeStrategy 80% Equity",
+      name: "Retarget from LifeStrategy",
     });
 
-    retargetWith(chosen);
+    await retargetWith(chosen);
 
     await waitFor(() => {
       expect(importTargets).toHaveBeenCalledWith(readTargets(saved70));
     });
+    expect(pullLifeStrategy).toHaveBeenCalledWith("9244");
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(
       screen.getByRole("button", { name: "Reload from Portfolio Performance" }),
@@ -310,7 +317,7 @@ describe("TargetAllocation", () => {
     expect(StubUrl.revokeObjectURL).not.toHaveBeenCalled();
 
     // Retargeted again, the offer is replaced and the first file let go.
-    retargetWith(chosen);
+    await retargetWith(chosen);
 
     await waitFor(() => {
       expect(
@@ -345,7 +352,7 @@ describe("TargetAllocation", () => {
     );
     renderCard();
 
-    retargetWith(chosen);
+    await retargetWith(chosen);
     const link = await screen.findByRole("link", {
       name: "Download the retargeted file",
     });
@@ -381,7 +388,7 @@ describe("TargetAllocation", () => {
       { wrapper: Toaster },
     );
 
-    retargetWith(chosen);
+    await retargetWith(chosen);
 
     await waitFor(() => {
       expect(
@@ -397,10 +404,116 @@ describe("TargetAllocation", () => {
     );
   });
 
+  // At seven tenths in stocks, LifeStrategy 80% Equity is laid at the
+  // plan's split, and LifeStrategy 100% Equity, holding no bonds, says
+  // it sets aside the 30% the plan holds in them.
+  it("offers each fund of the range, saying the split it would be laid at, and flags one holding no bonds while the plan holds some", async () => {
+    renderCard();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    );
+
+    expect(
+      (await screen.findAllByRole("menuitem")).map((item) => item.textContent),
+    ).toStrictEqual([
+      "LifeStrategy 80% EquityAt 70% equity and 30% bonds",
+      "LifeStrategy 100% EquityHolds no bonds; the plan holds 30% now",
+    ]);
+    expect(screen.getByText("At 70% equity and 30% bonds")).toHaveClass(
+      "text-muted-foreground",
+    );
+    expect(
+      screen.getByText("Holds no bonds; the plan holds 30% now"),
+    ).toHaveClass("text-caution");
+  });
+
+  // The plan's split being the target allocation's own, each fund is
+  // laid at its own, and retargeting moves the plan with it, so there is
+  // nothing to flag.
+  it("offers each fund at its own split, flagging nothing, while the plan's split is the target allocation's own", async () => {
+    render(
+      <TargetAllocation
+        cma={cma}
+        mappings={mappings}
+        split={null}
+        targets={targets}
+      />,
+      { wrapper: Toaster },
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    );
+
+    expect(
+      (await screen.findAllByRole("menuitem")).map((item) => item.textContent),
+    ).toStrictEqual([
+      "LifeStrategy 80% EquityAt 80% equity and 20% bonds",
+      "LifeStrategy 100% EquityAt 100% equity and 0% bonds",
+    ]);
+  });
+
+  it("flags nothing while the plan holds no bonds either", async () => {
+    render(
+      <TargetAllocation
+        cma={cma}
+        mappings={mappings}
+        split={{ stocks: 1 }}
+        targets={targets}
+      />,
+      { wrapper: Toaster },
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    );
+
+    expect(
+      (await screen.findAllByRole("menuitem")).map((item) => item.textContent),
+    ).toStrictEqual([
+      "LifeStrategy 80% EquityAt 100% equity and 0% bonds",
+      "LifeStrategy 100% EquityAt 100% equity and 0% bonds",
+    ]);
+  });
+
+  // LifeStrategy 100% Equity holding the fixture's four equity funds and
+  // no bonds, the file is laid all in equities whatever the plan's
+  // split, and the toast says what of it is set aside.
+  it("retargets from a fund holding no bonds all in equities, and says the bonds the plan holds now", async () => {
+    vi.stubGlobal("URL", StubUrl);
+    const equities = {
+      ...holdings,
+      fund: range[1],
+      funds: holdings.funds.slice(0, 4),
+    };
+    vi.mocked(pullLifeStrategy).mockResolvedValue(saved(equities));
+    vi.mocked(importTargets).mockResolvedValue(
+      saved({ ...targets, importedOn: "2026-09-15" }),
+    );
+    renderCard();
+
+    await retargetWith(chosen, "LifeStrategy 100% Equity");
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Target allocation retargeted" }),
+      ).toHaveAccessibleDescription(
+        "LifeStrategy 100% Equity as at 31 Aug 2026, at 100% equity and 0% bonds. Holds no bonds; the plan holds 30% now",
+      );
+    });
+    expect(pullLifeStrategy).toHaveBeenCalledWith("9232");
+    expect(importTargets).toHaveBeenCalledWith(
+      readTargets(
+        reweighted(saved80, retargeted(readTargets(saved80), equities, split)),
+      ),
+    );
+  });
+
   it("says why a file cannot be retargeted before Vanguard is asked, and asks for nothing", async () => {
     renderCard();
 
-    retargetWith(new File(["<?xml version='1.0'?>"], "portfolio.xml"));
+    await retargetWith(new File(["<?xml version='1.0'?>"], "portfolio.xml"));
 
     await waitFor(() => {
       expect(
@@ -419,7 +532,7 @@ describe("TargetAllocation", () => {
     );
     renderCard();
 
-    retargetWith(chosen);
+    await retargetWith(chosen);
 
     await waitFor(() => {
       expect(
@@ -448,7 +561,7 @@ describe("TargetAllocation", () => {
     );
     renderCard();
 
-    retargetWith(chosen);
+    await retargetWith(chosen);
 
     await waitFor(() => {
       expect(
@@ -470,7 +583,7 @@ describe("TargetAllocation", () => {
     );
     renderCard();
 
-    retargetWith(chosen);
+    await retargetWith(chosen);
 
     await waitFor(() => {
       expect(

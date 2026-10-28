@@ -2,6 +2,8 @@ import { strToU8 } from "fflate";
 
 import type { Holdings } from "@/data/lifestrategy";
 
+import { range } from "@/data/lifestrategy";
+
 // A line of Vanguard's answer as a test writes it: a fund by its name,
 // SEDOL and weight in per cent, or cash, with no SEDOL.
 export type Line = readonly [
@@ -57,10 +59,12 @@ export function vanguardAnswer(
   );
 }
 
-// The holdings the reader reads out of the answer over the lines above:
-// the six funds, the cash left out. For tests.
+// The holdings the reader reads out of the answer over the lines above,
+// as LifeStrategy 80% Equity's: the six funds, the cash left out. For
+// tests.
 export const holdings: Holdings = {
   asOf: "2026-08-31",
+  fund: range[0],
   funds: lines.flatMap(([name, sedol, weight]) =>
     sedol === null ? [] : [{ name, sedol, weight: weight / 100 }],
   ),
