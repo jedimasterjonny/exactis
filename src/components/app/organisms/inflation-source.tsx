@@ -8,9 +8,9 @@ import { useId } from "react";
 import type { Curve } from "@/data/inflation";
 
 import { pullCurve } from "@/actions/inflation";
-import { CurveChart } from "@/components/app/atoms/curve-chart";
 import { Ledger } from "@/components/app/atoms/ledger";
 import { EmptyState } from "@/components/app/molecules/empty-state";
+import { CurveChart } from "@/components/app/organisms/curve-chart";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
