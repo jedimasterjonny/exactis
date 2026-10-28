@@ -86,7 +86,7 @@ export function Worksheet({
                     {figures.map((figure, column) => (
                       <td
                         className={cn(
-                          "pt-3 pl-3 text-right align-baseline figure whitespace-nowrap @lg:pl-8",
+                          "pt-3 pl-3 text-right align-baseline figure @lg:pl-8",
                           pad,
                           isResult
                             ? "text-lg font-medium @lg:text-2xl"
