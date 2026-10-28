@@ -6,15 +6,15 @@ import { bySlot } from "@/test/dom";
 import { SegmentBar } from "./segment-bar";
 
 const lasting = [
-  { key: "surplus", tone: "bg-outcome-surplus", value: 280 },
-  { key: "comfortable", tone: "bg-outcome-comfortable", value: 500 },
-  { key: "barely", tone: "bg-outcome-barely", value: 120 },
+  { fill: "bg-outcome-surplus", key: "surplus", value: 280 },
+  { fill: "bg-outcome-comfortable", key: "comfortable", value: 500 },
+  { fill: "bg-outcome-barely", key: "barely", value: 120 },
 ];
 
 const short = [
-  { key: "almost", tone: "bg-outcome-almost", value: 40 },
-  { key: "middle", tone: "bg-outcome-middle", value: 60 },
-  { key: "early", tone: "bg-outcome-early", value: 0 },
+  { fill: "bg-outcome-almost", key: "almost", value: 40 },
+  { fill: "bg-outcome-middle", key: "middle", value: 60 },
+  { fill: "bg-outcome-early", key: "early", value: 0 },
 ];
 
 // The bar is hidden from the accessibility tree, so no query is better
@@ -58,8 +58,8 @@ describe("SegmentBar", () => {
       <SegmentBar
         groups={[
           [
-            { key: "pensions", tone: "bg-chart-2", value: 500 },
-            { key: "property", tone: "bg-chart-3", value: -200 },
+            { fill: "bg-chart-2", key: "pensions", value: 500 },
+            { fill: "bg-chart-3", key: "property", value: -200 },
           ],
         ]}
         total={1000}
@@ -72,8 +72,8 @@ describe("SegmentBar", () => {
 
   it("draws two groups listing the same parts, each holding those on its side", () => {
     const moves = [
-      { key: "pensions", tone: "bg-chart-2", value: 900 },
-      { key: "property", tone: "bg-chart-3", value: -100 },
+      { fill: "bg-chart-2", key: "pensions", value: 900 },
+      { fill: "bg-chart-3", key: "property", value: -100 },
     ];
     render(
       <SegmentBar

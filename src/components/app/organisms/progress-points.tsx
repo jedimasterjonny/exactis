@@ -32,8 +32,8 @@ import {
   yearsOf,
 } from "@/data/progress";
 import {
+  balanceFills,
   balanceNames,
-  balanceTones,
   formatBalance,
   partsOf,
 } from "@/lib/balances";
@@ -71,7 +71,7 @@ interface Scale {
 // an account's is; a narrow table folds each
 // month to what net worth moved by since the point before it and where
 // it ended, a tap opening it to its balances a line apiece, each by a
-// dot in its tone. A household keeping no point yet draws what would
+// dot in its fill. A household keeping no point yet draws what would
 // fill the card rather than an empty one.
 export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
   if (points.length === 0) {
@@ -164,7 +164,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
                                   aria-hidden
                                   className={cn(
                                     "size-2 rounded-full",
-                                    balanceTones[key],
+                                    balanceFills[key],
                                   )}
                                 />
                                 <span className="flex-1">

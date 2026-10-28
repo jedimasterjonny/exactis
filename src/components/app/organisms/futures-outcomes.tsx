@@ -12,8 +12,8 @@ import { formatCount } from "@/lib/count";
 import { formatGbp, formatWholePercent } from "@/lib/money";
 import {
   lastingOutcomes,
+  outcomeFills,
   outcomeNames,
-  outcomeTones,
   shortOutcomes,
 } from "@/lib/outcomes";
 
@@ -40,7 +40,7 @@ const lastedAs: Readonly<Record<(typeof lastingOutcomes)[number], string>> = {
 // and another saying when most of the rest fall short and what the
 // middle future leaves, the bar taking the sentences' width rather than
 // the figure's; and each outcome's share of the run beside the pounds
-// or the ages bounding it, which is where the bar's tones are named. Most is said only of more than half, many otherwise, and where
+// or the ages bounding it, which is where the bar's fills are named. Most is said only of more than half, many otherwise, and where
 // two outcomes hold as many the better is said. Read over the futures
 // drawn so far while the run comes in, the bar's rest shrinking as it
 // does, and saying only that it is drawing before the first are in.
@@ -72,10 +72,10 @@ export function FuturesOutcomes({
   };
   const shareOf = (outcome: Outcome): LegendEntry => ({
     figure: formatWholePercent(outcomes[outcome] / reading.run),
+    fill: outcomeFills[outcome],
     key: outcome,
     name: outcomeNames[outcome],
     note: bounds[outcome],
-    tone: outcomeTones[outcome],
   });
   const lasted = mostOf(lastingOutcomes, outcomes);
   const fell = mostOf(shortOutcomes, outcomes);
@@ -111,8 +111,8 @@ export function FuturesOutcomes({
               <SegmentBar
                 groups={[lastingOutcomes, shortOutcomes].map((group) =>
                   group.map((outcome) => ({
+                    fill: outcomeFills[outcome],
                     key: outcome,
-                    tone: outcomeTones[outcome],
                     value: outcomes[outcome],
                   })),
                 )}
