@@ -26,9 +26,9 @@ export const outcomeNames: Readonly<Record<Outcome, string>> = {
   surplus: "Large surplus",
 };
 
-// The tone each outcome is drawn in, as the whole class, since Tailwind
+// The fill each outcome is drawn in, as the whole class, since Tailwind
 // reads class names whole and one built from pieces is never generated.
-export const outcomeTones: Readonly<Record<Outcome, string>> = {
+export const outcomeFills: Readonly<Record<Outcome, string>> = {
   almost: "bg-outcome-almost",
   barely: "bg-outcome-barely",
   comfortable: "bg-outcome-comfortable",

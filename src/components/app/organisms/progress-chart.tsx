@@ -25,8 +25,8 @@ import { balances, netWorthOf } from "@/data/progress";
 import { axisOf } from "@/lib/axis";
 import {
   balanceColors,
+  balanceFills,
   balanceNames,
-  balanceTones,
   formatBalance,
 } from "@/lib/balances";
 import { formatAxisGbp, formatGbp } from "@/lib/money";
@@ -383,7 +383,7 @@ function RowTooltip({
           <span className="flex items-center gap-2" key={key}>
             <span
               aria-hidden
-              className={cn("h-0.5 w-3 rounded-full", balanceTones[key])}
+              className={cn("h-0.5 w-3 rounded-full", balanceFills[key])}
             />
             <span className="text-muted-foreground">{balanceNames[key]}</span>
             <span className="ml-auto figure font-medium">

@@ -13,16 +13,16 @@ describe("LegendTable", () => {
         entries={[
           {
             figure: "60%",
+            fill: "bg-outcome-surplus",
             key: "surplus",
             name: "Large surplus",
             note: "over £3,900,000",
-            tone: "bg-outcome-surplus",
           },
           {
             figure: "30%",
+            fill: "bg-outcome-comfortable",
             key: "comfortable",
             name: "Comfortable",
-            tone: "bg-outcome-comfortable",
           },
         ]}
       />,

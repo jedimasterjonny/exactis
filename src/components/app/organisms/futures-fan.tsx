@@ -73,11 +73,11 @@ const quarters = ({ bottomQuarter, topQuarter }: FutureYear): number[] => [
 // tenths' at a fifth, and the quarters' where their band lies over the
 // tenths', at about a half.
 const readings = [
-  { key: "topTenth", name: "Top 10%", tone: "bg-chart-2/20" },
-  { key: "topQuarter", name: "Top 25%", tone: "bg-chart-2/50" },
-  { key: "middle", name: "Median", tone: "bg-chart-1" },
-  { key: "bottomQuarter", name: "Bottom 25%", tone: "bg-chart-2/50" },
-  { key: "bottomTenth", name: "Bottom 10%", tone: "bg-chart-2/20" },
+  { fill: "bg-chart-2/20", key: "topTenth", name: "Top 10%" },
+  { fill: "bg-chart-2/50", key: "topQuarter", name: "Top 25%" },
+  { fill: "bg-chart-1", key: "middle", name: "Median" },
+  { fill: "bg-chart-2/50", key: "bottomQuarter", name: "Bottom 25%" },
+  { fill: "bg-chart-2/20", key: "bottomTenth", name: "Bottom 10%" },
 ] as const;
 
 // What the band of the middle four in five spans in a year.
@@ -285,9 +285,9 @@ function FanTooltip({
           </span>
         )}
       </span>
-      {readings.map(({ key, name, tone }) => (
+      {readings.map(({ fill, key, name }) => (
         <span className="flex items-center gap-2" key={key}>
-          <span aria-hidden className={cn("size-2 rounded-full", tone)} />
+          <span aria-hidden className={cn("size-2 rounded-full", fill)} />
           <span
             className={
               key === "middle" ? "font-medium" : "text-muted-foreground"

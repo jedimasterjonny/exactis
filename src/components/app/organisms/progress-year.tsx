@@ -8,8 +8,8 @@ import { SegmentBar } from "@/components/app/atoms/segment-bar";
 import { Card, CardContent } from "@/components/kit/card";
 import { movesOf, netWorthOf, sharedBy, sumOf } from "@/data/progress";
 import {
+  balanceFills,
   balanceNames,
-  balanceTones,
   formatBalance,
   partsOf,
 } from "@/lib/balances";
@@ -34,7 +34,7 @@ interface ProgressYearProps {
 // where it went from and to over those same balances, saying so where
 // the latest was read with more; and each balance's
 // move beside where it stands now, which is
-// where the bar's tones are named. A debt paid down adds and one run
+// where the bar's fills are named. A debt paid down adds and one run
 // up takes away, as it moves net worth.
 export function ProgressYear({ year }: ProgressYearProps): JSX.Element {
   const { before, from, to } = year;
@@ -46,10 +46,10 @@ export function ProgressYear({ year }: ProgressYearProps): JSX.Element {
   const moved = addedSum - takenSum;
   const entryOf = ({ key, move }: Move): LegendEntry => ({
     figure: formatSignedGbp(move),
+    fill: balanceFills[key],
     key,
     name: balanceNames[key],
     note: `${formatBalance(to[key])} now`,
-    tone: balanceTones[key],
   });
   const span = `${spanOf(months)} to ${monthName(to.month.month, "long")}`;
   return (

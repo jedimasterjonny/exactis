@@ -29,7 +29,7 @@ interface SpreadBarProps {
 
 // Where the futures reach a goal on the plan's span: the fan turned on
 // its side, over the track a line's bar is drawn on. The middle four in
-// five are banded faintly and the middle half over them, in the tones
+// five are banded faintly and the middle half over them, in the fills
 // the fan bands them, the earliest and latest 5% are small dots at the
 // ends, and the median is the larger dot on top, in the fan's median
 // colour and ringed in the card's as a milestone's pin is. A band whose
@@ -56,8 +56,8 @@ export function SpreadBar({
       className="relative h-1.5 rounded-full bg-muted"
       data-slot="spread-bar"
     >
-      <Band last={last} pair={outer} plan={plan} tone="bg-chart-2/20" />
-      <Band last={last} pair={inner} plan={plan} tone="bg-chart-2/50" />
+      <Band fill="bg-chart-2/20" last={last} pair={outer} plan={plan} />
+      <Band fill="bg-chart-2/50" last={last} pair={inner} plan={plan} />
       {marks.map((mark) => (
         <span
           className="absolute inset-y-0 w-px bg-brand/40"
@@ -83,15 +83,15 @@ export function SpreadBar({
 // year its larger does, or to the last year any share does where the
 // larger never reaches it; nothing while neither does.
 function Band({
+  fill,
   last,
   pair: [from, to],
   plan,
-  tone,
 }: {
+  readonly fill: string;
   readonly last: null | number;
   readonly pair: Pair;
   readonly plan: Plan;
-  readonly tone: string;
 }): JSX.Element | null {
   if (from === null || last === null) {
     return null;
@@ -101,7 +101,7 @@ function Band({
     <span
       className={cn(
         "absolute inset-y-0 rounded-full motion-safe:transition-[left,width]",
-        tone,
+        fill,
       )}
       data-slot="spread-bar-band"
       style={{

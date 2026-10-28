@@ -2,11 +2,11 @@ import type { JSX } from "react";
 
 import { cn } from "cn";
 
-// A part of a whole, drawn as long as its value, in its tone, given as
+// A part of a whole, drawn as long as its value, in its fill, given as
 // the whole class, since Tailwind reads class names whole.
 interface Segment {
+  readonly fill: string;
   readonly key: string;
-  readonly tone: string;
   readonly value: number;
 }
 
@@ -45,9 +45,9 @@ export function SegmentBar({
               key={held.map(({ key }) => key).join()}
               style={{ flexGrow: sum }}
             >
-              {held.map(({ key, tone, value }) => (
+              {held.map(({ fill, key, value }) => (
                 <span
-                  className={cn("min-w-1 basis-0 rounded-sm", tone)}
+                  className={cn("min-w-1 basis-0 rounded-sm", fill)}
                   data-segment={key}
                   data-slot="segment-bar-part"
                   key={key}
