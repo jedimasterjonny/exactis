@@ -9,7 +9,7 @@ import { working } from "@/data/owners.fixture";
 import { forget } from "@/hooks/use-futures";
 import { FuturesWorker } from "@/test/futures-worker";
 
-import { ChanceBoard } from "./chance-board";
+import { ChanceScreen } from "./chance-screen";
 
 vi.mock("@/actions/milestones", () => ({
   removeMilestone: vi.fn(),
@@ -67,7 +67,7 @@ function spending(amount: number): Schedule {
   };
 }
 
-describe("ChanceBoard", () => {
+describe("ChanceScreen", () => {
   // jsdom has no Worker, and the chance of success draws its futures on two.
   beforeEach(() => {
     vi.stubGlobal("Worker", FuturesWorker);
@@ -77,7 +77,7 @@ describe("ChanceBoard", () => {
 
   it("says there is nothing to draw the futures at while the plan has no spread", () => {
     render(
-      <ChanceBoard
+      <ChanceScreen
         accounts={[isa]}
         milestones={[]}
         plan={plan}
@@ -104,7 +104,7 @@ describe("ChanceBoard", () => {
 
   it("says there are no savings for the futures to grow while the plan holds none", () => {
     render(
-      <ChanceBoard
+      <ChanceScreen
         accounts={[home]}
         milestones={[]}
         plan={plan}
@@ -127,7 +127,7 @@ describe("ChanceBoard", () => {
   // the £12,000 of that last year, and lasting on it is comfortable.
   it("draws the futures as the screen opens, saying how far the run has come, then what they come to", async () => {
     render(
-      <ChanceBoard
+      <ChanceScreen
         accounts={[isa]}
         milestones={[]}
         plan={plan}
@@ -156,7 +156,7 @@ describe("ChanceBoard", () => {
 
   it("draws the futures again from the header once they are drawn", async () => {
     render(
-      <ChanceBoard
+      <ChanceScreen
         accounts={[isa]}
         milestones={[]}
         plan={plan}
@@ -180,7 +180,7 @@ describe("ChanceBoard", () => {
   // £3,000 to spare, so straying 15% a year more than a tenth fall short.
   it("grades every future drawn, those that last and those that fall short", async () => {
     render(
-      <ChanceBoard
+      <ChanceScreen
         accounts={[isa]}
         milestones={[]}
         plan={{ ...plan, rate: 0.05, retires: 35 }}
@@ -211,7 +211,7 @@ describe("ChanceBoard", () => {
   // at 34, and the milestones are read over the futures drawn.
   it("lists the milestones beneath the fan, read over the futures drawn", async () => {
     render(
-      <ChanceBoard
+      <ChanceScreen
         accounts={[isa]}
         milestones={[
           {
@@ -243,7 +243,7 @@ describe("ChanceBoard", () => {
   // lasts at its own rates only by the early draw, every year from 2026.
   it("says before the count that the plan lasts at its own rates only by drawing a pension early", () => {
     render(
-      <ChanceBoard
+      <ChanceScreen
         accounts={[{ ...isa, balance: 1000000, kind: "tax-deferred" }]}
         milestones={[]}
         plan={plan}
@@ -263,7 +263,7 @@ describe("ChanceBoard", () => {
   // own rates, and so does every future where nothing strays.
   it("says before the count that the plan runs out even at its own rates", async () => {
     render(
-      <ChanceBoard
+      <ChanceScreen
         accounts={[isa]}
         milestones={[]}
         plan={plan}
@@ -291,7 +291,7 @@ describe("ChanceBoard", () => {
   // any future where nothing strays, and none of them lasts.
   it("says before the count that the plan never reaches its retirement's conditions at its own rates, and counts the futures that never retire", async () => {
     render(
-      <ChanceBoard
+      <ChanceScreen
         accounts={[isa]}
         milestones={[]}
         plan={{
