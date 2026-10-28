@@ -314,18 +314,18 @@ describe("saveAnchor", () => {
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
-  // All in equities under the CMA's rates, nothing says what bonds
+  // All in bonds under the CMA's rates, nothing says what stocks
   // return.
   it("refuses an anchor the CMA's rates cannot run on while they are live", async () => {
     await keepAfter(
       db,
       { scenario: "", version: 0 },
-      { ...reference, rateSet: "cma", targets: targetsUnder("Equity") },
+      { ...reference, rateSet: "cma", targets: targetsUnder("Bonds") },
     );
 
     expect(await saveAnchor(null, { age: 60, bonds: 0.4 })).toStrictEqual(
       refused(
-        "The glide path holds bonds the target allocation holds none of, so nothing says what they return, so the plan cannot run on the CMA's rates",
+        "The glide path holds stocks the target allocation holds none of, so nothing says what they return, so the plan cannot run on the CMA's rates",
       ),
     );
   });

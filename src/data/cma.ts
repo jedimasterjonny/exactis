@@ -131,10 +131,11 @@ export interface Vintages {
 
 // A category as it blends into its sleeve: the category, the class it
 // is mapped onto, and its weight in the sleeve, its share of the whole
-// over the sleeve's.
+// over the sleeve's; or, in a sleeve that stands in at a class of its
+// own, the class alone, the whole of the sleeve.
 interface Part {
   readonly asset: Asset;
-  readonly category: Target;
+  readonly category?: Target;
   readonly weight: number;
 }
 
@@ -144,6 +145,16 @@ interface Risked extends Part {
 }
 
 export const sleeves = ["bonds", "stocks"] as const;
+
+// Global bonds as BlackRock's sterling block prices them, the form
+// hedged to sterling first, which the funds sold here almost all hold,
+// then the unhedged form for a vintage pricing no hedged one: what a
+// category tracking global bonds is suggested onto, and what bonds
+// nothing in the target allocation blends into stand in at.
+export const globalBonds = [
+  "Global aggregate bonds (GBP hedged)",
+  "Global aggregate bonds",
+] as const;
 
 // What a household deducts from the CMA's returns before anything is
 // typed. Fees of 0.20%, a round figure for fund charges and a flat
@@ -164,8 +175,10 @@ const listed = new Intl.ListFormat("en-GB", { type: "conjunction" });
 // mapped or not, since it weighs nothing. A class hedged to sterling is
 // blended at the return of the class it hedges, and what the hedging
 // moves is kept apart as the adjustment, so the screen can show it, the
-// two adding up to the class's own return. A sleeve nothing blends
-// into, as bonds in an allocation all in equities, stands in at the
+// two adding up to the class's own return. Bonds nothing blends into,
+// as in an allocation all in equities, stand in at the first of the
+// global bond classes the vintage prices, the whole of the sleeve and
+// none of the whole. Any other sleeve nothing blends into stands in at the
 // other sleeve's return with no parts and none of the whole, so the rate
 // it gives the plan weighs nothing in what the plan earns, and the
 // screen, finding no parts, shows it as empty. There is no blend without
@@ -217,7 +230,10 @@ export function blendsOf(
     return { short: "Nothing in the target allocation asks for a share" };
   }
   const empty = { ...standIn, parts: [], share: 0 };
-  return { bonds: bonds ?? empty, stocks: stocks ?? empty };
+  return {
+    bonds: bonds ?? bondsStandIn(named) ?? empty,
+    stocks: stocks ?? empty,
+  };
 }
 
 // The rates the plan runs on when they are derived from a vintage:
@@ -250,9 +266,9 @@ export function cmaRates(
 // blend, and what is missing is said. Given a split, as the glide path
 // gives one for a year, the plan holds that one instead, with the rates
 // as they were blended, and rebalancing earns what it does between the
-// sleeves in those shares; a split holding a sleeve the target
-// allocation holds none of leaves nothing to say what that part of the
-// savings returns, and that is said too.
+// sleeves in those shares; a split holding stocks the target allocation
+// holds none of, or bonds no class stands in for, leaves nothing to say
+// what that part of the savings returns, and that is said too.
 export function derivedSet(
   {
     cma,
@@ -445,9 +461,10 @@ export function riskOf(
 // live, those typed by hand among them, since how far the markets stray
 // is theirs whatever return is set for them. There is none before a
 // vintage is pulled, while it makes no blend, while it gives no risk, or
-// while the plan holds stocks or bonds the target allocation holds none
-// of, as a split typed by hand can, since nothing then says how far that
-// part of the savings strays; and what is missing is said.
+// while the plan holds stocks the target allocation holds none of, or
+// bonds no class stands in for, as a split typed by hand can, since
+// nothing then says how far that part of the savings strays; and what is
+// missing is said.
 export function spreadOf(
   {
     cma,
@@ -532,7 +549,7 @@ export function vintageName({ vintage }: Cma): string {
 // A sleeve's blend of the categories in it, or none for a sleeve none
 // is in.
 function blendOf(
-  priced: readonly Omit<Part, "weight">[],
+  priced: readonly { readonly asset: Asset; readonly category: Target }[],
   named: ReadonlyMap<string, Asset>,
 ): Blend | undefined {
   const share = priced.reduce((sum, { category }) => sum + category.share, 0);
@@ -543,19 +560,42 @@ function blendOf(
     ...part,
     weight: part.category.share / share,
   }));
-  const unhedged = ({ hedges, rate }: Asset): number =>
-    named.get(hedges ?? "")?.rate ?? rate;
   return {
     hedging: parts.reduce(
-      (sum, { asset, weight }) => sum + weight * (asset.rate - unhedged(asset)),
+      (sum, { asset, weight }) =>
+        sum + weight * (asset.rate - unhedgedOf(asset, named)),
       0,
     ),
     parts,
     rate: parts.reduce(
-      (sum, { asset, weight }) => sum + weight * unhedged(asset),
+      (sum, { asset, weight }) => sum + weight * unhedgedOf(asset, named),
       0,
     ),
     share,
+  };
+}
+
+// Bonds standing in at the first of the global bond classes the vintage
+// prices, the whole of the sleeve and none of the whole, or none where it
+// prices none of them. Where the vintage says how far any class strays,
+// only a class it says it of stands in, so standing in never leaves the
+// plan without the risk it had.
+function bondsStandIn(named: ReadonlyMap<string, Asset>): Blend | undefined {
+  const isRiskRead = [...named.values()].some(({ risk }) => risk !== undefined);
+  const asset = globalBonds
+    .map((name) => named.get(name))
+    .find(
+      (each) => each !== undefined && (each.risk !== undefined || !isRiskRead),
+    );
+  if (asset === undefined) {
+    return undefined;
+  }
+  const rate = unhedgedOf(asset, named);
+  return {
+    hedging: asset.rate - rate,
+    parts: [{ asset, weight: 1 }],
+    rate,
+    share: 0,
   };
 }
 
@@ -589,8 +629,17 @@ function sharedBy(first: Risked, second: Risked, correlation: number): number {
   );
 }
 
+// The return of the class a class hedges to sterling, or the class's
+// own for one hedging nothing or a class the vintage does not price.
+function unhedgedOf(
+  { hedges, rate }: Asset,
+  named: ReadonlyMap<string, Asset>,
+): number {
+  return named.get(hedges ?? "")?.rate ?? rate;
+}
+
 // The sleeves a split holds some of that nothing in the target
-// allocation blends into, by name.
+// allocation blends into and no class stands in for, by name.
 function unheldBy(
   blends: { readonly bonds: Blend; readonly stocks: Blend },
   { stocks: share }: Allocation,

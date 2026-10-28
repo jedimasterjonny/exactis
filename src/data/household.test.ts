@@ -1229,22 +1229,27 @@ describe("soundKept", () => {
     );
   });
 
-  // All in equities, nothing says how far the 40% the glide path holds
-  // in bonds from 60 strays, so no future can be drawn through it; and
-  // with no CMA pulled, nothing says how far anything strays.
-  it("gives no spread along a glide path holding what the target allocation holds none of, or with no CMA", () => {
-    const { spread } = soundKept({
+  // All in equities, the 40% the glide path holds in bonds from 60
+  // strays as the class standing in for them does. All in bonds, nothing
+  // says how far the 60% it holds in stocks from 60 strays, so no future
+  // can be drawn through it; and with no CMA pulled, nothing says how
+  // far anything strays.
+  it("gives no spread along a glide path holding what the target allocation holds none of and nothing stands in for, or with no CMA", () => {
+    const along = (top: string, now: number): Kept => ({
       ...kept,
       glide: [
-        { age: 34, bonds: 0 },
+        { age: 34, bonds: now },
         { age: 60, bonds: 0.4 },
       ],
-      targets: targetsUnder("Equity"),
-    }).household;
+      targets: targetsUnder(top),
+    });
 
-    expect(spread).toStrictEqual({
+    expect(soundKept(along("Equity", 0)).household.spread).not.toHaveProperty(
+      "short",
+    );
+    expect(soundKept(along("Bonds", 1)).household.spread).toStrictEqual({
       short:
-        "The plan holds bonds the target allocation holds none of, so nothing says how far they stray",
+        "The plan holds stocks the target allocation holds none of, so nothing says how far they stray",
     });
     expect(
       soundKept({
@@ -1297,16 +1302,19 @@ describe("soundKept", () => {
     ).not.toThrow();
   });
 
-  it("refuses a glide path holding bonds under the CMA's rates while the target allocation holds none", () => {
-    expect(() =>
-      soundKept({
-        ...kept,
-        glide: [{ age: 60, bonds: 0.4 }],
-        rateSet: "cma",
-        targets: targetsUnder("Equity"),
-      }),
-    ).toThrow(
-      "The glide path holds bonds the target allocation holds none of, so nothing says what they return, so the plan cannot run on the CMA's rates",
+  // All in equities, the 40% in bonds runs on the class standing in for
+  // them; all in bonds, nothing says what the 60% in stocks returns.
+  it("refuses a glide path holding stocks under the CMA's rates while the target allocation holds none, and runs one holding bonds", () => {
+    const along = (top: string): Kept => ({
+      ...kept,
+      glide: [{ age: 60, bonds: 0.4 }],
+      rateSet: "cma",
+      targets: targetsUnder(top),
+    });
+
+    expect(() => soundKept(along("Equity"))).not.toThrow();
+    expect(() => soundKept(along("Bonds"))).toThrow(
+      "The glide path holds stocks the target allocation holds none of, so nothing says what they return, so the plan cannot run on the CMA's rates",
     );
   });
 
@@ -2103,23 +2111,23 @@ describe("holdWhileLive", () => {
     then: "import it there",
   };
 
-  // All in equities under the CMA's rates, the glide path's 40% in bonds
+  // All in bonds under the CMA's rates, the glide path's 60% in stocks
   // from 60 has nothing to say what it returns, and choosing the CMA's
   // again after the rates typed would be refused the same way.
   it("refuses a change leaving the glide path holding what the target allocation holds none of, pointing at the glide path", () => {
-    const equities = {
+    const bonds = {
       ...kept,
       rateSet: "cma" as const,
-      targets: targetsUnder("Equity"),
+      targets: targetsUnder("Bonds"),
     };
 
     expect(() => {
-      holdWhileLive({ ...equities, glide: [{ age: 60, bonds: 0.4 }] }, change);
+      holdWhileLive({ ...bonds, glide: [{ age: 60, bonds: 0.4 }] }, change);
     }).toThrow(
-      "The glide path holds bonds the target allocation holds none of, so nothing says what they return, so this allocation cannot be imported while the plan runs on the CMA's rates. Change the glide path first, or choose custom rates",
+      "The glide path holds stocks the target allocation holds none of, so nothing says what they return, so this allocation cannot be imported while the plan runs on the CMA's rates. Change the glide path first, or choose custom rates",
     );
     expect(() => {
-      holdWhileLive({ ...equities, glide: [{ age: 60, bonds: 0 }] }, change);
+      holdWhileLive({ ...bonds, glide: [{ age: 60, bonds: 1 }] }, change);
     }).not.toThrow();
   });
 });

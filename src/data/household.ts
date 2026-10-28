@@ -980,13 +980,14 @@ const kept = z
 // live, since a category is mapped once it is imported and onto a class
 // the latest vintage kept prices. A change under the rates typed, or one
 // leaving the CMA's whole, is let through. One leaving the CMA's whole
-// but the glide path holding a sleeve the target allocation then holds
-// none of is refused too, saying so, and that the way through is the
-// glide path or the rates typed, since choosing the CMA's again would be
-// refused the same way. Each anchor's own split is asked, which is
-// every split the path holds between them; an anchor outside the plan's
-// years is asked as well, which can refuse a change the plan's own
-// years would let through, and choosing the rates typed lets it through.
+// but the glide path holding stocks the target allocation then holds
+// none of, or bonds no class stands in for, is refused too, saying so,
+// and that the way through is the glide path or the rates typed, since
+// choosing the CMA's again would be refused the same way. Each anchor's
+// own split is asked, which is every split the path holds between
+// them; an anchor outside the plan's years is asked as well, which can
+// refuse a change the plan's own years would let through, and choosing
+// the rates typed lets it through.
 export function holdWhileLive(
   kept: Kept,
   change: { readonly cannot: string; readonly then: string },
