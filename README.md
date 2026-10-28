@@ -81,7 +81,9 @@ changes only by migration, as `AGENTS.md` sets out.
 
 ## Signing in
 
-One password, and no user table. `APP_PASSWORD_HASH` is its scrypt hash, and
+Every deployment sits behind Vercel Authentication, so only someone signed in to
+Vercel with access to the project reaches the app at all. Behind that is one
+password, and no user table. `APP_PASSWORD_HASH` is its scrypt hash, and
 `SESSION_PASSWORD` seals the session cookie. To make the hash without the
 password showing:
 
