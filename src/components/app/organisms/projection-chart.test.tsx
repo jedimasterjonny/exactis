@@ -15,7 +15,6 @@ import { owners } from "@/data/owners.fixture";
 import { measuredOf, project } from "@/engine/projection";
 import { formatGbp } from "@/lib/money";
 import { lumpSumAllowance } from "@/lib/tax";
-import { bySlot } from "@/test/dom";
 
 import { ProjectionChart, ProjectionPending } from "./projection-chart";
 
@@ -191,7 +190,7 @@ const pounds = (): string[] =>
 // The names under the crosshair of the ISA, and of a flat and what is
 // secured on it, in the order they are drawn.
 const flatNames = (): (null | string)[] =>
-  within(screen.getByText(bySlot("projection-tooltip")))
+  within(screen.getByRole("status"))
     .getAllByText(/^(Stocks|Flat)/)
     .map((name) => name.textContent);
 
@@ -229,7 +228,7 @@ describe("ProjectionChart", () => {
 
     expect(await screen.findByText("2027 · Age 35")).toHaveClass("font-medium");
 
-    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+    const tooltip = within(screen.getByRole("status"));
 
     expect(tooltip.getByText(pension.name)).toBeInTheDocument();
     expect(tooltip.getByText(isa.name)).toBeInTheDocument();
@@ -261,7 +260,7 @@ describe("ProjectionChart", () => {
     fireEvent.keyDown(chart, { key: "ArrowRight" });
     await screen.findByText("2027 · Age 35");
 
-    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+    const tooltip = within(screen.getByRole("status"));
 
     expect(tooltip.queryByText(cash.name)).not.toBeInTheDocument();
     expect(tooltip.getByText("£688,045")).toHaveClass("figure");
@@ -307,7 +306,7 @@ describe("ProjectionChart", () => {
     fireEvent.keyDown(chart, { key: "ArrowRight" });
     await screen.findByText("2027 · Age 35");
 
-    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+    const tooltip = within(screen.getByRole("status"));
 
     expect(tooltip.getByText(gia.name)).toBeInTheDocument();
     expect(tooltip.getByText("£10,000")).toHaveClass("figure");
@@ -370,7 +369,7 @@ describe("ProjectionChart", () => {
     fireEvent.keyDown(chart, { key: "ArrowRight" });
     await screen.findByText("2027 · Age 35");
 
-    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+    const tooltip = within(screen.getByRole("status"));
 
     expect(
       tooltip
@@ -444,7 +443,7 @@ describe("ProjectionChart", () => {
     fireEvent.keyDown(chart, { key: "ArrowRight" });
     await screen.findByText("2027 · Age 35");
 
-    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+    const tooltip = within(screen.getByRole("status"));
 
     expect(
       screen
@@ -521,7 +520,7 @@ describe("ProjectionChart", () => {
     fireEvent.keyDown(chart, { key: "ArrowRight" });
     await screen.findByText("2027 · Age 35");
 
-    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+    const tooltip = within(screen.getByRole("status"));
 
     expect(
       tooltip.getAllByText(/^(Car|PCP|Card)$/).map((name) => name.textContent),
@@ -533,11 +532,9 @@ describe("ProjectionChart", () => {
     fireEvent.keyDown(chart, { key: "ArrowLeft" });
     await screen.findByText("2026 · Age 34");
 
-    expect(
-      within(screen.getByText(bySlot("projection-tooltip"))).getByText(
-        "−£5,000",
-      ),
-    ).toHaveClass("figure");
+    expect(within(screen.getByRole("status")).getByText("−£5,000")).toHaveClass(
+      "figure",
+    );
   });
 
   // The plan's liquidity to begin with: the ISA, and every debt, the
@@ -581,8 +578,7 @@ describe("ProjectionChart", () => {
     chart.focus();
     fireEvent.keyDown(chart, { key: "ArrowRight" });
     await screen.findByText("2027 · Age 35");
-    const tooltip = (): HTMLElement =>
-      screen.getByText(bySlot("projection-tooltip"));
+    const tooltip = (): HTMLElement => screen.getByRole("status");
 
     expect(screen.getByRole("switch", { name: "Liquidity" })).not.toBeChecked();
     expect(flatNames()).toStrictEqual([isa.name, loan.name]);
@@ -646,8 +642,7 @@ describe("ProjectionChart", () => {
     chart.focus();
     fireEvent.keyDown(chart, { key: "ArrowRight" });
     await screen.findByText("2027 · Age 35");
-    const tooltip = (): HTMLElement =>
-      screen.getByText(bySlot("projection-tooltip"));
+    const tooltip = (): HTMLElement => screen.getByRole("status");
 
     expect(flatNames()).toStrictEqual([isa.name, "Flat mortgage"]);
     expect(within(tooltip()).getByText("−£200,000")).toHaveClass("figure");
@@ -992,7 +987,7 @@ describe("ProjectionChart", () => {
 
     expect(await screen.findByText("2027 · Age 35")).toHaveClass("font-medium");
 
-    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+    const tooltip = within(screen.getByRole("status"));
 
     expect(tooltip.getByText("Drawn early")).toBeInTheDocument();
     expect(tooltip.getByText("£26,667")).toHaveClass(
@@ -1039,7 +1034,7 @@ describe("ProjectionChart", () => {
 
     expect(await screen.findByText("2027 · Age 35")).toHaveClass("font-medium");
 
-    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+    const tooltip = within(screen.getByRole("status"));
 
     expect(tooltip.getByText("Uncovered")).toBeInTheDocument();
     expect(tooltip.getByText("£18,450")).toHaveClass(
@@ -1204,9 +1199,7 @@ describe("ProjectionChart", () => {
     await screen.findByText("2027 · Age 35");
 
     expect(
-      within(screen.getByText(bySlot("projection-tooltip"))).getByText(
-        "Retirement and Sabbatical",
-      ),
+      within(screen.getByRole("status")).getByText("Retirement and Sabbatical"),
     ).toHaveClass("text-muted-foreground");
   });
 
@@ -1233,7 +1226,7 @@ describe("ProjectionChart", () => {
     await screen.findByText("2027 · Age 35");
 
     expect(
-      within(screen.getByText(bySlot("projection-tooltip"))).getByText(
+      within(screen.getByRole("status")).getByText(
         formatGbp(
           entering2027 === undefined
             ? 0
@@ -1312,7 +1305,7 @@ describe("ProjectionChart", () => {
 
     expect(await screen.findByText("2027 · Age 35")).toHaveClass("font-medium");
 
-    const tooltip = within(screen.getByText(bySlot("projection-tooltip")));
+    const tooltip = within(screen.getByRole("status"));
 
     expect(tooltip.getByText("Household")).toBeInTheDocument();
     expect(tooltip.getByText("£600,000")).toHaveClass("figure");

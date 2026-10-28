@@ -245,3 +245,13 @@
 @utility label {
   @apply font-mono text-xs font-medium tracking-widest uppercase;
 }
+
+/* The popover frame every chart's tooltip sits in. A utility rather than a
+   component because two of the charts are atoms, and an atom may not
+   compose another. The frame only: the grid, gap and width inside it are
+   each tooltip's own. tailwind-merge cannot see into a utility, so a
+   padding or text size layered over it at a call site would be kept beside
+   it, and which won would be down to the stylesheet's order. */
+@utility chart-tip {
+  @apply rounded-md border bg-popover px-2.5 py-2 text-xs text-popover-foreground shadow-md;
+}

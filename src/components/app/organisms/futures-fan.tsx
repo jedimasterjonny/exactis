@@ -274,10 +274,7 @@ function FanTooltip({
     .filter((marker) => marker.year === year.year)
     .map(({ name }) => name);
   return (
-    <div
-      className="grid min-w-48 gap-1.5 rounded-md border bg-popover px-2.5 py-2 text-xs text-popover-foreground shadow-md"
-      role="status"
-    >
+    <div className="grid min-w-48 gap-1.5 chart-tip" role="status">
       <span className="grid gap-0.5">
         <span className="font-medium">
           {`${String(year.year)} · Age ${String(ageIn(year.year, plan))}`}

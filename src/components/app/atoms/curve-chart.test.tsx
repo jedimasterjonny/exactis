@@ -2,7 +2,6 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { curve } from "@/data/inflation.fixture";
-import { bySlot } from "@/test/dom";
 
 import { CurveChart } from "./curve-chart";
 
@@ -59,9 +58,7 @@ describe("CurveChart", () => {
     chart.focus();
     fireEvent.keyDown(chart, { key: "ArrowRight" });
 
-    const tooltip = await screen.findByText(bySlot("curve-tooltip"), {
-      suggest: false,
-    });
+    const tooltip = await screen.findByRole("status");
 
     expect(within(tooltip).getByText("10y 3.441%")).toHaveClass("figure");
   });
