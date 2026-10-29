@@ -12,10 +12,10 @@ import { monthAfter, monthsBetween } from "@/lib/months";
 // The order a month's shortfall is drawn in, which the plan chooses:
 // the savings before the pension, the pension before the ISA, the
 // pension first, or the pension to the top of each owner's basic rate
-// band and the savings first after it, listed in that order, which is
-// the order a screen offers them in. The engine holds what each draws,
-// and draws a pension before its owner's pension age last under every
-// one.
+// band, or of their personal allowance alone, and the savings first
+// after it, listed in that order, which is the order a screen offers
+// them in. The engine holds what each draws, and draws a pension before
+// its owner's pension age last under every one.
 export type Drawdown = (typeof drawdowns)[number];
 
 export const drawdowns = [
@@ -23,6 +23,7 @@ export const drawdowns = [
   "pension-before-isa",
   "pension-first",
   "pension-to-basic-rate",
+  "pension-to-allowance",
 ] as const;
 
 // One future of the markets, a figure for each year the plan carries,

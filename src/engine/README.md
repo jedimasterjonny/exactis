@@ -524,15 +524,16 @@ for the month it is gone. It is drawn in two parts: first what the spending and
 the debts' payments are short of, in the order the plan's drawdown names, and
 then what keeping the pensions paid adds to it, under Pensions kept paid.
 
-The plan names one of four drawdowns, and a plan naming none draws its savings
+The plan names one of five drawdowns, and a plan naming none draws its savings
 first:
 
-| Drawdown                       | Order                                                  |
-| ------------------------------ | ------------------------------------------------------ |
-| Savings first                  | cash, the GIA, the ISA, the pension                    |
-| Pension before the ISA         | cash, the GIA, the pension, the ISA                    |
-| Pension first                  | the pension, cash, the GIA, the ISA                    |
-| Pension to the basic rate band | the pension to the basic rate band, then savings first |
+| Drawdown                          | Order                                                     |
+| --------------------------------- | --------------------------------------------------------- |
+| Savings first                     | cash, the GIA, the ISA, the pension                       |
+| Pension before the ISA            | cash, the GIA, the pension, the ISA                       |
+| Pension first                     | the pension, cash, the GIA, the ISA                       |
+| Pension to the basic rate band    | the pension to the basic rate band, then savings first    |
+| Pension to the personal allowance | the pension to the personal allowance, then savings first |
 
 Savings first takes cash first, since it is spent as it stands and grows least;
 then the GIA, since what it earns is taxed and what an ISA earns is not, though
@@ -563,6 +564,9 @@ pensions are drawn in the order they are listed. What the fill draws, less its
 tax, is no more than the month is short, since the draw only takes money out and
 what it drew past need would have nowhere to land, and the reason to draw past
 it, the inheritance tax a pension is charged from April 2027, is not modelled.
+Pension to the personal allowance fills the allowances alone and no band, so a
+pension is drawn ahead of the savings only where it is taxed nothing, for a
+household that would rather keep the pension than pay 20% to draw it sooner.
 
 The room left in a band is measured over the tax year so far, as April settles
 the year, rather than as a fresh twelfth each month: the share of the band for

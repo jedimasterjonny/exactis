@@ -2194,6 +2194,21 @@ describe("drawing the pensions to the top of the basic rate band", () => {
     ).toStrictEqual({ 3: 11122, 7: 106120 });
   });
 
+  // Drawing the pensions to the personal allowance alone, with £800 a
+  // month of other income to Sam and £2,000 short: Ada's SIPP fills her
+  // allowance with £1,396.67 and Sam's the £247.50 left of his with
+  // £330, as to the basic rate band, but no band is filled after them,
+  // so the cash gives the £273.33 left and nothing is taxed.
+  it("fills the allowances alone when the plan draws to the personal allowance", () => {
+    expect(
+      project(
+        [savings, adas, sams],
+        { expenses: [{ ...household, amount: 2800 }], income: [other(2, 800)] },
+        { ...filling, drawdown: "pension-to-allowance" },
+      ).at(-1)?.balances,
+    ).toStrictEqual({ 3: 9727, 7: 98603, 8: 99670 });
+  });
+
   // £9,000 a month of other income, in the band where the allowance is
   // withdrawn, and £8,000 spent: the income is already past the basic
   // rate band, so there is no room and the cash gives what the month is
