@@ -9,7 +9,7 @@ import { house, move } from "@/data/houses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
 import { owners, sam } from "@/data/owners.fixture";
 
-import type { Measured } from "./milestones";
+import type { Condition, Measured } from "./milestones";
 
 import {
   ageOf,
@@ -51,12 +51,13 @@ const raising: Plan = {
 const adaAt18 = { conditions: atAge(18, ada.id), id: 11, name: "Ada at 18" };
 
 // A year worth a million, half of it the house, spending £30,000 and
-// owing £40,000, at 34.
+// owing £40,000 on a debt no expense line pays, at 34.
 const year: Measured = {
   age: 34,
   debt: 40000,
   expenses: 30000,
   liquid: 500000,
+  loans: 0,
   worth: 1000000,
 };
 
@@ -158,6 +159,40 @@ describe("isReached", () => {
 
   it("is reached at once by a milestone holding no condition", () => {
     expect(isReached({ conditions: [] }, year)).toBe(true);
+  });
+
+  // The £40,000 owed is on a loan an expense line pays, so the year's
+  // £21,600 of expenses carries its payments. Against the expenses the
+  // worths count it back, £540,000 liquid, 25 years of them, and
+  // £1,040,000 in all, 48 years and more, and the expenses are 4% of the
+  // £540,000 and no more; against pounds or the debt £500,000 is read
+  // as it is, short of £540,000 and of 13 times what is owed.
+  it("adds the loans the lines pay back to a worth set against the expenses, and nowhere else", () => {
+    const owing = { ...year, expenses: 21600, loans: 40000 };
+    const isHeld = (condition: Condition, measured = owing): boolean =>
+      isReached({ conditions: [condition] }, measured);
+
+    expect(isHeld({ measure: "liquid", of: "expenses", times: 25 })).toBe(true);
+    expect(
+      isHeld(
+        { measure: "liquid", of: "expenses", times: 25 },
+        { ...owing, loans: 39999 },
+      ),
+    ).toBe(false);
+    expect(isHeld({ measure: "worth", of: "expenses", times: 48 })).toBe(true);
+    expect(isHeld({ measure: "expenses", of: "liquid", times: 0.04 })).toBe(
+      true,
+    );
+    expect(
+      isHeld(
+        { measure: "expenses", of: "liquid", times: 0.04 },
+        { ...owing, loans: 40001 },
+      ),
+    ).toBe(false);
+    expect(isHeld({ measure: "liquid", of: "pounds", times: 540000 })).toBe(
+      false,
+    );
+    expect(isHeld({ measure: "liquid", of: "debt", times: 13 })).toBe(false);
   });
 });
 

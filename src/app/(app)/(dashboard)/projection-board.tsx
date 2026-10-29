@@ -83,7 +83,7 @@ interface FuturesProps extends Planned {
 interface Mine {
   readonly at: Measured | undefined;
   readonly chosen: Tie | undefined;
-  readonly measure: Exclude<keyof Measured, "age">;
+  readonly measure: Exclude<keyof Measured, "age" | "loans">;
   readonly projected: Future;
 }
 

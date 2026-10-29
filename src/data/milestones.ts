@@ -43,8 +43,11 @@ export interface Marker {
 // through, short of their pension age;
 // what a year of its expense lines comes to as the year opens; and
 // what it owes, every debt summed, as a sum owed rather than a balance
-// below nothing.
-export type Measured = Readonly<Record<Measure, number>>;
+// below nothing. Beside the measures, what it owes on the loans those
+// expense lines pay, which a worth set against the expenses adds back.
+export interface Measured extends Readonly<Record<Measure, number>> {
+  readonly loans: number;
+}
 
 // A milestone is a year the plan turns on, named: the children leaving
 // home, a move, the last of a mortgage, the first million. It is
@@ -169,16 +172,24 @@ export function isMeasuredOn(
 }
 
 // Whether a milestone is reached in a year measured so: every condition
-// holds, a pound and a year each counting once. A milestone with no
+// holds, a pound and a year each counting once, and a worth set against
+// the expenses, either way round, read with the loans their lines pay
+// added back, under What a point is worth. A milestone with no
 // condition is reached at once, which the model refuses to keep.
 export function isReached(
   { conditions }: Pick<MilestoneValues, "conditions">,
   measured: Measured,
 ): boolean {
+  const heldAgainst = (sum: Measure, other: Basis | Measure): number =>
+    measured[sum] +
+    ((sum === "worth" || sum === "liquid") && other === "expenses"
+      ? measured.loans
+      : 0);
   return conditions.every(
     ({ measure, of, times }) =>
-      measured[measure] >=
-      times * (of === "pounds" || of === "years" ? 1 : measured[of]),
+      heldAgainst(measure, of) >=
+      times *
+        (of === "pounds" || of === "years" ? 1 : heldAgainst(of, measure)),
   );
 }
 

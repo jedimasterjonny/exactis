@@ -2411,6 +2411,39 @@ describe("retiring when conditions hold", () => {
     );
   });
 
+  // £450,000 saved and £50,000 owed on a loan a line pays £500 a month,
+  // so a retired year's expenses are £18,000 with the payments, and 25
+  // of them £450,000. The savings hold that as the plan opens, the loan
+  // counted once, as its payments, so the owner retires at once; a pound
+  // short, they work a year more.
+  it("counts a loan a line pays once, as its payments, against the expenses", () => {
+    const loan: Account = {
+      balance: -50000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 9,
+      kind: "debt",
+      name: "Loan",
+    };
+    const paying = {
+      ...lines,
+      expenses: [
+        ...lines.expenses,
+        { ...household, amount: 500, id: 3, name: "Loan", pays: loan.id },
+      ],
+    };
+    const retiredIn = (saved: number): null | number => {
+      const accounts = [{ ...saving, balance: saved }, loan];
+      return retirementIn(project(accounts, paying, onConditions), {
+        accounts,
+        plan: onConditions,
+        schedule: paying,
+      });
+    };
+
+    expect(retiredIn(450000)).toBe(2026);
+    expect(retiredIn(449999)).toBe(2027);
+  });
+
   // A hundred years of retired spending is £1,200,000, which ten years
   // of saving never reach, so the owner works to the end, the spending
   // starting at retirement never starting.
@@ -2850,6 +2883,7 @@ describe("measuredOf", () => {
       debt: 100000,
       expenses: 12000,
       liquid: -40000,
+      loans: 0,
       worth: 345000,
     });
     expect(at(2048)).toStrictEqual({
@@ -2857,6 +2891,7 @@ describe("measuredOf", () => {
       debt: 100000,
       expenses: 12000,
       liquid: -40000,
+      loans: 0,
       worth: 345000,
     });
     expect(at(2049)).toStrictEqual({
@@ -2864,6 +2899,7 @@ describe("measuredOf", () => {
       debt: 100000,
       expenses: 12000,
       liquid: 45000,
+      loans: 0,
       worth: 345000,
     });
   });
@@ -2889,6 +2925,39 @@ describe("measuredOf", () => {
     expect(liquidIn(1973, 2028)).toBe(50000);
     expect(liquidIn(1971, 2028)).toBe(135000);
     expect(liquidIn(1972, 2027)).toBe(135000);
+  });
+
+  // £1,000 a month on the household beside £500 a month paying the
+  // mortgage: a year's expenses are £18,000, the payments among them,
+  // and the £100,000 owed on the mortgage is what the loans the lines
+  // pay owe. The same £500 paying no loan leaves the mortgage paid by
+  // nothing on the expenses.
+  it("measures what is owed on the loans the expense lines pay", () => {
+    const payments = { ...household, amount: 500, id: 99, name: "Payments" };
+    const measuredWith = (line: ExpenseLine): ReturnType<typeof measuredOf> =>
+      measuredOf(
+        point(2026, { 5: -100000 }),
+        { month: 0, year: 2026 },
+        {
+          accounts: [mortgage],
+          plan: { ...plan, years: 30 },
+          schedule: {
+            expenses: [{ ...household, amount: 1000 }, line],
+            income: [],
+          },
+        },
+      );
+
+    expect(measuredWith({ ...payments, pays: mortgage.id })).toMatchObject({
+      debt: 100000,
+      expenses: 18000,
+      loans: 100000,
+    });
+    expect(measuredWith(payments)).toMatchObject({
+      debt: 100000,
+      expenses: 18000,
+      loans: 0,
+    });
   });
 });
 

@@ -367,9 +367,10 @@ export function liquidOf(
 // nothing rather than nothing with a sign; what every account counts
 // for as liquidOf counts it, which leaves out the property and vehicles
 // and every pension its owner cannot draw all year, which is its liquid
-// net worth; and twelve of what the expense lines running in the month
+// net worth; twelve of what the expense lines running in the month
 // cost it, read in today's money at how far prices have risen by then
-// along the future's path. A pension before its pension age is still
+// along the future's path; and what it owes on the loans those lines
+// pay, as the debt is read. A pension before its pension age is still
 // counted in the net worth, and not at the 55% a draw then is charged:
 // what the plan owns is not what it can have this month. The futures
 // measure every year of every future here, so the worths are worked
@@ -382,22 +383,21 @@ export function measuredOf(
   const worths = worthsIn(point, accounts);
   const sum = (counted: Readonly<Record<number, number>>): number =>
     Object.values(counted).reduce((total, each) => total + each, 0);
+  const debts = accounts.filter(({ kind }) => kind === "debt");
+  const owed = (owing: readonly Account[]): number =>
+    0 - owing.reduce((total, { id }) => total + balanceIn(point, id), 0);
+  const spent = spentIn(accounts, schedule, { at, plan });
   return {
     age: ageIn(at.year, plan),
-    debt:
-      0 -
-      accounts
-        .filter(({ kind }) => kind === "debt")
-        .reduce((total, { id }) => total + balanceIn(point, id), 0),
+    debt: owed(debts),
     expenses: Math.round(
-      (12 *
-        spentIn(accounts, schedule, { at, plan }).reduce(
-          (total, { amount }) => total + amount,
-          0,
-        )) /
+      (12 * spent.reduce((total, { amount }) => total + amount, 0)) /
         pricesIn(plan, at),
     ),
     liquid: sum(liquidOf(worths, at.year, { accounts, plan })),
+    loans: owed(
+      debts.filter(({ id }) => spent.some(({ line }) => line.pays === id)),
+    ),
     worth: sum(worths),
   };
 }
