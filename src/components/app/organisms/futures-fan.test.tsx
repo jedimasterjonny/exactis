@@ -32,6 +32,7 @@ const futures = Array.from({ length: 10 }, (_, nth): Future => ({
     debt: 0,
     expenses: 0,
     liquid: worth,
+    loans: 0,
     worth,
   })),
   ranOut: [2027, 2028][nth] ?? null,

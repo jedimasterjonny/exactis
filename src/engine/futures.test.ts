@@ -48,6 +48,7 @@ function worthOf(pounds: readonly number[]): Measured[] {
     debt: 0,
     expenses: 0,
     liquid: worth,
+    loans: 0,
     worth,
   }));
 }
@@ -212,6 +213,7 @@ describe("futuresOf", () => {
             debt: 0,
             expenses: 12000,
             liquid: worth - 400000,
+            loans: 0,
             worth,
           }),
         ),
@@ -245,6 +247,7 @@ describe("futuresOf", () => {
       debt: 100000,
       expenses: 12000,
       liquid: -70000,
+      loans: 0,
       worth: 330000,
     });
   });

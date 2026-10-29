@@ -626,6 +626,17 @@ counts at the same figure. The net worth counts a pension all along, and not at
 the 55% a draw before that age is charged, since what the household owns is not
 what it can have this month.
 
+A condition setting the net worth or the liquid net worth against a year's
+expenses, either way round, adds back what is owed on every loan an expense line
+running that year pays. Both worths take every debt off, and the expenses count
+the line paying a loan, so set against each other they would count the loan
+twice, as its balance and again as a multiple of its payments, and the multiple
+typed would ask for more than it says. Counted once it is counted as the
+payments, which carry its interest where the balance does not. A debt paid its
+own fixed sum is no expense line, so it is counted once already, as the balance.
+Set against pounds or the debt, a worth is read as measured, since nothing there
+counts the loan a second time.
+
 ## What is refused, and where
 
 A household that breaks a rule is refused where it is saved, by the rules in

@@ -64,7 +64,14 @@ const futures = Array.from({ length: 10 }, (_, nth): Future => ({
   fell: null,
   measured: Array.from({ length: 16 }, (_, offset) => {
     const worth = nth < 8 && offset >= 4 + nth ? 1000000 : 0;
-    return { age: 34 + offset, debt: 0, expenses: 0, liquid: worth, worth };
+    return {
+      age: 34 + offset,
+      debt: 0,
+      expenses: 0,
+      liquid: worth,
+      loans: 0,
+      worth,
+    };
   }),
   ranOut: null,
   retired: 2084,
