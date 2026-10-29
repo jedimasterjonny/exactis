@@ -2209,6 +2209,111 @@ describe("drawing the pensions to the top of the basic rate band", () => {
     ).toStrictEqual({ 3: 9727, 7: 98603, 8: 99670 });
   });
 
+  // Sam on a salary of £24,000 a year, which leaves him £1,733.30 a
+  // month, and £8,000 spent, so the month is £6,266.70 short. Ada's SIPP
+  // fills both her bands as it would alone, and the £1,309.48 left comes
+  // from the cash rather than from Sam's SIPP, since he is working.
+  it("fills no band of an owner with a salary running", () => {
+    expect(
+      project(
+        [savings, adas, sams],
+        {
+          expenses: [{ ...household, amount: 8000 }],
+          income: [
+            {
+              ...salary,
+              amount: 24000,
+              bonus: 0,
+              feeds: null,
+              owner: 2,
+              rsu: 0,
+              sacrifice: 0,
+            },
+          ],
+        },
+        { ...filling, owners: [ada, { ...ada, id: 2, retirement: atAge(70) }] },
+      ).at(-1)?.balances,
+    ).toStrictEqual({ 3: 8691, 7: 94414, 8: 100000 });
+  });
+
+  // Ada, the plan's, still working until 70 for £24,000 a year of
+  // self-employed profit, which leaves her £1,752.35 a month, and Sam
+  // retiring with her and earning nothing, £8,000 spent. Sam's SIPP
+  // fills both his bands, though he does not retire until Ada does, and
+  // the £1,290.43 left comes from the cash rather than from Ada's SIPP.
+  it("fills the band of an owner earning nothing while another works", () => {
+    expect(
+      project(
+        [savings, adas, sams],
+        {
+          expenses: [{ ...household, amount: 8000 }],
+          income: [
+            {
+              ...salary,
+              amount: 24000,
+              bonus: 0,
+              feeds: null,
+              kind: "self-employment",
+              rsu: 0,
+              sacrifice: 0,
+            },
+          ],
+        },
+        {
+          ...filling,
+          owners: [
+            { ...ada, retirement: atAge(70) },
+            { ...ada, id: 2, name: "Sam", retirement: "retirement" },
+          ],
+          retires: 70,
+        },
+      ).at(-1)?.balances,
+    ).toStrictEqual({ 3: 8710, 7: 100000, 8: 94414 });
+  });
+
+  // Ada retiring once the savings come to a year of what she would
+  // spend retired, and Sam retiring with her, each on a salary of
+  // £12,000 a year that their retirement stops, and £4,000 spent. A year
+  // of £48,000, which the savings hold, retires both of them as 2026
+  // opens, so neither salary runs, the month is £4,000 short, and Ada's
+  // SIPP fills her allowance, Sam's his, and Ada's the band for the
+  // £1,206.67 left. A thousand years of it, which they never hold,
+  // leaves both working, the salaries running and the month £2,000
+  // short, which the cash gives.
+  it("fills the owners retiring on conditions from the year the run retires them", () => {
+    const retiringOn = (times: number): Plan => ({
+      ...filling,
+      owners: [
+        { ...ada, retirement: [{ measure: "liquid", of: "expenses", times }] },
+        { ...ada, id: 2, name: "Sam", retirement: "retirement" },
+      ],
+      retires: 68,
+    });
+    const balancesOn = (
+      times: number,
+    ): ProjectionPoint["balances"] | undefined =>
+      project(
+        [savings, adas, sams],
+        {
+          expenses: [{ ...household, amount: 4000 }],
+          income: [1, 2].map((owner) => ({
+            ...salary,
+            amount: 12000,
+            bonus: 0,
+            feeds: null,
+            id: owner,
+            owner,
+            rsu: 0,
+            sacrifice: 0,
+          })),
+        },
+        retiringOn(times),
+      ).at(-1)?.balances;
+
+    expect(balancesOn(1)).toStrictEqual({ 3: 10000, 7: 97184, 8: 98603 });
+    expect(balancesOn(1000)).toStrictEqual({ 3: 8000, 7: 100000, 8: 100000 });
+  });
+
   // £9,000 a month of other income, in the band where the allowance is
   // withdrawn, and £8,000 spent: the income is already past the basic
   // rate band, so there is no room and the cash gives what the month is

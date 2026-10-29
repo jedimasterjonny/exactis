@@ -152,14 +152,15 @@ type Borrowing = NonNullable<Move["mortgage"]> & { readonly loan: Account };
 // of each owner's lump sum allowance, by the owner's id, an owner not
 // yet entered having the whole of it; the owners who have drawn on a
 // pension as income before the month, by id, whose pensions are on the
-// money purchase allowance; what each owner's lines earned
-// that the tax is charged on, which a draw on a pension of theirs is
-// taxed on top of; the month itself and the plan, which say whether
-// the month falls before the pension's owner's pension age, when it is
-// drawn only early; each owner's tax year before the month, by id, an
-// owner not yet entered in it having none, which a drawdown filling the
-// bands measures their room by; and how far the bands have risen by its
-// tax year.
+// money purchase allowance; what each owner's lines earned that the tax
+// is charged on, which a draw on a pension of theirs is taxed on top
+// of, and whether they are working, which a drawdown filling the bands
+// passes them over for; the month itself and the plan, which say
+// whether the month falls before the pension's owner's pension age,
+// when it is drawn only early; each owner's tax year before the month,
+// by id, an owner not yet entered in it having none, which a drawdown
+// filling the bands measures their room by; and how far the bands have
+// risen by its tax year.
 interface Drawing {
   readonly allowances: ReadonlyMap<number, number>;
   readonly at: Month;
@@ -835,19 +836,20 @@ function carried(balance: number, paid: number, rate: number): number {
 // is taxed on once the draws on their pensions are counted, and what it
 // drew from a pension early. The spending comes first. Under a drawdown
 // filling the bands, each band it fills is filled in turn from the
-// pensions drawable as income, the owner taxed on least over the tax
-// year so far first, to the penny, a tie in the order the plan lists
-// them, and each owner's pensions in the order listed, each drawn as
-// far as the room left in the band, what it holds or what the month is
-// still short, whichever is the least, and none for room of less than a
-// penny or once the month is covered. Then its kinds in the order the
-// plan's drawdown names and a last pass for the pensions before their
-// owner's pension age, the accounts of a kind in the order listed, each
-// drawn to nothing and no lower. A pension's draw is grossed up for its
-// tax, or for the charge on an early one. What keeping the pensions
-// paid adds comes after, out of the cash, the GIAs and the ISAs alone.
-// What the last of them leaves is uncovered. The rules, and why, are
-// under The draw in README.md beside this file.
+// pensions drawable as income of the owners not working in the month,
+// the owner taxed on least over the tax year so far first, to the
+// penny, a tie in the order the plan lists them, and each owner's
+// pensions in the order listed, each drawn as far as the room left in
+// the band, what it holds or what the month is still short, whichever
+// is the least, and none for room of less than a penny or once the
+// month is covered. Then its kinds in the order the plan's drawdown
+// names and a last pass for the pensions before their owner's pension
+// age, the accounts of a kind in the order listed, each drawn to
+// nothing and no lower. A pension's draw is grossed up for its tax, or
+// for the charge on an early one. What keeping the pensions paid adds
+// comes after, out of the cash, the GIAs and the ISAs alone. What the
+// last of them leaves is uncovered. The rules, and why, are under The
+// draw in README.md beside this file.
 function drawnFrom(
   held: readonly Held[],
   { kept, spending }: { readonly kept: number; readonly spending: number },
@@ -905,9 +907,14 @@ function drawnFrom(
   const tops =
     bands === 0 ? [] : bandTopsOn({ months: 1, uprating }).slice(0, bands);
   for (const top of tops) {
-    for (const { id } of plan.owners.toSorted(
-      (first, second) => penniesOf(first.id) - penniesOf(second.id),
-    )) {
+    for (const { id } of plan.owners
+      .filter(
+        ({ id }) =>
+          !earned.some((entry) => entry.owner === id && entry.isWorking),
+      )
+      .toSorted(
+        (first, second) => penniesOf(first.id) - penniesOf(second.id),
+      )) {
       if (left <= 0) {
         break;
       }
