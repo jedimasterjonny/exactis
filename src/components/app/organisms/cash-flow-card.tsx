@@ -9,7 +9,7 @@ import { useState } from "react";
 import type { StripYear } from "@/components/app/atoms/year-strip";
 import type { Account } from "@/data/accounts";
 import type { Marker, Milestone } from "@/data/milestones";
-import type { Plan } from "@/data/plan";
+import type { Drawdown, Plan } from "@/data/plan";
 import type { Fed, Paid, Schedule, Spent, Take } from "@/engine/cash-flow";
 import type { MovedYear, ProjectionPoint } from "@/engine/projection";
 
@@ -29,7 +29,7 @@ import {
 import { CardContent } from "@/components/kit/card";
 import { drawnAsMortgages, mortgageLine } from "@/data/houses";
 import { markersOf, yearsOf } from "@/data/milestones";
-import { ageIn, endYear, pricesIn } from "@/data/plan";
+import { ageIn, drawnFromWords, endYear, pricesIn } from "@/data/plan";
 import { cashFlow, inTodaysMoney, totalsOf } from "@/engine/cash-flow";
 import { isShort, movedIn, movedYears, project } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
@@ -206,10 +206,12 @@ export function CashFlowCard({
 // a pension drawn before the pension age. A fraction of a pound short is
 // read as nothing left over, as the figure shown is.
 function Closing({
+  drawdown,
   early,
   left,
   uncovered,
 }: {
+  readonly drawdown: Drawdown;
   readonly early: number;
   readonly left: number;
   readonly uncovered: number;
@@ -222,7 +224,7 @@ function Closing({
   return (
     <Row
       amount={-left}
-      detail={describeShort(early, uncovered)}
+      detail={describeShort(early, uncovered, drawdown)}
       isLoss={uncovered > 0 || early > 0}
       isTotal
       label="Short"
@@ -238,21 +240,25 @@ function describeFed({ amount, line }: Fed): string {
 }
 
 // Where what the month is short by comes from, beneath the figure: the
-// savings, cash first, while they carry it; what the year leaves
-// uncovered where they run out in it; and, where the year is carried only
-// by a pension drawn before the pension age, that the savings fall short,
-// in the words the screen's headline says it in, with the gross draw the
-// 55% charge makes of it, which is what the pension is debited. The run
-// out is said first where a year does both, since that is where the money
-// ends.
-function describeShort(early: number, uncovered: number): string {
+// savings, in the order the plan's drawdown names, while they carry it;
+// what the year leaves uncovered where they run out in it; and, where
+// the year is carried only by a pension drawn before the pension age,
+// that the savings fall short, in the words the screen's headline says
+// it in, with the gross draw the 55% charge makes of it, which is what
+// the pension is debited. The run out is said first where a year does
+// both, since that is where the money ends.
+function describeShort(
+  early: number,
+  uncovered: number,
+  drawdown: Drawdown,
+): string {
   if (uncovered > 0) {
     return `The savings run out this year, ${formatGbp(uncovered)} uncovered.`;
   }
   if (early > 0) {
     return `The savings fall short this year, carried by ${formatGbp(early)} drawn early from a pension at the 55% charge.`;
   }
-  return "Drawn from the savings, cash first.";
+  return drawnFromWords[drawdown];
 }
 
 // What a line is paid at, how that grows and the years it runs, "£2,130
@@ -471,6 +477,7 @@ function MonthLedger({ book, onYear, year }: LedgerProps): JSX.Element {
           />
         )}
         <Closing
+          drawdown={plan.drawdown ?? "savings-first"}
           early={inYear.reduce((sum, point) => sum + point.early, 0)}
           left={flow.left}
           uncovered={inYear.reduce((sum, point) => sum + point.uncovered, 0)}

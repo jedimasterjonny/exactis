@@ -26,6 +26,24 @@ export const drawdowns = [
   "pension-to-allowance",
 ] as const;
 
+// Where each drawdown draws a short month from, in the words a screen
+// writes beneath what the month is short by, so the cash flow card and
+// the order of payment say it alike. Each says the rule as it holds in
+// any year rather than the order at its best: a pension comes early
+// only where its owner can draw it, and into a band only where they are
+// not working as well.
+export const drawnFromWords: Readonly<Record<Drawdown, string>> = {
+  "pension-before-isa":
+    "Drawn from the savings, cash first, and a pension its owner can draw before the ISA.",
+  "pension-first":
+    "Drawn from the savings, a pension its owner can draw first, then cash.",
+  "pension-to-allowance":
+    "Drawn from the savings, the pension of an owner not working and able to draw it first, to the top of the personal allowance, then cash.",
+  "pension-to-basic-rate":
+    "Drawn from the savings, the pension of an owner not working and able to draw it first, to the top of the basic rate band, then cash.",
+  "savings-first": "Drawn from the savings, cash first.",
+};
+
 // One future of the markets, a figure for each year the plan carries,
 // the first year's the one the plan starts in and each after it the
 // year on: what the plan rate comes to that year, and what prices rise
