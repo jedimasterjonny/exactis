@@ -225,8 +225,10 @@ const drawOrder: readonly AccountKind[] = [
 // first, and the order it then draws the kinds in. The savings first
 // fills none and draws as above; the pension before the ISA draws the
 // pension after the GIA; the pension first draws it ahead of the cash;
-// and the pension to the basic rate band fills the personal allowance
-// and the basic rate band and then draws the savings first.
+// the pension to the basic rate band fills the personal allowance and
+// the basic rate band and then draws the savings first; and the pension
+// to the personal allowance fills the allowance alone and then draws the
+// savings first.
 const drawdownSteps: Readonly<
   Record<
     Drawdown,
@@ -241,6 +243,7 @@ const drawdownSteps: Readonly<
     bands: 0,
     order: ["tax-deferred", "cash", "taxable", "tax-free"],
   },
+  "pension-to-allowance": { bands: 1, order: drawOrder },
   "pension-to-basic-rate": { bands: 2, order: drawOrder },
   "savings-first": { bands: 0, order: drawOrder },
 };
