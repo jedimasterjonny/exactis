@@ -25,7 +25,7 @@ import { asPaid } from "@/data/income";
 import {
   ageOf,
   atAge,
-  conditionOf,
+  conditionsOf,
   markersOf,
   yearsOf,
 } from "@/data/milestones";
@@ -144,7 +144,7 @@ export function MilestoneList({
                 milestone === undefined && onConditions !== undefined;
               const ties = tiesAt(marker, paid);
               const said = [
-                ...(isOnConditions ? onConditions.map(conditionOf) : []),
+                ...(isOnConditions ? [conditionsOf(onConditions)] : []),
                 ...(ties === undefined ? [] : [ties]),
                 ...sales.filter(({ at }) => at === marker.id).map(saleOf),
               ];
@@ -168,7 +168,7 @@ export function MilestoneList({
             })}
             {reached.map((milestone) => (
               <MilestoneRow
-                detail={milestone.conditions.map(conditionOf).join(" · ")}
+                detail={conditionsOf(milestone.conditions)}
                 key={milestone.id}
                 marks={marks}
                 name={milestone.name}

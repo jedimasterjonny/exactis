@@ -25,7 +25,7 @@ import { ProjectionChart } from "@/components/app/organisms/projection-chart";
 import { takesSpare } from "@/data/accounts";
 import {
   ageOf,
-  conditionOf,
+  conditionsOf,
   measureNames,
   retiresOn,
   retiringAt,
@@ -451,7 +451,7 @@ function Board({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {["Retirement", ...conditions.map(conditionOf)].join(" · ")}
+              {`Retirement · ${conditionsOf(conditions)}`}
             </p>
           )
         }

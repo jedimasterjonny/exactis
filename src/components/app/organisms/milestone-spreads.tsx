@@ -33,7 +33,7 @@ import {
 } from "@/components/kit/tooltip";
 import {
   ageOf,
-  conditionOf,
+  conditionsOf,
   markersOf,
   retiresOn,
   yearOf,
@@ -418,7 +418,7 @@ function SpreadRow({
     median: by(0.5),
     outer: [by(0.1), by(0.9)],
   };
-  const said = conditions.map(conditionOf).join(" · ");
+  const said = conditionsOf(conditions);
   const year = spread.median ?? unreached(run);
   const age =
     spread.median === null

@@ -16,6 +16,7 @@ import {
   atAge,
   bornIn,
   conditionOf,
+  conditionsOf,
   isMeasuredOn,
   isReached,
   isTiedTo,
@@ -133,6 +134,17 @@ describe("conditionOf", () => {
     expect(kidsLeave.conditions.map(conditionOf)).toStrictEqual([
       "Age ≥ 48 years",
     ]);
+  });
+});
+
+describe("conditionsOf", () => {
+  it("says conditions in words, each as conditionOf says it, between dots", () => {
+    expect(
+      conditionsOf([
+        { measure: "worth", of: "pounds", times: 1000000 },
+        { measure: "liquid", of: "debt", times: 10 },
+      ]),
+    ).toBe("Net worth ≥ £1,000,000 · Liquid net worth ≥ 10 times the debt");
   });
 });
 
