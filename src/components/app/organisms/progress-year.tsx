@@ -79,7 +79,7 @@ export function ProgressYear({ year }: ProgressYearProps): JSX.Element {
               taken away
             </span>
           </p>
-          <h2 className="mt-3 font-heading text-2xl font-semibold tracking-tight text-balance">
+          <h2 className="mt-3 heading text-2xl text-balance">
             {verdictOf(moved, span, before)}
           </h2>
           <p className="text-sm text-pretty text-muted-foreground">
