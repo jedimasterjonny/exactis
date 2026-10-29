@@ -134,8 +134,10 @@ describe("PlanAssumptions", () => {
   });
 
   // A plan that chose to draw its pension before the ISA opens on that,
-  // among the three in the order they draw the pension sooner.
-  it("offers the drawdowns beneath the age, opening on the plan's, with the rule every one keeps", () => {
+  // among the five: the three orders in the order they draw the pension
+  // sooner, and then the two that draw it into the bands, the wider
+  // first, with what holds a pension back beneath them.
+  it("offers the drawdowns beneath the age, opening on the plan's, with what holds a pension back", () => {
     renderAssumptions({ ...retiring, drawdown: "pension-before-isa" });
 
     fireEvent.click(screen.getByRole("button", { name: "Assumptions" }));
@@ -143,7 +145,7 @@ describe("PlanAssumptions", () => {
 
     expect(drawn).toHaveValue("pension-before-isa");
     expect(drawn).toHaveAccessibleDescription(
-      "A pension is drawn last before its owner's pension age",
+      "A pension is drawn last before its owner's pension age, and fills no band while its owner works",
     );
     expect(
       within(drawn)
@@ -153,6 +155,8 @@ describe("PlanAssumptions", () => {
       "Savings first",
       "Pension before the ISA",
       "Pension first",
+      "Pension to the basic rate band",
+      "Pension to the personal allowance",
     ]);
   });
 
