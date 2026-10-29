@@ -1279,6 +1279,24 @@ describe("cashFlow", () => {
     ]);
   });
 
+  // The first owner's salary is work and Sam's other income is not, so
+  // the month has the one working and the other not; Sam's line read as
+  // self-employment is work as well.
+  it("says which owners have a salary or a profit running in the month", () => {
+    const workingWith = (kind: IncomeLine["kind"]): readonly boolean[] =>
+      cashFlow(
+        [],
+        {
+          expenses: [],
+          income: [plain, { ...plain, id: 9, kind, owner: sam.id }],
+        },
+        { at: { month: 0, year: 2026 }, plan },
+      ).earned.map(({ isWorking }) => isWorking);
+
+    expect(workingWith("other")).toStrictEqual([true, false]);
+    expect(workingWith("self-employment")).toStrictEqual([true, true]);
+  });
+
   // A £200,000 base with a £94,000 bonus and a fifth of the base
   // sacrificed is £294,000 of threshold income, the £40,000 sacrifice
   // counted back in, and £300,000 of adjusted income, the £46,000 the

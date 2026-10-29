@@ -68,10 +68,13 @@ export interface CashFlow extends Taxed {
 // their income tax is charged on, what their lines pay with what lands
 // in their pensions past the pension allowance on top, which a draw on
 // a pension of theirs is taxed on top of, and the self-employed profit
-// among it that their Class 4 is charged on. The projection carries
-// each owner's tax year from these, since a year is settled a person at
-// a time.
+// among it that their Class 4 is charged on; and whether they are
+// working, a salary or a profit of theirs among the lines. The
+// projection carries each owner's tax year from these, since a year is
+// settled a person at a time, and a drawdown filling the bands passes
+// over an owner who is working.
 export interface Earned {
+  readonly isWorking: boolean;
   readonly owner: number;
   readonly profit: number;
   readonly taxable: number;
@@ -282,8 +285,9 @@ const nobody: ReadonlySet<number> = new Set();
 // it, and a pension's relief to what its owner earns. It hands back the
 // month in its own pounds, line by line and summed, with what each
 // pension was fed and claims in relief, what landed under each allowance
-// and what each owner is taxed on, for the projection to carry, and what
-// is left, below nothing by what the month must draw. The rules, and
+// and what each owner is taxed on and whether they work, for the
+// projection to carry, and what is left, below nothing by what the
+// month must draw. The rules, and
 // why, are under The month, Lines and milestones, Salaries and what they
 // feed, The tax on the month, Debts, Pensions kept paid, The allowances
 // and relief, Today's money and What is refused, and where in README.md
@@ -1083,7 +1087,10 @@ function taxOn(
       );
       const taxable = payOf(theirs, fed, reading) + excess;
       return {
-        earned: [...taxed.earned, { owner, profit, taxable }],
+        earned: [
+          ...taxed.earned,
+          { isWorking: theirs.some(isEarned), owner, profit, taxable },
+        ],
         incomeTax: taxed.incomeTax + incomeTaxOn(taxable, stretch),
         insurance:
           taxed.insurance +

@@ -560,13 +560,19 @@ band while another's allowance stands empty is a pound the household could have
 had free of tax. Within each, the owner taxed on least so far in the tax year
 goes first, read to the penny so that a residue of the arithmetic cannot break a
 tie, a tie going in the order the household lists its owners, and an owner's
-pensions are drawn in the order they are listed. What the fill draws, less its
-tax, is no more than the month is short, since the draw only takes money out and
-what it drew past need would have nowhere to land, and the reason to draw past
-it, the inheritance tax a pension is charged from April 2027, is not modelled.
-Pension to the personal allowance fills the allowances alone and no band, so a
-pension is drawn ahead of the savings only where it is taxed nothing, for a
-household that would rather keep the pension than pay 20% to draw it sooner.
+pensions are drawn in the order they are listed. An owner with a salary or a
+self-employed profit running in the month is passed over, since a draw as income
+holds what is paid into their pensions to the money purchase allowance from then
+on, and a working owner's pensions are the ones still being paid into. A salary
+or a profit stops in the year its owner retires, so the plan's owner retiring on
+conditions, and anyone retiring with them, is filled from the year the run
+retires them. What the fill draws, less its tax, is no more than the month is
+short, since the draw only takes money out and what it drew past need would have
+nowhere to land, and the reason to draw past it, the inheritance tax a pension
+is charged from April 2027, is not modelled. Pension to the personal allowance
+fills the allowances alone and no band, so a pension is drawn ahead of the
+savings only where it is taxed nothing, for a household that would rather keep
+the pension than pay 20% to draw it sooner.
 
 The room left in a band is measured over the tax year so far, as April settles
 the year, rather than as a fresh twelfth each month: the share of the band for
