@@ -29,7 +29,7 @@ export function PinBar({ marks = [], plan, year }: PinBarProps): JSX.Element {
     >
       {marks.map((mark) => (
         <span
-          className="absolute inset-y-0 w-px bg-brand/40"
+          className="absolute inset-y-0 mark"
           data-slot="pin-bar-mark"
           key={mark}
           style={{ left: `${String(placed(mark, plan))}%` }}

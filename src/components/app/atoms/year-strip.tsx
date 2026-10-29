@@ -81,7 +81,7 @@ export function YearStrip({
           <span className="absolute inset-x-0 top-1/2 h-px bg-border" />
           {marks.map((mark) => (
             <span
-              className="absolute inset-y-0 w-px bg-brand/40"
+              className="absolute inset-y-0 mark"
               data-slot="year-strip-mark"
               key={mark}
               style={{ left: `${String(placed(mark, plan))}%` }}

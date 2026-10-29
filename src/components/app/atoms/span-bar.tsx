@@ -85,7 +85,7 @@ export function SpanBar({
       />
       {marks.map((year) => (
         <span
-          className="absolute inset-y-0 w-px bg-brand/40"
+          className="absolute inset-y-0 mark"
           data-slot="span-bar-mark"
           key={year}
           style={{ left: `${String(placed(year, plan))}%` }}

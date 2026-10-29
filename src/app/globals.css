@@ -255,3 +255,13 @@
 @utility chart-tip {
   @apply rounded-md border bg-popover px-2.5 py-2 text-xs text-popover-foreground shadow-md;
 }
+
+/* The mark a milestone's year is ruled across a bar with: a hairline in
+   faint oxide, the colour the palette keeps for milestones, drawn alike on
+   every bar so a rule reads the same on each. A utility rather than a
+   component because the four bars are atoms, and an atom may not compose
+   another. The look only: where the mark stands and how far it runs are
+   each bar's own. */
+@utility mark {
+  @apply w-px bg-brand/40;
+}
