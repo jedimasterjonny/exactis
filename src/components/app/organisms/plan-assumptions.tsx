@@ -13,8 +13,9 @@ import { SelectField } from "@/components/app/molecules/select-field";
 import { EditDialog } from "@/components/app/organisms/edit-dialog";
 import { Button } from "@/components/kit/button";
 import { retiresOn } from "@/data/milestones";
-import { ageIn, endAge, oldestAge } from "@/data/plan";
+import { ageIn, drawdowns, endAge, oldestAge } from "@/data/plan";
 import { useSender } from "@/hooks/use-sender";
+import { optionsOf } from "@/lib/options";
 
 // What the dialog holds while it is open: the age the plan runs to and
 // the order it draws a shortfall in.
@@ -27,11 +28,19 @@ interface PlanAssumptionsProps {
   readonly plan: Plan;
 }
 
-const orders = [
-  { label: "Savings first", value: "savings-first" },
-  { label: "Pension before the ISA", value: "pension-before-isa" },
-  { label: "Pension first", value: "pension-first" },
-] as const;
+// The drawdowns as Drawn down offers them, each under its name and in
+// the order the plan lists them, so a drawdown the engine holds cannot
+// go unoffered or unnamed.
+const orders = optionsOf<Drawdown>(
+  {
+    "pension-before-isa": "Pension before the ISA",
+    "pension-first": "Pension first",
+    "pension-to-allowance": "Pension to the personal allowance",
+    "pension-to-basic-rate": "Pension to the basic rate band",
+    "savings-first": "Savings first",
+  },
+  drawdowns,
+);
 
 // The dashboard's assumptions: a button in its header opening a dialog
 // on the age the plan runs to and the order it draws a shortfall in,
@@ -44,10 +53,10 @@ const orders = [
 // project and a retirement within it, where they retire at an age
 // rather than on conditions, to the oldest age a plan may run
 // to, a typed age outside them held to the nearer. The order is one of
-// the engine's drawdowns, savings first for a plan naming none, with the
-// rule that holds under every one beneath it. The dialog holds a draft,
-// the age and the order as it opened or as set since, or nothing while
-// it is closed, so
+// the engine's drawdowns, savings first for a plan naming none, with
+// what holds a pension back from the order beneath it. The dialog holds
+// a draft, the age and the order as it opened or as set since, or
+// nothing while it is closed, so
 // the draft doubles as the dialog's open state, and nothing reaches the
 // store until Save. Save sends the order if it moved, and then the age
 // unless the order alone moved, so a save moving both writes twice; it
@@ -124,7 +133,7 @@ export function PlanAssumptions({ plan }: PlanAssumptionsProps): JSX.Element {
           />
           <SelectField
             defaultValue={drawdown}
-            hint="A pension is drawn last before its owner's pension age"
+            hint="A pension is drawn last before its owner's pension age, and fills no band while its owner works"
             label="Drawn down"
             onValueChange={(chosen) => {
               setDraft({ ...draft, drawdown: chosen });
