@@ -9,6 +9,7 @@ import type { Curve } from "@/data/inflation";
 
 import { pullCurve } from "@/actions/inflation";
 import { Ledger } from "@/components/app/atoms/ledger";
+import { Panel } from "@/components/app/atoms/panel";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { CurveChart } from "@/components/app/organisms/curve-chart";
 import { SectionCard } from "@/components/app/organisms/section-card";
@@ -103,10 +104,7 @@ function ByMaturity({
 }): JSX.Element {
   const id = useId();
   return (
-    <section
-      aria-labelledby={id}
-      className="grid gap-4 self-start rounded-lg bg-muted p-5"
-    >
+    <Panel aria-labelledby={id} className="self-start">
       <h3 className="label text-muted-foreground" id={id}>
         Curve, by maturity
       </h3>
@@ -122,7 +120,7 @@ function ByMaturity({
           );
         })}
       </dl>
-    </section>
+    </Panel>
   );
 }
 

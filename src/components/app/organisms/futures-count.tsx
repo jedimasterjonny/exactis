@@ -6,6 +6,7 @@ import type { Plan } from "@/data/plan";
 import type { Reading } from "@/engine/futures";
 
 import { Ledger } from "@/components/app/atoms/ledger";
+import { Panel } from "@/components/app/atoms/panel";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { CardContent } from "@/components/kit/card";
 import { retiresOn } from "@/data/milestones";
@@ -119,10 +120,7 @@ function AgainstProjection({
 }): JSX.Element {
   const id = useId();
   return (
-    <section
-      aria-labelledby={id}
-      className="grid gap-4 self-start rounded-lg bg-muted p-5"
-    >
+    <Panel aria-labelledby={id} className="self-start">
       <h3 className="label text-muted-foreground" id={id}>
         {`Net worth at ${String(age)}`}
       </h3>
@@ -136,7 +134,7 @@ function AgainstProjection({
           <dd className="figure">{formatGbp(middle)}</dd>
         </div>
       </dl>
-    </section>
+    </Panel>
   );
 }
 
