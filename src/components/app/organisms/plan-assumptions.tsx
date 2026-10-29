@@ -12,7 +12,7 @@ import { AgeField } from "@/components/app/molecules/age-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { EditDialog } from "@/components/app/organisms/edit-dialog";
 import { Button } from "@/components/kit/button";
-import { retiresOn } from "@/data/milestones";
+import { retiresBy, retiresOn } from "@/data/milestones";
 import { ageIn, drawdowns, endAge, oldestAge } from "@/data/plan";
 import { useSender } from "@/hooks/use-sender";
 import { optionsOf } from "@/lib/options";
@@ -48,11 +48,12 @@ const orders = optionsOf<Drawdown>(
 // the plan's whole span is set on purpose rather than watched as it
 // moves, with the year that age falls in beneath it and the title
 // saying what the plan will be projected to. The age runs from the year
-// after the one its owner has reached, or from the age they retire at
-// if that is later, since a save is held to a plan with a year to
-// project and a retirement within it, where they retire at an age
-// rather than on conditions, to the oldest age a plan may run
-// to, a typed age outside them held to the nearer. The order is one of
+// after the one its owner has reached, or from the age they retire at,
+// or the one after the age they retire by, if that is later, since a
+// save is held to a plan with a year to project and a retirement within
+// it, where they retire at an age or by one rather than on conditions
+// alone, to the oldest age a plan may run to, a typed age outside them
+// held to the nearer. The order is one of
 // the engine's drawdowns, savings first for a plan naming none, with
 // what holds a pension back from the order beneath it. The dialog holds
 // a draft, the age and the order as it opened or as set since, or
@@ -123,7 +124,9 @@ export function PlanAssumptions({ plan }: PlanAssumptionsProps): JSX.Element {
             label="Plan end age"
             max={oldestAge}
             min={Math.max(
-              retiresOn(plan) === undefined ? plan.retires : 0,
+              retiresOn(plan) === undefined
+                ? plan.retires
+                : (retiresBy(plan) ?? -1) + 1,
               ageIn(plan.from, plan) + 1,
             )}
             onValueCommitted={(ends) => {
