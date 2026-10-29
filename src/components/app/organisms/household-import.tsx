@@ -6,8 +6,8 @@ import { Upload } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { importHousehold } from "@/actions/household";
+import { FooterAction } from "@/components/app/atoms/footer-action";
 import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
-import { SidebarMenuButton } from "@/components/kit/sidebar";
 import { useSender } from "@/hooks/use-sender";
 
 // The sidebar footer's import: a household file, as the export hands one
@@ -46,15 +46,14 @@ export function HouseholdImport(): JSX.Element {
         ref={pickerRef}
         type="file"
       />
-      <SidebarMenuButton
-        className="-mx-2 label text-xs text-sidebar-foreground/60 [&_svg]:size-3.5"
+      <FooterAction
         onClick={() => {
           pickerRef.current?.click();
         }}
       >
         <Upload aria-hidden />
         Import file…
-      </SidebarMenuButton>
+      </FooterAction>
       {chosen !== null && (
         <ConfirmDialog
           confirm="Import"

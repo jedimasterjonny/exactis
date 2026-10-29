@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import { LogOut } from "lucide-react";
 
 import { signOut } from "@/actions/auth";
+import { FooterAction } from "@/components/app/atoms/footer-action";
 import { AppNav } from "@/components/app/molecules/app-nav";
 import { ExportMenu } from "@/components/app/molecules/export-menu";
 import { HouseholdImport } from "@/components/app/organisms/household-import";
@@ -11,7 +12,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarMenuButton,
 } from "@/components/kit/sidebar";
 
 // What the shell's sidebar holds: the wordmark, the navigation, the theme
@@ -43,13 +43,10 @@ export function AppSidebar(): JSX.Element {
         <ExportMenu />
         <HouseholdImport />
         <form action={signOut} aria-label="Sign out">
-          <SidebarMenuButton
-            className="-mx-2 label text-xs text-sidebar-foreground/60 [&_svg]:size-3.5"
-            type="submit"
-          >
+          <FooterAction type="submit">
             <LogOut aria-hidden />
             Sign out
-          </SidebarMenuButton>
+          </FooterAction>
         </form>
         {/* The one Latin motto, and the whole of the 40k licence. */}
         <span className="label text-sidebar-foreground/60">

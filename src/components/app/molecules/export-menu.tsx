@@ -4,13 +4,13 @@ import type { JSX } from "react";
 
 import { Download } from "lucide-react";
 
+import { FooterAction } from "@/components/app/atoms/footer-action";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/kit/dropdown-menu";
-import { SidebarMenuButton } from "@/components/kit/sidebar";
 
 // The sidebar footer's export: one menu, drawn as sign-out's button is,
 // for the two files the route hands out, what is open as a file to read
@@ -23,11 +23,7 @@ import { SidebarMenuButton } from "@/components/kit/sidebar";
 export function ExportMenu(): JSX.Element {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <SidebarMenuButton className="-mx-2 label text-xs text-sidebar-foreground/60 [&_svg]:size-3.5" />
-        }
-      >
+      <DropdownMenuTrigger render={<FooterAction />}>
         <Download aria-hidden />
         Export
       </DropdownMenuTrigger>
