@@ -548,7 +548,8 @@ export function movedYears(
 // a time, from the month the plan starts in; the last year is not
 // carried. Each year opens by moving any house moving in it and, for an
 // owner retiring on conditions, retiring them if its opening holds
-// them, each State Pension counted again to that retirement. Each month
+// them or they reach the age they retire by in it, each State Pension
+// counted again to that retirement. Each month
 // then, in April, settles the tax year before it and
 // opens the allowances afresh; reads its cash flow over the run as
 // carried, handed what the cash, the GIAs and the ISAs hold, the owners
@@ -735,8 +736,9 @@ export function project(
 // points it was projected to: the year the plan lays out for one
 // retiring at an age, and for one retiring when conditions hold the
 // first whose opening the conditions hold for, as the projection read
-// them over the run and the balances its moves carried, or null for a
-// run in which they never do.
+// them over the run and the balances its moves carried, or in which
+// they reach the age they retire by, whichever comes first, or null
+// for a run in which neither comes.
 export function retirementIn(
   points: readonly ProjectionPoint[],
   run: Run,
@@ -1005,11 +1007,14 @@ function isReserve(account: Account): boolean {
 }
 
 // Whether the plan's owner retires on the conditions given in a year,
-// from its opening balances and month: whether they hold for the year
-// measured as if the owner retired in it, a year's expenses read off
-// the lines tied to retirement as they would run then, so the spending
-// they would retire to is what twenty-five years of expenses is
-// twenty-five years of.
+// from its opening balances and month: whether they reach the age they
+// retire by in it, where the conditions hold one, or else whether the
+// conditions on the sums hold for the year measured as if the owner
+// retired in it, a year's expenses read off the lines tied to
+// retirement as they would run then, so the spending they would retire
+// to is what twenty-five years of expenses is twenty-five years of. The
+// age is no condition held with the sums, under Retirement on
+// conditions.
 function isRetiring(
   point: Pick<ProjectionPoint, "allowances" | "balances">,
   at: Month,
@@ -1018,9 +1023,13 @@ function isRetiring(
     run,
   }: { readonly conditions: readonly Condition[]; readonly run: Run },
 ): boolean {
+  const by = conditions.find(({ measure }) => measure === "age")?.times;
+  if (by !== undefined && ageIn(at.year, run.plan) >= by) {
+    return true;
+  }
   const asIf = { ...run.plan, retires: ageIn(at.year, run.plan) };
   return isReached(
-    { conditions },
+    { conditions: conditions.filter(({ measure }) => measure !== "age") },
     measuredOf(point, at, {
       ...run,
       schedule: {

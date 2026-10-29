@@ -2,9 +2,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { Measured, Milestone } from "@/data/milestones";
+import type { Condition, Measured, Milestone } from "@/data/milestones";
+import type { Plan } from "@/data/plan";
 
 import { expenseLines } from "@/data/expenses.fixture";
+import { atAge } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { owners, working } from "@/data/owners.fixture";
 import { project } from "@/engine/projection";
@@ -22,6 +24,7 @@ import {
   reachedBy,
   reachedIn,
   readingOf,
+  yearBy,
   yearsIn,
 } from "./futures";
 
@@ -315,6 +318,55 @@ describe("futuresOf", () => {
     ).toBe(true);
     expect(lasted).toBeGreaterThan(0);
     expect(lasted).toBeLessThan(40);
+  });
+
+  // £30,000 at 7% straying 15% a year is worth £45,000 in some futures
+  // before 2030, the year the owner reaches 38, and in others later or
+  // never in the ten years. Retiring by 38 retires each of those others
+  // in 2030 and leaves the rest as they were, a future spending nothing
+  // being measured the same however it retires, so none never retires,
+  // and the futures place Retirement by the year half of them retired.
+  it("retires each future by the age the owner retires by where the conditions hold no sooner", () => {
+    const worth = { measure: "worth", of: "pounds", times: 45000 } as const;
+    const retiringOn = (conditions: readonly Condition[]): Plan => ({
+      ...planned,
+      owners: [{ ...working, retirement: conditions }],
+      rate: 0.07,
+      years: 10,
+    });
+    const run = (on: Plan): readonly Future[] =>
+      futuresOf(
+        [isa],
+        { expenses: [], income: [] },
+        { plan: on, spread: { inflation: 0.02, rate: 0.15 } },
+      )
+        .take(40)
+        .toArray();
+    const capped = run(retiringOn([worth, ...atAge(38)]));
+    const uncapped = run(retiringOn([worth]));
+
+    expect(capped).toStrictEqual(
+      uncapped.map((future) => ({
+        ...future,
+        retired: Math.min(future.retired ?? 2030, 2030),
+      })),
+    );
+    expect(readingOf(capped).unretired).toBe(0);
+    expect(readingOf(uncapped).unretired).toBeGreaterThan(0);
+    expect(capped.some(({ retired }) => (retired ?? 2030) < 2030)).toBe(true);
+    expect(capped.some(({ retired }) => retired === 2030)).toBe(true);
+    expect(
+      markersIn(capped, [], retiringOn([worth, ...atAge(38)])),
+    ).toStrictEqual([
+      {
+        id: "retirement",
+        name: "Retirement",
+        year: yearBy(
+          capped.map(({ retired }) => retired),
+          0.5,
+        ),
+      },
+    ]);
   });
 });
 

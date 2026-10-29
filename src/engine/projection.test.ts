@@ -2943,6 +2943,99 @@ describe("retiring when conditions hold", () => {
       }),
     ).toBe(2053);
   });
+
+  // The plan's owner retiring when the liquid net worth holds so many
+  // years of expenses, or by the age given, whichever comes first.
+  function retiringBy(years: number, age: number): Plan {
+    return {
+      ...onConditions,
+      owners: [
+        {
+          ...working,
+          retirement: [
+            { measure: "liquid", of: "expenses", times: years },
+            ...atAge(age),
+          ],
+        },
+      ],
+    };
+  }
+
+  function retiredIn(planned: Plan): null | number {
+    return retirementIn(project([saving], lines, planned), {
+      accounts: [saving],
+      plan: planned,
+      schedule: lines,
+    });
+  }
+
+  // A hundred years of expenses never hold, so retiring by 40 the owner
+  // retires in 2032, the year they reach it, as a plan retiring at 40
+  // would, and a screen lays the plan out at 40; twenty-five hold in
+  // 2027, at 35, so retiring by 40 changes nothing. Held with the
+  // conditions, the age would keep them working to 40 in both.
+  it("retires in the year the owner reaches the age they retire by, or when the conditions hold where that is sooner", () => {
+    expect(retiredIn(retiringBy(100, 40))).toBe(2032);
+    expect(project([saving], lines, retiringBy(100, 40))).toStrictEqual(
+      retiringFixed(40),
+    );
+    expect(laidOut([saving], lines, retiringBy(100, 40)).plan.retires).toBe(40);
+    expect(retiredIn(retiringBy(25, 40))).toBe(2027);
+    expect(project([saving], lines, retiringBy(25, 40))).toStrictEqual(
+      retiringFixed(35),
+    );
+    expect(project([saving], lines, retiringBy(25, 40))).toStrictEqual(
+      project([saving], lines, onConditions),
+    );
+  });
+
+  // At 34 as the plan opens, an owner retiring by 30 retires at once, in
+  // 2026, as a plan retiring at 34 would; one retiring by 43, a year
+  // short of the age the plan ends at, retires in 2035, the last year it
+  // carries, rather than working on past it.
+  it("retires at once by an age already reached, and in the last year the plan carries by the age a year short of its end", () => {
+    expect(retiredIn(retiringBy(100, 30))).toBe(2026);
+    expect(project([saving], lines, retiringBy(100, 30))).toStrictEqual(
+      retiringFixed(34),
+    );
+    expect(retiredIn(retiringBy(100, 43))).toBe(2035);
+  });
+
+  // Sam, born in 1995, retires with the plan's owner, who never holds a
+  // hundred years of expenses and retires by 40, in 2032, so Sam's
+  // salary stops then too, as it would were they set to retire at 37,
+  // the age they reach in it.
+  it("retires an owner retiring with the plan's owner in the year the owner reaches the age they retire by", () => {
+    const capped = retiringBy(100, 40);
+    const withSam = (retirement: Owner["retirement"]): Plan => ({
+      ...capped,
+      owners: [...capped.owners, { ...sam, retirement }],
+    });
+    const earning = {
+      ...lines,
+      income: [
+        ...lines.income,
+        {
+          ...salary,
+          amount: 60000,
+          bonus: 0,
+          feeds: null,
+          id: 3,
+          lastYear: null,
+          owner: sam.id,
+          rsu: 0,
+          sacrifice: 0,
+        },
+      ],
+    } as const;
+
+    expect(project([saving], earning, withSam("retirement"))).toStrictEqual(
+      project([saving], earning, withSam(atAge(37))),
+    );
+    expect(project([saving], earning, withSam("retirement"))).not.toStrictEqual(
+      project([saving], earning, withSam(atAge(62))),
+    );
+  });
 });
 
 describe("monthsOn", () => {
