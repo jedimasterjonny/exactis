@@ -31,6 +31,9 @@ type PresetProps<TForwarded extends keyof Forwarded> = Figure &
 // How each kind of figure is written, and how far an arrow key steps it,
 // then with shift.
 const presets = {
+  // A count is whole, a fraction typed rounded to one. One at a time,
+  // five with shift.
+  count: { format: { maximumFractionDigits: 0 }, largeStep: 5, step: 1 },
   // Whole pounds are formatted by Intl, so the £ and the thousands
   // separators are the field's own and never typed.
   money: {
@@ -57,6 +60,12 @@ const presets = {
   string,
   Pick<FigureFieldProps, "format" | "largeStep" | "step">
 >;
+
+// A count input, of so many trades, held inside the bounds it is given
+// if any.
+export function CountField(props: PresetProps<"max" | "min">): JSX.Element {
+  return <FigureField {...props} {...presets.count} />;
+}
 
 // A money input, under a hint that carries the derivation. The figure is
 // held inside the bounds it is given if any, which the number field
@@ -117,7 +126,7 @@ export function YearsInput(
   return <FigureInput {...props} {...presets.year} />;
 }
 
-// What the three fields share: a figure input under a label, a hint and,
+// What the fields share: a figure input under a label, a hint and,
 // if the caller gives one, an error. The figure is held as the caller
 // says, by default or by value.
 function FigureField({

@@ -7,7 +7,10 @@ import { useState } from "react";
 
 import type { Targets } from "@/data/targets";
 
-import { MoneyField } from "@/components/app/molecules/figure-field";
+import {
+  CountField,
+  MoneyField,
+} from "@/components/app/molecules/figure-field";
 import { Screen } from "@/components/app/templates/screen";
 import { Badge } from "@/components/kit/badge";
 import { formatGbp } from "@/lib/money";
@@ -23,16 +26,21 @@ interface CogitatorScreenProps {
 
 // The next best trades for the pounds typed in the header. The header
 // says when the targets were imported and what they hold in all, and
-// takes the amount to invest once there is something to buy toward. The
-// amount is the screen's own and forgotten when it is left, since it is
-// typed afresh at each visit to the broker, so it is held here, beside
-// the route, where both the header that takes it and the board beneath
-// that lays out the trades for it can reach it.
+// takes the amount to invest and the most sales to make once there is
+// something to buy toward, the sales held to a few, since every choice
+// of them is tried. Both are the screen's own and forgotten when it is
+// left, since they are typed afresh at each visit to the broker, so
+// they are held here, beside the route, where both the header that
+// takes them and the board beneath that lays out the trades for them
+// can reach them. The sales field shows the sales held, so it says what
+// the ladder is making when it comes back after the allocation had
+// nothing to buy toward.
 export function CogitatorScreen({
   bonds,
   targets,
 }: CogitatorScreenProps): JSX.Element {
   const [amount, setAmount] = useState(0);
+  const [sales, setSales] = useState(0);
   const categories = targets?.categories ?? [];
   const held = categories.reduce((sum, { value }) => sum + value, 0);
   const isReady =
@@ -42,12 +50,21 @@ export function CogitatorScreen({
     <Screen
       actions={
         isReady ? (
-          <MoneyField
-            defaultValue={0}
-            label="Amount to invest"
-            min={0}
-            onValueCommitted={setAmount}
-          />
+          <>
+            <MoneyField
+              defaultValue={0}
+              label="Amount to invest"
+              min={0}
+              onValueCommitted={setAmount}
+            />
+            <CountField
+              label="Sales at most"
+              max={5}
+              min={0}
+              onValueCommitted={setSales}
+              value={sales}
+            />
+          </>
         ) : undefined
       }
       label={sectionLabel(cogitator)}
@@ -69,6 +86,7 @@ export function CogitatorScreen({
         {...(bonds !== undefined && { bonds })}
         held={held}
         isReady={isReady}
+        sales={sales}
         targets={targets}
       />
     </Screen>

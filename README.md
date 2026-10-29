@@ -25,7 +25,7 @@ in Postgres on Neon and the app on Vercel.
   inflation curve, BlackRock's capital market assumptions and a target
   allocation imported from Portfolio Performance; the glide path; and each
   owner's State Pension.
-- Cogitator — what to buy next, towards that target allocation.
+- Cogitator — what to buy and sell next, towards that target allocation.
 
 A scenario is a what-if copy of the household, or of another scenario. Every
 screen, and export and import, works on whichever is open. Adopting one makes

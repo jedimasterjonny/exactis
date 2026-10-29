@@ -7,7 +7,7 @@ import { CogitatorScreen } from "./cogitator-screen";
 
 // The next best trades, over the target allocation last imported and
 // what each category of it holds, read from the store behind the
-// session. The amount to invest is typed on the screen and the trades
+// session. What to trade for is chosen on the screen and the trades
 // laid out in the browser as it is, so the screen beside this route
 // holds it. The screen is told what the plan holds in bonds now
 // beside what the target allocation holds, while the two differ by a

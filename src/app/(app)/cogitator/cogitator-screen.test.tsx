@@ -36,6 +36,13 @@ function invest(amount: string): void {
   commit(field("Amount to invest"), amount);
 }
 
+// The tile of the tone given, inverse for the one set apart.
+function toned(tone: string): HTMLElement {
+  return screen.getByText(
+    (_content, element) => element?.getAttribute("data-tone") === tone,
+  );
+}
+
 describe("CogitatorScreen", () => {
   it("heads the screen as the seventh, saying when the targets were imported and what they hold", () => {
     render(<CogitatorScreen targets={reference} />);
@@ -111,11 +118,6 @@ describe("CogitatorScreen", () => {
     render(<CogitatorScreen targets={reference} />);
     invest("2000");
 
-    const toned = (tone: string): HTMLElement =>
-      screen.getByText(
-        (_content, element) => element?.getAttribute("data-tone") === tone,
-      );
-
     expect(toned("inverse")).toHaveTextContent("A£1,745");
     expect(toned("default")).toHaveTextContent("C£255");
     expect(screen.getByText("18.35% → 36.85% of 40.00%")).toBeInTheDocument();
@@ -169,7 +171,7 @@ describe("CogitatorScreen", () => {
     ).toHaveLength(1);
   });
 
-  it("says the next trade would buy nothing where every other category holds its target", () => {
+  it("says the next trade would bring the allocation no nearer where every other category holds its target", () => {
     render(
       <CogitatorScreen
         targets={allocation([target("A", 0.5, 2000), target("B", 0.5, 3000)])}
@@ -178,8 +180,83 @@ describe("CogitatorScreen", () => {
     invest("1000");
 
     expect(
-      screen.getAllByText("1 trade. Trade 2 would buy nothing."),
+      screen.getAllByText("1 trade. Trade 2 would bring it no nearer."),
     ).toHaveLength(1);
+  });
+
+  // A holds £1,000 of its 50%, B £1,500 of 25% and C £950 of 25%, with
+  // nothing coming in: two trades sell the £637 B stands over into A;
+  // three would bring all three to target but sell only £87 of C.
+  it("sells to buy up to the sales typed with no amount, recommending as many sales as are worth placing", () => {
+    render(
+      <CogitatorScreen
+        targets={allocation([
+          target("A", 0.5, 1000),
+          target("B", 0.25, 1500),
+          target("C", 0.25, 950),
+        ])}
+      />,
+    );
+    commit(field("Sales at most"), "2");
+
+    expect(toned("inverse")).toHaveTextContent("A£637");
+    expect(toned("default")).toHaveTextContent("B−£637");
+    expect(screen.getByText("43.48% → 25.01% of 25.00%")).toBeInTheDocument();
+    expect(
+      screen.getAllByText(
+        "2 trades. Trade 3 would sell only £87 of C, under the £100 minimum.",
+      ),
+    ).toHaveLength(1);
+
+    const ladder = screen.getByRole("region", { name: "How many trades" });
+    const rows = within(ladder).getAllByRole("row").slice(1);
+
+    expect(rows.map((row) => row.textContent)).toStrictEqual([
+      expect.stringContaining("No trade"),
+      expect.stringContaining("A £637 · B −£637"),
+      expect.stringContaining("A £724 · B −£637 · C −£87"),
+    ]);
+
+    const ledger = screen.getByRole("region", {
+      name: "Where it leaves the allocation",
+    });
+
+    expect(within(ledger).getAllByRole("row")[2]).toHaveTextContent(
+      "B£1,50043.48%−£63725.01%25.00%",
+    );
+  });
+
+  // A holds £1,000 of its half and B £1,500 of its half. £50 in makes
+  // £2,550: one trade puts the £50 into A, under the minimum; two sell
+  // the £225 B stands over into A, both over it.
+  it("mutes a rung below the one recommended with a trade under the minimum", () => {
+    render(
+      <CogitatorScreen
+        targets={allocation([target("A", 0.5, 1000), target("B", 0.5, 1500)])}
+      />,
+    );
+    invest("50");
+    commit(field("Sales at most"), "1");
+
+    const ladder = screen.getByRole("region", { name: "How many trades" });
+    const rows = within(ladder).getAllByRole("row").slice(1);
+
+    expect(rows.map((row) => row.textContent)).toStrictEqual([
+      expect.stringContaining("No trade"),
+      expect.stringContaining("A £50"),
+      expect.stringContaining("A £275 · B −£225"),
+    ]);
+    expect(rows[1]).toHaveClass("text-muted-foreground");
+    expect(rows[2]).not.toHaveClass("text-muted-foreground");
+  });
+
+  it("opens the sales field on the sales held when it comes back", () => {
+    const { rerender } = render(<CogitatorScreen targets={reference} />);
+    commit(field("Sales at most"), "3");
+    rerender(<CogitatorScreen targets={null} />);
+    rerender(<CogitatorScreen targets={reference} />);
+
+    expect(field("Sales at most")).toHaveValue("3");
   });
 
   it("ledgers each category's holding, its share now and after the trades, and its target, flagging one with no fund and muting a target of nothing", () => {

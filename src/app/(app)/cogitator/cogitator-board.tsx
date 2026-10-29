@@ -42,6 +42,7 @@ interface CogitatorBoardProps {
   readonly bonds?: { readonly now: number; readonly targeted: number };
   readonly held: number;
   readonly isReady: boolean;
+  readonly sales: number;
   readonly targets: null | Targets;
 }
 
@@ -57,21 +58,24 @@ interface Row {
 // the target allocation flags it in.
 const unimplemented = "No fund assigned";
 
-// The next best trades: what to buy, buying only, to bring the
-// allocation nearest its targets for the pounds typed in the header.
-// The screen holds the amount and hands it down, with what the
-// allocation holds in all and whether any of it can be bought
-// toward. Beneath, a tile a trade of the rung recommended, the
-// largest first and set apart, each saying what it puts into its
-// category and where that takes its share; then the ladder, a row a
-// count of trades, saying what each count buys, how far off target it
-// leaves the allocation and how much nearer it brings it than one
-// fewer, with the rung recommended flagged and those past it muted,
-// since another trade past it is not worth placing, which the card's
-// caption says in pounds once one is recommended; then where the
-// recommended trades leave each category against its target. Before
-// the amount is typed the tile says so, and the ledger reads as the
-// allocation stands.
+// The next best trades: what to buy, and to sell up to the count of
+// sales typed, to bring the allocation nearest its targets for the
+// pounds typed in the header. The screen holds the amount and the
+// sales and hands them down, with what the allocation holds in all
+// and whether any of it can be bought toward. Beneath, a tile a trade
+// of the rung recommended, the purchases first, the largest set
+// apart, each saying what it puts into or takes out of its category
+// and where that takes its share; then the ladder, a row a count of
+// trades, saying what each count buys and sells, how far off target
+// it leaves the allocation and how much nearer it brings it than the
+// rung before it, which with sales may make two fewer trades, or
+// stand nearer, with the rung recommended flagged and those past it
+// or with a trade under the minimum muted, since neither is worth
+// placing, which the card's caption says in pounds once one is
+// recommended; then where the recommended trades leave each category
+// against its target. A sale is written in pounds below nothing.
+// Before an amount or a sale is typed the tile says so, and the
+// ledger reads as the allocation stands.
 // While the plan holds a share in bonds now other than the target
 // allocation's, as one retargeted from a fund all in equities leaves it
 // once the glide path reaches bonds, a caution above everything says
@@ -86,6 +90,7 @@ export function CogitatorBoard({
   bonds,
   held,
   isReady,
+  sales,
   targets,
 }: CogitatorBoardProps): JSX.Element {
   return (
@@ -119,15 +124,21 @@ export function CogitatorBoard({
         />
       )}
       {targets !== null && isReady && (
-        <Trades amount={amount} categories={targets.categories} held={held} />
+        <Trades
+          amount={amount}
+          categories={targets.categories}
+          held={held}
+          sales={sales}
+        />
       )}
     </>
   );
 }
 
-// What a rung buys, as a line: each category and the pounds put into
-// it, or a dash for the rung of no trade.
-function buysOf(rung: Rung): string {
+// What a rung trades, as a line: each category and the pounds put into
+// it, or taken out of it below nothing, or a dash for the rung of no
+// trade.
+function lineOf(rung: Rung): string {
   return rung.count === 0
     ? "—"
     : rung.trades
@@ -140,24 +151,34 @@ function nameOf(rung: Rung): string {
   return rung.count === 0 ? "No trade" : counted(rung.count, "trade");
 }
 
-// Why the rung recommended is the one: before an amount is typed, that
-// it is to be; otherwise the count, and what the rung above would do,
-// put less than the minimum into one category, named with the pounds,
-// or buy nothing at all.
-function reasonOf({ recommended, rungs }: Ladder, amount: number): string {
-  if (amount <= 0) {
+// Why the rung recommended is the one: before an amount or a sale is
+// typed, that one is to be; otherwise the count, and what the next rung
+// up would do: put less than the minimum into one category, or take
+// less than it out of one, named with the pounds, or else bring the
+// allocation no nearer, as a trade that moves nothing does.
+function reasonOf(
+  { recommended, rungs }: Ladder,
+  amount: number,
+  sales: number,
+): string {
+  if (amount <= 0 && sales === 0) {
     return "Type an amount to invest.";
   }
   const opening =
     recommended.count === 0 ? "No trade" : counted(recommended.count, "trade");
-  const next = rungs.find((rung) => rung.count === recommended.count + 1);
-  if (next === undefined) {
-    return `${opening}. Trade ${String(recommended.count + 1)} would buy nothing.`;
-  }
-  const least = next.trades.reduce((smallest, trade) =>
-    trade.pounds < smallest.pounds ? trade : smallest,
+  const next = rungs.find((rung) => rung.count > recommended.count);
+  const trade = String(next?.count ?? recommended.count + 1);
+  const least = next?.trades.reduce((smallest, each) =>
+    Math.abs(each.pounds) < Math.abs(smallest.pounds) ? each : smallest,
   );
-  return `${opening}. Trade ${String(next.count)} would put only ${formatGbp(least.pounds)} into ${least.category.name}, under the ${formatGbp(minimumTrade)} minimum.`;
+  if (least === undefined || Math.abs(least.pounds) >= minimumTrade) {
+    return `${opening}. Trade ${trade} would bring it no nearer.`;
+  }
+  const what =
+    least.pounds > 0
+      ? `put only ${formatGbp(least.pounds)} into`
+      : `sell only ${formatGbp(-least.pounds)} of`;
+  return `${opening}. Trade ${trade} would ${what} ${least.category.name}, under the ${formatGbp(minimumTrade)} minimum.`;
 }
 
 // The ladder's rows, each with how much nearer the target it brings the
@@ -173,24 +194,26 @@ function rowsOf(ladder: Ladder): readonly Row[] {
 }
 
 // The tiles, the ladder and the ledger over an allocation that can be
-// bought toward, for the amount typed.
+// bought toward, for the amount and the sales typed.
 function Trades({
   amount,
   categories,
   held,
+  sales,
 }: {
   readonly amount: number;
   readonly categories: readonly Target[];
   readonly held: number;
+  readonly sales: number;
 }): JSX.Element {
-  const ladder = ladderOf(categories, amount);
+  const ladder = ladderOf(categories, amount, { sales });
   const { recommended } = ladder;
   const bought = recommended.trades.reduce(
     (sum, { pounds }) => sum + pounds,
     0,
   );
   const total = held + bought;
-  const reason = reasonOf(ladder, amount);
+  const reason = reasonOf(ladder, amount, sales);
   return (
     <>
       <TileGrid>
@@ -222,7 +245,7 @@ function Trades({
           <TableHeader className="folded:hidden">
             <TableRow>
               <TableHead>Trades</TableHead>
-              <TableHead>Buys</TableHead>
+              <TableHead>Buys and sales</TableHead>
               <TableHead className="text-right">Off target</TableHead>
               <TableHead className="text-right">Closes</TableHead>
             </TableRow>
@@ -231,16 +254,20 @@ function Trades({
             {rowsOf(ladder).map(({ closes, rung }) => {
               const isRecommended = rung === recommended;
               const drift = formatPoints(rung.drift, 2);
+              const isUnder = rung.trades.some(
+                ({ pounds }) => Math.abs(pounds) < minimumTrade,
+              );
               return (
                 <TableRow
                   className={cn(
-                    rung.count > recommended.count && "text-muted-foreground",
+                    (rung.count > recommended.count || isUnder) &&
+                      "text-muted-foreground",
                   )}
                   key={rung.count}
                 >
                   <FoldedCell figure={drift} name={nameOf(rung)}>
                     {isRecommended && <span>Recommended</span>}
-                    <span>{buysOf(rung)}</span>
+                    <span>{lineOf(rung)}</span>
                     <span>
                       Closes <DeltaValue format="points" value={closes * 100} />
                     </span>
@@ -257,7 +284,7 @@ function Trades({
                     </span>
                   </TableCell>
                   <TableCell className="whitespace-normal folded:hidden">
-                    {buysOf(rung)}
+                    {lineOf(rung)}
                   </TableCell>
                   <TableCell className="text-right figure folded:hidden">
                     {drift}
@@ -284,7 +311,7 @@ function Trades({
               <TableHead>Category</TableHead>
               <TableHead className="text-right">Holds</TableHead>
               <TableHead className="text-right">Now</TableHead>
-              <TableHead className="text-right">Buy</TableHead>
+              <TableHead className="text-right">Trade</TableHead>
               <TableHead className="text-right">After</TableHead>
               <TableHead className="text-right">Target</TableHead>
             </TableRow>
