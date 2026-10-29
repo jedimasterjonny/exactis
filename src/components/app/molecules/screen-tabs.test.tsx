@@ -68,6 +68,18 @@ describe("ScreenTabs", () => {
     expect(screen.getByRole("tabpanel")).toBe(rates);
   });
 
+  // A chart in a tab left is sized to the box its panel keeps, which a
+  // panel taken out of the layout would not give it.
+  it("keeps the panel left in the layout, unseen", () => {
+    renderTabs();
+
+    const rates = screen.getByRole("tabpanel");
+    fireEvent.click(screen.getByRole("tab", { name: "Target allocation" }));
+
+    expect(rates).not.toHaveStyle({ display: "none" });
+    expect(rates).toHaveStyle({ visibility: "hidden" });
+  });
+
   it("lets the open panel take the focus, and rings it when it does", () => {
     renderTabs();
 
