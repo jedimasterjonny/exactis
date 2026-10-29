@@ -17,6 +17,7 @@ import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { allowanceOf, isOwned } from "@/data/accounts";
 import { matchOf } from "@/data/income";
+import { drawnFromWords } from "@/data/plan";
 import { cashFlow } from "@/engine/cash-flow";
 import { listed } from "@/lib/feeders";
 import { formatGbp } from "@/lib/money";
@@ -82,8 +83,9 @@ const penny = 0.01;
 // twelfth of it together; so a pension shares its owner's allowance with
 // the others it names. What is left once every saving has taken what it
 // can closes the list, as what the plan takes as spent, or as what the
-// month is short by and draws from the savings. Debts are paid before
-// any of it and have no place in the order, which the caption says.
+// month is short by and draws from the savings, in the order the plan's
+// drawdown names. Debts are paid before any of it and have no place in
+// the order, which the caption says.
 // Reorder shows an arrow up and down on each step, and each move goes to
 // the caller as the account and the one it moves onto, as dragging did,
 // and is said aloud with the place it lands in. The arrow pressed keeps
@@ -232,7 +234,7 @@ export function MoneyFlow({
         </p>
         <p className="text-xs text-muted-foreground">
           {flow.left < -penny
-            ? "Drawn from the savings, cash first."
+            ? drawnFromWords[plan.drawdown ?? "savings-first"]
             : "Taken as spent."}
         </p>
         <p aria-live="polite" className="sr-only">

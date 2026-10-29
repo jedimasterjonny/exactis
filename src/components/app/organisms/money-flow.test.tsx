@@ -10,7 +10,7 @@ import type { Schedule } from "@/engine/cash-flow";
 import { accounts, sipp } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
-import { owners } from "@/data/owners.fixture";
+import { owners, working } from "@/data/owners.fixture";
 
 import { MoneyFlow } from "./money-flow";
 
@@ -249,6 +249,29 @@ describe("MoneyFlow", () => {
     );
     expect(screen.getByText("Short")).toHaveClass("label");
     expect(said()).toContain("Drawn from the savings, cash first.");
+  });
+
+  // The same month for an owner born in 1960, who at 66 can draw the
+  // workplace pension among the savings, under a plan drawing the
+  // pension first: it says so, and not cash first.
+  it("says the month is drawn in the order the plan's drawdown names", () => {
+    renderFlow({
+      plan: {
+        ...plan,
+        born: 1960,
+        drawdown: "pension-first",
+        owners: [{ ...working, born: 1960 }],
+      },
+      schedule: {
+        expenses: [{ ...household, amount: 20000 }],
+        income: [salary],
+      },
+    });
+
+    expect(said()).toContain(
+      "Drawn from the savings, a pension its owner can draw first, then cash.",
+    );
+    expect(said()).not.toContain("Drawn from the savings, cash first.");
   });
 
   it("draws nothing for no savings, and no reorder for one", () => {

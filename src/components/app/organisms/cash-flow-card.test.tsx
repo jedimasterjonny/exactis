@@ -344,6 +344,27 @@ describe("CashFlowCard", () => {
     expect(screen.getByText(drawn)).toBeInTheDocument();
   });
 
+  // The same short month with the ISA and the pension behind it, under
+  // a plan drawing the pension to the top of the basic rate band: in
+  // 2053 the owner is 61, past the pension age, and their salary has
+  // ended, so the pension is the one the band is filled from, and the
+  // figure says so rather than cash first.
+  it("says a short month is drawn in the order the plan's drawdown names", () => {
+    render(
+      <CashFlowCard
+        accounts={[isa, { ...pension, isDroppable: true }]}
+        milestones={[]}
+        plan={{ ...plan, drawdown: "pension-to-basic-rate" }}
+        schedule={{ expenses: [retirement], income: [salary] }}
+      />,
+    );
+    choose(2053);
+
+    expect(ledger().at(-1)).toBe(
+      "ShortDrawn from the savings, the pension of an owner not working and able to draw it first, to the top of the basic rate band, then cash.£4,833",
+    );
+  });
+
   // The household's £3,350 a month with nothing coming in and only the
   // pension to draw on, at 34: September to December are each short
   // £3,350 that no cash or ISA stands behind, so each is met by a gross
