@@ -36,7 +36,16 @@ function holding(
   securities: readonly Written[],
   transactions: readonly Written[],
 ): Uint8Array {
-  return portfolioFile([
+  return portfolioFile(holdingClient(assignments, securities, transactions));
+}
+
+// The client of a file holding, as holding gives it.
+function holdingClient(
+  assignments: readonly (readonly [vehicle: string, weight: number])[],
+  securities: readonly Written[],
+  transactions: readonly Written[],
+): Written {
+  return [
     ...securities.map((each) => [2, each] as const),
     ...transactions.map((each) => [5, each] as const),
     [
@@ -65,7 +74,7 @@ function holding(
         ],
       ],
     ],
-  ]);
+  ];
 }
 
 // A security as a test writes one: its id, a name from it, the
@@ -144,6 +153,7 @@ describe("readTargets", () => {
 
     expect(readTargets(file)).toStrictEqual([
       {
+        accounts: [{ name: "Brokerage", value: 21401 }],
         classes: ["Equity", "Developed"],
         id: "Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK",
         isImplemented: true,
@@ -152,6 +162,7 @@ describe("readTargets", () => {
         value: 21401,
       },
       {
+        accounts: [{ name: "Brokerage", value: 21401 }],
         classes: ["Equity"],
         id: "Asset Allocation/Equity/Global emerging markets",
         isImplemented: true,
@@ -160,6 +171,7 @@ describe("readTargets", () => {
         value: 21401,
       },
       {
+        accounts: [{ name: "Brokerage", value: 21401 }],
         classes: ["Equity", "UK"],
         id: "Asset Allocation/Equity/UK/UK equity",
         isImplemented: true,
@@ -168,6 +180,7 @@ describe("readTargets", () => {
         value: 21401,
       },
       {
+        accounts: [{ name: "Brokerage", value: 21401 }],
         classes: ["Equity"],
         id: "Asset Allocation/Equity/Global small cap",
         isImplemented: true,
@@ -176,6 +189,7 @@ describe("readTargets", () => {
         value: 21401,
       },
       {
+        accounts: [{ name: "Brokerage", value: 21401 }],
         classes: ["Equity", "Developed"],
         id: "Asset Allocation/Equity/Developed/FTSE USA",
         isImplemented: true,
@@ -184,6 +198,7 @@ describe("readTargets", () => {
         value: 21401,
       },
       {
+        accounts: [{ name: "Brokerage", value: 21401 }],
         classes: ["Equity", "UK"],
         id: "Asset Allocation/Equity/UK/FTSE All-Share",
         isImplemented: true,
@@ -192,6 +207,7 @@ describe("readTargets", () => {
         value: 21401,
       },
       {
+        accounts: [{ name: "Brokerage", value: 21401 }],
         classes: ["Bonds"],
         id: "Asset Allocation/Bonds/Global bonds, hedged",
         isImplemented: true,
@@ -200,6 +216,7 @@ describe("readTargets", () => {
         value: 21401,
       },
       {
+        accounts: [],
         classes: ["Bonds"],
         id: "Asset Allocation/Bonds/Index-linked gilts",
         isImplemented: false,
@@ -208,6 +225,7 @@ describe("readTargets", () => {
         value: 0,
       },
       {
+        accounts: [{ name: "Brokerage", value: 21401 }],
         classes: ["Bonds"],
         id: "Asset Allocation/Bonds/Short-dated gilts",
         isImplemented: true,
@@ -235,6 +253,7 @@ describe("readTargets", () => {
     expect(readTargets(file)).toStrictEqual(readTargets(reordered));
     expect(readTargets(file)).toStrictEqual([
       {
+        accounts: [{ name: "Brokerage", value: 21401 }],
         classes: [],
         id: "Asset Allocation/Cash",
         isImplemented: true,
@@ -293,6 +312,7 @@ describe("readTargets", () => {
 
     expect(readTargets(file)).toStrictEqual([
       {
+        accounts: [],
         classes: [],
         id: "cash",
         isImplemented: false,
@@ -357,6 +377,7 @@ describe("readTargets", () => {
 
     expect(readTargets(file)).toStrictEqual([
       {
+        accounts: [],
         classes: [],
         id: "cash",
         isImplemented: true,
@@ -364,6 +385,75 @@ describe("readTargets", () => {
         share: 1,
         value: 2655,
       },
+    ]);
+  });
+
+  // a is £10 a share and b £20. ISA buys 10 of a and moves 4 to GIA;
+  // GIA buys 5 of b, of which the category takes half; Spare buys 3 of
+  // a and sells them; Junior, a second account named ISA, buys 2 of a;
+  // and a purchase naming no account, and one naming an account the
+  // client does not list, buy 1 of a each. ISA holds £80, GIA £40 of a
+  // and £50 of b, and Spare nothing; the whole is £190.
+  it("reads what each securities account holds of a category, a transfer moving shares from one to the other", () => {
+    const shares = 100_000_000;
+    const inAccount = (
+      written: Written,
+      account: string,
+      other?: string,
+    ): Written => [
+      ...written,
+      [4, account],
+      ...(other === undefined ? [] : [[6, other] as const]),
+    ];
+    const accounts = (
+      [
+        ["isa", "ISA"],
+        ["gia", "GIA"],
+        ["spare", "Spare"],
+        ["junior", "ISA"],
+      ] as const
+    ).map(
+      ([id, name]) =>
+        [
+          4,
+          [
+            [1, id],
+            [2, name],
+          ],
+        ] as const,
+    );
+    const file = portfolioFile([
+      ...accounts,
+      ...holdingClient(
+        [
+          ["a", 10_000],
+          ["b", 5000],
+        ],
+        [
+          security("a", "GBP", 1_000_000_000),
+          security("b", "GBP", 2_000_000_000),
+        ],
+        [
+          inAccount(transaction(0, 10 * shares, "a"), "isa"),
+          inAccount(transaction(4, 4 * shares, "a"), "isa", "gia"),
+          inAccount(transaction(0, 5 * shares, "b"), "gia"),
+          inAccount(transaction(0, 3 * shares, "a"), "spare"),
+          inAccount(transaction(1, 3 * shares, "a"), "spare"),
+          inAccount(transaction(0, 2 * shares, "a"), "junior"),
+          transaction(0, shares, "a"),
+          inAccount(transaction(0, shares, "a"), "unlisted"),
+        ],
+      ),
+    ]);
+
+    expect(readTargets(file)).toStrictEqual([
+      expect.objectContaining({
+        accounts: [
+          { name: "ISA", value: 80 },
+          { name: "GIA", value: 90 },
+        ],
+        value: 190,
+      }),
     ]);
   });
 
