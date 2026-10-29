@@ -265,3 +265,12 @@
 @utility mark {
   @apply w-px bg-brand/40;
 }
+
+/* A display heading's face: the heading font, semibold and tracked tight,
+   for a screen's title and a card's headline. The size and the spacing
+   around it are left to the call site, since a screen's title is set a
+   step larger than a card's. The section and card titles set in the
+   heading font at medium weight are a quieter tier and do not take it. */
+@utility heading {
+  @apply font-heading font-semibold tracking-tight;
+}

@@ -132,9 +132,7 @@ export function FuturesOutcomes({
                   fell short
                 </span>
               </p>
-              <h2 className="mt-3 font-heading text-2xl font-semibold tracking-tight text-balance">
-                {verdict}
-              </h2>
+              <h2 className="mt-3 heading text-2xl text-balance">{verdict}</h2>
               <p className="text-sm text-pretty text-muted-foreground">
                 {`${shortfall} The middle one leaves ${formatGbp(reading.middle)}.`}
               </p>

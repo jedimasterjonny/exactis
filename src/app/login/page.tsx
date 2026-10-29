@@ -13,9 +13,7 @@ export default function Login(): JSX.Element {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <span className="label text-muted-foreground">Exactis</span>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">
-            Sign in
-          </h1>
+          <h1 className="heading text-2xl">Sign in</h1>
         </CardHeader>
         <CardContent className="grid gap-4">
           <LoginForm />
