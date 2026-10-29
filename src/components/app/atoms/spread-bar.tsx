@@ -60,7 +60,7 @@ export function SpreadBar({
       <Band fill="bg-chart-2/50" last={last} pair={inner} plan={plan} />
       {marks.map((mark) => (
         <span
-          className="absolute inset-y-0 w-px bg-brand/40"
+          className="absolute inset-y-0 mark"
           data-slot="spread-bar-mark"
           key={mark}
           style={{ left: `${String(placed(mark, plan))}%` }}

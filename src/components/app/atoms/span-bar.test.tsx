@@ -187,7 +187,7 @@ describe("SpanBar", () => {
     });
 
     expect(marks.map((mark) => mark.style.left)).toStrictEqual(["25%", "50%"]);
-    expect(marks[0]).toHaveClass("w-px", "bg-brand/40");
+    expect(marks[0]).toHaveClass("mark");
 
     rerender(
       <SpanBar
