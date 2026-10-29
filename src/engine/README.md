@@ -510,6 +510,17 @@ they earn, a line starting at retirement has not started and one ending at it
 runs on, and from then the year is carried as a plan retiring at the age they
 reach in it.
 
+The plan's owner retiring on conditions may also retire by an age, whatever the
+conditions do, since a working life ends at an age however the markets have
+gone, and a retirement waiting on them alone assumes the work lasts as long as
+they take. The run then retires them in the first year whose opening holds the
+conditions or in which they reach the age, whichever comes first. The age is
+read off the year they were born, as every age the plan reads is, so the whole
+of the year they reach it counts as retired, as it does for a retirement at an
+age; and it is their own, as every retirement is. It is not one more condition
+to hold with the rest, since held with them it could only keep the owner working
+longer, never retire them sooner.
+
 Another owner may still retire with the plan's owner rather than at an age of
 their own, as a household retiring together does, and then retires at
 Retirement, whatever it is reached on. So where it is reached when conditions

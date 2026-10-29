@@ -117,7 +117,8 @@ const multiple = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 2 });
 // The age a milestone reached at an age is reached at: the years of its
 // one condition, which is on the age, and which the model holds is its
 // only one. A milestone reached when conditions on the sums hold has
-// none.
+// none, and so has a retirement on them that comes by an age, whose age
+// is held beside them.
 export function ageOf({
   conditions,
 }: Pick<MilestoneValues, "conditions">): number | undefined {
@@ -272,12 +273,13 @@ export function retirementYearOf(owner: Owner, plan: Plan): number {
   return retirementYear(plan);
 }
 
-// What the plan's owner retires on, where it is conditions, or none
-// where they retire at an age, or the plan has no owner to retire: a
-// retirement reached at an age falls in the year the plan lays it out
-// in, and one reached when conditions hold only a run of the plan can
-// place. The plan's owner retiring with themselves is refused where the
-// plan is made, so it is read as no conditions here.
+// What the plan's owner retires on, where it is conditions, the age
+// they retire by among them where they hold one, or none where they
+// retire at an age, or the plan has no owner to retire: a retirement
+// reached at an age falls in the year the plan lays it out in, and one
+// reached when conditions hold only a run of the plan can place. The
+// plan's owner retiring with themselves is refused where the plan is
+// made, so it is read as no conditions here.
 export function retiresOn(
   plan: Pick<Plan, "owners">,
 ): readonly Condition[] | undefined {
