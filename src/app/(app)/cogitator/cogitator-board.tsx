@@ -38,6 +38,7 @@ import { assumptions, cogitator, subsectionLabel } from "@/lib/nav";
 import { ladderOf, minimumTrade } from "@/lib/trades";
 
 interface CogitatorBoardProps {
+  readonly account: string;
   readonly amount: number;
   readonly bonds?: { readonly now: number; readonly targeted: number };
   readonly held: number;
@@ -60,22 +61,26 @@ const unimplemented = "No fund assigned";
 
 // The next best trades: what to buy, and to sell up to the count of
 // sales typed, to bring the allocation nearest its targets for the
-// pounds typed in the header. The screen holds the amount and the
-// sales and hands them down, with what the allocation holds in all
-// and whether any of it can be bought toward. Beneath, a tile a trade
-// of the rung recommended, the purchases first, the largest set
-// apart, each saying what it puts into or takes out of its category
-// and where that takes its share; then the ladder, a row a count of
-// trades, saying what each count buys and sells, how far off target
-// it leaves the allocation and how much nearer it brings it than the
-// rung before it, which with sales may make two fewer trades, or
-// stand nearer, with the rung recommended flagged and those past it
-// or with a trade under the minimum muted, since neither is worth
-// placing, which the card's caption says in pounds once one is
-// recommended; then where the recommended trades leave each category
-// against its target. A sale is written in pounds below nothing.
-// Before an amount or a sale is typed the tile says so, and the
-// ledger reads as the allocation stands.
+// pounds typed in the header, the trades placed in the securities
+// account chosen there, so each sale is held to what that account
+// holds of its category, or to what every account holds of it until
+// one is chosen; the allocation is measured whole all the same. The
+// screen holds the amount, the sales and the account, all accounts
+// being the one of no name, and hands them down, with what the
+// allocation holds in all and whether any of it can be bought toward.
+// Beneath, a tile a trade of the rung recommended, the purchases
+// first, the largest set apart, each saying what it puts into or
+// takes out of its category and where that takes its share; then the
+// ladder, a row a count of trades, saying what each count buys and
+// sells, how far off target it leaves the allocation and how much
+// nearer it brings it than the rung before it, which with sales may
+// make two fewer trades, or stand nearer, with the rung recommended
+// flagged and those past it or with a trade under the minimum muted,
+// since neither is worth placing, which the card's caption says in
+// pounds once one is recommended; then where the recommended trades
+// leave each category against its target. A sale is written in pounds
+// below nothing. Before an amount or a sale is typed the tile says
+// so, and the ledger reads as the allocation stands.
 // While the plan holds a share in bonds now other than the target
 // allocation's, as one retargeted from a fund all in equities leaves it
 // once the glide path reaches bonds, a caution above everything says
@@ -86,6 +91,7 @@ const unimplemented = "No fund assigned";
 // while no category has both a fund and a share to fill, and the
 // screen says which, pointing to where the allocation is imported.
 export function CogitatorBoard({
+  account,
   amount,
   bonds,
   held,
@@ -125,6 +131,7 @@ export function CogitatorBoard({
       )}
       {targets !== null && isReady && (
         <Trades
+          account={account}
           amount={amount}
           categories={targets.categories}
           held={held}
@@ -194,19 +201,28 @@ function rowsOf(ladder: Ladder): readonly Row[] {
 }
 
 // The tiles, the ladder and the ledger over an allocation that can be
-// bought toward, for the amount and the sales typed.
+// bought toward, for the amount and the sales typed and the account
+// chosen.
 function Trades({
+  account,
   amount,
   categories,
   held,
   sales,
 }: {
+  readonly account: string;
   readonly amount: number;
   readonly categories: readonly Target[];
   readonly held: number;
   readonly sales: number;
 }): JSX.Element {
-  const ladder = ladderOf(categories, amount, { sales });
+  const ladder = ladderOf(categories, amount, {
+    sales,
+    sellable: (category) =>
+      account === ""
+        ? category.value
+        : (category.accounts?.find(({ name }) => name === account)?.value ?? 0),
+  });
   const { recommended } = ladder;
   const bought = recommended.trades.reduce(
     (sum, { pounds }) => sum + pounds,

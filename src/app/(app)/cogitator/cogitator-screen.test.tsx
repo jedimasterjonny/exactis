@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { Target, Targets } from "@/data/targets";
@@ -54,6 +54,7 @@ describe("CogitatorScreen", () => {
     expect(screen.getByText("Imported 7 Sep 2026")).toBeInTheDocument();
     expect(screen.getByText("£5,450 held")).toBeInTheDocument();
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
 
   it("cautions that the trades buy toward the target allocation's split while the plan holds another in bonds", () => {
@@ -257,6 +258,115 @@ describe("CogitatorScreen", () => {
     rerender(<CogitatorScreen targets={reference} />);
 
     expect(field("Sales at most")).toHaveValue("3");
+  });
+
+  // A holds £1,000 of its half, all in ISA, and B £3,000 of its half,
+  // £400 in ISA and £2,600 in GIA. With nothing coming in and one sale,
+  // every account together sells £1,000 of B into A; ISA can sell only
+  // its £400 of B, and GIA its £1,000.
+  it("places the trades in the account chosen, holding each sale to what it holds there, the accounts listed by name", () => {
+    render(
+      <CogitatorScreen
+        targets={allocation([
+          {
+            ...target("A", 0.5, 1000),
+            accounts: [{ name: "ISA", value: 1000 }],
+          },
+          {
+            ...target("B", 0.5, 3000),
+            accounts: [
+              { name: "ISA", value: 400 },
+              { name: "GIA", value: 2600 },
+            ],
+          },
+        ])}
+      />,
+    );
+    commit(field("Sales at most"), "1");
+
+    const menu = screen.getByRole("combobox", { name: "Account" });
+
+    expect(
+      within(menu)
+        .getAllByRole("option")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual(["All accounts", "GIA", "ISA"]);
+    expect(toned("default")).toHaveTextContent("B−£1,000");
+
+    fireEvent.change(menu, { target: { value: "ISA" } });
+
+    expect(toned("inverse")).toHaveTextContent("A£400");
+    expect(toned("default")).toHaveTextContent("B−£400");
+
+    fireEvent.change(menu, { target: { value: "GIA" } });
+
+    expect(toned("default")).toHaveTextContent("B−£1,000");
+  });
+
+  it("trades in every account again once the account chosen is no longer listed, and offers none with no name", () => {
+    const listed = (accounts: readonly string[]): Targets =>
+      allocation([
+        target("A", 0.5, 1000),
+        {
+          ...target("B", 0.5, 3000),
+          accounts: accounts.map((name) => ({ name, value: 400 })),
+        },
+      ]);
+    const { rerender } = render(
+      <CogitatorScreen targets={listed(["ISA", ""])} />,
+    );
+    commit(field("Sales at most"), "1");
+
+    const menu = screen.getByRole("combobox", { name: "Account" });
+
+    expect(
+      within(menu)
+        .getAllByRole("option")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual(["All accounts", "ISA"]);
+
+    fireEvent.change(menu, { target: { value: "ISA" } });
+
+    expect(toned("default")).toHaveTextContent("B−£400");
+
+    rerender(<CogitatorScreen targets={listed(["GIA"])} />);
+
+    expect(toned("default")).toHaveTextContent("B−£1,000");
+
+    rerender(<CogitatorScreen targets={allocation([target("A", 1, 1000)])} />);
+    rerender(<CogitatorScreen targets={listed(["ISA"])} />);
+
+    expect(screen.getByRole("combobox", { name: "Account" })).toHaveValue("");
+    expect(toned("default")).toHaveTextContent("B−£1,000");
+  });
+
+  it("opens the account choice on the account held when it comes back after the allocation had nothing to buy toward", () => {
+    const listed = allocation([
+      target("A", 0.5, 1000),
+      { ...target("B", 0.5, 3000), accounts: [{ name: "ISA", value: 400 }] },
+    ]);
+    const { rerender } = render(<CogitatorScreen targets={listed} />);
+    commit(field("Sales at most"), "1");
+    fireEvent.change(screen.getByRole("combobox", { name: "Account" }), {
+      target: { value: "ISA" },
+    });
+    rerender(
+      <CogitatorScreen
+        targets={allocation([
+          { ...target("A", 0, 1000), accounts: [{ name: "ISA", value: 1000 }] },
+          { ...target("B", 1, 0), isImplemented: false },
+        ])}
+      />,
+    );
+
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+
+    rerender(<CogitatorScreen targets={listed} />);
+
+    expect(screen.getByRole("combobox", { name: "Account" })).toHaveValue(
+      "ISA",
+    );
+    expect(toned("default")).toHaveTextContent("B−£400");
   });
 
   it("ledgers each category's holding, its share now and after the trades, and its target, flagging one with no fund and muting a target of nothing", () => {
