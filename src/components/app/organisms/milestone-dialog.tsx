@@ -35,7 +35,7 @@ import {
   atAge,
   basisNames,
   bornIn,
-  conditionOf,
+  conditionsOf,
   isTiedTo,
   measureNames,
   sums,
@@ -441,9 +441,7 @@ function ConditionRow({
 function describeOf(saved: MilestoneValues, plan: Plan): string {
   const year = yearOf(saved, plan);
   const when =
-    year === undefined
-      ? saved.conditions.map(conditionOf).join(" · ")
-      : String(year);
+    year === undefined ? conditionsOf(saved.conditions) : String(year);
   return `${saved.name} · ${when}`;
 }
 

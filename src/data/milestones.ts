@@ -163,6 +163,13 @@ export function conditionOf({ measure, of, times }: Condition): string {
   return `${measureNames[measure]} ≥ ${held}`;
 }
 
+// A milestone's conditions in words, each as conditionOf says it, "Net
+// worth ≥ £1,000,000 · Liquid net worth ≥ 10 times the debt", as a row,
+// a toast and the dashboard say them.
+export function conditionsOf(conditions: readonly Condition[]): string {
+  return conditions.map(conditionOf).join(" · ");
+}
+
 // Whether the milestone is reached at the age of whoever the id names.
 export function isMeasuredOn(
   { conditions }: Pick<MilestoneValues, "conditions">,
