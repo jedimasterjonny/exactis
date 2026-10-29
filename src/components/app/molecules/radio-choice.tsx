@@ -17,6 +17,8 @@ interface RadioChoiceProps {
 // so a click anywhere on it chooses, but only the name names the radio
 // and the line describes it, so a screen reader reads the two apart. A
 // choice that cannot be made yet is drawn faint and refuses the pointer.
+// Its lines keep to its top, so a choice stretched to a taller one beside
+// it leaves the room beneath them rather than between.
 export function RadioChoice({
   children,
   isDisabled = false,
@@ -27,7 +29,7 @@ export function RadioChoice({
   return (
     <label
       className={cn(
-        "grid grid-cols-[auto_1fr] gap-x-3 gap-y-1",
+        "grid grid-cols-[auto_1fr] content-start gap-x-3 gap-y-1",
         isDisabled && "cursor-not-allowed opacity-50",
       )}
     >
