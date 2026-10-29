@@ -153,6 +153,37 @@ describe("saveAges", () => {
     );
   });
 
+  // Retiring on twenty-five years of expenses, or by 60: a plan ending
+  // at 60 would end no later than the age, and an age dragged to 58 is
+  // what the owner retires at alone.
+  it("holds the end age past the age a retirement on conditions comes by, and writes an age dragged over it alone", async () => {
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...blank,
+        owners: blank.owners.map((owner) => ({
+          ...owner,
+          retirement: [
+            { measure: "liquid", of: "expenses", times: 25 },
+            ...atAge(60),
+          ],
+        })),
+      },
+    );
+
+    await expect(saveAges({ ends: 60 })).resolves.toStrictEqual(
+      refused("A plan's owner retires by an age before it ends"),
+    );
+    expect(await saveAges({ retires: 58 })).toStrictEqual(
+      saved({ ends: 91, retires: 58 }),
+    );
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped(retiringAt(58)),
+      version: 2,
+    });
+  });
+
   // A retirement already past says only that nothing is earned by
   // working, so 28 is sound for someone of 34.
   it("holds the retirement age to the plan's end, but not to the age reached", async () => {

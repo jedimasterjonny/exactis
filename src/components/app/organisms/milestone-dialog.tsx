@@ -42,6 +42,7 @@ import {
   yearOf,
 } from "@/data/milestones";
 import { ageIn, endAge, endYear } from "@/data/plan";
+import { statePensionAge } from "@/data/state-pension";
 import { useMountedEditor } from "@/hooks/use-editor";
 import { useRemover } from "@/hooks/use-remover";
 import { optionsOf } from "@/lib/options";
@@ -60,15 +61,17 @@ interface ConditionRowProps {
 }
 
 // What the dialog holds while it is open: the name; how the milestone
-// is reached, at an age or when conditions hold, which the choice
-// sets; the age, and whose it is, by their id, none for the plan's
-// owner's, for the one; and the conditions, for the other, each
-// carrying a key of its own, so a row keeps its fields as the rows
-// before it are removed. Both are held whichever is chosen, so a
-// choice turned and turned back finds what was typed. The key is the
-// dialog's and is never saved.
+// is reached, at an age or when conditions hold, or for retirement on
+// them or by an age, which the choice sets; the age, and whose it is,
+// by their id, none for the plan's owner's, for the one; the
+// conditions, for the others, each carrying a key of its own, so a row
+// keeps its fields as the rows before it are removed; and the age
+// retirement comes by, for the last, which only retirement offers. All
+// are held whichever is chosen, so a choice turned and turned back
+// finds what was typed. The key is the dialog's and is never saved.
 interface Draft {
   readonly age: number;
+  readonly by: number;
   readonly conditions: readonly Keyed[];
   readonly kind: Kind;
   readonly name: string;
@@ -79,11 +82,13 @@ interface Keyed extends Condition {
   readonly key: number;
 }
 
-// How a milestone is reached: at an age, or when conditions hold.
-type Kind = "age" | "conditions";
+// How a milestone is reached: at an age, or when conditions hold, or,
+// for retirement alone, when they hold or by an age, whichever comes
+// first.
+type Kind = "age" | "conditions" | "either";
 
 interface MilestoneDialogProps {
-  readonly kind?: Kind;
+  readonly kind?: Exclude<Kind, "either">;
   readonly milestone: Milestone | null | Retirement;
   readonly onClose: () => void;
   readonly plan: Plan;
@@ -159,7 +164,11 @@ const twentyFiveYears: readonly Condition[] = [
 // plan's owner's: named Retirement, with no name to type and nothing to
 // delete, and saved onto the owner rather than among the records. It
 // is never held to its age by the lines tied to it, since a run moves
-// them with a retirement on conditions year by year.
+// them with a retirement on conditions year by year. It alone offers a
+// third choice, the conditions' rows with the age it comes by beneath
+// them, bounded as the age is but a year short of the plan's end, and
+// saying its year as the age does, saved as the conditions with the age
+// last among them.
 export function MilestoneDialog({
   kind = "age",
   milestone,
@@ -232,10 +241,11 @@ export function MilestoneDialog({
       )}
       <RadioGroup
         aria-label="Reached"
-        className="grid gap-4 sm:grid-cols-2"
-        onValueChange={(chosen) => {
+        className="grid gap-4 sm:auto-cols-fr sm:grid-flow-col"
+        onValueChange={(chosen: unknown) => {
           amend(entry, {
-            kind: chosen === "conditions" ? "conditions" : "age",
+            kind:
+              chosen === "conditions" || chosen === "either" ? chosen : "age",
           });
         }}
         value={draft.kind}
@@ -252,6 +262,14 @@ export function MilestoneDialog({
         >
           {reachedOf(isRetirement, tied)}
         </RadioChoice>
+        {isRetirement && (
+          <RadioChoice
+            label="When conditions hold, or by an age"
+            value="either"
+          >
+            Each future retires once they first hold, or at the age if sooner
+          </RadioChoice>
+        )}
       </RadioGroup>
       {draft.kind === "age" ? (
         <div className="grid gap-4 sm:grid-cols-3">
@@ -301,6 +319,21 @@ export function MilestoneDialog({
             amend(entry, { conditions });
           }}
         />
+      )}
+      {draft.kind === "either" && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <AgeField
+            hasSlider={false}
+            hint={`In ${String(born + draft.by)}`}
+            label="Or by age"
+            max={endYear(plan) - born - 1}
+            min={Math.max(0, plan.from - born)}
+            onValueCommitted={(by) => {
+              amend(entry, { by });
+            }}
+            value={draft.by}
+          />
+        </div>
       )}
     </EditDialog>
   );
@@ -489,8 +522,10 @@ function leavingOf(plan: Plan, whose: number | undefined): number | undefined {
 // under its id, reached as it is, at whoever's age it names, with the
 // other way's fields standing by at those opening values; or
 // retirement, named so, reached as the owner retires, its age standing
-// by at the age the plan lays it out at, held to the plan's end, and its
-// conditions at twenty-five years of expenses. Retirement is no record and is opened under nought, which
+// by at the age the plan lays it out at, held to the plan's end, its
+// conditions at twenty-five years of expenses, and the age it comes by
+// at its owner's State Pension age, held to the ages its field offers,
+// each where the owner retires on none. Retirement is no record and is opened under nought, which
 // no record's id is, so it is edited rather than added.
 function openingOf(
   milestone: Milestone | null | Retirement,
@@ -499,12 +534,25 @@ function openingOf(
 ): Entry<Draft> {
   if (milestone !== null && "retirement" in milestone) {
     const age = ageOf({ conditions: milestone.retirement });
+    const by =
+      age === undefined
+        ? milestone.retirement.find(({ measure }) => measure === "age")?.times
+        : undefined;
+    const onConditions = by === undefined ? "conditions" : "either";
     const draft: Draft = {
       age: age ?? Math.min(plan.retires, endAge(plan)),
+      by:
+        by ??
+        Math.max(
+          Math.max(0, plan.from - plan.born),
+          Math.min(statePensionAge(plan.born), endAge(plan) - 1),
+        ),
       conditions: keyed(
-        age === undefined ? milestone.retirement : twentyFiveYears,
+        age === undefined
+          ? milestone.retirement.filter(({ measure }) => measure !== "age")
+          : twentyFiveYears,
       ),
-      kind: age === undefined ? "conditions" : "age",
+      kind: age === undefined ? onConditions : "age",
       name: "Retirement",
       whose: undefined,
     };
@@ -514,6 +562,7 @@ function openingOf(
   if (milestone === null) {
     const draft: Draft = {
       age: tenYearsIn,
+      by: tenYearsIn,
       conditions: keyed(firstMillion),
       kind,
       name: "",
@@ -524,6 +573,7 @@ function openingOf(
   const age = ageOf(milestone);
   const draft: Draft = {
     age: age ?? tenYearsIn,
+    by: tenYearsIn,
     conditions: keyed(age === undefined ? milestone.conditions : firstMillion),
     kind: age === undefined ? "conditions" : "age",
     name: milestone.name,
@@ -566,17 +616,19 @@ function reachedOf(isRetirement: boolean, tied: number): string {
 }
 
 // The draft as the store takes it: the one condition on the age,
-// whoever's it is, or the conditions with the keys left behind.
+// whoever's it is, or the conditions with the keys left behind, and
+// after them the age retirement comes by, where it does.
 function valuesOf(draft: Draft): MilestoneValues {
+  const typed = draft.conditions.map(({ measure, of, times }) => ({
+    measure,
+    of,
+    times,
+  }));
   return {
     conditions:
       draft.kind === "age"
         ? atAge(draft.age, draft.whose)
-        : draft.conditions.map(({ measure, of, times }) => ({
-            measure,
-            of,
-            times,
-          })),
+        : [...typed, ...(draft.kind === "either" ? atAge(draft.by) : [])],
     name: draft.name,
   };
 }

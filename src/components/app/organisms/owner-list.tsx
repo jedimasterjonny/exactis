@@ -50,6 +50,7 @@ const blank: OwnerValues = { ...openingOwner, name: "" };
 // purpose here and dragged on the dashboard, and written as their
 // retirement's one condition; an owner retiring when conditions hold
 // has no age to type, the dialog saying where it is set in its place,
+// with the age they retire by where they hold one beside the sums,
 // and keeps what they retire on as it is. Anyone but the plan's owner
 // chooses between an age and retiring with the plan's owner, named,
 // between the two years, and retiring with them has no age to type
@@ -225,7 +226,13 @@ export function OwnerList({
             {entry.draft.retirement !== "retirement" &&
               (retires === undefined ? (
                 <p className="text-sm text-muted-foreground">
-                  {`Retires when conditions hold, set among the milestones on ${planScreen.label}`}
+                  {[
+                    "Retires when conditions hold",
+                    ...entry.draft.retirement
+                      .filter(({ measure }) => measure === "age")
+                      .map(({ times }) => `or by age ${String(times)}`),
+                    `set among the milestones on ${planScreen.label}`,
+                  ].join(", ")}
                 </p>
               ) : (
                 <AgeField

@@ -23,7 +23,7 @@ import { Toaster } from "@/components/kit/toast";
 import { children } from "@/data/children.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { incomeLines, retiring } from "@/data/income.fixture";
-import { atAge } from "@/data/milestones";
+import { atAge, retiringAt } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { sam } from "@/data/owners.fixture";
 import { refused, saved } from "@/lib/answer";
@@ -529,6 +529,158 @@ describe("MilestoneDialog", () => {
     fireEvent.click(radio("At an age"));
 
     expect(field("Age", dialog)).toHaveValue("91");
+  });
+
+  // Retiring on twenty-five years of expenses, or by 60, in 2052: both
+  // open, the age is held a year short of the plan's end at 91, and the
+  // age typed is saved after the conditions, and said as the age
+  // retirement comes by.
+  it("edits retirement on conditions or by an age, and saves it with the age after the conditions", async () => {
+    const onClose = vi.fn<() => void>();
+    renderDialog({
+      milestone: {
+        retirement: [
+          { measure: "liquid", of: "expenses", times: 25 },
+          ...atAge(60),
+        ],
+      },
+      onClose,
+    });
+    const dialog = screen.getByRole("dialog", { name: "Retirement" });
+    const either = radio("When conditions hold, or by an age");
+
+    expect(either).toBeChecked();
+    expect(either).toHaveAccessibleDescription(
+      "Each future retires once they first hold, or at the age if sooner",
+    );
+    expect(field("At least", dialog)).toHaveValue("25");
+    expect(field("Or by age", dialog)).toHaveValue("60");
+    expect(field("Or by age", dialog)).toHaveAccessibleDescription("In 2052");
+
+    commit(field("Or by age", dialog), "91");
+
+    expect(field("Or by age", dialog)).toHaveValue("90");
+
+    commit(field("Or by age", dialog), "58");
+
+    expect(field("Or by age", dialog)).toHaveAccessibleDescription("In 2050");
+
+    const retirement = [
+      { measure: "liquid", of: "expenses", times: 25 },
+      { measure: "age", of: "years", times: 58 },
+    ] as const;
+    vi.mocked(saveRetirement).mockResolvedValue(
+      saved({ conditions: retirement, name: "Retirement" }),
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(saveRetirement).toHaveBeenCalledExactlyOnceWith(retirement);
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+    expect(
+      screen.getByRole("dialog", { name: "Retirement updated" }),
+    ).toHaveAccessibleDescription(
+      "Retirement · Liquid net worth ≥ 25 years of expenses · Or by age 58",
+    );
+  });
+
+  // Born in 1992, the owner reaches their State Pension age of 68 in
+  // 2060, within a plan to 91, so the age retirement comes by opens
+  // there, rather than at the 61 they retire at or anywhere the
+  // conditions say; a plan to 68 holds it a year short, at 67 in 2059,
+  // and an owner born in 1950, 76 as the plan opens and past their 66,
+  // opens on the age they are.
+  it.each([
+    {
+      age: "68",
+      plan: retiring,
+      retirement: atAge(61),
+      said: "retiring at 61",
+      year: "In 2060",
+    },
+    {
+      age: "68",
+      plan: retiring,
+      retirement: independence.conditions,
+      said: "on conditions",
+      year: "In 2060",
+    },
+    {
+      age: "67",
+      plan: { ...retiring, years: 34 },
+      retirement: independence.conditions,
+      said: "on conditions in a plan to 68",
+      year: "In 2059",
+    },
+    {
+      age: "76",
+      plan: { ...retiring, born: 1950, years: 20 },
+      retirement: independence.conditions,
+      said: "on conditions past the State Pension age",
+      year: "In 2026",
+    },
+  ])(
+    "opens the age retirement comes by at its owner's State Pension age, held to the ages its field offers: $said",
+    ({ age, plan, retirement, year }) => {
+      renderDialog({ milestone: { retirement }, plan });
+      const dialog = screen.getByRole("dialog", { name: "Retirement" });
+
+      fireEvent.click(radio("When conditions hold, or by an age"));
+
+      expect(field("Or by age", dialog)).toHaveValue(age);
+      expect(field("Or by age", dialog)).toHaveAccessibleDescription(year);
+    },
+  );
+
+  // Retiring on twenty-five years of expenses, or by 60, laid out at 57,
+  // where the plan at its own rates reaches them: turned to the
+  // conditions alone the age goes, and turned to an age it is the one
+  // the plan lays out.
+  it.each([
+    [
+      "When conditions hold",
+      [{ measure: "liquid", of: "expenses", times: 25 }] as const,
+    ],
+    ["At an age", atAge(57)],
+  ])(
+    "saves retirement turned from conditions or by an age to %s on that alone",
+    async (choice, conditions) => {
+      renderDialog({
+        milestone: {
+          retirement: [
+            { measure: "liquid", of: "expenses", times: 25 },
+            ...atAge(60),
+          ],
+        },
+        plan: retiringAt(retiring, 57),
+      });
+      const dialog = screen.getByRole("dialog", { name: "Retirement" });
+
+      fireEvent.click(radio(choice));
+      vi.mocked(saveRetirement).mockResolvedValue(
+        saved({ conditions, name: "Retirement" }),
+      );
+      fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+      expect(saveRetirement).toHaveBeenCalledExactlyOnceWith(conditions);
+      expect(
+        await screen.findByRole("dialog", { name: "Retirement updated" }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  // Only retirement comes by an age; a milestone is one way or the
+  // other.
+  it("offers a milestone no choice of conditions or an age", () => {
+    renderDialog({ milestone: firstMillion });
+
+    expect(radio("When conditions hold")).toBeChecked();
+    expect(
+      screen.queryByRole("radio", {
+        name: "When conditions hold, or by an age",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   // Ten years in is the plan's owner's 44, in 2036, which is Ada's 21;

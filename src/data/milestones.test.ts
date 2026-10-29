@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
 
 import { accounts } from "@/data/accounts.fixture";
@@ -23,6 +24,7 @@ import {
   markersOf,
   moving,
   retirementYearOf,
+  retiresBy,
   retiresOn,
   retiringAt,
   timed,
@@ -145,6 +147,22 @@ describe("conditionsOf", () => {
         { measure: "liquid", of: "debt", times: 10 },
       ]),
     ).toBe("Net worth ≥ £1,000,000 · Liquid net worth ≥ 10 times the debt");
+  });
+
+  it("says the age a retirement on conditions comes by as that, and no floor", () => {
+    expect(
+      conditionsOf([
+        { measure: "liquid", of: "expenses", times: 25 },
+        ...atAge(60),
+      ]),
+    ).toBe("Liquid net worth ≥ 25 years of expenses · Or by age 60");
+  });
+
+  // A milestone reached at an age is described by its condition where
+  // the plan carries nobody it is measured on, and an age alone is no
+  // age a retirement comes by.
+  it("says an age standing alone as conditionOf says it", () => {
+    expect(conditionsOf(atAge(18))).toBe("Age ≥ 18 years");
   });
 });
 
@@ -290,6 +308,22 @@ describe("moving", () => {
     expect(moving(cash, milestones, retiring)).toBe(cash);
     expect(moving(unlisted, milestones, retiring)).toBe(unlisted);
     expect(moving(conditional, milestones, retiring)).toBe(conditional);
+  });
+});
+
+describe("retiresBy", () => {
+  // Retiring on twenty-five years of expenses, or by 60.
+  it("reads the age the plan's owner retiring on conditions retires by, and nothing where they hold none, retire at an age, with themselves, or there is no owner", () => {
+    const [sum] = independence.conditions;
+    const retiringOn = (
+      retirement: Owner["retirement"],
+    ): Pick<Plan, "owners"> => ({ owners: [{ ...owners[0], retirement }] });
+
+    expect(retiresBy(retiringOn([sum, ...atAge(60)]))).toBe(60);
+    expect(retiresBy(retiringOn([sum]))).toBeUndefined();
+    expect(retiresBy(retiringOn(atAge(60)))).toBeUndefined();
+    expect(retiresBy(retiringOn("retirement"))).toBeUndefined();
+    expect(retiresBy({ owners: [] })).toBeUndefined();
   });
 });
 

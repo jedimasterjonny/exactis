@@ -379,6 +379,40 @@ describe("the milestone actions", () => {
       });
     });
 
+    // Twenty-five years of expenses, or by 60, in a plan to 91: an age
+    // at 62 written over it stands alone, and the age it comes by is held
+    // to before the plan's end, to one, and to its owner's own.
+    it("writes a retirement on conditions or by an age, holding the age to before the plan's end, to one and to its owner's own", async () => {
+      const retiringBy = [...onConditions, ...atAge(60)];
+
+      expect(await saveRetirement(retiringBy)).toStrictEqual(
+        saved({ conditions: retiringBy, name: "Retirement" }),
+      );
+      expect(await readLatest(db, "")).toMatchObject({
+        household: { owners: [{ ...kept.owners[0], retirement: retiringBy }] },
+        version: 2,
+      });
+      expect(await saveRetirement(atAge(62))).toStrictEqual(
+        saved({ conditions: atAge(62), name: "Retirement" }),
+      );
+      await expect(
+        saveRetirement([...onConditions, ...atAge(91)]),
+      ).resolves.toStrictEqual(
+        refused("A plan's owner retires by an age before it ends"),
+      );
+      await expect(
+        saveRetirement([...retiringBy, ...atAge(61)]),
+      ).rejects.toThrow(
+        "A retirement holds one age at most, after its conditions",
+      );
+      await expect(
+        saveRetirement([...onConditions, ...atAge(60, 1)]),
+      ).resolves.toStrictEqual(
+        refused("A retirement is at its owner's own age"),
+      );
+      expect(await readLatest(db, "")).toMatchObject({ version: 3 });
+    });
+
     // The plan runs to 91, and its owner retires at their own age.
     it("holds a retirement at an age to the plan's end and to its owner's own age, in the household's words, and refuses no condition", async () => {
       await expect(saveRetirement(atAge(92))).resolves.toStrictEqual(
