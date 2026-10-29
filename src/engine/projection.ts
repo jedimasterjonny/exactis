@@ -831,37 +831,43 @@ function drawnFrom(
   const below = new Map(
     earned.map(({ owner, taxable }) => [owner, taxable] as const),
   );
+  const isEarly = (account: Account): boolean =>
+    isBeforePensionAge(ageIn(at.year, holderOf(account, plan)), at);
+  // A pension's draw for what the month is still short, grossed up for
+  // its tax or the charge and held to what it holds, counted against its
+  // owner's lump sum allowance and income.
+  const drawnOn = ({ account, balance }: Held): Held => {
+    const owner = holderOf(account, plan);
+    const taxed = {
+      allowance: allowanceOf.get(owner.id) ?? lumpSumAllowance,
+      below: below.get(owner.id) ?? 0,
+      isEarly: isEarly(account),
+      months: 1,
+      uprating,
+    };
+    const wanted = drawFor(left, taxed);
+    const draw = wanted.gross <= balance ? wanted : drawOf(balance, taxed);
+    left = draw === wanted ? 0 : Math.max(0, left - draw.net);
+    early += taxed.isEarly ? draw.gross : 0;
+    if (!taxed.isEarly && draw.gross > 0) {
+      accessed.add(owner.id);
+    }
+    allowanceOf.set(owner.id, taxed.allowance - draw.taxFree);
+    below.set(owner.id, taxed.below + draw.taxable);
+    return { account, balance: balance - draw.gross };
+  };
   const order = drawOrders[plan.drawdown ?? "savings-first"];
   for (const [pass, kind] of [...order, "tax-deferred" as const].entries()) {
     const isEarlyPass = pass === order.length;
-    carried = carried.map(({ account, balance }) => {
+    carried = carried.map((entry) => {
+      const { account, balance } = entry;
       if (account.kind !== kind || !isPension(account)) {
         const taken =
           account.kind === kind ? Math.max(0, Math.min(balance, left)) : 0;
         left -= taken;
         return { account, balance: balance - taken };
       }
-      const owner = holderOf(account, plan);
-      const taxed = {
-        allowance: allowanceOf.get(owner.id) ?? lumpSumAllowance,
-        below: below.get(owner.id) ?? 0,
-        isEarly: isBeforePensionAge(ageIn(at.year, owner), at),
-        months: 1,
-        uprating,
-      };
-      if (taxed.isEarly !== isEarlyPass) {
-        return { account, balance };
-      }
-      const wanted = drawFor(left, taxed);
-      const draw = wanted.gross <= balance ? wanted : drawOf(balance, taxed);
-      left = draw === wanted ? 0 : Math.max(0, left - draw.net);
-      early += taxed.isEarly ? draw.gross : 0;
-      if (!taxed.isEarly && draw.gross > 0) {
-        accessed.add(owner.id);
-      }
-      allowanceOf.set(owner.id, taxed.allowance - draw.taxFree);
-      below.set(owner.id, taxed.below + draw.taxable);
-      return { account, balance: balance - draw.gross };
+      return isEarly(account) === isEarlyPass ? drawnOn(entry) : entry;
     });
   }
   left += kept;
