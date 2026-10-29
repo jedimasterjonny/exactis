@@ -21,6 +21,7 @@ import type { Across, Allocation } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 
 import { Note } from "@/components/app/atoms/note";
+import { Panel } from "@/components/app/atoms/panel";
 import { Worksheet } from "@/components/app/atoms/worksheet";
 import { Caution } from "@/components/app/molecules/caution";
 import { EmptyState } from "@/components/app/molecules/empty-state";
@@ -415,10 +416,7 @@ function Weights({
       mappings.find((mapping) => mapping.category === category)?.asset ?? "",
     );
   return (
-    <section
-      aria-labelledby={id}
-      className="grid gap-4 rounded-lg bg-muted p-5"
-    >
+    <Panel aria-labelledby={id}>
       <h3 className="label text-muted-foreground" id={id}>
         {heading}
       </h3>
@@ -458,6 +456,6 @@ function Weights({
           </div>
         ))}
       </div>
-    </section>
+    </Panel>
   );
 }

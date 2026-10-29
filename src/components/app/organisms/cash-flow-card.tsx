@@ -13,6 +13,7 @@ import type { Plan } from "@/data/plan";
 import type { Fed, Paid, Schedule, Spent, Take } from "@/engine/cash-flow";
 import type { MovedYear, ProjectionPoint } from "@/engine/projection";
 
+import { Panel } from "@/components/app/atoms/panel";
 import { RowAction } from "@/components/app/atoms/row-action";
 import { SpanRuler } from "@/components/app/atoms/span-ruler";
 import { YearAge } from "@/components/app/atoms/year-age";
@@ -399,7 +400,7 @@ function MonthLedger({ book, onYear, year }: LedgerProps): JSX.Element {
   });
   const inYear = points.filter((point) => point.year === year);
   return (
-    <div className="grid gap-3 rounded-md bg-muted/50 p-3">
+    <Panel variant="subtle">
       <div className="flex items-center justify-between gap-3">
         <span aria-live="polite" className="text-sm text-muted-foreground">
           {[
@@ -475,7 +476,7 @@ function MonthLedger({ book, onYear, year }: LedgerProps): JSX.Element {
           uncovered={inYear.reduce((sum, point) => sum + point.uncovered, 0)}
         />
       </ul>
-    </div>
+    </Panel>
   );
 }
 
