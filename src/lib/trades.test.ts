@@ -112,7 +112,7 @@ describe("ladderOf", () => {
 
   it("recommends the last rung whose smallest trade is at least the minimum, or no trade where none is", () => {
     expect(ladderOf(targets, 2000).recommended.count).toBe(2);
-    expect(ladderOf(targets, 2000, 500).recommended.count).toBe(1);
+    expect(ladderOf(targets, 2000, { minimum: 500 }).recommended.count).toBe(1);
     expect(minimumTrade).toBe(100);
 
     const little = ladderOf(targets, 50);
@@ -224,6 +224,273 @@ describe("ladderOf", () => {
         }
       }
     }
+  });
+
+  // A, half the whole, holds £1,000 and B, the other half, £3,000, with
+  // nothing coming in: one trade alone can move nothing, and two sell
+  // £1,000 of B into A. With only £400 of B to sell, two move that.
+  it("sells to buy, up to the count of sales given, held to what can be sold", () => {
+    const halves = [target("A", 0.5, 1000), target("B", 0.5, 3000)];
+    const ladder = ladderOf(halves, 0, { sales: 2 });
+
+    expect(laid(ladder)).toStrictEqual([
+      [],
+      [
+        ["A", 1000],
+        ["B", -1000],
+      ],
+    ]);
+    expect(ladder.rungs.map((rung) => rung.count)).toStrictEqual([0, 2]);
+    expect(ladder.recommended.drift).toBe(0);
+    expect(laid(ladderOf(halves, 0))).toStrictEqual([[]]);
+    expect(
+      laid(
+        ladderOf(halves, 0, {
+          sales: 1,
+          sellable: ({ id }) => (id === "B" ? 400 : 0),
+        }),
+      ).at(-1),
+    ).toStrictEqual([
+      ["A", 400],
+      ["B", -400],
+    ]);
+  });
+
+  it("sells a category asking for nothing, as one being wound down", () => {
+    const ladder = ladderOf([target("A", 1, 1000), target("D", 0, 500)], 0, {
+      sales: 1,
+    });
+
+    expect(pairs(ladder.recommended.trades)).toStrictEqual([
+      ["A", 500],
+      ["D", -500],
+    ]);
+  });
+
+  // A, half the whole, holds nothing; B, a quarter, holds £1,500 but
+  // only £50 of it can be sold; C, a quarter, holds £1,300. A is £1,400
+  // short, B £800 over and C £600 over. Selling the £50 of B would
+  // leave A £1,350 short; selling the £600 C stands over, all of it
+  // that may be sold, leaves A £800 short, nearer, though B is the
+  // further over.
+  it("sells the category that brings the allocation nearest, not the one furthest over", () => {
+    const ladder = ladderOf(
+      [target("A", 0.5, 0), target("B", 0.25, 1500), target("C", 0.25, 1300)],
+      0,
+      { sales: 1, sellable: ({ id, value }) => (id === "B" ? 50 : value) },
+    );
+
+    expect(pairs(ladder.recommended.trades)).toStrictEqual([
+      ["A", 600],
+      ["C", -600],
+    ]);
+  });
+
+  // A, three fifths of £1,000, holds £200; B, three tenths, holds £250,
+  // £50 under its target; C, a tenth, holds £550, £450 over. Where only
+  // B can be sold nothing is. Where any can, C is: two trades bring A
+  // and C level £25 over target, since B stays £50 short, and three
+  // sell the £450 C stands over, and no more, into A and B.
+  it("never sells a category under its target, nor past it", () => {
+    const targets = [
+      target("A", 0.6, 200),
+      target("B", 0.3, 250),
+      target("C", 0.1, 550),
+    ];
+
+    expect(
+      laid(
+        ladderOf(targets, 0, {
+          sales: 2,
+          sellable: ({ id, value }) => (id === "B" ? value : 0),
+        }),
+      ),
+    ).toStrictEqual([[]]);
+    expect(laid(ladderOf(targets, 0, { sales: 2 }))).toStrictEqual([
+      [],
+      [
+        ["A", 425],
+        ["C", -425],
+      ],
+      [
+        ["A", 400],
+        ["B", 50],
+        ["C", -450],
+      ],
+    ]);
+  });
+
+  // A, half the whole, holds £1,000, B a quarter of it £1,500 and C a
+  // quarter £950, with nothing coming in: A is £725 short, B £637.50
+  // over and C £87.50 over. Two trades sell the £637 B stands over into
+  // A; three bring all three to target, but sell only £87 of C.
+  it("recommends as many sales as are each worth placing", () => {
+    const ladder = ladderOf(
+      [target("A", 0.5, 1000), target("B", 0.25, 1500), target("C", 0.25, 950)],
+      0,
+      { sales: 2 },
+    );
+
+    expect(laid(ladder)).toStrictEqual([
+      [],
+      [
+        ["A", 637],
+        ["B", -637],
+      ],
+      [
+        ["A", 724],
+        ["B", -637],
+        ["C", -87],
+      ],
+    ]);
+    expect(ladder.recommended.count).toBe(2);
+  });
+
+  // The claim the sales rest on, checked against every way of buying,
+  // selling and leaving each category on allocations drawn at random,
+  // with a random share of each category sellable, and no more of one
+  // than it stands over its target, the trades on each
+  // way found by halving rather than as the ladder finds them. With no
+  // minimum, each rung's choice is the way of least squared gap for its
+  // count, and the rung recommended the way of least of all. With a
+  // minimum high enough to bind, and the ways held to buying the
+  // categories most short, as the ladder holds its choices, each rung's
+  // is the way of least squared gap for its count of those each worth
+  // placing, or of all where none is, and the rung recommended the way
+  // of least of every count's worth placing. Each rung's trades are the
+  // way's to within the pounds rounding moves.
+  it("buys and sells the categories every other choice of so many would leave further off target", () => {
+    let seed = 11;
+    const drawn = (): number => {
+      seed = (seed * 48_271) % 2_147_483_647;
+      return seed / 2_147_483_647;
+    };
+    const sales = 2;
+    const minimum = 2000;
+    for (let instance = 0; instance < 12; instance++) {
+      const weights = Array.from({ length: 5 }, () => drawn() + 0.1);
+      const whole = weights.reduce((sum, weight) => sum + weight, 0);
+      const targets = weights.map((weight, at) =>
+        target(String(at), weight / whole, Math.round(drawn() * 100_000)),
+      );
+      const caps = targets.map(({ value }) => Math.round(value * drawn()));
+      const amount = Math.round(drawn() * 20_000);
+      const total = targets.reduce((sum, { value }) => sum + value, 0) + amount;
+      const shorts = targets.map(({ share, value }) => share * total - value);
+      const mostShort = shorts
+        .map((short, place) => ({ place, short }))
+        .toSorted((one, other) => other.short - one.short)
+        .map(({ place }) => place);
+      const ways = Array.from({ length: 3 ** targets.length }, (_, way) =>
+        targets.map((_target, place) => Math.floor(way / 3 ** place) % 3),
+      )
+        .filter(
+          (way) =>
+            way.filter((role) => role === 2).length <= sales && way.includes(1),
+        )
+        .map((way) => {
+          const traded = (level: number): readonly number[] =>
+            shorts.map((short, place) => {
+              const least =
+                way[place] === 2
+                  ? -Math.min(caps[place] ?? 0, Math.max(0, -short))
+                  : 0;
+              const most = way[place] === 1 ? Infinity : 0;
+              return Math.min(most, Math.max(least, short - level));
+            });
+          let low = -1e9;
+          let high = 1e9;
+          for (let step = 0; step < 200; step++) {
+            const level = (low + high) / 2;
+            const sum = traded(level).reduce((all, each) => all + each, 0);
+            if (sum > amount) {
+              low = level;
+            } else {
+              high = level;
+            }
+          }
+          const trades = traded(high);
+          const moved = trades.filter((_each, place) => way[place] !== 0);
+          const bought = way.filter((role) => role === 1).length;
+          return {
+            count: moved.length,
+            gap: shorts.reduce(
+              (sum, short, place) => sum + (short - (trades[place] ?? 0)) ** 2,
+              0,
+            ),
+            isEach: moved.every((each) => Math.trunc(each) !== 0),
+            isMostShort: mostShort
+              .slice(0, bought)
+              .every((place) => way[place] === 1),
+            isWorth: moved.every((each) => Math.abs(each) >= minimum),
+            trades,
+            way,
+          };
+        })
+        .filter(({ isEach }) => isEach)
+        .toSorted((one, other) => one.gap - other.gap);
+      const same = (
+        rung: Rung,
+        best: (typeof ways)[number] | undefined,
+      ): void => {
+        expect(best).toBeDefined();
+        for (const { category, pounds } of rung.trades) {
+          const place = Number(category.id);
+
+          expect(best?.way[place]).toBe(pounds > 0 ? 1 : 2);
+          expect(
+            Math.abs(pounds - (best?.trades[place] ?? 0)),
+          ).toBeLessThanOrEqual(rung.count);
+        }
+      };
+      const sellable = ({ id }: Target): number => caps[Number(id)] ?? 0;
+      const free = ladderOf(targets, amount, { minimum: 0, sales, sellable });
+      for (const rung of free.rungs.slice(1)) {
+        same(
+          rung,
+          ways.find(({ count }) => count === rung.count),
+        );
+      }
+      same(free.recommended, ways[0]);
+      const held = ladderOf(targets, amount, { minimum, sales, sellable });
+      const ladderWays = ways.filter(({ isMostShort }) => isMostShort);
+      for (const rung of held.rungs.slice(1)) {
+        const counted = ladderWays.filter(({ count }) => count === rung.count);
+        same(rung, counted.find(({ isWorth }) => isWorth) ?? counted[0]);
+      }
+      same(
+        held.recommended,
+        ladderWays.find(({ isWorth }) => isWorth),
+      );
+    }
+  });
+
+  // A, B and C, each 20.11% of £1,000 and holding £200, are £1.10
+  // short; D and E, each 19.835% and holding £200, are £1.65 over, with
+  // nothing coming in. Five trades bring all five level, a pound bought
+  // into each of A, B and C and a pound sold of D and E, which leaves a
+  // pound over the pounds to take back off A, buying it nothing; so
+  // only two trades and four make a rung.
+  it("makes no choice whose odd pounds would take its largest purchase to nothing", () => {
+    const ladder = ladderOf(
+      [
+        target("A", 0.2011, 200),
+        target("B", 0.2011, 200),
+        target("C", 0.2011, 200),
+        target("D", 0.198_35, 200),
+        target("E", 0.198_35, 200),
+      ],
+      0,
+      { minimum: 0, sales: 2 },
+    );
+
+    expect(ladder.rungs.map((rung) => rung.count)).toStrictEqual([0, 2, 4]);
+    expect(laid(ladder).at(-1)).toStrictEqual([
+      ["A", 1],
+      ["B", 1],
+      ["D", -1],
+      ["E", -1],
+    ]);
   });
 
   it("names the recommended rung among the rungs", () => {
