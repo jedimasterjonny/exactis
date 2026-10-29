@@ -110,15 +110,22 @@ const condition = z
 // condition: one reached at an age falls in a year the plan says, and
 // one reached when conditions hold in a year the futures say, and a
 // milestone is the one or the other. Retirement is a milestone, and is
-// reached on the same.
-const conditions = z
-  .array(condition)
-  .min(1, "A milestone holds a condition")
-  .refine(
-    (held) =>
-      held.length === 1 || held.every(({ measure }) => measure !== "age"),
-    "An age is a milestone's only condition",
-  );
+// reached on the same, save for the age it may come by, below.
+const reachedOn = z.array(condition).min(1, "A milestone holds a condition");
+const conditions = reachedOn.refine(
+  (held) => held.length === 1 || held.every(({ measure }) => measure !== "age"),
+  "An age is a milestone's only condition",
+);
+
+// What a retirement is reached on: what a milestone is, save that an
+// age may stand beside conditions on the sums, as the age it comes by
+// whatever they do, under Retirement on conditions. It holds one age at
+// most, and last: alone for a retirement at an age, or after the sums
+// for one that comes by it.
+export const retirementConditions = reachedOn.refine(
+  (held) => held.slice(0, -1).every(({ measure }) => measure !== "age"),
+  "A retirement holds one age at most, after its conditions",
+);
 
 // What a milestone holds: the name, and what it is reached on.
 export const milestoneValues = { conditions, name: named };
@@ -131,7 +138,7 @@ export const milestoneValues = { conditions, name: named };
 // until they are typed, so a household kept before there were any reads
 // as it was, the tax year they run through, by the year it opens in and
 // one a plan's dates fall in, absent for years taken as they stand, and
-// what they retire on, as a milestone is reached, an age
+// what they retire on, as a retirement is reached, an age
 // being whole years and nothing or more and their own, or Retirement,
 // for an owner retiring with the plan's owner. Who may retire on what,
 // and that the first listed owner retires no later than the plan ends, are
@@ -150,7 +157,7 @@ export const ownerValues = {
     .max(mostQualifyingYears)
     .exactOptional(),
   retirement: z
-    .union([z.literal("retirement"), conditions])
+    .union([z.literal("retirement"), retirementConditions])
     .refine(
       (held) =>
         held === "retirement" || held.every(({ whose }) => whose === undefined),

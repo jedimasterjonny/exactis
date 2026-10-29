@@ -34,7 +34,7 @@ import {
 } from "@/data/accounts";
 import { derivedSet, openingDeductions, sleeves, spreadOf } from "@/data/cma";
 import { incomeKinds } from "@/data/income";
-import { ageOf, moving, retiresOn, timed } from "@/data/milestones";
+import { ageOf, moving, retiresBy, retiresOn, timed } from "@/data/milestones";
 import { openingOwner } from "@/data/owners";
 import {
   ageIn,
@@ -905,7 +905,8 @@ const idsBelow = 1_000_000;
 // The household as the store may keep it: its records sound on their
 // own, the end age the plan action holds it to, the first listed owner
 // retiring no later than it, since the plan is theirs and the chart can
-// mark a retirement only within it, every record's id below the one the
+// mark a retirement only within it, and retiring by an age before it,
+// under Retirement on conditions, every record's id below the one the
 // next is given and held by no other record, owner, child, account,
 // milestone or line, since a line the household lays for a record
 // takes that record's id, as the line paying a move's mortgage takes its loan's,
@@ -956,6 +957,10 @@ const kept = z
       (ageOf({ conditions: owner?.retirement ?? [] }) ?? 0) <= ages.ends,
     "A plan's owner retires no later than it ends",
   )
+  .refine(({ ages, owners }) => {
+    const by = retiresBy({ owners });
+    return by === undefined || by < ages.ends;
+  }, "A plan's owner retires by an age before it ends")
   .refine(
     (kept) => recordsIn(kept).every((record) => record.id < kept.next),
     "A record's id is below the one the next record is given",

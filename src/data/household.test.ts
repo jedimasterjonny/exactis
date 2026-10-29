@@ -1496,6 +1496,44 @@ describe("soundKept", () => {
     ).toThrow(/^A record's id is held by no other record$/);
   });
 
+  // Twenty-five years of expenses, or by 60, within a plan to 91: the
+  // plan's owner's alone, by one age, after the sums, and by none at or
+  // past the plan's end, where a retirement at 91 is sound. A milestone
+  // still holds an age alone, as the rules above say.
+  it("keeps the plan's owner retiring on conditions or by an age, refusing two ages, one first, one at the plan's end and anyone else retiring so, in the rules' words", () => {
+    const retirement = [
+      { measure: "liquid", of: "expenses", times: 25 },
+      ...atAge(60),
+    ] as const;
+    const retiringOn = (conditions: Owner["retirement"]): Kept => ({
+      ...kept,
+      owners: [{ ...owners[0], retirement: conditions }],
+    });
+
+    expect(
+      soundKept(retiringOn(retirement)).household.plan.owners[0]?.retirement,
+    ).toStrictEqual(retirement);
+    expect(
+      soundKept(retiringOn(atAge(91))).household.plan.owners[0]?.retirement,
+    ).toStrictEqual(atAge(91));
+    expect(() => soundKept(retiringOn([...retirement, ...atAge(61)]))).toThrow(
+      /^A retirement holds one age at most, after its conditions$/,
+    );
+    expect(() => soundKept(retiringOn([...atAge(60), retirement[0]]))).toThrow(
+      /^A retirement holds one age at most, after its conditions$/,
+    );
+    expect(() => soundKept(retiringOn([retirement[0], ...atAge(91)]))).toThrow(
+      /^A plan's owner retires by an age before it ends$/,
+    );
+    expect(() =>
+      soundKept({
+        ...kept,
+        next: 21,
+        owners: [...owners, { ...sam, id: 20, retirement }],
+      }),
+    ).toThrow(/^Only the plan's owner retires when conditions hold$/);
+  });
+
   // The first listed owner's retirement is the plan's; a second owner
   // retires when they like.
   it("refuses ages the plan action refuses, in its words", () => {

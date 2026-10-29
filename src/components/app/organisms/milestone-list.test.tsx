@@ -224,6 +224,31 @@ describe("MilestoneList", () => {
     ).toBeChecked();
   });
 
+  // Retiring on twenty-five years of expenses, or by 60, laid out at
+  // 52, where the plan at its own rates reaches them: the row says the
+  // age they come by last, as that, and opens on both.
+  it("lists retirement on conditions or by an age, saying the age it comes by, and opens on both", () => {
+    renderList([], tied, {
+      onConditions: [
+        { measure: "liquid", of: "expenses", times: 25 },
+        ...atAge(60),
+      ],
+      plan: retiringAt(retiring, 52),
+    });
+
+    expect(
+      screen.getAllByText(
+        "Liquid net worth ≥ 25 years of expenses · Or by age 60 · Ends Salary, Salary step-up and Household",
+      ),
+    ).toHaveLength(2);
+
+    openRow("Retirement");
+
+    expect(
+      screen.getByRole("radio", { name: "When conditions hold, or by an age" }),
+    ).toBeChecked();
+  });
+
   it("draws no pin or year for retirement on conditions the plan never reaches", () => {
     renderList(
       [],

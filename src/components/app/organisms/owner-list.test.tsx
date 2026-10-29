@@ -198,6 +198,27 @@ describe("OwnerList", () => {
     });
   });
 
+  // Retiring on twenty-five years of expenses, or by 60.
+  it("says the age an owner retiring when conditions hold retires by", () => {
+    renderList([
+      {
+        ...me,
+        retirement: [
+          { measure: "liquid", of: "expenses", times: 25 },
+          ...atAge(60),
+        ],
+      },
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Me" }));
+
+    expect(
+      within(screen.getByRole("dialog", { name: "Me" })).getByRole("paragraph"),
+    ).toHaveTextContent(
+      "Retires when conditions hold, or by age 60, set among the milestones on Income & expenses",
+    );
+  });
+
   // Sam is not the plan's owner, so may retire with them; Me is, and is
   // offered no such choice.
   it("lets anyone but the plan's owner retire with them, offering no age, and saves the tie", async () => {

@@ -166,9 +166,18 @@ export function conditionOf({ measure, of, times }: Condition): string {
 
 // A milestone's conditions in words, each as conditionOf says it, "Net
 // worth ≥ £1,000,000 · Liquid net worth ≥ 10 times the debt", as a row,
-// a toast and the dashboard say them.
+// a toast and the dashboard say them, and an age standing beside them as
+// the age a retirement on them comes by, "Or by age 60", under
+// Retirement on conditions. A milestone reached at an age is said by its
+// year instead.
 export function conditionsOf(conditions: readonly Condition[]): string {
-  return conditions.map(conditionOf).join(" · ");
+  return conditions
+    .map((condition) =>
+      condition.measure === "age" && conditions.length > 1
+        ? `Or by age ${String(condition.times)}`
+        : conditionOf(condition),
+    )
+    .join(" · ");
 }
 
 // Whether the milestone is reached at the age of whoever the id names.
@@ -271,6 +280,13 @@ export function retirementYearOf(owner: Owner, plan: Plan): number {
     throw new Error(rules.retiresAtAge);
   }
   return retirementYear(plan);
+}
+
+// The age the plan's owner retiring on conditions retires by, whatever
+// the conditions do, where an age is held beside them, or none, under
+// Retirement on conditions.
+export function retiresBy(plan: Pick<Plan, "owners">): number | undefined {
+  return retiresOn(plan)?.find(({ measure }) => measure === "age")?.times;
 }
 
 // What the plan's owner retires on, where it is conditions, the age
