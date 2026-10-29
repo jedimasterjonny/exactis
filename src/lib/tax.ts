@@ -155,6 +155,20 @@ const taxFreeShare = 0.25;
 // forcing it rather than a way the plan may count on.
 const unauthorisedCharge = 0.55;
 
+// Where each band charged at no more than the basic rate ends over a
+// stretch of the year, from the bottom: the top of the personal
+// allowance and of the basic rate band, each as the stretch's share of
+// the year's figure.
+export function bandTopsOn(stretch: Stretch): readonly number[] {
+  checkCharge(stretch);
+  return incomeTax.flatMap(({ rate }, index) => {
+    const next = incomeTax[index + 1];
+    return next === undefined || rate > basicRate
+      ? []
+      : [next.from * shareOf(stretch)];
+  });
+}
+
 // The draw that leaves `net` once it is taxed, grossed up through the
 // bands from where the income below it stands, or by the charge alone
 // before the pension age.
@@ -188,6 +202,17 @@ export function drawOf(gross: number, standing: Standing): Draw {
   const tax =
     incomeTaxOn(below + taxable, standing) - incomeTaxOn(below, standing);
   return { gross, net: gross - tax, taxable, taxFree };
+}
+
+// The draw that adds `room` to what is taxed as income, and nothing for
+// room at or below nothing: a third more than the room while the lump
+// sum `allowance` lasts, since a quarter of the draw is free, and a
+// pound for a pound past where it runs out.
+export function grossFilling(room: number, allowance: number): number {
+  const taxed = Math.max(0, room);
+  return (
+    taxed + Math.min(allowance, (taxed * taxFreeShare) / (1 - taxFreeShare))
+  );
 }
 
 // The income tax on what a stretch of the year earned, which is

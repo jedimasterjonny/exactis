@@ -25,8 +25,10 @@ import { clearsIn, paymentOf } from "@/lib/loans";
 import { isOnOrBefore, monthAfter } from "@/lib/months";
 import {
   april,
+  bandTopsOn,
   drawFor,
   drawOf,
+  grossFilling,
   incomeTaxOn,
   insuranceOn,
   keptOf,
@@ -154,13 +156,17 @@ type Borrowing = NonNullable<Move["mortgage"]> & { readonly loan: Account };
 // that the tax is charged on, which a draw on a pension of theirs is
 // taxed on top of; the month itself and the plan, which say whether
 // the month falls before the pension's owner's pension age, when it is
-// drawn only early; and how far the bands have risen by its tax year.
+// drawn only early; each owner's tax year before the month, by id, an
+// owner not yet entered in it having none, which a drawdown filling the
+// bands measures their room by; and how far the bands have risen by its
+// tax year.
 interface Drawing {
   readonly allowances: ReadonlyMap<number, number>;
   readonly at: Month;
   readonly drawn: ReadonlySet<number>;
   readonly earned: readonly Earned[];
   readonly plan: Plan;
+  readonly taxYears: ReadonlyMap<number, TaxYear>;
   readonly uprating: number;
 }
 
@@ -213,15 +219,35 @@ const drawOrder: readonly AccountKind[] = [
   "tax-deferred",
 ];
 
-// The order each drawdown draws the kinds in, as The draw in README.md
-// beside this file gives the reasons for: the savings first, as above;
-// the pension after the GIA and before the ISA; and the pension first,
-// ahead of the cash.
-const drawOrders: Readonly<Record<Drawdown, readonly AccountKind[]>> = {
-  "pension-before-isa": ["cash", "taxable", "tax-deferred", "tax-free"],
-  "pension-first": ["tax-deferred", "cash", "taxable", "tax-free"],
-  "savings-first": drawOrder,
+// The steps each drawdown draws a short month in, as The draw in
+// README.md beside this file gives the reasons for: how many of the
+// bands bandTopsOn gives, from the bottom, it fills from the pensions
+// first, and the order it then draws the kinds in. The savings first
+// fills none and draws as above; the pension before the ISA draws the
+// pension after the GIA; the pension first draws it ahead of the cash;
+// and the pension to the basic rate band fills the personal allowance
+// and the basic rate band and then draws the savings first.
+const drawdownSteps: Readonly<
+  Record<
+    Drawdown,
+    { readonly bands: number; readonly order: readonly AccountKind[] }
+  >
+> = {
+  "pension-before-isa": {
+    bands: 0,
+    order: ["cash", "taxable", "tax-deferred", "tax-free"],
+  },
+  "pension-first": {
+    bands: 0,
+    order: ["tax-deferred", "cash", "taxable", "tax-free"],
+  },
+  "pension-to-basic-rate": { bands: 2, order: drawOrder },
+  "savings-first": { bands: 0, order: drawOrder },
 };
+
+// The least room a band may have left and be filled from a pension, as
+// The draw in README.md beside this file has it: a penny.
+const penny = 0.01;
 
 // A tax year the plan holds no months of yet: an owner's as April opens,
 // and one the plan has not entered.
@@ -649,6 +675,7 @@ export function project(
           drawn,
           earned: flow.earned,
           plan: carried.plan,
+          taxYears,
           uprating: stretch.uprating,
         });
         const risen = pricesIn(plan, at);
@@ -797,24 +824,31 @@ function carried(balance: number, paid: number, rate: number): number {
 }
 
 // From the savings, the month's shortfall in its two parts, what each
-// owner's lump sum allowance has left, who has drawn as income and what
-// each owner is already taxed on this month: what the shortfall takes
-// out of the savings, and what is left of it after them, with what is
-// left of each owner's lump sum allowance, the owners who have now drawn
-// on a pension as income, what each owner is taxed on once the draws on
-// their pensions are counted, and what it drew from a pension early.
-// The spending comes first, its kinds in the order the plan's drawdown
-// names and then a last pass for the pensions before their owner's
-// pension age, the accounts of a kind in the order listed, each drawn to
-// nothing and no lower. A pension's draw is grossed up for its tax, or
-// for the charge on an early one. What keeping the pensions paid adds
-// comes after, out of the cash, the GIAs and the ISAs alone. What the
-// last of them leaves is uncovered. The rules, and why, are under The
-// draw in README.md beside this file.
+// owner's lump sum allowance has left, who has drawn as income, what
+// each owner is already taxed on this month and their tax year before
+// it: what the shortfall takes out of the savings, and what is left of
+// it after them, with what is left of each owner's lump sum allowance,
+// the owners who have now drawn on a pension as income, what each owner
+// is taxed on once the draws on their pensions are counted, and what it
+// drew from a pension early. The spending comes first. Under a drawdown
+// filling the bands, each band it fills is filled in turn from the
+// pensions drawable as income, the owner taxed on least over the tax
+// year so far first, to the penny, a tie in the order the plan lists
+// them, and each owner's pensions in the order listed, each drawn as
+// far as the room left in the band, what it holds or what the month is
+// still short, whichever is the least, and none for room of less than a
+// penny or once the month is covered. Then its kinds in the order the
+// plan's drawdown names and a last pass for the pensions before their
+// owner's pension age, the accounts of a kind in the order listed, each
+// drawn to nothing and no lower. A pension's draw is grossed up for its
+// tax, or for the charge on an early one. What keeping the pensions
+// paid adds comes after, out of the cash, the GIAs and the ISAs alone.
+// What the last of them leaves is uncovered. The rules, and why, are
+// under The draw in README.md beside this file.
 function drawnFrom(
   held: readonly Held[],
   { kept, spending }: { readonly kept: number; readonly spending: number },
-  { allowances, at, drawn, earned, plan, uprating }: Drawing,
+  { allowances, at, drawn, earned, plan, taxYears, uprating }: Drawing,
 ): {
   readonly allowances: ReadonlyMap<number, number>;
   readonly below: ReadonlyMap<number, number>;
@@ -834,9 +868,9 @@ function drawnFrom(
   const isEarly = (account: Account): boolean =>
     isBeforePensionAge(ageIn(at.year, holderOf(account, plan)), at);
   // A pension's draw for what the month is still short, grossed up for
-  // its tax or the charge and held to what it holds, counted against its
-  // owner's lump sum allowance and income.
-  const drawnOn = ({ account, balance }: Held): Held => {
+  // its tax or the charge and held to what it holds and to the most
+  // given, counted against its owner's lump sum allowance and income.
+  const drawnOn = ({ account, balance }: Held, most: number): Held => {
     const owner = holderOf(account, plan);
     const taxed = {
       allowance: allowanceOf.get(owner.id) ?? lumpSumAllowance,
@@ -846,7 +880,8 @@ function drawnFrom(
       uprating,
     };
     const wanted = drawFor(left, taxed);
-    const draw = wanted.gross <= balance ? wanted : drawOf(balance, taxed);
+    const gross = Math.min(balance, most);
+    const draw = wanted.gross <= gross ? wanted : drawOf(gross, taxed);
     left = draw === wanted ? 0 : Math.max(0, left - draw.net);
     early += taxed.isEarly ? draw.gross : 0;
     if (!taxed.isEarly && draw.gross > 0) {
@@ -856,7 +891,44 @@ function drawnFrom(
     below.set(owner.id, taxed.below + draw.taxable);
     return { account, balance: balance - draw.gross };
   };
-  const order = drawOrders[plan.drawdown ?? "savings-first"];
+  const { bands, order } = drawdownSteps[plan.drawdown ?? "savings-first"];
+  // What an owner is taxed on over the tax year so far, this month's
+  // income and draws among it, and the room a band has for them: a
+  // month's share of it for each month of the year the plan has held,
+  // this one among them, less that.
+  const taxedOf = (id: number): number =>
+    (taxYears.get(id) ?? noMonths).taxable + (below.get(id) ?? 0);
+  const penniesOf = (id: number): number => Math.round(taxedOf(id) * 100);
+  const tops =
+    bands === 0 ? [] : bandTopsOn({ months: 1, uprating }).slice(0, bands);
+  for (const top of tops) {
+    for (const { id } of plan.owners.toSorted(
+      (first, second) => penniesOf(first.id) - penniesOf(second.id),
+    )) {
+      if (left <= 0) {
+        break;
+      }
+      const months = (taxYears.get(id) ?? noMonths).months + 1;
+      carried = carried.map((entry) => {
+        const { account } = entry;
+        if (
+          account.owner !== id ||
+          !isPension(account) ||
+          isEarly(account) ||
+          left <= 0
+        ) {
+          return entry;
+        }
+        const room = top * months - taxedOf(id);
+        return room < penny
+          ? entry
+          : drawnOn(
+              entry,
+              grossFilling(room, allowanceOf.get(id) ?? lumpSumAllowance),
+            );
+      });
+    }
+  }
   for (const [pass, kind] of [...order, "tax-deferred" as const].entries()) {
     const isEarlyPass = pass === order.length;
     carried = carried.map((entry) => {
@@ -867,7 +939,9 @@ function drawnFrom(
         left -= taken;
         return { account, balance: balance - taken };
       }
-      return isEarly(account) === isEarlyPass ? drawnOn(entry) : entry;
+      return isEarly(account) === isEarlyPass
+        ? drawnOn(entry, Number.POSITIVE_INFINITY)
+        : entry;
     });
   }
   left += kept;

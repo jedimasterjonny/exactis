@@ -1636,7 +1636,7 @@ describe("soundKept", () => {
     ).toStrictEqual(drawdowns);
     expect(soundKept(kept).household.plan).not.toHaveProperty("drawdown");
     expect(() => soundKept({ ...kept, drawdown: "isa-first" })).toThrow(
-      'Invalid option: expected one of "pension-before-isa"|"pension-first"|"savings-first"',
+      'Invalid option: expected one of "savings-first"|"pension-before-isa"|"pension-first"|"pension-to-basic-rate"',
     );
   });
 

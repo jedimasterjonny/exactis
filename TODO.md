@@ -26,9 +26,10 @@ are figures to add as the plan needs them.
 ## Tax
 
 What holds is under The tax on the month, The draw and What a point is worth in
-[`src/engine/README.md`](src/engine/README.md). The plan draws a shortfall in
-one of three drawdowns, and drawing the pension only as far as the basic rate
-band is a fourth not yet offered.
+[`src/engine/README.md`](src/engine/README.md). A drawdown filling the bands
+from the pensions draws no further than a month is short, so a month with money
+to spare leaves the bands unused, and nothing counts the inheritance tax on a
+pension that would make drawing past need pay.
 
 Smaller gaps sit beside it. The employer's NI is credited at the full rate on
 the whole sacrifice, ignoring the threshold and what the scheme passes on, and

@@ -2,8 +2,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  bandTopsOn,
   drawFor,
   drawOf,
+  grossFilling,
   incomeTaxOn,
   insuranceOn,
   isWithinAllowance,
@@ -175,6 +177,39 @@ describe("drawFor", () => {
   });
 });
 
+describe("grossFilling", () => {
+  // £3,000 of room takes £4,000 while the allowance lasts, a quarter of
+  // it free; with £500 of the allowance left the free part is held to
+  // the £500, so £3,500; with none left every pound is taxed, so
+  // £3,000; and room below nothing draws nothing. Each draw drawn adds
+  // the room to what is taxed, and no more.
+  it("draws what fills the room taxed, the free quarter on top while the allowance lasts", () => {
+    expect(grossFilling(3000, lumpSumAllowance)).toBe(4000);
+    expect(grossFilling(3000, 500)).toBe(3500);
+    expect(grossFilling(3000, 0)).toBe(3000);
+    expect(grossFilling(-5, 100)).toBe(0);
+    for (const allowance of [lumpSumAllowance, 500, 0]) {
+      expect(
+        drawOf(grossFilling(3000, allowance), { ...alone, allowance }).taxable,
+      ).toBe(3000);
+    }
+  });
+});
+
+describe("bandTopsOn", () => {
+  // A whole year at the figures as they stand tops the allowance at
+  // £12,570 and the basic rate band at £50,270; a month of bands risen
+  // by 21% meets a twelfth of each, risen, £1,267.475 and £5,068.89.
+  it("gives the tops of the allowance and the basic rate band as the stretch's share of them", () => {
+    expect(bandTopsOn(wholeYear)).toStrictEqual([12570, 50270]);
+
+    const [allowance, basic] = bandTopsOn({ months: 1, uprating: 1.21 });
+
+    expect(allowance).toBeCloseTo((12570 * 1.21) / 12, 10);
+    expect(basic).toBeCloseTo((50270 * 1.21) / 12, 10);
+  });
+});
+
 describe("incomeTaxOn", () => {
   // Nothing on the allowance; £36,000 is 20% on the £23,430 above it;
   // £50,270 fills the basic rate band, £7,540; £100,000 is that and 40%
@@ -282,6 +317,9 @@ describe("refusing a charge", () => {
       expect(() =>
         insuranceOn("pension", 1000, { months, uprating: 1 }),
       ).toThrow("A tax year holds one to twelve months");
+      expect(() => bandTopsOn({ months, uprating: 1 })).toThrow(
+        "A tax year holds one to twelve months",
+      );
     }
   });
 
@@ -300,6 +338,9 @@ describe("refusing a charge", () => {
         "The bands rise by a multiple above nothing",
       );
       expect(() => drawOf(1000, { ...alone, uprating })).toThrow(
+        "The bands rise by a multiple above nothing",
+      );
+      expect(() => bandTopsOn({ months: 12, uprating })).toThrow(
         "The bands rise by a multiple above nothing",
       );
     }
