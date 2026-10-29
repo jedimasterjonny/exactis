@@ -1,4 +1,6 @@
-import type { JSX, ReactNode } from "react";
+"use client";
+
+import type { CSSProperties, JSX, ReactNode } from "react";
 
 import {
   Tabs,
@@ -11,6 +13,21 @@ interface ScreenTabsProps {
   readonly open?: string | undefined;
   readonly tabs: readonly [Tab, ...Tab[]];
 }
+
+// A panel not open: laid out at the width of the one open but at no
+// height, out of the flow, and unseen. Base UI hides it with the hidden
+// attribute, which the stylesheet makes display: none, and a chart sized
+// to a box it was not given measured nothing there, warned, and drew a
+// frame late when its tab was opened. Unseen, it keeps its box and
+// stays out of the accessibility tree and, with Base UI's inert, out of
+// the tab order.
+const unseen: CSSProperties = {
+  height: 0,
+  insetInline: 0,
+  overflow: "hidden",
+  position: "absolute",
+  visibility: "hidden",
+};
 
 // A tab of a screen: what it is called, and the regions it holds.
 interface Tab {
@@ -38,7 +55,7 @@ export function ScreenTabs({ open, tabs }: ScreenTabsProps): JSX.Element {
       ({ label }) => label.toLowerCase().replaceAll(" ", "-") === open,
     ) ?? tabs[0];
   return (
-    <Tabs className="gap-5" defaultValue={opening.label}>
+    <Tabs className="relative gap-5" defaultValue={opening.label}>
       <TabsList>
         {tabs.map(({ label }) => (
           <TabsTrigger key={label} value={label}>
@@ -49,8 +66,10 @@ export function ScreenTabs({ open, tabs }: ScreenTabsProps): JSX.Element {
       {tabs.map(({ children, label }) => (
         <TabsContent
           className="grid gap-5 rounded-xl focus-visible:ring-3 focus-visible:ring-ring/50"
+          hidden={false}
           keepMounted
           key={label}
+          style={({ hidden: isHidden }) => (isHidden ? unseen : undefined)}
           value={label}
         >
           {children}
