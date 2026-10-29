@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { commit } from "@/test/dom";
 
 import {
+  CountField,
   MoneyField,
   MultipleField,
   RateField,
@@ -11,9 +12,16 @@ import {
   YearsInput,
 } from "./figure-field";
 
-// What tells the four apart: how each writes a figure, how far a key
+// What tells the five apart: how each writes a figure, how far a key
 // steps it and then with shift, and how a typed one is read.
 const presets = [
+  {
+    figure: 6,
+    preset: CountField,
+    shown: "6",
+    stepped: ["7", "2"],
+    typed: ["2.6", 3, "3"],
+  },
   {
     figure: 391640,
     preset: MoneyField,

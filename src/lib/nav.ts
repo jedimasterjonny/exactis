@@ -79,7 +79,7 @@ export const cogitator: Screen = {
 // dashboard, the two readings of where the plan goes, ahead of the
 // screens it is read from. The cogitator closes the list: it is read
 // from the target allocation at the end of the assumptions, and says
-// what to buy next rather than what the plan rests on.
+// what to buy and sell next rather than what the plan rests on.
 export const screens: readonly Screen[] = [
   dashboard,
   chance,
