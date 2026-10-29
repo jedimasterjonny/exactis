@@ -108,10 +108,10 @@ const factors: ReadonlyMap<string, number> = new Map([
   ["GBX", 0.01],
 ]);
 
-// What a transaction of each type does to what is held of its
-// security: a purchase or a delivery in adds its shares, a sale or a
-// delivery out takes them off, and the rest, a dividend or a fee,
-// moves none, so is not listed.
+// What a transaction of each type does to what its securities account
+// holds of its security: a purchase or a delivery in adds its shares, a
+// sale or a delivery out takes them off, and the rest, a dividend or a
+// fee, moves none, so is not listed.
 const signs: ReadonlyMap<number, -1 | 1> = new Map([
   [0, 1],
   [1, -1],
@@ -119,17 +119,25 @@ const signs: ReadonlyMap<number, -1 | 1> = new Map([
   [3, -1],
 ]);
 
+// The type of a transaction moving shares from one securities account
+// to another, which Portfolio Performance writes once, from the account
+// it names to the other it names.
+const transfer = 4;
+
 // The fields read, by their numbers in Portfolio Performance's
-// client.proto: the client's securities, transactions and taxonomies,
-// a security's id, name, currency and prices, a price's close, a
-// transaction's type, date, currency, shares, security and units, a
-// timestamp's seconds, a unit's amount and the same in the currency
-// it was carried from, a taxonomy's name and classes, what a class
-// holds, and a holding's vehicle and weight.
+// client.proto: the client's securities, securities accounts,
+// transactions and taxonomies, a security's id, name, currency and
+// prices, a securities account's id and name, a price's close, a
+// transaction's type, date, currency, shares, security, units,
+// securities account and the other it moves shares to, a timestamp's
+// seconds, a unit's amount and the same in the currency it was carried
+// from, a taxonomy's name and classes, what a class holds, and a
+// holding's vehicle and weight.
 const fields = {
   assignment: { vehicle: 1, weight: 2 },
   class: { assignments: 9, id: 1, name: 3, parent: 2, rank: 7, weight: 6 },
-  client: { securities: 2, taxonomies: 8, transactions: 5 },
+  client: { portfolios: 4, securities: 2, taxonomies: 8, transactions: 5 },
+  portfolio: { id: 1, name: 2 },
   price: { close: 2 },
   security: { currency: 4, id: 1, name: 3, prices: 13 },
   taxonomy: { classes: 5, name: 2 },
@@ -137,6 +145,8 @@ const fields = {
   transaction: {
     currency: 10,
     date: 9,
+    otherPortfolio: 6,
+    portfolio: 4,
     security: 14,
     shares: 12,
     type: 2,
@@ -149,16 +159,19 @@ const fields = {
 // Asset Allocation taxonomy, and what each category of it holds. The
 // file is the one Portfolio Performance saves in binary: a zip holding
 // one part, the protobuf of the whole client behind a signature. The
-// taxonomy is read out of it, and beside it the securities and the
-// transactions, to say what each category holds; nothing else the
-// client holds, its accounts among them, is opened. Each class with
+// taxonomy is read out of it, and beside it the securities, the
+// securities accounts and the transactions, to say what each category
+// holds, and how much of it in each securities account; nothing else
+// the client holds, its cash accounts among them, is opened. Each class with
 // none beneath it is a category, and its share of the whole is its
 // weight times the weight of every class above it, the root's aside,
 // since the root is the whole. What it holds is each security assigned
 // to it, what is held of the security summed from the transactions,
 // bought and delivered in less sold and delivered out, at the last
 // price the file holds for it, by the weight of the holding the class
-// takes, to the whole pound. A price in sterling or in pence is a
+// takes, to the whole pound; and what each securities account holds of
+// it the same way, a transfer moving shares from one account to
+// another, the accounts named as the file names them. A price in sterling or in pence is a
 // pound's worth as it is, and one in any other currency is carried
 // into pounds at the rate the file's latest transaction in pounds
 // carrying that currency was made at, which is as old as that
@@ -389,20 +402,37 @@ function securitiesOf(client: Message): ReadonlyMap<string, Security> {
   );
 }
 
-// What is held of each security, by id, summed from the transactions
-// as the signs take them, in hundred-millionths of a share as they are
-// written. A transaction on no security, a deposit or a removal, holds
-// none.
-function sharesHeld(client: Message): ReadonlyMap<string, number> {
-  const held = new Map<string, number>();
+// What each securities account holds of each security, by the
+// security's id and then the account's, summed from the transactions as
+// the signs take them, a transfer taking its shares off the account it
+// names and adding them to the other, in hundred-millionths of a share
+// as they are written. A transaction on no security, a deposit or a
+// removal, holds none, and one naming no account is held in an account
+// of no id.
+function sharesHeld(
+  client: Message,
+): ReadonlyMap<string, ReadonlyMap<string, number>> {
+  const held = new Map<string, Map<string, number>>();
+  const add = (security: string, account: string, shares: number): void => {
+    const accounts = held.get(security) ?? new Map<string, number>();
+    accounts.set(account, (accounts.get(account) ?? 0) + shares);
+    held.set(security, accounts);
+  };
   for (const transaction of messagesAt(client, fields.client.transactions)) {
     const security = textAt(transaction, fields.transaction.security);
-    const sign = signs.get(int32At(transaction, fields.transaction.type));
+    const type = int32At(transaction, fields.transaction.type);
+    const sign = signs.get(type);
+    const account = textOf(transaction, fields.transaction.portfolio);
+    const shares = int64At(transaction, fields.transaction.shares);
     if (security !== undefined && sign !== undefined) {
-      held.set(
+      add(security, account, sign * shares);
+    }
+    if (security !== undefined && type === transfer) {
+      add(security, account, -shares);
+      add(
         security,
-        (held.get(security) ?? 0) +
-          sign * int64At(transaction, fields.transaction.shares),
+        textOf(transaction, fields.transaction.otherPortfolio),
+        shares,
       );
     }
   }
@@ -415,7 +445,9 @@ function sharesHeld(client: Message): ReadonlyMap<string, number> {
 // where it sits.
 function targetsOf(
   classes: readonly Class[],
-  worth: (assignments: readonly Assignment[]) => number,
+  worth: (
+    assignments: readonly Assignment[],
+  ) => Pick<Target, "accounts" | "value">,
 ): readonly Target[] {
   const { beneath, root } = treeOf(classes);
   const categoriesOf = (
@@ -433,12 +465,12 @@ function targetsOf(
     return below.length === 0
       ? [
           {
+            ...worth(of.assignments),
             classes: above,
             id: of.id,
             isImplemented: of.assignments.length > 0,
             name: of.name,
             share: within,
-            value: worth(of.assignments),
           },
         ]
       : below.flatMap((each) =>
@@ -518,35 +550,61 @@ function weightsOf(
 }
 
 // What holdings assigned to a class come to, in whole pounds, read off
-// the client's securities and transactions: each security held, at its
-// last price in pounds, by the weight of it the class takes. A vehicle
-// the securities do not list, an account, and a security of which
+// the client's securities, securities accounts and transactions: each
+// security held, at its last price in pounds, by the weight of it the
+// class takes; and the same of what each securities account the client
+// lists holds of it, by the account's name, those of one name together,
+// an account holding nothing of the class left out. A vehicle the
+// securities do not list, a cash account, and a security of which
 // nothing is held, count for nothing; one held but priced in a currency
 // the reader has no pound for is refused by name.
 function worthOf(
   client: Message,
-): (assignments: readonly Assignment[]) => number {
+): (assignments: readonly Assignment[]) => Pick<Target, "accounts" | "value"> {
   const securities = securitiesOf(client);
   const held = sharesHeld(client);
   const pounds = poundsPer(client);
-  return (assignments) =>
-    Math.round(
-      assignments.reduce((sum, { vehicle, weight }) => {
-        // ponytail: an account assigned to a category, as a cash one
-        // is, is worth nothing here; sum its transactions when a cash
-        // target is to be bought toward.
-        const security = securities.get(vehicle);
-        const shares = (held.get(vehicle) ?? 0) / scaled;
-        if (security === undefined || shares <= 0) {
-          return sum;
-        }
-        const factor = pounds.get(security.currency);
-        if (factor === undefined) {
-          throw new Refusal(
-            `The file holds ${security.name}, priced in ${security.currency}, and no transaction in pounds gives a rate for it`,
+  const names = new Map(
+    messagesAt(client, fields.client.portfolios).map((portfolio) => [
+      textOf(portfolio, fields.portfolio.id),
+      textOf(portfolio, fields.portfolio.name),
+    ]),
+  );
+  return (assignments) => {
+    const accounts = new Map<string, number>();
+    const value = assignments.reduce((sum, { vehicle, weight }) => {
+      // ponytail: a cash account assigned to a category is worth
+      // nothing here; sum its transactions when a cash target is to be
+      // bought toward.
+      const security = securities.get(vehicle);
+      const inAccounts = held.get(vehicle) ?? new Map<string, number>();
+      const shares = sumOf([...inAccounts.values()], (each) => each) / scaled;
+      if (security === undefined || shares <= 0) {
+        return sum;
+      }
+      const factor = pounds.get(security.currency);
+      if (factor === undefined) {
+        throw new Refusal(
+          `The file holds ${security.name}, priced in ${security.currency}, and no transaction in pounds gives a rate for it`,
+        );
+      }
+      for (const [id, written] of inAccounts) {
+        const name = names.get(id);
+        if (name !== undefined && written > 0) {
+          accounts.set(
+            name,
+            (accounts.get(name) ?? 0) +
+              ((written / scaled) * security.price * factor * weight) / whole,
           );
         }
-        return sum + (shares * security.price * factor * weight) / whole;
-      }, 0),
-    );
+      }
+      return sum + (shares * security.price * factor * weight) / whole;
+    }, 0);
+    return {
+      accounts: [...accounts]
+        .map(([name, worth]) => ({ name, value: Math.round(worth) }))
+        .filter((each) => each.value > 0),
+      value: Math.round(value),
+    };
+  };
 }

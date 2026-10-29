@@ -58,8 +58,8 @@ export const reference: readonly Classed[] = [
 // A client as Portfolio Performance writes one, holding the taxonomies
 // given in order, each by its name, and around them what a real file
 // holds: its version, a security priced in sterling, its prices varints
-// wider than an int32, a purchase of a hundred of it, and the base
-// currency. For tests.
+// wider than an int32, a securities account, a purchase of a hundred of
+// the security into it, and the base currency. For tests.
 export function clientOf(
   taxonomies: readonly (readonly [string, readonly Classed[]])[],
 ): Written {
@@ -88,10 +88,18 @@ export function clientOf(
       ],
     ],
     [
+      4,
+      [
+        [1, "portfolio-1"],
+        [2, "Brokerage"],
+      ],
+    ],
+    [
       5,
       [
         [1, "transaction-1"],
         [2, 0],
+        [4, "portfolio-1"],
         [12, 10_000_000_000],
         [14, "security-1"],
       ],

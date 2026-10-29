@@ -9,8 +9,12 @@
 // to is not, however much of the whole it asks for. What it holds is
 // the securities assigned to it at the price the file last held them
 // at, in whole pounds, or nothing for a category imported before what
-// it holds was read, or whose holdings the reader does not price.
+// it holds was read, or whose holdings the reader does not price. Beside
+// it is what each securities account holds of the category the same
+// way, an account holding none of it left out; a category imported
+// before that was read carries none.
 export interface Target {
+  readonly accounts?: readonly Held[];
   readonly classes: readonly string[];
   readonly id: string;
   readonly isImplemented: boolean;
@@ -25,4 +29,11 @@ export interface Target {
 export interface Targets {
   readonly categories: readonly Target[];
   readonly importedOn: string;
+}
+
+// What a securities account holds of a category: the account's name,
+// as Portfolio Performance names it, and the whole pounds.
+interface Held {
+  readonly name: string;
+  readonly value: number;
 }
