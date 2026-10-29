@@ -9,6 +9,8 @@ import { AppSidebar } from "@/components/app/organisms/app-sidebar";
 import { AppFrame } from "@/components/app/templates/app-frame";
 import { getOpened } from "@/store/household";
 
+import { FrameCatch } from "./frame-catch";
+
 interface OpenScenarioProps {
   readonly scenario: Promise<null | Opened>;
 }
@@ -21,19 +23,25 @@ interface OpenScenarioProps {
 // from the request's cookie, so the read waits for the request behind a
 // boundary of its own that stands in nothing, and the frame and the screen
 // beneath it never wait on it: the layout starts the read and hands the
-// promise down rather than awaiting it.
+// promise down rather than awaiting it. The read sits above the screens'
+// error boundary, which catches nothing this layout throws, so a read
+// that fails is caught around the frame, which is drawn again with the
+// error screen in place of the screen and the banner both.
 export default function AppLayout({ children }: LayoutProps<"/">): JSX.Element {
+  const sidebar = <AppSidebar />;
   return (
-    <AppFrame
-      banner={
-        <Suspense fallback={null}>
-          <OpenScenario scenario={getOpened()} />
-        </Suspense>
-      }
-      sidebar={<AppSidebar />}
-    >
-      {children}
-    </AppFrame>
+    <FrameCatch sidebar={sidebar}>
+      <AppFrame
+        banner={
+          <Suspense fallback={null}>
+            <OpenScenario scenario={getOpened()} />
+          </Suspense>
+        }
+        sidebar={sidebar}
+      >
+        {children}
+      </AppFrame>
+    </FrameCatch>
   );
 }
 

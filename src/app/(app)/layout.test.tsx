@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { getOpened } from "@/store/household";
 import { stubViewport } from "@/test/dom";
 
+import { takeConsoleOutput } from "../../../vitest.setup";
 import AppLayout from "./layout";
 
 vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
@@ -26,6 +27,14 @@ const retiringEarly = Object.assign(Promise.resolve(opened), {
   status: "fulfilled",
   value: opened,
 });
+
+// A read that failed, marked the way React marks a promise it has seen
+// reject, so the layout throws at once. React reads the mark rather than
+// waiting on the promise, so its rejection is handled here.
+const refusal = new Error("The store did not answer");
+const rejected = Promise.reject(refusal);
+void rejected.catch(() => undefined);
+const failed = Object.assign(rejected, { reason: refusal, status: "rejected" });
 
 // The layout with a screen in it.
 function renderLayout(): void {
@@ -64,5 +73,26 @@ describe("AppLayout", () => {
     expect(
       within(screen.getByRole("main")).getByRole("note"),
     ).toHaveTextContent("Scenario · Retire early");
+  });
+
+  it("draws the error screen in the frame, in place of the screen and the banner, when the read of the scenario open fails", () => {
+    vi.mocked(getOpened).mockReturnValue(failed);
+
+    renderLayout();
+
+    expect(takeConsoleOutput().join("\n")).toContain(
+      "The store did not answer",
+    );
+    expect(
+      screen.getByRole("link", { name: /^Dashboard/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("This screen could not be drawn"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Try again" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Screen")).not.toBeInTheDocument();
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 });
