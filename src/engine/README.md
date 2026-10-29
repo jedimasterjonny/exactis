@@ -469,7 +469,7 @@ From month to month the run carries what a month cannot read afresh: each
 owner's lump sum allowance left, under The draw; the owners who have drawn on a
 pension as income and what has landed under each allowance since April, under
 The allowances and relief; and each owner's tax year, under The tax on the
-month.
+month, which the draw reads as well, under The draw.
 
 What no account covered is the year's uncovered shortfall, summed over its
 months and carried on the point the year's balances are read off, so the
@@ -524,14 +524,15 @@ for the month it is gone. It is drawn in two parts: first what the spending and
 the debts' payments are short of, in the order the plan's drawdown names, and
 then what keeping the pensions paid adds to it, under Pensions kept paid.
 
-The plan names one of three drawdowns, and a plan naming none draws its savings
+The plan names one of four drawdowns, and a plan naming none draws its savings
 first:
 
-| Drawdown               | Order                               |
-| ---------------------- | ----------------------------------- |
-| Savings first          | cash, the GIA, the ISA, the pension |
-| Pension before the ISA | cash, the GIA, the pension, the ISA |
-| Pension first          | the pension, cash, the GIA, the ISA |
+| Drawdown                       | Order                                                  |
+| ------------------------------ | ------------------------------------------------------ |
+| Savings first                  | cash, the GIA, the ISA, the pension                    |
+| Pension before the ISA         | cash, the GIA, the pension, the ISA                    |
+| Pension first                  | the pension, cash, the GIA, the ISA                    |
+| Pension to the basic rate band | the pension to the basic rate band, then savings first |
 
 Savings first takes cash first, since it is spent as it stands and grows least;
 then the GIA, since what it earns is taxed and what an ISA earns is not, though
@@ -545,18 +546,55 @@ listed, each giving up what it holds or what the month is still short, whichever
 is the lesser, so an account is drawn to nothing and no lower and what it could
 not cover passes to the next.
 
+Pension to the basic rate band draws the pensions first, but only into the bands
+charged at no more than the basic rate and only as far as the month is short,
+and draws what is left as savings first does. A pension drawn as income is taxed
+nothing within its owner's personal allowance and 20% within the basic rate
+band, and a year's bands left empty are lost with the year, while a pension left
+whole until the savings run out is drawn later, beside the State Pension and in
+larger sums, into the higher rates; so filling them in the years the savings are
+drawn can pay less tax over a life. Every owner's personal allowance is filled
+before any owner's basic rate band, since a pound drawn at 20% into one owner's
+band while another's allowance stands empty is a pound the household could have
+had free of tax. Within each, the owner taxed on least so far in the tax year
+goes first, read to the penny so that a residue of the arithmetic cannot break a
+tie, a tie going in the order the household lists its owners, and an owner's
+pensions are drawn in the order they are listed. What the fill draws, less its
+tax, is no more than the month is short, since the draw only takes money out and
+what it drew past need would have nowhere to land, and the reason to draw past
+it, the inheritance tax a pension is charged from April 2027, is not modelled.
+
+The room left in a band is measured over the tax year so far, as April settles
+the year, rather than as a fresh twelfth each month: the share of the band for
+the months the plan has held of the year, this one among them, less everything
+the owner has been taxed on in them, this month's income and draws included. So
+a year whose salary stopped part-way, having used the band already, fills
+nothing until the months catch it up, rather than drawing at 20% what April
+charges at 40%; and a month after one that drew less than its share catches up,
+charged as a twelfth of a year as every month is, which is too much, and
+refunded the excess in April, as a bonus month is. Income later in the tax year,
+such as a State Pension starting in January, is not foreseen, so a band filled
+before it starts is overfilled once it does, and April charges what is over. The
+room is what may be taxed, so while the owner's lump sum allowance lasts the
+draw is a third more than the room, a quarter of it being free, and a pound for
+a pound once the allowance is used up, exactly where it runs out part-way
+through a draw. Room of less than a penny is none, since a draw on a pension
+marks its owner as having drawn on one as income, which holds what is paid into
+their pensions to the money purchase allowance from then on, and the residue of
+the arithmetic, or a few pence, is no reason to.
+
 A pension is drawn as income, where its kind falls in the order, from its
 owner's pension age: from the year the owner the pension belongs to turns 55
 until the age rises in April 2028, taken from the start of that April, and from
 the year they turn 57 after it, read off each owner's own year of birth. Someone
 who is 55 or 56 when it rises can draw before it and not again until 57. Before
-its owner's pension age, under every drawdown, a pension is drawn only after
-every pension drawable as income has given up all it holds and once cash, the
-GIA and the ISA are empty, as the last thing between the month and running out,
-and at the 55% charge on a payment the rules do not allow, 45p kept of each
-pound, since the money can be had that way and at no other. A registered scheme
-will not normally make one, so the run marks such a draw rather than counting on
-it, under The run.
+its owner's pension age, under every drawdown, a pension fills no band and is
+drawn only after every pension drawable as income has given up all it holds and
+once cash, the GIA and the ISA are empty, as the last thing between the month
+and running out, and at the 55% charge on a payment the rules do not allow, 45p
+kept of each pound, since the money can be had that way and at no other. A
+registered scheme will not normally make one, so the run marks such a draw
+rather than counting on it, under The run.
 
 Cash, the GIA and the ISA give up what the month is short, a GIA charged no tax
 on what its draw realises. A pension is taxed on the way out, as its owner's

@@ -1974,6 +1974,237 @@ describe("project", () => {
   });
 });
 
+// Ada and Sam, both born in 1960 and retired at 65, so each draws a
+// pension as income and earns nothing by working in any year here,
+// drawing the pensions to the top of the basic rate band. Read in
+// December at no growth, so a run of a year carries one month, the
+// first of its tax year the plan holds, whose room is a twelfth of each
+// band: £1,047.50 of the personal allowance, which a draw of £1,396.67
+// fills with a quarter of it free, and £4,189.17 to the top of the
+// basic rate band. Each holds a SIPP of £100,000, Ada's listed first,
+// beside £10,000 of cash.
+describe("drawing the pensions to the top of the basic rate band", () => {
+  const ada: Owner = { born: 1960, id: 1, name: "Ada", retirement: atAge(65) };
+  const filling: Plan = {
+    born: 1960,
+    drawdown: "pension-to-basic-rate",
+    from: 2026,
+    inflation: 0,
+    month: 11,
+    owners: [ada, { ...ada, id: 2, name: "Sam" }],
+    rate: 0,
+    retires: 65,
+    years: 1,
+  };
+  const savings: Account = { ...pocket, balance: 10000 };
+  const adas: Account = { ...sipp, balance: 100000 };
+  const sams: Account = { ...sipp, balance: 100000, id: 8, owner: 2 };
+
+  // A line of other income, paid monthly and charged no National
+  // Insurance, to the owner given.
+  function other(owner: number, amount: number): IncomeLine {
+    return {
+      ...salary,
+      amount,
+      bonus: 0,
+      cadence: "month",
+      feeds: null,
+      kind: "other",
+      owner,
+      rsu: 0,
+      sacrifice: 0,
+    };
+  }
+
+  // The point after a run of the plan over the accounts given, spending
+  // the sum given a month beside the income given.
+  function after(
+    held: readonly Account[],
+    spent: number,
+    income: readonly IncomeLine[] = [],
+  ): ProjectionPoint | undefined {
+    return project(
+      held,
+      { expenses: [{ ...household, amount: spent }], income },
+      filling,
+    ).at(-1);
+  }
+
+  // £5,000 short with nothing coming in: Ada's SIPP fills her allowance
+  // with £1,396.67 and then the basic rate band with £4,188.89, £5,585.56
+  // in all, of which £1,396.39 is free and £4,189.17 taxed, a twelfth
+  // of £50,270. The band costs £628.33 of tax, so the SIPP leaves
+  // £4,957.22 and the cash gives the last £42.78. Drawing the pension
+  // first would have taken £5,646.67, the last £61.11 of it at 40%.
+  it("fills each band from the pension and draws the rest from the savings", () => {
+    expect(after([savings, adas], 5000)).toMatchObject({
+      allowances: { 1: 266879, 2: lumpSumAllowance },
+      balances: { 3: 9957, 7: 94414 },
+    });
+  });
+
+  // £1,000 short: the SIPP gives up the £1,000 the month is short, all
+  // of it within the allowance and taxed nothing, and draws nothing more
+  // for the room it leaves, so the cash is untouched.
+  it("draws no more than the month is short", () => {
+    expect(after([savings, adas], 1000)?.balances).toStrictEqual({
+      3: 10000,
+      7: 99000,
+    });
+  });
+
+  // £1,500 spent and £600 a month of other income to Sam, so the month
+  // is £900 short, which Ada's SIPP gives though Sam's is listed first,
+  // since she is taxed on less. With the income Ada's, Sam's SIPP gives
+  // it; with no income on either and £900 spent, Ada's, since the plan
+  // lists her first.
+  it("fills the owner taxed on least first, a tie in the order the plan lists them", () => {
+    expect(
+      after([savings, sams, adas], 1500, [other(2, 600)])?.balances,
+    ).toStrictEqual({ 3: 10000, 7: 99100, 8: 100000 });
+    expect(
+      after([savings, sams, adas], 1500, [other(1, 600)])?.balances,
+    ).toStrictEqual({ 3: 10000, 7: 100000, 8: 99100 });
+    expect(after([savings, sams, adas], 900)?.balances).toStrictEqual({
+      3: 10000,
+      7: 99100,
+      8: 100000,
+    });
+  });
+
+  // £2,800 spent and £800 a month of other income to Sam, so the month
+  // is £2,000 short. Ada's SIPP fills her allowance with £1,396.67, and
+  // Sam's fills the £247.50 left of his with £330; the two are then
+  // taxed alike, so Ada's goes first into the basic rate band and gives
+  // the last £273.33 for £321.57, £1,718.24 in all, paying £48.24 of
+  // tax. One pass, lowest income first, would take £2,106.47 out of
+  // Ada's alone and pay £106.47, Sam's allowance left unused.
+  it("fills every owner's allowance before any owner's band", () => {
+    expect(
+      after([savings, adas, sams], 2800, [other(2, 800)])?.balances,
+    ).toStrictEqual({ 3: 10000, 7: 98282, 8: 99670 });
+  });
+
+  // £101.10 a month of other income to Sam and £3,101.10 spent, so the
+  // month is £3,000 short. Ada fills her allowance with £1,396.67 and
+  // Sam the rest of his with £1,261.87, which leaves them taxed on the
+  // same £1,047.50, though the arithmetic leaves Sam's a residue under
+  // Ada's. Read to the penny it is a tie, so Ada's SIPP gives the £341.47
+  // left for £401.73, and Sam's nothing more.
+  it("reads a tie to the penny", () => {
+    expect(
+      after([savings, adas, sams], 3101.1, [other(2, 101.1)])?.balances,
+    ).toStrictEqual({ 3: 10000, 7: 98202, 8: 98738 });
+  });
+
+  // Opening in April with £8,000 a month of other income to Ada to June
+  // and £3,000 spent, against £20,000 of cash. The three months use
+  // £24,000 of the band, so July and August, with £16,756.67 and then
+  // £20,945.83 of it to the months held, have no room and draw £3,000
+  // each from the cash. September's six twelfths come to £25,135, which
+  // leaves £1,135 of room: the SIPP gives £1,513.33 for it, whose £1,135
+  // taxed is charged £17.50 against the month's own twelfth of the
+  // bands, and the cash gives the £1,504.17 left. October has a twelfth
+  // of room, more than the month needs, so it and November and December
+  // each take £3,282.94 from the SIPP, as drawing it first would.
+  it("measures the room in a band over the tax year so far", () => {
+    expect(
+      project(
+        [{ ...savings, balance: 20000 }, adas],
+        {
+          expenses: [{ ...household, amount: 3000 }],
+          income: [{ ...other(1, 8000), lastMonth: 5, lastYear: 2026 }],
+        },
+        { ...filling, month: 3 },
+      ).at(-1)?.balances,
+    ).toStrictEqual({ 3: 12496, 7: 88638 });
+  });
+
+  // An Old SIPP of £1,000 listed before the SIPP and £5,000 short: the
+  // Old SIPP gives all it holds into the allowance and the SIPP the rest
+  // of the two bands, £4,585.56, the same £5,585.56 between them as one
+  // pension gives alone.
+  it("fills a band from each of an owner's pensions in the order listed", () => {
+    expect(
+      after([savings, { ...adas, balance: 1000, id: 9 }, adas], 5000)?.balances,
+    ).toStrictEqual({ 3: 9957, 7: 95414, 9: 0 });
+  });
+
+  // Born in 1980 and retired at 45, so 2026 is the year 46 is reached,
+  // and read from January £1,000 short a month: no band is filled from
+  // the SIPP, which is drawn only once the cash and the ISA are empty,
+  // £19,555.56 of it at the charge, as under every drawdown.
+  it("fills no band from a pension before the pension age", () => {
+    const young = { ...ada, born: 1980, retirement: atAge(45) };
+
+    expect(
+      project(
+        [{ ...sipp, balance: 30000 }, { ...flatIsa, balance: 2000 }, pocket],
+        short,
+        { ...filling, born: 1980, month: 0, owners: [young], retires: 45 },
+      ).map(({ balances, early }) => ({ balances, early })),
+    ).toStrictEqual([
+      { balances: { 3: 1200, 6: 2000, 7: 30000 }, early: 19556 },
+      { balances: { 3: 0, 6: 0, 7: 10444 }, early: 0 },
+    ]);
+  });
+
+  // £800 spent and the SIPP kept paid £500, which lands as £560: the
+  // SIPP gives the £800, within the allowance, and the £500 keeping it
+  // paid comes out of the cash, so 100,000 − 800 + 560 = 99,760.
+  it("pays a pension kept paid out of the savings while the pension pays the spending", () => {
+    expect(
+      after(
+        [
+          savings,
+          {
+            ...adas,
+            contribution: { amount: 500, cadence: "month", kind: "fixed" },
+          },
+        ],
+        800,
+      )?.balances,
+    ).toStrictEqual({ 3: 9500, 7: 99760 });
+  });
+
+  // £50,269.95 a year of other income to Ada, 5p short of the top of the
+  // basic rate band, leaves her under a penny of room in each month, and
+  // from November £5,000 is spent and her SIPP is kept paid £3,000 a
+  // month, which lands as £3,060. The cash gives the £1,439.17 each month
+  // is short and the £3,000, and the SIPP none of it, so she has not
+  // drawn on a pension as income and December's £3,000 lands whole;
+  // drawing the pennies would have held it to the money purchase
+  // allowance.
+  it("fills no band from room of less than a penny", () => {
+    expect(
+      project(
+        [
+          { ...savings, balance: 20000 },
+          {
+            ...adas,
+            contribution: { amount: 3000, cadence: "month", kind: "fixed" },
+          },
+        ],
+        {
+          expenses: [{ ...household, amount: 5000 }],
+          income: [{ ...other(1, 50269.95), cadence: "year" }],
+        },
+        { ...filling, month: 10, owners: [ada] },
+      ).at(-1)?.balances,
+    ).toStrictEqual({ 3: 11122, 7: 106120 });
+  });
+
+  // £9,000 a month of other income, in the band where the allowance is
+  // withdrawn, and £8,000 spent: the income is already past the basic
+  // rate band, so there is no room and the cash gives what the month is
+  // short, the SIPP untouched.
+  it("fills nothing for an owner with no room left", () => {
+    expect(
+      after([savings, adas], 8000, [other(1, 9000)])?.balances,
+    ).toStrictEqual({ 3: 8314, 7: 100000 });
+  });
+});
+
 // A plan of ten years from 34, at no growth and no inflation, whose
 // owner retires once the cash comes to twenty-five years of what they
 // would spend retired. A salary of £120,000 leaves £6,346.45 a month
