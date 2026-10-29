@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Reading } from "@/engine/futures";
 
+import { atAge } from "@/data/milestones";
 import { owners } from "@/data/owners.fixture";
 
 import { FuturesCount } from "./futures-count";
@@ -100,6 +101,37 @@ describe("FuturesCount", () => {
       "Kept going only by drawing a pension early94% if counted as lasting−4",
       "Never retired−30",
       "Lasted to 91940",
+    ]);
+  });
+
+  // Retiring on twenty-five years of expenses, or by 60, every future
+  // retires before the plan's end, so none is counted as never retiring.
+  it("counts no future out as never retired for an owner retiring on conditions or by an age", () => {
+    render(
+      <FuturesCount
+        count={1000}
+        plan={{
+          ...plan,
+          owners: [
+            {
+              ...owners[0],
+              retirement: [
+                { measure: "liquid", of: "expenses", times: 25 },
+                ...atAge(60),
+              ],
+            },
+          ],
+        }}
+        projected={1300000}
+        reading={reading}
+      />,
+    );
+
+    expect(steps()).toStrictEqual([
+      "Futures run1,000",
+      "Ran out of moneyThe first at 71, half by 86−26",
+      "Kept going only by drawing a pension early97% if counted as lasting−4",
+      "Lasted to 91970",
     ]);
   });
 
