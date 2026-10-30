@@ -36,7 +36,7 @@ interface SpreadBarProps {
 // far share never reaches the goal runs to the last year any share
 // does and stops, with no dot past it, rather than fading to the plan's
 // end, which would read as a year. The years given to mark, the
-// milestones', are ruled across the track in faint oxide, as every
+// milestones', are ruled across the track in faint ink, as every
 // bar's are, so the median is read against retirement without looking
 // up to its pin. Decorative, since the years are written beside it:
 // hidden from the accessibility tree.

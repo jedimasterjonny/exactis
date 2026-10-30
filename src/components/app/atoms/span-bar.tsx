@@ -26,9 +26,9 @@ interface SpanBarProps {
 // ink rather than the loss red, since money going out as the plan means
 // it to is no loss, and red read every expense as one; a loan's
 // payments take the first of the debt greys, the colour a debt is drawn
-// in below nothing on the dashboard. Oxide is the milestones' alone, so
-// the rules and the dots where a line meets one stand out against any
-// fill.
+// in below nothing on the dashboard. The milestones' rules, and the
+// dots where a line meets one, are ink over the fill, so they stand out
+// against any fill.
 const fills: Record<Side, string> = {
   expense: "bg-foreground/50",
   income: "bg-chart-2 dark:bg-chart-1",
@@ -43,10 +43,10 @@ const sliver = 1.2;
 // it ends in when it ends part way through, or to the plan's end when it
 // has no last year. So a line that ends the year before another starts
 // meets it rather than stopping a year short of it. An end tied to a
-// milestone carries a dot in oxide, the milestones' colour, where it
+// milestone carries a dot in ink, the milestones' colour, where it
 // meets the milestone's pin on the span above. A year outside the span
 // is held to its edge rather than drawn past it. The years given to mark,
-// the milestones', are ruled across the track in faint oxide, over the
+// the milestones', are ruled across the track in faint ink, over the
 // fill, so every bar on the screen carries the same rules and a line's
 // end is read against the milestones without looking up to their pins.
 // Decorative, since the years are written beside it: the bar is hidden
@@ -103,7 +103,7 @@ export function SpanBar({
 function TieDot({ at }: { readonly at: number }): JSX.Element {
   return (
     <span
-      className="absolute inset-y-0 w-1.5 -translate-x-1/2 rounded-full bg-brand"
+      className="absolute inset-y-0 w-1.5 -translate-x-1/2 rounded-full bg-foreground"
       data-slot="span-bar-tie"
       style={{ left: `${String(at)}%` }}
     />

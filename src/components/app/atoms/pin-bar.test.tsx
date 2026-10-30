@@ -21,7 +21,7 @@ const plan: Plan = {
 };
 
 describe("PinBar", () => {
-  it("pins a year in oxide where it begins on the plan's span, hidden from the tree", () => {
+  it("pins a year in ink where it begins on the plan's span, hidden from the tree", () => {
     render(<PinBar plan={plan} year={2036} />);
 
     expect(screen.getByText(bySlot("pin-bar"))).toHaveAttribute(
@@ -31,7 +31,9 @@ describe("PinBar", () => {
     expect(screen.getByText(bySlot("pin-bar-pin"))).toHaveStyle({
       left: "25%",
     });
-    expect(screen.getByText(bySlot("pin-bar-pin"))).toHaveClass("bg-brand");
+    expect(screen.getByText(bySlot("pin-bar-pin"))).toHaveClass(
+      "bg-foreground",
+    );
   });
 
   it("rules the other milestones' years across the track, and none unless given", () => {

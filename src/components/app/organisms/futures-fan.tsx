@@ -97,7 +97,7 @@ const tenths = ({ bottomTenth, topTenth }: FutureYear): number[] => [
 // share of the run out of money by then, on hover and on the arrow keys,
 // and is announced to a screen reader as it moves, the chart being
 // named for one. The milestones in the plan's years are faint lines in
-// oxide, as the dashboard draws them, named by the chips beneath, and
+// ink, as the dashboard draws them, named by the chips beneath, and
 // the one chosen is drawn solid until it is chosen again: one reached
 // at an age where the plan lays it, and one reached when conditions
 // hold in the year by which half the futures drawn so far have reached
@@ -226,7 +226,7 @@ export function FuturesFan({
                 {markers.map((marker) => (
                   <ReferenceLine
                     key={marker.id}
-                    stroke="var(--brand)"
+                    stroke="var(--foreground)"
                     strokeOpacity={marker.id === chosen ? 1 : 0.35}
                     strokeWidth={marker.id === chosen ? 1.5 : 1}
                     x={marker.year}

@@ -944,7 +944,7 @@ describe("ProjectionChart", () => {
 
   // A milestone's line carries no name, so the warnings' labels are the
   // only words on the plot.
-  it("marks a milestone beside the warnings in oxide, unnamed, under either mark", () => {
+  it("marks a milestone beside the warnings in ink, unnamed, under either mark", () => {
     render(
       <ProjectionChart
         accounts={held}
@@ -959,7 +959,7 @@ describe("ProjectionChart", () => {
       "2027",
       "2028",
     ]);
-    expect(marks()[0]).toHaveAttribute("stroke", "var(--brand)");
+    expect(marks()[0]).toHaveAttribute("stroke", "var(--foreground)");
     expect(screen.queryByText("Retirement")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
@@ -1141,7 +1141,7 @@ describe("ProjectionChart", () => {
       marks().map((mark) => mark.getAttribute("stroke-opacity")),
     ).toStrictEqual(["0.35", "1"]);
     expect(dots()).toHaveLength(1);
-    expect(dots()[0]).toHaveAttribute("fill", "var(--brand)");
+    expect(dots()[0]).toHaveAttribute("fill", "var(--foreground)");
     expect(dots()[0]).toHaveAttribute("x", "2030");
     expect(dots()[0]).toHaveAttribute("y", "55000");
 

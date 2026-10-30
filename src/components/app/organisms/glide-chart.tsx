@@ -55,7 +55,7 @@ const config = { bonds: { color: "var(--chart-2)", label: "Bonds" } };
 // scaled to the whole. Each
 // anchor within the plan is ringed on the line, the ring the card's
 // colour so it reads as a gap in it, and the owner's retirement is
-// marked as the curve marks its horizon, with a faint rule. The ages
+// marked with a faint rule in ink, as the milestones are. The ages
 // are ruled at each decade. What a year holds is shown on hover or on
 // the arrow keys, its age, its year and the split; the anchors are
 // listed beneath, which is the table to read them from.
@@ -128,7 +128,7 @@ export function GlideChart({ glide, plan }: GlideChartProps): JSX.Element {
               position: "top",
               value: `Retires ${String(plan.retires)}`,
             }}
-            stroke="var(--brand)"
+            stroke="var(--foreground)"
             strokeOpacity={0.35}
             x={plan.retires}
           />

@@ -185,7 +185,7 @@ const axisWidth = 57;
 // right of its own line where the other's is to the left, so neither
 // writes over the other a year apart or in the one year. Every
 // milestone is marked too, retirement among them, as a faint hairline
-// in oxide, the palette's colour for milestones, and the one the caller
+// in ink, the palette's colour for milestones, and the one the caller
 // says is chosen as a solid line with a dot at what the stack comes to
 // on the basis counted, the total the crosshair writes for its year, so
 // the dot moves with the toggle as the figures do rather than standing
@@ -418,7 +418,7 @@ export function ProjectionChart({
             {marked.map((marker) => (
               <ReferenceLine
                 key={marker.id}
-                stroke="var(--brand)"
+                stroke="var(--foreground)"
                 strokeOpacity={marker.id === selected ? 1 : 0.35}
                 strokeWidth={marker.id === selected ? 1.5 : 1}
                 x={marker.year}
@@ -426,7 +426,7 @@ export function ProjectionChart({
             ))}
             {chosen !== undefined && (
               <ReferenceDot
-                fill="var(--brand)"
+                fill="var(--foreground)"
                 r={4}
                 stroke="var(--card)"
                 strokeWidth={2}

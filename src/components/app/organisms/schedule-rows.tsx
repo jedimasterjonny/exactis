@@ -90,7 +90,7 @@ const icons: Record<Side, LucideIcon> = { expense: Receipt, income: Banknote };
 // what the rows cannot read off one, the badge, the figure and the
 // detail, comes from it. The figures are right-aligned mono, as in every
 // ledger. A line tied to a milestone at either end says which beside
-// its detail, flagged in oxide as the milestones are, "Until
+// its detail, flagged in ink as the milestones are, "Until
 // Retirement", its years staying the figures they fall on, since a name
 // in their place would not fit their column; and a line whose milestone
 // has moved past its other end says it runs no years in place of its
@@ -286,7 +286,7 @@ function nameOf(tie: null | Tie, milestones: readonly Marker[]): null | string {
   return milestones.find(({ id }) => id === tie)?.name ?? null;
 }
 
-// The milestones a line is tied to, after a flag in oxide, the colour
+// The milestones a line is tied to, after a flag in ink, the colour
 // the milestones are pinned in. The words set its baseline, so they sit
 // on the line of the name they follow, and the flag is centred on them:
 // leading with the flag, the tie took its baseline from the flag's foot
@@ -294,7 +294,7 @@ function nameOf(tie: null | Tie, milestones: readonly Marker[]): null | string {
 function Ties({ children }: { readonly children: string }): JSX.Element {
   return (
     <span className="inline-flex items-baseline gap-1">
-      <Flag aria-hidden className="size-3 self-center text-brand" />
+      <Flag aria-hidden className="size-3 self-center text-foreground" />
       {children}
     </span>
   );
