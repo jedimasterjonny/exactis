@@ -37,7 +37,7 @@ interface YearStripProps {
 // loss tone in a year the savings run out in, since only then is the
 // draw a failure. Both are drawn to the one scale, the most either
 // reaches in any year, so a year's rise and a year's draw compare by
-// height. The milestones rule the strip in faint oxide, as they rule
+// height. The milestones rule the strip in faint ink, as they rule
 // every bar, the first and last years are half drawn, at the span's
 // edges where they fall, and the chosen year is drawn whole while the
 // rest fade.

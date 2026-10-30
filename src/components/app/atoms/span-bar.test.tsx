@@ -230,7 +230,7 @@ describe("SpanBar", () => {
     ).toStrictEqual(["25%", "50%"]);
     expect(
       screen.getAllByText(bySlot("span-bar-tie"), { suggest: false })[0],
-    ).toHaveClass("bg-brand");
+    ).toHaveClass("bg-foreground");
 
     rerender(
       <SpanBar

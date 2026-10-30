@@ -140,7 +140,7 @@
   --sidebar-border: rgb(255 255 255 / 8%);
   --sidebar-ring: var(--grey-25);
   /* Exactis additions */
-  --brand: #8c2f27; /* oxide-500: wordmark dot, active tab, milestone markers */
+  --brand: #8c2f27; /* oxide-500: wordmark dot, active tab, chosen milestone */
   --brand-foreground: #ffffff;
   /* Gains, funded. 6.1:1 on paper, equal to loss */
   --positive: var(--jade-500);
@@ -272,13 +272,13 @@
 }
 
 /* The mark a milestone's year is ruled across a bar with: a hairline in
-   faint oxide, the colour the palette keeps for milestones, drawn alike on
+   faint ink, the colour the palette keeps for milestones, drawn alike on
    every bar so a rule reads the same on each. A utility rather than a
    component because the four bars are atoms, and an atom may not compose
    another. The look only: where the mark stands and how far it runs are
    each bar's own. */
 @utility mark {
-  @apply w-px bg-brand/40;
+  @apply w-px bg-foreground/40;
 }
 
 /* A display heading's face: the heading font, semibold and tracked tight,
