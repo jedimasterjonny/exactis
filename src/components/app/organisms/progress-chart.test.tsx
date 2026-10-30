@@ -170,7 +170,7 @@ describe("ProgressChart", () => {
 
     expect(runsOf("var(--chart-2)")).toBe(1);
     expect(runsOf("var(--chart-5)")).toBe(1);
-    expect(runsOf("var(--brand)")).toBe(2);
+    expect(runsOf("var(--chart-5-2)")).toBe(2);
   });
 
   // The cash is drawn over January and February and again from June, and

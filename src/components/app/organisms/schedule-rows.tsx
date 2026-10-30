@@ -27,10 +27,10 @@ import { laneColumns } from "@/lib/span";
 // What a schedule says of a line that the rows cannot read off it: the
 // badge its kind takes, if it has one, what it pays at its cadence, any
 // detail to write beside the badge, whether it is a loan's payments,
-// which its bar is drawn in red for, why it is held here and the screen
-// it is set on, for a line edited elsewhere, and the line as it is paid where
-// that stops short of where it says it ends, which the row draws in its
-// place.
+// which its bar is drawn in the debt grey for, why it is held here and
+// the screen it is set on, for a line edited elsewhere, and the line as
+// it is paid where that stops short of where it says it ends, which the
+// row draws in its place.
 export interface Summary {
   readonly badge?: { readonly label: string; readonly variant: Tone };
   readonly detail?: string;

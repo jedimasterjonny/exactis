@@ -182,7 +182,8 @@ describe("ScheduleRows", () => {
       expect(fill).toHaveClass("bg-foreground/50");
     }
 
-    // A line its schedule says is a loan's payments is drawn in red.
+    // A line its schedule says is a loan's payments is drawn in the debt
+    // grey.
     rerender(
       <ScheduleRows
         emptyDescription="Add one."

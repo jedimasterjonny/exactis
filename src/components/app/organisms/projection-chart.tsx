@@ -122,10 +122,9 @@ type Total = (point: ProjectionPoint) => null | number;
 // The wrappers keep the colours they had, and cash and the assets take
 // the palette's colours for cash and for property; a GIA takes the slate
 // the palette keeps for money invested outside a wrapper. The debts stack
-// down from nothing, the first listed nearest it, in the palette's reds and
-// its orange: loss red, which the palette gives debt, then oxide, then
-// ochre, since three debts in one red would be told apart by lightness
-// alone.
+// down from nothing, the first listed nearest it, in the palette's three
+// debt greys, told apart by lightness and named under the crosshair: red
+// is kept for status, and below nothing the sign already says owed.
 const families: readonly Family[] = [
   { hues: ["var(--chart-2)"], kinds: ["tax-deferred"] },
   { hues: ["var(--chart-1)"], kinds: ["tax-free"] },
@@ -133,7 +132,7 @@ const families: readonly Family[] = [
   { hues: ["var(--chart-4)"], kinds: ["cash"] },
   { hues: ["var(--chart-3)"], kinds: ["house", "car", "real-asset"] },
   {
-    hues: ["var(--chart-5)", "var(--brand)", "var(--caution)"],
+    hues: ["var(--chart-5)", "var(--chart-5-2)", "var(--chart-5-3)"],
     kinds: ["debt"],
   },
 ];

@@ -28,6 +28,8 @@
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
   --color-chart-6: var(--chart-6);
+  --color-chart-5-3: var(--chart-5-3);
+  --color-chart-5-2: var(--chart-5-2);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -113,12 +115,19 @@
   /* Chart series by meaning: equity, bonds, property, cash, debt, and
      money invested outside a wrapper. That last is slate, stacked between
      the ISA's petrol and the cash's stone: ΔE 21.8 from the petrol, its
-     nearer neighbour, and 21.0 under deuteranopia */
+     nearer neighbour, and 21.0 under deuteranopia. Debt is neutral, three
+     steps of one grey told apart by lightness, receding toward the card:
+     red is kept for status, and below the zero line the sign already says
+     owed. The first, nearest the line, is ΔE 9.3 or more from every other
+     series; the steps are 11.2 or more apart, 3.2:1 or more on the card,
+     and 19.5 or more from the stone and 8.3 from the slate */
   --chart-1: #163f3a;
   --chart-2: #3f7e6f;
   --chart-3: #b08540;
   --chart-4: #cfcbbf;
-  --chart-5: var(--red-700); /* debt follows loss red, no longer oxide */
+  --chart-5: #4a4f4b;
+  --chart-5-2: #6a6f6b;
+  --chart-5-3: #8b908c;
   --chart-6: #536f9d;
   --radius: 0.5rem; /* controls on the lg step at 8px; the card takes xl, about 11px */
   /* Ink sidebar, identical in both themes, so the dark scope leaves it be */
@@ -177,7 +186,13 @@
   --chart-2: #43897a;
   --chart-3: var(--ochre-300);
   --chart-4: #8a867b;
-  --chart-5: var(--red-300);
+  /* Debt lightest first, opening below the foreground so it recedes, each
+     step darker toward the stone and held above it, which caps the steps
+     at ΔE 4.8 apart: 6.0:1 or more on the card, 11.8 or more from the
+     stone and 48.5 from the slate */
+  --chart-5: var(--grey-300);
+  --chart-5-2: #abb0ab;
+  --chart-5-3: #9ea39f;
   /* Lifted in chroma rather than lightness, since lighter it meets the
      petrol: ΔE 15.8 from the stone and 14.0 under protanopia */
   --chart-6: #436eb4;
