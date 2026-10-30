@@ -820,6 +820,47 @@ describe("ProjectionChart", () => {
     expect(ends()).toStrictEqual(new Set(["49"]));
   });
 
+  // The home is left out of the liquidity, so its family is not keyed
+  // until the net worth draws it; the mortgage, secured on nothing, is a
+  // debt on both. No GIA is held, so none is keyed.
+  it("keys each family drawn on the basis counted, in the order they stack, in its first hue", () => {
+    render(
+      <ProjectionChart
+        accounts={accounts}
+        milestones={[]}
+        plan={drawing}
+        points={points}
+      />,
+    );
+    const keyed = (): (null | string)[] =>
+      within(screen.getByRole("list", { name: "Key" }))
+        .getAllByRole("listitem")
+        .map(({ textContent }) => textContent);
+
+    expect(keyed()).toStrictEqual(["Pensions", "ISAs", "Cash", "Debts"]);
+    // Hidden from the tree, so no query is better than the slot.
+    expect(
+      screen
+        .getAllByText(bySlot("projection-key-swatch"), { suggest: false })
+        .map(({ style }) => style.backgroundColor),
+    ).toStrictEqual([
+      "var(--chart-2)",
+      "var(--chart-1)",
+      "var(--chart-4)",
+      "var(--chart-5)",
+    ]);
+
+    fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
+
+    expect(keyed()).toStrictEqual([
+      "Pensions",
+      "ISAs",
+      "Cash",
+      "Property & vehicles",
+      "Debts",
+    ]);
+  });
+
   // The choices scroll sideways on a row of their own beneath the plot,
   // which holds its floor whatever they come to, and the foot closes the
   // card.
@@ -1322,6 +1363,11 @@ describe("ProjectionChart", () => {
     expect(
       screen.getAllByText(byClass("recharts-bar"), { suggest: false }),
     ).toHaveLength(2);
+    expect(
+      within(screen.getByRole("list", { name: "Key" }))
+        .getAllByRole("listitem")
+        .at(-1),
+    ).toHaveTextContent("Household");
 
     const chart = screen.getByRole("application");
     chart.focus();
