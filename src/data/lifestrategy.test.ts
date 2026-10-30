@@ -28,6 +28,17 @@ function beneath(shares: ReadonlyMap<string, number>, top: string): number {
 const idOf = (name: string): string =>
   targets.categories.find((category) => category.name === name)?.id ?? "";
 
+// The reference's categories with those named renamed, each keeping its
+// id and share.
+function renamed(
+  renames: ReadonlyMap<string, string>,
+): typeof targets.categories {
+  return targets.categories.map((category) => ({
+    ...category,
+    name: renames.get(category.name) ?? category.name,
+  }));
+}
+
 describe("requestOf", () => {
   it("posts Vanguard's site the question of what the fund given holds, by its id, each holding with its day, weight, name and SEDOL", async () => {
     const asked = requestOf(range[1]);
@@ -201,6 +212,159 @@ describe("retargeted", () => {
         "No category stands for Vanguard Emerging Markets Stock Index Fund/Ireland, which LifeStrategy 80% Equity holds",
       ),
     );
+  });
+
+  // The US market fund, 20 of equities' 80 of 60, 0.15 of the whole,
+  // with FTSE USA renamed the S&P 500, global small caps the MidCap 400
+  // and short-dated gilts the SmallCap 600, is cut over the three as the
+  // S&P publishes their market caps, 92.31%, 5.08% and 2.61% of the
+  // three together; where no category stands for the MidCap 400, the
+  // other two take it between them as theirs come to.
+  it("cuts a fund over the categories standing for the cuts of its index, by their market caps", () => {
+    const all = retargeted(
+      renamed(
+        new Map([
+          ["FTSE USA", "S&P 500"],
+          ["Global small cap", "S&P 400"],
+          ["Short-dated gilts", "S&P 600"],
+        ]),
+      ),
+      holdings,
+      split,
+    );
+
+    expect(all.get(idOf("FTSE USA"))).toBeCloseTo(0.15 * 0.9231, 4);
+    expect(all.get(idOf("Global small cap"))).toBeCloseTo(0.15 * 0.0508, 4);
+    expect(all.get(idOf("Short-dated gilts"))).toBeCloseTo(0.15 * 0.0261, 4);
+    expect(all.get(idOf("FTSE Global All Cap ex-UK"))).toBeCloseTo(0.375, 12);
+
+    const two = retargeted(
+      renamed(
+        new Map([
+          ["FTSE USA", "S&P 500"],
+          ["Short-dated gilts", "S&P 600"],
+        ]),
+      ),
+      holdings,
+      split,
+    );
+
+    expect(two.get(idOf("FTSE USA"))).toBeCloseTo(
+      (0.15 * 0.9231) / (0.9231 + 0.0261),
+      4,
+    );
+    expect(
+      (two.get(idOf("FTSE USA")) ?? 0) +
+        (two.get(idOf("Short-dated gilts")) ?? 0),
+    ).toBeCloseTo(0.15, 12);
+  });
+
+  // Global small caps renamed the MidCap 400 ask for 8 and short-dated
+  // gilts renamed its shorter name 2, so the first takes the cut and
+  // the second, being wound down, nothing; FTSE All-Share renamed the
+  // SmallCap 600 asks for nothing and takes its cut all the same, as
+  // the one category standing for it. Asking alike, two are refused.
+  it("gives each later cut to the category standing for it that asks for the most", () => {
+    const shares = retargeted(
+      renamed(
+        new Map([
+          ["FTSE All-Share", "S&P 600"],
+          ["FTSE USA", "S&P 500"],
+          ["Global small cap", "S&P MidCap 400"],
+          ["Short-dated gilts", "S&P 400"],
+        ]),
+      ),
+      holdings,
+      split,
+    );
+
+    expect(shares.get(idOf("Global small cap"))).toBeCloseTo(0.15 * 0.0508, 4);
+    expect(shares.get(idOf("Short-dated gilts"))).toBe(0);
+    expect(shares.get(idOf("FTSE All-Share"))).toBeCloseTo(0.15 * 0.0261, 4);
+    expect(() =>
+      retargeted(
+        renamed(
+          new Map([
+            ["FTSE USA", "S&P 500"],
+            ["Global small cap", "S&P MidCap 400"],
+            ["Short-dated gilts", "S&P 400"],
+          ]),
+        ).map((category) =>
+          category.name === "S&P 400" ? { ...category, share: 0.08 } : category,
+        ),
+        holdings,
+        split,
+      ),
+    ).toThrow(
+      new Refusal(
+        "S&P MidCap 400 and S&P 400 both stand for the S&P MidCap 400 in Vanguard US Equity Index Fund, and neither asks for more",
+      ),
+    );
+  });
+
+  // Global small caps renamed the S&P 500 ask for 8 and come first;
+  // FTSE USA renamed it too asks for 10 and takes the fund, cut over it
+  // and short-dated gilts renamed the MidCap 400. A category for US
+  // small caps takes both later cuts.
+  it("cuts a fund over whichever category for the first cut takes it, and gives a category standing for two cuts both", () => {
+    const twice = retargeted(
+      renamed(
+        new Map([
+          ["FTSE USA", "S&P 500"],
+          ["Global small cap", "S&P 500"],
+          ["Short-dated gilts", "S&P 400"],
+        ]),
+      ).map((category) =>
+        category.id === idOf("FTSE USA")
+          ? { ...category, share: 0.1 }
+          : category,
+      ),
+      holdings,
+      split,
+    );
+
+    expect(twice.get(idOf("FTSE USA"))).toBeCloseTo(
+      (0.15 * 0.9231) / (0.9231 + 0.0508),
+      4,
+    );
+    expect(twice.get(idOf("Global small cap"))).toBe(0);
+
+    const small = retargeted(
+      renamed(
+        new Map([
+          ["FTSE USA", "S&P 500"],
+          ["Global small cap", "US small cap"],
+        ]),
+      ),
+      holdings,
+      split,
+    );
+
+    expect(small.get(idOf("Global small cap"))).toBeCloseTo(
+      0.15 * (0.0508 + 0.0261),
+      4,
+    );
+  });
+
+  // Global small caps renamed FTSE North America ask for 8, more than
+  // FTSE USA renamed the S&P 500 at nothing, so they take the whole
+  // fund, and short-dated gilts renamed the MidCap 400 nothing.
+  it("cuts no fund where the category taking it stands for no cut", () => {
+    const shares = retargeted(
+      renamed(
+        new Map([
+          ["FTSE USA", "S&P 500"],
+          ["Global small cap", "FTSE North America"],
+          ["Short-dated gilts", "S&P 400"],
+        ]),
+      ),
+      holdings,
+      split,
+    );
+
+    expect(shares.get(idOf("Global small cap"))).toBeCloseTo(0.15, 12);
+    expect(shares.get(idOf("FTSE USA"))).toBe(0);
+    expect(shares.get(idOf("Short-dated gilts"))).toBe(0);
   });
 
   it("refuses two categories standing for one fund and asking alike, by name", () => {

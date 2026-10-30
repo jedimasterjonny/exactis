@@ -158,14 +158,17 @@ describe("standingFor", () => {
   it("finds every category standing for the fund of the SEDOL given, by name, with the fund's sleeve", () => {
     expect(standingFor("B3X7QG6", targets.categories)).toStrictEqual({
       categories: named("UK equity", "FTSE All-Share"),
+      cuts: [],
       sleeve: "stocks",
     });
     expect(standingFor("B59G4Q7", targets.categories)).toStrictEqual({
       categories: named("FTSE Global All Cap ex-UK"),
+      cuts: [],
       sleeve: "stocks",
     });
     expect(standingFor("B50W2R1", targets.categories)).toStrictEqual({
       categories: named("Global bonds, hedged"),
+      cuts: [],
       sleeve: "bonds",
     });
   });
@@ -174,9 +177,48 @@ describe("standingFor", () => {
   it("finds no category for a fund none stands for, and nothing for a SEDOL the table does not hold", () => {
     expect(standingFor("B5B71H8", targets.categories)).toStrictEqual({
       categories: [],
+      cuts: [],
       sleeve: "stocks",
     });
     expect(standingFor("B000000", targets.categories)).toBeUndefined();
+  });
+
+  // The US market fund's index is cut into the S&P 500, MidCap 400 and
+  // SmallCap 600: FTSE USA renamed the first and global small caps the
+  // second, by its longer name, stand for theirs, at their market caps
+  // in millions of dollars, and no category stands for the third. A
+  // category for US small caps stands for the second and the third.
+  it("finds the categories standing for each cut of a fund's index, by name, with its market cap", () => {
+    const renamed = (small: string): typeof targets.categories => {
+      const names = new Map([
+        ["FTSE USA", "S&P 500"],
+        ["Global small cap", small],
+      ]);
+      return targets.categories.map((category) => ({
+        ...category,
+        name: names.get(category.name) ?? category.name,
+      }));
+    };
+    const cutsOf = (
+      categories: typeof targets.categories,
+    ): readonly (readonly [readonly string[], number])[] =>
+      (standingFor("B5B71Q7", categories)?.cuts ?? []).map(
+        ({ cap, categories: standing }) => [
+          standing.map(({ name }) => name),
+          cap,
+        ],
+      );
+
+    expect(cutsOf(renamed("S&P MidCap 400"))).toStrictEqual([
+      [["S&P 500"], 68_828_211.97],
+      [["S&P MidCap 400"], 3_788_135.2],
+      [[], 1_942_867.17],
+    ]);
+    expect(cutsOf(renamed("US small cap"))).toStrictEqual([
+      [["S&P 500"], 68_828_211.97],
+      [["US small cap"], 3_788_135.2],
+      [["US small cap"], 1_942_867.17],
+    ]);
   });
 
   // A SEDOL held twice would give a fund two sets of categories, with
