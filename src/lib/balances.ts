@@ -16,8 +16,8 @@ export const balanceNames: Readonly<Record<Balance, string>> = {
 
 // The fill each balance is drawn in, as the whole class, since Tailwind
 // reads class names whole: the dashboard's colour for the family of
-// accounts it sums, and for the debts loss red and then oxide, as the
-// dashboard takes them in turn.
+// accounts it sums, and for the debts the first two of the debt greys,
+// as the dashboard takes them in turn.
 export const balanceFills: Readonly<Record<Balance, string>> = {
   assets: "bg-chart-3",
   cash: "bg-chart-4",
@@ -25,7 +25,7 @@ export const balanceFills: Readonly<Record<Balance, string>> = {
   free: "bg-chart-1",
   loans: "bg-chart-5",
   taxable: "bg-chart-6",
-  unsecured: "bg-brand",
+  unsecured: "bg-chart-5-2",
 };
 
 // The same colours as a chart draws in them, by the palette's own
@@ -37,7 +37,7 @@ export const balanceColors: Readonly<Record<Balance, string>> = {
   free: "var(--chart-1)",
   loans: "var(--chart-5)",
   taxable: "var(--chart-6)",
-  unsecured: "var(--brand)",
+  unsecured: "var(--chart-5-2)",
 };
 
 // A balance as a point carries it, or a dash where the point was not

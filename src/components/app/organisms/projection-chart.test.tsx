@@ -316,11 +316,11 @@ describe("ProjectionChart", () => {
   // Two pensions, the ISA, the current account and the home, stacked
   // family by family from the baseline, the second pension receding
   // toward the card from the first, and the mortgage stacked down from
-  // nothing in loss red, each but the current account named under the
-  // crosshair from the top of the stack down, over the net worth they
-  // come to, which counts the home and the current account. The two
-  // pensions are one owner's, and their £1,600 counts at the £1,360
-  // drawing them would leave.
+  // nothing in the first debt grey, each but the current account named
+  // under the crosshair from the top of the stack down, over the net
+  // worth they come to, which counts the home and the current account.
+  // The two pensions are one owner's, and their £1,600 counts at the
+  // £1,360 drawing them would leave.
   it("draws each account on its own, family by family, and names each under the crosshair", async () => {
     const listed = [...accounts, { ...sipp, owner: pension.owner }];
     const years = [2026, 2027].map((year, place) => ({
@@ -387,12 +387,12 @@ describe("ProjectionChart", () => {
     expect(tooltip.getByText("£223,660")).toHaveClass("figure");
   });
 
-  // Four debts take loss red, oxide and ochre in the order they are
-  // listed, and the fourth loss red again a step toward the card. The
-  // car loan owes nothing from 2027, so from then it is gone: no dot
-  // under the crosshair and no name beside it, where the debts still
-  // owed keep both.
-  it("stacks the debts down from nothing in the reds and orange, and drops a debt once it owes nothing", async () => {
+  // Four debts take the three debt greys in the order they are listed,
+  // and the fourth the first again a step toward the card. The car loan
+  // owes nothing from 2027, so from then it is gone: no dot under the
+  // crosshair and no name beside it, where the debts still owed keep
+  // both.
+  it("stacks the debts down from nothing in the debt greys, and drops a debt once it owes nothing", async () => {
     const debt = (id: number, name: string): Account => ({
       ...mortgage,
       id,
@@ -429,10 +429,10 @@ describe("ProjectionChart", () => {
     fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
 
     expect(colours()).toContain(
-      "--color-account-7: color-mix(in oklab, var(--brand), var(--card) 0%);",
+      "--color-account-7: color-mix(in oklab, var(--chart-5-2), var(--card) 0%);",
     );
     expect(colours()).toContain(
-      "--color-account-8: color-mix(in oklab, var(--caution), var(--card) 0%);",
+      "--color-account-8: color-mix(in oklab, var(--chart-5-3), var(--card) 0%);",
     );
     expect(colours()).toContain(
       "--color-account-9: color-mix(in oklab, var(--chart-5), var(--card) 30%);",
@@ -460,10 +460,10 @@ describe("ProjectionChart", () => {
   // the PCP owes, and the PCP is not drawn beside it: £20,000 against
   // £25,000 owed is £5,000 below nothing in 2026, and £18,000 against
   // £10,000 is £8,000 above it in 2027. The card, secured on nothing, is
-  // a debt of its own, and keeps the oxide it takes as the second debt
-  // listed though the first is drawn in the car. The net worth is the
-  // same either way. The axis reaches down to the car's equity and the
-  // card together, £6,000 below nothing, as it reaches up to £8,000.
+  // a debt of its own, and keeps the second grey it takes as the second
+  // debt listed though the first is drawn in the car. The net worth is
+  // the same either way. The axis reaches down to the car's equity and
+  // the card together, £6,000 below nothing, as it reaches up to £8,000.
   it("draws an asset at its equity, the loans secured on it drawn in it rather than beside it", async () => {
     const car: Account = {
       balance: 20000,
@@ -501,7 +501,7 @@ describe("ProjectionChart", () => {
       screen.getAllByText(byClass("recharts-bar"), { suggest: false }),
     ).toHaveLength(2);
     expect(colours()).toContain(
-      "--color-account-12: color-mix(in oklab, var(--brand), var(--card) 0%);",
+      "--color-account-12: color-mix(in oklab, var(--chart-5-2), var(--card) 0%);",
     );
     expect(colours()).not.toContain("--color-account-11");
     expect(pounds()).toStrictEqual([

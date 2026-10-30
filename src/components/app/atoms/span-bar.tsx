@@ -25,9 +25,10 @@ interface SpanBarProps {
 // mode's jade was dimmer than the bars beside it. Spending is drawn in
 // ink rather than the loss red, since money going out as the plan means
 // it to is no loss, and red read every expense as one; a loan's
-// payments keep the red, the colour a debt is drawn in below nothing on
-// the dashboard. Oxide is the milestones' alone, so the rules and the
-// dots where a line meets one stand out against any fill.
+// payments take the first of the debt greys, the colour a debt is drawn
+// in below nothing on the dashboard. Oxide is the milestones' alone, so
+// the rules and the dots where a line meets one stand out against any
+// fill.
 const fills: Record<Side, string> = {
   expense: "bg-foreground/50",
   income: "bg-chart-2 dark:bg-chart-1",
