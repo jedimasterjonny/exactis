@@ -15,6 +15,7 @@ import { owners } from "@/data/owners.fixture";
 import { measuredOf, project } from "@/engine/projection";
 import { formatGbp } from "@/lib/money";
 import { lumpSumAllowance } from "@/lib/tax";
+import { bySlot } from "@/test/dom";
 
 import { ProjectionChart, ProjectionPending } from "./projection-chart";
 
@@ -819,12 +820,16 @@ describe("ProjectionChart", () => {
     expect(ends()).toStrictEqual(new Set(["49"]));
   });
 
-  it("sets the caller's controls and choices beside the toggle, and none over nothing to plot", () => {
+  // The choices scroll sideways on a row of their own beneath the plot,
+  // which holds its floor whatever they come to, and the foot closes the
+  // card.
+  it("sets the caller's controls beside the toggle, its choices beneath the plot and its foot under them, and none over nothing to plot", () => {
     const { rerender } = render(
       <ProjectionChart
         accounts={held}
         choices={<button type="button">A choice</button>}
         controls={<button type="button">A control</button>}
+        foot="What is plotted"
         milestones={[]}
         plan={drawing}
         points={points}
@@ -834,19 +839,35 @@ describe("ProjectionChart", () => {
     expect(
       screen.getByRole("button", { name: "A control" }),
     ).toBeInTheDocument();
+    // The row and the plot's box have no role, so no query is better
+    // than their slots.
+    const choices = screen.getByText(bySlot("projection-choices"), {
+      suggest: false,
+    });
+
+    expect(choices).toHaveClass("overflow-x-auto");
     expect(
-      screen.getByRole("button", { name: "A choice" }),
+      within(choices).getByRole("button", { name: "A choice" }),
     ).toBeInTheDocument();
+    expect(screen.getByText(bySlot("chart"), { suggest: false })).toHaveClass(
+      "min-h-60",
+    );
     expect(screen.getByRole("switch", { name: "Bars" })).toBeInTheDocument();
     expect(
       screen.getByRole("switch", { name: "Liquidity" }),
     ).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByText(bySlot("card-footer"), { suggest: false }),
+      ).getByRole("paragraph"),
+    ).toHaveTextContent("What is plotted");
 
     rerender(
       <ProjectionChart
         accounts={held}
         choices={<button type="button">A choice</button>}
         controls={<button type="button">A control</button>}
+        foot="What is plotted"
         milestones={[]}
         plan={drawing}
         points={[]}
@@ -858,6 +879,9 @@ describe("ProjectionChart", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "A choice" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("What is plotted", { suggest: false }),
     ).not.toBeInTheDocument();
   });
 
