@@ -40,6 +40,7 @@ import {
   worthsIn,
 } from "@/engine/projection";
 import { axisOf } from "@/lib/axis";
+import { balanceNames } from "@/lib/balances";
 import { listed } from "@/lib/feeders";
 import { formatAxisGbp, formatGbp } from "@/lib/money";
 import { accountsAndAssets } from "@/lib/nav";
@@ -65,10 +66,12 @@ type Basis = "liquidity" | "net-worth";
 // The kinds of account that share a colour, and the hues they are drawn
 // in, from the palette's tokens, which name a colour by what it means.
 // The accounts of one family take its hues in turn, and once each hue
-// has been taken are told from the ones before by lightness.
+// has been taken are told from the ones before by lightness. Last, what
+// the key calls the family.
 interface Family {
   readonly hues: Hues;
   readonly kinds: readonly AccountKind[];
+  readonly name: string;
 }
 
 // A family's hues: one at least.
@@ -94,15 +97,16 @@ interface ProjectionChartProps {
 // What the chart draws for an account: the ids of the accounts it sums,
 // the account's own and, for a house, a car or another real asset, each
 // loan secured on it, so it stands at its equity; the account's name;
-// whether it is cash or a debt; the colour it is drawn in, and the key that
-// colour is written under. The colour is named once: the container
-// writes it into --color-<key> within its own scope, and everything
-// drawn for the series, the tooltip's key included, reads it back from
-// there. Last, what the series stands at on a point, as a function of
-// its own, which its column takes as the dataKey: made with the series,
-// it is the same function for as long as the series is.
+// whether it is cash or a debt; its family, the colour it is drawn in,
+// and the key that colour is written under. The colour is named once:
+// the container writes it into --color-<key> within its own scope, and
+// everything drawn for the series, the tooltip's key included, reads it
+// back from there. Last, what the series stands at on a point, as a
+// function of its own, which its column takes as the dataKey: made with
+// the series, it is the same function for as long as the series is.
 interface Series {
   readonly color: string;
+  readonly family: Family;
   readonly ids: readonly number[];
   readonly isCash: boolean;
   readonly isOwed: boolean;
@@ -126,15 +130,25 @@ type Total = (point: ProjectionPoint) => null | number;
 // down from nothing, the first listed nearest it, in the palette's three
 // debt greys, told apart by lightness and named under the crosshair: red
 // is kept for status, and below nothing the sign already says owed.
+// Each family is named in the key as Progress names the balance it sums.
 const families: readonly Family[] = [
-  { hues: ["var(--chart-2)"], kinds: ["tax-deferred"] },
-  { hues: ["var(--chart-1)"], kinds: ["tax-free"] },
-  { hues: ["var(--chart-6)"], kinds: ["taxable"] },
-  { hues: ["var(--chart-4)"], kinds: ["cash"] },
-  { hues: ["var(--chart-3)"], kinds: ["house", "car", "real-asset"] },
+  {
+    hues: ["var(--chart-2)"],
+    kinds: ["tax-deferred"],
+    name: balanceNames.deferred,
+  },
+  { hues: ["var(--chart-1)"], kinds: ["tax-free"], name: balanceNames.free },
+  { hues: ["var(--chart-6)"], kinds: ["taxable"], name: balanceNames.taxable },
+  { hues: ["var(--chart-4)"], kinds: ["cash"], name: balanceNames.cash },
+  {
+    hues: ["var(--chart-3)"],
+    kinds: ["house", "car", "real-asset"],
+    name: balanceNames.assets,
+  },
   {
     hues: ["var(--chart-5)", "var(--chart-5-2)", "var(--chart-5-3)"],
     kinds: ["debt"],
+    name: "Debts",
   },
 ];
 
@@ -151,7 +165,7 @@ const basisNames: Record<Basis, string> = {
 // where the choices wrap, and taller where the rows need more. No ratio
 // is held, since a box held to one lets its rows spill past a floor of
 // its own rather than growing.
-const boxSize = "min-h-100 sm:min-h-112";
+const boxSize = "min-h-108 sm:min-h-120";
 
 // The width the pounds' axis takes, held rather than measured. The
 // widest label it writes, "−£2.55m", is 49px in the tick's face, and
@@ -172,8 +186,10 @@ const axisWidth = 57;
 // the loans secured on it. The plot alone, with no figure
 // over it: a hairline grid, the years and the pounds as recessive ticks,
 // and a crosshair with the year's figures on hover and on the arrow
-// keys, which names each series beside its figure, so no legend names
-// them again beneath the plot. The pounds on the axis are shortened to
+// keys, which names each series beside its figure. A key above the
+// plot names each family drawn on the basis counted, in the order they
+// stack, beside a swatch of its first hue, so the colours read on a
+// phone, where nothing hovers. The pounds on the axis are shortened to
 // millions and thousands, "£7m" and "£500k", since a tick marks a place
 // on the scale and full pounds took a quarter of a phone's plot; every
 // figure under the crosshair is written in full, as money is everywhere
@@ -315,7 +331,7 @@ export function ProjectionChart({
     <Frame foot={foot}>
       <div
         className={cn(
-          "grid w-full grid-cols-1 grid-rows-[auto_minmax(15rem,1fr)] gap-4",
+          "grid w-full grid-cols-1 grid-rows-[auto_auto_minmax(15rem,1fr)] gap-4",
           boxSize,
         )}
       >
@@ -326,6 +342,7 @@ export function ProjectionChart({
             <MarkToggle mark={mark} onMarkChange={setMark} />
           </div>
         </div>
+        <Key hasHousehold={household !== undefined} series={series} />
         <ChartContainer
           className="aspect-auto min-h-60 min-w-0"
           config={config}
@@ -595,6 +612,49 @@ function hueAt(hues: Hues, place: number): string {
   );
 }
 
+// The key: each family drawn on the basis counted, in the order they
+// stack, named beside a swatch of its first hue, which every account of
+// it after the first recedes from, and last, while a scenario is set
+// against it, the household's dashed line. The names are muted text, as
+// the crosshair's are, and the swatches carry the colour.
+function Key({
+  hasHousehold,
+  series,
+}: {
+  readonly hasHousehold: boolean;
+  readonly series: readonly Series[];
+}): JSX.Element {
+  return (
+    <ul
+      aria-label="Key"
+      className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
+    >
+      {families
+        .filter((family) => series.some((line) => line.family === family))
+        .map(({ hues, name }) => (
+          <li className="flex items-center gap-1.5" key={name}>
+            <span
+              aria-hidden
+              className="size-2.5 rounded-xs"
+              data-slot="projection-key-swatch"
+              style={{ backgroundColor: hues[0] }}
+            />
+            {name}
+          </li>
+        ))}
+      {hasHousehold && (
+        <li className="flex items-center gap-1.5">
+          <span
+            aria-hidden
+            className="w-3 border-t-2 border-dashed border-muted-foreground"
+          />
+          Household
+        </li>
+      )}
+    </ul>
+  );
+}
+
 // The switch between the two marks: the name of the mark drawn now, with
 // the switch on for the bars. It sits at the right of the plot's top row,
 // where a screen keeps its actions, whatever is to the left of it.
@@ -794,9 +854,9 @@ function seriesOf(
   const assets = new Set(accounts.filter(isAsset).map(({ id }) => id));
   const isSecured = ({ secures }: Account): boolean =>
     secures !== undefined && assets.has(secures);
-  const drawn = families.flatMap(({ hues, kinds }) =>
+  const drawn = families.flatMap((family) =>
     accounts
-      .filter(({ kind }) => kinds.includes(kind))
+      .filter(({ kind }) => family.kinds.includes(kind))
       .map((account, place) => {
         const { id, kind, name } = account;
         const ids = [
@@ -806,7 +866,8 @@ function seriesOf(
             .map((loan) => loan.id),
         ];
         const series: Series = {
-          color: `color-mix(in oklab, ${hueAt(hues, place)}, var(--card) ${String(Math.min(Math.floor(place / hues.length), 2) * 30)}%)`,
+          color: `color-mix(in oklab, ${hueAt(family.hues, place)}, var(--card) ${String(Math.min(Math.floor(place / family.hues.length), 2) * 30)}%)`,
+          family,
           ids,
           isCash: kind === "cash",
           isOwed: kind === "debt",
