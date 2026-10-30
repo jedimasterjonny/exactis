@@ -10,11 +10,14 @@ import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
-import { getHousehold } from "@/store/household";
+import { getHousehold, getOpened } from "@/store/household";
 
 import Accounts from "./page";
 
-vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
+vi.mock("@/store/household", () => ({
+  getHousehold: vi.fn(),
+  getOpened: vi.fn(),
+}));
 vi.mock("@/actions/accounts", () => ({
   closeBalances: vi.fn(),
   removeAccount: vi.fn(),
@@ -30,7 +33,7 @@ vi.mock("@/actions/owners", () => ({
 }));
 
 // The page over the fixture's household, as the store reads it, with
-// the expense lines a test gives.
+// the expense lines a test gives, with no scenario open.
 async function renderAccounts({
   expenses = [],
 }: { readonly expenses?: readonly ExpenseLine[] } = {}): Promise<void> {
@@ -42,6 +45,7 @@ async function renderAccounts({
     plan,
     schedule: { expenses, income: [...incomeLines] },
   });
+  vi.mocked(getOpened).mockResolvedValue(null);
   render(await Accounts());
 }
 

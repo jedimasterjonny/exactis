@@ -10,7 +10,7 @@ import { balanceOf, drawingTaxOf } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
 import { formatMonth, monthBefore, thisMonth, today } from "@/lib/months";
 import { accountsAndAssets, sectionLabel } from "@/lib/nav";
-import { getHousehold } from "@/store/household";
+import { getHousehold, getOpened } from "@/store/household";
 
 import { AccountLedger } from "./account-ledger";
 
@@ -38,9 +38,10 @@ import { AccountLedger } from "./account-ledger";
 // month that has ended unless another is picked, over the body the
 // ledger lays its sections out in, which opens on how fresh the
 // balances are, as the assumptions screen's opens on how fresh its
-// sources are. The day and the month are read once on the server.
+// sources are. The day and the month are read once on the server, and
+// whether a scenario is open, since the month end is held while one is.
 export default async function Accounts(): Promise<JSX.Element> {
-  const household = await getHousehold();
+  const [household, opened] = await Promise.all([getHousehold(), getOpened()]);
   const { accounts, owners } = household;
   const { plan, schedule } = laidOut(
     accounts,
@@ -53,6 +54,7 @@ export default async function Accounts(): Promise<JSX.Element> {
       actions={
         <MonthEnd
           accounts={accounts}
+          isInScenario={opened !== null}
           month={monthBefore(thisMonth())}
           plan={plan}
           schedule={schedule}

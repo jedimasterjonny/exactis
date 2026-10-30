@@ -3,7 +3,7 @@
 import type { JSX } from "react";
 
 import { CalendarCheck, Check } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
@@ -43,6 +43,7 @@ interface Draft {
 
 interface MonthEndProps {
   readonly accounts: readonly Account[];
+  readonly isInScenario: boolean;
   readonly month: Month;
   readonly plan: Plan;
   readonly schedule: Schedule;
@@ -85,9 +86,12 @@ interface Row {
 // takes, so a year mistyped asks the plan for no more months than it
 // has. The day it is is given rather than read, so the ages draw the
 // same on the server as in a test, and so is the month the worksheet
-// opens on.
+// opens on. While a scenario is open the button is held, beside the
+// store's reason for refusing the month there, so no balance is typed
+// only to be refused.
 export function MonthEnd({
   accounts,
+  isInScenario,
   month,
   plan,
   schedule,
@@ -95,6 +99,7 @@ export function MonthEnd({
 }: MonthEndProps): JSX.Element {
   const [draft, setDraft] = useState<Draft | null>(null);
   const { isSending: isSaving, send } = useSender();
+  const heldId = useId();
   const from: Month = { month: plan.month, year: plan.from };
 
   function open(): void {
@@ -103,7 +108,17 @@ export function MonthEnd({
 
   return (
     <>
-      <Button onClick={open} size="sm">
+      {isInScenario && (
+        <span className="text-sm text-muted-foreground" id={heldId}>
+          Leave the scenario to close the month
+        </span>
+      )}
+      <Button
+        aria-describedby={isInScenario ? heldId : undefined}
+        disabled={isInScenario}
+        onClick={open}
+        size="sm"
+      >
         <CalendarCheck aria-hidden />
         Update balances
       </Button>

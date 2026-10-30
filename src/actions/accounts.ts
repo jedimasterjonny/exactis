@@ -38,6 +38,7 @@ import { month, named, pounds, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { isOnOrBefore, monthsBetween, thisMonth, today } from "@/lib/months";
 import { found, holdUnchanged, replaced, written } from "@/lib/records";
+import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
 
@@ -239,13 +240,21 @@ const order = z
 // twice, which the worksheet could not have sent. The month, the
 // balances and the point land together or not at all, and a balance
 // the household's rules refuse, such as one below nothing on anything
-// but a debt, is refused in their words. Checked as a save is.
+// but a debt, is refused in their words. A month is closed in the
+// household alone, and refused while a scenario is open, since it would
+// be lost there whichever way the scenario went: adopting one keeps the
+// household's bookkeeping over the scenario's, and dropping one deletes
+// it. Checked as a save is.
 export async function closeBalances(
   draft: Closed,
 ): Promise<Answer<{ readonly asOf: Month; readonly isRecorded: boolean }>> {
   await requireSession();
   const { asOf, balances } = closed.parse(draft);
+  const scenario = await openedScenario();
   return amend(({ household, kept }) => {
+    if (scenario !== null) {
+      throw new Refusal("Leave the scenario to close the month");
+    }
     if (isOnOrBefore(thisMonth(), asOf)) {
       throw new Refusal("The balances are as of a month that has ended");
     }
