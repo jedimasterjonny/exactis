@@ -23,24 +23,25 @@ interface Unplaced {
   readonly reached: null | number;
 }
 
-// The milestones as a row of chips, one chosen at a time, or none: each a button
-// naming its milestone after the flag the plan screen ties a line to one
-// with, its flag in ink, the palette's colour for milestones, as the
-// chart rules them, and pressed while it is the one chosen and then
-// filled in oxide, which marks the choice. A chip gives its flag and its
-// year beside its name where there is room, and on a phone its name
-// alone, so three fit a row there and the plot keeps its height, and the
+// The milestones as a row of chips, one chosen at a time, or none: each
+// a button naming its milestone after the flag the plan screen ties a
+// line to one with, its flag in ink, the palette's colour for
+// milestones, as the chart rules them, and pressed while it is the one
+// chosen and then filled in oxide, which marks the choice. A chip gives
+// its flag and its year beside its name where there is room, and on a
+// phone its name alone, so more of them show at once there, and the
 // year of the one chosen is read where the choice is shown. The year is
 // the name's size, set back from it by its weight and, on a chip not
-// chosen, its tone: a smaller figure centred beside the name stood a pixel above its line.
-// A milestone the caller says the futures have not placed follows them
-// as a chip that cannot be pressed, dashed and muted, so it is seen to
-// be off the years rather than missing: with an ellipsis where its year
-// will be while they are drawn, and once they are, the share of them
-// that reach it, said to a screen reader as that. The chips are drawn 32px tall and
-// reach 44px for a finger past their own edges, so a row of them stays
-// compact. The row is a group named for a screen reader, and each chip
-// says whether it is the one chosen.
+// chosen, its tone: a smaller figure centred beside the name stood a
+// pixel above its line. A milestone the caller says the futures have
+// not placed follows them as a chip that cannot be pressed, dashed and
+// muted, so it is seen to be off the years rather than missing: with an
+// ellipsis where its year will be while they are drawn, and once they
+// are, the share of them that reach it, said to a screen reader as
+// that. The chips are drawn 32px tall and reach 44px for a finger past
+// their own edges, so a row of them stays compact. The row is a group
+// named for a screen reader, and each chip says whether it is the one
+// chosen.
 export function MilestoneChips({
   markers,
   onSelect,

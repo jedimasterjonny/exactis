@@ -144,8 +144,8 @@ export const settle = 400;
 // spread, the CMA giving it none, or no savings for the futures to
 // grow, and then the tiles say which and the chart marks the
 // milestones the plan lays out alone.
-// One milestone is chosen at a time, from the chips in the chart's top
-// row, which name what the chart's lines cannot: the tile reads what
+// One milestone is chosen at a time, from the chips beneath the chart,
+// which name what the chart's lines cannot: the tile reads what
 // the plan holds entering its year on the measure the milestone is on,
 // the liquid net worth for one reached on that and the net worth for
 // one reached on it, at an age or for retirement, named in the caption
@@ -190,8 +190,9 @@ export const settle = 400;
 // for each; a board taken down with a save still waiting sends it as
 // it goes. A store that refuses drops the draft, so the board shows
 // what the store holds, read afresh, and says why under a toast. A
-// retirement on conditions has no age to drag, so the row says what it
-// is reached on instead, as the plan screen's milestones say it.
+// retirement on conditions has no age to drag, so the chart's foot
+// says what it is reached on instead, as the plan screen's milestones
+// say it.
 // Given the household a scenario is set against, as the dashboard is
 // while one is open, the board projects the household too and draws its
 // futures beside the scenario's, and each tile carries what the
@@ -449,11 +450,12 @@ function Board({
                 value={retires}
               />
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {`Retirement · ${conditionsOf(conditions)}`}
-            </p>
-          )
+          ) : undefined
+        }
+        foot={
+          conditions === undefined
+            ? undefined
+            : `Retirement · ${conditionsOf(conditions)}`
         }
         milestones={markers}
         plan={plan}

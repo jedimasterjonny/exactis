@@ -29,7 +29,7 @@ import type { ProjectionPoint } from "@/engine/projection";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { LabelledSwitch } from "@/components/app/molecules/labelled-switch";
 import { buttonVariants } from "@/components/kit/button";
-import { Card, CardContent } from "@/components/kit/card";
+import { Card, CardContent, CardFooter } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
 import { isAsset } from "@/data/accounts";
 import { drawnAsMortgages } from "@/data/houses";
@@ -84,6 +84,7 @@ interface ProjectionChartProps {
   readonly against?: Against | undefined;
   readonly choices?: ReactNode;
   readonly controls?: ReactNode;
+  readonly foot?: string | undefined;
   readonly milestones: readonly Marker[];
   readonly plan: Pick<Plan, "owners">;
   readonly points: readonly ProjectionPoint[];
@@ -144,11 +145,13 @@ const basisNames: Record<Basis, string> = {
   "net-worth": "Net worth",
 };
 
-// The height of the plot's box, the frames standing in for it and the
-// empty state in its place: three times as wide as it is tall, down to a
-// floor that is higher on a phone, where the choices take a row of
-// their own above the plot.
-const boxSize = "aspect-[3/1] min-h-90 sm:min-h-72";
+// The height of the plot's box, its rows with it, and of the frames
+// standing in for it and the empty state in its place: a floor that
+// leaves the plot its own floor beside the rows at any width, higher
+// where the choices wrap, and taller where the rows need more. No ratio
+// is held, since a box held to one lets its rows spill past a floor of
+// its own rather than growing.
+const boxSize = "min-h-100 sm:min-h-112";
 
 // The width the pounds' axis takes, held rather than measured. The
 // widest label it writes, "−£2.55m", is 49px in the tick's face, and
@@ -192,24 +195,26 @@ const axisWidth = 57;
 // on a sum neither basis reads. A milestone's line carries no
 // name: on a phone a year is a few pixels wide and a name spans more
 // than a decade, so the names are the caller's to give, as the choices
-// it sets above the plot, and the crosshair names the milestones in its
-// year. A milestone outside the plan's years has no year to stand on
-// and goes undrawn. The toggles take their row from
-// inside the plot's box rather than adding one over it, so the box is
-// the same height as the frames that stand in for it and nothing shifts
-// when the chart arrives; whatever controls the caller gives for what
-// is plotted share the row, at its left, the toggles keeping the right,
-// side by side and on a phone one above the other,
-// and the choices it gives between them, or on a row of their own
-// beneath on a phone. The row centres what shares it, so a field there,
-// its label above its box and its hint beneath a line each, stands with
-// its box level with the choices and the toggles, where aligning their
-// feet set them level with its hint. The rows stand a gap clear of the
-// plot, so a figure box above the top tick does not crowd it. The box is three
-// times as wide as it is tall down to a floor, and every frame with it:
-// the rows and the axis take the same height at any width,
-// and on a phone a third of the width is less than they need, which
-// left no plot at all, so the floor there is higher again.
+// it sets on a row of their own beneath the years, and the crosshair
+// names the milestones in its year. On a phone the choices keep to one
+// row and scroll sideways within it, so however many milestones there
+// are they take no height from the plot and the page never scrolls
+// sideways for them; wider, where a mouse cannot easily scroll a row,
+// they wrap. A milestone outside the plan's years has no year to stand
+// on and goes undrawn. The toggles take a row above the plot, at its
+// right, side by side and one above the other only where the controls
+// the caller gives for what is plotted, at its left, leave them no
+// room. The row centres what shares it, so a field there, its label
+// above its box and its hint beneath a line each, stands with its box
+// level with the toggles, where aligning their feet set them level with
+// its hint. The rows stand a gap clear of the plot,
+// so a figure box above the top tick does not crowd it. The plot holds
+// 240px at any width, enough for a phone to read its ticks by, and the
+// box around it and its rows is three times as wide as it is tall down
+// to a floor that leaves the plot that much beside them, so the box is
+// the height of the frames that stand in for it and nothing shifts when
+// the chart arrives. What the caller says defines what is plotted is
+// written at the card's foot, beneath the choices.
 // A projection of nothing, because the plan
 // holds nothing yet, says so in the plot's place rather than drawing a
 // flat zero over a column of £0 ticks, and points at the screen where
@@ -224,6 +229,7 @@ export function ProjectionChart({
   against,
   choices,
   controls,
+  foot,
   milestones,
   plan,
   points: projected,
@@ -306,21 +312,24 @@ export function ProjectionChart({
   );
 
   return (
-    <Frame>
-      <div className={cn("flex w-full flex-col gap-4", boxSize)}>
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+    <Frame foot={foot}>
+      <div
+        className={cn(
+          "grid w-full grid-cols-1 grid-rows-[auto_minmax(15rem,1fr)] gap-4",
+          boxSize,
+        )}
+      >
+        <div className="flex items-center gap-4">
           <div>{controls}</div>
-          {choices !== undefined && (
-            <div className="col-span-2 row-start-2 sm:col-span-1 sm:col-start-2 sm:row-start-1">
-              {choices}
-            </div>
-          )}
-          <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
             <BasisToggle basis={basis} onBasisChange={setBasis} />
             <MarkToggle mark={mark} onMarkChange={setMark} />
           </div>
         </div>
-        <ChartContainer className="aspect-auto min-h-0 flex-1" config={config}>
+        <ChartContainer
+          className="aspect-auto min-h-60 min-w-0"
+          config={config}
+        >
           <Plot
             data={points}
             margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
@@ -463,6 +472,14 @@ export function ProjectionChart({
             )}
           </Plot>
         </ChartContainer>
+        {choices !== undefined && (
+          <div
+            className="-mx-1.5 overflow-x-auto p-1.5"
+            data-slot="projection-choices"
+          >
+            <div className="w-max sm:w-auto">{choices}</div>
+          </div>
+        )}
       </div>
     </Frame>
   );
@@ -548,11 +565,23 @@ function drawnIn(
 // Clipping is also what held the card to the width of its column,
 // since an item that clips may shrink below its contents, so it is
 // held there by name: unheld, it took the width of what it holds, and a
-// phone's page scrolled sideways to nearly three times its width.
-function Frame({ children }: { readonly children: JSX.Element }): JSX.Element {
+// phone's page scrolled sideways to nearly three times its width. Given
+// a foot, it closes the card in muted text beneath the plot.
+function Frame({
+  children,
+  foot,
+}: {
+  readonly children: JSX.Element;
+  readonly foot?: string | undefined;
+}): JSX.Element {
   return (
     <Card className="min-w-0 overflow-visible">
       <CardContent>{children}</CardContent>
+      {foot !== undefined && (
+        <CardFooter className="text-sm text-muted-foreground">
+          <p>{foot}</p>
+        </CardFooter>
+      )}
     </Card>
   );
 }
