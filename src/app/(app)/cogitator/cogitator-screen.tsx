@@ -41,9 +41,10 @@ interface CogitatorScreenProps {
 // allocation no longer lists, as one does once a scenario with
 // another is opened, which keeps the screen, is all accounts again,
 // and stays so should it be listed again, as the choice by then
-// shows. The sales field shows the sales held, and the account choice
-// opens on the account held, so each says what the ladder is making
-// when it comes back after the allocation had nothing to buy toward.
+// shows. The amount and sales fields show those held, and the account
+// choice opens on the account held, so each says what the ladder is
+// making when it comes back after the allocation had nothing to buy
+// toward.
 export function CogitatorScreen({
   bonds,
   targets,
@@ -74,10 +75,10 @@ export function CogitatorScreen({
         isReady ? (
           <>
             <MoneyField
-              defaultValue={0}
               label="Amount to invest"
               min={0}
               onValueCommitted={setAmount}
+              value={amount}
             />
             <CountField
               label="Sales at most"

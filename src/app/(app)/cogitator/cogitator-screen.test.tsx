@@ -251,12 +251,14 @@ describe("CogitatorScreen", () => {
     expect(rows[2]).not.toHaveClass("text-muted-foreground");
   });
 
-  it("opens the sales field on the sales held when it comes back", () => {
+  it("shows the amount and sales held when their fields come back", () => {
     const { rerender } = render(<CogitatorScreen targets={reference} />);
+    invest("2000");
     commit(field("Sales at most"), "3");
     rerender(<CogitatorScreen targets={null} />);
     rerender(<CogitatorScreen targets={reference} />);
 
+    expect(field("Amount to invest")).toHaveValue("£2,000");
     expect(field("Sales at most")).toHaveValue("3");
   });
 
