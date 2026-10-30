@@ -19,6 +19,7 @@ import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
 import { found } from "@/lib/records";
+import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 
 import {
@@ -1444,6 +1445,22 @@ describe("the account actions", () => {
         }),
       ).toStrictEqual(refused("A balance below nothing is a debt's"));
       expect(await versions()).toBe(1);
+    });
+
+    // A month closed in the scenario would be lost to it, adopted or
+    // dropped, so neither branch is written.
+    it("refuses a month closed while a scenario is open, and writes to neither branch", async () => {
+      await keepAfter(db, { scenario: "Retire early", version: 0 }, kept);
+      vi.mocked(openedScenario).mockResolvedValue("Retire early");
+
+      expect(await moveTo({ month: 7, year: 2026 })).toStrictEqual(
+        refused("Leave the scenario to close the month"),
+      );
+      expect(await readLatest(db, "Retire early")).toMatchObject({
+        version: 1,
+      });
+      expect(await versions()).toBe(1);
+      expect(refresh).not.toHaveBeenCalled();
     });
 
     it("refuses what the worksheet could not have sent", async () => {

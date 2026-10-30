@@ -31,7 +31,8 @@ in Postgres on Neon and the app on Vercel.
 A scenario is a what-if copy of the household, or of another scenario. Every
 screen, and export and import, works on whichever is open. Adopting one makes
 its plan the household's, keeping the household's own bookkeeping: balances,
-progress points and what was pulled in.
+progress points and what was pulled in. So the month is closed in the household
+alone, and refused while a scenario is open.
 
 ## Getting started
 

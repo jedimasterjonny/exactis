@@ -42,6 +42,7 @@ function openWorksheet(
   render(
     <MonthEnd
       accounts={accounts}
+      isInScenario={false}
       month={{ month: 8, year: 2026 }}
       plan={plan}
       schedule={{ expenses: [], income: [salary] }}
@@ -285,6 +286,27 @@ describe("MonthEnd", () => {
         name: "Balances at the end of September 2026",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("holds the button while a scenario is open, saying why", () => {
+    render(
+      <MonthEnd
+        accounts={accounts}
+        isInScenario
+        month={{ month: 8, year: 2026 }}
+        plan={plan}
+        schedule={{ expenses: [], income: [salary] }}
+        today="2026-10-04"
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "Update balances" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(
+      "Leave the scenario to close the month",
+    );
+    fireEvent.click(button);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("closes on cancel, saving nothing", () => {
