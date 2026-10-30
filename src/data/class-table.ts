@@ -3,6 +3,15 @@ import type { Target, Targets } from "@/data/targets";
 
 import { globalBonds } from "@/data/cma";
 
+// A cut of a fund's index by size, as the S&P's own indices cut the US
+// market: the index it is, the names a category standing for it goes
+// by, and its market cap, in millions of dollars.
+interface Cut {
+  readonly cap: number;
+  readonly name: string;
+  readonly names: readonly string[];
+}
+
 // An entry of the table: the names a category goes by, the classes it
 // is suggested onto, the first a vintage prices taken, and the fund of
 // Vanguard's LifeStrategy range it stands for, if it stands for one.
@@ -16,16 +25,21 @@ type Entry = readonly [
 // the SEDOL of the share class LifeStrategy holds, which names the fund
 // whatever share class or tracker of the same index the category's own
 // holding is, and the sleeve it is in, which says how it is scaled
-// when the allocation is retargeted from LifeStrategy.
+// when the allocation is retargeted from LifeStrategy; and, for a fund
+// whose index is cut by size, the cuts, the one its own category
+// stands for first.
 interface Fund {
+  readonly cuts?: readonly Cut[];
   readonly sedol: string;
   readonly sleeve: Sleeve;
 }
 
 // What the categories standing for a LifeStrategy fund come to: the
-// categories, and the sleeve the fund is in.
+// categories, the cuts of its index in order, each with the categories
+// standing for it, and the sleeve the fund is in.
 interface Standing {
   readonly categories: readonly Target[];
+  readonly cuts: readonly (Cut & { readonly categories: readonly Target[] })[];
   readonly sleeve: Sleeve;
 }
 
@@ -58,11 +72,31 @@ const table: readonly Entry[] = [
     { sedol: "B59G4Q7", sleeve: "stocks" },
   ],
   // MSCI USA. FTSE North America is a few points Canada, which sterling
-  // does not price. Vanguard US Equity Index Fund.
+  // does not price. Vanguard US Equity Index Fund, which tracks the
+  // whole US market, cut by size as the S&P 500, MidCap 400 and
+  // SmallCap 600 hold it, at their market caps on 31 August 2026; a
+  // category for US small caps stands for the last two, as it does
+  // below.
   [
     ["S&P 500", "FTSE North America", "FTSE USA", "North America", "US equity"],
     ["US large cap equities"],
-    { sedol: "B5B71Q7", sleeve: "stocks" },
+    {
+      cuts: [
+        { cap: 68_828_211.97, name: "S&P 500", names: ["S&P 500"] },
+        {
+          cap: 3_788_135.2,
+          name: "S&P MidCap 400",
+          names: ["S&P 400", "S&P MidCap 400", "US small cap"],
+        },
+        {
+          cap: 1_942_867.17,
+          name: "S&P SmallCap 600",
+          names: ["S&P 600", "S&P SmallCap 600", "US small cap"],
+        },
+      ],
+      sedol: "B5B71Q7",
+      sleeve: "stocks",
+    },
   ],
   // MSCI United Kingdom is large and mid caps. The All-Share's smaller
   // companies, a sixth of it, have no class of their own. Vanguard FTSE
@@ -173,8 +207,9 @@ const suggested: ReadonlyMap<string, readonly string[]> = new Map(
 );
 
 // The categories standing for the LifeStrategy fund of the SEDOL given,
-// by their names, with the sleeve the fund is in; or nothing for a fund
-// the table does not hold.
+// by their names, with the cuts of its index, each with the categories
+// standing for it by theirs, and the sleeve the fund is in; or nothing
+// for a fund the table does not hold.
 export function standingFor(
   sedol: string,
   categories: readonly Target[],
@@ -187,6 +222,13 @@ export function standingFor(
   const keys = new Set(entry[0].map(keyOf));
   return {
     categories: categories.filter(({ name }) => keys.has(keyOf(name))),
+    cuts: (fund.cuts ?? []).map((cut) => {
+      const named = new Set(cut.names.map(keyOf));
+      return {
+        ...cut,
+        categories: categories.filter(({ name }) => named.has(keyOf(name))),
+      };
+    }),
     sleeve: fund.sleeve,
   };
 }

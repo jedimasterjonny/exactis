@@ -36,12 +36,13 @@ interface Holding {
   readonly weight: number;
 }
 
-// A fund placed in the allocation: the category standing for it, and
-// the sleeve it is in.
+// A fund placed in the allocation: the category standing for it, or for
+// a cut of its index, the sleeve the fund is in, and the weight of the
+// fund the category takes.
 interface Placed {
   readonly category: Target;
-  readonly holding: Holding;
   readonly sleeve: Sleeve;
+  readonly weight: number;
 }
 
 // The funds the allocation can be retargeted from, the first offered
@@ -147,7 +148,13 @@ export function readHoldings(sent: Uint8Array, fund: Fund): Holdings {
 // a fund tracks and one for the fund it replaced do, the one asking
 // for the largest share now takes it, since the others are the ones
 // being wound down; two asking alike are refused by name, since
-// nothing says which. A fund the table does not hold is refused by
+// nothing says which. Where the one taking a fund stands for the first
+// cut of the fund's index, as a category for the S&P 500 does of the
+// whole US market, the fund is cut over it and the categories taking
+// the other cuts by the cuts' market caps, each cut taken as a fund is,
+// by the category standing for it that asks for the largest share,
+// even where that is nothing, two asking alike refused, and a cut no
+// category stands for going to those that are. A fund the table does not hold is refused by
 // name, as is one no category stands for, since the allocation cannot
 // then hold what the fund does; and a sleeve the split asks a share of
 // that the fund holds nothing in, whether its funds weigh nothing or it
@@ -170,33 +177,44 @@ export function retargeted(
     if (shares[standing.sleeve] === 0) {
       return [];
     }
-    const [first, second] = standing.categories.toSorted(
-      (one, other) => other.share - one.share,
-    );
+    const first = takerOf(standing.categories, holding.name);
     if (first === undefined) {
       throw new Refusal(
         `No category stands for ${holding.name}, which ${fund.name} holds`,
       );
     }
-    if (second?.share === first.share) {
-      throw new Refusal(
-        `${first.name} and ${second.name} both stand for ${holding.name}, and neither asks for more`,
-      );
+    const [lead, ...rest] = standing.cuts;
+    if (lead?.categories.includes(first) !== true) {
+      return [
+        { category: first, sleeve: standing.sleeve, weight: holding.weight },
+      ];
     }
-    return [{ category: first, holding, sleeve: standing.sleeve }];
+    const takers = [
+      { cap: lead.cap, category: first },
+      ...rest.flatMap(({ cap, categories: candidates, name }) => {
+        const category = takerOf(candidates, `the ${name} in ${holding.name}`);
+        return category === undefined ? [] : [{ cap, category }];
+      }),
+    ];
+    const whole = sumOf(takers, ({ cap }) => cap);
+    return takers.map(({ cap, category }) => ({
+      category,
+      sleeve: standing.sleeve,
+      weight: (holding.weight * cap) / whole,
+    }));
   });
   const heldIn = (sleeve: Sleeve): number =>
     sumOf(
       placed.filter((each) => each.sleeve === sleeve),
-      (each) => each.holding.weight,
+      (each) => each.weight,
     );
   for (const sleeve of sleeves) {
     if (shares[sleeve] > 0 && heldIn(sleeve) <= 0) {
       throw new Refusal(`${fund.name} holds nothing in ${sleeve}`);
     }
   }
-  const shareOf = ({ holding, sleeve }: Placed): number =>
-    (holding.weight / heldIn(sleeve)) * shares[sleeve];
+  const shareOf = ({ sleeve, weight }: Placed): number =>
+    (weight / heldIn(sleeve)) * shares[sleeve];
   return new Map(
     categories.map(({ id }) => [
       id,
@@ -224,4 +242,23 @@ function jsonOf(sent: Uint8Array): unknown {
   } catch {
     throw new Refusal("Vanguard's answer is not JSON");
   }
+}
+
+// Which of the categories standing for what is named takes it: the one
+// asking for the largest share, since the others are being wound down,
+// or none where none stands for it; two asking alike are refused by
+// name, since nothing says which.
+function takerOf(
+  standing: readonly Target[],
+  named: string,
+): Target | undefined {
+  const [first, second] = standing.toSorted(
+    (one, other) => other.share - one.share,
+  );
+  if (first !== undefined && second?.share === first.share) {
+    throw new Refusal(
+      `${first.name} and ${second.name} both stand for ${named}, and neither asks for more`,
+    );
+  }
+  return first;
 }
