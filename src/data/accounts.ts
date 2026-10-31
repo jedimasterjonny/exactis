@@ -147,15 +147,21 @@ type Growth =
 // The groups the balances are dated and checked in, each by its name and
 // which accounts it holds: the savings, what the property and vehicles
 // are worth, and every loan and debt, a loan on an asset among them.
+// Each says whether its balances are typed from a statement, as the
+// savings' are, or are usually what the plan expected, as a loan's are,
+// its payments and interest being the plan's, and a house's or a car's
+// worth, which no statement gives.
 export const balanceGroups = [
   {
     holds: (account: Account): boolean =>
       !isAsset(account) && account.kind !== "debt",
+    isStated: true,
     name: "Savings",
   },
-  { holds: isAsset, name: "Property & vehicles" },
+  { holds: isAsset, isStated: false, name: "Property & vehicles" },
   {
     holds: (account: Account): boolean => account.kind === "debt",
+    isStated: false,
     name: "Loans & debts",
   },
 ] as const;
