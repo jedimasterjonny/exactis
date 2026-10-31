@@ -23,6 +23,7 @@ import {
   keepAfter,
   listScenarios,
   readAsOf,
+  readClosed,
   readFirst,
   readLatest,
 } from "./household";
@@ -291,6 +292,69 @@ describe("household store", () => {
     expect(await readAsOf(db, "Retire early", day("2026-09-15"))).toStrictEqual(
       { household: later, savedAt: day("2026-09-20"), version: 2 },
     );
+  });
+
+  // A first save, as of August with no point; the reference closed onto
+  // August, then edited; September closed, then closed again; and an
+  // import of the August household over it, which takes the balances
+  // back to August's.
+  it("reads the version a month's close kept, the first of the latest run holding it", async () => {
+    const august = { month: 7, year: 2026 };
+    const september = { month: 8, year: 2026 };
+    const [point] = reference.points.slice(-1);
+    const closed = {
+      ...reference,
+      asOf: september,
+      points: [...reference.points, { ...point, month: september }],
+    };
+    const versions = [
+      blank,
+      reference,
+      { ...reference, ages: { ends: 95 } },
+      closed,
+      closed,
+    ];
+    await db
+      .insert(householdVersions)
+      .values(
+        versions.map((household, at) => ({
+          household,
+          scenario: "",
+          version: at + 1,
+        })),
+      );
+
+    expect(await readClosed(db, "", august)).toStrictEqual({
+      household: reference,
+      version: 2,
+    });
+    expect(await readClosed(db, "", september)).toStrictEqual({
+      household: closed,
+      version: 4,
+    });
+
+    await keepAfter(db, { scenario: "", version: 5 }, reference);
+
+    expect(await readClosed(db, "", august)).toMatchObject({ version: 6 });
+  });
+
+  // A point imported for August while the balances are as of July, and
+  // a scenario holding August's close, are no close of August in the
+  // household.
+  it("reads no close of a month the branch never closed", async () => {
+    await db.insert(householdVersions).values([
+      {
+        household: { ...reference, asOf: { month: 6, year: 2026 } },
+        scenario: "",
+        version: 1,
+      },
+      { household: reference, scenario: "Retire early", version: 1 },
+    ]);
+
+    expect(await readClosed(db, "", { month: 7, year: 2026 })).toBeNull();
+    expect(
+      await readClosed(db, "Retire early", { month: 7, year: 2026 }),
+    ).toMatchObject({ version: 1 });
   });
 
   // Postgres refuses a NUL in jsonb, and the values bound to a save are
