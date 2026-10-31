@@ -9,7 +9,6 @@ import { isAsset, isPension } from "@/data/accounts";
 import { isReached, retiresOn, retiringAt, timed } from "@/data/milestones";
 import {
   ageIn,
-  earnerOf,
   endYear,
   holderOf,
   pricesIn,
@@ -296,20 +295,10 @@ export function carriedBy(run: Run, year: null | number): Run {
   if (retiresOn(run.plan) === undefined) {
     return run;
   }
-  const plan =
-    year === null ? run.plan : retiringAt(run.plan, ageIn(year, run.plan));
-  return {
-    accounts: run.accounts,
-    plan,
-    schedule: {
-      expenses: run.schedule.expenses.map((line) => timed(line, [], plan)),
-      income: run.schedule.income.flatMap((line) =>
-        line.kind === "state-pension"
-          ? statePensionLines(earnerOf(line, plan), plan)
-          : [timed(line, [], plan)],
-      ),
-    },
-  };
+  return retimed(
+    run,
+    year === null ? run.plan : retiringAt(run.plan, ageIn(year, run.plan)),
+  );
 }
 
 // Whether a point holds or owes anything at all, in any account.
@@ -1391,6 +1380,29 @@ function reserveOf(held: readonly Held[]): number {
   return held
     .filter(({ account }) => isReserve(account))
     .reduce((sum, { balance }) => sum + balance, 0);
+}
+
+// The run carried over the plan given: every line tied to retirement
+// read off it, starting there or ending the year before, and each
+// owner's State Pension made again from the owners, as the household is
+// read, counted to the retirement the plan lays out and left out where
+// its years then earn nothing. The other lines keep their order, and
+// the State Pensions follow them, owner by owner, as the household lays
+// them.
+function retimed(run: Run, plan: Plan): Run {
+  return {
+    accounts: run.accounts,
+    plan,
+    schedule: {
+      expenses: run.schedule.expenses.map((line) => timed(line, [], plan)),
+      income: [
+        ...run.schedule.income
+          .filter(({ kind }) => kind !== "state-pension")
+          .map((line) => timed(line, [], plan)),
+        ...plan.owners.flatMap((owner) => statePensionLines(owner, plan)),
+      ],
+    },
+  };
 }
 
 // What a tax year is refunded once it closes, or owes as a negative:
