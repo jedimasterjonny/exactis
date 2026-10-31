@@ -10,8 +10,14 @@ import type { Answer } from "@/lib/answer";
 import { nothingKeptIn, soundKept, sourcesIn } from "@/data/household";
 import { upcast } from "@/data/shapes";
 import { getDb } from "@/db/client";
-import { keepAfter, listScenarios, readAsOf, readLatest } from "@/db/household";
-import { Refusal, refused, saved, Stale } from "@/lib/answer";
+import {
+  keepAfter,
+  listScenarios,
+  readAsOf,
+  readClosed,
+  readLatest,
+} from "@/db/household";
+import { answerOf, Refusal, refused, saved, Stale } from "@/lib/answer";
 import { dayOf, monthBefore, thisMonth } from "@/lib/months";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
@@ -28,6 +34,13 @@ export interface Held {
 export interface Opened {
   readonly isKept: boolean;
   readonly name: string;
+}
+
+// The household as the close before the latest left it, or why it cannot
+// be read now, beside the household now, both as kept.
+export interface SinceClose {
+  readonly before: Answer<Kept>;
+  readonly now: Kept;
 }
 
 // What a save makes of the household: the kept household to write, and
@@ -47,7 +60,8 @@ interface Open {
 // What a page reads, each read once a request however many parts of the
 // page ask for it, so a page never lays one version's accounts beside
 // another's lines, nor a scenario's name over the household's figures:
-// the branch open, the household as it stands there, and the household
+// the branch open, the household held there, as it stands and as it is
+// kept, held to the rules once whichever a page reads, and the household
 // itself, for the dashboard to set beside a scenario. Whether React's
 // cache carries from an action into the render its refresh() asks for
 // is not known here, so these are for a page's reads: what an action
@@ -56,9 +70,7 @@ interface Open {
 // by the page in place of what the action wrote. The names of the
 // scenarios kept are read once a request too.
 const readPage = cache(async (): Promise<Open> => readOpen(false));
-const readHousehold = cache(
-  async (): Promise<Household> => heldIn(await readPage()).household,
-);
+const readPageHeld = cache(async (): Promise<Held> => heldIn(await readPage()));
 const readBaseline = cache(
   async (): Promise<Household> =>
     heldIn({ latest: await readLatest(getDb(), ""), scenario: "" }).household,
@@ -126,7 +138,7 @@ export async function getBaseline(): Promise<Household> {
 
 export async function getHousehold(): Promise<Household> {
   await requireSession();
-  return readHousehold();
+  return (await readPageHeld()).household;
 }
 
 // The scenario the cookie names, or null while the household is open,
@@ -155,6 +167,31 @@ export async function getScenario(): Promise<null | string> {
 export async function getScenarios(): Promise<readonly string[]> {
   await requireSession();
   return readScenarios();
+}
+
+// The household now as it is kept on the branch open, the version the
+// page reads, beside the household as the close before its latest point
+// left it, the month of the point before the latest, carried through
+// the chain and held to every rule as the latest is, or the refusal in
+// their words where it cannot be read now; or null with fewer than two
+// points, or where no version holds the close of that month, as one
+// whose points were imported does not. The session is checked first,
+// as every read's is.
+export async function getSinceClose(): Promise<null | SinceClose> {
+  await requireSession();
+  const [{ scenario }, { kept }] = await Promise.all([
+    readPage(),
+    readPageHeld(),
+  ]);
+  const month = kept.points.at(-2)?.month;
+  const closed =
+    month === undefined ? null : await readClosed(getDb(), scenario, month);
+  return closed === null
+    ? null
+    : {
+        before: answerOf(() => soundKept(upcast(closed.household)).kept),
+        now: kept,
+      };
 }
 
 // The sources the CMA-derived rates rested on as the household stood so

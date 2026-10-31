@@ -32,6 +32,7 @@ import {
   getOpened,
   getScenario,
   getScenarios,
+  getSinceClose,
   getSourcesDaysAgo,
 } from "./household";
 
@@ -426,6 +427,68 @@ describe("the household store", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(getSourcesDaysAgo(30)).rejects.toThrow("redirected");
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  // The reference closed onto July, a version with July's point its
+  // latest, then onto August.
+  it("reads the household as the close before the latest left it, beside the household now", async () => {
+    const july = {
+      ...reference,
+      asOf: { month: 6, year: 2026 },
+      points: reference.points.slice(0, -1),
+    };
+    await keepAfter(db, { scenario: "", version: 0 }, july);
+    await keepAfter(db, { scenario: "", version: 1 }, reference);
+
+    expect(await getSinceClose()).toStrictEqual({
+      before: saved(july),
+      now: reference,
+    });
+  });
+
+  // Written past the rules, as a close kept before they tightened.
+  it("says why the close before the latest cannot be read now", async () => {
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      {
+        ...reference,
+        accounts: [...reference.accounts, ...reference.accounts],
+        asOf: { month: 6, year: 2026 },
+        points: reference.points.slice(0, -1),
+      },
+    );
+    await keepAfter(db, { scenario: "", version: 1 }, reference);
+
+    expect(await getSinceClose()).toStrictEqual({
+      before: refused("A record's id is held by no other record"),
+      now: reference,
+    });
+  });
+
+  // One point, kept or imported; and six with no version of July's
+  // close, as points imported from a sheet are.
+  it("reads no close before the latest with fewer than two points, or none kept", async () => {
+    expect(await getSinceClose()).toBeNull();
+
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...reference, points: reference.points.slice(-1) },
+    );
+
+    expect(await getSinceClose()).toBeNull();
+
+    await keepAfter(db, { scenario: "", version: 1 }, reference);
+
+    expect(await getSinceClose()).toBeNull();
+  });
+
+  it("reads no close before the latest without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(getSinceClose()).rejects.toThrow("redirected");
     expect(getDb).not.toHaveBeenCalled();
   });
 
