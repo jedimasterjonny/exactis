@@ -46,7 +46,7 @@
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
     "@commitlint/config-conventional": "21.2.4",
-    "@electric-sql/pglite": "0.5.11",
+    "@electric-sql/pglite": "0.5.13",
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
     "@eslint-react/eslint-plugin": "5.28.8",
     "@tailwindcss/postcss": "4.3.3",
