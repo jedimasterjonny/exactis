@@ -60,6 +60,13 @@ function detail(name: string): HTMLElement {
   return screen.getByRole("rowheader", { name });
 }
 
+// The links of the trades' card, each its name and where it goes.
+function links(): (null | string)[][] {
+  return within(screen.getByRole("region", { name: "Trades" }))
+    .getAllByRole("link")
+    .map((link) => [link.textContent, link.getAttribute("href")]);
+}
+
 // The month end at the address given on the day given, over the
 // household given, as the store reads it, with a scenario open where one
 // is named, and the close before the latest as given.
@@ -191,11 +198,10 @@ describe("Close", () => {
     expect(trades()).toStrictEqual([
       "The plan paid £1,250 into the ISAs and GIA in August 2026.",
     ]);
-    expect(
-      within(screen.getByRole("region", { name: "Trades" })).getByRole("link", {
-        name: "Choose an amount",
-      }),
-    ).toHaveAttribute("href", "/cogitator");
+    expect(links()).toStrictEqual([
+      ["Work out trades for £1,250", "/cogitator?amount=1250&from=2026-08"],
+      ["Choose an amount", "/cogitator"],
+    ]);
   });
 
   // September closed, on the fifteenth of October, over holdings
@@ -219,11 +225,10 @@ describe("Close", () => {
       "The plan paid £1,250 into the ISAs and GIA in September 2026.",
       "Import this month's holdings first.",
     ]);
-    expect(
-      within(screen.getByRole("region", { name: "Trades" })).getByRole("link", {
-        name: "Assumptions › Target allocation",
-      }),
-    ).toHaveAttribute("href", "/assumptions");
+    expect(links()).toStrictEqual([
+      ["Assumptions › Target allocation", "/assumptions"],
+      ["Choose an amount", "/cogitator"],
+    ]);
   });
 
   it("asks for holdings where none are imported, over the months since the close before", async () => {
@@ -263,6 +268,7 @@ describe("Close", () => {
     expect(trades()).toStrictEqual([
       "The plan paid nothing into the ISAs and GIA in August 2026.",
     ]);
+    expect(links()).toStrictEqual([["Choose an amount", "/cogitator"]]);
   });
 
   // The balances behind plan and folded into the changes, with nothing

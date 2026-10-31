@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { FolderSync } from "lucide-react";
 import { useState } from "react";
 
+import type { Month } from "@/data/schedule";
 import type { Targets } from "@/data/targets";
 
 import {
@@ -15,13 +16,14 @@ import { SelectField } from "@/components/app/molecules/select-field";
 import { Screen } from "@/components/app/templates/screen";
 import { Badge } from "@/components/kit/badge";
 import { formatGbp } from "@/lib/money";
-import { formatDay } from "@/lib/months";
+import { formatDay, monthName } from "@/lib/months";
 import { cogitator, sectionLabel } from "@/lib/nav";
 
 import { CogitatorBoard } from "./cogitator-board";
 
 interface CogitatorScreenProps {
   readonly bonds?: { readonly now: number; readonly targeted: number };
+  readonly offered?: { readonly amount: number; readonly month: Month };
   readonly targets: null | Targets;
 }
 
@@ -44,12 +46,16 @@ interface CogitatorScreenProps {
 // shows. The amount and sales fields show those held, and the account
 // choice opens on the account held, so each says what the ladder is
 // making when it comes back after the allocation had nothing to buy
-// toward.
+// toward. An amount the month end offered opens the amount at it rather
+// than at nothing, and the field says which month's close it came from
+// for as long as it holds it, so a figure is never there unexplained;
+// it is typed over as any amount is.
 export function CogitatorScreen({
   bonds,
+  offered,
   targets,
 }: CogitatorScreenProps): JSX.Element {
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState(offered?.amount ?? 0);
   const [sales, setSales] = useState(0);
   const [account, setAccount] = useState("");
   const categories = targets?.categories ?? [];
@@ -75,6 +81,11 @@ export function CogitatorScreen({
         isReady ? (
           <>
             <MoneyField
+              hint={
+                offered?.amount === amount
+                  ? `From ${monthName(offered.month.month, "long")}'s close`
+                  : undefined
+              }
               label="Amount to invest"
               min={0}
               onValueCommitted={setAmount}
