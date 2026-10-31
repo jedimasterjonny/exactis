@@ -7,6 +7,7 @@ import { accounts } from "./accounts.fixture";
 import { golf, golfLoan } from "./cars.fixture";
 import { house, houseLoan } from "./houses.fixture";
 import {
+  isDue,
   latestYearOf,
   movesOf,
   netWorthOf,
@@ -39,6 +40,16 @@ function monthly(worths: readonly number[]): ProgressPoint[] {
     unsecured: 0,
   }));
 }
+
+describe("isDue", () => {
+  // The latest point is August 2026's.
+  it("is due from the month after the latest point's until a point is kept for the month before", () => {
+    expect(isDue(points, { month: 8, year: 2026 })).toBe(false);
+    expect(isDue(points, { month: 9, year: 2026 })).toBe(true);
+    expect(isDue(points, { month: 0, year: 2027 })).toBe(true);
+    expect(isDue([], { month: 8, year: 2026 })).toBe(true);
+  });
+});
 
 describe("latestYearOf", () => {
   // Six points from March to August 2026: the year is read from the

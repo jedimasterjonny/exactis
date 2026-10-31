@@ -2,7 +2,7 @@ import type { Account } from "@/data/accounts";
 import type { Month } from "@/data/schedule";
 
 import { isAsset, isPension } from "@/data/accounts";
-import { monthsBetween } from "@/lib/months";
+import { isOnOrBefore, monthBefore, monthsBetween } from "@/lib/months";
 
 // A progress point is the household's balances as they were read at the
 // end of a month, each summed over the accounts it holds: the pensions,
@@ -93,6 +93,16 @@ export interface LatestYear {
 export interface Move {
   readonly key: Balance;
   readonly move: number;
+}
+
+// Whether the last month that has ended before the month given is still
+// to be closed: no point is kept for it or after it, as none is before
+// the first close.
+export function isDue(points: readonly ProgressPoint[], month: Month): boolean {
+  const latest = points.at(-1);
+  return (
+    latest === undefined || !isOnOrBefore(monthBefore(month), latest.month)
+  );
 }
 
 export function latestYearOf(

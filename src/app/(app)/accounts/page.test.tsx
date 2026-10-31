@@ -10,16 +10,12 @@ import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
-import { getHousehold, getOpened } from "@/store/household";
+import { getHousehold } from "@/store/household";
 
 import Accounts from "./page";
 
-vi.mock("@/store/household", () => ({
-  getHousehold: vi.fn(),
-  getOpened: vi.fn(),
-}));
+vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
 vi.mock("@/actions/accounts", () => ({
-  closeBalances: vi.fn(),
   removeAccount: vi.fn(),
   saveAccount: vi.fn(),
 }));
@@ -33,7 +29,7 @@ vi.mock("@/actions/owners", () => ({
 }));
 
 // The page over the fixture's household, as the store reads it, with
-// the expense lines a test gives, with no scenario open.
+// the expense lines a test gives.
 async function renderAccounts({
   expenses = [],
 }: { readonly expenses?: readonly ExpenseLine[] } = {}): Promise<void> {
@@ -45,7 +41,6 @@ async function renderAccounts({
     plan,
     schedule: { expenses, income: [...incomeLines] },
   });
-  vi.mocked(getOpened).mockResolvedValue(null);
   render(await Accounts());
 }
 
@@ -74,11 +69,10 @@ describe("Accounts", () => {
       screen.getAllByRole("definition").map((value) => value.textContent),
     ).toStrictEqual(["Not dated", "Not dated", "Not dated"]);
     expect(
-      within(screen.getByRole("banner"))
-        .getAllByRole("button")
-        .map((button) => button.textContent),
-    ).toStrictEqual(["Update balances"]);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      within(screen.getByRole("banner")).getByRole("link", {
+        name: "Update balances",
+      }),
+    ).toHaveAttribute("href", "/close");
   });
 
   // The fixture's salary feeds the workplace pension, which the ledger

@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 import {
+  CalendarCheck,
   Cpu,
   Dices,
   History,
@@ -65,6 +66,13 @@ export const assumptions: Screen = {
   title: "Plan assumptions",
 };
 
+export const monthEnd: Screen = {
+  href: "/close",
+  icon: CalendarCheck,
+  label: "Month end",
+  title: "Month end",
+};
+
 export const cogitator: Screen = {
   href: "/cogitator",
   icon: Cpu,
@@ -77,9 +85,12 @@ export const cogitator: Screen = {
 // has to change. Only built screens appear, since a typed route cannot
 // point at one that does not exist. The chance of success sits beside the
 // dashboard, the two readings of where the plan goes, ahead of the
-// screens it is read from. The cogitator closes the list: it is read
-// from the target allocation at the end of the assumptions, and says
-// what to buy and sell next rather than what the plan rests on.
+// screens it is read from. The month end and the cogitator close the
+// list, since each says what to do rather than what the plan rests on:
+// the month end checks the balances and says what moved the plan, and
+// the cogitator, read from the target allocation at the end of the
+// assumptions, says what to buy and sell next, which a month end
+// closes on.
 export const screens: readonly Screen[] = [
   dashboard,
   chance,
@@ -87,15 +98,16 @@ export const screens: readonly Screen[] = [
   plan,
   progress,
   assumptions,
+  monthEnd,
   cogitator,
 ];
 
 // Section numerals are roman, decorative and consistent, never the only
-// way to identify a screen. There are seven screens and no screen has
+// way to identify a screen. There are eight screens and no screen has
 // more than six cards, so the numerals are listed rather than worked
 // out; a place past the list is written in figures, so it shows rather
 // than vanishing.
-const numerals = ["I", "II", "III", "IV", "V", "VI", "VII"] as const;
+const numerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"] as const;
 
 // The screen at a pathname, or undefined where no built screen is.
 export function screenAt(pathname: string): Screen | undefined {

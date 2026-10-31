@@ -2,8 +2,8 @@
 
 import type { JSX } from "react";
 
-import { CalendarCheck, Check } from "lucide-react";
-import { useId, useState } from "react";
+import { Check } from "lucide-react";
+import { useState } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
@@ -16,10 +16,11 @@ import { FieldRow } from "@/components/app/atoms/field-row";
 import { Ledger } from "@/components/app/atoms/ledger";
 import { Note } from "@/components/app/atoms/note";
 import { RowAction } from "@/components/app/atoms/row-action";
-import { DialogFrame } from "@/components/app/molecules/dialog-frame";
 import { MoneyInput, YearField } from "@/components/app/molecules/figure-field";
 import { MonthField } from "@/components/app/molecules/month-field";
+import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";
+import { CardContent, CardFooter } from "@/components/kit/card";
 import { balanceGroups } from "@/data/accounts";
 import { monthsOn } from "@/engine/projection";
 import { useSender } from "@/hooks/use-sender";
@@ -31,6 +32,7 @@ import {
   monthBefore,
   monthsBetween,
 } from "@/lib/months";
+import { monthEnd, subsectionLabel } from "@/lib/nav";
 
 // The worksheet while it is open: the month the balances are being
 // closed onto, the balances checked, and the figures typed, by the
@@ -43,7 +45,6 @@ interface Draft {
 
 interface MonthEndProps {
   readonly accounts: readonly Account[];
-  readonly isInScenario: boolean;
   readonly month: Month;
   readonly plan: Plan;
   readonly schedule: Schedule;
@@ -59,7 +60,7 @@ interface Row {
   readonly paid: number;
 }
 
-// The month end: the header's button, which opens a worksheet of every
+// The month end's worksheet, the first card of its screen: every
 // balance closed onto the end of the last month that has ended, or of
 // another month picked. Each balance opens at what the plan expected it
 // to reach by then, as the projection carries it over the months from
@@ -79,112 +80,83 @@ interface Row {
 // last set. The worksheet closes on the balances the month leaves, as
 // the statements have them, a pension at what it holds, ruled off from
 // what they were, what was paid in and what moved, over the balances
-// checked; the footer counts them. A
-// store that refuses leaves the worksheet open and says why. The year
-// picked is held between the year the plan's owner was born and the
-// year of the last month that has ended, which are the months the store
-// takes, so a year mistyped asks the plan for no more months than it
-// has. The day it is is given rather than read, so the ages draw the
-// same on the server as in a test, and so is the month the worksheet
-// opens on. While a scenario is open the button is held, beside the
-// store's reason for refusing the month there, so no balance is typed
-// only to be refused.
+// checked; the footer counts them. A store that refuses leaves the
+// worksheet as it was and says why, and one that saves opens it afresh,
+// so a month closed that leaves the screen where it was is not saved
+// twice. The year picked is held between the year the plan's owner was
+// born and the year of the last month that has ended, which are the
+// months the store takes, so a year mistyped asks the plan for no more
+// months than it has. The day it is is given rather than read, so the
+// ages draw the same on the server as in a test, and so is the month
+// the worksheet opens on.
 export function MonthEnd({
   accounts,
-  isInScenario,
   month,
   plan,
   schedule,
   today,
 }: MonthEndProps): JSX.Element {
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const opened = (): Draft => ({
+    asOf: month,
+    checked: new Set(),
+    typed: new Map(),
+  });
+  const [draft, setDraft] = useState(opened);
   const { isSending: isSaving, send } = useSender();
-  const heldId = useId();
   const from: Month = { month: plan.month, year: plan.from };
-  const rows =
-    draft === null ? [] : rowsOf(accounts, draft, { from, plan, schedule });
+  const rows = rowsOf(accounts, draft, { from, plan, schedule });
   const checked = rows.filter(({ isChecked }) => isChecked);
-
-  function dismiss(): void {
-    setDraft(null);
-  }
-
-  function open(): void {
-    setDraft({ asOf: month, checked: new Set(), typed: new Map() });
-  }
-
   return (
-    <>
-      {isInScenario && (
-        <span className="text-sm text-muted-foreground" id={heldId}>
-          Leave the scenario to close the month
+    <SectionCard
+      label={subsectionLabel(monthEnd, 1)}
+      title={`Balances at the end of ${formatMonth(draft.asOf)}`}
+    >
+      <CardContent className="grid gap-4">
+        <Worksheet
+          checked={checked}
+          draft={draft}
+          from={from}
+          month={month}
+          onAmend={setDraft}
+          plan={plan}
+          rows={rows}
+          today={today}
+        />
+      </CardContent>
+      <CardFooter className="justify-end gap-2">
+        <span className="mr-auto text-sm text-muted-foreground">
+          {`${String(checked.length)} of ${String(rows.length)} checked`}
         </span>
-      )}
-      <Button
-        aria-describedby={isInScenario ? heldId : undefined}
-        disabled={isInScenario}
-        onClick={open}
-        size="sm"
-      >
-        <CalendarCheck aria-hidden />
-        Update balances
-      </Button>
-      {draft !== null && (
-        <DialogFrame
-          className="sm:max-w-3xl"
-          eyebrow="Month end"
-          footer={
-            <>
-              <span className="mr-auto self-center text-sm text-muted-foreground">
-                {`${String(checked.length)} of ${String(rows.length)} checked`}
-              </span>
-              <Button onClick={dismiss} size="sm" variant="outline">
-                Cancel
-              </Button>
-              <Button
-                isBusy={isSaving}
-                onClick={() => {
-                  send(
-                    async () =>
-                      closeBalances({
-                        asOf: draft.asOf,
-                        balances: checked.map(({ account, now }) => ({
-                          balance: Math.round(now),
-                          id: account.id,
-                        })),
-                      }),
-                    {
-                      failure: "Balances not saved",
-                      onAccepted: dismiss,
-                      success: (saved) => ({
-                        description: `${counted(checked.length, "balance")} set as of the end of ${formatMonth(saved.asOf)}${saved.isRecorded ? ", its progress point recorded" : ""}`,
-                        title: "Balances updated",
-                      }),
-                    },
-                  );
-                }}
-                size="sm"
-              >
-                Save
-              </Button>
-            </>
-          }
-          onDismiss={dismiss}
-          title={`Balances at the end of ${formatMonth(draft.asOf)}`}
+        <Button
+          isBusy={isSaving}
+          onClick={() => {
+            send(
+              async () =>
+                closeBalances({
+                  asOf: draft.asOf,
+                  balances: checked.map(({ account, now }) => ({
+                    balance: Math.round(now),
+                    id: account.id,
+                  })),
+                }),
+              {
+                failure: "Balances not saved",
+                onAccepted: () => {
+                  setDraft(opened());
+                },
+                success: (saved) => ({
+                  description: `${counted(checked.length, "balance")} set as of the end of ${formatMonth(saved.asOf)}${saved.isRecorded ? ", its progress point recorded" : ""}`,
+                  title: "Balances updated",
+                }),
+              },
+            );
+          }}
+          size="sm"
         >
-          <Worksheet
-            checked={checked}
-            draft={draft}
-            from={from}
-            month={month}
-            onAmend={setDraft}
-            plan={plan}
-            rows={rows}
-            today={today}
-          />
-        </DialogFrame>
-      )}
-    </>
+          Save
+        </Button>
+      </CardFooter>
+    </SectionCard>
   );
 }
 
@@ -277,9 +249,9 @@ function typedAs(account: Account, value: number): number {
   return account.kind === "debt" ? negated(Math.abs(value)) : value;
 }
 
-// The open worksheet, drawn in whatever frame its caller gives it: the
-// month, a field a balance in its group, and the balances the month
-// leaves, given every row and the rows checked among them.
+// The worksheet between the card's header and its footer: the month, a
+// field a balance in its group, and the balances the month leaves, given
+// every row and the rows checked among them.
 function Worksheet({
   checked,
   draft,

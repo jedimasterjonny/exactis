@@ -44,10 +44,10 @@ function toned(tone: string): HTMLElement {
 }
 
 describe("CogitatorScreen", () => {
-  it("heads the screen as the seventh, saying when the targets were imported and what they hold", () => {
+  it("heads the screen as the eighth, saying when the targets were imported and what they hold", () => {
     render(<CogitatorScreen targets={reference} />);
 
-    expect(screen.getByText("Sect. VII · Cogitator")).toHaveClass("label");
+    expect(screen.getByText("Sect. VIII · Cogitator")).toHaveClass("label");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Next best trades",
     );
