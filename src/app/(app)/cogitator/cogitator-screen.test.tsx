@@ -251,6 +251,26 @@ describe("CogitatorScreen", () => {
     expect(rows[2]).not.toHaveClass("text-muted-foreground");
   });
 
+  // August's close offered the £2,000; typed over, it is the screen's own.
+  it("opens on the amount a month end offered, saying so until it is typed over", () => {
+    render(
+      <CogitatorScreen
+        offered={{ amount: 2000, month: { month: 7, year: 2026 } }}
+        targets={reference}
+      />,
+    );
+
+    expect(field("Amount to invest")).toHaveValue("£2,000");
+    expect(field("Amount to invest")).toHaveAccessibleDescription(
+      "From August's close",
+    );
+    expect(toned("inverse")).toHaveTextContent("£1,745");
+
+    invest("1,500");
+
+    expect(field("Amount to invest")).not.toHaveAccessibleDescription();
+  });
+
   it("shows the amount and sales held when their fields come back", () => {
     const { rerender } = render(<CogitatorScreen targets={reference} />);
     invest("2000");

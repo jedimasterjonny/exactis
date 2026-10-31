@@ -353,6 +353,12 @@ function figuresOf(standing: Standing, plan: Plan): readonly string[] {
   ];
 }
 
+// A month as an ISO date writes it, its year and its month from one:
+// "2026-08".
+function keyOf({ month, year }: Month): string {
+  return `${String(year)}-${String(month + 1).padStart(2, "0")}`;
+}
+
 // The rows of what moved: the standing the month end expected, a row a
 // step with how far it moved the retirement and the liquid worth, and
 // the standing now, each with how far it moved the liquid worth beside
@@ -428,8 +434,11 @@ function titleOf(moved: Moved, month: string, plan: Plan): string {
 }
 
 // The offer of what the plan paid into the ISAs and the GIAs to the
-// cogitator, or, where the holdings were imported before the month
-// closed ended, the word to import them first.
+// cogitator, as the amount to work trades out for, the month closed with
+// it so the cogitator can say where it came from, or any amount chosen
+// there; or, where the holdings were imported before the month closed
+// ended, the word to import them first, and no amount, since trades
+// worked out from them would be for holdings that have moved since.
 function Trades({
   month,
   moved,
@@ -439,11 +448,8 @@ function Trades({
   readonly moved: Moved;
   readonly targets: Kept["targets"];
 }): JSX.Element {
-  const ended = monthAfter(month);
   const isStale =
-    targets === null ||
-    targets.importedOn <
-      `${String(ended.year)}-${String(ended.month + 1).padStart(2, "0")}-01`;
+    targets === null || targets.importedOn < `${keyOf(monthAfter(month))}-01`;
   const months =
     moved.months === 1
       ? `in ${formatMonth(month)}`
@@ -453,13 +459,22 @@ function Trades({
     <SectionCard
       actions={
         <>
-          {isStale && (
+          {isStale ? (
             <Link
               className={buttonVariants({ size: "sm", variant: "outline" })}
               href={assumptions.href}
             >
               {`${assumptions.label} › Target allocation`}
             </Link>
+          ) : (
+            moved.invested > 0 && (
+              <Link
+                className={buttonVariants({ size: "sm" })}
+                href={`${cogitator.href}?amount=${String(moved.invested)}&from=${keyOf(month)}`}
+              >
+                {`Work out trades for ${formatGbp(moved.invested)}`}
+              </Link>
+            )
           )}
           <Link
             className={buttonVariants({ size: "sm", variant: "outline" })}
