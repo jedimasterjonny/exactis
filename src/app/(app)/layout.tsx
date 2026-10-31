@@ -7,7 +7,7 @@ import type { Opened } from "@/store/household";
 import { ScenarioBanner } from "@/components/app/molecules/scenario-banner";
 import { AppSidebar } from "@/components/app/organisms/app-sidebar";
 import { AppFrame } from "@/components/app/templates/app-frame";
-import { getOpened } from "@/store/household";
+import { getOpened, isCloseDue } from "@/store/household";
 
 import { FrameCatch } from "./frame-catch";
 
@@ -26,9 +26,11 @@ interface OpenScenarioProps {
 // promise down rather than awaiting it. The read sits above the screens'
 // error boundary, which catches nothing this layout throws, so a read
 // that fails is caught around the frame, which is drawn again with the
-// error screen in place of the screen and the banner both.
+// error screen in place of the screen and the banner both. Whether last
+// month is still to be closed is read the same way, for the navigation
+// to badge the month end.
 export default function AppLayout({ children }: LayoutProps<"/">): JSX.Element {
-  const sidebar = <AppSidebar />;
+  const sidebar = <AppSidebar isDue={isCloseDue()} />;
   return (
     <FrameCatch sidebar={sidebar}>
       <AppFrame

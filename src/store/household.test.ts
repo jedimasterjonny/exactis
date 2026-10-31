@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { refresh } from "next/cache";
+import { redirect } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 
 import type { DerivedSet } from "@/data/cma";
@@ -34,6 +35,7 @@ import {
   getScenarios,
   getSinceClose,
   getSourcesDaysAgo,
+  isCloseDue,
 } from "./household";
 
 vi.mock("server-only", () => ({}));
@@ -489,6 +491,39 @@ describe("the household store", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(getSinceClose()).rejects.toThrow("redirected");
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  // Read on the fifteenth of September: before anything is kept no month
+  // is closed, and the reference's latest point is August's, the last
+  // month that has ended; a scenario holding no point reads the
+  // household's.
+  it("says whether the household's last month that has ended is still to be closed", async () => {
+    expect(await isCloseDue()).toBe(true);
+
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+
+    expect(await isCloseDue()).toBe(false);
+
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
+    vi.mocked(openedScenario).mockResolvedValue("Retire early");
+
+    expect(await isCloseDue()).toBe(false);
+  });
+
+  it("says nothing is due where the read fails", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("unreadable"));
+
+    expect(await isCloseDue()).toBe(false);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  // The session's check redirecting to the login screen, as it does
+  // without a session.
+  it("throws on what Next throws to steer the render, a redirect among them", async () => {
+    vi.mocked(requireSession).mockImplementation(() => redirect("/login"));
+
+    await expect(isCloseDue()).rejects.toThrow("NEXT_REDIRECT");
     expect(getDb).not.toHaveBeenCalled();
   });
 

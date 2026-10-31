@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getOpened } from "@/store/household";
+import { getOpened, isCloseDue } from "@/store/household";
 import { stubViewport } from "@/test/dom";
 
 import { takeConsoleOutput } from "../../../vitest.setup";
@@ -11,7 +11,10 @@ vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
 vi.mock("@/actions/auth", () => ({ signOut: vi.fn() }));
 vi.mock("@/actions/household", () => ({ importHousehold: vi.fn() }));
 vi.mock("@/actions/scenarios", () => ({ leaveScenario: vi.fn() }));
-vi.mock("@/store/household", () => ({ getOpened: vi.fn() }));
+vi.mock("@/store/household", () => ({
+  getOpened: vi.fn(),
+  isCloseDue: vi.fn(),
+}));
 
 // The scenario open as reads already answered: the household, and a
 // scenario. Each is marked the way React marks a promise it has seen
@@ -26,6 +29,17 @@ const opened = { isKept: true, name: "Retire early" };
 const retiringEarly = Object.assign(Promise.resolve(opened), {
   status: "fulfilled",
   value: opened,
+});
+
+// Whether last month is still to be closed, as reads already answered,
+// marked the same way.
+const closed = Object.assign(Promise.resolve(false), {
+  status: "fulfilled",
+  value: false,
+});
+const due = Object.assign(Promise.resolve(true), {
+  status: "fulfilled",
+  value: true,
 });
 
 // A read that failed, marked the way React marks a promise it has seen
@@ -47,6 +61,10 @@ function renderLayout(): void {
 }
 
 describe("AppLayout", () => {
+  beforeEach(() => {
+    vi.mocked(isCloseDue).mockReturnValue(closed);
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -63,6 +81,17 @@ describe("AppLayout", () => {
       screen.getByRole("link", { name: /^Dashboard/ }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("badges the month end where the read says last month is still to be closed", () => {
+    vi.mocked(getOpened).mockReturnValue(household);
+    vi.mocked(isCloseDue).mockReturnValue(due);
+
+    renderLayout();
+
+    expect(
+      within(screen.getByRole("link", { name: /^Month end/ })).getByText("Due"),
+    ).toBeInTheDocument();
   });
 
   it("heads the main column with the scenario open", () => {

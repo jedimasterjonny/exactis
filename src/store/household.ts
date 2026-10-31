@@ -1,5 +1,6 @@
 import "server-only";
 import { refresh } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { cache } from "react";
 
 import type { Household, Kept } from "@/data/household";
@@ -8,6 +9,7 @@ import type { Read, Version } from "@/db/household";
 import type { Answer } from "@/lib/answer";
 
 import { nothingKeptIn, soundKept, sourcesIn } from "@/data/household";
+import { isDue } from "@/data/progress";
 import { upcast } from "@/data/shapes";
 import { getDb } from "@/db/client";
 import {
@@ -221,6 +223,30 @@ export async function getSourcesDaysAgo(days: number): Promise<Before | null> {
           cma: sources.cma && { latest: sources.cma.latest, previous: null },
         },
       };
+}
+
+// Whether the household's last month that has ended is still to be
+// closed, for the navigation to badge the month end: the household's
+// whatever branch is open, since a month is closed in the household
+// alone, read through the page's own read while the household is open.
+// The session is checked first, as every read's is. A read that fails
+// says nothing is due rather than fail, since the navigation is drawn
+// again around the error screen a failed read leads to, and would fail
+// it in turn; the screen's own reads say what failed. What Next throws
+// to steer the render, as a redirect from the session's check or the
+// bail-out from prerendering a read of the request, is thrown on for
+// Next to act on, as it would be uncaught.
+export async function isCloseDue(): Promise<boolean> {
+  try {
+    await requireSession();
+    const { scenario } = await readPage();
+    const { points } =
+      scenario === "" ? (await readPageHeld()).household : await readBaseline();
+    return isDue(points, thisMonth());
+  } catch (error: unknown) {
+    unstable_rethrow(error);
+    return false;
+  }
 }
 
 // The household held on the branch open, with the branch and the
