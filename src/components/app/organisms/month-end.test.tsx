@@ -1,12 +1,6 @@
 import type { ComponentProps } from "react";
 
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { closeBalances } from "@/actions/accounts";
@@ -33,16 +27,14 @@ function ledger(sheet: HTMLElement): (null | string)[] {
 // The month end over the fixture's accounts, their plan running from
 // September 2026 on balances as of the end of August, on the fourth of
 // October, when September is the last month that has ended, the salary
-// feeding the pension, with whatever a test gives in their place; opened
-// from its button. Save reports through the toast manager, which needs
-// its Toaster mounted.
+// feeding the pension, with whatever a test gives in their place. Save
+// reports through the toast manager, which needs its Toaster mounted.
 function openWorksheet(
   props: Partial<ComponentProps<typeof MonthEnd>> = {},
 ): HTMLElement {
   render(
     <MonthEnd
       accounts={accounts}
-      isInScenario={false}
       month={{ month: 8, year: 2026 }}
       plan={plan}
       schedule={{ expenses: [], income: [salary] }}
@@ -51,8 +43,7 @@ function openWorksheet(
     />,
     { wrapper: Toaster },
   );
-  fireEvent.click(screen.getByRole("button", { name: "Update balances" }));
-  return screen.getByRole("dialog");
+  return screen.getByRole("region", { name: /^Balances at the end of/ });
 }
 
 describe("MonthEnd", () => {
@@ -66,7 +57,7 @@ describe("MonthEnd", () => {
   it("opens on the last month that has ended, each balance at what the plan expected of it, in its group", () => {
     const sheet = openWorksheet();
 
-    expect(within(sheet).getByText("Month end")).toHaveClass("text-brand");
+    expect(within(sheet).getByText("Sect. VII.i")).toHaveClass("label");
     expect(
       within(sheet).getByRole("heading", {
         name: "Balances at the end of September 2026",
@@ -157,15 +148,16 @@ describe("MonthEnd", () => {
         { balance: -175053, id: 5 },
       ],
     });
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("dialog", { name: /^Balances at the end of/ }),
-      ).not.toBeInTheDocument();
-    });
     expect(
-      screen.getByRole("dialog", { name: "Balances updated" }),
+      await screen.findByRole("dialog", { name: "Balances updated" }),
     ).toHaveAccessibleDescription(
       "2 balances set as of the end of September 2026, its progress point recorded",
+    );
+    expect(
+      await within(sheet).findByText("0 of 5 checked"),
+    ).toBeInTheDocument();
+    expect(field("Workplace pension")).toHaveAccessibleDescription(
+      "Was £391,640 · £4,350 paid in · not dated",
     );
   });
 
@@ -261,12 +253,15 @@ describe("MonthEnd", () => {
     expect(field("Mortgage")).toHaveValue("£0");
   });
 
-  it("keeps the worksheet open and says why when the store refuses", async () => {
+  it("keeps the worksheet as it was and says why when the store refuses", async () => {
     const sheet = openWorksheet();
     const { promise, resolve: answer } =
       Promise.withResolvers<Awaited<ReturnType<typeof closeBalances>>>();
     vi.mocked(closeBalances).mockReturnValue(promise);
 
+    fireEvent.click(
+      within(sheet).getByRole("button", { name: "Check Mortgage" }),
+    );
     fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));
 
     expect(within(sheet).getByRole("button", { name: "Save" })).toHaveAttribute(
@@ -281,40 +276,6 @@ describe("MonthEnd", () => {
     ).toHaveAccessibleDescription(
       "The balances are as of a month that has ended",
     );
-    expect(
-      screen.getByRole("dialog", {
-        name: "Balances at the end of September 2026",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("holds the button while a scenario is open, saying why", () => {
-    render(
-      <MonthEnd
-        accounts={accounts}
-        isInScenario
-        month={{ month: 8, year: 2026 }}
-        plan={plan}
-        schedule={{ expenses: [], income: [salary] }}
-        today="2026-10-04"
-      />,
-    );
-
-    const button = screen.getByRole("button", { name: "Update balances" });
-    expect(button).toBeDisabled();
-    expect(button).toHaveAccessibleDescription(
-      "Leave the scenario to close the month",
-    );
-    fireEvent.click(button);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
-
-  it("closes on cancel, saving nothing", () => {
-    const sheet = openWorksheet();
-
-    fireEvent.click(within(sheet).getByRole("button", { name: "Cancel" }));
-
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(closeBalances).not.toHaveBeenCalled();
+    expect(within(sheet).getByText("1 of 5 checked")).toBeInTheDocument();
   });
 });

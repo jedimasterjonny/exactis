@@ -1,16 +1,19 @@
 import type { JSX } from "react";
 
+import { CalendarCheck } from "lucide-react";
+import Link from "next/link";
+
 import { BalanceDates } from "@/components/app/atoms/balance-dates";
-import { MonthEnd } from "@/components/app/organisms/month-end";
 import { Screen } from "@/components/app/templates/screen";
+import { buttonVariants } from "@/components/kit/button";
 import { moveChoices } from "@/data/houses";
 import { markersOf } from "@/data/milestones";
 import { laidOut } from "@/engine/projection";
 import { balanceOf, drawingTaxOf } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
-import { formatMonth, monthBefore, thisMonth, today } from "@/lib/months";
-import { accountsAndAssets, sectionLabel } from "@/lib/nav";
-import { getHousehold, getOpened } from "@/store/household";
+import { formatMonth, monthBefore, today } from "@/lib/months";
+import { accountsAndAssets, monthEnd, sectionLabel } from "@/lib/nav";
+import { getHousehold } from "@/store/household";
 
 import { AccountLedger } from "./account-ledger";
 
@@ -33,15 +36,13 @@ import { AccountLedger } from "./account-ledger";
 // the balances come to and nothing else: it says the starting net worth
 // and the month the balances are as of, the one before the plan starts
 // in, at whose end they were read, as the assumptions screen's says the
-// plan rate, and holds the month end, which moves the month on and
-// checks the balances against it, closing onto the end of the last
-// month that has ended unless another is picked, over the body the
-// ledger lays its sections out in, which opens on how fresh the
-// balances are, as the assumptions screen's opens on how fresh its
-// sources are. The day and the month are read once on the server, and
-// whether a scenario is open, since the month end is held while one is.
+// plan rate, and links to the month end, which moves the month on and
+// checks the balances against it, over the body the ledger lays its
+// sections out in, which opens on how fresh the balances are, as the
+// assumptions screen's opens on how fresh its sources are. The day is
+// read once on the server.
 export default async function Accounts(): Promise<JSX.Element> {
-  const [household, opened] = await Promise.all([getHousehold(), getOpened()]);
+  const household = await getHousehold();
   const { accounts, owners } = household;
   const { plan, schedule } = laidOut(
     accounts,
@@ -52,14 +53,10 @@ export default async function Accounts(): Promise<JSX.Element> {
   return (
     <Screen
       actions={
-        <MonthEnd
-          accounts={accounts}
-          isInScenario={opened !== null}
-          month={monthBefore(thisMonth())}
-          plan={plan}
-          schedule={schedule}
-          today={day}
-        />
+        <Link className={buttonVariants({ size: "sm" })} href={monthEnd.href}>
+          <CalendarCheck aria-hidden />
+          Update balances
+        </Link>
       }
       label={sectionLabel(accountsAndAssets)}
       meta={`Starting net worth ${formatGbp(balanceOf(accounts) - drawingTaxOf(accounts))} · balances as of the end of ${formatMonth(monthBefore({ month: plan.month, year: plan.from }))}`}

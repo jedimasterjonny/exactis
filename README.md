@@ -16,7 +16,7 @@ in Postgres on Neon and the app on Vercel.
 - Chance of success — the plan across a thousand simulated futures of the
   markets.
 - Accounts & assets — the owners and children, and every balance, house, car and
-  debt. Updating the balances at a month's end records a progress point.
+  debt.
 - Income & expenses — the income and expense lines, the milestones, and what a
   month of each year puts by or draws.
 - Progress — the balances month by month from the progress points, with the
@@ -25,6 +25,9 @@ in Postgres on Neon and the app on Vercel.
   inflation curve, BlackRock's capital market assumptions and a target
   allocation imported from Portfolio Performance; the glide path; and each
   owner's State Pension.
+- Month end — the balances checked against what the plan expected, which records
+  a progress point, then what moved the plan since the close before and what the
+  plan paid in to invest.
 - Cogitator — what to buy and sell next in an account, towards that target
   allocation.
 

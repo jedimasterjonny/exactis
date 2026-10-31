@@ -12,6 +12,21 @@ import { answerOf } from "@/lib/answer";
 import { sumOf } from "@/lib/ledger";
 import { monthsBetween } from "@/lib/months";
 
+// A record outside the rates that the walk tells apart, for the step of
+// changes to name.
+export type Area =
+  | "accounts"
+  | "ages"
+  | "children"
+  | "drawdown"
+  | "milestones"
+  | "owners"
+  | "schedule";
+
+// A group of what the household keeps, as the walk takes it: the
+// balances, the rates and their sources, or everything else.
+export type Group = "balances" | "changes" | "rates";
+
 // What the household has moved by since the close before the latest:
 // the age the liquid net worth is read at, the standing the month end
 // expected, a step for each group that changed, or for two or more
@@ -31,16 +46,20 @@ export interface Moved {
   readonly steps: readonly Step[];
 }
 
-// A record outside the rates that the walk tells apart, for the step of
-// changes to name.
-type Area =
-  | "accounts"
-  | "ages"
-  | "children"
-  | "drawdown"
-  | "milestones"
-  | "owners"
-  | "schedule";
+// A source of the rates, as the walk tells them apart: the set chosen,
+// the rates and the split typed, the CMA, the curve, the fees and the
+// yield, the target allocation with its mappings, and the glide path.
+export type RateSource =
+  "cma" | "curve" | "deductions" | "glide" | "rates" | "rateSet" | "targets";
+
+// What the household reads at one state of the walk: the year the
+// plan's owner retires in, or null where they never do, and the liquid
+// net worth at the age the walk reads it at, whole pounds of today's
+// money.
+export interface Standing {
+  readonly liquid: number;
+  readonly retired: null | number;
+}
 
 // The balances the close set against those it closed from, over the
 // accounts both hold, as the month end's ledger sums them: what they
@@ -55,25 +74,6 @@ interface Balances {
   readonly paid: number;
   readonly stood: number;
   readonly unchecked: number;
-}
-
-// A group of what the household keeps, as the walk takes it: the
-// balances, the rates and their sources, or everything else.
-type Group = "balances" | "changes" | "rates";
-
-// A source of the rates, as the walk tells them apart: the set chosen,
-// the rates and the split typed, the CMA, the curve, the fees and the
-// yield, the target allocation with its mappings, and the glide path.
-type RateSource =
-  "cma" | "curve" | "deductions" | "glide" | "rates" | "rateSet" | "targets";
-
-// What the household reads at one state of the walk: the year the
-// plan's owner retires in, or null where they never do, and the liquid
-// net worth at the age the walk reads it at, whole pounds of today's
-// money.
-interface Standing {
-  readonly liquid: number;
-  readonly retired: null | number;
 }
 
 // The groups a step took, one or more, and the standing it leaves.

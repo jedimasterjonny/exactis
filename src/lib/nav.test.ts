@@ -7,6 +7,7 @@ import {
   chance,
   cogitator,
   dashboard,
+  monthEnd,
   plan,
   progress,
   screenAt,
@@ -27,7 +28,8 @@ describe("sectionLabel", () => {
     expect(sectionLabel(progress)).toBe("Sect. V · Progress");
     expect(sectionNumeral(progress)).toBe("V");
     expect(sectionLabel(assumptions)).toBe("Sect. VI · Assumptions");
-    expect(sectionLabel(cogitator)).toBe("Sect. VII · Cogitator");
+    expect(sectionLabel(monthEnd)).toBe("Sect. VII · Month end");
+    expect(sectionLabel(cogitator)).toBe("Sect. VIII · Cogitator");
   });
 
   it("numbers a card within a screen in lower case after the screen's", () => {
@@ -36,11 +38,11 @@ describe("sectionLabel", () => {
     expect(subsectionLabel(progress, 4)).toBe("Sect. V.iv");
     expect(subsectionLabel(assumptions, 6)).toBe("Sect. VI.vi");
     expect(subsectionLabel(assumptions, 2)).toBe("Sect. VI.ii");
-    expect(subsectionLabel(cogitator, 1)).toBe("Sect. VII.i");
+    expect(subsectionLabel(cogitator, 1)).toBe("Sect. VIII.i");
   });
 
   it("writes a place past the numerals in figures", () => {
-    expect(subsectionLabel(plan, 8)).toBe("Sect. IV.8");
+    expect(subsectionLabel(plan, 9)).toBe("Sect. IV.9");
   });
 
   it("lists every screen with a distinct typed route", () => {
@@ -52,6 +54,7 @@ describe("sectionLabel", () => {
     expect(hrefs).toContain("/plan");
     expect(hrefs).toContain("/progress");
     expect(hrefs).toContain("/assumptions");
+    expect(hrefs).toContain("/close");
     expect(hrefs).toContain("/cogitator");
   });
 });
