@@ -2820,11 +2820,19 @@ describe("retiring when conditions hold", () => {
     expect(points).toStrictEqual(retiringFixed(45));
   });
 
-  // The plan as a screen lays it out: retiring at 35, where its own run
-  // reaches the conditions, or at 45, past its end, where it never does,
-  // each line tied to retirement read off that age; and as it is for a
-  // plan retiring at an age.
+  // The plan as a screen lays it out, over its lines as the household
+  // reads them, the owner's State Pension among them: retiring at 35,
+  // where its own run reaches the conditions, or at 45, past its end,
+  // where it never does, each line tied to retirement read off that age;
+  // and as it is for a plan retiring at an age.
   it("lays a plan retiring on conditions out at the age its own run reaches them, or past its end", () => {
+    const read = {
+      ...lines,
+      income: [
+        ...lines.income,
+        ...statePensionLines(onConditions.owners[0], onConditions),
+      ],
+    };
     const never = {
       ...onConditions,
       owners: [
@@ -2840,21 +2848,21 @@ describe("retiring when conditions hold", () => {
         accounts: [saving],
         plan: fixed,
         schedule: {
-          expenses: lines.expenses.map((line) => timed(line, [], fixed)),
-          income: lines.income.map((line) => timed(line, [], fixed)),
+          expenses: read.expenses.map((line) => timed(line, [], fixed)),
+          income: read.income.map((line) => timed(line, [], fixed)),
         },
       };
     };
     const fixed = retiringAt(onConditions, 61);
 
-    expect(laidOut([saving], lines, onConditions)).toStrictEqual(
+    expect(laidOut([saving], read, onConditions)).toStrictEqual(
       atAge(onConditions, 35),
     );
-    expect(laidOut([saving], lines, never)).toStrictEqual(atAge(never, 45));
-    expect(laidOut([saving], lines, fixed)).toStrictEqual({
+    expect(laidOut([saving], read, never)).toStrictEqual(atAge(never, 45));
+    expect(laidOut([saving], read, fixed)).toStrictEqual({
       accounts: [saving],
       plan: fixed,
-      schedule: lines,
+      schedule: read,
     });
   });
 
