@@ -14,8 +14,14 @@ import {
   SidebarHeader,
 } from "@/components/kit/sidebar";
 
+interface AppSidebarProps {
+  readonly isDue: Promise<boolean>;
+}
+
 // What the shell's sidebar holds: the wordmark, the navigation, the theme
-// toggle, export and import, sign-out and the motto. Sign-out is a form
+// toggle, export and import, sign-out and the motto. The navigation is
+// handed the read of whether last month is still to be closed, for its
+// badge. Sign-out is a form
 // posting to its action, so it works before the page hydrates and needs
 // no client code of its own. Its button is the registry's, so hover and
 // focus come from where the navigation's do, but the footer's micro-label
@@ -23,7 +29,7 @@ import {
 // the navigation above. The export and the import above sign-out are
 // drawn as the same button: the export a menu of the two files the route
 // hands out, and the import asking before a file replaces what is open.
-export function AppSidebar(): JSX.Element {
+export function AppSidebar({ isDue }: AppSidebarProps): JSX.Element {
   return (
     <>
       <SidebarHeader className="px-4 pt-5 pb-4">
@@ -36,7 +42,7 @@ export function AppSidebar(): JSX.Element {
         </span>
       </SidebarHeader>
       <SidebarContent className="px-2">
-        <AppNav />
+        <AppNav isDue={isDue} />
       </SidebarContent>
       <SidebarFooter className="gap-3 px-4 pb-5">
         <ThemeToggle />

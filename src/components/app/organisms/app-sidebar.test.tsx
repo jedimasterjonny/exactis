@@ -11,12 +11,19 @@ vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
 vi.mock("@/actions/auth", () => ({ signOut: vi.fn() }));
 vi.mock("@/actions/household", () => ({ importHousehold: vi.fn() }));
 
-// The sidebar's contents in the provider the frame gives them.
+// The sidebar's contents in the provider the frame gives them, last
+// month closed, as a read already answered and marked the way React
+// marks a promise it has seen settle.
 function renderSidebar(): void {
   stubViewport(1024);
   render(
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar
+        isDue={Object.assign(Promise.resolve(false), {
+          status: "fulfilled",
+          value: false,
+        })}
+      />
     </SidebarProvider>,
   );
 }
