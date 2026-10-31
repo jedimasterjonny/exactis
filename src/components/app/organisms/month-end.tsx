@@ -101,6 +101,13 @@ export function MonthEnd({
   const { isSending: isSaving, send } = useSender();
   const heldId = useId();
   const from: Month = { month: plan.month, year: plan.from };
+  const rows =
+    draft === null ? [] : rowsOf(accounts, draft, { from, plan, schedule });
+  const checked = rows.filter(({ isChecked }) => isChecked);
+
+  function dismiss(): void {
+    setDraft(null);
+  }
 
   function open(): void {
     setDraft({ asOf: month, checked: new Set(), typed: new Map() });
@@ -123,43 +130,59 @@ export function MonthEnd({
         Update balances
       </Button>
       {draft !== null && (
-        <Worksheet
-          accounts={accounts}
-          draft={draft}
-          from={from}
-          isSaving={isSaving}
-          month={month}
-          onAmend={setDraft}
-          onDismiss={() => {
-            setDraft(null);
-          }}
-          onSave={(rows) => {
-            const checked = rows.filter(({ isChecked }) => isChecked);
-            send(
-              async () =>
-                closeBalances({
-                  asOf: draft.asOf,
-                  balances: checked.map(({ account, now }) => ({
-                    balance: Math.round(now),
-                    id: account.id,
-                  })),
-                }),
-              {
-                failure: "Balances not saved",
-                onAccepted: () => {
-                  setDraft(null);
-                },
-                success: (saved) => ({
-                  description: `${counted(checked.length, "balance")} set as of the end of ${formatMonth(saved.asOf)}${saved.isRecorded ? ", its progress point recorded" : ""}`,
-                  title: "Balances updated",
-                }),
-              },
-            );
-          }}
-          plan={plan}
-          schedule={schedule}
-          today={today}
-        />
+        <DialogFrame
+          className="sm:max-w-3xl"
+          eyebrow="Month end"
+          footer={
+            <>
+              <span className="mr-auto self-center text-sm text-muted-foreground">
+                {`${String(checked.length)} of ${String(rows.length)} checked`}
+              </span>
+              <Button onClick={dismiss} size="sm" variant="outline">
+                Cancel
+              </Button>
+              <Button
+                isBusy={isSaving}
+                onClick={() => {
+                  send(
+                    async () =>
+                      closeBalances({
+                        asOf: draft.asOf,
+                        balances: checked.map(({ account, now }) => ({
+                          balance: Math.round(now),
+                          id: account.id,
+                        })),
+                      }),
+                    {
+                      failure: "Balances not saved",
+                      onAccepted: dismiss,
+                      success: (saved) => ({
+                        description: `${counted(checked.length, "balance")} set as of the end of ${formatMonth(saved.asOf)}${saved.isRecorded ? ", its progress point recorded" : ""}`,
+                        title: "Balances updated",
+                      }),
+                    },
+                  );
+                }}
+                size="sm"
+              >
+                Save
+              </Button>
+            </>
+          }
+          onDismiss={dismiss}
+          title={`Balances at the end of ${formatMonth(draft.asOf)}`}
+        >
+          <Worksheet
+            checked={checked}
+            draft={draft}
+            from={from}
+            month={month}
+            onAmend={setDraft}
+            plan={plan}
+            rows={rows}
+            today={today}
+          />
+        </DialogFrame>
       )}
     </>
   );
@@ -223,45 +246,22 @@ function pounds(amount: number): string {
   return formatGbp(whole === 0 ? 0 : whole);
 }
 
-// What a balance reads now: what was typed, a debt's below nothing, and
-// a debt typed as nothing as nothing rather than as minus nothing.
-function typedAs(account: Account, value: number): number {
-  return account.kind === "debt" ? negated(Math.abs(value)) : value;
-}
-
-// The open worksheet: the month, a field a balance in its group, and
-// the balances the month leaves, between the title and the footer.
-// Closing the end of a month carries every month from the plan's first
-// through it, the one more than the months between them: the plan's
-// first month alone closes its own end, and the month the balances are
-// already as of, the one before the plan's first, carries none.
-function Worksheet({
-  accounts,
-  draft,
-  from,
-  isSaving,
-  month,
-  onAmend,
-  onDismiss,
-  onSave,
-  plan,
-  schedule,
-  today,
-}: {
-  readonly accounts: readonly Account[];
-  readonly draft: Draft;
-  readonly from: Month;
-  readonly isSaving: boolean;
-  readonly month: Month;
-  readonly onAmend: (draft: Draft) => void;
-  readonly onDismiss: () => void;
-  readonly onSave: (rows: readonly Row[]) => void;
-  readonly plan: Plan;
-  readonly schedule: Schedule;
-  readonly today: string;
-}): JSX.Element {
+// A row a balance as the draft has it. Closing the end of a month
+// carries every month from the plan's first through it, the one more
+// than the months between them: the plan's first month alone closes its
+// own end, and the month the balances are already as of, the one before
+// the plan's first, carries none.
+function rowsOf(
+  accounts: readonly Account[],
+  draft: Draft,
+  {
+    from,
+    plan,
+    schedule,
+  }: { readonly from: Month; readonly plan: Plan; readonly schedule: Schedule },
+): readonly Row[] {
   const months = Math.max(0, monthsBetween(from, draft.asOf) + 1);
-  const rows = monthsOn(accounts, schedule, { months, plan }).map(
+  return monthsOn(accounts, schedule, { months, plan }).map(
     ({ account, balance, paid }): Row => ({
       account,
       isChecked: draft.checked.has(account.id),
@@ -269,7 +269,36 @@ function Worksheet({
       paid,
     }),
   );
-  const checked = rows.filter(({ isChecked }) => isChecked);
+}
+
+// What a balance reads now: what was typed, a debt's below nothing, and
+// a debt typed as nothing as nothing rather than as minus nothing.
+function typedAs(account: Account, value: number): number {
+  return account.kind === "debt" ? negated(Math.abs(value)) : value;
+}
+
+// The open worksheet, drawn in whatever frame its caller gives it: the
+// month, a field a balance in its group, and the balances the month
+// leaves, given every row and the rows checked among them.
+function Worksheet({
+  checked,
+  draft,
+  from,
+  month,
+  onAmend,
+  plan,
+  rows,
+  today,
+}: {
+  readonly checked: readonly Row[];
+  readonly draft: Draft;
+  readonly from: Month;
+  readonly month: Month;
+  readonly onAmend: (draft: Draft) => void;
+  readonly plan: Plan;
+  readonly rows: readonly Row[];
+  readonly today: string;
+}): JSX.Element {
   const was = rows.reduce((sum, { account }) => sum + account.balance, 0);
   const paid = checked.reduce((sum, row) => sum + row.paid, 0);
   const moved = checked.reduce(
@@ -296,31 +325,7 @@ function Worksheet({
   }
 
   return (
-    <DialogFrame
-      className="sm:max-w-3xl"
-      eyebrow="Month end"
-      footer={
-        <>
-          <span className="mr-auto self-center text-sm text-muted-foreground">
-            {`${String(checked.length)} of ${String(rows.length)} checked`}
-          </span>
-          <Button onClick={onDismiss} size="sm" variant="outline">
-            Cancel
-          </Button>
-          <Button
-            isBusy={isSaving}
-            onClick={() => {
-              onSave(rows);
-            }}
-            size="sm"
-          >
-            Save
-          </Button>
-        </>
-      }
-      onDismiss={onDismiss}
-      title={`Balances at the end of ${formatMonth(draft.asOf)}`}
-    >
+    <>
       <FieldRow layout="pair">
         <MonthField
           label="Month"
@@ -386,6 +391,6 @@ function Worksheet({
         total={formatGbp(was + paid + moved)}
         totalName={`As the balances stand at the end of ${formatMonth(draft.asOf)}`}
       />
-    </DialogFrame>
+    </>
   );
 }
