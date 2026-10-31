@@ -916,10 +916,11 @@ const idsBelow = 1_000_000;
 // with the shape it is kept in, and every read carries a version kept
 // in an older shape to this one first, so nothing is defaulted here:
 // what the chain cannot carry is refused rather than read. Only the
-// latest version is read whole; an older one is read only for its
-// sources, above. The stamp is no key here, so it is dropped on the
-// read and never reaches the household in memory. A household with no
-// owner is refused for that, and holds nobody to the plan's end.
+// latest version and the one the close before the latest kept are read
+// whole; any other older one is read only for its sources, above. The
+// stamp is no key here, so it is dropped on the read and never reaches
+// the household in memory. A household with no owner is refused for
+// that, and holds nobody to the plan's end.
 const kept = z
   .object({
     accounts: z.array(account),

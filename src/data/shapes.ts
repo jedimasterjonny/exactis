@@ -16,9 +16,10 @@ type Step = (document: Record<string, unknown>) => Record<string, unknown>;
 // carried by rewriting the store rather than by steps. A step carries
 // what it finds and leaves what it does not, refusing with a Refusal
 // rather than throwing anything else, since an older version is read
-// through the chain for its sources alone, before the rules, and a
-// refusal reads as no sources there where anything else thrown fails
-// the page.
+// through the chain for its sources, before the rules, or as the close
+// before the latest left it, and a refusal reads as no sources there,
+// or as nothing to compare with, where anything else thrown fails the
+// page.
 //
 // 1 to 2: a pension was dropped in a month short of it unless it was
 // marked always funded, and is now kept paid unless it is marked
