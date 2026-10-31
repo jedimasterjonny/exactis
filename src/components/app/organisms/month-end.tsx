@@ -68,7 +68,10 @@ interface Row {
 // and interest the plan knows, is usually only checked, and a saving is
 // typed from its statement. A
 // balance typed is checked by the typing; one confirmed as it reads is
-// checked by its press. Only the balances checked are saved, each dated
+// checked by its press, and the rest of a group whose balances no
+// statement gives, the property and vehicles or the loans, by one press
+// for the group, which the savings, read from statements, are not
+// offered. Only the balances checked are saved, each dated
 // today, with the month, in one version; every other balance keeps what
 // it held and the day it was set, so the worksheet never makes up a
 // balance nobody read. A debt is written below nothing, as its balance
@@ -320,8 +323,9 @@ function Worksheet({
         Each balance opens at what the plan expected. Check it or type the
         statement&apos;s figure; only checked balances are saved.
       </Note>
-      {balanceGroups.map(({ holds, name }) => {
+      {balanceGroups.map(({ holds, isStated, name }) => {
         const held = rows.filter(({ account }) => holds(account));
+        const unchecked = held.filter(({ isChecked }) => !isChecked);
         return (
           held.length > 0 && (
             <div
@@ -330,7 +334,26 @@ function Worksheet({
               key={name}
               role="group"
             >
-              <h3 className="label text-muted-foreground">{name}</h3>
+              <div className="flex min-h-6 items-center justify-between gap-4">
+                <h3 className="label text-muted-foreground">{name}</h3>
+                {!isStated && unchecked.length > 0 && (
+                  <Button
+                    onClick={() => {
+                      onAmend({
+                        ...draft,
+                        checked: new Set([
+                          ...draft.checked,
+                          ...unchecked.map(({ account }) => account.id),
+                        ]),
+                      });
+                    }}
+                    size="xs"
+                    variant="outline"
+                  >
+                    Check the rest
+                  </Button>
+                )}
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 {held.map((row) => (
                   <Balance

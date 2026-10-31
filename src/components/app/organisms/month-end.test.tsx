@@ -94,6 +94,61 @@ describe("MonthEnd", () => {
     ]);
   });
 
+  // The mortgage checked by its own press first, so the loans' group has
+  // none left; the home is the rest of the property's, checked as it
+  // reads; and the savings are offered no such press.
+  it("checks the rest of the property or the loans as they read in one press, and never the savings", async () => {
+    const sheet = openWorksheet();
+    vi.mocked(closeBalances).mockResolvedValue(
+      saved({ asOf: { month: 8, year: 2026 }, isRecorded: true }),
+    );
+    const group = (name: string): HTMLElement =>
+      within(sheet).getByRole("group", { name });
+
+    expect(
+      within(group("Savings")).queryByRole("button", {
+        name: "Check the rest",
+      }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(sheet).getByRole("button", { name: "Check Mortgage" }),
+    );
+
+    expect(
+      within(group("Loans & debts")).queryByRole("button", {
+        name: "Check the rest",
+      }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(group("Property & vehicles")).getByRole("button", {
+        name: "Check the rest",
+      }),
+    );
+
+    expect(
+      within(sheet).getByRole("button", { name: "Check Home" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(within(sheet).getByText("2 of 5 checked")).toBeInTheDocument();
+    expect(
+      within(group("Property & vehicles")).queryByRole("button", {
+        name: "Check the rest",
+      }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));
+
+    expect(closeBalances).toHaveBeenCalledExactlyOnceWith({
+      asOf: { month: 8, year: 2026 },
+      balances: [
+        { balance: 398201, id: home.id },
+        { balance: -175053, id: 5 },
+      ],
+    });
+    await screen.findByRole("dialog", { name: "Balances updated" });
+  });
+
   it("says the day a balance was last set until it is checked", () => {
     openWorksheet({ accounts: [{ ...home, setOn: "2026-03-14" }] });
 
