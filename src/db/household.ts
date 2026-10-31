@@ -1,9 +1,10 @@
 import type { SQL } from "drizzle-orm";
 
-import { and, asc, desc, eq, lte, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lte, ne, sql } from "drizzle-orm";
 import * as z from "zod";
 
 import type { Kept } from "@/data/household";
+import type { Month } from "@/data/schedule";
 import type { Database } from "@/db/client";
 
 import { stamped } from "@/data/shapes";
@@ -178,6 +179,43 @@ export async function readAsOf(
       .from(householdVersions)
       .where(and(branch, derived))
       .orderBy(asc(householdVersions.version))
+      .limit(1),
+  );
+  return first ?? null;
+}
+
+// The version the close of a month kept on the branch, or null where no
+// version holds it. A close writes the month its balances are as of and
+// the progress point for it together, so a version matching the month
+// on both is one a close of it wrote or one saved after it before the
+// next; a first save, which records no point, and a point imported from
+// a sheet, as of no month the balances were, match on neither. The walk
+// goes back from the latest version matching, past every version
+// matching before it, to the first of that unbroken run, so a month
+// closed again later, or an import that took the balances back to it,
+// reads the latest run rather than the first close of the month ever
+// kept. The filter reads the stored document in SQL, outside the chain
+// of shapes, so a step that renames or moves asOf or points changes
+// this query too.
+// ponytail: a scan of the branch's versions, as readAsOf's; an index on
+// the two fields once the versions run to thousands.
+export async function readClosed(
+  db: Database,
+  scenario: string,
+  month: Month,
+): Promise<null | Version> {
+  const { household, version } = householdVersions;
+  const branch = eq(householdVersions.scenario, scenario);
+  const closed = sql`${JSON.stringify(month)}::jsonb`;
+  const closes: SQL = sql`${household} -> 'asOf' = ${closed} and ${household} -> 'points' -> -1 -> 'month' = ${closed}`;
+  const latest = sql`(select max(${version}) from ${householdVersions} where ${branch} and ${closes})`;
+  const broken = sql`(select coalesce(max(${version}), 0) from ${householdVersions} where ${branch} and ${version} < ${latest} and (${closes}) is not true)`;
+  const [first] = await queried(
+    db
+      .select({ household, version })
+      .from(householdVersions)
+      .where(and(branch, lte(version, latest), gt(version, broken)))
+      .orderBy(asc(version))
       .limit(1),
   );
   return first ?? null;
