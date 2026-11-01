@@ -20,8 +20,8 @@ pensions, and the savings are those with the cash and the GIAs. A run reads a
 point a year, the balances entering it. A month can also be read on its own,
 without the run around it, and where it then knows less than the run, the
 section says what it assumes. The futures the chance of success reads, in
-`futures.ts`, carry the run along paths of the markets and are specified beside
-that code, not here.
+`futures.ts`, carry the run along paths of the markets, and they and the search
+of the run for where it breaks are specified beside that code, not here.
 
 ## The month
 

@@ -21,6 +21,12 @@ import {
 } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
+// Where a run of futures breaks, as breaksIn finds it: the least cut to
+// the spending nine in ten of them last with.
+export interface Breaks {
+  readonly cut: null | number;
+}
+
 // One future the plan was run over, as the chance of success reads it:
 // the year it first fell short, by running out of money or by drawing a
 // pension before the pension age, or null for a future that lasts; the
@@ -87,6 +93,12 @@ export interface Reading {
   readonly unretired: number;
 }
 
+// A future tried again in the search for where the run breaks: its
+// spending cut by the points given.
+interface Trial {
+  readonly cut: number;
+}
+
 // How many futures a run draws: enough to pin the chance to within two
 // points either way, and few enough that the run is a matter of
 // seconds. The screen and the dashboard's tile draw the same run, so
@@ -103,6 +115,14 @@ export const defaultSeed = 2026;
 // from each other as any step can.
 const step = 0x9e3779b9;
 
+// The deepest cut to the spending a future is searched over, in points
+// either way: from half the spending planned to half as much again.
+const deepestCut = 50;
+
+// The share of a run's futures the search for where it breaks finds the
+// cut and the age for: nine in ten.
+const lastingShare = 0.9;
+
 // The lines a run of futures is graded on, as gradingOf draws them for
 // a plan: the year from which a future falling short has reached the
 // middle of retirement and the year from which it almost made it, and
@@ -113,6 +133,51 @@ export interface Grading {
   readonly comfortable: number;
   readonly middle: number;
   readonly surplus: number;
+}
+
+// Where a run of the plan's futures breaks: the least cut to its
+// spending, in whole points of the spending planned from 50 off to 50
+// on, that nine in ten of the futures last with. Lasting is as the
+// chance counts it, never falling short and retiring. A cut scales
+// every expense line paying no debt, in every year of the plan, those
+// still saving among them; a line paying a debt is left as it is, since
+// the loan says what it pays, as a move's mortgage line does. Each
+// future tried is tried as lastsTried tries one, given the future's
+// place in the run, and the search runs as many tries at once as the
+// lanes given. The search starts from the plan itself, the cut of
+// nothing, where each future's verdict is the run's as the chance read
+// it, so none is tried there, and halves the values below it where nine
+// in ten last there and above it where they do not, asking at each
+// value whether nine in ten last. A future's verdict at a value is read
+// off the values it was tried at before, where they settle it, since a
+// future lasting with a cut is taken to last with any deeper one and
+// one falling short to fall short with any shallower; the rest are
+// tried, only until enough have lasted or fallen short to settle it. A
+// run lasting even on half as much again reads -50, one falling short
+// even on half the spending null. A future need not last at every
+// depth past a cut it lasts with: a move at an age, the pension age, or
+// a retirement on conditions, which reads the year's expenses and so
+// comes sooner on less, can leave a deeper cut short, and the verdict
+// read off an earlier try is then wrong. So the figure is where nine in
+// ten last as the tries read them; but since every verdict at the plan
+// itself is the chance's own, the cut is nothing or less exactly where
+// nine in ten futures last as the chance counts them.
+export async function breaksIn(
+  futures: readonly Future[],
+  {
+    lanes,
+    tried,
+  }: {
+    readonly lanes: number;
+    readonly tried: (trial: Trial, future: number) => Promise<boolean>;
+  },
+): Promise<Breaks> {
+  const cut = await breakingAt(
+    futures.map(isLasting),
+    { above: deepestCut + 1, below: -deepestCut - 1, pivot: 0 },
+    { lanes, tried: async (value, future) => tried({ cut: value }, future) },
+  );
+  return { cut: cut > deepestCut ? null : cut };
 }
 
 // What a future is worth entering the plan's last year: the net worth
@@ -134,10 +199,10 @@ export function endWorthOf({ measured }: Pick<Future, "measured">): number {
 // years it carries. What a future drawn is read as, and what the plan
 // at its own rates is read as beside them.
 export function futureOf(points: readonly ProjectionPoint[], run: Run): Future {
-  const retired = retirementIn(points, run);
+  const { fell, retired } = lastingOf(points, run);
   const ran = new Map<Run, Run>();
   return {
-    fell: points.find(isShort)?.year ?? null,
+    fell,
     measured: movedYears(points, run).map(
       ({ allowances, at, balances, run: moved }) => {
         const carried = ran.get(moved) ?? carriedBy(moved, retired);
@@ -175,8 +240,7 @@ export function* futuresOf(
   },
 ): Generator<Future, never, undefined> {
   for (let future = from; ; future += 1) {
-    const path = pathOf(plan, spread, normalsFrom(seed + future * step));
-    const run = { accounts, plan: { ...plan, path }, schedule };
+    const run = drawnOver(accounts, schedule, { future, plan, seed, spread });
     yield futureOf(project(accounts, schedule, run.plan), run);
   }
 }
@@ -228,6 +292,32 @@ export function gradingOf(projected: Future, plan: Plan): Grading {
     middle: opens + Math.ceil((2 * span) / 5),
     surplus: 3 * worth,
   };
+}
+
+// Whether the future at the place given in a run of the plan's futures
+// lasts tried as given: its own path, drawn as futuresOf draws it,
+// projected again with the spending cut by every expense line paying no
+// debt scaled by what the cut leaves of it, and read for whether it
+// lasts and nothing more.
+export function lastsTried(
+  accounts: readonly Account[],
+  schedule: Schedule,
+  {
+    future,
+    plan,
+    seed = defaultSeed,
+    spread,
+    trial,
+  }: {
+    readonly future: number;
+    readonly plan: Plan;
+    readonly seed?: number;
+    readonly spread: Spread;
+    readonly trial: Trial;
+  },
+): boolean {
+  const run = drawnOver(accounts, schedule, { future, plan, seed, spread });
+  return lastsOver(cutBy(run, trial.cut));
 }
 
 // The milestones as a run of futures places them on the plan's years:
@@ -444,6 +534,151 @@ export function yearsIn(
       year,
     };
   });
+}
+
+// A value between one falling short and one lasting, or an end past the
+// range, neither tried, that lasts where the value before it falls
+// short: the stretch between the two halved until they meet, keeping
+// whichever end the value tried at each halving turns out to be.
+async function boundary(
+  fails: number,
+  holds: number,
+  lasts: (value: number) => Promise<boolean>,
+): Promise<number> {
+  let short = fails;
+  let lasting = holds;
+  while (lasting - short > 1) {
+    const value = Math.floor((short + lasting) / 2);
+    if (await lasts(value)) {
+      lasting = value;
+    } else {
+      short = value;
+    }
+  }
+  return lasting;
+}
+
+// The value nine in ten of a run's futures last at, as breaksIn finds
+// it between the ends given, each past the range, from the value given
+// that the run's verdicts were read at: each future kept between the
+// most it fell short at and the least it lasted at, and at each value
+// asked about only those it falls between tried, a lane at a time.
+async function breakingAt(
+  lasting: readonly boolean[],
+  {
+    above,
+    below,
+    pivot,
+  }: { readonly above: number; readonly below: number; readonly pivot: number },
+  {
+    lanes,
+    tried,
+  }: {
+    readonly lanes: number;
+    readonly tried: (value: number, future: number) => Promise<boolean>;
+  },
+): Promise<number> {
+  const needed = Math.ceil(lastingShare * lasting.length);
+  const known = lasting.map((hasLasted, future) => ({
+    fails: hasLasted ? below : pivot,
+    future,
+    holds: hasLasted ? pivot : above,
+  }));
+  async function isEnough(value: number): Promise<boolean> {
+    const open = known.filter(
+      ({ fails, holds }) => fails < value && value < holds,
+    );
+    let lasted = known.filter(({ holds }) => holds <= value).length;
+    let left = open.length;
+    const isSettled = (): boolean => lasted >= needed || lasted + left < needed;
+    async function lane(): Promise<void> {
+      for (let next = open.shift(); next !== undefined; next = open.shift()) {
+        if (isSettled()) {
+          return;
+        }
+        if (await tried(value, next.future)) {
+          next.holds = value;
+          lasted += 1;
+        } else {
+          next.fails = value;
+        }
+        left -= 1;
+      }
+    }
+    await Promise.all(Array.from({ length: lanes }, lane));
+    return lasted >= needed;
+  }
+  return lasting.filter(Boolean).length >= needed
+    ? boundary(below, pivot, isEnough)
+    : boundary(pivot, above, isEnough);
+}
+
+// The run with its spending cut by the points given, every expense line
+// paying no debt scaled by what the cut leaves of it.
+function cutBy(run: Run, cut: number): Run {
+  return {
+    ...run,
+    schedule: {
+      ...run.schedule,
+      expenses: run.schedule.expenses.map((line) =>
+        line.pays === undefined
+          ? { ...line, amount: line.amount * (1 - cut / 100) }
+          : line,
+      ),
+    },
+  };
+}
+
+// The run of the future at the place given in a run of the plan's
+// futures: the plan carried along the path drawn from that future's
+// own stream.
+function drawnOver(
+  accounts: readonly Account[],
+  schedule: Schedule,
+  {
+    future,
+    plan,
+    seed,
+    spread,
+  }: {
+    readonly future: number;
+    readonly plan: Plan;
+    readonly seed: number;
+    readonly spread: Spread;
+  },
+): Run {
+  const path = pathOf(plan, spread, normalsFrom(seed + future * step));
+  return { accounts, plan: { ...plan, path }, schedule };
+}
+
+// Whether a future lasted, as the chance counts it: it never fell short,
+// and its owner retired.
+function isLasting({
+  fell,
+  retired,
+}: Pick<Future, "fell" | "retired">): boolean {
+  return fell === null && retired !== null;
+}
+
+// What decides whether a projection lasted, as futureOf reads it: the
+// year it first fell short, by running out or by drawing a pension
+// early, and the year its owner retired in, over what it was run over.
+function lastingOf(
+  points: readonly ProjectionPoint[],
+  run: Run,
+): Pick<Future, "fell" | "retired"> {
+  return {
+    fell: points.find(isShort)?.year ?? null,
+    retired: retirementIn(points, run),
+  };
+}
+
+// Whether a run lasts, projected as a future of it is and read as the
+// chance reads one.
+function lastsOver(run: Run): boolean {
+  return isLasting(
+    lastingOf(project(run.accounts, run.schedule, run.plan), run),
+  );
 }
 
 function sorted(values: readonly number[]): readonly number[] {
