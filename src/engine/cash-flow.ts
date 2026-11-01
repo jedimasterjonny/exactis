@@ -327,32 +327,41 @@ export function cashFlow(
   // nothing lands no entry. Each line's entry is worked out once each
   // way, so two feedings giving up the same sacrifices hold the same
   // entries.
-  const giving = new Map<IncomeLine, readonly Fed[]>();
-  const flooring = new Map<IncomeLine, readonly Fed[]>();
+  const giving = new Map<IncomeLine, Fed | null>();
+  const flooring = new Map<IncomeLine, Fed | null>();
+  const entryOf = (
+    line: IncomeLine,
+    account: Account,
+    isGiven: boolean,
+  ): Fed | null =>
+    keptIn(isGiven ? giving : flooring, line, () => {
+      const given = isGiven ? line : { ...line, sacrifice: 0 };
+      const wanted = monthlyOf(line, contributionOf(given), reading);
+      return wanted === 0
+        ? null
+        : {
+            account,
+            amount: wanted,
+            line,
+            sacrificed: monthlyOf(line, sacrificeOf(given), reading),
+          };
+    });
   const feedingInto = (
     isGiving: (account: Account) => boolean,
-  ): readonly Fed[] =>
-    running.flatMap((line) => {
+  ): readonly Fed[] => {
+    const fed: Fed[] = [];
+    for (const line of running) {
       const account = accountAt(accounts, line.feeds);
-      if (account === undefined) {
-        return [];
+      const entry =
+        account === undefined
+          ? null
+          : entryOf(line, account, isGiving(account));
+      if (entry !== null) {
+        fed.push(entry);
       }
-      const isGiven = isGiving(account);
-      return keptIn(isGiven ? giving : flooring, line, () => {
-        const given = isGiven ? line : { ...line, sacrifice: 0 };
-        const wanted = monthlyOf(line, contributionOf(given), reading);
-        return wanted === 0
-          ? []
-          : [
-              {
-                account,
-                amount: wanted,
-                line,
-                sacrificed: monthlyOf(line, sacrificeOf(given), reading),
-              },
-            ];
-      });
-    });
+    }
+    return fed;
+  };
   // The tax on the month fed as given, worked out once for each feeding
   // the month reads, entry for entry: whether it can keep the pensions
   // paid and what it then pays are read over the same feeding as often
@@ -373,15 +382,19 @@ export function cashFlow(
   };
   const spent = spentIn(accounts, schedule, reading);
   const expenses = total(spent);
-  const paid = new Set(
-    schedule.expenses.flatMap((line) =>
-      line.pays === undefined ? [] : [line.pays],
-    ),
-  );
+  const paid = new Set<number>();
+  for (const { pays } of schedule.expenses) {
+    if (pays !== undefined) {
+      paid.add(pays);
+    }
+  }
   const own = accounts.filter((account) => !paid.has(account.id));
-  const owed = own
-    .filter((account) => account.kind === "debt")
-    .flatMap((account) => fixedSum(account, reading));
+  const owed: Paid[] = [];
+  for (const account of own) {
+    if (account.kind === "debt") {
+      owed.push(...fixedSum(account, reading));
+    }
+  }
   const outgoings = expenses + total(owed);
   const leftWith = (
     feeds: readonly Fed[],
@@ -410,33 +423,25 @@ export function cashFlow(
       landed: new Map(),
       relief: [],
       reliefs: new Map(),
-      relievable: new Map(
-        [...Map.groupBy(running.filter(isEarned), byOwner)].map(
-          ([owner, lines]) => [
-            owner,
-            relievableOn(evenPayOf(lines, fed, reading)),
-          ],
-        ),
-      ),
-      rooms: new Map(
-        reading.plan.owners.flatMap(({ id }) => {
-          const isa = roomOf({ kind: "tax-free", owner: id });
-          const pension = roomOf({ kind: "tax-deferred", owner: id });
-          const theirs = running.filter((line) => line.owner === id);
-          return [
-            [isa, openedAt(isa, isaAllowance, reading)],
-            [
-              pension,
-              openedAt(
-                pension,
-                allowanceIn(id, theirs, { fed, reading }),
-                reading,
-              ),
-            ],
-          ];
-        }),
-      ),
+      relievable: new Map(),
+      rooms: new Map(),
     };
+    for (const [owner, lines] of Map.groupBy(
+      running.filter(isEarned),
+      byOwner,
+    )) {
+      purse.relievable.set(owner, relievableOn(evenPayOf(lines, fed, reading)));
+    }
+    for (const { id } of reading.plan.owners) {
+      const isa = roomOf({ kind: "tax-free", owner: id });
+      const pension = roomOf({ kind: "tax-deferred", owner: id });
+      const theirs = running.filter((line) => line.owner === id);
+      purse.rooms.set(isa, openedAt(isa, isaAllowance, reading));
+      purse.rooms.set(
+        pension,
+        openedAt(pension, allowanceIn(id, theirs, { fed, reading }), reading),
+      );
+    }
     for (const entry of fed) {
       landIn(purse, entry.account, entry.amount);
     }
@@ -854,7 +859,10 @@ function fixedSums(
 ): { readonly left: number; readonly sums: readonly Paid[] } {
   const sums: Paid[] = [];
   let left = available;
-  const stated = accounts.flatMap((account) => fixedSum(account, reading));
+  const stated: Paid[] = [];
+  for (const account of accounts) {
+    stated.push(...fixedSum(account, reading));
+  }
   for (const { account, amount } of stated) {
     const sum = Math.max(
       0,
@@ -1134,39 +1142,34 @@ function taxOn(
       fed,
       reading,
     );
-  return [...Map.groupBy(lines, ({ owner }) => owner)].reduce<Taxed>(
-    (taxed, [owner, theirs]) => {
-      const profit = ofKind(theirs, "self-employment");
-      const landed = total(fed.filter((entry) => entry.line.owner === owner));
-      const excess = Math.max(
-        0,
-        landed -
-          openedAt(
-            roomOf({ kind: "tax-deferred", owner }),
-            allowanceIn(owner, theirs, { fed, reading }),
-            reading,
-          ),
-      );
-      const taxable = payOf(theirs, fed, reading) + excess;
-      return {
-        earned: [
-          ...taxed.earned,
-          { isWorking: theirs.some(isEarned), owner, profit, taxable },
-        ],
-        incomeTax: taxed.incomeTax + incomeTaxOn(taxable, stretch),
-        insurance:
-          taxed.insurance +
-          incomeKinds.reduce(
-            (sum, kind) =>
-              sum + insuranceOn(kind, ofKind(theirs, kind), stretch),
-            0,
-          ),
-        profit: taxed.profit + profit,
-        taxable: taxed.taxable + taxable,
-      };
-    },
-    { earned: [], incomeTax: 0, insurance: 0, profit: 0, taxable: 0 },
-  );
+  const earned: Earned[] = [];
+  let incomeTax = 0;
+  let insurance = 0;
+  let profits = 0;
+  let taxables = 0;
+  for (const [owner, theirs] of Map.groupBy(lines, ({ owner }) => owner)) {
+    const profit = ofKind(theirs, "self-employment");
+    const landed = total(fed.filter((entry) => entry.line.owner === owner));
+    const excess = Math.max(
+      0,
+      landed -
+        openedAt(
+          roomOf({ kind: "tax-deferred", owner }),
+          allowanceIn(owner, theirs, { fed, reading }),
+          reading,
+        ),
+    );
+    const taxable = payOf(theirs, fed, reading) + excess;
+    earned.push({ isWorking: theirs.some(isEarned), owner, profit, taxable });
+    incomeTax += incomeTaxOn(taxable, stretch);
+    insurance += incomeKinds.reduce(
+      (sum, kind) => sum + insuranceOn(kind, ofKind(theirs, kind), stretch),
+      0,
+    );
+    profits += profit;
+    taxables += taxable;
+  }
+  return { earned, incomeTax, insurance, profit: profits, taxable: taxables };
 }
 
 function total(amounts: readonly { readonly amount: number }[]): number {
