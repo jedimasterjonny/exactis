@@ -172,6 +172,14 @@ placed before any of it is paid, and one placed after leaves the count where it
 was. What the State Pension pays can therefore never move the year it is counted
 to.
 
+The search of a run for the earliest age nine in ten of its futures last
+retiring at, for one retiring at an age, carries each future over each age it
+tries through the step a run on conditions is carried through, `retimed` in
+`projection.ts`, which makes every owner's line again from the owners, as the
+household's read makes them, so each age pays the State Pension its own years
+earn, and a line dropped at the plan's own age is paid at a later age whose
+years earn it.
+
 ## Salaries and what they feed
 
 A salary may feed a pension by sacrifice, a share of its base from none of it to
