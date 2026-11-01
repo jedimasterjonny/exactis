@@ -166,7 +166,7 @@ export function MilestoneSpreads({
             Add milestone
           </Button>
         }
-        label={subsectionLabel(chance, 2)}
+        label={subsectionLabel(chance, 3)}
         title="When the milestones are reached"
       >
         {milestones.length === 0 && retirement === undefined ? (

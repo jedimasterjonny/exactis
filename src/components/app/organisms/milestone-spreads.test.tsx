@@ -110,7 +110,7 @@ describe("MilestoneSpreads", () => {
     const card = screen.getByRole("region", {
       name: "When the milestones are reached",
     });
-    expect(within(card).getByText("Sect. II.ii")).toHaveClass("label");
+    expect(within(card).getByText("Sect. II.iii")).toHaveClass("label");
     // A row is drawn in its columns and again in its folded lines, only
     // one of which is on screen at any width, so each is found twice.
     expect(

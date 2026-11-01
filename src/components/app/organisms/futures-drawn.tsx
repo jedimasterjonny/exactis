@@ -29,7 +29,7 @@ export function FuturesDrawn({ plan, spread }: FuturesDrawnProps): JSX.Element {
     formatPercent((1 + rate) * Math.exp(spreads * by) - 1);
   return (
     <SectionCard
-      label={subsectionLabel(chance, 4)}
+      label={subsectionLabel(chance, 5)}
       title="What the futures are drawn from"
     >
       <CardContent>

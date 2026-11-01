@@ -81,9 +81,10 @@ export function ChanceScreen({
 // The plan's futures as they come in, under a header saying how many
 // there are and over what ages, or, while they are coming in, how many
 // have, beside a button to draw them again; then the board, drawing
-// what they come to. The run is read here and nowhere else, since the
-// header and the board both read it, and a second reader would start a
-// second pair of workers over the slices still to draw.
+// what they come to. The run is read here, since the header and the
+// board both read it, and a second reader would start a second pair of
+// workers over the slices still to draw; the board reads only its
+// search of the run, once the run is drawn.
 function Futures({
   accounts,
   milestones,
@@ -116,6 +117,7 @@ function Futures({
       <ChanceBoard
         accounts={accounts}
         futures={futures}
+        isDone={isDone}
         milestones={milestones}
         plan={plan}
         schedule={schedule}

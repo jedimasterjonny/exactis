@@ -11,6 +11,7 @@ import type { Schedule } from "@/engine/cash-flow";
 import type { Future } from "@/engine/futures";
 
 import { Caution } from "@/components/app/molecules/caution";
+import { FuturesBreaks } from "@/components/app/organisms/futures-breaks";
 import { FuturesCount } from "@/components/app/organisms/futures-count";
 import { FuturesDrawn } from "@/components/app/organisms/futures-drawn";
 import { FuturesFan } from "@/components/app/organisms/futures-fan";
@@ -25,10 +26,12 @@ import {
   runLength,
 } from "@/engine/futures";
 import { project } from "@/engine/projection";
+import { useBreaks } from "@/hooks/use-futures";
 
 interface ChanceBoardProps {
   readonly accounts: readonly Account[];
   readonly futures: readonly Future[];
+  readonly isDone: boolean;
   readonly milestones: readonly Milestone[];
   readonly plan: Plan;
   readonly schedule: Schedule;
@@ -36,7 +39,8 @@ interface ChanceBoardProps {
 }
 
 // What the plan's futures come to, as many as have come in: graded,
-// the run fanned over the plan's years, every milestone and when the
+// where the plan breaks, searched once the whole run has come in, the
+// run fanned over the plan's years, every milestone and when the
 // run reaches it, and the count beneath them. The screen reads the run
 // and hands the futures down, since its header reads them too, so the
 // board reads none of its own. The plan at its own rates is read as a
@@ -49,6 +53,7 @@ interface ChanceBoardProps {
 export function ChanceBoard({
   accounts,
   futures,
+  isDone,
   milestones,
   plan,
   schedule,
@@ -75,6 +80,17 @@ export function ChanceBoard({
         plan={plan}
         reading={reading}
       />
+      {isDone ? (
+        <Searched
+          accounts={accounts}
+          futures={futures}
+          plan={plan}
+          schedule={schedule}
+          spread={spread}
+        />
+      ) : (
+        <FuturesBreaks plan={plan} />
+      )}
       <FuturesFan futures={futures} milestones={milestones} plan={plan} />
       <MilestoneSpreads
         futures={futures}
@@ -126,4 +142,21 @@ function AtItsRates({
     );
   }
   return null;
+}
+
+// Where the plan breaks, over the run searched once it is drawn whole,
+// in a component of its own so the search starts only once the run it
+// searches is drawn, and never on workers beside the run's own.
+function Searched({
+  accounts,
+  futures,
+  plan,
+  schedule,
+  spread,
+}: Pick<
+  ChanceBoardProps,
+  "accounts" | "futures" | "plan" | "schedule" | "spread"
+>): JSX.Element {
+  const breaks = useBreaks(accounts, schedule, { futures, plan, spread });
+  return <FuturesBreaks plan={plan} searched={{ breaks }} />;
 }

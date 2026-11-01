@@ -43,7 +43,7 @@ export function FuturesCount({
   const isDone = reading.run >= count;
   return (
     <SectionCard
-      label={subsectionLabel(chance, 3)}
+      label={subsectionLabel(chance, 4)}
       title="How many futures last"
     >
       <CardContent>
