@@ -33,6 +33,7 @@ import { rules } from "@/data/rules";
 import { fixedMonthly, monthly } from "@/lib/cadence";
 import { runsIn } from "@/lib/lines";
 import { lastPaymentOf, paidUntil, termOf } from "@/lib/loans";
+import { keptIn } from "@/lib/maps";
 import { monthsBetween } from "@/lib/months";
 import {
   april,
@@ -318,7 +319,11 @@ export function cashFlow(
   // the lines are listed: the whole of its feed where the month gives up
   // the sacrifices into that account, and otherwise the employer's floor
   // under its match alone, the line giving up nothing; a line landing
-  // nothing lands no entry.
+  // nothing lands no entry. Each line's entry is worked out once each
+  // way, so two feedings giving up the same sacrifices hold the same
+  // entries.
+  const giving = new Map<IncomeLine, readonly Fed[]>();
+  const flooring = new Map<IncomeLine, readonly Fed[]>();
   const feedingInto = (
     isGiving: (account: Account) => boolean,
   ): readonly Fed[] =>
@@ -327,19 +332,40 @@ export function cashFlow(
       if (account === undefined) {
         return [];
       }
-      const given = isGiving(account) ? line : { ...line, sacrifice: 0 };
-      const wanted = monthlyOf(line, contributionOf(given), reading);
-      return wanted === 0
-        ? []
-        : [
-            {
-              account,
-              amount: wanted,
-              line,
-              sacrificed: monthlyOf(line, sacrificeOf(given), reading),
-            },
-          ];
+      const isGiven = isGiving(account);
+      return keptIn(isGiven ? giving : flooring, line, () => {
+        const given = isGiven ? line : { ...line, sacrifice: 0 };
+        const wanted = monthlyOf(line, contributionOf(given), reading);
+        return wanted === 0
+          ? []
+          : [
+              {
+                account,
+                amount: wanted,
+                line,
+                sacrificed: monthlyOf(line, sacrificeOf(given), reading),
+              },
+            ];
+      });
     });
+  // The tax on the month fed as given, worked out once for each feeding
+  // the month reads, entry for entry: whether it can keep the pensions
+  // paid and what it then pays are read over the same feeding as often
+  // as not.
+  const taxes: { readonly fed: readonly Fed[]; readonly taxed: Taxed }[] = [];
+  const taxedWith = (fed: readonly Fed[]): Taxed => {
+    const known = taxes.find(
+      (each) =>
+        each.fed.length === fed.length &&
+        each.fed.every((entry, index) => entry === fed[index]),
+    );
+    if (known !== undefined) {
+      return known.taxed;
+    }
+    const taxed = taxOn(running, fed, reading);
+    taxes.push({ fed, taxed });
+    return taxed;
+  };
   const spent = spentIn(accounts, schedule, reading);
   const expenses = total(spent);
   const paid = new Set(
@@ -354,7 +380,7 @@ export function cashFlow(
   const outgoings = expenses + total(owed);
   const leftWith = (
     feeds: readonly Fed[],
-    taxed: Taxed = taxOn(running, feeds, reading),
+    taxed: Taxed = taxedWith(feeds),
   ): number =>
     income -
     feeds.reduce((sum, entry) => sum + entry.sacrificed, 0) -
@@ -373,7 +399,7 @@ export function cashFlow(
   const others = feeding.filter(({ account }) => !isKeptPaid(account));
   const saving = own.filter((account) => account.kind !== "debt");
   const paidWith = (fed: readonly Fed[], least: number): Feeding => {
-    const taxed = taxOn(running, fed, reading);
+    const taxed = taxedWith(fed);
     const month = leftWith(fed, taxed);
     const purse: Purse = {
       landed: new Map(),
