@@ -954,9 +954,11 @@ function drawnFrom(
     const isEarlyPass = pass === order.length;
     carried = carried.map((entry) => {
       const { account, balance } = entry;
-      if (account.kind !== kind || !isPension(account)) {
-        const taken =
-          account.kind === kind ? Math.max(0, Math.min(balance, left)) : 0;
+      if (account.kind !== kind) {
+        return entry;
+      }
+      if (!isPension(account)) {
+        const taken = Math.max(0, Math.min(balance, left));
         left -= taken;
         return { account, balance: balance - taken };
       }
@@ -967,11 +969,12 @@ function drawnFrom(
   }
   left += kept;
   for (const kind of kept > 0 ? drawOrder : []) {
-    carried = carried.map(({ account, balance }) => {
-      const taken =
-        account.kind === kind && isReserve(account)
-          ? Math.min(balance, left)
-          : 0;
+    carried = carried.map((entry) => {
+      const { account, balance } = entry;
+      if (account.kind !== kind || !isReserve(account)) {
+        return entry;
+      }
+      const taken = Math.min(balance, left);
       left -= taken;
       return { account, balance: balance - taken };
     });
