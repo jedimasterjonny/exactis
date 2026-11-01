@@ -260,9 +260,17 @@ const nanopound = 1e-9;
 // on its own: none, since only the projection draws.
 const nobody: ReadonlySet<number> = new Set();
 
+// The accounts, schedules and plans checkOnce has found sound together,
+// by the objects themselves.
+const checked = new WeakMap<
+  readonly Account[],
+  WeakMap<Schedule, WeakSet<Plan>>
+>();
+
 // A month's money, from the accounts, the two schedules and the reading
 // of the month. It first refuses what the store could not have handed
-// it: an account listed twice, an inflation no prices can be read
+// it, once for the accounts, schedule and plan it is handed together:
+// an account listed twice, an inflation no prices can be read
 // against, a wrapper with no owner or an owner on anything else, a
 // droppable mark on what is no pension, and any link the schedule holds
 // to the wrong kind of account or to an owner the plan does not list,
@@ -298,28 +306,7 @@ export function cashFlow(
   reading: Reading,
 ): CashFlow {
   const { at, settlement = 0 } = reading;
-  if (new Set(accounts.map(({ id }) => id)).size !== accounts.length) {
-    throw new Error(rules.listedOnce);
-  }
-  const { inflation } = reading.plan;
-  if (!(inflation > -1 && Number.isFinite(inflation))) {
-    throw new Error(rules.inflation);
-  }
-  if (
-    accounts.some(
-      (account) => isOwned(account) !== (typeof account.owner === "number"),
-    )
-  ) {
-    throw new Error(rules.owned);
-  }
-  if (
-    accounts.some(
-      (account) => account.isDroppable === true && !isPension(account),
-    )
-  ) {
-    throw new Error(rules.droppable);
-  }
-  checkLinks(accounts, schedule, reading.plan);
+  checkOnce(accounts, schedule, reading.plan);
   const running = schedule.income.filter(
     (line) =>
       runsIn(line, at) &&
@@ -718,6 +705,46 @@ function checkLinks(
       throw new Error(rules.paysDebt);
     }
   }
+}
+
+// What cashFlow refuses before it works out any month, checked the
+// first time it is handed the accounts, schedule and plan given, and
+// not again while it is handed the same three, as a run hands them
+// over month after month. One refused is never marked sound.
+function checkOnce(
+  accounts: readonly Account[],
+  schedule: Schedule,
+  plan: Plan,
+): void {
+  const bySchedule =
+    checked.get(accounts) ?? new WeakMap<Schedule, WeakSet<Plan>>();
+  const plans = bySchedule.get(schedule) ?? new WeakSet<Plan>();
+  if (plans.has(plan)) {
+    return;
+  }
+  if (new Set(accounts.map(({ id }) => id)).size !== accounts.length) {
+    throw new Error(rules.listedOnce);
+  }
+  const { inflation } = plan;
+  if (!(inflation > -1 && Number.isFinite(inflation))) {
+    throw new Error(rules.inflation);
+  }
+  if (
+    accounts.some(
+      (account) => isOwned(account) !== (typeof account.owner === "number"),
+    )
+  ) {
+    throw new Error(rules.owned);
+  }
+  if (
+    accounts.some(
+      (account) => account.isDroppable === true && !isPension(account),
+    )
+  ) {
+    throw new Error(rules.droppable);
+  }
+  checkLinks(accounts, schedule, plan);
+  checked.set(accounts, bySchedule.set(schedule, plans.add(plan)));
 }
 
 // A twelfth of what the lines given pay in a year, risen to the month
