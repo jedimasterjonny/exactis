@@ -1,4 +1,4 @@
-import type { Account } from "@/data/accounts";
+import type { Account, AccountKind } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { IncomeKind, IncomeLine } from "@/data/income";
 import type { Plan } from "@/data/plan";
@@ -260,6 +260,11 @@ const nanopound = 1e-9;
 // The owners who have drawn on a pension as income when a month is read
 // on its own: none, since only the projection draws.
 const nobody: ReadonlySet<number> = new Set();
+
+// The name of each allowance, by its owner and the kind it is held for,
+// made once each, so the maps a month reads its rooms from are handed
+// the same string every time rather than a new one to hash.
+const roomNames = new Map<number | undefined, Map<AccountKind, string>>();
 
 // The accounts, schedules and plans checkOnce has found sound together,
 // by the objects themselves.
@@ -1031,8 +1036,12 @@ function roomIn(rooms: Rooms, account: Account): number {
 // The allowance an account is paid under, named by its owner and its
 // kind, since an owner has one of each kind shared across every account
 // of it they hold.
-function roomOf(account: Pick<Account, "kind" | "owner">): string {
-  return `${String(account.owner)} ${account.kind}`;
+function roomOf({ kind, owner }: Pick<Account, "kind" | "owner">): string {
+  return keptIn(
+    keptIn(roomNames, owner, () => new Map<AccountKind, string>()),
+    kind,
+    () => `${String(owner)} ${kind}`,
+  );
 }
 
 // The spare money handed down the accounts that take it, each taking
