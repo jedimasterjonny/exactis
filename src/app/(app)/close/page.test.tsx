@@ -18,6 +18,7 @@ vi.mock("@/store/household", () => ({
   getSinceClose: vi.fn(),
 }));
 vi.mock("@/actions/accounts", () => ({ closeBalances: vi.fn() }));
+vi.mock("@/actions/targets", () => ({ importTargets: vi.fn() }));
 vi.mock("@/lib/moved", () => ({ movedSince: vi.fn() }));
 
 // The reference household as the close of July 2026 left it.
@@ -206,7 +207,7 @@ describe("Close", () => {
 
   // September closed, on the fifteenth of October, over holdings
   // imported on the seventh of September, before September was cut.
-  it("asks for this month's holdings where they were imported before the month closed was cut", async () => {
+  it("asks for this month's holdings, from the file, where they were imported before the month closed was cut", async () => {
     await renderClose({
       day: "2026-10-15",
       household: {
@@ -225,10 +226,13 @@ describe("Close", () => {
       "The plan paid £1,250 into the ISAs and GIA in September 2026.",
       "Import this month's holdings first.",
     ]);
-    expect(links()).toStrictEqual([
-      ["Assumptions › Target allocation", "/assumptions"],
-      ["Choose an amount", "/cogitator"],
-    ]);
+    expect(links()).toStrictEqual([["Choose an amount", "/cogitator"]]);
+    expect(
+      within(screen.getByRole("region", { name: "Trades" })).getByRole(
+        "button",
+        { name: "Import from Portfolio Performance" },
+      ),
+    ).toBeInTheDocument();
   });
 
   it("asks for holdings where none are imported, over the months since the close before", async () => {
