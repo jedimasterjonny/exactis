@@ -20,7 +20,7 @@ import {
   readLatest,
 } from "@/db/household";
 import { answerOf, Refusal, refused, saved, Stale } from "@/lib/answer";
-import { dayOf, monthBefore, thisMonth } from "@/lib/months";
+import { closingOn, dayOf, monthBefore, thisMonth, today } from "@/lib/months";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 
@@ -225,8 +225,8 @@ export async function getSourcesDaysAgo(days: number): Promise<Before | null> {
       };
 }
 
-// Whether the household's last month that has ended is still to be
-// closed, for the navigation to badge the month end: the household's
+// Whether the household's month cut last is still to be closed, for
+// the navigation to badge the month end: the household's
 // whatever branch is open, since a month is closed in the household
 // alone, read through the page's own read while the household is open.
 // The session is checked first, as every read's is. A read that fails
@@ -242,7 +242,7 @@ export async function isCloseDue(): Promise<boolean> {
     const { scenario } = await readPage();
     const { points } =
       scenario === "" ? (await readPageHeld()).household : await readBaseline();
-    return isDue(points, thisMonth());
+    return isDue(points, closingOn(today()));
   } catch (error: unknown) {
     unstable_rethrow(error);
     return false;

@@ -2,6 +2,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  closingOn,
+  cutOf,
   daysBetween,
   formatDated,
   formatDay,
@@ -17,6 +19,38 @@ import {
   thisMonth,
   today,
 } from "./months";
+
+describe("closingOn", () => {
+  // October 2026 is cut on Friday the 23rd, its 25th being a Sunday.
+  it("reads the month a day falls in from its cut on, and the month before until then", () => {
+    expect(closingOn("2026-10-22")).toStrictEqual({ month: 8, year: 2026 });
+    expect(closingOn("2026-10-23")).toStrictEqual({ month: 9, year: 2026 });
+    expect(closingOn("2026-10-31")).toStrictEqual({ month: 9, year: 2026 });
+    expect(closingOn("2027-01-05")).toStrictEqual({ month: 11, year: 2026 });
+  });
+});
+
+describe("cutOf", () => {
+  it("cuts on the 25th where it is a working day", () => {
+    expect(cutOf({ month: 8, year: 2026 })).toBe("2026-09-25");
+    expect(cutOf({ month: 10, year: 2026 })).toBe("2026-11-25");
+  });
+
+  it("cuts on the Friday before a 25th on a Saturday or a Sunday", () => {
+    expect(cutOf({ month: 6, year: 2026 })).toBe("2026-07-24");
+    expect(cutOf({ month: 9, year: 2026 })).toBe("2026-10-23");
+  });
+
+  // Christmas Day on a Friday in 2026 and on a Monday in 2023, and the
+  // late May and August bank holidays on a Monday the 25th in 2026 and
+  // 2025.
+  it("cuts on the working day before a holiday on the 25th", () => {
+    expect(cutOf({ month: 11, year: 2026 })).toBe("2026-12-24");
+    expect(cutOf({ month: 11, year: 2023 })).toBe("2023-12-22");
+    expect(cutOf({ month: 4, year: 2026 })).toBe("2026-05-22");
+    expect(cutOf({ month: 7, year: 2025 })).toBe("2025-08-22");
+  });
+});
 
 describe("daysBetween", () => {
   it("counts the whole days from one date to a later one, over a month's end", () => {

@@ -1404,17 +1404,18 @@ describe("the account actions", () => {
       expect(await versions()).toBe(2);
     });
 
-    // It is 15 September 2026: August has ended, September has not and
-    // nor has any month after it, and the plan's owner was born in 1992.
-    it("takes a month that has ended, none from this one on, and none before the owner was born", async () => {
+    // It is 15 September 2026: August is cut, September is not until
+    // Friday the 25th and nor is any month after it, and the plan's
+    // owner was born in 1992.
+    it("takes a month cut by today, none cut after it, and none before the owner was born", async () => {
       for (const [month, refusal] of [
         [
           { month: 8, year: 2026 },
-          "The balances are as of a month that has ended",
+          "The balances are as of a month cut by today, on its 25th or the working day before",
         ],
         [
           { month: 0, year: 2027 },
-          "The balances are as of a month that has ended",
+          "The balances are as of a month cut by today, on its 25th or the working day before",
         ],
         [
           { month: 11, year: 1991 },
@@ -1427,8 +1428,10 @@ describe("the account actions", () => {
 
       await moveTo({ month: 0, year: 1992 });
       await moveTo({ month: 7, year: 2026 });
+      vi.setSystemTime(new Date("2026-09-25T12:00:00Z"));
+      await moveTo({ month: 8, year: 2026 });
 
-      expect(await versions()).toBe(3);
+      expect(await versions()).toBe(4);
     });
 
     it("refuses a balance on no account, or one the household's rules refuse, and writes nothing", async () => {

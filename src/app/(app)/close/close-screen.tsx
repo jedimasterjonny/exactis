@@ -27,9 +27,10 @@ import { answerOf, refused } from "@/lib/answer";
 import { counted } from "@/lib/count";
 import { formatGbp, formatSignedGbp } from "@/lib/money";
 import {
+  cutOf,
+  formatDay,
   formatMonth,
   monthAfter,
-  monthBefore,
   monthName,
   monthsBetween,
 } from "@/lib/months";
@@ -88,15 +89,15 @@ interface CloseScreenProps {
   readonly today: string;
 }
 
-// The month end: the last month that has ended closed onto the
+// The month end: the month whose balances were cut last closed onto the
 // household, and once it is, what moved the plan since the close before.
 // The title gives the answer. Until the month is closed, which its
 // latest progress point says, the screen is the worksheet that closes
 // it, opening on that month, and says since when a month has been due:
-// the first of the month after the one after the latest point's, or
-// that it is due where no point is kept. Once it is, the balances the
-// close set against those it closed from, what moved the plan since the
-// close before as the steps movedSince takes, and what the plan paid
+// the cut of the month after the latest point's, or that it is due
+// where no point is kept. Once it is, the balances the close set
+// against those it closed from, what moved the plan since the close
+// before as the steps movedSince takes, and what the plan paid
 // into the ISAs and the GIAs, offered to the cogitator; with the next
 // close due and what mostly moved said in the meta line, and the
 // balances to update in the header, which opens the same worksheet on
@@ -107,17 +108,16 @@ interface CloseScreenProps {
 // compare with, and says why. A month is closed in the household alone,
 // so while a scenario is open the screen says to leave it, and nothing
 // else, rather than lay the scenario's balances out to be refused. The
-// month it is and the day are given rather than read, as the household
-// and the close before the latest are.
+// month cut last and the day are given rather than read, as the
+// household and the close before the latest are.
 export function CloseScreen({
   household,
   isInScenario,
   isUpdating,
-  month: now,
+  month: due,
   since,
   today,
 }: CloseScreenProps): JSX.Element {
-  const due = monthBefore(now);
   const label = sectionLabel(monthEnd);
   if (isInScenario) {
     return (
@@ -130,9 +130,10 @@ export function CloseScreen({
       </Screen>
     );
   }
-  const isOpen = isDue(household.points, now);
+  const isOpen = isDue(household.points, due);
   const month = monthName(due.month, "long");
-  const next = `${monthName(now.month, "long")} closes from 1 ${monthName(monthAfter(now).month, "long")}`;
+  const after = monthAfter(due);
+  const next = `${monthName(after.month, "long")} closes from ${cutDay(after)}`;
   if (isOpen || isUpdating) {
     const { plan, schedule } = laidOut(
       household.accounts,
@@ -222,13 +223,13 @@ export function CloseScreen({
           caption: `${counted(moved.balances.unchecked, "balance")} left as it stood`,
         })}
         label={subsectionLabel(monthEnd, 1)}
-        title={`Balances at the end of ${formatMonth(due)}`}
+        title={`Balances on ${formatDay(cutOf(due))}`}
       >
         <CardContent>
           <Ledger
             steps={[
               {
-                detail: `End of ${formatMonth(before.asOf)}`,
+                detail: formatDay(cutOf(before.asOf)),
                 figure: formatGbp(moved.balances.stood),
                 label: "As the balances stood",
               },
@@ -240,7 +241,7 @@ export function CloseScreen({
               },
             ]}
             total={formatGbp(moved.balances.now)}
-            totalName={`As the balances stand at the end of ${formatMonth(due)}`}
+            totalName={`As the balances stand on ${formatDay(cutOf(due))}`}
           />
         </CardContent>
       </SectionCard>
@@ -304,6 +305,12 @@ function comparedOf(
     : answer;
 }
 
+// The day a month's balances are cut on, as the meta line says it: "25
+// September".
+function cutDay(month: Month): string {
+  return `${cutOf(month).slice(8)} ${monthName(month.month, "long")}`;
+}
+
 // What a group's row rests on: for the balances, how far they stand from
 // what the month end expected, what was paid in and what moved them, and
 // how many were left as they stood; for the rates, the sources that
@@ -336,14 +343,13 @@ function detailOf(group: Group, moved: Moved): string {
   }
 }
 
-// Since when a month has been due to close: the first of the month after
-// the one after the latest point's, which is when the month after the
-// latest point's could first be closed; or no more than that a month is
-// due, before any point is kept.
+// Since when a month has been due to close: the cut of the month after
+// the latest point's, which is when it could first be closed; or no more
+// than that a month is due, before any point is kept.
 function dueSince(latest: Month | undefined): string {
   return latest === undefined
     ? "Due"
-    : `Due since 1 ${monthName(monthAfter(monthAfter(latest)).month, "long")}`;
+    : `Due since ${cutDay(monthAfter(latest))}`;
 }
 
 // A standing's figures: the age the plan's owner retires at, or never,
@@ -439,7 +445,7 @@ function titleOf(moved: Moved, month: string, plan: Plan): string {
 // cogitator, as the amount to work trades out for, the month closed with
 // it so the cogitator can say where it came from, or any amount chosen
 // there; or, where the holdings were imported before the month closed
-// ended, the word to import them first, and no amount, since trades
+// was cut, the word to import them first, and no amount, since trades
 // worked out from them would be for holdings that have moved since.
 function Trades({
   month,
@@ -450,8 +456,7 @@ function Trades({
   readonly moved: Moved;
   readonly targets: Kept["targets"];
 }): JSX.Element {
-  const isStale =
-    targets === null || targets.importedOn < `${keyOf(monthAfter(month))}-01`;
+  const isStale = targets === null || targets.importedOn < cutOf(month);
   const months =
     moved.months === 1
       ? `in ${formatMonth(month)}`

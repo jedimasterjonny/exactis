@@ -36,7 +36,7 @@ import { moving } from "@/data/milestones";
 import { pointOf } from "@/data/progress";
 import { month, named, pounds, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
-import { isOnOrBefore, monthsBetween, thisMonth, today } from "@/lib/months";
+import { cutOf, isOnOrBefore, monthsBetween, today } from "@/lib/months";
 import { found, holdUnchanged, replaced, written } from "@/lib/records";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
@@ -217,7 +217,7 @@ const order = z
   .refine((ids) => new Set(ids).size === ids.length);
 
 // Closes the month: moves the month the household's balances are as
-// of, the one at whose end they were read and the one before the plan
+// of, the one whose cut they were read on and the one before the plan
 // starts in, writes the balances checked against it, each dated
 // today, whether it moved or was confirmed as it stood, records the
 // month's progress point off the accounts as they now stand, and hands
@@ -232,10 +232,9 @@ const order = z
 // it otherwise; a month before the latest moves the balances and
 // records nothing, since the balances read now are not what the
 // accounts held then, and the points before the latest are never
-// touched. A month that has not ended is refused, this one among them,
-// since a balance is what an account held at a month's end and a month
-// still running has none to read, and so is one before the plan's
-// owner was born, since the plan would run from it; a balance against
+// touched. A month not cut by today is refused, since its balances are
+// read on its cut, and so is one before the plan's owner was born,
+// since the plan would run from it; a balance against
 // an id no account has is refused as well, and so is a list naming one
 // twice, which the worksheet could not have sent. The month, the
 // balances and the point land together or not at all, and a balance
@@ -255,8 +254,10 @@ export async function closeBalances(
     if (scenario !== null) {
       throw new Refusal("Leave the scenario to close the month");
     }
-    if (isOnOrBefore(thisMonth(), asOf)) {
-      throw new Refusal("The balances are as of a month that has ended");
+    if (cutOf(asOf) > today()) {
+      throw new Refusal(
+        "The balances are as of a month cut by today, on its 25th or the working day before",
+      );
     }
     if (asOf.year < household.plan.born) {
       throw new Refusal(

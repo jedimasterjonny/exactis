@@ -22,6 +22,28 @@ const ukDay = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
 });
 
+// The month whose balances were cut last on the day given, an ISO date:
+// the month the day falls in from its cut on, and the month before it
+// until then, which is the month a close is due for.
+export function closingOn(day: string): Month {
+  const month = monthOf(day);
+  return cutOf(month) <= day ? month : monthBefore(month);
+}
+
+// The day a month's balances are cut on, as an ISO date: its 25th, or
+// the last working day before it where the 25th is none. A Saturday and
+// a Sunday are none, and nor is the 25th on Christmas Day, or on a
+// Monday in May or August, when it is the late bank holiday.
+// ponytail: Easter's holidays are not counted, so a Good Friday or an
+// Easter Monday on the 25th is cut on; count them if one ever is.
+export function cutOf({ month, year }: Month): string {
+  let day = 25;
+  while (!isWorkingDay({ month, year }, day)) {
+    day -= 1;
+  }
+  return `${String(year)}-${String(month + 1).padStart(2, "0")}-${String(day)}`;
+}
+
 // The day a moment falls on, as an ISO date names it. Read in the UK's
 // time rather than the clock's own, since the household is in the UK
 // and a server keeps UTC, as Vercel's does, which would date what is
@@ -71,9 +93,7 @@ export function formatMonthShort({ month, year }: Month): string {
 
 // Whether a month falls in or before another: an earlier year, or the
 // same year and no later month. A line runs to its last month, a loan's
-// payments to the month they clear it in, and a month said to have
-// ended has not when this one falls in or before it, each asked this
-// way.
+// payments to the month they clear it in, each asked this way.
 export function isOnOrBefore(month: Month, other: Month): boolean {
   return monthsBetween(month, other) >= 0;
 }
@@ -133,11 +153,24 @@ export function monthsBetween(from: Month, to: Month): number {
 // for the month before, while the day the household is dated on had
 // moved on.
 export function thisMonth(): Month {
-  const day = dayOf(new Date());
-  return { month: Number(day.slice(5, 7)) - 1, year: Number(day.slice(0, 4)) };
+  return monthOf(today());
 }
 
 // The day it is, read from the clock, as dayOf names it.
 export function today(): string {
   return dayOf(new Date());
+}
+
+// Whether a day of a month is a working day, as cutOf counts one: no
+// Saturday or Sunday, and no holiday on the 25th.
+function isWorkingDay({ month, year }: Month, day: number): boolean {
+  const weekday = new Date(Date.UTC(year, month, day)).getUTCDay();
+  const isHoliday =
+    day === 25 && (month === 11 || (weekday === 1 && [4, 7].includes(month)));
+  return weekday !== 0 && weekday !== 6 && !isHoliday;
+}
+
+// The month an ISO date falls in, January being nought.
+function monthOf(day: string): Month {
+  return { month: Number(day.slice(5, 7)) - 1, year: Number(day.slice(0, 4)) };
 }

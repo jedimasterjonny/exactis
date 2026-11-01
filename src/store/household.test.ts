@@ -495,15 +495,21 @@ describe("the household store", () => {
   });
 
   // Read on the fifteenth of September: before anything is kept no month
-  // is closed, and the reference's latest point is August's, the last
-  // month that has ended; a scenario holding no point reads the
-  // household's.
-  it("says whether the household's last month that has ended is still to be closed", async () => {
+  // is closed, and the reference's latest point is August's, the month
+  // cut last, until September is cut on Friday the 25th; a scenario
+  // holding no point reads the household's.
+  it("says whether the household's month cut last is still to be closed", async () => {
     expect(await isCloseDue()).toBe(true);
 
     await keepAfter(db, { scenario: "", version: 0 }, reference);
 
     expect(await isCloseDue()).toBe(false);
+
+    vi.setSystemTime(new Date("2026-09-25T12:00:00Z"));
+
+    expect(await isCloseDue()).toBe(true);
+
+    vi.setSystemTime(new Date("2026-09-15T12:00:00Z"));
 
     await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
     vi.mocked(openedScenario).mockResolvedValue("Retire early");

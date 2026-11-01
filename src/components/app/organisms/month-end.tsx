@@ -27,8 +27,9 @@ import { useSender } from "@/hooks/use-sender";
 import { counted } from "@/lib/count";
 import { formatGbp, negated } from "@/lib/money";
 import {
+  cutOf,
   formatDated,
-  formatMonth,
+  formatDay,
   monthBefore,
   monthsBetween,
 } from "@/lib/months";
@@ -61,7 +62,7 @@ interface Row {
 }
 
 // The month end's worksheet, the first card of its screen: every
-// balance closed onto the end of the last month that has ended, or of
+// balance closed onto the month whose balances were cut last, or onto
 // another month picked. Each balance opens at what the plan expected it
 // to reach by then, as the projection carries it over the months from
 // the plan's first through the month closed, so a loan, whose payments
@@ -87,9 +88,9 @@ interface Row {
 // worksheet as it was and says why, and one that saves opens it afresh,
 // so a month closed that leaves the screen where it was is not saved
 // twice. The year picked is held between the year the plan's owner was
-// born and the year of the last month that has ended, which are the
-// months the store takes, so a year mistyped asks the plan for no more
-// months than it has. The day it is is given rather than read, so the
+// born and the year of the month cut last, which hold the months the
+// store takes, so a year mistyped asks the plan for no more months than
+// it has. The day it is is given rather than read, so the
 // ages draw the same on the server as in a test, and so is the month
 // the worksheet opens on.
 export function MonthEnd({
@@ -112,7 +113,7 @@ export function MonthEnd({
   return (
     <SectionCard
       label={subsectionLabel(monthEnd, 1)}
-      title={`Balances at the end of ${formatMonth(draft.asOf)}`}
+      title={`Balances on ${formatDay(cutOf(draft.asOf))}`}
     >
       <CardContent className="grid gap-4">
         <Worksheet
@@ -148,7 +149,7 @@ export function MonthEnd({
                   setDraft(opened());
                 },
                 success: (saved) => ({
-                  description: `${counted(checked.length, "balance")} set as of the end of ${formatMonth(saved.asOf)}${saved.isRecorded ? ", its progress point recorded" : ""}`,
+                  description: `${counted(checked.length, "balance")} set as of ${formatDay(cutOf(saved.asOf))}${saved.isRecorded ? ", its progress point recorded" : ""}`,
                   title: "Balances updated",
                 }),
               },
@@ -372,7 +373,7 @@ function Worksheet({
       <Ledger
         steps={[
           {
-            detail: `End of ${formatMonth(monthBefore(from))}`,
+            detail: formatDay(cutOf(monthBefore(from))),
             figure: formatGbp(was),
             label: "As the balances stood",
           },
@@ -384,7 +385,7 @@ function Worksheet({
           },
         ]}
         total={formatGbp(was + paid + moved)}
-        totalName={`As the balances stand at the end of ${formatMonth(draft.asOf)}`}
+        totalName={`As the balances stand on ${formatDay(cutOf(draft.asOf))}`}
       />
     </>
   );
