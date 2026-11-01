@@ -105,7 +105,7 @@ export interface Reading {
 // A future tried again in the search for where the run breaks: its
 // spending cut by the points given, or its owner retiring at the age
 // given.
-type Trial = { readonly age: number } | { readonly cut: number };
+export type Trial = { readonly age: number } | { readonly cut: number };
 
 // How many futures a run draws: enough to pin the chance to within two
 // points either way, and few enough that the run is a matter of

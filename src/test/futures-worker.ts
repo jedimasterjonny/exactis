@@ -1,31 +1,36 @@
 import { vi } from "vitest";
 
 import type { Future } from "@/engine/futures";
-import type { Slice } from "@/hooks/futures.worker";
+import type { Slice, Tried } from "@/hooks/futures.worker";
 
-import { futuresOf } from "@/engine/futures";
+import { futuresOf, lastsTried } from "@/engine/futures";
 
 // jsdom has no Worker, and the one worker the app starts draws a slice
-// of a run of futures, so this stands in for it on the test's own
-// thread: a slice posted to it is drawn as the worker draws it and
-// handed back on a later turn, as a worker's answer is. An answer on its
-// way lands whether or not the worker has been terminated since, as a
-// real worker's may, and only a handler taken off hears nothing of it.
-// It answers on the next turn unless a test gives it longer to take.
+// of a run of futures or tries one future again, so this stands in for
+// it on the test's own thread: what is posted to it is answered as the
+// worker answers it and handed back on a later turn, as a worker's
+// answer is. An answer on its way lands whether or not the worker has
+// been terminated since, as a real worker's may, and only a handler
+// taken off hears nothing of it. It answers on the next turn unless a
+// test gives it longer to take.
 export class FuturesWorker {
   public onmessage:
-    ((event: { readonly data: readonly Future[] }) => void) | null = null;
+    ((event: { readonly data: boolean | readonly Future[] }) => void) | null =
+    null;
 
   public readonly terminate = vi.fn();
 
   protected readonly took: number = 0;
 
-  public postMessage(slice: Slice): void {
+  public postMessage(posted: Slice | Tried): void {
     setTimeout(() => {
       this.onmessage?.({
-        data: futuresOf(slice.accounts, slice.schedule, slice)
-          .take(slice.count)
-          .toArray(),
+        data:
+          "trial" in posted
+            ? lastsTried(posted.accounts, posted.schedule, posted)
+            : futuresOf(posted.accounts, posted.schedule, posted)
+                .take(posted.count)
+                .toArray(),
       });
     }, this.took);
   }
