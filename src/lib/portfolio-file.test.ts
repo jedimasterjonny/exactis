@@ -13,7 +13,7 @@ import {
 } from "@/lib/portfolio-file.fixture";
 import { int32At, messageOf, messagesAt, textAt } from "@/lib/protobuf";
 
-import { readTargets, reweighted } from "./portfolio-file";
+import { readPortfolios, readTargets, reweighted } from "./portfolio-file";
 
 // A transaction as a test writes it out: the security it is on, or
 // none, the currency it was made in, sterling unless said, and when it
@@ -143,6 +143,109 @@ function weightsIn(file: Uint8Array): ReadonlyMap<string, number> {
     ]),
   );
 }
+
+describe("readPortfolios", () => {
+  // A cash account as a test writes one: its id, a name from it, and
+  // the currency it is kept in.
+  const account = (id: string, currency: string): Written => [
+    [1, id],
+    [2, `Cash ${id}`],
+    [3, currency],
+  ];
+  // A securities account: its id, its name and the cash account it
+  // takes as its reference, or none.
+  const portfolio = (id: string, name: string, reference?: string): Written => [
+    [1, id],
+    [2, name],
+    ...(reference === undefined ? [] : [[5, reference] as const]),
+  ];
+  // A transaction moving cash: its type, the cash account it names, the
+  // day it was made, its amount in pence, as Portfolio Performance
+  // writes every amount above nothing, and the other account it moves
+  // cash to, if any.
+  const moving = (
+    type: number,
+    from: string,
+    { day, pence, to }: { day: string; pence: number; to?: string },
+  ): Written => [
+    [2, type],
+    [3, from],
+    ...(to === undefined ? [] : [[5, to] as const]),
+    [9, [[1, Date.parse(`${day}T09:30:00Z`) / 1000]]],
+    [10, "GBP"],
+    [11, pence],
+  ];
+
+  // The ISA pays in £1,500 on the 25th of August, buys £1,200 of a fund,
+  // takes a dividend of £12.34, pays a fee of £2 and takes a delivery of
+  // shares naming it, which moves no cash; on the 25th of
+  // September it is paid £500 from a current account the file keeps,
+  // and moves £100 to the GIA, which is paid into neither. The GIA has
+  // £30 taken out on the 1st of October, and £50 paid in and taken out
+  // again on the 2nd. A junior account sharing the ISA's name and
+  // reference account is read with it, once. An account kept in
+  // dollars, one taking no reference account and one with no name are
+  // left out.
+  it("reads each securities account's cash and what was paid into its reference account by the day", () => {
+    const file = portfolioFile([
+      ...[
+        account("isa-cash", "GBP"),
+        account("gia-cash", "GBP"),
+        account("bank", "GBP"),
+        account("usd-cash", "USD"),
+      ].map((each) => [3, each] as const),
+      ...[
+        portfolio("isa", "ISA", "isa-cash"),
+        portfolio("junior", "ISA", "isa-cash"),
+        portfolio("gia", "GIA", "gia-cash"),
+        portfolio("us", "US", "usd-cash"),
+        portfolio("spare", "Spare"),
+        portfolio("nameless", "", "gia-cash"),
+      ].map((each) => [4, each] as const),
+      ...[
+        moving(6, "isa-cash", { day: "2026-08-25", pence: 150_000 }),
+        [
+          ...moving(0, "isa-cash", { day: "2026-08-26", pence: 120_000 }),
+          [4, "isa"] as const,
+        ],
+        moving(8, "isa-cash", { day: "2026-09-01", pence: 1234 }),
+        moving(13, "isa-cash", { day: "2026-09-01", pence: 200 }),
+        moving(2, "isa-cash", { day: "2026-09-01", pence: 99_999 }),
+        moving(5, "bank", { day: "2026-09-25", pence: 50_000, to: "isa-cash" }),
+        moving(5, "isa-cash", {
+          day: "2026-09-25",
+          pence: 10_000,
+          to: "gia-cash",
+        }),
+        moving(7, "gia-cash", { day: "2026-10-01", pence: 3000 }),
+        moving(6, "gia-cash", { day: "2026-10-02", pence: 5000 }),
+        moving(7, "gia-cash", { day: "2026-10-02", pence: 5000 }),
+        moving(6, "usd-cash", { day: "2026-10-02", pence: 5000 }),
+        transaction(2, 100_000_000, "security-1"),
+      ].map((each) => [5, each] as const),
+    ]);
+
+    expect(readPortfolios(file)).toStrictEqual([
+      {
+        cash: 710,
+        name: "ISA",
+        paid: [
+          { amount: 1500, on: "2026-08-25" },
+          { amount: 500, on: "2026-09-25" },
+        ],
+      },
+      { cash: 70, name: "GIA", paid: [{ amount: -30, on: "2026-10-01" }] },
+    ]);
+  });
+
+  it("refuses what it could not read, as reading the targets does", () => {
+    expect(() => readPortfolios(strToU8("Account,Balance\nISA,1000"))).toThrow(
+      new Refusal(
+        "The file is not a zip, as a Portfolio Performance file saved in binary is",
+      ),
+    );
+  });
+});
 
 describe("readTargets", () => {
   // Equities' categories come first, the largest first, the tie

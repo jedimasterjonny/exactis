@@ -63,6 +63,7 @@ import {
   monthOfYear,
   named,
   ownerValues,
+  portfolioValues,
   pounds,
   recordId,
 } from "@/data/schemas";
@@ -588,12 +589,17 @@ const target = z.object({
 // the rounding of multiplying weights down the taxonomy.
 const tolerance = 1e-9;
 
-// The target allocation as imported: the day it was imported on, and
-// its categories, each listed once by its id and adding up to the
-// whole, since a target allocation that does not is no allocation of
-// it, and nothing the plan could blend a rate from.
+// The target allocation as imported: the day it was imported on, its
+// categories, each listed once by its id and adding up to the whole,
+// since a target allocation that does not is no allocation of it, and
+// nothing the plan could blend a rate from, and each securities
+// account's cash and what was paid into it, where they were read.
 const targets = z
-  .object({ categories: z.array(target), importedOn: z.iso.date() })
+  .object({
+    categories: z.array(target),
+    importedOn: z.iso.date(),
+    portfolios: z.array(z.object(portfolioValues)).exactOptional(),
+  })
   .refine(
     ({ categories }) =>
       new Set(categories.map(({ id }) => id)).size === categories.length,

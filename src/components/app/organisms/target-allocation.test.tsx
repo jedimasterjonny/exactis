@@ -158,7 +158,7 @@ describe("TargetAllocation", () => {
 
     expect(
       screen.getByText(
-        "The file is read in the browser. Only the targets and what each category holds leave it.",
+        "The file is read in the browser. Only the targets, what each category holds, and each account's cash and what was paid into it leave it.",
       ),
     ).toBeInTheDocument();
   });
@@ -184,7 +184,7 @@ describe("TargetAllocation", () => {
 
   // The page is drawn again from the store's targets, which the toast
   // reads.
-  it("reads the file chosen here, sends the store its categories alone, and says what was imported", async () => {
+  it("reads the file chosen here, sends the store what it reads of it, and says what was imported", async () => {
     const answer = Promise.withResolvers<Answer<Targets>>();
     vi.mocked(importTargets).mockReturnValue(answer.promise);
     renderCard();
@@ -197,6 +197,7 @@ describe("TargetAllocation", () => {
     await waitFor(() => {
       expect(importTargets).toHaveBeenCalledWith(
         readTargets(portfolioFile(clientOf([["Asset Allocation", reference]]))),
+        [],
       );
     });
     expect(picker).toHaveValue("");
@@ -284,7 +285,7 @@ describe("TargetAllocation", () => {
     await retargetWith(chosen);
 
     await waitFor(() => {
-      expect(importTargets).toHaveBeenCalledWith(readTargets(saved70));
+      expect(importTargets).toHaveBeenCalledWith(readTargets(saved70), []);
     });
     expect(pullLifeStrategy).toHaveBeenCalledWith("9244");
     expect(button).toHaveAttribute("aria-busy", "true");
@@ -401,6 +402,7 @@ describe("TargetAllocation", () => {
       readTargets(
         reweighted(saved80, retargeted(readTargets(saved80), holdings, null)),
       ),
+      [],
     );
   });
 
@@ -507,6 +509,7 @@ describe("TargetAllocation", () => {
       readTargets(
         reweighted(saved80, retargeted(readTargets(saved80), equities, split)),
       ),
+      [],
     );
   });
 

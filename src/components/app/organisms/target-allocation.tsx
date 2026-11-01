@@ -38,7 +38,12 @@ import { acceptedOf, saved } from "@/lib/answer";
 import { formatWholePercent } from "@/lib/money";
 import { formatDay } from "@/lib/months";
 import { assumptions, subsectionLabel } from "@/lib/nav";
-import { readTargets, reweighted, taxonomy } from "@/lib/portfolio-file";
+import {
+  readPortfolios,
+  readTargets,
+  reweighted,
+  taxonomy,
+} from "@/lib/portfolio-file";
 
 // The file as retargeted, to be saved over the original: its name, and
 // the address its bytes are held at in this browser.
@@ -63,7 +68,8 @@ interface TargetAllocationProps {
 // it. The file is read here in the browser rather than sent, since it
 // holds every holding and transaction beside the taxonomy, so the
 // store is sent the categories alone, each with what it holds worked
-// out here. The
+// out here, and each securities account's cash and what was paid into
+// it. The
 // import spins while the file is read and the store asked, and the
 // store's answer draws the screen again from the targets kept, under a
 // toast. A file that cannot be read, or targets the store refuses, are
@@ -131,8 +137,10 @@ export function TargetAllocation({
 
   function importFile(file: File): void {
     send(
-      async () =>
-        importTargets(readTargets(new Uint8Array(await file.arrayBuffer()))),
+      async () => {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        return importTargets(readTargets(bytes), readPortfolios(bytes));
+      },
       {
         failure: "Allocation not imported",
         onAccepted: () => {
@@ -169,7 +177,10 @@ export function TargetAllocation({
         const held = readTargets(bytes);
         const holdings = acceptedOf(await pullLifeStrategy(fund.portId));
         const written = reweighted(bytes, retargeted(held, holdings, split));
-        const imported = await importTargets(readTargets(written));
+        const imported = await importTargets(
+          readTargets(written),
+          readPortfolios(written),
+        );
         return imported.kind === "saved"
           ? saved({ asOf: holdings.asOf, written })
           : imported;
@@ -312,8 +323,8 @@ export function TargetAllocation({
         />
       )}
       <CardFooter className="text-sm text-muted-foreground">
-        The file is read in the browser. Only the targets and what each category
-        holds leave it.
+        The file is read in the browser. Only the targets, what each category
+        holds, and each account&apos;s cash and what was paid into it leave it.
       </CardFooter>
     </SectionCard>
   );

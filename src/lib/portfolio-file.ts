@@ -2,7 +2,7 @@ import type { Unzipped } from "fflate";
 
 import { strToU8, zipSync } from "fflate";
 
-import type { Target } from "@/data/targets";
+import type { Portfolio, Target } from "@/data/targets";
 import type { Message } from "@/lib/protobuf";
 
 import { Refusal } from "@/lib/answer";
@@ -124,27 +124,72 @@ const signs: ReadonlyMap<number, -1 | 1> = new Map([
 // it names to the other it names.
 const transfer = 4;
 
+// The types of a transaction moving cash from one cash account to
+// another, which Portfolio Performance writes once, from the account it
+// names to the other it names; of one paying cash into an account from
+// outside the file; and of one taking it out.
+const cashTransfer = 5;
+const deposit = 6;
+const removal = 7;
+
+// What an amount of money is written in: hundredths of the currency.
+const hundredths = 100;
+
+// What a transaction of each type does to the cash account it names: a
+// sale, a deposit, a dividend, interest and a refund put its amount in,
+// and a purchase, a removal, interest charged, a tax and a fee take it
+// out, as does cash moved to another account, which puts it into the
+// other; a delivery or a transfer of shares moves no cash, so is not
+// listed. Portfolio Performance writes every amount above nothing and
+// says which way it goes by the type.
+const cashSigns: ReadonlyMap<number, -1 | 1> = new Map([
+  [0, -1],
+  [1, 1],
+  [8, 1],
+  [9, 1],
+  [10, -1],
+  [11, -1],
+  [12, 1],
+  [13, -1],
+  [14, 1],
+  [cashTransfer, -1],
+  [deposit, 1],
+  [removal, -1],
+]);
+
 // The fields read, by their numbers in Portfolio Performance's
-// client.proto: the client's securities, securities accounts,
-// transactions and taxonomies, a security's id, name, currency and
-// prices, a securities account's id and name, a price's close, a
-// transaction's type, date, currency, shares, security, units,
+// client.proto: the client's securities, cash accounts, securities
+// accounts, transactions and taxonomies, a security's id, name, currency
+// and prices, a cash account's id and currency, a securities account's
+// id, name and the cash account it takes as its reference, a price's
+// close, a transaction's type, date, currency, amount, shares,
+// security, units, cash account and the other it moves cash to,
 // securities account and the other it moves shares to, a timestamp's
 // seconds, a unit's amount and the same in the currency it was carried
 // from, a taxonomy's name and classes, what a class holds, and a
 // holding's vehicle and weight.
 const fields = {
+  account: { currency: 3, id: 1 },
   assignment: { vehicle: 1, weight: 2 },
   class: { assignments: 9, id: 1, name: 3, parent: 2, rank: 7, weight: 6 },
-  client: { portfolios: 4, securities: 2, taxonomies: 8, transactions: 5 },
-  portfolio: { id: 1, name: 2 },
+  client: {
+    accounts: 3,
+    portfolios: 4,
+    securities: 2,
+    taxonomies: 8,
+    transactions: 5,
+  },
+  portfolio: { id: 1, name: 2, reference: 5 },
   price: { close: 2 },
   security: { currency: 4, id: 1, name: 3, prices: 13 },
   taxonomy: { classes: 5, name: 2 },
   timestamp: { seconds: 1 },
   transaction: {
+    account: 3,
+    amount: 11,
     currency: 10,
     date: 9,
+    otherAccount: 5,
     otherPortfolio: 6,
     portfolio: 4,
     security: 14,
@@ -154,6 +199,82 @@ const fields = {
   },
   unit: { amount: 2, fxAmount: 4, fxCurrency: 5 },
 } as const;
+
+// What each securities account a Portfolio Performance file lists held
+// in cash and was paid, read off its reference account, the cash
+// account its purchases are paid from: the account's name; the cash
+// left uninvested there, to the pound, what every transaction naming it
+// has put in and taken out as the signs take them; and what was paid
+// into it from outside the securities accounts' reference accounts on
+// each day anything was, less what was taken out, to the pound, earliest
+// first. A deposit is paid in and a removal taken out, and so is cash
+// moved from or to a cash account no securities account takes as its
+// reference, as a current account kept in the file is, while cash moved
+// between two reference accounts is paid into neither. Securities
+// accounts of one name are read together, over the reference accounts
+// they take, each once. One taking no reference account, or one kept in
+// a currency other than sterling, is left out, since the reader cannot
+// say what it holds in pounds, and so is one with no name, as the
+// cogitator leaves it. A day is the one the file dates a transaction on,
+// which it writes as a moment in UTC. The file is opened and refused as
+// readTargets opens it.
+// ponytail: two securities accounts of different names taking one
+// reference account each read its cash whole; split it by what each
+// bought if a file ever shares one.
+export function readPortfolios(file: Uint8Array): readonly Portfolio[] {
+  const client = messageOf(opened(file).client);
+  const sterling = new Set(
+    messagesAt(client, fields.client.accounts)
+      .filter((each) => textAt(each, fields.account.currency) === "GBP")
+      .map((each) => textOf(each, fields.account.id)),
+  );
+  const references = new Map<string, Set<string>>();
+  for (const portfolio of messagesAt(client, fields.client.portfolios)) {
+    const reference = textAt(portfolio, fields.portfolio.reference);
+    const name = textOf(portfolio, fields.portfolio.name);
+    if (reference !== undefined && name !== "") {
+      references.set(
+        name,
+        (references.get(name) ?? new Set<string>()).add(reference),
+      );
+    }
+  }
+  const inside = new Set([...references.values()].flatMap((each) => [...each]));
+  const transactions = messagesAt(client, fields.client.transactions);
+  return [...references]
+    .filter(([, accounts]) => [...accounts].every((id) => sterling.has(id)))
+    .map(([name, accounts]) => {
+      let cash = 0;
+      const paid = new Map<string, number>();
+      for (const transaction of transactions) {
+        const type = int32At(transaction, fields.transaction.type);
+        const amount =
+          int64At(transaction, fields.transaction.amount) / hundredths;
+        const from = textOf(transaction, fields.transaction.account);
+        const to = textOf(transaction, fields.transaction.otherAccount);
+        const sign =
+          (accounts.has(from) ? (cashSigns.get(type) ?? 0) : 0) +
+          (type === cashTransfer && accounts.has(to) ? 1 : 0);
+        cash += sign * amount;
+        const isPaid =
+          type === deposit ||
+          type === removal ||
+          (type === cashTransfer && !(inside.has(from) && inside.has(to)));
+        if (sign !== 0 && isPaid) {
+          const on = dayOf(transaction);
+          paid.set(on, (paid.get(on) ?? 0) + sign * amount);
+        }
+      }
+      return {
+        cash: Math.round(cash),
+        name,
+        paid: [...paid]
+          .map(([on, amount]) => ({ amount: Math.round(amount), on }))
+          .filter(({ amount }) => amount !== 0)
+          .toSorted((one, other) => one.on.localeCompare(other.on)),
+      };
+    });
+}
 
 // The target allocation a Portfolio Performance file holds, from its
 // Asset Allocation taxonomy, and what each category of it holds. The
@@ -279,6 +400,12 @@ function classOf(message: Message): Class {
 function dateOf(transaction: Message): number {
   const [date] = messagesAt(transaction, fields.transaction.date);
   return date === undefined ? 0 : int64At(date, fields.timestamp.seconds);
+}
+
+// The day a transaction was made, as an ISO date: the day of its date in
+// UTC, as Portfolio Performance writes the moment.
+function dayOf(transaction: Message): string {
+  return new Date(dateOf(transaction) * 1000).toISOString().slice(0, 10);
 }
 
 // Fractions of a whole as hundredths of a per cent that add up to the

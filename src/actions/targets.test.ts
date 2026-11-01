@@ -6,7 +6,7 @@ import * as z from "zod";
 import { mappings } from "@/data/cma.fixture";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { stamped } from "@/data/shapes";
-import { targets } from "@/data/targets.fixture";
+import { portfolios, targets } from "@/data/targets.fixture";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
@@ -25,7 +25,7 @@ const memory = inMemory();
 const { db } = memory;
 
 // The reference categories, read on the day the store is stood up on.
-const importedToday = { ...targets, importedOn: "2026-09-15" };
+const importedToday = { ...targets, importedOn: "2026-09-15", portfolios: [] };
 
 standUp(memory, { today });
 
@@ -33,14 +33,14 @@ describe("importTargets", () => {
   it("writes nothing without a session", async () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
-    await expect(importTargets(targets.categories)).rejects.toThrow(
+    await expect(importTargets(targets.categories, [])).rejects.toThrow(
       "redirected",
     );
     expect(await readLatest(db, "")).toBeNull();
   });
 
   it("keeps the categories as imported today, draws the page again and hands them back", async () => {
-    expect(await importTargets(targets.categories)).toStrictEqual(
+    expect(await importTargets(targets.categories, [])).toStrictEqual(
       saved(importedToday),
     );
     expect(await readLatest(db, "")).toStrictEqual({
@@ -50,7 +50,7 @@ describe("importTargets", () => {
     expect(refresh).toHaveBeenCalledOnce();
   });
 
-  it("keeps an import over the one the household held, and nothing else", async () => {
+  it("keeps an import over the one the household held, with each account's cash and what was paid in, and nothing else", async () => {
     await keepAfter(db, { scenario: "", version: 0 }, reference);
     const [first, second, ...rest] = targets.categories;
     const moved = [
@@ -59,12 +59,12 @@ describe("importTargets", () => {
       ...rest,
     ];
 
-    await importTargets(moved);
+    await importTargets(moved, portfolios);
 
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped({
         ...reference,
-        targets: { categories: moved, importedOn: "2026-09-15" },
+        targets: { categories: moved, importedOn: "2026-09-15", portfolios },
       }),
       version: 2,
     });
@@ -91,37 +91,42 @@ describe("importTargets", () => {
       { ...reference, rateSet: "cma" },
     );
 
-    expect(await importTargets(adding)).toStrictEqual(
+    expect(await importTargets(adding, [])).toStrictEqual(
       refused(
         "Japan has no CMA class, so this allocation cannot be imported while the plan runs on the CMA's rates. Choose custom rates, import it and give its new categories a class, then choose From CMA again",
       ),
     );
-    expect(await importTargets(targets.categories)).toStrictEqual(
+    expect(await importTargets(targets.categories, [])).toStrictEqual(
       saved(importedToday),
     );
     expect(await readLatest(db, "")).toMatchObject({ version: 2 });
 
     await keepAfter(db, { scenario: "", version: 2 }, reference);
 
-    expect(await importTargets(adding)).toMatchObject({ kind: "saved" });
+    expect(await importTargets(adding, [])).toMatchObject({ kind: "saved" });
   });
 
   it("refuses categories that do not add up to the whole, and keeps nothing", async () => {
-    expect(await importTargets(targets.categories.slice(1))).toStrictEqual(
+    expect(await importTargets(targets.categories.slice(1), [])).toStrictEqual(
       refused("A target allocation's categories add up to 100%"),
     );
     expect(await readLatest(db, "")).toBeNull();
   });
 
-  // Only a bug or a forgery sends a category the reader could not
-  // have read, so it fails loudly rather than being refused.
-  it("fails on a category the reader could not have sent, and keeps nothing", async () => {
+  // Only a bug or a forgery sends a category or an account the reader
+  // could not have read, so it fails loudly rather than being refused.
+  it("fails on a category or an account the reader could not have sent, and keeps nothing", async () => {
     const unnamed = targets.categories.map((category) => ({
       ...category,
       id: "",
     }));
 
-    await expect(importTargets(unnamed)).rejects.toThrow(z.ZodError);
+    await expect(importTargets(unnamed, [])).rejects.toThrow(z.ZodError);
+    await expect(
+      importTargets(targets.categories, [
+        { cash: 0, name: "ISA", paid: [{ amount: 0.5, on: "2026-09-25" }] },
+      ]),
+    ).rejects.toThrow(z.ZodError);
     expect(await readLatest(db, "")).toBeNull();
   });
 });
