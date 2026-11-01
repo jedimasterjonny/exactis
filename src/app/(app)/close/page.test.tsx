@@ -434,7 +434,7 @@ describe("Close", () => {
 
     expect(
       screen.getByText(
-        "The close before August's cannot be read now: A rule since tightened.",
+        "The close before August's was kept in a form this app cannot read, so what moved shows from the next close.",
       ),
     ).toBeInTheDocument();
 
