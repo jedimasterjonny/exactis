@@ -2440,6 +2440,28 @@ describe("cashFlow", () => {
     ).not.toThrow();
   });
 
+  // A run hands the flow the same accounts, lines and plan month after
+  // month, and they are checked the first time alone. One refused is
+  // refused every time it is handed over, and the accounts and lines
+  // found sound over one plan are checked again over another.
+  it("refuses a household each time it is handed over, and over each plan", () => {
+    const schedule = { expenses: [], income: [plain] };
+    const twice = [isa, isa];
+    const once = [isa];
+    const at = { month: 0, year: 2026 };
+
+    expect(() => cashFlow(twice, schedule, { at, plan })).toThrow(
+      "An account is listed once",
+    );
+    expect(() => cashFlow(twice, schedule, { at, plan })).toThrow(
+      "An account is listed once",
+    );
+    expect(() => cashFlow(once, schedule, { at, plan })).not.toThrow();
+    expect(() =>
+      cashFlow(once, schedule, { at, plan: { ...plan, inflation: -1 } }),
+    ).toThrow("Inflation is a rate, and prices fall by less than everything");
+  });
+
   it("refuses to hand the spare money to a real asset or a debt", () => {
     const spareHome: Account = {
       ...home,
