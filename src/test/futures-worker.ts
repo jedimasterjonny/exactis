@@ -30,3 +30,14 @@ export class FuturesWorker {
     }, this.took);
   }
 }
+
+// Stands the test's workers in for the browser's: the Worker global as
+// the stand-in given, this one unless another is, in a browser saying it
+// has two cores, so how many workers a run is drawn on, and which slices
+// each is handed, is the test's to say rather than the host's.
+export function stubWorkers(
+  worker: typeof FuturesWorker = FuturesWorker,
+): void {
+  vi.stubGlobal("Worker", worker);
+  vi.spyOn(navigator, "hardwareConcurrency", "get").mockReturnValue(2);
+}

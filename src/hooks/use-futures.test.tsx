@@ -61,8 +61,10 @@ class Watched extends FuturesWorker {
 }
 
 // The workers the hook starts, in the order it starts them, on a clock
-// faked so a test says when each slice lands.
-function watchWorkers(): readonly Watched[] {
+// faked so a test says when each slice lands, in a browser saying it
+// has the cores given, two unless told otherwise.
+function watchWorkers(cores = 2): readonly Watched[] {
+  vi.spyOn(navigator, "hardwareConcurrency", "get").mockReturnValue(cores);
   const started: Watched[] = [];
   vi.stubGlobal(
     "Worker",
@@ -545,6 +547,60 @@ describe("useFutures", () => {
     expect(
       renderHook(() => useFutures(accounts, schedule, compared)).result.current,
     ).toStrictEqual({ futures: [], isDone: false });
+  });
+
+  // 40 futures are four slices, the first three handed to the three
+  // workers at once, and the fourth to whichever comes back first; and a
+  // browser saying it has none is drawn for on one.
+  it("draws on a worker for each core the browser says it has", () => {
+    const started = watchWorkers(3);
+    renderHook(() =>
+      useFutures(accounts, schedule, { count: 40, plan, spread }),
+    );
+
+    expect(started.map(({ handed }) => handed)).toStrictEqual([
+      [0],
+      [10],
+      [20],
+    ]);
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(started.map(({ handed }) => handed)).toStrictEqual([
+      [0, 30],
+      [10],
+      [20],
+    ]);
+    vi.spyOn(navigator, "hardwareConcurrency", "get").mockReturnValue(0);
+    renderHook(() =>
+      useFutures(accounts, schedule, {
+        count: 40,
+        plan: { ...plan, rate: 0.03 },
+        spread,
+      }),
+    );
+    expect(started).toHaveLength(4);
+  });
+
+  // 100 futures are ten slices, but a browser saying it has sixteen
+  // cores draws them on four workers; and one giving no count at all, as
+  // a browser may leave it unsaid, draws on one rather than none.
+  it("draws on four workers at most, and on one where the browser gives no count", () => {
+    const started = watchWorkers(16);
+    renderHook(() =>
+      useFutures(accounts, schedule, { count: 100, plan, spread }),
+    );
+
+    expect(started).toHaveLength(4);
+    vi.stubGlobal("navigator", {});
+    renderHook(() =>
+      useFutures(accounts, schedule, {
+        count: 100,
+        plan: { ...plan, rate: 0.03 },
+        spread,
+      }),
+    );
+    expect(started).toHaveLength(5);
   });
 
   it("stops the workers when the screen is taken down", () => {

@@ -32,7 +32,7 @@ import { forget } from "@/hooks/use-futures";
 import { refused } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
 import { bySlot, commit, slider } from "@/test/dom";
-import { FuturesWorker } from "@/test/futures-worker";
+import { FuturesWorker, stubWorkers } from "@/test/futures-worker";
 
 import { ProjectionBoard, settle } from "./projection-board";
 
@@ -515,7 +515,7 @@ describe("ProjectionBoard", () => {
   // that do once they are. Each tile reads the measure its milestone is
   // on, so the home counts in the one and not in the other.
   it("draws the futures once, says a milestone reached when conditions hold is coming, and marks it at the median once the run is drawn", async () => {
-    vi.stubGlobal("Worker", FuturesWorker);
+    stubWorkers();
     const planned = { ...retiringAt(retiring, 92), years: 3 };
     const isa: Account = {
       balance: 30000,
@@ -608,12 +608,13 @@ describe("ProjectionBoard", () => {
     ).toBeInTheDocument();
   });
 
-  // The plan above, its run standing at the first two slices: every
-  // future drawn so far reaches thirty grand in 2026, so it is marked
-  // there while the rest are drawn, and none reaches a million, which
-  // is said to be coming still.
+  // The plan above, its run standing at the first two slices, one on
+  // each of the two workers a browser saying it has two cores draws on:
+  // every future drawn so far reaches thirty grand in 2026, so it is
+  // marked there while the rest are drawn, and none reaches a million,
+  // which is said to be coming still.
   it("marks a milestone reached when conditions hold at the median of the futures drawn so far", async () => {
-    vi.stubGlobal("Worker", Stalled);
+    stubWorkers(Stalled);
     const isa: Account = {
       balance: 30000,
       growth: { kind: "plan" },
