@@ -17,7 +17,7 @@ import {
   getScenario,
   getScenarios,
 } from "@/store/household";
-import { FuturesWorker } from "@/test/futures-worker";
+import { stubWorkers } from "@/test/futures-worker";
 
 import Dashboard from "./page";
 
@@ -55,7 +55,7 @@ describe("Dashboard", () => {
     vi.mocked(getScenario).mockResolvedValue(null);
     vi.mocked(getScenarios).mockResolvedValue([]);
     // jsdom has no Worker, and the chance of success draws its futures on two.
-    vi.stubGlobal("Worker", FuturesWorker);
+    stubWorkers();
     // Each test opens a page of its own, with no run kept from the last.
     forget();
   });

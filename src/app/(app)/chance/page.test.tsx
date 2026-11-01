@@ -6,7 +6,7 @@ import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
 import { forget } from "@/hooks/use-futures";
 import { getHousehold } from "@/store/household";
-import { FuturesWorker } from "@/test/futures-worker";
+import { stubWorkers } from "@/test/futures-worker";
 
 import Chance from "./page";
 
@@ -23,7 +23,7 @@ const { household } = soundKept(blank);
 describe("Chance", () => {
   // jsdom has no Worker, and the chance of success draws its futures on two.
   beforeEach(() => {
-    vi.stubGlobal("Worker", FuturesWorker);
+    stubWorkers();
     // Each test opens a page of its own, with no run kept from the last.
     forget();
   });

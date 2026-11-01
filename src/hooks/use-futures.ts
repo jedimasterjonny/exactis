@@ -28,10 +28,12 @@ interface Kept {
 
 // How long the futures drawn are held before the screen is handed them,
 // in milliseconds: often enough to watch the run come in, and seldom
-// enough that the screen is not drawn again for every slice. The two
+// enough that the screen is not drawn again for every slice. The
 // workers draw alike and so land their slices within a few milliseconds
 // of each other, and handed each as it landed the screen showed the
-// count between them for a frame or two, which read as a flicker.
+// count between them for a frame or two, which read as a flicker when
+// it was measured on two workers, and more workers land more slices in
+// the same few milliseconds.
 const handed = 200;
 
 // Nothing drawn, as a page opens with, and every run drawn from the
@@ -57,15 +59,18 @@ const runsKept = 2;
 // How many futures a worker is handed at a time: few enough that slices
 // land many times between the screen's hand-overs, so the count rises
 // by about as much at each, the first futures show early, and the last
-// slice keeps a worker waiting on the other for little; and enough that
-// handing a slice over is nothing beside drawing it. At 50 the two
-// workers landed a pair about every 600 ms, and the count rose in a
-// limp, half a pair and then the rest 200 ms later.
+// slice keeps the other workers waiting on it for little; and enough
+// that handing a slice over is nothing beside drawing it. Measured on
+// two workers, at 50 they landed a pair about every 600 ms, and the
+// count rose in a limp, half a pair and then the rest 200 ms later.
 const slice = 10;
 
-// How many workers draw a run between them, each run its own, so two
-// runs drawn side by side start four.
-const workers = 2;
+// The most workers a run is drawn on. ponytail: four a run, since
+// WebKit drew no faster past two on a four-core box and an iPhone says
+// four, so a desktop saying sixteen draws a run and the one compared
+// beside it on eight in all; sharing the cores out across the runs
+// kept, rather than capping each, would let one run take them all.
+const mostWorkers = 4;
 
 let kept = none;
 
@@ -86,10 +91,11 @@ export function forget(): void {
   kept = none;
 }
 
-// The plan's futures as they are drawn, the count given of them, by two
-// workers off the page's thread, so the page stays to hand and the run
-// takes half the time one thread would: the futures drawn so far, in
-// the order the run holds them, and whether that is all of them. The
+// The plan's futures as they are drawn, the count given of them, by a
+// worker for each core off the page's thread, so the page stays to hand
+// and the run takes the cores' share of the time one thread would, as
+// workersOf counts them: the futures drawn so far, in the order the run
+// holds them, and whether that is all of them. The
 // run is handed out a slice at a time, the next to whichever worker
 // comes free first, so a worker slowed by the page's own work does not
 // hold the run up. The screen is handed what has come back at most
@@ -111,10 +117,6 @@ export function forget(): void {
 // screen is reading is never dropped. Every screen reading a run is
 // handed the same futures as they land, and is not drawn again as
 // another run's land.
-//
-// ponytail: two workers; one a core, from
-// navigator.hardwareConcurrency, would take a run to the cores' share,
-// if two are not enough.
 export function useFutures(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -156,7 +158,7 @@ export function useFutures(
       (_, index) => index,
     ).filter((index) => slices[index] === undefined);
     const pool = waiting
-      .slice(0, workers)
+      .slice(0, workersOf())
       .map(() => new Worker(new URL("./futures.worker.ts", import.meta.url)));
     let lastHanded = performance.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -261,4 +263,14 @@ function trimmed(runs: readonly Kept[]): readonly Kept[] {
     spare -= 1;
     return spare >= 0;
   });
+}
+
+// How many workers draw a run between them: one for each core the
+// browser says it has, up to mostWorkers, and one where it says none or
+// gives no count at all, each run its own, so two runs drawn side by
+// side start twice as many. WebKit says four on fewer than eight cores
+// and eight on more, whatever the device holds.
+function workersOf(): number {
+  const cores = navigator.hardwareConcurrency;
+  return Number.isFinite(cores) ? Math.min(mostWorkers, Math.max(1, cores)) : 1;
 }

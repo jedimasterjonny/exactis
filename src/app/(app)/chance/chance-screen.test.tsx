@@ -7,7 +7,7 @@ import type { Schedule } from "@/engine/cash-flow";
 import { expenseLines } from "@/data/expenses.fixture";
 import { working } from "@/data/owners.fixture";
 import { forget } from "@/hooks/use-futures";
-import { FuturesWorker } from "@/test/futures-worker";
+import { stubWorkers } from "@/test/futures-worker";
 
 import { ChanceScreen } from "./chance-screen";
 
@@ -68,9 +68,10 @@ function spending(amount: number): Schedule {
 }
 
 describe("ChanceScreen", () => {
-  // jsdom has no Worker, and the chance of success draws its futures on two.
+  // jsdom has no Worker, and the chance of success draws its futures on
+  // a worker for each core, two here.
   beforeEach(() => {
-    vi.stubGlobal("Worker", FuturesWorker);
+    stubWorkers();
     // Each test opens a page of its own, with no run kept from the last.
     forget();
   });
