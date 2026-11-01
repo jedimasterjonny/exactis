@@ -850,8 +850,10 @@ function carried(balance: number, paid: number, rate: number): number {
 // nothing and no lower. A pension's draw is grossed up for its tax, or
 // for the charge on an early one. What keeping the pensions paid adds
 // comes after, out of the cash, the GIAs and the ISAs alone. What the
-// last of them leaves is uncovered. The rules, and why, are under The
-// draw in README.md beside this file.
+// last of them leaves is uncovered. A month short of nothing draws on
+// nothing and leaves every account, allowance and owner as it found
+// them. The rules, and why, are under The draw in README.md beside this
+// file.
 function drawnFrom(
   held: readonly Held[],
   { kept, spending }: { readonly kept: number; readonly spending: number },
@@ -864,6 +866,18 @@ function drawnFrom(
   readonly held: readonly Held[];
   readonly uncovered: number;
 } {
+  if (spending === 0 && kept === 0) {
+    return {
+      allowances,
+      below: new Map(
+        earned.map(({ owner, taxable }) => [owner, taxable] as const),
+      ),
+      drawn,
+      early: 0,
+      held,
+      uncovered: 0,
+    };
+  }
   let carried = held;
   let left = spending;
   let early = 0;
