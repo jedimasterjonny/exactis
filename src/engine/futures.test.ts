@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Account } from "@/data/accounts";
 import type { Condition, Measured, Milestone } from "@/data/milestones";
-import type { Plan } from "@/data/plan";
+import type { Plan, Spread } from "@/data/plan";
+import type { Schedule } from "@/engine/cash-flow";
 
 import { expenseLines } from "@/data/expenses.fixture";
 import { atAge } from "@/data/milestones";
@@ -12,12 +13,14 @@ import { owners, working } from "@/data/owners.fixture";
 import { project } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
-import type { Future } from "./futures";
+import type { Breaks, Future } from "./futures";
 
 import {
+  breaksIn,
   futureOf,
   futuresOf,
   gradingOf,
+  lastsTried,
   markersIn,
   outcomesOf,
   pathOf,
@@ -367,6 +370,161 @@ describe("futuresOf", () => {
         ),
       },
     ]);
+  });
+
+  // Where a run of the futures breaks, the count given of them, nothing
+  // straying unless told otherwise, searched as many tries at once as the
+  // lanes given, a lane at a time unless told otherwise; and every future
+  // tried, at its place in the run, in the order tried.
+  async function breaksOver(
+    accounts: readonly Account[],
+    {
+      count = 1,
+      lanes = 1,
+      plan: on = planned,
+      schedule = short,
+      spread = nothingStrays,
+    }: {
+      readonly count?: number;
+      readonly lanes?: number;
+      readonly plan?: Plan;
+      readonly schedule?: Schedule;
+      readonly spread?: Spread;
+    } = {},
+  ): Promise<{ readonly breaks: Breaks; readonly tries: readonly number[] }> {
+    const run = { plan: on, spread };
+    const tries: number[] = [];
+    const breaks = await breaksIn(
+      futuresOf(accounts, schedule, run).take(count).toArray(),
+      {
+        lanes,
+        tried: async (trial, future) => {
+          tries.push(future);
+          return Promise.resolve(
+            lastsTried(accounts, schedule, { ...run, future, trial }),
+          );
+        },
+      },
+    );
+    return { breaks, tries };
+  }
+
+  // £1,000 a month over the plan's five years is £60,000: £40,000 lasts
+  // on 66% of it, £39,600, and not on 67%, £40,200; £70,000 lasts on
+  // 116%, £69,600, and not on 117%; £20,000 falls short even on half of
+  // it; and £100,000 lasts even on half as much again, £90,000.
+  it("searches the run for the least cut to its spending nine in ten futures last with, from half the spending to half as much again", async () => {
+    const cutFor = async (balance: number): Promise<null | number> =>
+      (await breaksOver([{ ...isa, balance }])).breaks.cut;
+
+    expect(await cutFor(40000)).toBe(34);
+    expect(await cutFor(70000)).toBe(-16);
+    expect(await cutFor(20000)).toBeNull();
+    expect(await cutFor(100000)).toBe(-50);
+  });
+
+  // Ten futures alike, none lasting with no cut: halving from there tries
+  // 25, 38, 31, 34, 32 and 33. Two falling short at 25 leave too few to
+  // make nine, and nine lasting at 38 make them, so each value is settled
+  // after two tries where it falls short and nine where it lasts, 26 in
+  // all rather than six for each of the ten; and none is tried with no
+  // cut, which the run has read already.
+  it("tries only the futures the tries before leave open, until they settle whether nine in ten last", async () => {
+    const { breaks, tries } = await breaksOver([{ ...isa, balance: 40000 }], {
+      count: 10,
+    });
+
+    expect(breaks.cut).toBe(34);
+    expect(tries).toHaveLength(2 + 9 + 2 + 9 + 2 + 2);
+  });
+
+  // £200 a month pays off a £12,000 loan over the five years whatever
+  // the cut, so £52,000 lasts on 66% of the rest, £39,600 beside the
+  // £12,000, where scaling the loan's line as well would last on 72%.
+  it("leaves a line paying a debt as it is", async () => {
+    const loan: Account = {
+      balance: -12000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 3,
+      kind: "debt",
+      name: "Loan",
+    };
+    const paying = {
+      ...short,
+      expenses: [
+        ...short.expenses,
+        {
+          ...expenseLines[0],
+          amount: 200,
+          growth: "nominal" as const,
+          id: 12,
+          lastYear: null,
+          pays: loan.id,
+        },
+      ],
+    };
+
+    expect(
+      (
+        await breaksOver([{ ...isa, balance: 52000 }, loan], {
+          schedule: paying,
+        })
+      ).breaks.cut,
+    ).toBe(34);
+  });
+
+  // Retiring on any net worth at all, the owner retires as the plan
+  // opens, and the spending is cut as it is for one retiring at an age.
+  it("searches the spending of a plan retiring on conditions", async () => {
+    const onConditions = {
+      ...planned,
+      owners: [
+        {
+          ...working,
+          retirement: [{ measure: "worth", of: "pounds", times: 0 } as const],
+        },
+      ],
+    };
+
+    expect(
+      (await breaksOver([{ ...isa, balance: 40000 }], { plan: onConditions }))
+        .breaks.cut,
+    ).toBe(34);
+  });
+
+  // £100,000 at 5% straying 15% a year, drawn £12,000 a year over ten
+  // years, lasts with no cut in some futures and needs one in others:
+  // nine in ten of 40 is 36, which £100,000 falls short of with no cut
+  // and £150,000 makes.
+  it("finds a cut nine in ten futures last with and fewer do a point under, nothing or less exactly where nine in ten last as the run counts them", async () => {
+    const run = {
+      plan: { ...planned, rate: 0.05, years: 10 },
+      spread: { inflation: 0.02, rate: 0.15 },
+    };
+    for (const [balance, isNine] of [
+      [100000, false],
+      [150000, true],
+    ] as const) {
+      const saved = [{ ...isa, balance }];
+      const lasting = (cut: number): number =>
+        Array.from({ length: 40 }, (_, future) =>
+          lastsTried(saved, short, { ...run, future, trial: { cut } }),
+        ).filter(Boolean).length;
+      const { breaks } = await breaksOver(saved, { ...run, count: 40 });
+      const { lasted } = readingOf(
+        futuresOf(saved, short, run).take(40).toArray(),
+      );
+
+      expect(breaks.cut).not.toBeNull();
+      const cut = breaks.cut ?? 0;
+      expect(lasted >= 36).toBe(isNine);
+      expect(cut <= 0).toBe(isNine);
+      expect(lasting(cut)).toBeGreaterThanOrEqual(36);
+      expect(lasting(cut - 1)).toBeLessThan(36);
+      expect(
+        (await breaksOver(saved, { ...run, count: 40, lanes: 4 })).breaks,
+      ).toStrictEqual(breaks);
+    }
   });
 });
 
