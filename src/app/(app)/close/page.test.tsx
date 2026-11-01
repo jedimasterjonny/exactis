@@ -36,10 +36,12 @@ const july: Kept = {
 const moved: Moved = {
   age: 61,
   balances: {
+    actual: [],
     expected: 900_000,
     moved: 3000,
     now: 902_140,
     paid: 1500,
+    planned: 1500,
     stood: 897_640,
     unchecked: 1,
   },
@@ -203,6 +205,31 @@ describe("Close", () => {
       ["Work out trades for £1,250", "/cogitator?amount=1250&from=2026-08"],
       ["Choose an amount", "/cogitator"],
     ]);
+  });
+
+  // Of the £1,500 paid in, what Portfolio Performance says was paid into
+  // the ISA and the pension stands in for the plan's £1,800.
+  it("says what was paid in against what the plan paid, and which accounts Portfolio Performance said it of", async () => {
+    vi.mocked(movedSince).mockReturnValue({
+      ...moved,
+      balances: {
+        ...moved.balances,
+        actual: ["Stocks & shares ISA", "Workplace pension"],
+        planned: 1800,
+      },
+    });
+    await renderClose();
+
+    expect(
+      within(screen.getByRole("region", { name: "Balances on 25 Aug 2026" }))
+        .getAllByRole("listitem")
+        .map((step) => step.textContent),
+    ).toContain(
+      "Paid in£1,800 planned · Stocks & shares ISA, Workplace pension from Portfolio Performance£1,500",
+    );
+    expect(detail("Balances against the plan")).toHaveAccessibleDescription(
+      "£2,140 above what was expected · £1,500 paid in against £1,800 planned · £3,000 moved · 1 balance left unchecked",
+    );
   });
 
   // September closed, on the fifteenth of October, over holdings

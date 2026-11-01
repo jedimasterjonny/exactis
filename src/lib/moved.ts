@@ -1,6 +1,7 @@
 import type { Account } from "@/data/accounts";
 import type { Kept } from "@/data/household";
 import type { Plan } from "@/data/plan";
+import type { Month } from "@/data/schedule";
 import type { Future } from "@/engine/futures";
 import type { MonthsOn } from "@/engine/projection";
 
@@ -10,7 +11,7 @@ import { futureOf } from "@/engine/futures";
 import { laidOut, monthsOn, project } from "@/engine/projection";
 import { answerOf } from "@/lib/answer";
 import { sumOf } from "@/lib/ledger";
-import { monthsBetween } from "@/lib/months";
+import { cutOf, monthsBetween } from "@/lib/months";
 
 // A record outside the rates that the walk tells apart, for the step of
 // changes to name.
@@ -63,15 +64,19 @@ export interface Standing {
 
 // The balances the close set against those it closed from, over the
 // accounts both hold, as the month end's ledger sums them: what they
-// stood at, what the plan paid into the balances checked and what moved
-// them besides, which add up to what they stand at now; what the month
-// end expected them to stand at; and how many were left as they stood,
-// their day unchanged.
+// stood at, what was paid into the balances checked and what moved them
+// besides, which add up to what they stand at now; what the plan paid
+// into the balances checked; the names of those whose paid in is what
+// Portfolio Performance says was, rather than the plan's; what the
+// month end expected them to stand at; and how many were left as they
+// stood, their day unchanged.
 interface Balances {
+  readonly actual: readonly string[];
   readonly expected: number;
   readonly moved: number;
   readonly now: number;
   readonly paid: number;
+  readonly planned: number;
   readonly stood: number;
   readonly unchecked: number;
 }
@@ -212,7 +217,7 @@ export function movedSince(before: Kept, now: Kept): Moved {
   }
   return {
     age,
-    balances: balancesOf(carried, nowById),
+    balances: balancesOf(carried, nowById, paidIn(now, before.asOf)),
     changes,
     expected: standing,
     invested: Math.round(
@@ -232,11 +237,14 @@ export function movedSince(before: Kept, now: Kept): Moved {
 
 // The balances the close set against those it closed from, over the
 // accounts both hold: one whose day moved was checked, and was paid what
-// the plan carried into it, the rest of its difference having moved it;
-// one whose day did not was left as it stood.
+// Portfolio Performance says was paid into the securities account of its
+// name, where it says, or else what the plan carried into it, the rest
+// of its difference having moved it; one whose day did not was left as
+// it stood.
 function balancesOf(
   carried: readonly MonthsOn[],
   now: ReadonlyMap<number, Account>,
+  actual: ReadonlyMap<string, number>,
 ): Balances {
   const both = carried.flatMap((reached) => {
     const closed = now.get(reached.account.id);
@@ -246,13 +254,22 @@ function balancesOf(
     ({ account, closed }) => closed.setOn !== account.setOn,
   );
   const stood = sumOf(both, ({ account }) => account.balance);
-  const paid = Math.round(sumOf(checked, (reached) => reached.paid));
+  const paid = Math.round(
+    sumOf(
+      checked,
+      ({ closed, paid: planned }) => actual.get(closed.name) ?? planned,
+    ),
+  );
   const total = sumOf(both, ({ closed }) => closed.balance);
   return {
+    actual: checked
+      .map(({ closed }) => closed.name)
+      .filter((name) => actual.has(name)),
     expected: sumOf(both, ({ balance }) => Math.round(balance)),
     moved: total - stood - paid,
     now: total,
     paid,
+    planned: Math.round(sumOf(checked, (reached) => reached.paid)),
     stood,
     unchecked: both.length - checked.length,
   };
@@ -278,6 +295,32 @@ function futureIn(kept: Kept): {
     }),
     plan,
   };
+}
+
+// What Portfolio Performance says was paid into each of its securities
+// accounts, by name, after the cut of the month the balances stood at,
+// up to and on the cut of the month they stand at now, but for a name
+// two of the household's accounts carry; or nothing, where the file was
+// imported before that cut, or before what was paid in was read, since
+// it need not hold all that was paid by then.
+function paidIn(now: Kept, from: Month): ReadonlyMap<string, number> {
+  const to = cutOf(now.asOf);
+  const after = cutOf(from);
+  const { targets } = now;
+  const names = now.accounts.map(({ name }) => name);
+  return targets?.portfolios === undefined || targets.importedOn < to
+    ? new Map()
+    : new Map(
+        targets.portfolios
+          .filter(({ name }) => names.indexOf(name) === names.lastIndexOf(name))
+          .map(({ name, paid }) => [
+            name,
+            sumOf(
+              paid.filter(({ on }) => on > after && on <= to),
+              ({ amount }) => amount,
+            ),
+          ]),
+      );
 }
 
 // What a future stands at: when its owner retires, and its liquid net

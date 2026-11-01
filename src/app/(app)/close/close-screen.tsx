@@ -86,25 +86,26 @@ interface CloseScreenProps {
 
 // The month end: the month whose balances were cut last closed onto the
 // household, and once it is, what moved the plan since the close before.
-// The title gives the answer. Until the month is closed, which its
-// latest progress point says, the screen is the worksheet that closes
-// it, opening on that month, and says since when a month has been due:
-// the cut of the month after the latest point's, or that it is due
-// where no point is kept. Once it is, the balances the close set
-// against those it closed from, what moved the plan since the close
-// before as the steps movedSince takes, and what the plan paid
-// into the ISAs and the GIAs, offered to the cogitator; with the next
-// close due and what mostly moved said in the meta line, and the
-// balances to update in the header, which opens the same worksheet on
-// the month closed, for a close to be made again or another month
-// picked, with the way back. A household with no close before the
-// latest, one the rules refuse now, or one whose balances have since
-// been closed back onto that close's month or before it, has nothing to
-// compare with, and says why. A month is closed in the household alone,
-// so while a scenario is open the screen says to leave it, and nothing
-// else, rather than lay the scenario's balances out to be refused. The
-// month cut last and the day are given rather than read, as the
-// household and the close before the latest are.
+// The title gives the answer. Until the month is closed, which its latest
+// progress point says, the screen is the worksheet that closes it,
+// opening on that month, and says since when a month has been due: the
+// cut of the month after the latest point's, or that it is due where no
+// point is kept. Once it is, the balances the close set against those it
+// closed from, with what the plan paid in beside what Portfolio
+// Performance says was, where it says, what moved the plan since the
+// close before as the steps movedSince takes, and what the plan paid into
+// the ISAs and the GIAs, offered to the cogitator; with the next close
+// due and what mostly moved said in the meta line, and the balances to
+// update in the header, which opens the same worksheet on the month
+// closed, for a close to be made again or another month picked, with the
+// way back. A household with no close before the latest, one the rules
+// refuse now, or one whose balances have since been closed back onto that
+// close's month or before it, has nothing to compare with, and says why.
+// A month is closed in the household alone, so while a scenario is open
+// the screen says to leave it, and nothing else, rather than lay the
+// scenario's balances out to be refused. The month cut last and the day
+// are given rather than read, as the household and the close before the
+// latest are.
 export function CloseScreen({
   household,
   isInScenario,
@@ -228,7 +229,13 @@ export function CloseScreen({
                 figure: formatGbp(moved.balances.stood),
                 label: "As the balances stood",
               },
-              { figure: formatGbp(moved.balances.paid), label: "Paid in" },
+              {
+                ...(moved.balances.actual.length > 0 && {
+                  detail: `${formatGbp(moved.balances.planned)} planned · ${moved.balances.actual.join(", ")} from Portfolio Performance`,
+                }),
+                figure: formatGbp(moved.balances.paid),
+                label: "Paid in",
+              },
               {
                 detail: "Markets, interest and the unexpected",
                 figure: formatGbp(moved.balances.moved),
@@ -307,18 +314,22 @@ function cutDay(month: Month): string {
 }
 
 // What a group's row rests on: for the balances, how far they stand from
-// what the month end expected, what was paid in and what moved them, and
-// how many were left as they stood; for the rates, the sources that
+// what the month end expected, what was paid in, against what the plan
+// paid where any of it is what Portfolio Performance says was, and what
+// moved them, and how many were left as they stood; for the rates, the sources that
 // changed, a tab of the assumptions screen at a time; for the household's
 // own changes, the records that changed.
 function detailOf(group: Group, moved: Moved): string {
   switch (group) {
     case "balances": {
-      const { expected, now, paid, unchecked } = moved.balances;
+      const { actual, expected, now, paid, planned, unchecked } =
+        moved.balances;
       const apart = now - expected;
       return [
         `${formatGbp(Math.abs(apart))} ${apart < 0 ? "below" : "above"} what was expected`,
-        `${formatGbp(paid)} paid in`,
+        actual.length > 0
+          ? `${formatGbp(paid)} paid in against ${formatGbp(planned)} planned`
+          : `${formatGbp(paid)} paid in`,
         `${formatGbp(moved.balances.moved)} moved`,
         ...(unchecked > 0
           ? [`${counted(unchecked, "balance")} left unchecked`]

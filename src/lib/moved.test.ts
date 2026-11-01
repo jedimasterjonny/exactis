@@ -10,6 +10,7 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
 import { owners } from "@/data/owners.fixture";
+import { portfolios, targets } from "@/data/targets.fixture";
 import { laidOut, monthsOn } from "@/engine/projection";
 import { Refusal } from "@/lib/answer";
 
@@ -98,10 +99,12 @@ describe("movedSince", () => {
     expect(movedSince(before, asPlanned)).toStrictEqual({
       age: 49,
       balances: {
+        actual: [],
         expected: 909_489,
         moved: 2697,
         now: 909_489,
         paid: 5330,
+        planned: 5330,
         stood: 901_462,
         unchecked: 0,
       },
@@ -147,16 +150,74 @@ describe("movedSince", () => {
     );
 
     expect(moved.balances).toStrictEqual({
+      actual: [],
       expected: 909_489,
       moved: 1084,
       now: 903_526,
       paid: 980,
+      planned: 980,
       stood: 901_462,
       unchecked: 1,
     });
     expect(moved.steps.map(({ groups }) => groups)).toStrictEqual([
       ["balances"],
     ]);
+  });
+
+  // August is cut on Tuesday the 25th and September on Friday the 25th,
+  // so of what the fixture's accounts were paid, the ISA's £1,500 and
+  // the pension's £2,376 less £40 fall between the two, and the
+  // payments on the 25th of August before them. They stand in for the
+  // plan's £4,350 into the pension and nothing into the ISA, beside the
+  // £980 the plan paid off the mortgage, and what is left of the
+  // difference moved the balances. The brokerage account has no account
+  // of its name.
+  it("takes what Portfolio Performance says was paid into an account of its name between the two cuts", () => {
+    const imported = (importedOn: string): Kept =>
+      closed(before, { targets: { ...targets, importedOn, portfolios } });
+
+    expect(movedSince(before, imported("2026-09-25")).balances).toStrictEqual({
+      actual: ["Workplace pension", "Stocks & shares ISA"],
+      expected: 909_489,
+      moved: 3211,
+      now: 909_489,
+      paid: 4816,
+      planned: 5330,
+      stood: 901_462,
+      unchecked: 0,
+    });
+  });
+
+  // The current account named as the pension is, so which of the two
+  // the pension's £2,336 was paid into cannot be told, and the plan's
+  // £4,350 stands for the pension instead.
+  it("takes the plan's paid in for a name two accounts carry", () => {
+    const named = closing({
+      accounts: changed(kept.accounts, 3, { name: "Workplace pension" }),
+    });
+    const now = closed(named, {
+      targets: { ...targets, importedOn: "2026-09-25", portfolios },
+    });
+
+    expect(movedSince(named, now).balances).toMatchObject({
+      actual: ["Stocks & shares ISA"],
+      moved: 1197,
+      paid: 6830,
+    });
+  });
+
+  // Imported on the 24th, the file need not hold all that was paid by
+  // September's cut on the 25th, and with no target allocation there is
+  // nothing it says.
+  it("takes the plan's paid in where the file was imported before the cut, or none is", () => {
+    for (const changes of [
+      { targets: { ...targets, importedOn: "2026-09-24", portfolios } },
+      { targets: null },
+    ]) {
+      expect(
+        movedSince(before, closed(before, changes)).balances,
+      ).toMatchObject({ actual: [], paid: 5330 });
+    }
   });
 
   // The month made short by an invented £9,000 a month of spending,
