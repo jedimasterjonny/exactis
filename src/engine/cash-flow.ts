@@ -163,6 +163,14 @@ interface Feeding {
   readonly taxed: Taxed;
 }
 
+// What a line pays in a month, as payIn reads it: its base and RSUs, its
+// bonus as the line pays it, and a twelfth of its year.
+interface Pay {
+  readonly base: number;
+  readonly bonus: number;
+  readonly even: number;
+}
+
 // What the payments out of the month are held to as they are made:
 // what is left of each allowance, in what lands, and what is left of
 // each owner's relief, in what lands with it, which opens at what a
@@ -260,6 +268,13 @@ const nanopound = 1e-9;
 // The owners who have drawn on a pension as income when a month is read
 // on its own: none, since only the projection draws.
 const nobody: ReadonlySet<number> = new Set();
+
+// What each line pays in the month read last, as payIn works it out, by
+// the line, and the reading it was worked out for.
+let pays: null | {
+  readonly lines: Map<IncomeLine, Pay>;
+  readonly reading: Reading;
+} = null;
 
 // The name of each allowance, by its owner and the kind it is held for,
 // made once each, so the maps a month reads its rooms from are handed
@@ -799,7 +814,7 @@ function evenPayOf(
   return lines.reduce(
     (sum, line) =>
       sum +
-      monthlyOf(line, totalOf(line), reading) -
+      payIn(line, reading).even -
       (fed.find((entry) => entry.line === line)?.sacrificed ?? 0),
     0,
   );
@@ -995,6 +1010,25 @@ function payableInto(account: Account, limit: number, purse: Purse): number {
     : limit - (room * rate) / (1 + rate);
 }
 
+// What a line pays in the month read, in that month's pounds, before
+// what it gives up into the pension it feeds: its base and RSUs at its
+// cadence, its bonus as the line pays it, and a twelfth of its whole
+// year, bonus and all, as evenPayOf reads it. Worked out once a line
+// and reading, since the month reads it for its income, each owner's
+// tax and National Insurance, the allowances and the relief alike. Only
+// the last reading's are kept, since a month asks for no other while it
+// is worked out.
+function payIn(line: IncomeLine, reading: Reading): Pay {
+  if (pays?.reading !== reading) {
+    pays = { lines: new Map(), reading };
+  }
+  return keptIn(pays.lines, line, () => ({
+    base: monthlyOf(line, totalOf(line) - line.bonus, reading),
+    bonus: bonusIn(line, reading),
+    even: monthlyOf(line, totalOf(line), reading),
+  }));
+}
+
 // What the lines given pay in the month, each as it is earned, its
 // base and RSUs at its cadence and its bonus as the line pays it, less
 // what it gives up into the pension it feeds.
@@ -1003,14 +1037,15 @@ function payOf(
   fed: readonly Fed[],
   reading: Reading,
 ): number {
-  return lines.reduce(
-    (sum, line) =>
+  return lines.reduce((sum, line) => {
+    const { base, bonus } = payIn(line, reading);
+    return (
       sum +
-      monthlyOf(line, totalOf(line) - line.bonus, reading) +
-      bonusIn(line, reading) -
-      (fed.find((entry) => entry.line === line)?.sacrificed ?? 0),
-    0,
-  );
+      base +
+      bonus -
+      (fed.find((entry) => entry.line === line)?.sacrificed ?? 0)
+    );
+  }, 0);
 }
 
 // What is left of the relief an account's owner may claim in the month,
