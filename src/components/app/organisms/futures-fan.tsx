@@ -148,7 +148,7 @@ export function FuturesFan({
     <SectionCard
       caption="Median, middle half and middle 80%, in today's money"
       className="min-w-0 overflow-visible"
-      label={subsectionLabel(chance, 1)}
+      label={subsectionLabel(chance, 2)}
       title="Year by year"
     >
       <CardContent className="grid grid-cols-1 gap-4">

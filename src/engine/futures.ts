@@ -125,7 +125,7 @@ const step = 0x9e3779b9;
 
 // The deepest cut to the spending a future is searched over, in points
 // either way: from half the spending planned to half as much again.
-const deepestCut = 50;
+export const deepestCut = 50;
 
 // The share of a run's futures the search for where it breaks finds the
 // cut and the age for: nine in ten.
@@ -329,6 +329,17 @@ export function gradingOf(projected: Future, plan: Plan): Grading {
     middle: opens + Math.ceil((2 * span) / 5),
     surplus: 3 * worth,
   };
+}
+
+// Whether a run is searched for the earliest age nine in ten of its
+// futures last retiring at as well as for its cut: only where the
+// plan's owner retires at an age not already behind them as the plan
+// opens. One retiring on conditions has no age to try, since the run
+// finds it, and one already retired has none to move.
+export function isAgeSearched(plan: Plan): boolean {
+  return (
+    retiresOn(plan) === undefined && plan.retires >= ageIn(plan.from, plan)
+  );
 }
 
 // Whether the future at the place given in a run of the plan's futures
@@ -692,18 +703,6 @@ function drawnOver(
 ): Run {
   const path = pathOf(plan, spread, normalsFrom(seed + future * step));
   return { accounts, plan: { ...plan, path }, schedule };
-}
-
-// Whether a run is searched for the earliest age nine in ten of its
-// futures last retiring at as well as for its cut: only where the
-// plan's owner retires at an age not already behind them as the plan
-// opens. One
-// retiring on conditions has no age to try, since the run finds it, and
-// one already retired has none to move.
-function isAgeSearched(plan: Plan): boolean {
-  return (
-    retiresOn(plan) === undefined && plan.retires >= ageIn(plan.from, plan)
-  );
 }
 
 // Whether a future lasted, as the chance counts it: it never fell short,

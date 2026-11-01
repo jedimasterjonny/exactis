@@ -7,7 +7,7 @@ import type { Schedule } from "@/engine/cash-flow";
 import { expenseLines } from "@/data/expenses.fixture";
 import { working } from "@/data/owners.fixture";
 import { forget } from "@/hooks/use-futures";
-import { stubWorkers } from "@/test/futures-worker";
+import { FuturesWorker, stubWorkers } from "@/test/futures-worker";
 
 import { ChanceScreen } from "./chance-screen";
 
@@ -155,6 +155,48 @@ describe("ChanceScreen", () => {
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 
+  // Two workers draw the run, one for each of the two cores the tests'
+  // browser says it has, and two more the search once it is in, and not
+  // before. The search is not waited out: a thousand futures tried on
+  // the test's own thread take seconds, so the card is read as it starts,
+  // and the figures it reads are its own tests'.
+  it("searches the futures for where the plan breaks once they are drawn", async () => {
+    const started: FuturesWorker[] = [];
+    vi.stubGlobal(
+      "Worker",
+      vi.fn(function start() {
+        const worker = new FuturesWorker();
+        started.push(worker);
+        return worker;
+      }),
+    );
+    const breaks = (): HTMLElement =>
+      screen.getByRole("region", { name: "Where the plan breaks" });
+    render(
+      <ChanceScreen
+        accounts={[isa]}
+        milestones={[]}
+        plan={plan}
+        schedule={spending(500)}
+        spread={nothingStrays}
+      />,
+    );
+
+    expect(within(breaks()).getByRole("paragraph")).toHaveTextContent(
+      "The search starts once the futures are drawn.",
+    );
+    expect(started).toHaveLength(2);
+    await within(screen.getByRole("banner")).findByText(
+      "1,000 futures, age 34 to 37",
+      {},
+      { timeout: 5000 },
+    );
+    expect(within(breaks()).getByRole("paragraph")).toHaveTextContent(
+      "Searching the futures…",
+    );
+    expect(started).toHaveLength(4);
+  });
+
   it("draws the futures again from the header once they are drawn", async () => {
     render(
       <ChanceScreen
@@ -231,7 +273,7 @@ describe("ChanceScreen", () => {
       name: "When the milestones are reached",
     });
 
-    expect(within(card).getByText("Sect. II.ii")).toHaveClass("label");
+    expect(within(card).getByText("Sect. II.iii")).toHaveClass("label");
     // Drawn folded and in its columns, so each figure is found twice.
     expect(
       await within(card).findAllByText("100%", {}, { timeout: 5000 }),

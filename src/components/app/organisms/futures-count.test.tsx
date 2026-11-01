@@ -54,7 +54,7 @@ describe("FuturesCount", () => {
     const card = screen.getByRole("region", { name: "How many futures last" });
     const panel = within(card).getByRole("region", { name: "Net worth at 91" });
 
-    expect(within(card).getByText("Sect. II.iii")).toHaveClass("label");
+    expect(within(card).getByText("Sect. II.iv")).toHaveClass("label");
     expect(steps()).toStrictEqual([
       "Futures run1,000",
       "Ran out of moneyThe first at 71, half by 86−26",
