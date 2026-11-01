@@ -668,12 +668,7 @@ export function project(
           used,
         };
         const flow = cashFlow(carried.accounts, carried.schedule, reading);
-        used = new Map([
-          ...used,
-          ...[...flow.landed].map(
-            ([held, landed]) => [held, (used.get(held) ?? 0) + landed] as const,
-          ),
-        ]);
+        used = landedWith(used, flow.landed);
         const draw = drawnFrom(held, shortOf(carried, flow, reading), {
           allowances,
           at,
@@ -1095,6 +1090,20 @@ function landed(held: readonly Held[], cash: number): readonly Held[] {
       ? { ...entry, balance: entry.balance + Math.max(0, cash) }
       : entry,
   );
+}
+
+// What has landed under each allowance since April once a month's
+// landings are added to it, an allowance the month landed nothing under
+// left as it was, each in the order it first landed.
+function landedWith(
+  used: ReadonlyMap<string, number>,
+  landed: ReadonlyMap<string, number>,
+): ReadonlyMap<string, number> {
+  const sum = new Map(used);
+  for (const [held, amount] of landed) {
+    sum.set(held, (used.get(held) ?? 0) + amount);
+  }
+  return sum;
 }
 
 // An account carried a month on the month's cash flow, as the projection
