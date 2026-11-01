@@ -3,14 +3,16 @@ import { Activity } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { Slice } from "@/hooks/futures.worker";
+import type { Future } from "@/engine/futures";
+import type { Slice, Tried } from "@/hooks/futures.worker";
 
 import { expenseLines } from "@/data/expenses.fixture";
+import { retiringAt } from "@/data/milestones";
 import { working } from "@/data/owners.fixture";
-import { futuresOf } from "@/engine/futures";
+import { breaksIn, futuresOf, lastsTried } from "@/engine/futures";
 import { FuturesWorker } from "@/test/futures-worker";
 
-import { drawAgain, forget, useFutures } from "./use-futures";
+import { drawAgain, forget, useBreaks, useFutures } from "./use-futures";
 
 // An ISA drawn £1,000 a month over three years at 5%, straying 15% a
 // year, so each future is drawn in a moment and no two alike.
@@ -48,15 +50,21 @@ const spread = { inflation: 0.02, rate: 0.15 };
 const took = 150;
 
 // A worker that keeps the place in the run of each slice it is handed,
-// and takes a while over each.
+// and of each future it is handed to try, and takes a while over each.
 class Watched extends FuturesWorker {
   public readonly handed: number[] = [];
 
+  public readonly tried: number[] = [];
+
   protected override readonly took = took;
 
-  public override postMessage(slice: Slice): void {
-    this.handed.push(slice.from);
-    super.postMessage(slice);
+  public override postMessage(posted: Slice | Tried): void {
+    if ("trial" in posted) {
+      this.tried.push(posted.future);
+    } else {
+      this.handed.push(posted.from);
+    }
+    super.postMessage(posted);
   }
 }
 
@@ -626,5 +634,143 @@ describe("useFutures", () => {
 
     expect(result.current).toStrictEqual({ futures: [], isDone: true });
     expect(started).toHaveLength(0);
+  });
+});
+
+describe("useBreaks", () => {
+  // Each test opens a page of its own, with no run kept from the last.
+  beforeEach(() => {
+    forget();
+  });
+
+  // Retiring at 36, inside the plan's three years, so the age is searched
+  // as well as the spending.
+  const run = { count: 10, plan: retiringAt(plan, 36), spread };
+
+  // The run's ten futures, drawn on one worker by a screen left open.
+  function drawn(): readonly Future[] {
+    const { result } = renderHook(() => useFutures(accounts, schedule, run));
+    act(() => {
+      vi.runAllTimers();
+    });
+    return result.current.futures;
+  }
+
+  // Ten futures to the slice, the run is one slice on one worker, and
+  // the search starts two more, each handed one future at a time; the
+  // household's run beside it, five futures on a worker of its own, is
+  // left unsearched.
+  it("searches a run drawn whole for where it breaks on two workers trying a future at a time, and keeps it with that run alone", async () => {
+    const started = watchWorkers();
+    const household = { count: 5, plan, spread };
+    const { result: other } = renderHook(() =>
+      useFutures(accounts, schedule, household),
+    );
+    const futures = drawn();
+    const searched = { ...run, futures };
+    const { result, unmount } = renderHook(() =>
+      useBreaks(accounts, schedule, searched),
+    );
+
+    expect(result.current).toBeUndefined();
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+    expect(result.current).toStrictEqual(
+      await breaksIn(futures, run.plan, {
+        lanes: 1,
+        tried: async (trial, future) =>
+          Promise.resolve(
+            lastsTried(accounts, schedule, { ...run, future, trial }),
+          ),
+      }),
+    );
+    const [, , ...searching] = started;
+    expect(searching).toHaveLength(2);
+    for (const worker of searching) {
+      expect(worker.tried.length).toBeGreaterThan(0);
+      expect(worker.terminate).toHaveBeenCalled();
+    }
+    unmount();
+    const { result: again } = renderHook(() =>
+      useBreaks([{ ...isa }], { ...schedule }, { ...searched }),
+    );
+    expect(again.current).toStrictEqual(result.current);
+    expect(started).toHaveLength(4);
+    expect(
+      renderHook(() =>
+        useBreaks(accounts, schedule, {
+          ...household,
+          futures: other.current.futures,
+        }),
+      ).result.current,
+    ).toBeUndefined();
+  });
+
+  // Taken down after the first two tries are back, others on their way.
+  it("stops the workers when the screen is taken down part way, and searches afresh when shown again", () => {
+    const started = watchWorkers();
+    const searched = { ...run, futures: drawn() };
+    const { unmount } = renderHook(() =>
+      useBreaks(accounts, schedule, searched),
+    );
+    act(() => {
+      vi.advanceTimersByTime(took);
+    });
+
+    unmount();
+
+    const [, ...searching] = started;
+    for (const worker of searching) {
+      expect(worker.terminate).toHaveBeenCalled();
+      expect(worker.onmessage).toBeNull();
+    }
+    const { result } = renderHook(() =>
+      useBreaks(accounts, schedule, searched),
+    );
+    act(() => {
+      vi.advanceTimersByTime(took);
+    });
+    expect(result.current).toBeUndefined();
+    expect(started).toHaveLength(5);
+  });
+
+  // A worker taking a minute over what it is handed.
+  class Late extends FuturesWorker {
+    protected override readonly took = 60000;
+  }
+
+  // Two screens read the one run, the second's worker a minute over the
+  // slice the first's draws in 150 ms, and a third, opened once the run
+  // is drawn, searches it. The second's slice lands after the search,
+  // handing the run over again, and where it breaks is kept with it, so
+  // the third reads it still and searches nothing again.
+  it("keeps where a run breaks when another screen hands the run over after the search", async () => {
+    const started = watchWorkers();
+    const watching = globalThis.Worker;
+    renderHook(() => useFutures(accounts, schedule, run));
+    vi.stubGlobal("Worker", Late);
+    renderHook(() => useFutures(accounts, schedule, run));
+    vi.stubGlobal("Worker", watching);
+    act(() => {
+      vi.advanceTimersByTime(took);
+    });
+    const { result } = renderHook(() => {
+      const { futures } = useFutures(accounts, schedule, run);
+      return useBreaks(accounts, schedule, { ...run, futures });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000);
+    });
+    const breaks = result.current;
+    const searching = started.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60000);
+    });
+
+    expect(breaks).toBeDefined();
+    expect(result.current).toStrictEqual(breaks);
+    expect(started).toHaveLength(searching);
   });
 });

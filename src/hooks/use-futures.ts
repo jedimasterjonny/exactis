@@ -3,10 +3,10 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { Account } from "@/data/accounts";
 import type { Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
-import type { Future } from "@/engine/futures";
-import type { Slice } from "@/hooks/futures.worker";
+import type { Breaks, Future, Trial } from "@/engine/futures";
+import type { Slice, Tried } from "@/hooks/futures.worker";
 
-import { defaultSeed } from "@/engine/futures";
+import { breaksIn, defaultSeed } from "@/engine/futures";
 
 // The runs kept, the one read last first, and the seed every one of
 // them is drawn from.
@@ -18,9 +18,11 @@ interface Drawn {
 // A run kept past the screen that drew it: what it was drawn over,
 // written out whole so a plan handed down again in new objects reads as
 // the plan it is, the slices of it drawn so far, each at the place it
-// falls in the run, a slice not yet drawn left empty, and the futures
-// the screens have been handed of them.
+// falls in the run, a slice not yet drawn left empty, the futures the
+// screens have been handed of them, and where the run breaks once it
+// has been searched.
 interface Kept {
+  readonly breaks?: Breaks;
   readonly for: string;
   readonly futures: readonly Future[];
   readonly slices: (readonly Future[])[];
@@ -91,6 +93,104 @@ export function forget(): void {
   kept = none;
 }
 
+// Where the plan breaks over its run of the futures, the run given whole
+// as useFutures hands it, as breaksIn finds it, by as many workers as a
+// run is drawn on, each handed one future to try at a time and the next
+// as it answers: nothing until the search is done. The search is kept
+// with the run, found by the futures handed, so what the run was drawn
+// over is written out once, by useFutures, and it is dropped with the
+// run; a screen shown again over a run already searched reads where it
+// breaks rather than searching again, and so does one handed the run
+// again by another screen's hand-over, which keeps it. A plan changed
+// stops the workers and searches the new run, and so does a screen
+// taken down, hearing nothing more from them; one shown again before
+// the search was done searches from the start.
+export function useBreaks(
+  accounts: readonly Account[],
+  schedule: Schedule,
+  {
+    futures,
+    plan,
+    spread,
+  }: {
+    readonly futures: readonly Future[];
+    readonly plan: Plan;
+    readonly spread: Spread;
+  },
+): Breaks | undefined {
+  const seed = useSyncExternalStore(subscribe, readSeed, readSeed);
+  const run = useMemo(
+    () => ({ accounts, futures, plan, schedule, seed, spread }),
+    [accounts, futures, plan, schedule, seed, spread],
+  );
+  useEffect(() => {
+    const isSearched = searchedFor(run.futures) !== undefined;
+    const pool = Array.from(
+      { length: isSearched ? 0 : workersOf() },
+      () => new Worker(new URL("./futures.worker.ts", import.meta.url)),
+    );
+    const free = [...pool];
+    const queued: {
+      readonly posted: Tried;
+      readonly settle: (lasts: boolean) => void;
+    }[] = [];
+    function hand(worker: Worker): void {
+      const next = queued.shift();
+      if (next === undefined) {
+        free.push(worker);
+        return;
+      }
+      worker.onmessage = ({ data: hasLasted }: MessageEvent<boolean>): void => {
+        next.settle(hasLasted);
+        hand(worker);
+      };
+      worker.postMessage(next.posted);
+    }
+    async function tried(trial: Trial, future: number): Promise<boolean> {
+      return new Promise((settle) => {
+        queued.push({
+          posted: {
+            accounts: run.accounts,
+            future,
+            plan: run.plan,
+            schedule: run.schedule,
+            seed: run.seed,
+            spread: run.spread,
+            trial,
+          },
+          settle,
+        });
+        const worker = free.pop();
+        if (worker !== undefined) {
+          hand(worker);
+        }
+      });
+    }
+    function stop(): void {
+      for (const worker of pool) {
+        worker.onmessage = null;
+        worker.terminate();
+      }
+    }
+    if (!isSearched) {
+      void breaksIn(run.futures, run.plan, { lanes: pool.length, tried }).then(
+        (breaks) => {
+          keep({
+            ...kept,
+            runs: kept.runs.map((each) =>
+              each.futures === run.futures ? { ...each, breaks } : each,
+            ),
+          });
+          stop();
+        },
+      );
+    }
+    return stop;
+  }, [run]);
+  const readBreaks = (): Breaks | undefined => searchedFor(futures);
+  return useSyncExternalStore(subscribe, readBreaks, readBreaks);
+}
+
 // The plan's futures as they are drawn, the count given of them, by a
 // worker for each core off the page's thread, so the page stays to hand
 // and the run takes the cores' share of the time one thread would, as
@@ -99,7 +199,9 @@ export function forget(): void {
 // run is handed out a slice at a time, the next to whichever worker
 // comes free first, so a worker slowed by the page's own work does not
 // hold the run up. The screen is handed what has come back at most
-// every 200 ms, and the whole run the moment it is. A plan changed part
+// every 200 ms, and the whole run the moment it is, each hand-over
+// replacing the run's futures and nothing else kept with it, so where
+// the run breaks stays however late another screen's slice lands. A plan changed part
 // way drops what was drawn for the one before and starts again, and a
 // screen taken down stops the workers, hearing nothing more from them,
 // and hands over what had landed since it last handed any over, unless
@@ -166,10 +268,11 @@ export function useFutures(
       timer = undefined;
       lastHanded = performance.now();
       const index = kept.runs.findIndex((other) => other.slices === slices);
-      if (index !== -1) {
+      const current = kept.runs[index];
+      if (current !== undefined) {
         keep({
           ...kept,
-          runs: kept.runs.with(index, { ...mine, futures: slices.flat() }),
+          runs: kept.runs.with(index, { ...current, futures: slices.flat() }),
         });
       }
     }
@@ -242,6 +345,12 @@ function readSeed(): number {
   return kept.seed;
 }
 
+// Where the run kept whose futures are those given breaks, once it has
+// been searched.
+function searchedFor(futures: readonly Future[]): Breaks | undefined {
+  return kept.runs.find((run) => run.futures === futures)?.breaks;
+}
+
 // Tells the listener given when the runs kept change, until it unsubscribes.
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
@@ -265,11 +374,11 @@ function trimmed(runs: readonly Kept[]): readonly Kept[] {
   });
 }
 
-// How many workers draw a run between them: one for each core the
-// browser says it has, up to mostWorkers, and one where it says none or
-// gives no count at all, each run its own, so two runs drawn side by
-// side start twice as many. WebKit says four on fewer than eight cores
-// and eight on more, whatever the device holds.
+// How many workers draw a run, or search one, between them: one for
+// each core the browser says it has, up to mostWorkers, and one where it
+// says none or gives no count at all, each run its own, so two runs
+// drawn side by side start twice as many. WebKit says four on fewer
+// than eight cores and eight on more, whatever the device holds.
 function workersOf(): number {
   const cores = navigator.hardwareConcurrency;
   return Number.isFinite(cores) ? Math.min(mostWorkers, Math.max(1, cores)) : 1;
