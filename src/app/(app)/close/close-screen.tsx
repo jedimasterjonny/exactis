@@ -13,6 +13,7 @@ import type { SinceClose } from "@/store/household";
 
 import { Ledger } from "@/components/app/atoms/ledger";
 import { Note } from "@/components/app/atoms/note";
+import { PortfolioImport } from "@/components/app/atoms/portfolio-import";
 import { Worksheet } from "@/components/app/atoms/worksheet";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { MonthEnd } from "@/components/app/organisms/month-end";
@@ -35,13 +36,7 @@ import {
   monthsBetween,
 } from "@/lib/months";
 import { movedSince } from "@/lib/moved";
-import {
-  assumptions,
-  cogitator,
-  monthEnd,
-  sectionLabel,
-  subsectionLabel,
-} from "@/lib/nav";
+import { cogitator, monthEnd, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 // What each group of the walk is called as a row of what moved.
 const groupNames: Record<Group, string> = {
@@ -445,8 +440,9 @@ function titleOf(moved: Moved, month: string, plan: Plan): string {
 // cogitator, as the amount to work trades out for, the month closed with
 // it so the cogitator can say where it came from, or any amount chosen
 // there; or, where the holdings were imported before the month closed
-// was cut, the word to import them first, and no amount, since trades
-// worked out from them would be for holdings that have moved since.
+// was cut, the word to import them first, with the file to import them
+// from, and no amount, since trades worked out from them would be for
+// holdings that have moved since.
 function Trades({
   month,
   moved,
@@ -467,12 +463,7 @@ function Trades({
       actions={
         <>
           {isStale ? (
-            <Link
-              className={buttonVariants({ size: "sm", variant: "outline" })}
-              href={assumptions.href}
-            >
-              {`${assumptions.label} › Target allocation`}
-            </Link>
+            <PortfolioImport />
           ) : (
             moved.invested > 0 && (
               <Link
