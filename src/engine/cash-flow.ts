@@ -232,6 +232,20 @@ interface Reading {
 // has no allowance has no room to run out of and is never entered.
 type Rooms = Map<string, number>;
 
+// What a month reads off the accounts and the schedule alone, the same
+// in every month of a run: the debts no expense line pays, which pay
+// their own fixed sums, and the savings no expense line pays, the
+// pensions kept paid apart from the rest, each in the order listed; the
+// account each income line feeds, none for one feeding nothing listed;
+// and the plans the household has been found sound over.
+interface Standing {
+  readonly debts: readonly Account[];
+  readonly feeds: ReadonlyMap<IncomeLine, Account | undefined>;
+  readonly kept: readonly Account[];
+  readonly plans: WeakSet<Plan>;
+  readonly rest: readonly Account[];
+}
+
 // What the month's income pays in tax: the income tax on all of it,
 // each owner's charged on their own, and the National Insurance on the
 // kinds that pay it, and the income the tax is charged on, which is
@@ -281,11 +295,11 @@ let pays: null | {
 // the same string every time rather than a new one to hash.
 const roomNames = new Map<number | undefined, Map<AccountKind, string>>();
 
-// The accounts, schedules and plans checkOnce has found sound together,
-// by the objects themselves.
-const checked = new WeakMap<
+// What standingOf has read off each accounts and schedule handed it
+// together, by the objects themselves.
+const standings = new WeakMap<
   readonly Account[],
-  WeakMap<Schedule, WeakSet<Plan>>
+  WeakMap<Schedule, Standing>
 >();
 
 // A month's money, from the accounts, the two schedules and the reading
@@ -327,7 +341,7 @@ export function cashFlow(
   reading: Reading,
 ): CashFlow {
   const { at, settlement = 0 } = reading;
-  checkOnce(accounts, schedule, reading.plan);
+  const standing = standingOf(accounts, schedule, reading.plan);
   const running = schedule.income.filter(
     (line) =>
       runsIn(line, at) &&
@@ -366,7 +380,7 @@ export function cashFlow(
   ): readonly Fed[] => {
     const fed: Fed[] = [];
     for (const line of running) {
-      const account = accountAt(accounts, line.feeds);
+      const account = standing.feeds.get(line);
       const entry =
         account === undefined
           ? null
@@ -397,18 +411,9 @@ export function cashFlow(
   };
   const spent = spentIn(accounts, schedule, reading);
   const expenses = total(spent);
-  const paid = new Set<number>();
-  for (const { pays } of schedule.expenses) {
-    if (pays !== undefined) {
-      paid.add(pays);
-    }
-  }
-  const own = accounts.filter((account) => !paid.has(account.id));
   const owed: Paid[] = [];
-  for (const account of own) {
-    if (account.kind === "debt") {
-      owed.push(...fixedSum(account, reading));
-    }
+  for (const account of standing.debts) {
+    owed.push(...fixedSum(account, reading));
   }
   const outgoings = expenses + total(owed);
   const leftWith = (
@@ -430,7 +435,6 @@ export function cashFlow(
   const isKeeping = kept.length > 0 && leftWith(kept) >= floor - nanopound;
   const feeding = feedingInto((account) => isKeeping || !isKeptPaid(account));
   const others = feeding.filter(({ account }) => !isKeptPaid(account));
-  const saving = own.filter((account) => account.kind !== "debt");
   const paidWith = (fed: readonly Fed[], least: number): Feeding => {
     const taxed = taxedWith(fed);
     const month = leftWith(fed, taxed);
@@ -460,11 +464,10 @@ export function cashFlow(
     for (const entry of fed) {
       landIn(purse, entry.account, entry.amount);
     }
-    const { sums: funded } = fixedSums(
-      saving.filter(isKeptPaid),
-      month - least,
-      { purse, reading },
-    );
+    const { sums: funded } = fixedSums(standing.kept, month - least, {
+      purse,
+      reading,
+    });
     return { fed, funded, month, purse, taxed };
   };
   const sacrificing =
@@ -478,7 +481,7 @@ export function cashFlow(
           floor,
         );
   const { left: rest, sums: saved } = fixedSums(
-    saving.filter((account) => !isKeptPaid(account)),
+    standing.rest,
     month - total(funded),
     { purse, reading },
   );
@@ -756,46 +759,6 @@ function checkLinks(
       throw new Error(rules.paysDebt);
     }
   }
-}
-
-// What cashFlow refuses before it works out any month, checked the
-// first time it is handed the accounts, schedule and plan given, and
-// not again while it is handed the same three, as a run hands them
-// over month after month. One refused is never marked sound.
-function checkOnce(
-  accounts: readonly Account[],
-  schedule: Schedule,
-  plan: Plan,
-): void {
-  const bySchedule =
-    checked.get(accounts) ?? new WeakMap<Schedule, WeakSet<Plan>>();
-  const plans = bySchedule.get(schedule) ?? new WeakSet<Plan>();
-  if (plans.has(plan)) {
-    return;
-  }
-  if (new Set(accounts.map(({ id }) => id)).size !== accounts.length) {
-    throw new Error(rules.listedOnce);
-  }
-  const { inflation } = plan;
-  if (!(inflation > -1 && Number.isFinite(inflation))) {
-    throw new Error(rules.inflation);
-  }
-  if (
-    accounts.some(
-      (account) => isOwned(account) !== (typeof account.owner === "number"),
-    )
-  ) {
-    throw new Error(rules.owned);
-  }
-  if (
-    accounts.some(
-      (account) => account.isDroppable === true && !isPension(account),
-    )
-  ) {
-    throw new Error(rules.droppable);
-  }
-  checkLinks(accounts, schedule, plan);
-  checked.set(accounts, bySchedule.set(schedule, plans.add(plan)));
 }
 
 // A twelfth of what the lines given pay in a year, risen to the month
@@ -1146,6 +1109,76 @@ function spareMoney(
     }
   }
   return { left, takes };
+}
+
+// What a month reads off the accounts and the schedule alone, worked
+// out the first time standingOf is handed the two together, as
+// Standing holds it.
+function standingIn(
+  accounts: readonly Account[],
+  schedule: Schedule,
+): Standing {
+  const paid = new Set<number>();
+  for (const { pays } of schedule.expenses) {
+    if (pays !== undefined) {
+      paid.add(pays);
+    }
+  }
+  const own = accounts.filter((account) => !paid.has(account.id));
+  const saving = own.filter((account) => account.kind !== "debt");
+  return {
+    debts: own.filter((account) => account.kind === "debt"),
+    feeds: new Map(
+      schedule.income.map((line) => [line, accountAt(accounts, line.feeds)]),
+    ),
+    kept: saving.filter(isKeptPaid),
+    plans: new WeakSet(),
+    rest: saving.filter((account) => !isKeptPaid(account)),
+  };
+}
+
+// What a month reads off the accounts and the schedule alone, once the
+// three are checked for what cashFlow refuses before it works out any
+// month: the first time it is handed the accounts, schedule and plan
+// given, and not again while it is handed the same three, as a run
+// hands them over month after month. One refused is never marked
+// sound.
+function standingOf(
+  accounts: readonly Account[],
+  schedule: Schedule,
+  plan: Plan,
+): Standing {
+  const bySchedule =
+    standings.get(accounts) ?? new WeakMap<Schedule, Standing>();
+  const standing = bySchedule.get(schedule) ?? standingIn(accounts, schedule);
+  if (standing.plans.has(plan)) {
+    return standing;
+  }
+  if (new Set(accounts.map(({ id }) => id)).size !== accounts.length) {
+    throw new Error(rules.listedOnce);
+  }
+  const { inflation } = plan;
+  if (!(inflation > -1 && Number.isFinite(inflation))) {
+    throw new Error(rules.inflation);
+  }
+  if (
+    accounts.some(
+      (account) => isOwned(account) !== (typeof account.owner === "number"),
+    )
+  ) {
+    throw new Error(rules.owned);
+  }
+  if (
+    accounts.some(
+      (account) => account.isDroppable === true && !isPension(account),
+    )
+  ) {
+    throw new Error(rules.droppable);
+  }
+  checkLinks(accounts, schedule, plan);
+  standing.plans.add(plan);
+  standings.set(accounts, bySchedule.set(schedule, standing));
+  return standing;
 }
 
 // The tax on the lines running in the month, each as it is earned less
