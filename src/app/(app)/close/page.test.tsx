@@ -131,7 +131,7 @@ describe("Close", () => {
   });
 
   // August's point is the latest, and on the fifteenth of September
-  // August is the last month that has ended.
+  // August is the month cut last.
   it("says what moved the plan since the close before, under a title that gives the answer", async () => {
     await renderClose();
 
@@ -141,14 +141,14 @@ describe("Close", () => {
     );
     expect(
       screen.getByText(
-        "Mostly rates and their sources · September closes from 1 October",
+        "Mostly rates and their sources · September closes from 25 September",
       ),
     ).toBeInTheDocument();
     expect(movedSince).toHaveBeenCalledExactlyOnceWith(july, kept);
     expect(updating()).toBe("/close?update");
 
     const balances = screen.getByRole("region", {
-      name: "Balances at the end of August 2026",
+      name: "Balances on 25 Aug 2026",
     });
     expect(within(balances).getByText("Sect. VII.i")).toHaveClass("label");
     expect(
@@ -159,7 +159,7 @@ describe("Close", () => {
         .getAllByRole("listitem")
         .map((step) => step.textContent),
     ).toStrictEqual([
-      "As the balances stoodEnd of July 2026£897,640",
+      "As the balances stood24 Jul 2026£897,640",
       "Paid in£1,500",
       "MovedMarkets, interest and the unexpected£3,000",
     ]);
@@ -205,8 +205,8 @@ describe("Close", () => {
   });
 
   // September closed, on the fifteenth of October, over holdings
-  // imported on the seventh of September, before September ended.
-  it("asks for this month's holdings where they were imported before the month closed ended", async () => {
+  // imported on the seventh of September, before September was cut.
+  it("asks for this month's holdings where they were imported before the month closed was cut", async () => {
     await renderClose({
       day: "2026-10-15",
       household: {
@@ -258,7 +258,7 @@ describe("Close", () => {
       "August went to plan; retirement still at 61",
     );
     expect(
-      screen.getByText("September closes from 1 October"),
+      screen.getByText("September closes from 25 September"),
     ).toBeInTheDocument();
     expect(screen.queryByText(/left as it stood$/)).not.toBeInTheDocument();
     expect(rows().map(([name]) => name)).toStrictEqual([
@@ -374,7 +374,7 @@ describe("Close", () => {
       "August is closed",
     );
     expect(
-      screen.getByText("September closes from 1 October"),
+      screen.getByText("September closes from 25 September"),
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole("region", { name: "What moved" })).getByText(
@@ -412,12 +412,10 @@ describe("Close", () => {
       "August is closed",
     );
     expect(
-      screen.getByText("September closes from 1 October"),
+      screen.getByText("September closes from 25 September"),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("region", {
-        name: "Balances at the end of August 2026",
-      }),
+      screen.getByRole("region", { name: "Balances on 25 Aug 2026" }),
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole("banner")).getByRole("link", {
@@ -450,19 +448,17 @@ describe("Close", () => {
     ).toBeInTheDocument();
   });
 
-  // On the fourth of October September is the last month that has
-  // ended, and the latest point is August's.
-  it("opens the worksheet on the month that is due until it is closed", async () => {
-    await renderClose({ day: "2026-10-04" });
+  // On Friday 25 September September is cut, and the latest point is
+  // August's.
+  it("opens the worksheet on the month that is due from its cut until it is closed", async () => {
+    await renderClose({ day: "2026-09-25" });
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "September isn't closed yet",
     );
-    expect(screen.getByText("Due since 1 October")).toBeInTheDocument();
+    expect(screen.getByText("Due since 25 September")).toBeInTheDocument();
     expect(
-      screen.getByRole("region", {
-        name: "Balances at the end of September 2026",
-      }),
+      screen.getByRole("region", { name: "Balances on 25 Sep 2026" }),
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole("banner")).queryByRole("link"),
@@ -470,16 +466,17 @@ describe("Close", () => {
     expect(getSinceClose).not.toHaveBeenCalled();
   });
 
-  // In the middle of November, with September and October both still to
-  // close after August's point: October is the month the worksheet opens
-  // on, and a month has been due since September could first be closed.
-  it("says a month has been due since the month after the latest point's could first be closed", async () => {
+  // In the middle of November, with September and October both cut
+  // after August's point and November not until the 25th: October is the
+  // month the worksheet opens on, and a month has been due since
+  // September was cut.
+  it("says a month has been due since the month after the latest point's was cut", async () => {
     await renderClose({ day: "2026-11-15" });
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "October isn't closed yet",
     );
-    expect(screen.getByText("Due since 1 October")).toBeInTheDocument();
+    expect(screen.getByText("Due since 25 September")).toBeInTheDocument();
   });
 
   it("opens the worksheet on a household with no point yet, saying only that it is due", async () => {

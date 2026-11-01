@@ -2,10 +2,10 @@ import type { Account } from "@/data/accounts";
 import type { Month } from "@/data/schedule";
 
 import { isAsset, isPension } from "@/data/accounts";
-import { isOnOrBefore, monthBefore, monthsBetween } from "@/lib/months";
+import { isOnOrBefore, monthsBetween } from "@/lib/months";
 
-// A progress point is the household's balances as they were read at the
-// end of a month, each summed over the accounts it holds: the pensions,
+// A progress point is the household's balances as they were read at a
+// month's cut, each summed over the accounts it holds: the pensions,
 // the ISAs, the GIAs, the cash, what the property and vehicles were
 // worth, the loans secured on them and the debt secured on nothing, each
 // whole pounds, the two debts nothing or less as an account's is. A point
@@ -95,14 +95,12 @@ export interface Move {
   readonly move: number;
 }
 
-// Whether the last month that has ended before the month given is still
-// to be closed: no point is kept for it or after it, as none is before
-// the first close.
+// Whether a month, the one whose balances were cut last, is still to
+// be closed: no point is kept for it or after it, as none is before the
+// first close.
 export function isDue(points: readonly ProgressPoint[], month: Month): boolean {
   const latest = points.at(-1);
-  return (
-    latest === undefined || !isOnOrBefore(monthBefore(month), latest.month)
-  );
+  return latest === undefined || !isOnOrBefore(month, latest.month);
 }
 
 export function latestYearOf(

@@ -26,9 +26,9 @@ in Postgres on Neon and the app on Vercel.
   inflation curve, BlackRock's capital market assumptions and a target
   allocation imported from Portfolio Performance; the glide path; and each
   owner's State Pension.
-- Month end — the balances checked against what the plan expected, which records
-  a progress point, then what moved the plan since the close before and what the
-  plan paid in to invest.
+- Month end — the balances cut on the 25th, or the working day before, checked
+  against what the plan expected, which records a progress point, then what
+  moved the plan since the close before and what the plan paid in to invest.
 - Cogitator — what to buy and sell next in an account, towards that target
   allocation.
 

@@ -43,7 +43,7 @@ function openWorksheet(
     />,
     { wrapper: Toaster },
   );
-  return screen.getByRole("region", { name: /^Balances at the end of/ });
+  return screen.getByRole("region", { name: /^Balances on/ });
 }
 
 describe("MonthEnd", () => {
@@ -59,9 +59,7 @@ describe("MonthEnd", () => {
 
     expect(within(sheet).getByText("Sect. VII.i")).toHaveClass("label");
     expect(
-      within(sheet).getByRole("heading", {
-        name: "Balances at the end of September 2026",
-      }),
+      within(sheet).getByRole("heading", { name: "Balances on 25 Sep 2026" }),
     ).toBeInTheDocument();
     expect(select("Month")).toHaveValue("8");
     expect(field("Year")).toHaveValue("2026");
@@ -88,7 +86,7 @@ describe("MonthEnd", () => {
     );
     expect(within(sheet).getByText("0 of 5 checked")).toBeInTheDocument();
     expect(ledger(sheet)).toStrictEqual([
-      "As the balances stoodEnd of August 2026£901,462",
+      "As the balances stood25 Aug 2026£901,462",
       "Paid in£0",
       "MovedMarkets, interest and the unexpected£0",
     ]);
@@ -188,9 +186,7 @@ describe("MonthEnd", () => {
       "MovedMarkets, interest and the unexpected£900",
     ]);
     expect(
-      within(sheet).getByText(
-        "As the balances stand at the end of September 2026",
-      ),
+      within(sheet).getByText("As the balances stand on 25 Sep 2026"),
     ).toHaveClass("label");
     expect(within(sheet).getByText("£908,892")).toBeInTheDocument();
 
@@ -206,7 +202,7 @@ describe("MonthEnd", () => {
     expect(
       await screen.findByRole("dialog", { name: "Balances updated" }),
     ).toHaveAccessibleDescription(
-      "2 balances set as of the end of September 2026, its progress point recorded",
+      "2 balances set as of 25 Sep 2026, its progress point recorded",
     );
     expect(
       await within(sheet).findByText("0 of 5 checked"),
@@ -264,7 +260,7 @@ describe("MonthEnd", () => {
 
     expect(
       await screen.findByRole("dialog", { name: "Balances updated" }),
-    ).toHaveAccessibleDescription("0 balances set as of the end of March 2026");
+    ).toHaveAccessibleDescription("0 balances set as of 25 Mar 2026");
   });
 
   // Closing onto August, the month the balances are already as of, runs
@@ -275,9 +271,7 @@ describe("MonthEnd", () => {
     fireEvent.change(select("Month"), { target: { value: "7" } });
 
     expect(
-      within(sheet).getByRole("heading", {
-        name: "Balances at the end of August 2026",
-      }),
+      within(sheet).getByRole("heading", { name: "Balances on 25 Aug 2026" }),
     ).toBeInTheDocument();
     expect(field("Workplace pension")).toHaveValue("£391,640");
     expect(field("Workplace pension")).toHaveAccessibleDescription(
