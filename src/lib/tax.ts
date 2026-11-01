@@ -6,6 +6,7 @@ import type { Month } from "@/data/schedule";
 import { allowanceOf, isPension, pensionAllowance } from "@/data/accounts";
 import { inflationIn } from "@/data/plan";
 import { yearly } from "@/lib/cadence";
+import { keptIn } from "@/lib/maps";
 
 // A draw on a pension: what leaves it, what is left of that once taxed,
 // and the two parts the tax reads it as, the quarter that is free of tax
@@ -154,6 +155,15 @@ const taxFreeShare = 0.25;
 // will not normally pay before the age at all, so this is the cost of
 // forcing it rather than a way the plan may count on.
 const unauthorisedCharge = 0.55;
+
+// How far the bands have risen along a path by each tax year, by the
+// plan and the year, each worked out once and read off after, since
+// every month reads it several times over. Held against the plan, which
+// carries the path, and let go with it.
+const upratings = new WeakMap<
+  Pick<Plan, "from" | "inflation" | "path">,
+  Map<number, number>
+>();
 
 // Where each band charged at no more than the basic rate ends over a
 // stretch of the year, from the bottom: the top of the personal
@@ -366,11 +376,18 @@ export function upratingIn(
   if (plan.path === undefined) {
     return (1 + plan.inflation) ** Math.max(0, taxYearOf(at) - frozenThrough);
   }
-  let risen = 1;
-  for (let year = frozenThrough; year < taxYearOf(at); year += 1) {
-    risen *= 1 + inflationIn(plan, year);
-  }
-  return risen;
+  const taxYear = taxYearOf(at);
+  return keptIn(
+    keptIn(upratings, plan, () => new Map<number, number>()),
+    taxYear,
+    () => {
+      let risen = 1;
+      for (let year = frozenThrough; year < taxYear; year += 1) {
+        risen *= 1 + inflationIn(plan, year);
+      }
+      return risen;
+    },
+  );
 }
 
 // What the bands charge on a share of them: each band's rate on the

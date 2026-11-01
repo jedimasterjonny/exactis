@@ -552,6 +552,25 @@ describe("upratingIn", () => {
     );
   });
 
+  // Each tax year along a path is worked out once a plan, so a year
+  // read late first, a year read after it and a year read again must
+  // each read what a plan asked nothing before does, to the last bit.
+  it("reads a tax year along a path the same whatever was read of the plan before", () => {
+    const path = { inflation: [0.5, 0.5, 0.5, 0.5, 0.1, 0.2], rate: [] };
+    const fresh = (): Parameters<typeof upratingIn>[0] => ({
+      from: 2026,
+      inflation: 0.03,
+      path,
+    });
+    const plan = fresh();
+    const late = upratingIn(plan, { month: 3, year: 2033 });
+    const early = upratingIn(plan, { month: 5, year: 2031 });
+
+    expect(late).toBe(upratingIn(fresh(), { month: 3, year: 2033 }));
+    expect(early).toBe(upratingIn(fresh(), { month: 5, year: 2031 }));
+    expect(upratingIn(plan, { month: 11, year: 2033 })).toBe(late);
+  });
+
   // A plan starting in 2035 holds no prices for the five years from
   // 2030, so the bands have risen 3% a year over them by April 2035, and
   // the path's 50% on top by April 2036.
