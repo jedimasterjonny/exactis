@@ -9,21 +9,30 @@ import type { Path, Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { ProjectionPoint, Run } from "@/engine/projection";
 
-import { ageOf, isReached, markersOf, retiresOn } from "@/data/milestones";
-import { endYear } from "@/data/plan";
+import {
+  ageOf,
+  isReached,
+  markersOf,
+  retiresOn,
+  retiringAt,
+} from "@/data/milestones";
+import { ageIn, endAge, endYear } from "@/data/plan";
 import {
   carriedBy,
   isShort,
   measuredOf,
   movedYears,
   project,
+  retimed,
   retirementIn,
 } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
 // Where a run of futures breaks, as breaksIn finds it: the least cut to
-// the spending nine in ten of them last with.
+// the spending nine in ten of them last with, and the earliest age nine
+// in ten last retiring at, for a plan isAgeSearched searches the age of.
 export interface Breaks {
+  readonly age?: null | number;
   readonly cut: null | number;
 }
 
@@ -94,10 +103,9 @@ export interface Reading {
 }
 
 // A future tried again in the search for where the run breaks: its
-// spending cut by the points given.
-interface Trial {
-  readonly cut: number;
-}
+// spending cut by the points given, or its owner retiring at the age
+// given.
+type Trial = { readonly age: number } | { readonly cut: number };
 
 // How many futures a run draws: enough to pin the chance to within two
 // points either way, and few enough that the run is a matter of
@@ -137,33 +145,41 @@ export interface Grading {
 
 // Where a run of the plan's futures breaks: the least cut to its
 // spending, in whole points of the spending planned from 50 off to 50
-// on, that nine in ten of the futures last with. Lasting is as the
+// on, that nine in ten of the futures last with, and the earliest age
+// nine in ten last retiring at, spending as planned. Lasting is as the
 // chance counts it, never falling short and retiring. A cut scales
 // every expense line paying no debt, in every year of the plan, those
 // still saving among them; a line paying a debt is left as it is, since
-// the loan says what it pays, as a move's mortgage line does. Each
-// future tried is tried as lastsTried tries one, given the future's
-// place in the run, and the search runs as many tries at once as the
-// lanes given. The search starts from the plan itself, the cut of
-// nothing, where each future's verdict is the run's as the chance read
-// it, so none is tried there, and halves the values below it where nine
-// in ten last there and above it where they do not, asking at each
-// value whether nine in ten last. A future's verdict at a value is read
-// off the values it was tried at before, where they settle it, since a
+// the loan says what it pays, as a move's mortgage line does. The ages
+// run from the owner's as the plan opens to the plan's last, as the
+// dashboard's retirement age does. Each future tried is tried as
+// lastsTried tries one, given the future's place in the run, and the
+// search runs as many tries at once as the lanes given. The search
+// starts from the plan itself, the cut of nothing and the plan's own
+// age, where each future's verdict is the run's as the chance read it,
+// so none is tried there, and halves the values below it where nine in
+// ten last there and above it where they do not, asking at each value
+// whether nine in ten last. A future's verdict at a value is read off
+// the values it was tried at before, where they settle it, since a
 // future lasting with a cut is taken to last with any deeper one and
-// one falling short to fall short with any shallower; the rest are
-// tried, only until enough have lasted or fallen short to settle it. A
-// run lasting even on half as much again reads -50, one falling short
-// even on half the spending null. A future need not last at every
+// one falling short to fall short with any shallower, and retiring
+// later likewise; the rest are tried, only until enough have lasted or
+// fallen short to settle it. A run lasting even on half as much again
+// reads -50, one falling short even on half the spending null; one
+// lasting even retiring as the plan opens reads that age, one falling
+// short even working to the end null. A future need not last at every
 // depth past a cut it lasts with: a move at an age, the pension age, or
 // a retirement on conditions, which reads the year's expenses and so
 // comes sooner on less, can leave a deeper cut short, and the verdict
-// read off an earlier try is then wrong. So the figure is where nine in
-// ten last as the tries read them; but since every verdict at the plan
-// itself is the chance's own, the cut is nothing or less exactly where
-// nine in ten futures last as the chance counts them.
+// read off an earlier try is then wrong. So the figures are where nine
+// in ten last as the tries read them; but since every verdict at the
+// plan itself is the chance's own, the cut is nothing or less, and the
+// age the plan's own or sooner, exactly where nine in ten futures last
+// as the chance counts them. A plan isAgeSearched passes over has the
+// spending alone searched.
 export async function breaksIn(
   futures: readonly Future[],
+  plan: Plan,
   {
     lanes,
     tried,
@@ -172,12 +188,33 @@ export async function breaksIn(
     readonly tried: (trial: Trial, future: number) => Promise<boolean>;
   },
 ): Promise<Breaks> {
-  const cut = await breakingAt(
-    futures.map(isLasting),
-    { above: deepestCut + 1, below: -deepestCut - 1, pivot: 0 },
-    { lanes, tried: async (value, future) => tried({ cut: value }, future) },
-  );
-  return { cut: cut > deepestCut ? null : cut };
+  const lasting = futures.map(isLasting);
+  const last = endAge(plan);
+  const [cut, age] = await Promise.all([
+    breakingAt(
+      lasting,
+      { above: deepestCut + 1, below: -deepestCut - 1, pivot: 0 },
+      { lanes, tried: async (value, future) => tried({ cut: value }, future) },
+    ),
+    isAgeSearched(plan)
+      ? breakingAt(
+          lasting,
+          {
+            above: last + 1,
+            below: ageIn(plan.from, plan) - 1,
+            pivot: plan.retires,
+          },
+          {
+            lanes,
+            tried: async (value, future) => tried({ age: value }, future),
+          },
+        )
+      : undefined,
+  ]);
+  const spending = cut > deepestCut ? null : cut;
+  return age === undefined
+    ? { cut: spending }
+    : { age: age > last ? null : age, cut: spending };
 }
 
 // What a future is worth entering the plan's last year: the net worth
@@ -297,8 +334,10 @@ export function gradingOf(projected: Future, plan: Plan): Grading {
 // Whether the future at the place given in a run of the plan's futures
 // lasts tried as given: its own path, drawn as futuresOf draws it,
 // projected again with the spending cut by every expense line paying no
-// debt scaled by what the cut leaves of it, and read for whether it
-// lasts and nothing more.
+// debt scaled by what the cut leaves of it, or as the run carried by
+// retimed over the plan retiring its owner at the age, so each owner's
+// State Pension is made again for it, and read for whether it lasts and
+// nothing more.
 export function lastsTried(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -317,7 +356,11 @@ export function lastsTried(
   },
 ): boolean {
   const run = drawnOver(accounts, schedule, { future, plan, seed, spread });
-  return lastsOver(cutBy(run, trial.cut));
+  return lastsOver(
+    "cut" in trial
+      ? cutBy(run, trial.cut)
+      : retimed(run, retiringAt(run.plan, trial.age)),
+  );
 }
 
 // The milestones as a run of futures places them on the plan's years:
@@ -649,6 +692,18 @@ function drawnOver(
 ): Run {
   const path = pathOf(plan, spread, normalsFrom(seed + future * step));
   return { accounts, plan: { ...plan, path }, schedule };
+}
+
+// Whether a run is searched for the earliest age nine in ten of its
+// futures last retiring at as well as for its cut: only where the
+// plan's owner retires at an age not already behind them as the plan
+// opens. One
+// retiring on conditions has no age to try, since the run finds it, and
+// one already retired has none to move.
+function isAgeSearched(plan: Plan): boolean {
+  return (
+    retiresOn(plan) === undefined && plan.retires >= ageIn(plan.from, plan)
+  );
 }
 
 // Whether a future lasted, as the chance counts it: it never fell short,

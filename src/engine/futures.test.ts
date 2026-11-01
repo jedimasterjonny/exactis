@@ -7,9 +7,11 @@ import type { Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 
 import { expenseLines } from "@/data/expenses.fixture";
-import { atAge } from "@/data/milestones";
+import { incomeLines } from "@/data/income.fixture";
+import { atAge, retiringAt } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { owners, working } from "@/data/owners.fixture";
+import { statePensionLines } from "@/data/state-pension";
 import { project } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
@@ -396,6 +398,7 @@ describe("futuresOf", () => {
     const tries: number[] = [];
     const breaks = await breaksIn(
       futuresOf(accounts, schedule, run).take(count).toArray(),
+      on,
       {
         lanes,
         tried: async (trial, future) => {
@@ -525,6 +528,156 @@ describe("futuresOf", () => {
         (await breaksOver(saved, { ...run, count: 40, lanes: 4 })).breaks,
       ).toStrictEqual(breaks);
     }
+  });
+
+  // £12,000 a year earned, under the personal allowance and the National
+  // Insurance threshold alike, against the £12,000 a year spent, so a
+  // year worked costs the savings nothing.
+  const earning = {
+    ...short,
+    income: [
+      {
+        ...incomeLines[0],
+        amount: 12000,
+        bonus: 0,
+        feeds: null,
+        growth: "nominal" as const,
+        lastYear: null,
+        rsu: 0,
+        sacrifice: 0,
+      },
+    ],
+  };
+
+  // Ten years from 34, so the plan ends at 44, retiring at 40.
+  const tenYears = retiringAt({ ...planned, years: 10 }, 40);
+
+  // £30,000 lasts two years retired, from 42, and not three, from 41;
+  // the search finds 42 from the plan's own age where that lasts and
+  // where it falls short.
+  it("searches the run for the earliest age nine in ten futures last retiring at, spending as planned", async () => {
+    const ageFor = async (
+      retires: number,
+    ): Promise<null | number | undefined> =>
+      (
+        await breaksOver([{ ...isa, balance: 30000 }], {
+          plan: retiringAt(tenYears, retires),
+          schedule: earning,
+        })
+      ).breaks.age;
+
+    expect([await ageFor(43), await ageFor(40)]).toStrictEqual([42, 42]);
+  });
+
+  // £200,000 lasts all ten years retired; with nothing earned, £30,000
+  // falls short at every age.
+  it("reads the age the plan opens at where retiring then lasts, and null where working to the end falls short", async () => {
+    expect(
+      (
+        await breaksOver([{ ...isa, balance: 200000 }], {
+          plan: tenYears,
+          schedule: earning,
+        })
+      ).breaks.age,
+    ).toBe(34);
+    expect(
+      (await breaksOver([{ ...isa, balance: 30000 }], { plan: tenYears }))
+        .breaks.age,
+    ).toBeNull();
+  });
+
+  // Retiring on any net worth at all, or at 30, before the plan opens.
+  it("searches the spending alone of an owner retiring on conditions or already retired", async () => {
+    const onConditions = {
+      ...planned,
+      owners: [
+        {
+          ...working,
+          retirement: [{ measure: "worth", of: "pounds", times: 0 } as const],
+        },
+      ],
+    };
+    const saved = [{ ...isa, balance: 40000 }];
+
+    expect(
+      (await breaksOver(saved, { plan: onConditions })).breaks,
+    ).toStrictEqual({ cut: 34 });
+    expect(
+      (await breaksOver(saved, { plan: retiringAt(planned, 30) })).breaks,
+    ).toStrictEqual({ cut: 34 });
+  });
+
+  // £35,000 at 5% straying 15% a year, earning as it spends until the
+  // owner retires at 40, lasts in some futures and falls short in others,
+  // fewer than nine in ten of 40 retiring then; £70,000 lasts in more.
+  it("finds an age nine in ten futures last retiring at and fewer do a year sooner, the plan's own or sooner exactly where nine in ten last as the run counts them", async () => {
+    const run = {
+      plan: { ...tenYears, rate: 0.05 },
+      spread: { inflation: 0.02, rate: 0.15 },
+    };
+    for (const [balance, isNine] of [
+      [35000, false],
+      [70000, true],
+    ] as const) {
+      const saved = [{ ...isa, balance }];
+      const lasting = (age: number): number =>
+        Array.from({ length: 40 }, (_, future) =>
+          lastsTried(saved, earning, { ...run, future, trial: { age } }),
+        ).filter(Boolean).length;
+      const { breaks } = await breaksOver(saved, {
+        ...run,
+        count: 40,
+        schedule: earning,
+      });
+      const { lasted } = readingOf(
+        futuresOf(saved, earning, run).take(40).toArray(),
+      );
+
+      expect(breaks.age).not.toBeNull();
+      const age = breaks.age ?? 0;
+      expect(lasted >= 36).toBe(isNine);
+      expect(age <= 40).toBe(isNine);
+      expect(lasting(age)).toBeGreaterThanOrEqual(36);
+      expect(age === 34 || lasting(age - 1) < 36).toBe(true);
+    }
+  });
+
+  // Born in 1962, 64 as the plan opens and paid the State Pension from
+  // 67, in 2029, on eight years through 2024/25 and one more for each
+  // year worked before retiring: retiring at 64 counts nine, which earn
+  // nothing, at 65 ten, £3,585 a year, at 66 eleven, £3,944, and from 67
+  // twelve, £4,302. Spending £12,000 a year for ten years with nothing
+  // else coming in, the seven years paid decide it: £100,000 lasts
+  // retiring at 65 on a line retiring at 64 does not pay, and £91,000
+  // lasts at 67 and not at 66, on less than 67 pays.
+  it("makes each owner's State Pension again at every age it tries", async () => {
+    const older = {
+      ...tenYears,
+      born: 1962,
+      owners: [
+        { ...working, born: 1962, qualifiedThrough: 2024, qualifyingYears: 8 },
+      ],
+    };
+    const ageFor = async (
+      retires: number,
+      balance: number,
+    ): Promise<null | number | undefined> => {
+      const plan = retiringAt(older, retires);
+      return (
+        await breaksOver([{ ...isa, balance }], {
+          plan,
+          schedule: {
+            ...short,
+            income: plan.owners.flatMap((owner) =>
+              statePensionLines(owner, plan),
+            ),
+          },
+        })
+      ).breaks.age;
+    };
+
+    expect(await ageFor(64, 100000)).toBe(65);
+    expect(await ageFor(67, 91000)).toBe(67);
   });
 });
 
