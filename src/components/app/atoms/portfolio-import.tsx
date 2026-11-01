@@ -9,10 +9,11 @@ import { importTargets } from "@/actions/targets";
 import { Button } from "@/components/kit/button";
 import { useSender } from "@/hooks/use-sender";
 import { formatDay } from "@/lib/months";
-import { readTargets } from "@/lib/portfolio-file";
+import { readPortfolios, readTargets } from "@/lib/portfolio-file";
 
 // The month end's button importing the holdings, the target allocation
-// with what each category holds, from a Portfolio Performance file
+// with what each category holds and each securities account's cash and
+// what was paid into it, from a Portfolio Performance file
 // chosen on this device, as the assumptions screen imports them, so the
 // trades are worked out over the holdings as they stand at the close.
 // The file is read here in the browser and the store is sent what the
@@ -33,8 +34,10 @@ export function PortfolioImport(): JSX.Element {
       return;
     }
     send(
-      async () =>
-        importTargets(readTargets(new Uint8Array(await file.arrayBuffer()))),
+      async () => {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        return importTargets(readTargets(bytes), readPortfolios(bytes));
+      },
       {
         failure: "Holdings not imported",
         success: (imported) => ({

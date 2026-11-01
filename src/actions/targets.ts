@@ -3,12 +3,12 @@
 import * as z from "zod";
 
 import type { Mapping } from "@/data/cma";
-import type { Target, Targets } from "@/data/targets";
+import type { Portfolio, Target, Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
 import { suggestedMappings } from "@/data/class-table";
 import { holdWhileLive } from "@/data/household";
-import { categoryValues, named } from "@/data/schemas";
+import { categoryValues, named, portfolioValues } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
 import { today } from "@/lib/months";
 import { requireSession } from "@/lib/session";
@@ -20,16 +20,24 @@ const categories = z.array(z.object(categoryValues)) satisfies z.ZodType<
   readonly Target[]
 >;
 
+// What an import carries beside them: each securities account's cash and
+// what was paid into it, as the reader read them out of the file.
+const portfolios = z.array(z.object(portfolioValues)) satisfies z.ZodType<
+  readonly Portfolio[]
+>;
+
 // What a mapping carries: the category by its id, and the asset class
 // it is mapped onto by its name, or none, to map it onto none.
 const mapped = z.object({ asset: named.nullable(), category: z.string() });
 
 // Keeps the target allocation read out of a Portfolio Performance file
-// over whatever the household held, as imported today, and hands it
+// over whatever the household held, as imported today, with each
+// securities account's cash and what was paid into it, and hands it
 // back as kept. The file is read in the browser, so only the categories
 // are sent, each with what it holds to the pound, in all and in each
-// securities account by the account's name, never the holdings and
-// transactions that is worked out from. An action answers a POST from anywhere, so it checks the
+// securities account by the account's name, and the accounts' cash and
+// what was paid in by the day, to the pound, never the holdings and
+// transactions those are worked out from. An action answers a POST from anywhere, so it checks the
 // session for itself and parses what it was sent rather than trusting
 // the reader that sent it. The categories are held by the household to
 // shares of the whole that add up to it, each listed once, and a
@@ -39,11 +47,17 @@ const mapped = z.object({ asset: named.nullable(), category: z.string() });
 // it can be imported, under the rates typed.
 export async function importTargets(
   read: readonly Target[],
+  held: readonly Portfolio[],
 ): Promise<Answer<Targets>> {
   await requireSession();
   const parsed = categories.parse(read);
+  const accounts = portfolios.parse(held);
   return amend(({ kept }) => {
-    const targets = { categories: parsed, importedOn: today() };
+    const targets = {
+      categories: parsed,
+      importedOn: today(),
+      portfolios: accounts,
+    };
     const next = { ...kept, targets };
     holdWhileLive(next, {
       cannot: "this allocation cannot be imported",

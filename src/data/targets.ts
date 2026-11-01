@@ -1,3 +1,15 @@
+// What a securities account held in cash and was paid, as last
+// imported from Portfolio Performance: the account's name, as Portfolio
+// Performance names it; the whole pounds its cash account held,
+// uninvested; and what was paid into that cash account each day
+// anything was, less what was taken out, in whole pounds by the ISO
+// date, earliest first.
+export interface Portfolio {
+  readonly cash: number;
+  readonly name: string;
+  readonly paid: readonly Paid[];
+}
+
 // A category of the target allocation, as Portfolio Performance's Asset
 // Allocation taxonomy holds it: a class with none beneath it. Its id is
 // the one Portfolio Performance gives the class, which a file saved
@@ -24,11 +36,14 @@ export interface Target {
 }
 
 // The target allocation as last imported from Portfolio Performance:
-// its categories in the order the file gives them, and the day it was
-// imported on, as an ISO date.
+// its categories in the order the file gives them, the day it was
+// imported on, as an ISO date, and each securities account's cash and
+// what was paid into it, which an allocation imported before they were
+// read carries none of.
 export interface Targets {
   readonly categories: readonly Target[];
   readonly importedOn: string;
+  readonly portfolios?: readonly Portfolio[];
 }
 
 // What a securities account holds of a category: the account's name,
@@ -36,4 +51,11 @@ export interface Targets {
 interface Held {
   readonly name: string;
   readonly value: number;
+}
+
+// What was paid into a cash account on a day, less what was taken out:
+// the whole pounds, and the day, as an ISO date.
+interface Paid {
+  readonly amount: number;
+  readonly on: string;
 }

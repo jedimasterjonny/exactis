@@ -1,4 +1,4 @@
-import type { Targets } from "@/data/targets";
+import type { Portfolio, Targets } from "@/data/targets";
 
 import { readTargets } from "@/lib/portfolio-file";
 import {
@@ -15,6 +15,32 @@ export const targets: Targets = {
   ),
   importedOn: "2026-09-07",
 };
+
+// Three securities accounts' cash and what was paid into them, invented:
+// the ISA and the workplace pension paid in on the 25th of August and
+// on Friday the 25th of September 2026, the pension's August payment
+// with a little taken back out the day after, and a brokerage account
+// holding a little cash that nothing was paid into. For tests.
+export const portfolios: readonly Portfolio[] = [
+  {
+    cash: 1830,
+    name: "Stocks & shares ISA",
+    paid: [
+      { amount: 1500, on: "2026-08-25" },
+      { amount: 1500, on: "2026-09-25" },
+    ],
+  },
+  {
+    cash: 0,
+    name: "Workplace pension",
+    paid: [
+      { amount: 2376, on: "2026-08-25" },
+      { amount: -40, on: "2026-08-26" },
+      { amount: 2376, on: "2026-09-25" },
+    ],
+  },
+  { cash: 64, name: "Brokerage", paid: [] },
+];
 
 // The reference target allocation with everything beneath the class at
 // the top named, Equity or Bonds, scaled to the whole, and everything

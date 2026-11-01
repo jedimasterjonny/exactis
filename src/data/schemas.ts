@@ -186,6 +186,16 @@ export const categoryValues = {
   value: pounds.default(0),
 };
 
+// What a securities account held in cash and was paid, as the reader
+// reads it out of a Portfolio Performance file: its cash may be below
+// nothing, as an account Portfolio Performance keeps may be overdrawn,
+// and what was paid on a day below nothing where more was taken out.
+export const portfolioValues = {
+  cash: z.number().int(),
+  name: z.string(),
+  paid: z.array(z.object({ amount: z.number().int(), on: z.iso.date() })),
+};
+
 // A month of a year a plan's dates fall in.
 export const month = z.object({
   month: monthOfYear,

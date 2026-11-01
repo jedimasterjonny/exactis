@@ -8,7 +8,7 @@ import { importTargets } from "@/actions/targets";
 import { Toaster } from "@/components/kit/toast";
 import { targets } from "@/data/targets.fixture";
 import { refused, saved } from "@/lib/answer";
-import { readTargets } from "@/lib/portfolio-file";
+import { readPortfolios, readTargets } from "@/lib/portfolio-file";
 import {
   clientOf,
   portfolioFile,
@@ -66,7 +66,10 @@ describe("PortfolioImport", () => {
     const picker = choose([new File([file], "Portfolio.portfolio")]);
 
     await waitFor(() => {
-      expect(importTargets).toHaveBeenCalledWith(readTargets(file));
+      expect(importTargets).toHaveBeenCalledWith(
+        readTargets(file),
+        readPortfolios(file),
+      );
     });
     expect(picker).toHaveValue("");
     expect(button).toHaveAttribute("aria-busy", "true");
