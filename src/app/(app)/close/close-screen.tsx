@@ -269,7 +269,9 @@ export function CloseScreen({
 
 // What moved the plan since the close before the latest, with the
 // household that close left; or why there is nothing to compare, said
-// whole: that close cannot be read or moved on now, in the rules' words,
+// whole: that close was kept in a form this app cannot read, without the
+// rules it breaks, since a version kept is history and nothing on the
+// page can mend it; or it cannot be moved on now, in the rules' words;
 // or the balances have been closed back onto its month or before it, as
 // closing an earlier month again takes them, leaving no month between;
 // or null where there is no such close.
@@ -283,7 +285,7 @@ function comparedOf(
   const { before, now } = since;
   if (before.kind === "refused") {
     return refused(
-      `The close before ${month}'s cannot be read now: ${before.reason}.`,
+      `The close before ${month}'s was kept in a form this app cannot read, so what moved shows from the next close.`,
     );
   }
   if (monthsBetween(before.value.asOf, now.asOf) < 1) {
