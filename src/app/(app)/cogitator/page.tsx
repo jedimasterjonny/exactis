@@ -8,8 +8,10 @@ import { getHousehold } from "@/store/household";
 import { CogitatorScreen } from "./cogitator-screen";
 
 // An amount the month end offers, as its link writes it: whole pounds,
-// something, and the month whose close paid it in, as year and month.
+// something, the month whose close paid it in, as year and month, and
+// the securities account it is held in, by name, where it says one.
 const offer = z.object({
+  account: z.string().min(1).optional(),
   amount: z.coerce.number().int().positive(),
   from: z
     .string()
@@ -31,8 +33,9 @@ const offer = z.object({
 // which sleeve a category is in, so with no CMA, or none it can blend,
 // nothing is said. An amount the month end offers in the address, as
 // ?amount=1250&from=2026-08 does, is handed on with the month it came
-// from; one the address holds that is not such an amount is left, and
-// the amount opens at nothing. The screen holds the amount it opens on
+// from, and with the account it is held in where ?account= names one;
+// one the address holds that is not such an amount is left, and the
+// amount opens at nothing. The screen holds the amount it opens on
 // as its own, so it is drawn afresh whenever the offer changes, as
 // leaving the month end's link for the bare address does, which Next
 // draws without remounting it; otherwise the offered amount would stay
@@ -60,7 +63,13 @@ export default async function Cogitator({
           bonds: { now, targeted },
         })}
       {...(offered.success && {
-        offered: { amount: offered.data.amount, month: offered.data.from },
+        offered: {
+          ...(offered.data.account !== undefined && {
+            account: offered.data.account,
+          }),
+          amount: offered.data.amount,
+          month: offered.data.from,
+        },
       })}
       targets={targets}
     />
