@@ -95,6 +95,21 @@ describe("Cogitator", () => {
     expect(field("Amount to invest")).not.toHaveAccessibleDescription();
   });
 
+  // The month end's link for the cash the fixture's brokerage account
+  // holds uninvested.
+  it("opens the account choice on the account the month end offers the amount in", async () => {
+    vi.mocked(getHousehold).mockResolvedValue(soundKept(kept).household);
+
+    render(
+      await cogitator({ account: "Brokerage", amount: "64", from: "2026-09" }),
+    );
+
+    expect(screen.getByRole("combobox", { name: "Account" })).toHaveValue(
+      "Brokerage",
+    );
+    expect(field("Amount to invest")).toHaveValue("£64");
+  });
+
   it.each([
     { amount: "0", from: "2026-08" },
     { amount: "12.5", from: "2026-08" },

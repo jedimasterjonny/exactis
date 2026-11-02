@@ -362,6 +362,36 @@ describe("CogitatorScreen", () => {
     expect(toned("default")).toHaveTextContent("B−£1,000");
   });
 
+  // The month end offers £400 in the ISA, then in an account the
+  // allocation does not list.
+  it("opens the account choice on the account an amount was offered in, or on every account where it is not listed", () => {
+    const listed = allocation([
+      target("A", 0.5, 1000),
+      { ...target("B", 0.5, 3000), accounts: [{ name: "ISA", value: 400 }] },
+    ]);
+    const month = { month: 8, year: 2026 };
+    const { unmount } = render(
+      <CogitatorScreen
+        offered={{ account: "ISA", amount: 400, month }}
+        targets={listed}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: "Account" })).toHaveValue(
+      "ISA",
+    );
+
+    unmount();
+    render(
+      <CogitatorScreen
+        offered={{ account: "Pension", amount: 400, month }}
+        targets={listed}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: "Account" })).toHaveValue("");
+  });
+
   it("opens the account choice on the account held when it comes back after the allocation had nothing to buy toward", () => {
     const listed = allocation([
       target("A", 0.5, 1000),

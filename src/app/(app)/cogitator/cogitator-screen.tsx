@@ -23,7 +23,11 @@ import { CogitatorBoard } from "./cogitator-board";
 
 interface CogitatorScreenProps {
   readonly bonds?: { readonly now: number; readonly targeted: number };
-  readonly offered?: { readonly amount: number; readonly month: Month };
+  readonly offered?: {
+    readonly account?: string;
+    readonly amount: number;
+    readonly month: Month;
+  };
   readonly targets: null | Targets;
 }
 
@@ -49,7 +53,9 @@ interface CogitatorScreenProps {
 // toward. An amount the month end offered opens the amount at it rather
 // than at nothing, and the field says which month's close it came from
 // for as long as it holds it, so a figure is never there unexplained;
-// it is typed over as any amount is.
+// it is typed over as any amount is. One offered in an account opens
+// the account choice on it, or on all accounts where the allocation
+// does not list it.
 export function CogitatorScreen({
   bonds,
   offered,
@@ -57,7 +63,7 @@ export function CogitatorScreen({
 }: CogitatorScreenProps): JSX.Element {
   const [amount, setAmount] = useState(offered?.amount ?? 0);
   const [sales, setSales] = useState(0);
-  const [account, setAccount] = useState("");
+  const [account, setAccount] = useState(offered?.account ?? "");
   const categories = targets?.categories ?? [];
   const accounts = [
     ...new Set(
