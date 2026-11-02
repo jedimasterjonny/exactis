@@ -6,6 +6,7 @@ import type { Moved } from "@/lib/moved";
 
 import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
+import { portfolios, targets } from "@/data/targets.fixture";
 import { Refusal, refused, saved } from "@/lib/answer";
 import { movedSince } from "@/lib/moved";
 import { getHousehold, getOpened, getSinceClose } from "@/store/household";
@@ -230,6 +231,85 @@ describe("Close", () => {
     expect(detail("Balances against the plan")).toHaveAccessibleDescription(
       "£2,140 above what was expected · £1,500 paid in against £1,800 planned · £3,000 moved · 1 balance left unchecked",
     );
+  });
+
+  // The fixture's ISA and brokerage account hold cash uninvested, and
+  // its pension none; its allocation lists only the brokerage account.
+  it("offers trades for the cash each account the allocation lists holds uninvested, in that account", async () => {
+    await renderClose({
+      household: { ...kept, targets: { ...targets, portfolios } },
+    });
+
+    expect(trades()).toStrictEqual([
+      "The plan paid £1,250 into the ISAs and GIA in August 2026.",
+      "Portfolio Performance holds £1,830 in Stocks & shares ISA, £64 in Brokerage uninvested.",
+    ]);
+    expect(links()).toStrictEqual([
+      [
+        "Work out trades for £64 in Brokerage",
+        "/cogitator?account=Brokerage&amount=64&from=2026-08",
+      ],
+      ["Choose an amount", "/cogitator"],
+    ]);
+  });
+
+  it("offers what the plan paid in where the file gave no account's cash", async () => {
+    await renderClose({
+      household: { ...kept, targets: { ...targets, portfolios: [] } },
+    });
+
+    expect(trades()).toStrictEqual([
+      "The plan paid £1,250 into the ISAs and GIA in August 2026.",
+    ]);
+    expect(links()).toStrictEqual([
+      ["Work out trades for £1,250", "/cogitator?amount=1250&from=2026-08"],
+      ["Choose an amount", "/cogitator"],
+    ]);
+  });
+
+  // An allocation read before the accounts holding each category were.
+  it("offers no account's cash in trades where the allocation lists no account", async () => {
+    await renderClose({
+      household: {
+        ...kept,
+        targets: {
+          ...targets,
+          categories: targets.categories.map(
+            ({ classes, id, isImplemented, name, share, value }) => ({
+              classes,
+              id,
+              isImplemented,
+              name,
+              share,
+              value,
+            }),
+          ),
+          portfolios,
+        },
+      },
+    });
+
+    expect(trades()).toContain(
+      "Portfolio Performance holds £1,830 in Stocks & shares ISA, £64 in Brokerage uninvested.",
+    );
+    expect(links()).toStrictEqual([["Choose an amount", "/cogitator"]]);
+  });
+
+  it("offers no account's cash where none holds any uninvested", async () => {
+    await renderClose({
+      household: {
+        ...kept,
+        targets: {
+          ...targets,
+          portfolios: portfolios.map((each) => ({ ...each, cash: 0 })),
+        },
+      },
+    });
+
+    expect(trades()).toContain(
+      "Portfolio Performance holds no cash uninvested.",
+    );
+    expect(links()).toStrictEqual([["Choose an amount", "/cogitator"]]);
   });
 
   // September closed, on the fifteenth of October, over holdings

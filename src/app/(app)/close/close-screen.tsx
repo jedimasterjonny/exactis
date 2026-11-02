@@ -447,13 +447,18 @@ function titleOf(moved: Moved, month: string, plan: Plan): string {
   return `${month} closed ${formatGbp(Math.abs(apart))} ${side} plan; ${still}`;
 }
 
-// The offer of what the plan paid into the ISAs and the GIAs to the
-// cogitator, as the amount to work trades out for, the month closed with
-// it so the cogitator can say where it came from, or any amount chosen
-// there; or, where the holdings were imported before the month closed
+// The offer of the cash each securities account holds uninvested to the
+// cogitator, an account at a time, as the amount to work trades out for
+// in it, the month closed with it so the cogitator can say where it
+// came from, or any amount chosen there, for the accounts the
+// allocation lists, since the cogitator can keep its trades to no
+// other; where the holdings were imported before their cash was read,
+// or none of it could be, what the plan paid into the ISAs and the
+// GIAs, in all; or, where they were imported before the month closed
 // was cut, the word to import them first, with the file to import them
 // from, and no amount, since trades worked out from them would be for
-// holdings that have moved since.
+// holdings that have moved since. What the plan paid in is said
+// whichever is offered, and the cash held where it was read.
 function Trades({
   month,
   moved,
@@ -463,28 +468,47 @@ function Trades({
   readonly moved: Moved;
   readonly targets: Kept["targets"];
 }): JSX.Element {
-  const isStale = targets === null || targets.importedOn < cutOf(month);
+  const fresh =
+    targets === null || targets.importedOn < cutOf(month) ? null : targets;
+  const held = fresh?.portfolios ?? [];
+  const uninvested =
+    held.length === 0 ? undefined : held.filter(({ cash }) => cash > 0);
+  const listed = new Set(
+    fresh?.categories.flatMap((category) =>
+      (category.accounts ?? []).map(({ name }) => name),
+    ),
+  );
   const months =
     moved.months === 1
       ? `in ${formatMonth(month)}`
       : `in the ${String(moved.months)} months to ${formatMonth(month)}`;
   const paid = moved.invested === 0 ? "nothing" : formatGbp(moved.invested);
+  const offers =
+    uninvested === undefined
+      ? moved.invested > 0 && (
+          <Link
+            className={buttonVariants({ size: "sm" })}
+            href={`${cogitator.href}?amount=${String(moved.invested)}&from=${keyOf(month)}`}
+          >
+            {`Work out trades for ${formatGbp(moved.invested)}`}
+          </Link>
+        )
+      : uninvested
+          .filter(({ name }) => listed.has(name))
+          .map(({ cash, name }) => (
+            <Link
+              className={buttonVariants({ size: "sm" })}
+              href={`${cogitator.href}?${new URLSearchParams({ account: name, amount: String(cash), from: keyOf(month) }).toString()}`}
+              key={name}
+            >
+              {`Work out trades for ${formatGbp(cash)} in ${name}`}
+            </Link>
+          ));
   return (
     <SectionCard
       actions={
         <>
-          {isStale ? (
-            <PortfolioImport />
-          ) : (
-            moved.invested > 0 && (
-              <Link
-                className={buttonVariants({ size: "sm" })}
-                href={`${cogitator.href}?amount=${String(moved.invested)}&from=${keyOf(month)}`}
-              >
-                {`Work out trades for ${formatGbp(moved.invested)}`}
-              </Link>
-            )
-          )}
+          {fresh === null ? <PortfolioImport /> : offers}
           <Link
             className={buttonVariants({ size: "sm", variant: "outline" })}
             href={cogitator.href}
@@ -498,7 +522,16 @@ function Trades({
     >
       <CardContent className="grid gap-4">
         <p>{`The plan paid ${paid} into the ISAs and GIA ${months}.`}</p>
-        {isStale && <Note>Import this month&apos;s holdings first.</Note>}
+        {uninvested !== undefined && (
+          <p>
+            {uninvested.length === 0
+              ? "Portfolio Performance holds no cash uninvested."
+              : `Portfolio Performance holds ${uninvested.map(({ cash, name }) => [formatGbp(cash), name].join(" in ")).join(", ")} uninvested.`}
+          </p>
+        )}
+        {fresh === null && (
+          <Note>Import this month&apos;s holdings first.</Note>
+        )}
       </CardContent>
     </SectionCard>
   );
