@@ -12,7 +12,12 @@ import { commit, field, select } from "@/test/dom";
 
 import { MonthEnd } from "./month-end";
 
+const replace = vi.hoisted(() => vi.fn());
+
 vi.mock("@/actions/accounts", () => ({ closeBalances: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  useRouter: (): { readonly replace: typeof replace } => ({ replace }),
+}));
 
 const [pension, isa, , home] = accounts;
 const [salary] = incomeLines;
@@ -35,6 +40,7 @@ function openWorksheet(
   render(
     <MonthEnd
       accounts={accounts}
+      isUpdating={false}
       month={{ month: 8, year: 2026 }}
       plan={plan}
       schedule={{ expenses: [], income: [salary] }}
@@ -210,6 +216,7 @@ describe("MonthEnd", () => {
     expect(field("Workplace pension")).toHaveAccessibleDescription(
       "Was £391,640 · £4,350 paid in · not dated",
     );
+    expect(replace).not.toHaveBeenCalled();
   });
 
   // The ISA's statement says £275,000, which checks it; the mortgage's

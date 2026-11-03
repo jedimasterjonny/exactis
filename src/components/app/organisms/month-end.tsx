@@ -3,6 +3,7 @@
 import type { JSX } from "react";
 
 import { Check } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { Account } from "@/data/accounts";
@@ -46,6 +47,7 @@ interface Draft {
 
 interface MonthEndProps {
   readonly accounts: readonly Account[];
+  readonly isUpdating: boolean;
   readonly month: Month;
   readonly plan: Plan;
   readonly schedule: Schedule;
@@ -87,7 +89,8 @@ interface Row {
 // checked; the footer counts them. A store that refuses leaves the
 // worksheet as it was and says why, and one that saves opens it afresh,
 // so a month closed that leaves the screen where it was is not saved
-// twice. The year picked is held between the year the plan's owner was
+// twice, or, while the balances are being updated, goes back to what
+// moved. The year picked is held between the year the plan's owner was
 // born and the year of the month cut last, which hold the months the
 // store takes, so a year mistyped asks the plan for no more months than
 // it has. The day it is is given rather than read, so the
@@ -95,6 +98,7 @@ interface Row {
 // the worksheet opens on.
 export function MonthEnd({
   accounts,
+  isUpdating,
   month,
   plan,
   schedule,
@@ -107,6 +111,7 @@ export function MonthEnd({
   });
   const [draft, setDraft] = useState(opened);
   const { isSending: isSaving, send } = useSender();
+  const router = useRouter();
   const from: Month = { month: plan.month, year: plan.from };
   const rows = rowsOf(accounts, draft, { from, plan, schedule });
   const checked = rows.filter(({ isChecked }) => isChecked);
@@ -147,6 +152,9 @@ export function MonthEnd({
                 failure: "Balances not saved",
                 onAccepted: () => {
                   setDraft(opened());
+                  if (isUpdating) {
+                    router.replace(monthEnd.href);
+                  }
                 },
                 success: (saved) => ({
                   description: `${counted(checked.length, "balance")} set as of ${formatDay(cutOf(saved.asOf))}${saved.isRecorded ? ", its progress point recorded" : ""}`,
