@@ -590,13 +590,13 @@ describe("Close", () => {
     expect(screen.getByText("Due since 25 September")).toBeInTheDocument();
   });
 
-  it("opens the worksheet on a household with no point yet, saying only that it is due", async () => {
+  it("opens the worksheet on a household with no point yet, saying no month is closed yet", async () => {
     await renderClose({ household: { ...kept, points: [] } });
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "August isn't closed yet",
     );
-    expect(screen.getByText("Due")).toBeInTheDocument();
+    expect(screen.getByText("No month closed yet")).toBeInTheDocument();
   });
 
   it("says to leave a scenario open, and draws nothing of it", async () => {
