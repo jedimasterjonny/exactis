@@ -366,9 +366,13 @@ describe("TargetAllocation", () => {
     await waitFor(() => {
       expect(link).not.toBeInTheDocument();
     });
-    expect(StubUrl.revokeObjectURL).toHaveBeenCalledWith(
-      link.getAttribute("href"),
-    );
+    // The file is let go in an effect, which can run in a turn after
+    // the commit that takes the link off, so it is waited for too.
+    await waitFor(() => {
+      expect(StubUrl.revokeObjectURL).toHaveBeenCalledWith(
+        link.getAttribute("href"),
+      );
+    });
   });
 
   // The plan's split being the target allocation's own, the fund is
