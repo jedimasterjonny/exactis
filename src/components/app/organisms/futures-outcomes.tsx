@@ -9,7 +9,7 @@ import { SegmentBar } from "@/components/app/atoms/segment-bar";
 import { Card, CardContent } from "@/components/kit/card";
 import { ageIn, endAge } from "@/data/plan";
 import { formatCount } from "@/lib/count";
-import { formatGbp, formatWholePercent } from "@/lib/money";
+import { formatChance, formatGbp, formatWholePercent } from "@/lib/money";
 import {
   lastingOutcomes,
   outcomeFills,
@@ -101,7 +101,7 @@ export function FuturesOutcomes({
           <>
             <div className="grid content-start gap-3">
               <p className="figure text-6xl font-medium tracking-tighter">
-                {formatWholePercent(reading.chance)}
+                {formatChance(reading.chance)}
               </p>
               <p className="text-xs text-muted-foreground">
                 {`± ${(reading.margin * 100).toFixed(1)} points`}

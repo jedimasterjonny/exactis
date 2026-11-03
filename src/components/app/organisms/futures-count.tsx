@@ -12,7 +12,7 @@ import { CardContent } from "@/components/kit/card";
 import { retiresBy, retiresOn } from "@/data/milestones";
 import { ageIn, endAge } from "@/data/plan";
 import { formatCount } from "@/lib/count";
-import { formatGbp, formatWholePercent } from "@/lib/money";
+import { formatChance, formatGbp } from "@/lib/money";
 import { chance, subsectionLabel } from "@/lib/nav";
 
 interface FuturesCountProps {
@@ -74,7 +74,7 @@ export function FuturesCount({
                   detail:
                     reading.early === 0
                       ? undefined
-                      : `${formatWholePercent((reading.lasted + reading.early) / reading.run)} if counted as lasting`,
+                      : `${formatChance((reading.lasted + reading.early) / reading.run)} if counted as lasting`,
                   figure: lessBy(reading.early),
                   label: "Kept going only by drawing a pension early",
                 },
@@ -92,7 +92,7 @@ export function FuturesCount({
                   label: `Lasted to ${String(endAge(plan))}`,
                 },
               ]}
-              total={formatWholePercent(reading.chance)}
+              total={formatChance(reading.chance)}
               totalName="Chance of success"
             />
             <AgainstProjection

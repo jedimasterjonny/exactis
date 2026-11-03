@@ -13,7 +13,7 @@ import { ageIn, endAge } from "@/data/plan";
 import { reachedBy, reachedIn, readingOf, runLength } from "@/engine/futures";
 import { drawAgain } from "@/hooks/use-futures";
 import { formatCount } from "@/lib/count";
-import { formatWholePercent } from "@/lib/money";
+import { formatChance, formatWholePercent } from "@/lib/money";
 
 // A run of the futures as the board hands it down: the futures drawn
 // so far and whether that is all of them, or why there is nothing to
@@ -97,7 +97,7 @@ export function ChanceTile({
           }
           deltaFormat="points"
           label={label}
-          value={formatWholePercent(readingOf(futures).chance)}
+          value={formatChance(readingOf(futures).chance)}
         />
       ) : (
         <StatTile
