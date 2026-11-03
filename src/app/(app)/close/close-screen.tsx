@@ -155,6 +155,7 @@ export function CloseScreen({
       >
         <MonthEnd
           accounts={household.accounts}
+          isUpdating={isUpdating}
           month={due}
           plan={plan}
           schedule={schedule}

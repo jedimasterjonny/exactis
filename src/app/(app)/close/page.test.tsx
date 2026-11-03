@@ -1,9 +1,16 @@
-import { render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Kept } from "@/data/household";
 import type { Moved } from "@/lib/moved";
 
+import { closeBalances } from "@/actions/accounts";
 import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
 import { portfolios, targets } from "@/data/targets.fixture";
@@ -13,6 +20,8 @@ import { getHousehold, getOpened, getSinceClose } from "@/store/household";
 
 import Close from "./page";
 
+const replace = vi.hoisted(() => vi.fn());
+
 vi.mock("@/store/household", () => ({
   getHousehold: vi.fn(),
   getOpened: vi.fn(),
@@ -21,6 +30,9 @@ vi.mock("@/store/household", () => ({
 vi.mock("@/actions/accounts", () => ({ closeBalances: vi.fn() }));
 vi.mock("@/actions/targets", () => ({ importTargets: vi.fn() }));
 vi.mock("@/lib/moved", () => ({ movedSince: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  useRouter: (): { readonly replace: typeof replace } => ({ replace }),
+}));
 
 // The reference household as the close of July 2026 left it.
 const july: Kept = {
@@ -534,6 +546,21 @@ describe("Close", () => {
       }),
     ).toHaveAttribute("href", "/close");
     expect(getSinceClose).not.toHaveBeenCalled();
+  });
+
+  // August's balances, updated and saved, go back to what moved rather
+  // than leave the worksheet open on a month already closed.
+  it("goes back to what moved once the balances updated are saved", async () => {
+    vi.mocked(closeBalances).mockResolvedValue(
+      saved({ asOf: { month: 7, year: 2026 }, isRecorded: false }),
+    );
+    await renderClose({ address: { update: "" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledExactlyOnceWith("/close");
+    });
   });
 
   it("says why the close before the latest cannot be read, or moved on, now", async () => {
