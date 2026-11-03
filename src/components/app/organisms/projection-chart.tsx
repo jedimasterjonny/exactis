@@ -31,7 +31,7 @@ import { LabelledSwitch } from "@/components/app/molecules/labelled-switch";
 import { buttonVariants } from "@/components/kit/button";
 import { Card, CardContent, CardFooter } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
-import { isAsset } from "@/data/accounts";
+import { isAsset, isPension } from "@/data/accounts";
 import { drawnAsMortgages } from "@/data/houses";
 import {
   balanceIn,
@@ -60,8 +60,20 @@ interface Against {
 // counts for what the tiles count it for, so the stack comes to the
 // figure they read: a pension counted as drawn at the basic rate, and on
 // the liquidity only in a year its owner can draw it all through, so
-// its band joins the stack at the pension age.
+// its band joins the stack at the pension age. Before then it is drawn
+// in outline on top of the stack, locked, at what it would count for,
+// and the stack comes to the figure the tiles read without it.
 type Basis = "liquidity" | "net-worth";
+
+// A point as a basis counts it: every account at what it counts for, by
+// id what each pension would count for that the basis leaves out as
+// locked, which only the liquidity does, and the ids of the pensions
+// that are locked in the year before or after it where they are not in
+// its own, or the other way round.
+type Counted = ProjectionPoint & {
+  readonly locked: Readonly<Record<number, number>>;
+  readonly turning: ReadonlySet<number>;
+};
 
 // The kinds of account that share a colour, and the hues they are drawn
 // in, from the palette's tokens, which name a colour by what it means.
@@ -102,9 +114,11 @@ interface ProjectionChartProps {
 // the container writes it into --color-<key> within its own scope, and
 // everything drawn for the series, the tooltip's key included, reads it
 // back from there. Last, what the series stands at on a point, as a
-// function of its own, which its column takes as the dataKey: made with
-// the series, it is the same function for as long as the series is.
+// function of its own, which its column takes as the dataKey, and what
+// its area draws there, which its area takes: made with the series, each
+// is the same function for as long as the series is.
 interface Series {
+  readonly areaAt: (point: Counted) => null | number;
   readonly color: string;
   readonly family: Family;
   readonly ids: readonly number[];
@@ -112,7 +126,7 @@ interface Series {
   readonly isOwed: boolean;
   readonly key: string;
   readonly name: string;
-  readonly valueAt: (point: ProjectionPoint) => number;
+  readonly valueAt: (point: Counted) => number;
 }
 
 // What the household comes to in a year on the basis counted, or null
@@ -131,12 +145,15 @@ type Total = (point: ProjectionPoint) => null | number;
 // debt greys, told apart by lightness and named under the crosshair: red
 // is kept for status, and below nothing the sign already says owed.
 // Each family is named in the key as Progress names the balance it sums.
+// The pensions are held by a name of their own too, since the key draws
+// what is locked of them in their hue.
+const pensions: Family = {
+  hues: ["var(--chart-2)"],
+  kinds: ["tax-deferred"],
+  name: balanceNames.deferred,
+};
 const families: readonly Family[] = [
-  {
-    hues: ["var(--chart-2)"],
-    kinds: ["tax-deferred"],
-    name: balanceNames.deferred,
-  },
+  pensions,
   { hues: ["var(--chart-1)"], kinds: ["tax-free"], name: balanceNames.free },
   { hues: ["var(--chart-6)"], kinds: ["taxable"], name: balanceNames.taxable },
   { hues: ["var(--chart-4)"], kinds: ["cash"], name: balanceNames.cash },
@@ -240,6 +257,13 @@ const axisWidth = 57;
 // stack, a year at a time and only in the years its own plan reaches,
 // named Household under the crosshair beneath the scenario's total, and
 // the scale takes it in, so the two read off one axis.
+// On the liquidity a pension its owner cannot draw yet is drawn locked,
+// a dashed outline in its own colour on top of the stack and unfilled,
+// so the stack is seen to hold it before it counts rather than jumping
+// at the pension age as if it had come from nowhere. The outline is no
+// part of what the stack comes to, so the total, the chosen milestone's
+// dot and the household's line leave it out, but the scale takes it in,
+// so it is not cut off and the axis does not move as it unlocks.
 export function ProjectionChart({
   accounts,
   against,
@@ -306,7 +330,28 @@ export function ProjectionChart({
   const config = Object.fromEntries(
     series.map(({ color, key, name }) => [key, { color, label: name }]),
   );
-  const scale = scaleOf(points, series, household);
+
+  // The pensions the liquidity locks in some year, each drawn in the
+  // colour of its own band, which the liquidity always draws; and those
+  // the basis counted draws, none on the net worth, which locks nothing.
+  const outlined = bases.locked.filter((line) =>
+    counted.liquidity.some((point) => line.valueAt(point) !== 0),
+  );
+  const locked = basis === "liquidity" ? outlined : [];
+  const scale = scaleOf(points, [...series, ...locked], household);
+
+  // What either basis may draw, which the plot is keyed on: recharts
+  // stacks its marks in the order they were first drawn rather than the
+  // order they are written in, so a series that arrives with an account
+  // added would stack above the outlines, or one outline above another,
+  // unless the plot is drawn afresh in the order written. Keyed on both
+  // bases rather than the one counted, so a switch of basis still leaves
+  // the columns it keeps be, and what it adds comes last on its side of
+  // nothing, as it is written.
+  const drawable = [
+    ...[...bases.liquidity, ...bases["net-worth"]].map(({ key }) => key),
+    ...outlined.map(({ key }) => `locked-${key}`),
+  ].join(" ");
 
   // The first year that could not draw what it needed from anywhere,
   // which is the year the money runs out. Undefined while every year
@@ -342,13 +387,18 @@ export function ProjectionChart({
             <MarkToggle mark={mark} onMarkChange={setMark} />
           </div>
         </div>
-        <Key hasHousehold={household !== undefined} series={series} />
+        <Key
+          hasHousehold={household !== undefined}
+          hasLocked={locked.length > 0}
+          series={series}
+        />
         <ChartContainer
           className="aspect-auto min-h-60 min-w-0"
           config={config}
         >
           <Plot
             data={points}
+            key={drawable}
             margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
             stackOffset="sign"
           >
@@ -398,6 +448,7 @@ export function ProjectionChart({
                 <ProjectionTooltip
                   {...props}
                   household={household}
+                  locked={locked}
                   milestones={milestones}
                   points={points}
                   series={series}
@@ -409,7 +460,7 @@ export function ProjectionChart({
               mark === "area" ? (
                 <Area
                   activeDot={{ r: 4, stroke: "var(--card)", strokeWidth: 2 }}
-                  dataKey={drawnIn(line)}
+                  dataKey={line.areaAt}
                   dot={false}
                   fill={`url(#${washOf(line.key)})`}
                   isAnimationActive={false}
@@ -426,6 +477,34 @@ export function ProjectionChart({
                   isAnimationActive={false}
                   key={line.key}
                   stackId="accounts"
+                />
+              ),
+            )}
+            {locked.map((line) =>
+              mark === "area" ? (
+                <Area
+                  activeDot={false}
+                  dataKey={line.areaAt}
+                  dot={false}
+                  fill="none"
+                  isAnimationActive={false}
+                  key={`locked-${line.key}`}
+                  stackId="accounts"
+                  stroke={`var(--color-${line.key})`}
+                  strokeDasharray="2 2"
+                  strokeWidth={1.5}
+                  type="monotone"
+                />
+              ) : (
+                <Bar
+                  dataKey={line.valueAt}
+                  fill="none"
+                  isAnimationActive={false}
+                  key={`locked-${line.key}`}
+                  stackId="accounts"
+                  stroke={`var(--color-${line.key})`}
+                  strokeDasharray="2 2"
+                  strokeWidth={1.5}
                 />
               ),
             )}
@@ -512,6 +591,31 @@ export function ProjectionPending(): JSX.Element {
   );
 }
 
+// What an area draws for a series, a year at a time: its figure in a
+// year it is drawn, and a break in any other, so it leaves the plot
+// rather than drawing its line along its place in the stack; save in a
+// year beside one where a pension it sums turns locked or unlocked,
+// where it stands at nothing, so its line runs down to its place in the
+// stack rather than standing on a year alone. A debt is drawn while it owes
+// anything, so it leaves the plot once paid off, since split by sign a
+// series of nothing counts as held and a debt at nothing would draw its
+// line along the top of the stack for the rest of the plan; a pension's
+// outline while it is locked; and anything else while nothing of it is,
+// so a pension's band breaks where its outline is drawn and the two
+// meet in the years either side. The stack reads a break as nothing, so
+// what stacks beyond it stacks as before.
+function areaOf(
+  line: Pick<Series, "ids" | "valueAt">,
+  isDrawn: (point: Counted) => boolean,
+): (point: Counted) => null | number {
+  return (point) => {
+    if (isDrawn(point)) {
+      return line.valueAt(point);
+    }
+    return line.ids.some((id) => point.turning.has(id)) ? 0 : null;
+  };
+}
+
 // The switch between the two bases: the name of the one counted now,
 // with the switch on for the net worth. It sits beside the marks'
 // switch, before it, at the right of the plot's top row.
@@ -541,37 +645,51 @@ function BasisToggle({
 // what worthsIn says it is worth, and on the liquidity what liquidOf
 // leaves of that, so the stack comes to what they read. Made once for
 // the points, both bases at once, as the series are, so every column,
-// the axis and the crosshair read the one figure.
+// the axis and the crosshair read the one figure. What liquidOf leaves
+// out of a pension's worth is what is locked of it, so a pension is
+// locked in just the years liquidOf leaves it out, and each year names
+// the pensions that turn locked or unlocked beside it, read off the
+// years either side of it, since an area reads one year at a time.
 function countedOf(
   projected: readonly ProjectionPoint[],
   { accounts, plan }: Omit<Against, "points">,
-): Record<Basis, readonly ProjectionPoint[]> {
+): Record<Basis, readonly Counted[]> {
+  const lockable = accounts.filter(isPension).map(({ id }) => id);
   const worths = projected.map((point) => ({
     ...point,
     balances: worthsIn(point, accounts),
+    locked: {},
+    turning: new Set<number>(),
   }));
-  return {
-    liquidity: worths.map((point) => ({
+  const liquid = worths.map((point) => {
+    const balances = liquidOf(point.balances, point.year, { accounts, plan });
+    return {
       ...point,
-      balances: liquidOf(point.balances, point.year, { accounts, plan }),
+      balances,
+      locked: Object.fromEntries(
+        lockable.map((id) => [
+          id,
+          balanceIn(point, id) - balanceIn({ balances }, id),
+        ]),
+      ),
+    };
+  });
+  const isLocked = ({ locked }: Pick<Counted, "locked">, id: number): boolean =>
+    balanceIn({ balances: locked }, id) !== 0;
+  return {
+    liquidity: liquid.map((point, place) => ({
+      ...point,
+      turning: new Set(
+        lockable.filter((id) =>
+          [liquid[place - 1], liquid[place + 1]].some(
+            (beside) =>
+              beside !== undefined &&
+              isLocked(beside, id) !== isLocked(point, id),
+          ),
+        ),
+      ),
     })),
     "net-worth": worths,
-  };
-}
-
-// What an area draws for an account, a year at a time: its balance, and
-// a break for a debt that owes nothing, which is a debt paid off, so a
-// debt leaves the plot once it reaches nothing. Its line ends with the
-// last year it owes anything. Split by sign, a series of nothing counts
-// as held, and a debt at nothing would draw its line along the top of
-// the stack for the rest of the plan. The stack reads a break as
-// nothing, so the debts beneath it stack as before.
-function drawnIn(
-  line: Pick<Series, "ids" | "isOwed">,
-): (point: ProjectionPoint) => null | number {
-  return (point) => {
-    const value = valueIn(point, line);
-    return line.isOwed && value === 0 ? null : value;
   };
 }
 
@@ -614,34 +732,49 @@ function hueAt(hues: Hues, place: number): string {
 
 // The key: each family drawn on the basis counted, in the order they
 // stack, named beside a swatch of its first hue, which every account of
-// it after the first recedes from, and last, while a scenario is set
-// against it, the household's dashed line. The names are muted text, as
-// the crosshair's are, and the swatches carry the colour.
+// it after the first recedes from, with a dashed outline in the
+// pensions' hue after what is held while a pension is drawn locked,
+// since its outline stacks on top of that, and before the debts, which
+// stack down from nothing; and last, while a scenario is set against
+// it, the household's dashed line. The names are muted text, as the
+// crosshair's are, and the swatches carry the colour.
 function Key({
   hasHousehold,
+  hasLocked,
   series,
 }: {
   readonly hasHousehold: boolean;
+  readonly hasLocked: boolean;
   readonly series: readonly Series[];
 }): JSX.Element {
+  const keyed = families.filter((family) =>
+    series.some((line) => line.family === family),
+  );
+  const isOwed = ({ kinds }: Family): boolean => kinds.includes("debt");
   return (
     <ul
       aria-label="Key"
       className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
     >
-      {families
-        .filter((family) => series.some((line) => line.family === family))
-        .map(({ hues, name }) => (
-          <li className="flex items-center gap-1.5" key={name}>
-            <span
-              aria-hidden
-              className="size-2.5 rounded-xs"
-              data-slot="projection-key-swatch"
-              style={{ backgroundColor: hues[0] }}
-            />
-            {name}
-          </li>
+      {keyed
+        .filter((family) => !isOwed(family))
+        .map((family) => (
+          <KeyFamily family={family} key={family.name} />
         ))}
+      {hasLocked && (
+        <li className="flex items-center gap-1.5">
+          <span
+            aria-hidden
+            className="size-2.5 rounded-xs border-[1.5px] border-dashed"
+            data-slot="projection-key-locked"
+            style={{ borderColor: pensions.hues[0] }}
+          />
+          Locked pensions
+        </li>
+      )}
+      {keyed.filter(isOwed).map((family) => (
+        <KeyFamily family={family} key={family.name} />
+      ))}
       {hasHousehold && (
         <li className="flex items-center gap-1.5">
           <span
@@ -652,6 +785,25 @@ function Key({
         </li>
       )}
     </ul>
+  );
+}
+
+// A family in the key: its name beside a swatch of its first hue.
+function KeyFamily({
+  family: { hues, name },
+}: {
+  readonly family: Family;
+}): JSX.Element {
+  return (
+    <li className="flex items-center gap-1.5">
+      <span
+        aria-hidden
+        className="size-2.5 rounded-xs"
+        data-slot="projection-key-swatch"
+        style={{ backgroundColor: hues[0] }}
+      />
+      {name}
+    </li>
   );
 }
 
@@ -709,18 +861,24 @@ function Placeholder({ children }: { readonly children: string }): JSX.Element {
 // entry recharts hands over, which is untyped. Beneath the total, where
 // a scenario is set against the household, what the household comes to
 // that year on the same basis, keyed by a dashed stroke as its line is.
+// Beneath that, what each pension locked that year would count for,
+// named as locked and keyed by a dashed stroke of its colour, since the
+// total leaves it out.
 // A status, so a screen reader reads it out as the crosshair steps.
 function ProjectionTooltip({
   active: isActive,
   household,
   label,
+  locked,
   milestones,
   points,
   series,
   total,
-}: Pick<ProjectionChartProps, "milestones" | "points"> &
+}: Pick<ProjectionChartProps, "milestones"> &
   TooltipContentProps & {
     readonly household: Total | undefined;
+    readonly locked: readonly Series[];
+    readonly points: readonly Counted[];
     readonly series: readonly Series[];
     readonly total: string;
   }): JSX.Element | null {
@@ -780,6 +938,21 @@ function ProjectionTooltip({
           </span>
         </span>
       )}
+      {locked
+        .filter((line) => line.valueAt(point) !== 0)
+        .map((line) => (
+          <span className="flex items-center gap-2" key={line.key}>
+            <span
+              aria-hidden
+              className="w-3 border-t-[1.5px] border-dashed"
+              style={{ borderColor: `var(--color-${line.key})` }}
+            />
+            <span className="text-muted-foreground">{`${line.name} (locked)`}</span>
+            <span className="ml-auto figure font-medium">
+              {formatGbp(line.valueAt(point))}
+            </span>
+          </span>
+        ))}
       {point.early > 0 && (
         <span className="flex items-center gap-2">
           <span className="text-muted-foreground">Drawn early</span>
@@ -803,17 +976,15 @@ function ProjectionTooltip({
 // The pounds the axis spans and the ticks it marks, from the most the
 // stack ever holds above nothing to the deepest it ever goes below it,
 // what is owed and any equity below nothing, and wherever the
-// household's line goes past either.
+// household's line goes past either. What the stack holds above nothing
+// is every series drawn, a locked pension's outline among them.
 function scaleOf(
-  points: readonly ProjectionPoint[],
+  points: readonly Counted[],
   series: readonly Series[],
   household: Total | undefined,
 ): { readonly domain: [number, number]; readonly ticks: number[] } {
-  const sumOf = (
-    point: ProjectionPoint,
-    side: (value: number) => number,
-  ): number =>
-    series.reduce((sum, line) => sum + side(valueIn(point, line)), 0);
+  const sumOf = (point: Counted, side: (value: number) => number): number =>
+    series.reduce((sum, line) => sum + side(line.valueAt(point)), 0);
   const theirs = points.flatMap((point) => household?.(point) ?? []);
   return axisOf(
     Math.min(
@@ -847,13 +1018,34 @@ function scaleOf(
 // that asset; one naming an asset the plan does not list is a debt like
 // any other. Each account's series is made once, for both bases, and
 // each basis draws the ones it counts, so an account either basis draws
-// is drawn from the one series on both.
+// is drawn from the one series on both. Beside them, each pension's
+// outline, which stands at what is locked of it and is made once as
+// they are, in the colour of the pension's own band. What a series
+// stands at and what its area draws, as areaOf has it, are made once
+// with it: a debt drawn while it owes anything, and anything else while
+// nothing of it is locked.
 function seriesOf(
   accounts: readonly Account[],
-): Record<Basis, readonly Series[]> {
+): Record<"locked" | Basis, readonly Series[]> {
   const assets = new Set(accounts.filter(isAsset).map(({ id }) => id));
   const isSecured = ({ secures }: Account): boolean =>
     secures !== undefined && assets.has(secures);
+  const readers = (
+    ids: readonly number[],
+    isOwed: boolean,
+  ): Pick<Series, "areaAt" | "valueAt"> => {
+    const valueAt = (point: Counted): number => valueIn(point, { ids });
+    return {
+      areaAt: areaOf(
+        { ids, valueAt },
+        isOwed
+          ? (point): boolean => valueAt(point) !== 0
+          : (point): boolean =>
+              valueIn({ balances: point.locked }, { ids }) === 0,
+      ),
+      valueAt,
+    };
+  };
   const drawn = families.flatMap((family) =>
     accounts
       .filter(({ kind }) => family.kinds.includes(kind))
@@ -866,6 +1058,7 @@ function seriesOf(
             .map((loan) => loan.id),
         ];
         const series: Series = {
+          ...readers(ids, kind === "debt"),
           color: `color-mix(in oklab, ${hueAt(family.hues, place)}, var(--card) ${String(Math.min(Math.floor(place / family.hues.length), 2) * 30)}%)`,
           family,
           ids,
@@ -873,7 +1066,6 @@ function seriesOf(
           isOwed: kind === "debt",
           key: `account-${String(id)}`,
           name,
-          valueAt: (point) => valueIn(point, { ids }),
         };
         return { account, series };
       }),
@@ -895,14 +1087,26 @@ function seriesOf(
             account,
             series: {
               ...series,
+              ...readers(ids, series.isOwed),
               ids,
               name: mortgage.name,
-              valueAt: (point) => valueIn(point, { ids }),
             },
           };
         },
       },
     ).map(({ series }) => series),
+    locked: counted(isPension).map((series) => {
+      const valueAt = (point: Counted): number =>
+        valueIn({ balances: point.locked }, series);
+      return {
+        ...series,
+        areaAt: areaOf(
+          { ids: series.ids, valueAt },
+          (point) => valueAt(point) !== 0,
+        ),
+        valueAt,
+      };
+    }),
     "net-worth": counted((account) => !isSecured(account)),
   };
 }
@@ -932,7 +1136,10 @@ function totalsOf({ accounts, plan, points }: Against): Record<Basis, Total> {
 
 // What a series stands at on a point as the chart counts it: what the
 // accounts it sums count for on the basis, less what they owe.
-function valueIn(point: ProjectionPoint, { ids }: Pick<Series, "ids">): number {
+function valueIn(
+  point: Pick<ProjectionPoint, "balances">,
+  { ids }: Pick<Series, "ids">,
+): number {
   return ids.reduce((sum, id) => sum + balanceIn(point, id), 0);
 }
 

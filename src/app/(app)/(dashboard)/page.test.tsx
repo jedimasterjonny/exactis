@@ -248,7 +248,8 @@ describe("Dashboard", () => {
 
   // The chart counts the plan's liquidity to begin with, so it draws
   // each account the store holds but the home: the pension, the ISA and
-  // the current account, and the mortgage owed. Retirement is named
+  // the current account, and the mortgage owed, and the pension again in
+  // outline for the years before it can be drawn. Retirement is named
   // twice, by the tile and by its chip, among the household's
   // milestones, and the age reads the plan's.
   it("follows the tiles with the store's projection and its milestones to choose from, retirement chosen", async () => {
@@ -261,7 +262,7 @@ describe("Dashboard", () => {
           element?.classList.contains("recharts-bar") === true,
         { suggest: false },
       ),
-    ).toHaveLength(4);
+    ).toHaveLength(5);
     expect(screen.getByText("At Retirement")).toBeInTheDocument();
     expect(screen.getByText("Net worth · 2053 · age 61")).toBeInTheDocument();
     expect(

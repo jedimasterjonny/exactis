@@ -11,7 +11,7 @@ import type { ProjectionPoint } from "@/engine/projection";
 import { accounts, sipp } from "@/data/accounts.fixture";
 import { kept } from "@/data/household.fixture";
 import { retiring } from "@/data/income.fixture";
-import { owners } from "@/data/owners.fixture";
+import { owners, sam } from "@/data/owners.fixture";
 import { measuredOf, project } from "@/engine/projection";
 import { formatGbp } from "@/lib/money";
 import { lumpSumAllowance } from "@/lib/tax";
@@ -154,6 +154,33 @@ const earlyPoints = [
   },
 ];
 
+// A plan whose owner turns 56 in 2031, a year short of the pension age,
+// and 57 in 2032, from when the pension is drawn down: £400,000 locked,
+// which drawing it would leave £340,000 of, then £200,000 and £100,000
+// counted, beside an ISA drawn down alongside it.
+const unlocking = { owners: [{ ...owners[0], born: 1975 }] };
+const unlockingPoints = [
+  { 2: 100000, 6: 400000 },
+  { 2: 50000, 6: 200000 },
+  { 2: 20000, 6: 100000 },
+].map((balances, place) => ({
+  age: 56 + place,
+  allowances: { 1: lumpSumAllowance },
+  balances,
+  deferred: balances[6],
+  early: 0,
+  free: balances[2],
+  uncovered: 0,
+  year: 2031 + place,
+}));
+
+// The props each column drawn in outline was handed, render by render.
+const outlined = (): BarProps[] =>
+  vi
+    .mocked(Bar)
+    .mock.calls.map(([props]) => props)
+    .filter(({ strokeDasharray }) => strokeDasharray === "2 2");
+
 // The vertical rule recharts draws for a ReferenceLine, which carries the
 // year it stands at as an attribute.
 const marks = (): HTMLElement[] =>
@@ -187,6 +214,24 @@ const pounds = (): string[] =>
     })
     .map((tick) => tick.textContent)
     .filter((tick) => tick.includes("£"));
+
+// How many years a curve recharts draws runs through: one for the move
+// to its first and one for each line or bend to the next, so a curve of
+// one year is a move alone.
+const yearsIn = (curve: HTMLElement | undefined): number =>
+  curve?.getAttribute("d")?.match(/[CLM]/g)?.length ?? 0;
+
+// The fill of every column drawn, in the order the plot draws them.
+const fills = (): (null | string)[] =>
+  screen
+    .getAllByText(byClass("recharts-rectangle"), { suggest: false })
+    .map((column) => column.getAttribute("fill"));
+
+// What the key names, in the order it names them.
+const keyed = (): (null | string)[] =>
+  within(screen.getByRole("list", { name: "Key" }))
+    .getAllByRole("listitem")
+    .map(({ textContent }) => textContent);
 
 // The names under the crosshair of the ISA, and of a flat and what is
 // secured on it, in the order they are drawn.
@@ -832,10 +877,6 @@ describe("ProjectionChart", () => {
         points={points}
       />,
     );
-    const keyed = (): (null | string)[] =>
-      within(screen.getByRole("list", { name: "Key" }))
-        .getAllByRole("listitem")
-        .map(({ textContent }) => textContent);
 
     expect(keyed()).toStrictEqual(["Pensions", "ISAs", "Cash", "Debts"]);
     // Hidden from the tree, so no query is better than the slot.
@@ -1334,6 +1375,256 @@ describe("ProjectionChart", () => {
     rerender(chart(2049));
 
     expect(dots()[0]).toHaveAttribute("y", liquidIn(2049));
+  });
+
+  // In 2031 the pension stands outlined over the ISA's £100,000, which is
+  // all the liquidity comes to, and the axis reaches the outline's
+  // £440,000 top, past any year's liquidity; from 2032 it is a band
+  // counted in the total. The net worth counts it every year and draws
+  // no outline.
+  it("outlines a pension on the liquidity, dashed in its own colour over the stack and out of its total, until its owner can draw it", async () => {
+    render(
+      <ProjectionChart
+        accounts={held}
+        milestones={[]}
+        plan={unlocking}
+        points={unlockingPoints}
+      />,
+    );
+
+    expect(outlined().at(-1)).toMatchObject({
+      fill: "none",
+      stroke: "var(--color-account-6)",
+      strokeDasharray: "2 2",
+    });
+    expect(
+      screen.getAllByText(byClass("recharts-bar"), { suggest: false }),
+    ).toHaveLength(3);
+    expect(keyed()).toStrictEqual(["Pensions", "ISAs", "Locked pensions"]);
+    // Hidden from the tree, so no query is better than the slot.
+    expect(
+      screen
+        .getAllByText(bySlot("projection-key-locked"), { suggest: false })
+        .map(({ style }) => style.borderColor),
+    ).toStrictEqual(["var(--chart-2)"]);
+    expect(pounds().at(-1)).toBe("£450k");
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2032 · Age 57");
+    fireEvent.keyDown(chart, { key: "ArrowLeft" });
+    await screen.findByText("2031 · Age 56");
+    const tooltip = (): HTMLElement => screen.getByRole("status");
+
+    expect(
+      within(tooltip()).getByText(`${pension.name} (locked)`),
+    ).toBeInTheDocument();
+    expect(within(tooltip()).getByText("£340,000")).toHaveClass("figure");
+    expect(within(tooltip()).getAllByText("£100,000")).toHaveLength(2);
+    expect(within(tooltip()).queryByText(pension.name)).not.toBeInTheDocument();
+
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2032 · Age 57");
+
+    expect(within(tooltip()).getByText(pension.name)).toBeInTheDocument();
+    expect(within(tooltip()).getByText("£170,000")).toHaveClass("figure");
+    expect(within(tooltip()).getByText("£220,000")).toHaveClass("figure");
+    expect(
+      within(tooltip()).queryByText(`${pension.name} (locked)`),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
+
+    expect(
+      screen.getAllByText(byClass("recharts-bar"), { suggest: false }),
+    ).toHaveLength(2);
+    expect(keyed()).toStrictEqual(["Pensions", "ISAs"]);
+  });
+
+  // Over the same years as areas, the outline is a dashed line in the
+  // pension's colour with nothing washed beneath it, run from its one
+  // locked year down to the stack in the next, rather than a point alone.
+  it("outlines a locked pension under the areas as a dashed line with no wash", () => {
+    render(
+      <ProjectionChart
+        accounts={held}
+        milestones={[]}
+        plan={unlocking}
+        points={unlockingPoints}
+      />,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
+    const curves = screen.getAllByText(byClass("recharts-area-curve"), {
+      suggest: false,
+    });
+
+    expect(curves.map((curve) => curve.getAttribute("stroke"))).toStrictEqual(
+      [6, 2, 6].map((id) => `var(--color-account-${String(id)})`),
+    );
+    expect(curves.at(-1)).toHaveAttribute("stroke-dasharray", "2 2");
+    expect(yearsIn(curves.at(-1))).toBe(2);
+    expect(
+      screen
+        .getAllByText(byClass("recharts-area-area"), { suggest: false })
+        .at(-1),
+    ).toHaveAttribute("fill", "none");
+  });
+
+  // The owner turns 55 in 2030 and 57 in 2032. Locked in 2030 and 2031,
+  // the pension's band breaks in 2030 and stands at nothing in 2031,
+  // rising to the band in 2032; the outline runs from 2030 down to the
+  // stack in 2032, where the two meet, and breaks in 2033. The ISA, never
+  // locked, runs through every year.
+  it("breaks a locked pension's band under the areas, meeting its outline in the years either side", () => {
+    const years = [
+      { 2: 100000, 6: 300000 },
+      { 2: 110000, 6: 340000 },
+      { 2: 60000, 6: 200000 },
+      { 2: 30000, 6: 100000 },
+    ].map((balances, place) => ({
+      age: 55 + place,
+      allowances: { 1: lumpSumAllowance },
+      balances,
+      deferred: balances[6],
+      early: 0,
+      free: balances[2],
+      uncovered: 0,
+      year: 2030 + place,
+    }));
+    render(
+      <ProjectionChart
+        accounts={held}
+        milestones={[]}
+        plan={unlocking}
+        points={years}
+      />,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
+    const curves = screen.getAllByText(byClass("recharts-area-curve"), {
+      suggest: false,
+    });
+
+    expect(curves.map((curve) => yearsIn(curve))).toStrictEqual([3, 4, 3]);
+  });
+
+  // A second ISA arriving with the household beside the pension and the
+  // ISA stacks beneath the outline, as it is written, rather than above
+  // it, in the order it was first drawn; a switch of basis draws nothing
+  // afresh, and leaves the ISA's columns be.
+  it("draws the plot afresh in the order written when what it may draw changes, and not on a switch of basis", () => {
+    const savings: Account = { ...isa, id: 7, name: "Cash ISA" };
+    const { rerender } = render(
+      <ProjectionChart
+        accounts={held}
+        milestones={[]}
+        plan={unlocking}
+        points={unlockingPoints}
+      />,
+    );
+    rerender(
+      <ProjectionChart
+        accounts={[...held, savings]}
+        milestones={[]}
+        plan={unlocking}
+        points={unlockingPoints.map((point) => ({
+          ...point,
+          balances: { ...point.balances, 7: 10000 },
+        }))}
+      />,
+    );
+
+    expect([...new Set(fills())]).toStrictEqual([
+      "var(--color-account-6)",
+      "var(--color-account-2)",
+      "var(--color-account-7)",
+      "none",
+    ]);
+
+    const [, columns] = screen.getAllByText(byClass("recharts-bar"), {
+      suggest: false,
+    });
+    fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
+
+    expect(columns).toBeInTheDocument();
+    expect([...new Set(fills())]).toStrictEqual([
+      "var(--color-account-6)",
+      "var(--color-account-2)",
+      "var(--color-account-7)",
+    ]);
+  });
+
+  // The outline stacks on top of what is held and the debts down from
+  // nothing, so the key names it between them.
+  it("keys a locked pension after what is held and before the debts", () => {
+    render(
+      <ProjectionChart
+        accounts={[...held, mortgage]}
+        milestones={[]}
+        plan={unlocking}
+        points={unlockingPoints.map((point) => ({
+          ...point,
+          balances: { ...point.balances, 5: -50000 },
+        }))}
+      />,
+    );
+
+    expect(keyed()).toStrictEqual([
+      "Pensions",
+      "ISAs",
+      "Locked pensions",
+      "Debts",
+    ]);
+  });
+
+  // Two owners' pensions, the first's owner long past the pension age
+  // and the second's far short of it, so the same year draws one as a
+  // band and the other in outline, each in its own colour: the second
+  // pension's £100,000 is outlined at the £85,000 drawing it would leave.
+  it("outlines each owner's pension until its own owner can draw it", async () => {
+    const theirs: Account = { ...sipp, owner: sam.id };
+    const years = [2026, 2027].map((year, place) => ({
+      age: 66 + place,
+      allowances: { 1: lumpSumAllowance, 2: lumpSumAllowance },
+      balances: { 2: 100000, 6: 200000, 20: 100000 },
+      deferred: 300000,
+      early: 0,
+      free: 100000,
+      uncovered: 0,
+      year,
+    }));
+    render(
+      <ProjectionChart
+        accounts={[...held, theirs]}
+        milestones={[]}
+        plan={{
+          owners: [
+            { ...owners[0], born: 1960 },
+            { ...sam, born: 1980 },
+          ],
+        }}
+        points={years}
+      />,
+    );
+
+    expect(new Set(outlined().map(({ stroke }) => stroke))).toStrictEqual(
+      new Set(["var(--color-account-20)"]),
+    );
+    expect(colours()).toContain(
+      "--color-account-20: color-mix(in oklab, var(--chart-2), var(--card) 30%);",
+    );
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2027 · Age 67");
+    const tooltip = within(screen.getByRole("status"));
+
+    expect(tooltip.getByText(pension.name)).toBeInTheDocument();
+    expect(tooltip.getByText("£170,000")).toHaveClass("figure");
+    expect(tooltip.getByText(`${sipp.name} (locked)`)).toBeInTheDocument();
+    expect(tooltip.getByText("£85,000")).toHaveClass("figure");
+    expect(tooltip.getByText("£270,000")).toHaveClass("figure");
   });
 
   // A scenario's pension and ISA set against a household holding the
