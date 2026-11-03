@@ -89,8 +89,8 @@ interface CloseScreenProps {
 // The title gives the answer. Until the month is closed, which its latest
 // progress point says, the screen is the worksheet that closes it,
 // opening on that month, and says since when a month has been due: the
-// cut of the month after the latest point's, or that it is due where no
-// point is kept. Once it is, the balances the close set against those it
+// cut of the month after the latest point's, or that none is closed yet
+// with no point kept. Once it is, the balances the close set against those it
 // closed from, with what the plan paid in beside what Portfolio
 // Performance says was, where it says, what moved the plan since the
 // close before as the steps movedSince takes, and what the plan paid into
@@ -350,11 +350,11 @@ function detailOf(group: Group, moved: Moved): string {
 }
 
 // Since when a month has been due to close: the cut of the month after
-// the latest point's, which is when it could first be closed; or no more
-// than that a month is due, before any point is kept.
+// the latest point's, which is when it could first be closed; or, before
+// any point is kept, that no month is closed yet.
 function dueSince(latest: Month | undefined): string {
   return latest === undefined
-    ? "Due"
+    ? "No month closed yet"
     : `Due since ${cutDay(monthAfter(latest))}`;
 }
 
