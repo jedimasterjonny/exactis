@@ -103,6 +103,19 @@ export function formatWholePercent(value: number): string {
   );
 }
 
+// The chance of success is rounded down rather than to the nearest, so
+// it reads 90% only once 9 in 10 futures last, as the breaking points
+// count them: 0.899 reads 89%. One more than none still reads 1%.
+const chancePercent = new Intl.NumberFormat("en-GB", {
+  maximumFractionDigits: 0,
+  roundingMode: "floor",
+  style: "percent",
+});
+
+export function formatChance(value: number): string {
+  return chancePercent.format(value > 0 ? Math.max(value, 0.01) : value);
+}
+
 // A difference between two rates, in percentage points and written pp,
 // never %, to three places or two: 0.00111 taken off a rate reads
 // −0.111pp, and 0.0065 to two places 0.65pp. negative signs only what

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatAxisGbp,
+  formatChance,
   formatCurveRate,
   formatGbp,
   formatPercent,
@@ -26,6 +27,21 @@ describe("formatAxisGbp", () => {
     expect(formatAxisGbp(750)).toBe("£750");
     expect(formatAxisGbp(-1500000)).toBe("−£1.5m");
     expect(formatAxisGbp(-250000)).toBe("−£250k");
+  });
+});
+
+describe("formatChance", () => {
+  it("rounds a chance down, so it reads 90% only once 9 in 10 last", () => {
+    expect(formatChance(0.899)).toBe("89%");
+    expect(formatChance(0.9)).toBe("90%");
+    expect(formatChance(0.29)).toBe("29%");
+    expect(formatChance(1)).toBe("100%");
+    expect(formatChance(0)).toBe("0%");
+  });
+
+  it("reads a chance short of all as 99%, and one more than none as 1%", () => {
+    expect(formatChance(0.999)).toBe("99%");
+    expect(formatChance(0.001)).toBe("1%");
   });
 });
 
