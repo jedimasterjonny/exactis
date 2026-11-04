@@ -274,6 +274,32 @@ export function movedSince(
   };
 }
 
+// What Portfolio Performance says was paid into each of its securities
+// accounts, by name, after the cut of the month the balances stood at,
+// up to and on the cut of the month they stand at now, but for a name
+// two of the household's accounts carry; or nothing, where the file was
+// imported before that cut, or before what was paid in was read, since
+// it need not hold all that was paid by then.
+export function paidIn(now: Kept, from: Month): ReadonlyMap<string, number> {
+  const to = cutOf(now.asOf);
+  const after = cutOf(from);
+  const { targets } = now;
+  const names = now.accounts.map(({ name }) => name);
+  return targets?.portfolios === undefined || targets.importedOn < to
+    ? new Map()
+    : new Map(
+        targets.portfolios
+          .filter(({ name }) => names.indexOf(name) === names.lastIndexOf(name))
+          .map(({ name, paid }) => [
+            name,
+            sumOf(
+              paid.filter(({ on }) => on > after && on <= to),
+              ({ amount }) => amount,
+            ),
+          ]),
+      );
+}
+
 // The balances the close set against those it closed from, over the
 // accounts both hold: one whose day moved was checked, and was paid what
 // Portfolio Performance says was paid into the securities account of its
@@ -334,32 +360,6 @@ function futureIn(kept: Kept): {
     }),
     plan,
   };
-}
-
-// What Portfolio Performance says was paid into each of its securities
-// accounts, by name, after the cut of the month the balances stood at,
-// up to and on the cut of the month they stand at now, but for a name
-// two of the household's accounts carry; or nothing, where the file was
-// imported before that cut, or before what was paid in was read, since
-// it need not hold all that was paid by then.
-function paidIn(now: Kept, from: Month): ReadonlyMap<string, number> {
-  const to = cutOf(now.asOf);
-  const after = cutOf(from);
-  const { targets } = now;
-  const names = now.accounts.map(({ name }) => name);
-  return targets?.portfolios === undefined || targets.importedOn < to
-    ? new Map()
-    : new Map(
-        targets.portfolios
-          .filter(({ name }) => names.indexOf(name) === names.lastIndexOf(name))
-          .map(({ name, paid }) => [
-            name,
-            sumOf(
-              paid.filter(({ on }) => on > after && on <= to),
-              ({ amount }) => amount,
-            ),
-          ]),
-      );
 }
 
 // What a future stands at: when its owner retires, and its liquid net

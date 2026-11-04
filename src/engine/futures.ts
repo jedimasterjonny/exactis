@@ -29,6 +29,13 @@ import {
 } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
+// What a run of futures reads at, as bandsOf reads it: the middle one
+// and a quarter and a tenth in from either end.
+export type Bands = Pick<
+  FutureYear,
+  "bottomQuarter" | "bottomTenth" | "middle" | "topQuarter" | "topTenth"
+>;
+
 // Where a run of futures breaks, as breaksIn finds it: the least cut to
 // the spending nine in ten of them last with, and the earliest age nine
 // in ten last retiring at, for a plan isAgeSearched searches the age of.
@@ -119,13 +126,6 @@ export const runLength = 1000;
 // they come to is the plan's.
 export const defaultSeed = 2026;
 
-// What a run of futures reads at, as bandsOf reads it: the middle one
-// and a quarter and a tenth in from either end.
-type Bands = Pick<
-  FutureYear,
-  "bottomQuarter" | "bottomTenth" | "middle" | "topQuarter" | "topTenth"
->;
-
 // What a substream's seed steps by from one future to the next: the
 // golden ratio's share of 2^32, which spreads the futures' seeds as far
 // from each other as any step can.
@@ -149,6 +149,22 @@ export interface Grading {
   readonly comfortable: number;
   readonly middle: number;
   readonly surplus: number;
+}
+
+// A figure for each of a run's futures, read once sorted at the middle
+// one and at a quarter and a tenth in from either end, counted the same
+// from either end, or as nothing at each for a run of none.
+export function bandsOf(figures: readonly number[]): Bands {
+  const held = sorted(figures);
+  const quarter = Math.floor(held.length / 4);
+  const tenth = Math.floor(held.length / 10);
+  return {
+    bottomQuarter: held[quarter] ?? 0,
+    bottomTenth: held[tenth] ?? 0,
+    middle: held[Math.floor(held.length / 2)] ?? 0,
+    topQuarter: held[held.length - 1 - quarter] ?? 0,
+    topTenth: held[held.length - 1 - tenth] ?? 0,
+  };
 }
 
 // Where a run of the plan's futures breaks: the least cut to its
@@ -675,22 +691,6 @@ export function yearsIn(
       year,
     };
   });
-}
-
-// A figure for each of a run's futures, read once sorted at the middle
-// one and at a quarter and a tenth in from either end, counted the same
-// from either end, or as nothing at each for a run of none.
-function bandsOf(figures: readonly number[]): Bands {
-  const held = sorted(figures);
-  const quarter = Math.floor(held.length / 4);
-  const tenth = Math.floor(held.length / 10);
-  return {
-    bottomQuarter: held[quarter] ?? 0,
-    bottomTenth: held[tenth] ?? 0,
-    middle: held[Math.floor(held.length / 2)] ?? 0,
-    topQuarter: held[held.length - 1 - quarter] ?? 0,
-    topTenth: held[held.length - 1 - tenth] ?? 0,
-  };
 }
 
 // A value between one falling short and one lasting, or an end past the

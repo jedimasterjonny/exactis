@@ -306,6 +306,12 @@ export function holdsAnything(point: ProjectionPoint): boolean {
   return Object.values(point.balances).some((balance) => balance !== 0);
 }
 
+// Whether an account follows the plan rate along a path or a glide path:
+// a saving or an asset on the plan rate.
+export function isOnPlanRate(account: Account): boolean {
+  return account.kind !== "debt" && account.growth.kind === "plan";
+}
+
 // Whether a point's year falls short: some of it drawn from nowhere, or
 // covered only by drawing a pension before the pension age, at a charge
 // that keeps the plan going on paper alone. A plan falls short in the
@@ -1020,12 +1026,6 @@ function heldTo({ kind }: Account, grown: number, limit: number): number {
 function isBeforePensionAge(age: number, { month, year }: Month): boolean {
   const hasRisen = isOnOrBefore(pensionAge.rises, { month, year });
   return age < (hasRisen ? pensionAge.after : pensionAge.before);
-}
-
-// Whether an account follows the plan rate along a path or a glide path:
-// a saving or an asset on the plan rate.
-function isOnPlanRate(account: Account): boolean {
-  return account.kind !== "debt" && account.growth.kind === "plan";
 }
 
 // Whether an account is among the savings a pension not marked
