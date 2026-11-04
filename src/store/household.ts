@@ -7,6 +7,7 @@ import type { Household, Kept, KeptBalances } from "@/data/household";
 import type { Before } from "@/data/moves";
 import type { Read, Version } from "@/db/household";
 import type { Answer } from "@/lib/answer";
+import type { KeptClose } from "@/lib/landed";
 
 import {
   balancesIn,
@@ -22,6 +23,7 @@ import {
   listScenarios,
   readAsOf,
   readClosed,
+  readCloses,
   readLatest,
 } from "@/db/household";
 import { answerOf, Refusal, refused, saved, Stale } from "@/lib/answer";
@@ -144,6 +146,29 @@ export async function amend<TResult>(
 export async function getBaseline(): Promise<Household> {
   await requireSession();
   return readBaseline();
+}
+
+// The closes kept on the branch open for the twelve months before the
+// month its balances are as of, oldest first, each with the month it
+// closed and the household it kept as readCloses reads it, carried
+// through the chain and held to every rule as the latest is, both as
+// kept and as it makes it, or the refusal in their words: what the
+// month end reads where the invested balances landed against. The
+// session is checked first, as every read's is.
+export async function getClosesBack(): Promise<readonly KeptClose[]> {
+  await requireSession();
+  const [{ scenario }, { kept }] = await Promise.all([
+    readPage(),
+    readPageHeld(),
+  ]);
+  const closes = await readCloses(getDb(), scenario, {
+    from: { month: kept.asOf.month, year: kept.asOf.year - 1 },
+    to: monthBefore(kept.asOf),
+  });
+  return closes.map(({ household, month }) => ({
+    before: answerOf(() => soundKept(upcast(household))),
+    month,
+  }));
 }
 
 export async function getHousehold(): Promise<Household> {

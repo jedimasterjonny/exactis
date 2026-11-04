@@ -9,6 +9,7 @@ import type { Answer } from "@/lib/answer";
 
 import { spreadOf } from "@/data/cma";
 import { cma } from "@/data/cma.fixture";
+import { soundKept } from "@/data/household";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { statePension } from "@/data/income.fixture";
 import { inflationOf } from "@/data/inflation";
@@ -29,6 +30,7 @@ import { requireSession } from "@/lib/session";
 import {
   amend,
   getBaseline,
+  getClosesBack,
   getHousehold,
   getOpened,
   getScenario,
@@ -430,6 +432,55 @@ describe("the household store", () => {
 
     await expect(getSourcesDaysAgo(30)).rejects.toThrow("redirected");
     expect(getDb).not.toHaveBeenCalled();
+  });
+
+  // July 2025 closed, thirteen months before August 2026; August 2025
+  // closed listing every account twice, as one kept before the rules
+  // tightened; July 2026 closed; and the reference closed onto August.
+  it("reads the closes kept in the year before the latest, oldest first, each held to the rules", async () => {
+    const closedAt = (asOf: { month: number; year: number }): Kept => ({
+      ...reference,
+      asOf,
+      points: [
+        ...reference.points.filter(
+          ({ month }) =>
+            month.year * 12 + month.month < asOf.year * 12 + asOf.month,
+        ),
+        ...reference.points
+          .slice(-1)
+          .map((point) => ({ ...point, month: asOf })),
+      ],
+    });
+    const lastAugust = { month: 7, year: 2025 };
+    const july = closedAt({ month: 6, year: 2026 });
+    const versions = [
+      closedAt({ month: 6, year: 2025 }),
+      {
+        ...closedAt(lastAugust),
+        accounts: [...reference.accounts, ...reference.accounts],
+      },
+      july,
+      reference,
+    ];
+    for (const [at, household] of versions.entries()) {
+      await keepAfter(db, { scenario: "", version: at }, household);
+    }
+
+    expect(await getClosesBack()).toStrictEqual([
+      {
+        before: refused("A record's id is held by no other record"),
+        month: lastAugust,
+      },
+      { before: saved(soundKept(july)), month: july.asOf },
+    ]);
+  });
+
+  it("reads no close in the year before the latest before anything is kept, nor without a session", async () => {
+    expect(await getClosesBack()).toStrictEqual([]);
+
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(getClosesBack()).rejects.toThrow("redirected");
   });
 
   // The reference closed onto July, a version with July's point its
