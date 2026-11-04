@@ -1,6 +1,17 @@
 import type { SQL } from "drizzle-orm";
 
-import { and, asc, desc, eq, gt, lte, ne, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  between,
+  desc,
+  eq,
+  gt,
+  inArray,
+  lte,
+  ne,
+  sql,
+} from "drizzle-orm";
 import * as z from "zod";
 
 import type { Kept } from "@/data/household";
@@ -10,6 +21,7 @@ import type { Database } from "@/db/client";
 import { stamped } from "@/data/shapes";
 import { householdVersions } from "@/db/schema";
 import { Refusal } from "@/lib/answer";
+import { monthsBetween } from "@/lib/months";
 
 // What a save read: the branch, and the version of it, nought where
 // nothing was kept there yet.
@@ -219,6 +231,114 @@ export async function readClosed(
       .limit(1),
   );
   return first ?? null;
+}
+
+// The versions the closes of the months from one to another kept on
+// the branch, both ends among them, each with the month it closed,
+// oldest month first, a month no version holds the close of left out:
+// for each, the first of the latest unbroken run of versions holding
+// it, as readClosed reads one. One query marks each version of the
+// branch with the month of the span it is a close of, where its asOf is
+// that month and the same as its last point's month, compared in SQL as
+// readClosed compares them, and hands back only the versions from the
+// first close of a month of the span to the last, since no version
+// before or after them can start, carry or break such a month's latest
+// run. The runs are then walked in JS. The documents of the versions
+// picked are read in a second query, by key, and with none picked it is
+// not run. The fields are read in SQL outside the chain of shapes, as
+// readClosed's are, so a step that renames or moves asOf or points
+// changes this query too.
+// ponytail: a scan of the branch's versions, each document read for
+// its asOf and last point. No bound on the scan is sound, since a
+// version of any age can start a month's latest run, as one an import
+// took the balances back to does; an index on the two fields, as
+// readClosed's would want, once the versions run to thousands.
+export async function readCloses(
+  db: Database,
+  scenario: string,
+  { from, to }: { readonly from: Month; readonly to: Month },
+): Promise<readonly (Version & { readonly month: Month })[]> {
+  const { household, version } = householdVersions;
+  const branch = eq(householdVersions.scenario, scenario);
+  const span = Array.from(
+    { length: monthsBetween(from, to) + 1 },
+    (_, offset) => ({
+      month: (from.month + offset) % 12,
+      year: from.year + Math.floor((from.month + offset) / 12),
+    }),
+  );
+  const months = sql`array[${sql.join(
+    span.map((month) => sql`${JSON.stringify(month)}::jsonb`),
+    sql`, `,
+  )}]`;
+  const asOf = sql`${household} -> 'asOf'`;
+  const point = sql`${household} -> 'points' -> -1 -> 'month'`;
+  const closes = sql<
+    null | number
+  >`case when ${asOf} = ${point} then array_position(${months}, ${asOf}) end`;
+  const marked = db
+    .select({ closes: closes.as("closes"), version })
+    .from(householdVersions)
+    .where(branch)
+    .as("marked");
+  const bounded = db
+    .select({
+      closes: marked.closes,
+      first:
+        sql<number>`min(${marked.version}) filter (where ${marked.closes} is not null) over ()`.as(
+          "first",
+        ),
+      last: sql<number>`max(${marked.version}) filter (where ${marked.closes} is not null) over ()`.as(
+        "last",
+      ),
+      version: marked.version,
+    })
+    .from(marked)
+    .as("bounded");
+  const rows = await queried(
+    db
+      .select({ closes: bounded.closes, version: bounded.version })
+      .from(bounded)
+      .where(between(bounded.version, bounded.first, bounded.last))
+      .orderBy(asc(bounded.version)),
+  );
+  const starts = new Map<number, number>();
+  let running: null | number = null;
+  let start = 0;
+  for (const row of rows) {
+    if (row.closes === null) {
+      running = null;
+    } else {
+      if (row.closes !== running) {
+        running = row.closes;
+        start = row.version;
+      }
+      starts.set(row.closes, start);
+    }
+  }
+  const picked = span.flatMap((month, place) => {
+    const first = starts.get(place + 1);
+    return first === undefined ? [] : [{ month, version: first }];
+  });
+  if (picked.length === 0) {
+    return [];
+  }
+  const documents = await queried(
+    db
+      .select({ household, version })
+      .from(householdVersions)
+      .where(
+        and(
+          branch,
+          inArray(
+            version,
+            picked.map((each) => each.version),
+          ),
+        ),
+      ),
+  );
+  const kept = new Map(documents.map((row) => [row.version, row.household]));
+  return picked.map((each) => ({ ...each, household: kept.get(each.version) }));
 }
 
 // The first version kept on the branch, or null before anything is. A
