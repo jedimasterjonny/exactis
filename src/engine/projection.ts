@@ -21,7 +21,7 @@ import { rules } from "@/data/rules";
 import { statePensionLines } from "@/data/state-pension";
 import { cashFlow, spentIn } from "@/engine/cash-flow";
 import { clearsIn, paymentOf } from "@/lib/loans";
-import { isOnOrBefore, monthAfter } from "@/lib/months";
+import { isOnOrBefore, monthAfter, monthsBetween } from "@/lib/months";
 import {
   april,
   bandTopsOn,
@@ -826,14 +826,14 @@ function borrowingOn(
 }
 
 // A month: what is paid in lands at the start of it, and the balance
-// then grows a month at the rate's twelfth root, so a whole year's
-// growth compounds to the yearly rate and each month's sum earns the
-// months it has been in for. A yearly sum is paid a twelfth at a time,
-// as the cash flow spreads it, so it is paid as the spare money is and
-// the two earn alike; the month in which it is really paid is not the
-// model's to know.
-function carried(balance: number, paid: number, rate: number): number {
-  return (balance + paid) * (1 + rate) ** (1 / 12);
+// then grows a month by the growth given, the rate's twelfth root or one
+// plus the month's own figure, so a whole year's growth compounds to the
+// yearly rate and each month's sum earns the months it has been in for.
+// A yearly sum is paid a twelfth at a time, as the cash flow spreads it,
+// so it is paid as the spare money is and the two earn alike; the month
+// in which it is really paid is not the model's to know.
+function carried(balance: number, paid: number, growth: number): number {
+  return (balance + paid) * growth;
 }
 
 // From the savings, the month's shortfall in its two parts, what each
@@ -1022,6 +1022,12 @@ function isBeforePensionAge(age: number, { month, year }: Month): boolean {
   return age < (hasRisen ? pensionAge.after : pensionAge.before);
 }
 
+// Whether an account follows the plan rate along a path or a glide path:
+// a saving or an asset on the plan rate.
+function isOnPlanRate(account: Account): boolean {
+  return account.kind !== "debt" && account.growth.kind === "plan";
+}
+
 // Whether an account is among the savings a pension not marked
 // droppable is kept paid out of: drawn on for a shortfall, and no
 // pension, since one pension sold to pay another is money going round
@@ -1121,6 +1127,19 @@ function landedWith(
   return sum;
 }
 
+// The month's own figure for an account following the plan rate, along
+// a path holding the months, held to losing no more than everything as
+// the rate is; none for any other account, or along any other path.
+function monthIn(account: Account, plan: Plan, at: Month): number | undefined {
+  const month = isOnPlanRate(account)
+    ? plan.path?.months?.[monthsBetween({ month: 0, year: plan.from }, at)]
+    : undefined;
+  if (month !== undefined && month < -1) {
+    throw new Error(rules.beyondLoss);
+  }
+  return month;
+}
+
 // An account carried a month on the month's cash flow, as the projection
 // and a month end both carry one: a saving or an asset paid what the
 // flow pays it and grown, and a debt charged a month's interest and paid
@@ -1129,7 +1148,9 @@ function landedWith(
 // the flow charges a debt's last payment as what clears it, so the two
 // agree, and a line paying a loan on past that month pays nothing more
 // off it. The month is read for the year it falls in, whose rate a plan
-// carried along a path takes. A house or a car is held to its limit.
+// carried along a path takes, and a saving or an asset on the plan rate
+// takes the month's own figure instead where monthIn finds one. A house
+// or a car is held to its limit.
 function monthOf(
   { account, balance }: Held,
   flow: CashFlow,
@@ -1138,7 +1159,12 @@ function monthOf(
   const rate = rateOf(account, plan, at.year);
   if (account.kind !== "debt") {
     const paid = paidIn(account, flow);
-    const grown = carried(balance, paid, rate);
+    const month = monthIn(account, plan, at);
+    const grown = carried(
+      balance,
+      paid,
+      month === undefined ? (1 + rate) ** (1 / 12) : 1 + month,
+    );
     return {
       balance:
         account.limit === undefined
@@ -1371,8 +1397,8 @@ function paidOff(account: Account, flow: CashFlow): number {
 
 // The rate a month of a year is carried at, held to losing no more than
 // everything. Along a path or a glide path, a saving or an asset on the
-// plan rate takes the year's figure in place of the plan's, and nothing
-// else does: an
+// plan rate takes the year's figure in place of the plan's, or the
+// month's own where monthIn finds one, and nothing else does: an
 // account on a fixed rate keeps its own, and so does a debt on the plan
 // rate, since its payment and the term it clears in are worked out
 // against the plan's own rate, and charged at another it would be left
@@ -1384,12 +1410,12 @@ function paidOff(account: Account, flow: CashFlow): number {
 // against them holds and the year the money runs out is never marked.
 // The plan rate is held to it as a fixed rate is, since the whole plan
 // is carried on the one and an account on the other, and the floor is
-// the one the action holds a saved rate to; so is a path's.
+// the one the action holds a saved rate to; so is a path's, a year's
+// here and a month's in monthIn.
 function rateOf(account: Account, plan: Plan, year: number): number {
-  const rate =
-    account.kind !== "debt" && account.growth.kind === "plan"
-      ? rateIn(plan, year)
-      : rateFrom(account, plan);
+  const rate = isOnPlanRate(account)
+    ? rateIn(plan, year)
+    : rateFrom(account, plan);
   if (rate < -1) {
     throw new Error(rules.beyondLoss);
   }
