@@ -28,8 +28,10 @@ in Postgres on Neon and the app on Vercel.
   owner's State Pension.
 - Month end — the balances cut on the 25th, or the working day before, checked
   against what the plan expected, which records a progress point, then what
-  moved the plan since the close before and the cash each account holds
-  uninvested, as Portfolio Performance says, to invest.
+  moved the plan since the close before, where the invested balances landed
+  among the futures of the oldest close in the year before that can be read, and
+  the cash each account holds uninvested, as Portfolio Performance says, to
+  invest.
 - Cogitator — what to buy and sell next in an account, towards that target
   allocation.
 
