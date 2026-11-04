@@ -7,7 +7,7 @@ import type {
 } from "@/data/milestones";
 import type { Path, Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
-import type { ProjectionPoint, Run } from "@/engine/projection";
+import type { MonthsOn, ProjectionPoint, Run } from "@/engine/projection";
 
 import {
   ageOf,
@@ -21,6 +21,7 @@ import {
   carriedBy,
   isShort,
   measuredOf,
+  monthsOn,
   movedYears,
   project,
   retimed,
@@ -412,6 +413,48 @@ export function markersIn(
   );
 }
 
+// The months of a month end carried along each future of the markets,
+// drawn one at a time without end from the place in the run given, its
+// first unless another is: every account carried the months given on
+// from the plan's month as monthsOn carries it, along the path futuresOf
+// draws for the same place in the run at the spread given, from the
+// seed given or the one every run starts from, so each meets the
+// markets the future of the chance at that place meets. The path is
+// drawn over the years the months reach alone, which are the first
+// years of the path drawn over the whole plan, since a path is drawn a
+// year at a time in year order. Along it the return any k months take
+// strays in logs by the spread times the root of k over twelve, as
+// monthsOver shares each year out over its months.
+export function* monthsAlong(
+  accounts: readonly Account[],
+  schedule: Schedule,
+  {
+    from = 0,
+    months,
+    plan,
+    seed = defaultSeed,
+    spread,
+  }: {
+    readonly from?: number;
+    readonly months: number;
+    readonly plan: Plan;
+    readonly seed?: number;
+    readonly spread: Spread;
+  },
+): Generator<readonly MonthsOn[], never, undefined> {
+  const years = Math.ceil((plan.month + months) / 12);
+  for (let future = from; ; future += 1) {
+    const run = drawnOver(accounts, schedule, {
+      future,
+      plan,
+      seed,
+      spread,
+      years,
+    });
+    yield monthsOn(accounts, schedule, { months, plan: run.plan });
+  }
+}
+
 // One future of the markets with its months: the path given, its years
 // as they were drawn, and what the plan rate comes to in each month of
 // them, twelve a year from January, drawn twelve normals a year in year
@@ -731,10 +774,11 @@ function cutBy(run: Run, cut: number): Run {
 
 // The run of the future at the place given in a run of the plan's
 // futures: the plan carried along the path drawn from that future's
-// own streams, its years' and its months', the months' seeded half the
-// generator's cycle on from the years', so that no stretch of the
-// generator one stream draws meets another's over a run of ten thousand
-// futures two hundred years long, as its test holds.
+// own streams, its years' and its months', over the years given or
+// else the plan's, the months' seeded half the generator's cycle on
+// from the years', so that no stretch of the generator one stream
+// draws meets another's over a run of ten thousand futures two hundred
+// years long, as its test holds.
 function drawnOver(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -743,16 +787,18 @@ function drawnOver(
     plan,
     seed,
     spread,
+    years = plan.years,
   }: {
     readonly future: number;
     readonly plan: Plan;
     readonly seed: number;
     readonly spread: Spread;
+    readonly years?: number;
   },
 ): Run {
   const yearsSeed = seed + future * step;
   const path = monthsOver(
-    pathOf(plan, spread, normalsFrom(yearsSeed)),
+    pathOf({ ...plan, years }, spread, normalsFrom(yearsSeed)),
     spread,
     normalsFrom(yearsSeed + 2 ** 31),
   );
