@@ -12,7 +12,7 @@ import { atAge, retiringAt } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { owners, working } from "@/data/owners.fixture";
 import { statePensionLines } from "@/data/state-pension";
-import { project } from "@/engine/projection";
+import { monthsOn, project } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
 import type { Breaks, Future } from "./futures";
@@ -24,6 +24,7 @@ import {
   gradingOf,
   lastsTried,
   markersIn,
+  monthsAlong,
   monthsOver,
   outcomesOf,
   pathOf,
@@ -36,6 +37,14 @@ import {
 
 // A plan at 7% and 3% over the years these tests draw.
 const plan = { inflation: 0.03, rate: 0.07, years: 40 };
+
+// How far values stray from their mean.
+function deviationOf(values: readonly number[]): number {
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return Math.sqrt(
+    values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length,
+  );
+}
 
 // What a year's figure is as the draw makes it: the logarithm of one
 // plus it, which is normal about the logarithm of one plus the plan's.
@@ -151,6 +160,71 @@ describe("pathOf", () => {
   });
 });
 
+describe("monthsAlong", () => {
+  // Born in 1992, so 34 when the plan opens in July 2026, and an ISA of
+  // an invented £30,000 on the plan rate that no line pays; no inflation,
+  // and the plan rate 5%, straying by 15% a year.
+  const plan = {
+    born: 1992,
+    from: 2026,
+    inflation: 0,
+    month: 6,
+    owners: [working],
+    rate: 0.05,
+    retires: 92,
+    years: 5,
+  };
+  const spread = { inflation: 0, rate: 0.15 };
+  const nothing = { expenses: [], income: [] };
+  const isa: Account = {
+    balance: 30000,
+    growth: { kind: "plan" },
+    id: 1,
+    kind: "tax-free",
+    name: "ISA",
+    owner: 1,
+  };
+
+  // Twelve months from July reach into 2027, so the path is drawn over
+  // two of the plan's five years.
+  it("carries each future's months along the path futuresOf draws over the whole plan, from the place given", () => {
+    expect(
+      monthsAlong([isa], nothing, { from: 2, months: 12, plan, spread })
+        .take(3)
+        .toArray(),
+    ).toStrictEqual(
+      Array.from({ length: 3 }, (_, offset) => {
+        const years = 2026 + (2 + offset) * 0x9e3779b9;
+        const path = monthsOver(
+          pathOf(plan, spread, normalsFrom(years)),
+          spread,
+          normalsFrom(years + 2 ** 31),
+        );
+        return monthsOn([isa], nothing, {
+          months: 12,
+          plan: { ...plan, path },
+        });
+      }),
+    );
+  });
+
+  // 2,000 futures: in logs one month along a future strays by 15% over
+  // the root of twelve, to within 5%, some three standard errors. This
+  // guards against an engine without the monthly bridge, whose months
+  // each grow at the twelfth root of their year's draw and so stray a
+  // twelfth of 15%, which fails it.
+  it("carries one month along a future straying by the year's spread over the root of twelve", () => {
+    const logs = monthsAlong([isa], nothing, { months: 1, plan, spread })
+      .take(2000)
+      .map(([reached]) => Math.log((reached?.balance ?? 0) / isa.balance))
+      .toArray();
+
+    expect(
+      Math.abs(deviationOf(logs) / (0.15 / Math.sqrt(12)) - 1),
+    ).toBeLessThan(0.05);
+  });
+});
+
 describe("monthsOver", () => {
   const spread = { inflation: 0.02, rate: 0.14 };
 
@@ -163,15 +237,6 @@ describe("monthsOver", () => {
     return (
       monthsOver(pathOf({ ...plan, years }, spread, yearly), spread, months)
         .months ?? []
-    );
-  }
-
-  // How far values stray from their mean.
-  function deviationOf(values: readonly number[]): number {
-    const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-    return Math.sqrt(
-      values.reduce((sum, value) => sum + (value - mean) ** 2, 0) /
-        values.length,
     );
   }
 
