@@ -119,6 +119,13 @@ export const runLength = 1000;
 // they come to is the plan's.
 export const defaultSeed = 2026;
 
+// What a run of futures reads at, as bandsOf reads it: the middle one
+// and a quarter and a tenth in from either end.
+type Bands = Pick<
+  FutureYear,
+  "bottomQuarter" | "bottomTenth" | "middle" | "topQuarter" | "topTenth"
+>;
+
 // What a substream's seed steps by from one future to the next: the
 // golden ratio's share of 2^32, which spreads the futures' seeds as far
 // from each other as any step can.
@@ -660,23 +667,30 @@ export function yearsIn(
 ): readonly FutureYear[] {
   return Array.from({ length: plan.years + 1 }, (_, offset) => {
     const year = plan.from + offset;
-    const held = sorted(
-      futures.map(({ measured }) => measured[offset]?.worth ?? 0),
-    );
-    const quarter = Math.floor(held.length / 4);
-    const tenth = Math.floor(held.length / 10);
     return {
-      bottomQuarter: held[quarter] ?? 0,
-      bottomTenth: held[tenth] ?? 0,
-      middle: held[Math.floor(held.length / 2)] ?? 0,
+      ...bandsOf(futures.map(({ measured }) => measured[offset]?.worth ?? 0)),
       outOfMoney: futures.filter(
         ({ ranOut }) => ranOut !== null && ranOut <= year,
       ).length,
-      topQuarter: held[held.length - 1 - quarter] ?? 0,
-      topTenth: held[held.length - 1 - tenth] ?? 0,
       year,
     };
   });
+}
+
+// A figure for each of a run's futures, read once sorted at the middle
+// one and at a quarter and a tenth in from either end, counted the same
+// from either end, or as nothing at each for a run of none.
+function bandsOf(figures: readonly number[]): Bands {
+  const held = sorted(figures);
+  const quarter = Math.floor(held.length / 4);
+  const tenth = Math.floor(held.length / 10);
+  return {
+    bottomQuarter: held[quarter] ?? 0,
+    bottomTenth: held[tenth] ?? 0,
+    middle: held[Math.floor(held.length / 2)] ?? 0,
+    topQuarter: held[held.length - 1 - quarter] ?? 0,
+    topTenth: held[held.length - 1 - tenth] ?? 0,
+  };
 }
 
 // A value between one falling short and one lasting, or an end past the
