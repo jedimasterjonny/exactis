@@ -1744,9 +1744,10 @@ describe("project", () => {
   // month and leaves it there, on the account's own rate and on the
   // plan's alike; one below it takes the twelfth root of a negative, so
   // every balance after it and every figure the year went short by is
-  // not a number and the year the money runs out is never marked. A
-  // rate that loses nine tenths of a balance a year is left to lose it,
-  // 20,000 × 0.1 = 2,000.
+  // not a number and the year the money runs out is never marked, and a
+  // month along a path that loses more than everything is refused as
+  // well. A rate that loses nine tenths of a balance a year is left to
+  // lose it, 20,000 × 0.1 = 2,000.
   it("refuses a rate that loses more than everything, on either side", () => {
     const rate = (fixed: number): Account => ({
       ...flatIsa,
@@ -1764,6 +1765,17 @@ describe("project", () => {
     );
     expect(() =>
       project([isa], funded, { ...plan, rate: -1.5, years: 1 }),
+    ).toThrow("A rate loses no more than everything");
+    expect(() =>
+      project([isa], funded, {
+        ...plan,
+        path: {
+          inflation: [0],
+          months: Array.from({ length: 12 }, () => -1.5),
+          rate: [0],
+        },
+        years: 1,
+      }),
     ).toThrow("A rate loses no more than everything");
     expect(
       project([rate(-0.9)], funded, { ...plan, years: 1 }).at(-1),
@@ -1924,8 +1936,32 @@ describe("project", () => {
     ).toStrictEqual([20000, 24000, 25200]);
   });
 
+  // Opening in November, £20,000 on the plan rate gains the path's 10%
+  // that month and loses half of it in December, 22,000 and 11,000,
+  // whatever the year's 30% or the months before the plan opens say;
+  // 2027, whose months the path does not hold, earns its 20%, 13,200,
+  // and 2028, past the path, the plan's own 5%, 13,860.
+  it("carries a saving on the plan rate by each month's figure along a path holding its months, and at the year's past them", () => {
+    const saving: Account = { ...flatIsa, growth: { kind: "plan" } };
+    const months = [...Array.from({ length: 10 }, () => 1), 0.1, -0.5];
+
+    expect(
+      project(
+        [saving],
+        { expenses: [], income: [] },
+        {
+          ...plan,
+          month: 10,
+          path: { inflation: [0, 0], months, rate: [0.3, 0.2] },
+          years: 3,
+        },
+      ).map((point) => balanceIn(point, saving.id)),
+    ).toStrictEqual([20000, 11000, 13200, 13860]);
+  });
+
   // The mortgage on the plan rate and the home on its own are carried
-  // the same whatever the path says the plan rate comes to.
+  // the same whatever the path says the plan rate comes to, in a year
+  // or in a month.
   it("carries a debt and an account on a fixed rate as at the plan's rates, whatever the path", () => {
     const carriedOn: readonly Account[] = [
       { ...mortgage, growth: { kind: "plan" } },
@@ -1937,7 +1973,11 @@ describe("project", () => {
     expect(
       project(carriedOn, funded, {
         ...atItsRates,
-        path: { inflation: [0, 0, 0], rate: [0.9, -0.5, 0.4] },
+        path: {
+          inflation: [0, 0, 0],
+          months: Array.from({ length: 36 }, () => 0.5),
+          rate: [0.9, -0.5, 0.4],
+        },
       }),
     ).toStrictEqual(project(carriedOn, funded, atItsRates));
   });

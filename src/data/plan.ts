@@ -47,12 +47,16 @@ export const drawnFromWords: Readonly<Record<Drawdown, string>> = {
 // One future of the markets, a figure for each year the plan carries,
 // the first year's the one the plan starts in and each after it the
 // year on: what the plan rate comes to that year, and what prices rise
-// by in it, each a fraction as every rate is. A plan carried along a
+// by in it, each a fraction as every rate is; and, where it holds them,
+// what the plan rate comes to in each month of those years, twelve a
+// year from January, the first year's first. A plan carried along a
 // path takes the year's figures in place of its own, everywhere a rate
-// or prices move with the markets; a year the path holds no figure for
-// takes the plan's own.
+// or prices move with the markets, and a saving or an asset on the plan
+// rate the month's where the path holds them; a year the path holds no
+// figure for takes the plan's own.
 export interface Path {
   readonly inflation: readonly number[];
+  readonly months?: readonly number[];
   readonly rate: readonly number[];
 }
 
