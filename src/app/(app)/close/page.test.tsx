@@ -15,7 +15,7 @@ import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
 import { portfolios, targets } from "@/data/targets.fixture";
 import { Refusal, refused, saved } from "@/lib/answer";
-import { movedSince } from "@/lib/moved";
+import { movedOver, movedSince } from "@/lib/moved";
 import { getHousehold, getOpened, getSinceClose } from "@/store/household";
 
 import Close from "./page";
@@ -29,7 +29,7 @@ vi.mock("@/store/household", () => ({
 }));
 vi.mock("@/actions/accounts", () => ({ closeBalances: vi.fn() }));
 vi.mock("@/actions/targets", () => ({ importTargets: vi.fn() }));
-vi.mock("@/lib/moved", () => ({ movedSince: vi.fn() }));
+vi.mock("@/lib/moved", () => ({ movedOver: vi.fn(), movedSince: vi.fn() }));
 vi.mock("next/navigation", () => ({
   useRouter: (): { readonly replace: typeof replace } => ({ replace }),
 }));
@@ -564,6 +564,8 @@ describe("Close", () => {
     });
   });
 
+  // July's close kept past the rules, with no balances to read either;
+  // then read, but refused moved on.
   it("says why the close before the latest cannot be read, or moved on, now", async () => {
     await renderClose({
       since: {
@@ -589,6 +591,46 @@ describe("Close", () => {
         "The close before August's cannot be read now: A rule the month end breaks.",
       ),
     ).toBeInTheDocument();
+  });
+
+  // July's close kept past the rules, its balances read alone and laid
+  // over the household now: what moved, invented, is the balances' step
+  // alone, the rates and the changes since inside what the month end
+  // expected.
+  it("lays the balances of a close it cannot read whole over today's plan, saying why the rates and changes are not told apart", async () => {
+    const balances = { accounts: july.accounts, asOf: july.asOf };
+    vi.mocked(movedOver).mockReturnValue({
+      ...moved,
+      changes: [],
+      now: { liquid: 605_000, retired: 2053 },
+      rates: [],
+      steps: moved.steps.slice(0, 1),
+    });
+    await renderClose({
+      since: { balances, before: refused("A rule since tightened"), now: kept },
+    });
+
+    expect(movedOver).toHaveBeenCalledExactlyOnceWith(balances, kept);
+    expect(movedSince).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "August closed £2,140 ahead of plan; retirement still at 61",
+    );
+    expect(rows()).toStrictEqual([
+      ["As the month end expected", "61", "£600,000"],
+      ["Balances against the plan", "Unchanged", "+£5,000"],
+      ["Now", "61", "£605,000"],
+    ]);
+    expect(detail("As the month end expected")).toHaveAccessibleDescription(
+      "July 2026's balances carried 1 month on as today's plan expects",
+    );
+    expect(
+      within(screen.getByRole("region", { name: "What moved" }))
+        .getAllByRole("paragraph")
+        .map((note) => note.textContent),
+    ).toStrictEqual([
+      "The close before August's was kept in a form this app cannot read, so its balances are carried on by today's plan, rates and your changes since included: without that close's plan, what they moved cannot be told apart.",
+      "Each row is worked out after the ones above it. Liquid net worth leaves out the property, the vehicles and a pension its owner cannot yet draw, in today's money.",
+    ]);
   });
 
   // On Friday 25 September September is cut, and the latest point is

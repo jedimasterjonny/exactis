@@ -35,7 +35,7 @@ import {
   monthName,
   monthsBetween,
 } from "@/lib/months";
-import { movedSince } from "@/lib/moved";
+import { movedOver, movedSince } from "@/lib/moved";
 import { cogitator, monthEnd, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 // What each group of the walk is called as a row of what moved.
@@ -84,6 +84,15 @@ interface CloseScreenProps {
   readonly today: string;
 }
 
+// What moved the plan since the close before the latest, the month that
+// close's balances were as of, and whether they alone were read, laid
+// over the household now.
+interface Compared {
+  readonly asOf: Month;
+  readonly isLaid: boolean;
+  readonly moved: Moved;
+}
+
 // The month end: the month whose balances were cut last closed onto the
 // household, and once it is, what moved the plan since the close before.
 // The title gives the answer. Until the month is closed, which its latest
@@ -98,8 +107,12 @@ interface CloseScreenProps {
 // due and what mostly moved said in the meta line, and the balances to
 // update in the header, which opens the same worksheet on the month
 // closed, for a close to be made again or another month picked, with the
-// way back. A household with no close before the latest, one the rules
-// refuse now, or one whose balances have since been closed back onto that
+// way back. A close before the latest kept in a form this app cannot read
+// whole is compared by the balances it set alone, carried on by the plan
+// now, which takes in the rates and the household's changes since, and
+// the screen says so. A household with no close before the latest, one
+// whose balances cannot be read either, one the rules refuse moved on
+// now, or one whose balances have since been closed back onto that
 // close's month or before it, has nothing to compare with, and says why.
 // A month is closed in the household alone, so while a scenario is open
 // the screen says to leave it, and nothing else, rather than lay the
@@ -198,9 +211,9 @@ export function CloseScreen({
       </Screen>
     );
   }
-  const { before, moved } = compared.value;
+  const { asOf, isLaid, moved } = compared.value;
   const { plan } = household;
-  const rows = rowsOf(moved, before, plan);
+  const rows = rowsOf(compared.value, plan);
   const most = rows
     .slice(1, -1)
     .toSorted((one, other) => Math.abs(other.liquid) - Math.abs(one.liquid))[0];
@@ -226,7 +239,7 @@ export function CloseScreen({
           <Ledger
             steps={[
               {
-                detail: formatDay(cutOf(before.asOf)),
+                detail: formatDay(cutOf(asOf)),
                 figure: formatGbp(moved.balances.stood),
                 label: "As the balances stood",
               },
@@ -249,7 +262,7 @@ export function CloseScreen({
         </CardContent>
       </SectionCard>
       <SectionCard
-        caption={`Since the close of ${formatMonth(before.asOf)}`}
+        caption={`Since the close of ${formatMonth(asOf)}`}
         label={subsectionLabel(monthEnd, 2)}
         title="What moved"
       >
@@ -259,6 +272,11 @@ export function CloseScreen({
             label="What moved the plan, worked out"
             rows={rows.map(({ row }) => row)}
           />
+          {isLaid && (
+            <Note>
+              {`The close before ${month}'s was kept in a form this app cannot read, so its balances are carried on by today's plan, rates and your changes since included: without that close's plan, what they moved cannot be told apart.`}
+            </Note>
+          )}
           <Note>
             Each row is worked out after the ones above it. Liquid net worth
             leaves out the property, the vehicles and a pension its owner cannot
@@ -271,35 +289,42 @@ export function CloseScreen({
   );
 }
 
-// What moved the plan since the close before the latest, with the
-// household that close left; or why there is nothing to compare, said
-// whole: that close was kept in a form this app cannot read, without the
-// rules it breaks, since a version kept is history and nothing on the
-// page can mend it; or it cannot be moved on now, in the rules' words;
-// or the balances have been closed back onto its month or before it, as
-// closing an earlier month again takes them, leaving no month between;
-// or null where there is no such close.
+// What moved the plan since the close before the latest, with the month
+// that close's balances were as of, and whether they alone were read,
+// laid over the household now, as where that close was kept in a form
+// this app cannot read whole; or why there is nothing to compare, said
+// whole: that close was kept in a form this app cannot read, its
+// balances among it, without the rules it breaks, since a version kept
+// is history and nothing on the page can mend it; or it cannot be moved
+// on now, in the rules' words; or the balances have been closed back
+// onto its month or before it, as closing an earlier month again takes
+// them, leaving no month between; or null where there is no such close.
 function comparedOf(
   since: null | SinceClose,
   month: string,
-): Answer<{ readonly before: Kept; readonly moved: Moved }> | null {
+): Answer<Compared> | null {
   if (since === null) {
     return null;
   }
-  const { before, now } = since;
-  if (before.kind === "refused") {
+  const { balances, before, now } = since;
+  const closed = before.kind === "saved" ? before.value : balances;
+  if (closed === null) {
     return refused(
       `The close before ${month}'s was kept in a form this app cannot read, so what moved shows from the next close.`,
     );
   }
-  if (monthsBetween(before.value.asOf, now.asOf) < 1) {
+  if (monthsBetween(closed.asOf, now.asOf) < 1) {
     return refused(
       `The balances are as of ${formatMonth(now.asOf)}, no later than the close before ${month}'s, so no month between them is left to compare.`,
     );
   }
   const answer = answerOf(() => ({
-    before: before.value,
-    moved: movedSince(before.value, now),
+    asOf: closed.asOf,
+    isLaid: before.kind === "refused",
+    moved:
+      before.kind === "saved"
+        ? movedSince(before.value, now)
+        : movedOver(closed, now),
   }));
   return answer.kind === "refused"
     ? refused(
@@ -374,13 +399,13 @@ function keyOf({ month, year }: Month): string {
   return `${String(year)}-${String(month + 1).padStart(2, "0")}`;
 }
 
-// The rows of what moved: the standing the month end expected, a row a
-// step with how far it moved the retirement and the liquid worth, and
-// the standing now, each with how far it moved the liquid worth beside
-// it, for the meta line to say which moved it most.
+// The rows of what moved: the standing the month end expected, by the
+// plan now where the balances alone were laid over it, a row a step with
+// how far it moved the retirement and the liquid worth, and the standing
+// now, each with how far it moved the liquid worth beside it, for the
+// meta line to say which moved it most.
 function rowsOf(
-  moved: Moved,
-  before: Kept,
+  { asOf, isLaid, moved }: Compared,
   plan: Plan,
 ): readonly { readonly liquid: number; readonly row: WorksheetRow }[] {
   let standing = moved.expected;
@@ -404,7 +429,7 @@ function rowsOf(
     {
       liquid: 0,
       row: {
-        detail: `${formatMonth(before.asOf)}'s balances carried ${counted(moved.months, "month")} on as the plan expected`,
+        detail: `${formatMonth(asOf)}'s balances carried ${counted(moved.months, "month")} on as ${isLaid ? "today's plan expects" : "the plan expected"}`,
         figures: figuresOf(moved.expected, plan),
         label: "As the month end expected",
       },
