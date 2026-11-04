@@ -254,13 +254,15 @@ export function futureOf(points: readonly ProjectionPoint[], run: Run): Future {
 
 // The futures of a plan, drawn one at a time without end from the place
 // in the run given, its first unless another is, each the plan carried
-// along its own path, drawn as pathOf draws one at the spread given.
-// Future by future the draws come from a stream of their own, seeded by
-// where the future falls in the run, counted on from the seed given, or
-// from the one every run starts from, so a run of a thousand starts with
-// the hundred a run of a hundred is, a run drawn from its fiftieth is
-// the rest of the run drawn from its first, and the futures do not
-// depend on how many are taken or by whom.
+// along its own path, its years drawn as pathOf draws them at the spread
+// given and shared out over their months as monthsOver shares them.
+// Future by future the years and the months come from two streams of
+// their own, each seeded by where the future falls in the run, counted
+// on from the seed given, or from the one every run starts from, so a
+// run of a thousand starts with the hundred a run of a hundred is, a
+// run drawn from its fiftieth is the rest of the run drawn from its
+// first, and the futures do not depend on how many are taken or by
+// whom.
 export function* futuresOf(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -410,6 +412,49 @@ export function markersIn(
   );
 }
 
+// One future of the markets with its months: the path given, its years
+// as they were drawn, and what the plan rate comes to in each month of
+// them, twelve a year from January, drawn twelve normals a year in year
+// order from the stream given. Each year's draw is shared out over its
+// twelve months: each month takes a twelfth of the logarithm of one plus
+// the year's figure, and strays from it by the year's spread over the
+// root of twelve, times its own draw less the mean of the year's twelve.
+// So the twelve compound to the year's figure, to within rounding, and
+// each month strays in logs by the root of a twelfth of its year's
+// spread squared, apart from every other, so that any months stray as
+// markets do, whichever January they cross, while each year is the draw
+// it was.
+// Grown alike, a year's months would each stray a twelfth of its spread
+// rather than the root of a twelfth, and a few months would be far
+// calmer than markets are; drawn afresh with no year to share, every
+// year would be drawn again, and every figure read off a run with it.
+// Markets, not prices: prices rise smoothly within a year, so inflation
+// is left a year at a time. The months of the first year before the
+// plan opens are drawn though never read, so a year's months are the
+// same whichever month the plan opens in and however long it runs. With
+// each year's figure held, what is left in from a month on grows a
+// little more on average than it did when the months grew alike, so
+// money drawn in a year costs a little more of where it ends, and money
+// paid in earns a little more: for a plan drawing on its savings that
+// is a correction, and edges its chance down.
+export function monthsOver(
+  path: Path,
+  spread: Spread,
+  normal: () => number,
+): Path {
+  return {
+    ...path,
+    months: path.rate.flatMap((rate, offset) => {
+      const draws = Array.from({ length: 12 }, () => normal());
+      const mean = draws.reduce((sum, draw) => sum + draw, 0) / 12;
+      const by = (spread.byYear?.[offset] ?? spread.rate) / Math.sqrt(12);
+      return draws.map((draw) =>
+        Math.expm1(Math.log1p(rate) / 12 + by * (draw - mean)),
+      );
+    }),
+  };
+}
+
 // A run of futures graded on the lines given, counted. A future kept
 // going only by drawing a pension early is graded by when it first did,
 // as it is counted as falling short then, and one whose owner never
@@ -464,10 +509,11 @@ export function outcomesOf(
 // much above the plan's rate, and no year loses more than
 // everything, as a normal draw of the return itself could. The plan's
 // first year is drawn whole although the plan holds only the months of
-// it from where it starts, which understates how far that one stretch
-// can stray. Inflation is drawn apart from returns, since no source
-// says how the two move together, and each year apart from the last, so
-// a decade of high prices is rarer here than the past has known.
+// it from where it starts; monthsOver shares it out over its months, so
+// the stretch the plan holds strays as far as those months do.
+// Inflation is drawn apart from returns, since no source says how the
+// two move together, and each year apart from the last, so a decade of
+// high prices is rarer here than the past has known.
 export function pathOf(
   plan: Pick<Plan, "byYear" | "inflation" | "rate" | "years">,
   spread: Spread,
@@ -685,7 +731,10 @@ function cutBy(run: Run, cut: number): Run {
 
 // The run of the future at the place given in a run of the plan's
 // futures: the plan carried along the path drawn from that future's
-// own stream.
+// own streams, its years' and its months', the months' seeded half the
+// generator's cycle on from the years', so that no stretch of the
+// generator one stream draws meets another's over a run of ten thousand
+// futures two hundred years long, as its test holds.
 function drawnOver(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -701,7 +750,12 @@ function drawnOver(
     readonly spread: Spread;
   },
 ): Run {
-  const path = pathOf(plan, spread, normalsFrom(seed + future * step));
+  const yearsSeed = seed + future * step;
+  const path = monthsOver(
+    pathOf(plan, spread, normalsFrom(yearsSeed)),
+    spread,
+    normalsFrom(yearsSeed + 2 ** 31),
+  );
   return { accounts, plan: { ...plan, path }, schedule };
 }
 
