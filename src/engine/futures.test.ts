@@ -24,6 +24,7 @@ import {
   gradingOf,
   lastsTried,
   markersIn,
+  monthsOver,
   outcomesOf,
   pathOf,
   reachedBy,
@@ -147,6 +148,102 @@ describe("pathOf", () => {
 
     expect(Math.min(...path.rate)).toBeGreaterThan(-1);
     expect(Math.min(...path.inflation)).toBeGreaterThan(-1);
+  });
+});
+
+describe("monthsOver", () => {
+  const spread = { inflation: 0.02, rate: 0.14 };
+
+  // The months of a path drawn over the years given, its years and its
+  // months from the streams given, or from streams of 1 and 2.
+  function monthsFor(
+    years: number,
+    { months = normalsFrom(2), yearly = normalsFrom(1) } = {},
+  ): readonly number[] {
+    return (
+      monthsOver(pathOf({ ...plan, years }, spread, yearly), spread, months)
+        .months ?? []
+    );
+  }
+
+  // How far values stray from their mean.
+  function deviationOf(values: readonly number[]): number {
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+    return Math.sqrt(
+      values.reduce((sum, value) => sum + (value - mean) ** 2, 0) /
+        values.length,
+    );
+  }
+
+  it("leaves the years as pathOf drew them, and holds twelve months for each", () => {
+    const path = pathOf(plan, spread, normalsFrom(1));
+    const { months, ...years } = monthsOver(path, spread, normalsFrom(2));
+
+    expect(years).toStrictEqual(path);
+    expect(months).toHaveLength(480);
+  });
+
+  it("shares each year's figure out over its twelve months, which compound to it", () => {
+    const path = pathOf(plan, spread, normalsFrom(1));
+    const months = monthsFor(40);
+
+    for (const [offset, rate] of path.rate.entries()) {
+      const grown = months
+        .slice(12 * offset, 12 * offset + 12)
+        .reduce((product, month) => product * (1 + month), 1);
+      expect(Math.abs(grown / (1 + rate) - 1)).toBeLessThan(1e-12);
+    }
+  });
+
+  // 2,000 paths of two years straying 14% a year: in logs a month
+  // strays by 14% over the root of twelve, the three months across the
+  // January between the years by half of 14%, and the twelve from July
+  // to June by 14%, each to within 5%, some three standard errors.
+  it("draws any months straying by the root of their share of a year's spread, whichever January they cross", () => {
+    const yearly = normalsFrom(1);
+    const months = normalsFrom(2);
+    const drawn = Array.from({ length: 2000 }, () =>
+      monthsFor(2, { months, yearly }),
+    );
+
+    for (const [from, count] of [
+      [17, 1],
+      [11, 3],
+      [6, 12],
+    ] as const) {
+      const logs = drawn.map((each) =>
+        each
+          .slice(from, from + count)
+          .reduce((sum, month) => sum + logOf(month), 0),
+      );
+      expect(
+        Math.abs(deviationOf(logs) / (0.14 * Math.sqrt(count / 12)) - 1),
+      ).toBeLessThan(0.05);
+    }
+  });
+
+  // Along a glide path whose first year strays by nothing and second by
+  // 14%, each month of the first grows at the twelfth root of its 7%,
+  // and the second's are the months a spread of 14% every year shares
+  // its figure out over, the spread's own 50% taking no part.
+  it("draws each year's months by that year's spread, at the twelfth root of its figure where nothing strays", () => {
+    const glided = { byYear: [0, 0.14], inflation: 0, rate: 0.5 };
+    const path = pathOf({ ...plan, years: 2 }, glided, normalsFrom(1));
+    const { months = [] } = monthsOver(path, glided, normalsFrom(2));
+    const { months: flat = [] } = monthsOver(
+      path,
+      { inflation: 0, rate: 0.14 },
+      normalsFrom(2),
+    );
+
+    for (const month of months.slice(0, 12)) {
+      expect(month).toBeCloseTo(1.07 ** (1 / 12) - 1, 15);
+    }
+    expect(months.slice(12)).toStrictEqual(flat.slice(12));
+  });
+
+  it("draws a year's months the same however long the plan runs", () => {
+    expect(monthsFor(40).slice(0, 120)).toStrictEqual(monthsFor(10));
   });
 });
 
@@ -293,6 +390,85 @@ describe("futuresOf", () => {
     for (const [index, future] of reseeded.entries()) {
       expect(future).not.toStrictEqual(unseeded[index]);
     }
+  });
+
+  // Each future's years are drawn from the seed stepped on by the golden
+  // ratio's share of 2^32 for each future before it, as they were before
+  // the months were, and its months from half of 2^32 on from that.
+  it("draws each future's years from a stream of its own and shares them over its months from another", () => {
+    const run = {
+      plan: { ...planned, rate: 0.05 },
+      spread: { inflation: 0.02, rate: 0.15 },
+    };
+
+    expect(taken([isa], run, 3)).toStrictEqual(
+      Array.from({ length: 3 }, (_, future) => {
+        const years = 2026 + future * 0x9e3779b9;
+        const path = monthsOver(
+          pathOf(run.plan, run.spread, normalsFrom(years)),
+          run.spread,
+          normalsFrom(years + 2 ** 31),
+        );
+        const along = { ...run.plan, path };
+        return futureOf(project([isa], short, along), {
+          accounts: [isa],
+          plan: along,
+          schedule: short,
+        });
+      }),
+    );
+  });
+
+  // mulberry32 steps its state by 0x6d2b79f5 through a single cycle of
+  // 2^32, two steps to a normal, so a stream draws a stretch of that
+  // cycle from where its seed falls on it, the seed times the step's
+  // inverse. Where two streams' stretches fall apart is set by their
+  // seeds' difference alone, so the seed every run starts from stands
+  // for any. Over ten thousand futures two hundred years long, no
+  // stretch reaches the next along the cycle.
+  it("draws no future's years or months where another stream draws, over a run of ten thousand futures each two hundred years long", () => {
+    const increment = 0x6d2b79f5;
+    const long = { ...plan, years: 200 };
+    const spread = { inflation: 0.02, rate: 0.15 };
+    const stepsOf = (draw: (normal: () => number) => unknown): number => {
+      let normals = 0;
+      draw(() => {
+        normals += 1;
+        return 0;
+      });
+      return 2 * normals;
+    };
+    const yearly = stepsOf((normal) => pathOf(long, spread, normal));
+    const monthly = stepsOf((normal) =>
+      monthsOver(pathOf(long, spread, normalsFrom(1)), spread, normal),
+    );
+    let inverse = BigInt(increment);
+    for (let bits = 3; bits < 32; bits *= 2) {
+      inverse = BigInt.asUintN(
+        32,
+        inverse * (2n - BigInt(increment) * inverse),
+      );
+    }
+    const placeOf = (seed: number): number =>
+      Number(BigInt.asUintN(32, BigInt(seed) * inverse));
+    const stretches = Array.from({ length: 10000 }, (_, future) => [
+      { start: placeOf(2026 + future * 0x9e3779b9), steps: yearly },
+      { start: placeOf(2026 + future * 0x9e3779b9 + 2 ** 31), steps: monthly },
+    ])
+      .flat()
+      .toSorted((first, second) => first.start - second.start);
+    const gaps = stretches.map(
+      ({ start, steps }, index) =>
+        (stretches[index + 1]?.start ?? 2 ** 32 + (stretches[0]?.start ?? 0)) -
+        start -
+        steps,
+    );
+    const stream = normalsFrom(0);
+    stream();
+
+    expect(normalsFrom(2 * increment)()).toBe(stream());
+    expect(BigInt.asUintN(32, BigInt(increment) * inverse)).toBe(1n);
+    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(0);
   });
 
   it("draws from any place in the run the futures the run holds there", () => {
@@ -498,7 +674,9 @@ describe("futuresOf", () => {
   // £100,000 at 5% straying 15% a year, drawn £12,000 a year over ten
   // years, lasts with no cut in some futures and needs one in others:
   // nine in ten of 40 is 36, which £100,000 falls short of with no cut
-  // and £150,000 makes.
+  // and £155,000 makes. £150,000 made it while each year's months grew
+  // alike and falls a future short with them shared out unevenly, as
+  // money drawn costs a little more of where a year ends.
   it("finds a cut nine in ten futures last with and fewer do a point under, nothing or less exactly where nine in ten last as the run counts them", async () => {
     const run = {
       plan: { ...planned, rate: 0.05, years: 10 },
@@ -506,7 +684,7 @@ describe("futuresOf", () => {
     };
     for (const [balance, isNine] of [
       [100000, false],
-      [150000, true],
+      [155000, true],
     ] as const) {
       const saved = [{ ...isa, balance }];
       const lasting = (cut: number): number =>
