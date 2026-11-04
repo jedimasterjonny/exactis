@@ -14,7 +14,7 @@ import { portfolios, targets } from "@/data/targets.fixture";
 import { laidOut, monthsOn } from "@/engine/projection";
 import { Refusal } from "@/lib/answer";
 
-import { movedSince } from "./moved";
+import { movedOver, movedSince } from "./moved";
 
 // The household's rules as they are, watched, so a test can have them
 // refuse a state the walk takes.
@@ -409,5 +409,64 @@ describe("movedSince", () => {
     const spare = closing({ schedule: { ...kept.schedule, expenses: [] } });
 
     expect(movedSince(spare, closed(spare)).invested).toBe(1667);
+  });
+});
+
+describe("movedOver", () => {
+  // The reference as the close of August left it, each balance set on
+  // the day of that close, as a close sets them.
+  const dated = closing({
+    accounts: kept.accounts.map((account) => ({
+      ...account,
+      setOn: "2026-08-25",
+    })),
+  });
+  const set = { accounts: dated.accounts, asOf: dated.asOf };
+
+  // Only the ISA's invented £10,000 over the plan since, so the
+  // household now holds the plan August's close left.
+  it("walks a close's balances laid over the household now as movedSince walks the household that close left", () => {
+    const expected = closed(dated);
+    const now = closed(dated, {
+      accounts: changed(expected.accounts, 2, {
+        balance: (expected.accounts[1]?.balance ?? 0) + 10_000,
+      }),
+    });
+
+    expect(movedOver(set, now)).toStrictEqual(movedSince(dated, now));
+  });
+
+  // The stocks typed at 6% rather than 5% since: the month end expects
+  // 6% of August's balances, so the step is the balances' alone, and it
+  // ends on the year the household now retires in.
+  it("takes the rates changed since into what the month end expected, rather than a step", () => {
+    const now = closed(dated, { rates: { ...dated.rates, stocks: 0.06 } });
+    const moved = movedOver(set, now);
+
+    expect(moved.rates).toStrictEqual([]);
+    expect(moved.steps.map(({ groups }) => groups)).toStrictEqual([
+      ["balances"],
+    ]);
+    expect(moved.now.retired).toBe(movedSince(dated, now).now.retired);
+  });
+
+  // The SIPP opened since at an invented £4,000, and the current account
+  // closed: the SIPP opens where it stands now and the current account
+  // is left out, so neither is in the balances' sums.
+  it("holds an account opened since where it stands, and leaves out one closed", () => {
+    const now = closed(dated, {
+      accounts: [
+        ...closed(dated).accounts.filter(({ id }) => id !== 3),
+        { ...sipp, balance: 4000, owner: 1 },
+      ],
+      next: 21,
+    });
+    const moved = movedOver(set, now);
+
+    expect(moved.balances).toMatchObject({
+      stood: 901_462 - 16_900,
+      unchecked: 0,
+    });
+    expect(moved.changes).toStrictEqual([]);
   });
 });

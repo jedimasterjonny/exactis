@@ -1,5 +1,5 @@
 import type { Account } from "@/data/accounts";
-import type { Kept } from "@/data/household";
+import type { Kept, KeptBalances } from "@/data/household";
 import type { Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 import type { Future } from "@/engine/futures";
@@ -123,12 +123,45 @@ const sources: readonly {
   { keys: ["glide"], source: "glide" },
 ];
 
+// What moved the plan from the balances a close set and the month they
+// were as of, laid over the household now, to the household now, as
+// movedSince walks it: an account both hold opens on the balance the
+// close set it to, and the day it was set where the close kept one, or
+// else the day it has now, and one only the household now holds on its
+// balance now, outside the accounts the close set; one only the close
+// set is left out, the household holding no record to carry it by. The
+// rates and the household's own changes since are the household now's
+// from the opening on, so neither is a step.
+export function movedOver(closed: KeptBalances, now: Kept): Moved {
+  const set = new Map(closed.accounts.map((account) => [account.id, account]));
+  return movedSince(
+    {
+      ...now,
+      accounts: now.accounts.map((account) => {
+        const was = set.get(account.id);
+        return was === undefined
+          ? account
+          : {
+              ...account,
+              balance: was.balance,
+              ...(was.setOn !== undefined && { setOn: was.setOn }),
+            };
+      }),
+      asOf: closed.asOf,
+    },
+    now,
+    new Set(set.keys()),
+  );
+}
+
 // What moved the plan from the household as the close before the latest
 // left it to the household now, both kept and sound. The walk opens on
 // what the month end expected: the household then, moved on to the
 // month the balances are as of now, each balance at what monthsOn
 // carries it to over the months between, to the pound, as the month
-// end's worksheet opens on. monthsOn is what the month end expects
+// end's worksheet opens on, but for an account outside those the close
+// set, where they are given by id, which stays where it stood. monthsOn
+// is what the month end expects
 // rather than the plan coming true: it draws nothing on the savings in
 // a short month, settles no tax year in April and moves no house, so
 // what those would have done shows as the balances' move. The kept
@@ -147,18 +180,24 @@ const sources: readonly {
 // household now: the last group is taken to carry a refused one there
 // even where it changed nothing itself, and is then not named. Each step is
 // worked out after the ones before it, so taken in another order a
-// group's share of the move could differ. Refused in the rules' words
-// where even the expected state is.
-export function movedSince(before: Kept, now: Kept): Moved {
+// group's share of the move could differ. The balances' sums and what
+// the plan paid in run over the accounts the close set alone. Refused
+// in the rules' words where even the expected state is.
+export function movedSince(
+  before: Kept,
+  now: Kept,
+  ids: ReadonlySet<number> = new Set(before.accounts.map(({ id }) => id)),
+): Moved {
   const then = soundKept(before).household;
   const { plan, schedule } = laidOut(then.accounts, then.schedule, then.plan);
   const months = Math.max(0, monthsBetween(before.asOf, now.asOf));
-  const carried = monthsOn(before.accounts, schedule, { months, plan });
+  const moving = monthsOn(before.accounts, schedule, { months, plan });
+  const carried = moving.filter(({ account }) => ids.has(account.id));
   const expected: Kept = {
     ...before,
-    accounts: carried.map(({ account, balance }) => ({
+    accounts: moving.map(({ account, balance }) => ({
       ...account,
-      balance: Math.round(balance),
+      balance: ids.has(account.id) ? Math.round(balance) : account.balance,
     })),
     asOf: now.asOf,
   };
