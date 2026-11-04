@@ -52,6 +52,14 @@ export interface Landing {
   readonly passed: readonly Passed[];
 }
 
+// A close passed over, by the month its balances were as of, and why:
+// it cannot be read whole, its plan has no spread to draw futures from,
+// or no invested balance was checked at both it and the latest.
+export interface Passed {
+  readonly kind: "short" | "unchecked" | "unreadable";
+  readonly month: Month;
+}
+
 // What a reading of a close works from: the accounts it kept and the
 // month their balances were as of, the household it makes, the
 // accounts read at both it and now, by id as now holds them, how many
@@ -63,14 +71,6 @@ interface Laid {
   readonly left: number;
   readonly months: number;
   readonly read: ReadonlyMap<number, Account>;
-}
-
-// A close passed over, by the month its balances were as of, and why:
-// it cannot be read whole, its plan has no spread to draw futures from,
-// or no invested balance was checked at both it and the latest.
-interface Passed {
-  readonly kind: "short" | "unchecked" | "unreadable";
-  readonly month: Month;
 }
 
 // Where the invested balances landed since the oldest of the closes

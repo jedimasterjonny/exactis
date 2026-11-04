@@ -1,13 +1,15 @@
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 
 import { CalendarCheck, History } from "lucide-react";
 import Link from "next/link";
+import { Suspense, use } from "react";
 
 import type { WorksheetRow } from "@/components/app/atoms/worksheet";
 import type { Household, Kept } from "@/data/household";
 import type { Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 import type { Answer } from "@/lib/answer";
+import type { KeptClose, Landed, Passed } from "@/lib/landed";
 import type { Area, Group, Moved, RateSource, Standing } from "@/lib/moved";
 import type { SinceClose } from "@/store/household";
 
@@ -23,9 +25,12 @@ import { buttonVariants } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { ageIn } from "@/data/plan";
 import { isDue } from "@/data/progress";
+import { runLength } from "@/engine/futures";
 import { laidOut } from "@/engine/projection";
 import { answerOf, refused } from "@/lib/answer";
-import { counted } from "@/lib/count";
+import { counted, formatCount } from "@/lib/count";
+import { listed } from "@/lib/feeders";
+import { landedSince } from "@/lib/landed";
 import { formatGbp, formatSignedGbp } from "@/lib/money";
 import {
   cutOf,
@@ -37,6 +42,22 @@ import {
 } from "@/lib/months";
 import { movedOver, movedSince } from "@/lib/moved";
 import { cogitator, monthEnd, sectionLabel, subsectionLabel } from "@/lib/nav";
+
+// A band of the futures as the card where the invested balances landed
+// gives it, to three significant figures, so a small pot's band over a
+// month is not rounded onto a single figure.
+const banded = new Intl.NumberFormat("en-GB", {
+  currency: "GBP",
+  maximumSignificantDigits: 3,
+  style: "currency",
+});
+
+// Why a close is passed over, as the note naming it says.
+const passedWhy: Record<Passed["kind"], string> = {
+  short: "its plan has no spread to draw futures from",
+  unchecked: "no invested balance was checked at both it and this one",
+  unreadable: "it is in a form this app cannot read",
+};
 
 // What each group of the walk is called as a row of what moved.
 const groupNames: Record<Group, string> = {
@@ -76,6 +97,7 @@ const areaNames: Record<Area, string> = {
 };
 
 interface CloseScreenProps {
+  readonly closes: null | Promise<readonly KeptClose[]>;
   readonly household: Household;
   readonly isInScenario: boolean;
   readonly isUpdating: boolean;
@@ -103,7 +125,10 @@ interface Compared {
 // closed from, with what the plan paid in beside what Portfolio
 // Performance says was, where it says, what moved the plan since the
 // close before as the steps movedSince takes, and what the plan paid into
-// the ISAs and the GIAs, offered to the cogitator; with the next close
+// the ISAs and the GIAs, offered to the cogitator, and between the two
+// where the invested balances landed among the futures of a close in
+// the year before, once the closes given are read, in a boundary of its
+// own so the rest is drawn first; with the next close
 // due and what mostly moved said in the meta line, and the balances to
 // update in the header, which opens the same worksheet on the month
 // closed, for a close to be made again or another month picked, with the
@@ -120,6 +145,7 @@ interface Compared {
 // are given rather than read, as the household and the close before the
 // latest are.
 export function CloseScreen({
+  closes,
   household,
   isInScenario,
   isUpdating,
@@ -284,9 +310,37 @@ export function CloseScreen({
           </Note>
         </CardContent>
       </SectionCard>
+      {closes !== null && since !== null && (
+        <Suspense
+          fallback={
+            <LandedCard>
+              <p className="text-sm text-muted-foreground">
+                Drawing the futures…
+              </p>
+            </LandedCard>
+          }
+        >
+          <LandedSince closes={closes} now={since.now} />
+        </Suspense>
+      )}
       <Trades month={due} moved={moved} targets={household.targets} />
     </Screen>
   );
+}
+
+// Where the actual sits among the bands a reading's futures carry the
+// invested balances to, in the words of the five bands.
+function bandOf({ actual, bands }: Landed): string {
+  if (actual < bands.bottomTenth) {
+    return "bottom tenth";
+  }
+  if (actual < bands.bottomQuarter) {
+    return "bottom quarter";
+  }
+  if (actual <= bands.topQuarter) {
+    return "middle half";
+  }
+  return actual <= bands.topTenth ? "top quarter" : "top tenth";
 }
 
 // What moved the plan since the close before the latest, with the month
@@ -384,6 +438,19 @@ function dueSince(latest: Month | undefined): string {
     : `Due since ${cutDay(monthAfter(latest))}`;
 }
 
+// Why no close in the year before the latest gives a reading, in one
+// sentence: none was closed, none checked an invested balance at both it
+// and this close, or none can be read.
+function emptyOf(passed: readonly Passed[], latest: Month): string {
+  const year = `the year before ${formatMonth(latest)}`;
+  if (passed.length === 0) {
+    return `No month in ${year} was closed here, so this shows from the next close.`;
+  }
+  return passed.every(({ kind }) => kind === "unchecked")
+    ? "No invested balance was checked at both this close and one in the year before it."
+    : `No close in ${year} can be read, so this shows from the next close.`;
+}
+
 // A standing's figures: the age the plan's owner retires at, or never,
 // and the liquid worth.
 function figuresOf(standing: Standing, plan: Plan): readonly string[] {
@@ -393,10 +460,135 @@ function figuresOf(standing: Standing, plan: Plan): readonly string[] {
   ];
 }
 
+// How long since the close a reading is against, as its verdict opens:
+// the month, the year, or the months between.
+function horizonOf(months: number): string {
+  if (months === 1) {
+    return "the month";
+  }
+  return months === 12 ? "the year" : `the ${String(months)} months`;
+}
+
+// What the invested balances are, with how many of them were left out.
+function investedOf(left: number): string {
+  const invested =
+    "Invested balances are the accounts growing at the plan rate that were checked at both closes, as their statements give them.";
+  if (left === 0) {
+    return invested;
+  }
+  return left === 1
+    ? `${invested} 1 of them was not checked at both and is left out.`
+    : `${invested} ${String(left)} of them were not checked at both and are left out.`;
+}
+
 // A month as an ISO date writes it, its year and its month from one:
 // "2026-08".
 function keyOf({ month, year }: Month): string {
   return `${String(year)}-${String(month + 1).padStart(2, "0")}`;
+}
+
+// The card where the invested balances landed, under the caption given.
+function LandedCard({
+  caption,
+  children,
+}: {
+  readonly caption?: string;
+  readonly children: ReactNode;
+}): JSX.Element {
+  return (
+    <SectionCard
+      {...(caption !== undefined && { caption })}
+      label={subsectionLabel(monthEnd, 3)}
+      title="Where the invested balances landed"
+    >
+      <CardContent className="grid gap-4">{children}</CardContent>
+    </SectionCard>
+  );
+}
+
+// Where the invested balances landed among the futures of the oldest
+// close in the year before the latest that gives a reading, once the
+// closes given are read, against the household now: a verdict with the
+// horizon in it, naming the close and the band of its futures the
+// balances landed in; the balances against the middle future and the
+// middle half and middle 80% of the run; what the balances are, and how
+// many were left out; how paid in is counted, as Portfolio Performance
+// gives it for the accounts it names, or as the plan paid it, saying so
+// where the holdings were imported before this close; that the plan
+// draws on the savings, where it does in any of the months; and each
+// close passed over on the way, and why. Where no close gives a reading
+// it says so in one sentence: none was closed in the year, none checked
+// an invested balance at both it and this close, or none can be read,
+// each passed over said after it.
+function LandedSince({
+  closes,
+  now,
+}: {
+  readonly closes: Promise<readonly KeptClose[]>;
+  readonly now: Kept;
+}): JSX.Element {
+  const { landed, passed } = landedSince(use(closes), now);
+  const passedOver = passed.map((each) => (
+    <Note key={keyOf(each.month)}>{passedOverOf(each)}</Note>
+  ));
+  if (landed === null) {
+    return (
+      <LandedCard>
+        <p className="text-sm text-muted-foreground">
+          {emptyOf(passed, now.asOf)}
+        </p>
+        {passed.some(({ kind }) => kind !== "unchecked") && passedOver}
+      </LandedCard>
+    );
+  }
+  const { actual, asOf, bands } = landed;
+  return (
+    <LandedCard caption={`Since the close of ${formatMonth(asOf)}`}>
+      <p className="heading text-xl text-balance">
+        {`Over ${horizonOf(landed.months)} since ${formatMonth(asOf)}'s close, the invested balances landed in the ${bandOf(landed)} of the futures its plan drew.`}
+      </p>
+      <p className="text-sm text-muted-foreground">
+        {`${formatGbp(actual)} invested on ${formatDay(cutOf(now.asOf))}. The middle future of the ${formatCount(runLength)} came to ${banded.format(bands.middle)}; the middle half ran from ${banded.format(bands.bottomQuarter)} to ${banded.format(bands.topQuarter)}, and the middle 80% from ${banded.format(bands.bottomTenth)} to ${banded.format(bands.topTenth)}.`}
+      </p>
+      <Note>{investedOf(landed.left)}</Note>
+      <Note>{paidInOf(landed, now)}</Note>
+      {landed.isDrawing && (
+        <Note>
+          The plan draws on the savings in at least one of these months, but the
+          futures here draw nothing, so the invested balances can land lower
+          among them than the markets alone would put them.
+        </Note>
+      )}
+      {passedOver}
+    </LandedCard>
+  );
+}
+
+// How a reading counts what was paid in: as Portfolio Performance gives
+// it for the accounts it names, with how far that is from what the plan
+// paid, or that it is the same to the pound, and as the plan paid it for
+// the rest; or as the plan paid it, saying so where the holdings were
+// imported before this close.
+function paidInOf({ beyond, paidBy, read }: Landed, now: Kept): string {
+  if (paidBy.length === 0) {
+    const { targets } = now;
+    return targets !== null && targets.importedOn < cutOf(now.asOf)
+      ? "The futures count paid in as the plan paid it, since the holdings were imported before this close."
+      : "The futures count paid in as the plan paid it.";
+  }
+  const side = beyond < 0 ? "less" : "more";
+  const against =
+    Math.round(beyond) === 0
+      ? "the same as the plan paid"
+      : `${formatGbp(Math.abs(beyond))} ${side} than the plan paid`;
+  const rest =
+    paidBy.length < read ? ", and as the plan paid for the rest" : "";
+  return `The futures count paid in as Portfolio Performance gives it for ${listed.format(paidBy)}, ${against}${rest}.`;
+}
+
+// Why a close was passed over, as its note says it.
+function passedOverOf({ kind, month }: Passed): string {
+  return `${formatMonth(month)}'s close is passed over, since ${passedWhy[kind]}.`;
 }
 
 // The rows of what moved: the standing the month end expected, by the
@@ -543,7 +735,7 @@ function Trades({
           </Link>
         </>
       }
-      label={subsectionLabel(monthEnd, 3)}
+      label={subsectionLabel(monthEnd, 4)}
       title="Trades"
     >
       <CardContent className="grid gap-4">

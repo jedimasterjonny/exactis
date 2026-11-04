@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Kept } from "@/data/household";
+import type { KeptClose, Landed, Landing } from "@/lib/landed";
 import type { Moved } from "@/lib/moved";
 
 import { closeBalances } from "@/actions/accounts";
@@ -15,20 +16,28 @@ import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
 import { portfolios, targets } from "@/data/targets.fixture";
 import { Refusal, refused, saved } from "@/lib/answer";
+import { landedSince } from "@/lib/landed";
 import { movedOver, movedSince } from "@/lib/moved";
-import { getHousehold, getOpened, getSinceClose } from "@/store/household";
+import {
+  getClosesBack,
+  getHousehold,
+  getOpened,
+  getSinceClose,
+} from "@/store/household";
 
 import Close from "./page";
 
 const replace = vi.hoisted(() => vi.fn());
 
 vi.mock("@/store/household", () => ({
+  getClosesBack: vi.fn(),
   getHousehold: vi.fn(),
   getOpened: vi.fn(),
   getSinceClose: vi.fn(),
 }));
 vi.mock("@/actions/accounts", () => ({ closeBalances: vi.fn() }));
 vi.mock("@/actions/targets", () => ({ importTargets: vi.fn() }));
+vi.mock("@/lib/landed", () => ({ landedSince: vi.fn() }));
 vi.mock("@/lib/moved", () => ({ movedOver: vi.fn(), movedSince: vi.fn() }));
 vi.mock("next/navigation", () => ({
   useRouter: (): { readonly replace: typeof replace } => ({ replace }),
@@ -71,9 +80,67 @@ const moved: Moved = {
   ],
 };
 
+// Where the invested balances landed since July's close, invented: a
+// month on, in the middle half of its futures, the ISA paid £300 more
+// than the plan paid it, as Portfolio Performance says, and one of three
+// invested balances left out.
+const landed: Landed = {
+  actual: 190_412,
+  asOf: { month: 6, year: 2026 },
+  bands: {
+    bottomQuarter: 185_600,
+    bottomTenth: 180_400,
+    middle: 191_250,
+    topQuarter: 196_800,
+    topTenth: 202_100,
+  },
+  beyond: 300,
+  isDrawing: false,
+  left: 1,
+  months: 1,
+  paidBy: ["Stocks & shares ISA"],
+  read: 2,
+};
+
+// The closes kept in the year before August's as reads already
+// answered: none, and July's. Each is marked the way React marks a
+// promise it has seen settle, so the card draws from it at once, as the
+// request's boundary does once the read is in, rather than suspending
+// inside a render the test cannot await.
+const noCloses: readonly KeptClose[] = [];
+const unclosed = Object.assign(Promise.resolve(noCloses), {
+  status: "fulfilled",
+  value: noCloses,
+});
+const julyCloses: readonly KeptClose[] = [
+  { before: saved(soundKept(july)), month: july.asOf },
+];
+const julyClosed = Object.assign(Promise.resolve(julyCloses), {
+  status: "fulfilled",
+  value: julyCloses,
+});
+
 // The line beneath a row of what moved, which describes its name.
 function detail(name: string): HTMLElement {
   return screen.getByRole("rowheader", { name });
+}
+
+// The card where the invested balances landed, once it is drawn: its
+// caption, where it has one, and its lines.
+function landing(): {
+  readonly caption: null | string;
+  readonly lines: readonly (null | string)[];
+} {
+  const card = screen.getByRole("region", {
+    name: "Where the invested balances landed",
+  });
+  return {
+    caption:
+      within(card).queryByText(/^Since the close of/u)?.textContent ?? null,
+    lines: within(card)
+      .getAllByRole("paragraph")
+      .map((line) => line.textContent),
+  };
 }
 
 // The links of the trades' card, each its name and where it goes.
@@ -85,15 +152,18 @@ function links(): (null | string)[][] {
 
 // The month end at the address given on the day given, over the
 // household given, as the store reads it, with a scenario open where one
-// is named, and the close before the latest as given.
+// is named, the close before the latest as given, and the closes kept in
+// the year before the latest as given, read once the page is drawn.
 async function renderClose({
   address = {},
+  closes = unclosed,
   day = "2026-09-15",
   household = kept,
   scenario = null,
   since = { balances: null, before: saved(july), now: kept },
 }: {
   readonly address?: Record<string, string>;
+  readonly closes?: Promise<readonly KeptClose[]>;
   readonly day?: string;
   readonly household?: Kept;
   readonly scenario?: null | string;
@@ -105,7 +175,9 @@ async function renderClose({
     scenario === null ? null : { isKept: true, name: scenario },
   );
   vi.mocked(getSinceClose).mockResolvedValue(since);
-  render(await Close({ searchParams: Promise.resolve(address) }));
+  vi.mocked(getClosesBack).mockReturnValue(closes);
+  const page = await Close({ searchParams: Promise.resolve(address) });
+  render(page);
 }
 
 // The rows of what moved, each its name and its figures.
@@ -140,6 +212,7 @@ function updating(): null | string {
 describe("Close", () => {
   beforeEach(() => {
     vi.mocked(movedSince).mockReturnValue(moved);
+    vi.mocked(landedSince).mockReturnValue({ landed: null, passed: [] });
   });
 
   afterEach(() => {
@@ -506,6 +579,12 @@ describe("Close", () => {
     ).toBeInTheDocument();
     expect(movedSince).not.toHaveBeenCalled();
     expect(updating()).toBe("/close?update");
+    expect(getClosesBack).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("region", {
+        name: "Where the invested balances landed",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   // An earlier month closed again since August's close took the
@@ -547,6 +626,7 @@ describe("Close", () => {
       }),
     ).toHaveAttribute("href", "/close");
     expect(getSinceClose).not.toHaveBeenCalled();
+    expect(getClosesBack).not.toHaveBeenCalled();
   });
 
   // August's balances, updated and saved, go back to what moved rather
@@ -649,6 +729,7 @@ describe("Close", () => {
       within(screen.getByRole("banner")).queryByRole("link"),
     ).not.toBeInTheDocument();
     expect(getSinceClose).not.toHaveBeenCalled();
+    expect(getClosesBack).not.toHaveBeenCalled();
   });
 
   // In the middle of November, with September and October both cut
@@ -684,5 +765,189 @@ describe("Close", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("region")).not.toBeInTheDocument();
     expect(getSinceClose).not.toHaveBeenCalled();
+    expect(getClosesBack).not.toHaveBeenCalled();
+  });
+});
+
+describe("Where the invested balances landed", () => {
+  // The reading given of the closes, over the household now given, or
+  // the reference with no holdings imported.
+  async function renderLanded(
+    reading: Landing,
+    now: Kept = { ...kept, targets: null },
+  ): Promise<void> {
+    vi.mocked(landedSince).mockReturnValue(reading);
+    await renderClose({
+      closes: julyClosed,
+      since: { balances: null, before: saved(july), now },
+    });
+  }
+
+  beforeEach(() => {
+    vi.mocked(movedSince).mockReturnValue(moved);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // The bands to three significant figures, the actual to the pound.
+  it("says where the invested balances landed over the month since the close before, between what moved and trades", async () => {
+    await renderLanded({ landed, passed: [] }, kept);
+
+    const card = screen.getByRole("region", {
+      name: "Where the invested balances landed",
+    });
+    expect(within(card).getByText("Sect. VII.iii")).toHaveClass("label");
+    expect(
+      within(screen.getByRole("region", { name: "Trades" })).getByText(
+        "Sect. VII.iv",
+      ),
+    ).toHaveClass("label");
+    expect(landing()).toStrictEqual({
+      caption: "Since the close of July 2026",
+      lines: [
+        "Over the month since July 2026's close, the invested balances landed in the middle half of the futures its plan drew.",
+        "£190,412 invested on 25 Aug 2026. The middle future of the 1,000 came to £191,000; the middle half ran from £186,000 to £197,000, and the middle 80% from £180,000 to £202,000.",
+        "Invested balances are the accounts growing at the plan rate that were checked at both closes, as their statements give them. 1 of them was not checked at both and is left out.",
+        "The futures count paid in as Portfolio Performance gives it for Stocks & shares ISA, £300 more than the plan paid, and as the plan paid for the rest.",
+      ],
+    });
+    expect(landedSince).toHaveBeenCalledExactlyOnceWith(julyCloses, kept);
+  });
+
+  // March's close read five months on, February's passed over, and both
+  // invested balances named by Portfolio Performance, less than planned.
+  it("says where they landed over the months since an older close, naming each close passed over", async () => {
+    await renderLanded(
+      {
+        landed: {
+          ...landed,
+          actual: 183_250,
+          asOf: { month: 2, year: 2026 },
+          beyond: -300,
+          left: 2,
+          months: 5,
+          paidBy: ["Stocks & shares ISA", "Workplace pension"],
+        },
+        passed: [{ kind: "unreadable", month: { month: 1, year: 2026 } }],
+      },
+      kept,
+    );
+
+    expect(landing()).toStrictEqual({
+      caption: "Since the close of March 2026",
+      lines: [
+        "Over the 5 months since March 2026's close, the invested balances landed in the bottom quarter of the futures its plan drew.",
+        "£183,250 invested on 25 Aug 2026. The middle future of the 1,000 came to £191,000; the middle half ran from £186,000 to £197,000, and the middle 80% from £180,000 to £202,000.",
+        "Invested balances are the accounts growing at the plan rate that were checked at both closes, as their statements give them. 2 of them were not checked at both and are left out.",
+        "The futures count paid in as Portfolio Performance gives it for Stocks & shares ISA and Workplace pension, £300 less than the plan paid.",
+        "February 2026's close is passed over, since it is in a form this app cannot read.",
+      ],
+    });
+  });
+
+  // August 2025's close read a year on, from a household whose holdings
+  // were imported on the 20th, before August's cut, and whose plan draws
+  // on its savings.
+  it("says where they landed over the year, that paid in is as planned where the holdings are older than the close, and that the plan draws on the savings", async () => {
+    await renderLanded(
+      {
+        landed: {
+          ...landed,
+          actual: 250_000,
+          asOf: { month: 7, year: 2025 },
+          beyond: 0,
+          isDrawing: true,
+          left: 0,
+          months: 12,
+          paidBy: [],
+        },
+        passed: [],
+      },
+      { ...kept, targets: { ...targets, importedOn: "2026-08-20" } },
+    );
+
+    expect(landing().lines).toStrictEqual([
+      "Over the year since August 2025's close, the invested balances landed in the top tenth of the futures its plan drew.",
+      "£250,000 invested on 25 Aug 2026. The middle future of the 1,000 came to £191,000; the middle half ran from £186,000 to £197,000, and the middle 80% from £180,000 to £202,000.",
+      "Invested balances are the accounts growing at the plan rate that were checked at both closes, as their statements give them.",
+      "The futures count paid in as the plan paid it, since the holdings were imported before this close.",
+      "The plan draws on the savings in at least one of these months, but the futures here draw nothing, so the invested balances can land lower among them than the markets alone would put them.",
+    ]);
+  });
+
+  // Portfolio Performance says 40p more went into the ISA than the plan
+  // paid it, which is nothing to the pound.
+  it("says paid in was the same as the plan paid where it is to the pound", async () => {
+    await renderLanded(
+      { landed: { ...landed, beyond: 0.4 }, passed: [] },
+      kept,
+    );
+
+    expect(landing().lines[3]).toBe(
+      "The futures count paid in as Portfolio Performance gives it for Stocks & shares ISA, the same as the plan paid, and as the plan paid for the rest.",
+    );
+  });
+
+  // Below the bottom tenth, and between the top quarter and the top
+  // tenth, with no holdings imported.
+  it.each([
+    [170_000, "bottom tenth"],
+    [200_000, "top quarter"],
+  ] as const)(
+    "names the band £%i landed in, the %s, and counts paid in as planned with no holdings",
+    async (actual, band) => {
+      await renderLanded({
+        landed: { ...landed, actual, paidBy: [] },
+        passed: [],
+      });
+
+      const [verdict, , , paid] = landing().lines;
+      expect(verdict).toBe(
+        `Over the month since July 2026's close, the invested balances landed in the ${band} of the futures its plan drew.`,
+      );
+      expect(paid).toBe("The futures count paid in as the plan paid it.");
+    },
+  );
+
+  it("says no month in the year before was closed, so it shows from the next close", async () => {
+    await renderLanded({ landed: null, passed: [] });
+
+    expect(landing()).toStrictEqual({
+      caption: null,
+      lines: [
+        "No month in the year before August 2026 was closed here, so this shows from the next close.",
+      ],
+    });
+  });
+
+  it("says no invested balance was checked at both this close and one before it", async () => {
+    await renderLanded({
+      landed: null,
+      passed: [{ kind: "unchecked", month: { month: 6, year: 2026 } }],
+    });
+
+    expect(landing().lines).toStrictEqual([
+      "No invested balance was checked at both this close and one in the year before it.",
+    ]);
+  });
+
+  it("says no close in the year before can be read, and why each was passed over", async () => {
+    await renderLanded({
+      landed: null,
+      passed: [
+        { kind: "unreadable", month: { month: 4, year: 2026 } },
+        { kind: "short", month: { month: 5, year: 2026 } },
+        { kind: "unchecked", month: { month: 6, year: 2026 } },
+      ],
+    });
+
+    expect(landing().lines).toStrictEqual([
+      "No close in the year before August 2026 can be read, so this shows from the next close.",
+      "May 2026's close is passed over, since it is in a form this app cannot read.",
+      "June 2026's close is passed over, since its plan has no spread to draw futures from.",
+      "July 2026's close is passed over, since no invested balance was checked at both it and this one.",
+    ]);
   });
 });
