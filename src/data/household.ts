@@ -901,6 +901,29 @@ const sources = z.object({
   targets: targets.nullable().default(null),
 }) satisfies z.ZodType<Sources>;
 
+// The balances a kept household holds, each by its account's id with
+// the day it was set where it was, and the month they are as of.
+export interface KeptBalances {
+  readonly accounts: readonly Pick<Account, "balance" | "id" | "setOn">[];
+  readonly asOf: Month;
+}
+
+// The balances as a kept household holds them, each field read as an
+// account's own is, off the stored document as it is rather than
+// carried through the chain of shapes, so a step that renames or moves
+// asOf, the accounts, or an account's balance, id or day changes this
+// read too.
+const balances = z.object({
+  accounts: z.array(
+    z.object({
+      balance: account.shape.balance,
+      id: account.shape.id,
+      setOn: account.shape.setOn,
+    }),
+  ),
+  asOf: month,
+}) satisfies z.ZodType<KeptBalances>;
+
 // The id no record reaches: a million, past any a household gives out a
 // save at a time, and far short of where counting on by one stops being
 // exact. The next id is held to it, so a household holding one past it,
@@ -923,7 +946,8 @@ const idsBelow = 1_000_000;
 // in an older shape to this one first, so nothing is defaulted here:
 // what the chain cannot carry is refused rather than read. Only the
 // latest version and the one the close before the latest kept are read
-// whole; any other older one is read only for its sources, above. The
+// whole, the second for its balances alone where it is refused; any
+// other older one is read only for its sources, above. The
 // stamp is no key here, so it is dropped on the read and never reaches
 // the household in memory. A household with no owner is refused for
 // that, and holds nobody to the plan's end.
@@ -981,6 +1005,15 @@ const kept = z
       schedule.income.every(({ kind }) => kind !== "state-pension"),
     "A State Pension is paid on its owner's qualifying years, not typed as a line",
   ) satisfies z.ZodType<Kept>;
+
+// The balances a value kept as a household holds and the month they are
+// as of, or null where they are not there to read as an account and a
+// month hold them: what the close before the latest is read for where
+// the chain or the rules refuse it whole.
+export function balancesIn(value: unknown): KeptBalances | null {
+  const parsed = balances.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
 
 // Holds a change that can be made only under the rates typed: one that
 // would leave the CMA's rates live with none to give, as an import of a

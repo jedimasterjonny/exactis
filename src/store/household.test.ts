@@ -444,19 +444,22 @@ describe("the household store", () => {
     await keepAfter(db, { scenario: "", version: 1 }, reference);
 
     expect(await getSinceClose()).toStrictEqual({
+      balances: null,
       before: saved(july),
       now: reference,
     });
   });
 
-  // Written past the rules, as a close kept before they tightened.
-  it("says why the close before the latest cannot be read now", async () => {
+  // Written past the rules, as a close kept before they tightened, every
+  // account listed twice: its balances are still read, each as listed.
+  it("says why the close before the latest cannot be read now, beside the balances it set", async () => {
+    const accounts = [...reference.accounts, ...reference.accounts];
     await keepAfter(
       db,
       { scenario: "", version: 0 },
       {
         ...reference,
-        accounts: [...reference.accounts, ...reference.accounts],
+        accounts,
         asOf: { month: 6, year: 2026 },
         points: reference.points.slice(0, -1),
       },
@@ -464,6 +467,10 @@ describe("the household store", () => {
     await keepAfter(db, { scenario: "", version: 1 }, reference);
 
     expect(await getSinceClose()).toStrictEqual({
+      balances: {
+        accounts: accounts.map(({ balance, id }) => ({ balance, id })),
+        asOf: { month: 6, year: 2026 },
+      },
       before: refused("A record's id is held by no other record"),
       now: reference,
     });

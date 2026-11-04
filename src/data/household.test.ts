@@ -57,6 +57,7 @@ import { project } from "@/engine/projection";
 import type { Kept } from "./household";
 
 import {
+  balancesIn,
   holdWhileLive,
   household,
   nothingKeptIn,
@@ -1848,6 +1849,35 @@ describe("soundKept", () => {
         ),
       }),
     ).toThrow(/^A balance below nothing is a debt's$/);
+  });
+});
+
+describe("balancesIn", () => {
+  // The ISA dated and the rest not, every account listed twice, which
+  // the rules refuse, and a stamp past this app's shape, which the chain
+  // refuses: the balances are read off the document as it is.
+  it("reads the balances a household kept and the month they are as of, past the chain and the rules", () => {
+    const listed = [...kept.accounts, ...kept.accounts].map((account) =>
+      account.id === 2 ? { ...account, setOn: "2026-08-03" } : account,
+    );
+
+    expect(
+      balancesIn({ ...kept, accounts: listed, shape: currentShape + 1 }),
+    ).toStrictEqual({
+      accounts: listed.map(({ balance, id, setOn }) => ({
+        balance,
+        id,
+        ...(setOn !== undefined && { setOn }),
+      })),
+      asOf: kept.asOf,
+    });
+  });
+
+  it("reads no balances where one is not whole pounds, or no month is kept", () => {
+    expect(
+      balancesIn({ ...kept, accounts: [{ ...accounts[0], balance: 0.5 }] }),
+    ).toBeNull();
+    expect(balancesIn({ accounts: kept.accounts })).toBeNull();
   });
 });
 

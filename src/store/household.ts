@@ -3,12 +3,17 @@ import { refresh } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { cache } from "react";
 
-import type { Household, Kept } from "@/data/household";
+import type { Household, Kept, KeptBalances } from "@/data/household";
 import type { Before } from "@/data/moves";
 import type { Read, Version } from "@/db/household";
 import type { Answer } from "@/lib/answer";
 
-import { nothingKeptIn, soundKept, sourcesIn } from "@/data/household";
+import {
+  balancesIn,
+  nothingKeptIn,
+  soundKept,
+  sourcesIn,
+} from "@/data/household";
 import { isDue } from "@/data/progress";
 import { upcast } from "@/data/shapes";
 import { getDb } from "@/db/client";
@@ -39,8 +44,11 @@ export interface Opened {
 }
 
 // The household as the close before the latest left it, or why it cannot
-// be read now, beside the household now, both as kept.
+// be read now, beside the household now, both as kept, with the balances
+// that close set and the month they were as of where it cannot be read
+// whole but they can.
 export interface SinceClose {
+  readonly balances: KeptBalances | null;
   readonly before: Answer<Kept>;
   readonly now: Kept;
 }
@@ -175,10 +183,11 @@ export async function getScenarios(): Promise<readonly string[]> {
 // page reads, beside the household as the close before its latest point
 // left it, the month of the point before the latest, carried through
 // the chain and held to every rule as the latest is, or the refusal in
-// their words where it cannot be read now; or null with fewer than two
-// points, or where no version holds the close of that month, as one
-// whose points were imported does not. The session is checked first,
-// as every read's is.
+// their words where it cannot be read now, with its balances and the
+// month they were as of read on their own where they can be; or null
+// with fewer than two points, or where no version holds the close of
+// that month, as one whose points were imported does not. The session
+// is checked first, as every read's is.
 export async function getSinceClose(): Promise<null | SinceClose> {
   await requireSession();
   const [{ scenario }, { kept }] = await Promise.all([
@@ -188,12 +197,7 @@ export async function getSinceClose(): Promise<null | SinceClose> {
   const month = kept.points.at(-2)?.month;
   const closed =
     month === undefined ? null : await readClosed(getDb(), scenario, month);
-  return closed === null
-    ? null
-    : {
-        before: answerOf(() => soundKept(upcast(closed.household)).kept),
-        now: kept,
-      };
+  return closed === null ? null : sinceOf(closed.household, kept);
 }
 
 // The sources the CMA-derived rates rested on as the household stood so
@@ -311,4 +315,16 @@ async function readOpen(isSaving: boolean): Promise<Open> {
     }
   }
   return { latest: await readLatest(db, ""), scenario: "" };
+}
+
+// The household as a close kept it, carried through the chain and held
+// to every rule, or the refusal in their words with the balances it
+// holds read on their own, beside the household now.
+function sinceOf(household: unknown, now: Kept): SinceClose {
+  const before = answerOf(() => soundKept(upcast(household)).kept);
+  return {
+    balances: before.kind === "refused" ? balancesIn(household) : null,
+    before,
+    now,
+  };
 }

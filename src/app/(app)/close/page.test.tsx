@@ -91,7 +91,7 @@ async function renderClose({
   day = "2026-09-15",
   household = kept,
   scenario = null,
-  since = { before: saved(july), now: kept },
+  since = { balances: null, before: saved(july), now: kept },
 }: {
   readonly address?: Record<string, string>;
   readonly day?: string;
@@ -513,6 +513,7 @@ describe("Close", () => {
   it("says there is nothing to compare with where the balances have been closed back onto the close before", async () => {
     await renderClose({
       since: {
+        balances: null,
         before: saved(july),
         now: { ...kept, asOf: { month: 6, year: 2026 } },
       },
@@ -565,7 +566,11 @@ describe("Close", () => {
 
   it("says why the close before the latest cannot be read, or moved on, now", async () => {
     await renderClose({
-      since: { before: refused("A rule since tightened"), now: kept },
+      since: {
+        balances: null,
+        before: refused("A rule since tightened"),
+        now: kept,
+      },
     });
 
     expect(
