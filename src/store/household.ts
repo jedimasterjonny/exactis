@@ -5,7 +5,7 @@ import { cache } from "react";
 
 import type { Household, Kept, KeptBalances } from "@/data/household";
 import type { Before } from "@/data/moves";
-import type { Decided, Read, Version } from "@/db/household";
+import type { Decided, Listed, Read, Version } from "@/db/household";
 import type { Answer } from "@/lib/answer";
 import type { KeptClose } from "@/lib/landed";
 
@@ -73,6 +73,16 @@ export interface Opened {
   readonly name: string;
 }
 
+// The names of the scenarios kept, as the scenario menu lists them: the
+// open ones in order of name, then those decided against and those made
+// the household, each the latest decided first, so the history grows
+// where it pushes nothing down.
+export interface Scenarios {
+  readonly adopted: readonly string[];
+  readonly open: readonly string[];
+  readonly rejected: readonly string[];
+}
+
 // The household as the close before the latest left it, or why it cannot
 // be read now, beside the household now, both as kept, with the balances
 // that close set and the month they were as of where it cannot be read
@@ -115,8 +125,8 @@ const readPageHeld = cache(async (): Promise<Held> => heldIn(await readPage()));
 const readBaseline = cache(async (): Promise<Held & Read> =>
   heldIn({ latest: await readLatest(getDb(), ""), scenario: "" }),
 );
-const readScenarios = cache(async (): Promise<readonly string[]> =>
-  listScenarios(getDb()),
+const readScenarios = cache(async (): Promise<Scenarios> =>
+  scenariosOf(await listScenarios(getDb())),
 );
 
 // Saves the household as the edit makes it, and answers with what the
@@ -286,8 +296,8 @@ export async function getScenario(): Promise<null | string> {
   return scenario === "" ? null : scenario;
 }
 
-// The names of the scenarios kept, in order.
-export async function getScenarios(): Promise<readonly string[]> {
+// The scenarios kept, open and decided apart, as the menu lists them.
+export async function getScenarios(): Promise<Scenarios> {
   await requireSession();
   return readScenarios();
 }
@@ -453,6 +463,23 @@ async function readOpen(isSaving: boolean): Promise<Open> {
     }
   }
   return { latest: await readLatest(db, ""), scenario: "" };
+}
+
+// The scenarios listed, open and decided apart, the decided ones the
+// latest first.
+function scenariosOf(listed: readonly Listed[]): Scenarios {
+  const decided = (decision: Decided["decision"]): readonly string[] =>
+    listed
+      .filter((row) => row.decision === decision)
+      .toSorted((one, other) => other.savedAt.getTime() - one.savedAt.getTime())
+      .map(({ name }) => name);
+  return {
+    adopted: decided("adopted"),
+    open: listed
+      .filter(({ decision }) => decision === null)
+      .map(({ name }) => name),
+    rejected: decided("rejected"),
+  };
 }
 
 // The household as a close kept it, carried through the chain and held

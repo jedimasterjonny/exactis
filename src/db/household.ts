@@ -33,6 +33,15 @@ export interface Decided {
   readonly savedAt: Date;
 }
 
+// A scenario kept, as the list of them reads its latest version: its
+// name, the decision it carries, or null for one still open, and when
+// it was saved.
+export interface Listed {
+  readonly decision: Decided["decision"] | null;
+  readonly name: string;
+  readonly savedAt: Date;
+}
+
 // What a save read: the branch, and the version of it, nought where
 // nothing was kept there yet.
 export interface Read {
@@ -169,17 +178,26 @@ export async function keepAfter(
   }
 }
 
-// The names of the scenarios kept, in order, the household not among
-// them.
-export async function listScenarios(db: Database): Promise<readonly string[]> {
-  const rows = await queried(
+// Each scenario kept, the household not among them, in order of name,
+// as its latest version stands: the name, the decision that version
+// carries, or null for a scenario still open, and when it was saved, so
+// one saved to since a decision, as by an app from before decisions,
+// reads as open. One query, reading no document.
+export async function listScenarios(db: Database): Promise<readonly Listed[]> {
+  return queried(
     db
-      .selectDistinct({ scenario: householdVersions.scenario })
+      .selectDistinctOn([householdVersions.scenario], {
+        decision: householdVersions.decision,
+        name: householdVersions.scenario,
+        savedAt: householdVersions.savedAt,
+      })
       .from(householdVersions)
       .where(ne(householdVersions.scenario, ""))
-      .orderBy(asc(householdVersions.scenario)),
+      .orderBy(
+        asc(householdVersions.scenario),
+        desc(householdVersions.version),
+      ),
   );
-  return rows.map(({ scenario }) => scenario);
 }
 
 // The version of the branch the CMA-derived rates stood at by the moment

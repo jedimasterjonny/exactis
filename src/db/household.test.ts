@@ -36,6 +36,11 @@ const { close, db, empty, ready } = inMemory();
 const readFailed =
   'Failed query: select "decision", "household", "reason", "saved_at", "version" from "household_versions" where "household_versions"."scenario" = $1 order by "household_versions"."version" desc limit $2';
 
+// The names of the scenarios kept, in order.
+async function namesIn(): Promise<readonly string[]> {
+  return (await listScenarios(db)).map(({ name }) => name);
+}
+
 // The household before anything is saved with a second owner added.
 const named = { ...blank, next: 3, owners: [...blank.owners, sam] };
 
@@ -158,9 +163,60 @@ describe("household store", () => {
     await keepAfter(db, { scenario: "Retire early", version: 1 }, named);
     await keepAfter(db, { scenario: "Move house", version: 0 }, blank);
 
+    expect(await namesIn()).toStrictEqual(["Move house", "Retire early"]);
+  });
+
+  // Four-day week decided against on the first of November, Sabbatical
+  // year made the household on the third, and Bonds sooner decided
+  // against and then saved to, as by an app from before decisions.
+  it("lists each scenario as its latest version stands, decided or open, with when it was saved", async () => {
+    const day = (date: string): Date => new Date(`${date}T12:00:00Z`);
+    await db.insert(householdVersions).values([
+      { household: blank, scenario: "", version: 1 },
+      { household: blank, scenario: "Four-day week", version: 1 },
+      {
+        decision: "rejected",
+        household: blank,
+        reason: "Too tight in the early years",
+        savedAt: day("2026-11-01"),
+        scenario: "Four-day week",
+        version: 2,
+      },
+      { household: blank, scenario: "Sabbatical year", version: 1 },
+      {
+        decision: "adopted",
+        household: blank,
+        savedAt: day("2026-11-03"),
+        scenario: "Sabbatical year",
+        version: 2,
+      },
+      { household: blank, scenario: "Bonds sooner", version: 1 },
+      {
+        decision: "rejected",
+        household: blank,
+        scenario: "Bonds sooner",
+        version: 2,
+      },
+      {
+        household: blank,
+        savedAt: day("2026-11-04"),
+        scenario: "Bonds sooner",
+        version: 3,
+      },
+    ]);
+
     expect(await listScenarios(db)).toStrictEqual([
-      "Move house",
-      "Retire early",
+      { decision: null, name: "Bonds sooner", savedAt: day("2026-11-04") },
+      {
+        decision: "rejected",
+        name: "Four-day week",
+        savedAt: day("2026-11-01"),
+      },
+      {
+        decision: "adopted",
+        name: "Sabbatical year",
+        savedAt: day("2026-11-03"),
+      },
     ]);
   });
 
@@ -173,7 +229,7 @@ describe("household store", () => {
     await dropScenario(db, "Retire early");
 
     expect(await readLatest(db, "Retire early")).toBeNull();
-    expect(await listScenarios(db)).toStrictEqual(["Move house"]);
+    expect(await namesIn()).toStrictEqual(["Move house"]);
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped(blank),
       version: 1,

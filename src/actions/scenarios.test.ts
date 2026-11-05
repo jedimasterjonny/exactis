@@ -58,6 +58,11 @@ async function keepFirst(scenario: string, household: Kept): Promise<void> {
   await keepAfter(db, { scenario, version: 0 }, household);
 }
 
+// The names of the scenarios kept, in order.
+async function namesIn(): Promise<readonly string[]> {
+  return (await listScenarios(db)).map(({ name }) => name);
+}
+
 // The versions of the household and of the scenario named as they stand,
 // as a page drawn now sends them, the scenario's first where none is
 // kept.
@@ -76,7 +81,7 @@ describe("createScenario", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(createScenario("Retire early")).rejects.toThrow("redirected");
-    expect(await listScenarios(db)).toStrictEqual([]);
+    expect(await namesIn()).toStrictEqual([]);
     expect(openScenario).not.toHaveBeenCalled();
   });
 
@@ -175,7 +180,7 @@ describe("createScenario", () => {
     await expect(createScenario("Retire early")).resolves.toStrictEqual(
       refused("No scenario is kept under that name"),
     );
-    expect(await listScenarios(db)).toStrictEqual([]);
+    expect(await namesIn()).toStrictEqual([]);
     expect(openScenario).not.toHaveBeenCalled();
   });
 
@@ -186,7 +191,7 @@ describe("createScenario", () => {
     await expect(createScenario("Retire\u2028early")).rejects.toThrow(
       z.ZodError,
     );
-    expect(await listScenarios(db)).toStrictEqual([]);
+    expect(await namesIn()).toStrictEqual([]);
 
     expect(await createScenario("x".repeat(40))).toStrictEqual(
       saved("x".repeat(40)),
@@ -268,7 +273,7 @@ describe("deleteScenario", () => {
     expect(await deleteScenario("Retire early")).toStrictEqual(
       saved(undefined),
     );
-    expect(await listScenarios(db)).toStrictEqual(["Move house"]);
+    expect(await namesIn()).toStrictEqual(["Move house"]);
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped(reference),
       version: 1,
@@ -284,7 +289,7 @@ describe("deleteScenario", () => {
     expect(await deleteScenario("Retire early")).toStrictEqual(
       saved(undefined),
     );
-    expect(await listScenarios(db)).toStrictEqual([]);
+    expect(await namesIn()).toStrictEqual([]);
     expect(closeScenario).not.toHaveBeenCalled();
   });
 
@@ -300,7 +305,7 @@ describe("deleteScenario", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(deleteScenario("Retire early")).rejects.toThrow("redirected");
-    expect(await listScenarios(db)).toStrictEqual(["Retire early"]);
+    expect(await namesIn()).toStrictEqual(["Retire early"]);
   });
 });
 
@@ -427,7 +432,7 @@ describe("adoptScenario", () => {
       ),
     );
     expect(await readLatest(db, "")).toMatchObject({ version: 2 });
-    expect(await listScenarios(db)).toStrictEqual(["Retire early"]);
+    expect(await namesIn()).toStrictEqual(["Retire early"]);
 
     await keepAfter(
       db,
@@ -576,7 +581,7 @@ describe("adoptScenario", () => {
       adoptScenario("Retire early", await shownNow("Retire early")),
     ).resolves.toStrictEqual(refused("A debt's balance is nothing or less"));
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
-    expect(await listScenarios(db)).toStrictEqual(["Retire early"]);
+    expect(await namesIn()).toStrictEqual(["Retire early"]);
   });
 
   // An edit saved to the scenario after the adoption read it, as from
@@ -683,7 +688,7 @@ describe("adoptScenario", () => {
       ) as unknown,
     });
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
-    expect(await listScenarios(db)).toStrictEqual(["Retire early"]);
+    expect(await namesIn()).toStrictEqual(["Retire early"]);
   });
 
   // Written raw, since a save stamps this app's shape: each side as a
@@ -706,10 +711,7 @@ describe("adoptScenario", () => {
     ).resolves.toStrictEqual(
       refused("This household was saved by a newer app than this one"),
     );
-    expect(await listScenarios(db)).toStrictEqual([
-      "Move house",
-      "Retire early",
-    ]);
+    expect(await namesIn()).toStrictEqual(["Move house", "Retire early"]);
   });
 
   // Two scenarios adopted at once: both read the household's first
@@ -848,7 +850,7 @@ describe("adoptScenario", () => {
       adoptScenario("Retire early", { household: 0, scenario: 1 }),
     ).rejects.toThrow("redirected");
     expect(await readLatest(db, "")).toBeNull();
-    expect(await listScenarios(db)).toStrictEqual(["Retire early"]);
+    expect(await namesIn()).toStrictEqual(["Retire early"]);
   });
 
   it("lets anything but a refusal through as the failure it is, and keeps the scenario", async () => {
@@ -860,7 +862,7 @@ describe("adoptScenario", () => {
     await expect(
       adoptScenario("Retire early", await shownNow("Retire early")),
     ).rejects.toThrow("The store is down");
-    expect(await listScenarios(db)).toStrictEqual(["Retire early"]);
+    expect(await namesIn()).toStrictEqual(["Retire early"]);
   });
 });
 
