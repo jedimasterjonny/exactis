@@ -1,0 +1,82 @@
+{
+  "id": "51bc8f02-161c-4724-8b14-de952c691e38",
+  "prevId": "4b1277c6-439b-4160-a127-6b595b9a2269",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.household_versions": {
+      "name": "household_versions",
+      "schema": "",
+      "columns": {
+        "decision": {
+          "name": "decision",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "household": {
+          "name": "household",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "saved_at": {
+          "name": "saved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "scenario": {
+          "name": "scenario",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "household_versions_scenario_version_pk": {
+          "name": "household_versions_scenario_version_pk",
+          "columns": [
+            "scenario",
+            "version"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "household_versions_decision": {
+          "name": "household_versions_decision",
+          "value": "\"household_versions\".\"decision\" in ('adopted', 'rejected')"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

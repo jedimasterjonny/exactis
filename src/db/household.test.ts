@@ -19,6 +19,7 @@ import { inMemory } from "@/db/memory.fixture";
 import { householdVersions } from "@/db/schema";
 
 import {
+  decideScenario,
   dropScenario,
   keepAfter,
   listScenarios,
@@ -33,7 +34,7 @@ const { close, db, empty, ready } = inMemory();
 
 // How a read of a branch's latest version fails, as the statement it ran.
 const readFailed =
-  'Failed query: select "household", "version" from "household_versions" where "household_versions"."scenario" = $1 order by "household_versions"."version" desc limit $2';
+  'Failed query: select "decision", "household", "reason", "saved_at", "version" from "household_versions" where "household_versions"."scenario" = $1 order by "household_versions"."version" desc limit $2';
 
 // The household before anything is saved with a second owner added.
 const named = { ...blank, next: 3, owners: [...blank.owners, sam] };
@@ -197,6 +198,131 @@ describe("household store", () => {
         .from(householdVersions),
     ).toStrictEqual([{ version: 3 }]);
     expect(await listScenarios(db)).toStrictEqual(["Retire early"]);
+  });
+
+  // A scenario's first version written raw, as an older app kept it,
+  // with no shape stamped on it, then a save after it.
+  it("keeps a decision as the version read copied whole after it, read back at the branch's latest alone", async () => {
+    await db
+      .insert(householdVersions)
+      .values({ household: blank, scenario: "Four-day week", version: 1 });
+
+    await decideScenario(
+      db,
+      { scenario: "Four-day week", version: 1 },
+      { decision: "rejected", reason: "Too tight in the early years" },
+    );
+
+    expect(await readLatest(db, "Four-day week")).toStrictEqual({
+      decided: {
+        decision: "rejected",
+        reason: "Too tight in the early years",
+        savedAt: expect.any(Date) as unknown,
+      },
+      household: blank,
+      version: 2,
+    });
+    expect(await readFirst(db, "Four-day week")).toStrictEqual({
+      household: blank,
+      version: 1,
+    });
+
+    await keepAfter(db, { scenario: "Four-day week", version: 2 }, named);
+    await decideScenario(
+      db,
+      { scenario: "Four-day week", version: 3 },
+      { decision: "adopted", reason: null },
+    );
+
+    expect(await readLatest(db, "Four-day week")).toStrictEqual({
+      decided: {
+        decision: "adopted",
+        reason: null,
+        savedAt: expect.any(Date) as unknown,
+      },
+      household: stamped(named),
+      version: 4,
+    });
+  });
+
+  // A save that took the version after the one read, and a scenario
+  // dropped since it was read.
+  it("refuses a decision on a version a save has been kept after, or one gone, and writes nothing", async () => {
+    await keepAfter(db, { scenario: "Four-day week", version: 0 }, blank);
+    await keepAfter(db, { scenario: "Four-day week", version: 1 }, named);
+
+    await expect(
+      decideScenario(
+        db,
+        { scenario: "Four-day week", version: 1 },
+        { decision: "rejected", reason: null },
+      ),
+    ).rejects.toThrow(
+      "The scenario changed while this was being decided, so nothing was",
+    );
+    expect(await readLatest(db, "Four-day week")).toStrictEqual({
+      household: stamped(named),
+      version: 2,
+    });
+
+    await dropScenario(db, "Four-day week");
+
+    await expect(
+      decideScenario(
+        db,
+        { scenario: "Four-day week", version: 2 },
+        { decision: "rejected", reason: null },
+      ),
+    ).rejects.toThrow(
+      "The scenario changed while this was being decided, so nothing was",
+    );
+    expect(await readLatest(db, "Four-day week")).toBeNull();
+  });
+
+  it("never keeps a decision on the household, nor one of no kind there is, and never writes over one", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, blank);
+    await keepAfter(db, { scenario: "Four-day week", version: 0 }, blank);
+
+    await expect(
+      decideScenario(
+        db,
+        { scenario: "", version: 1 },
+        { decision: "adopted", reason: null },
+      ),
+    ).rejects.toThrow("The household takes no decision");
+    await expect(
+      db.execute(
+        sql`insert into ${householdVersions} (decision, household, scenario, version) values ('postponed', '{}', 'Four-day week', 2)`,
+      ),
+    ).rejects.toMatchObject({
+      cause: { constraint: "household_versions_decision" },
+    });
+
+    await decideScenario(
+      db,
+      { scenario: "Four-day week", version: 1 },
+      { decision: "rejected", reason: "Too tight in the early years" },
+    );
+
+    await expect(
+      db
+        .update(householdVersions)
+        .set({ reason: "Fridays are worth it" })
+        .where(eq(householdVersions.version, 2)),
+    ).rejects.toMatchObject({
+      cause: {
+        message:
+          "A kept version of the household is never written over or deleted",
+      },
+    });
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped(blank),
+      version: 1,
+    });
+    expect(await readLatest(db, "Four-day week")).toMatchObject({
+      decided: { reason: "Too tight in the early years" },
+      version: 2,
+    });
   });
 
   // The reference household on the rates typed by hand on the first of
@@ -425,7 +551,7 @@ describe("household store", () => {
       ),
     ).rejects.toStrictEqual(
       new Error(
-        'Failed query: insert into "household_versions" ("household", "saved_at", "scenario", "version") values ($1, default, $2, $3) on conflict do nothing returning "version"',
+        'Failed query: insert into "household_versions" ("decision", "household", "reason", "saved_at", "scenario", "version") values (default, $1, default, default, $2, $3) on conflict do nothing returning "version"',
         {
           cause: {
             code: "22P05",

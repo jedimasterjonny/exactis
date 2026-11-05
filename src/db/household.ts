@@ -23,6 +23,16 @@ import { householdVersions } from "@/db/schema";
 import { Refusal } from "@/lib/answer";
 import { monthsBetween } from "@/lib/months";
 
+// A decision kept on a scenario: which it was, the reason given for it,
+// or null where none was, and when it was kept.
+export interface Decided {
+  readonly decision: NonNullable<
+    (typeof householdVersions.$inferSelect)["decision"]
+  >;
+  readonly reason: null | string;
+  readonly savedAt: Date;
+}
+
 // What a save read: the branch, and the version of it, nought where
 // nothing was kept there yet.
 export interface Read {
@@ -32,8 +42,10 @@ export interface Read {
 
 // A version the store has kept: its number, and the household as the
 // store holds it, which is for the model to read and hold to its rules
-// rather than for the store to vouch for.
+// rather than for the store to vouch for; and, read at either end of a
+// branch, the decision it carries, where it is one.
 export interface Version {
+  readonly decided?: Decided;
   readonly household: unknown;
   readonly version: number;
 }
@@ -69,6 +81,55 @@ const failure = z.object({
 // being the scenario with no name, and none defaults it, so a branch
 // forgotten is a type error rather than a save written to the household.
 // Each is run through queried, so none fails with its values.
+
+// Keeps a decision on a scenario as the version after the one read: that
+// version copied whole, the household as the store holds it and so with
+// the shape it was stamped with, through no chain, and the decision and
+// the reason given, or none, set on the copy. When another save has kept
+// the version after first, or the version read has gone, the scenario
+// changed after it was read, so the decision is refused and nothing is
+// written, as a save is. The household takes no decision; asking it to
+// is a bug, so it fails here before the store is asked.
+export async function decideScenario(
+  db: Database,
+  { scenario, version }: Read,
+  { decision, reason }: Omit<Decided, "savedAt">,
+): Promise<void> {
+  if (scenario === "") {
+    throw new Error("The household takes no decision");
+  }
+  const rows = await queried(
+    db
+      .insert(householdVersions)
+      .select(
+        db
+          .select({
+            decision: sql<typeof decision>`${decision}`.as("decision"),
+            household: householdVersions.household,
+            reason: sql<null | string>`${reason}`.as("reason"),
+            savedAt: sql<Date>`now()`.as("saved_at"),
+            scenario: householdVersions.scenario,
+            version: sql<number>`${householdVersions.version} + 1`.as(
+              "version",
+            ),
+          })
+          .from(householdVersions)
+          .where(
+            and(
+              eq(householdVersions.scenario, scenario),
+              eq(householdVersions.version, version),
+            ),
+          ),
+      )
+      .onConflictDoNothing()
+      .returning({ version: householdVersions.version }),
+  );
+  if (rows.length === 0) {
+    throw new Refusal(
+      "The scenario changed while this was being decided, so nothing was",
+    );
+  }
+}
 
 // Drops the versions of a scenario: every one, or those up to and
 // including the version given, so a version saved after the one an
@@ -378,7 +439,8 @@ async function queried<TResult>(query: PromiseLike<TResult>): Promise<TResult> {
 }
 
 // The version at one end of the branch, the versions ordered as given,
-// or null before anything is kept there.
+// with the decision it carries where it is one, or null before anything
+// is kept there.
 async function readEnd(
   db: Database,
   scenario: string,
@@ -387,7 +449,10 @@ async function readEnd(
   const [row] = await queried(
     db
       .select({
+        decision: householdVersions.decision,
         household: householdVersions.household,
+        reason: householdVersions.reason,
+        savedAt: householdVersions.savedAt,
         version: householdVersions.version,
       })
       .from(householdVersions)
@@ -395,5 +460,13 @@ async function readEnd(
       .orderBy(ordered(householdVersions.version))
       .limit(1),
   );
-  return row ?? null;
+  if (row === undefined) {
+    return null;
+  }
+  const { decision, household, reason, savedAt, version } = row;
+  return {
+    household,
+    version,
+    ...(decision !== null && { decided: { decision, reason, savedAt } }),
+  };
 }
