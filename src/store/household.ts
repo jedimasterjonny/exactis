@@ -103,7 +103,10 @@ const readScenarios = cache(async (): Promise<readonly string[]> =>
 // an edit made in a scenario is kept in the scenario, and one made from
 // a page drawn in a scenario dropped since is refused rather than kept
 // in the household; so is one read from a version the rules have since
-// tightened past, in their words. A save that names the branch its page
+// tightened past, in their words; and so is one to a scenario whose
+// latest version carries a decision, since a decided scenario is kept
+// as it was decided, and changed by making a new scenario from it. A
+// save that names the branch its page
 // was drawn on, the household as null or a scenario by name, as one held
 // back a moment before it is sent does, is refused where another branch
 // has been opened since, so an edit meant for a scenario never lands in
@@ -120,10 +123,16 @@ export async function amend<TResult>(
 ): Promise<Answer<TResult>> {
   await requireSession();
   try {
-    const { scenario, version, ...held } = heldIn(await readOpen(true));
+    const open = await readOpen(true);
+    const { scenario, version, ...held } = heldIn(open);
     if (on !== undefined && scenario !== (on ?? "")) {
       throw new Refusal(
         "Another branch was opened before this was saved, so nothing was; make the change again",
+      );
+    }
+    if (open.latest?.decided !== undefined) {
+      throw new Refusal(
+        "This scenario is decided, so it takes no edits; make a new scenario from it to change it",
       );
     }
     const { kept, result } = edit(held);
@@ -178,7 +187,7 @@ export async function getHousehold(): Promise<Household> {
 
 // The scenario the cookie names, or null while the household is open,
 // with whether the store keeps one by that name, which it does not once
-// the scenario is adopted or dropped from another device: this one's
+// the scenario is deleted from another device: this one's
 // pages then read the household while its cookie still names the
 // scenario and every save is refused, so the banner says so and offers
 // the way back.
@@ -322,8 +331,8 @@ function heldIn({ latest, scenario }: Open): Held & Read {
 
 // The branch open and its latest version, read afresh: the scenario the
 // cookie names where the store keeps one by that name, and the household
-// where it names none. A name no scenario is kept under, as one adopted
-// or dropped from another device, reads as the household for a page,
+// where it names none. A name no scenario is kept under, as one deleted
+// from another device, reads as the household for a page,
 // under a banner naming it as gone; but a save from a page drawn in it
 // is refused, so what was meant for a scenario is never kept in the
 // household.

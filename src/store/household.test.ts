@@ -19,7 +19,7 @@ import { planOf } from "@/data/plan";
 import { allInStocks, openingRates } from "@/data/rates";
 import { currentShape, stamped } from "@/data/shapes";
 import { getDb } from "@/db/client";
-import { keepAfter, readLatest } from "@/db/household";
+import { decideScenario, keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { householdVersions } from "@/db/schema";
 import { standUp } from "@/db/store.fixture";
@@ -667,6 +667,35 @@ describe("the household store", () => {
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     expect(await readLatest(db, "Dropped")).toBeNull();
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  // A scenario decided against, open in this browser, as one opened to
+  // read back; then saved to from an old app, which knew no decisions.
+  it("refuses a save to a scenario whose latest version carries a decision, and writes nothing", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+    await keepAfter(db, { scenario: "Four-day week", version: 0 }, blank);
+    await decideScenario(
+      db,
+      { scenario: "Four-day week", version: 1 },
+      { decision: "rejected", reason: "Too tight in the early years" },
+    );
+    vi.mocked(openedScenario).mockResolvedValue("Four-day week");
+
+    await expect(
+      amend(({ kept }) => ({ kept, result: null })),
+    ).resolves.toStrictEqual(
+      refused(
+        "This scenario is decided, so it takes no edits; make a new scenario from it to change it",
+      ),
+    );
+    expect(await readLatest(db, "Four-day week")).toMatchObject({ version: 2 });
+    expect(refresh).not.toHaveBeenCalled();
+
+    await keepAfter(db, { scenario: "Four-day week", version: 2 }, blank);
+
+    await expect(
+      amend(({ kept }) => ({ kept, result: null })),
+    ).resolves.toStrictEqual(saved(null));
   });
 
   // Written past the rules, as a version kept before they tightened.

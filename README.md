@@ -39,7 +39,9 @@ A scenario is a what-if copy of the household, or of another scenario. Every
 screen, and export and import, works on whichever is open. Adopting one makes
 its plan the household's, keeping the household's own bookkeeping: balances,
 progress points and what was pulled in. So the month is closed in the household
-alone, and refused while a scenario is open.
+alone, and refused while a scenario is open. An adopted scenario is kept, with
+its decision, and takes no more edits; it is changed by making a new scenario
+from it.
 
 ## Getting started
 
