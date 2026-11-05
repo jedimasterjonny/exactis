@@ -5,7 +5,7 @@ import { cache } from "react";
 
 import type { Household, Kept, KeptBalances } from "@/data/household";
 import type { Before } from "@/data/moves";
-import type { Read, Version } from "@/db/household";
+import type { Decided, Read, Version } from "@/db/household";
 import type { Answer } from "@/lib/answer";
 import type { KeptClose } from "@/lib/landed";
 
@@ -16,6 +16,7 @@ import {
   sourcesIn,
 } from "@/data/household";
 import { isDue } from "@/data/progress";
+import { scenarioName } from "@/data/schemas";
 import { upcast } from "@/data/shapes";
 import { getDb } from "@/db/client";
 import {
@@ -24,12 +25,30 @@ import {
   readAsOf,
   readClosed,
   readCloses,
+  readFirst,
   readLatest,
 } from "@/db/household";
 import { answerOf, Refusal, refused, saved, Stale } from "@/lib/answer";
 import { closingOn, dayOf, monthBefore, thisMonth, today } from "@/lib/months";
+import { fork, planOver } from "@/lib/plan-over";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
+
+// A scenario beside the household, as one is set against the other: the
+// household as a page holds it, with the version it is; the scenario's
+// latest version held to every rule, or the refusal in their words, with
+// the version it is and the decision it carries, where it carries one;
+// and the household making it the household would leave, or the refusal
+// in their words, or null for a scenario made the household already,
+// which always carries its decision.
+export type Compared = (
+  | { readonly decision: Decision; readonly over: null }
+  | { readonly decision: Decision | null; readonly over: Answer<Held> }
+) & {
+  readonly household: Held & Read;
+  readonly scenario: Answer<Kept>;
+  readonly version: number;
+};
 
 // What a save works from: the household as it stands, the whole it makes
 // on the day, and the kept household it is written back as.
@@ -62,6 +81,15 @@ interface Amended<TResult> {
   readonly result: TResult;
 }
 
+// A decision kept on a scenario, as a page reads it: which it was, the
+// day it was made on as the UK names it, and the reason given, or null
+// where none was.
+interface Decision {
+  readonly kind: Decided["decision"];
+  readonly on: string;
+  readonly reason: null | string;
+}
+
 // The branch a request has open and its latest version, or null before
 // anything is kept there: the household is the scenario with no name.
 interface Open {
@@ -74,7 +102,8 @@ interface Open {
 // another's lines, nor a scenario's name over the household's figures:
 // the branch open, the household held there, as it stands and as it is
 // kept, held to the rules once whichever a page reads, and the household
-// itself, for the dashboard to set beside a scenario. Whether React's
+// itself, with the version it is, for the dashboard and Compare to set
+// beside a scenario. Whether React's
 // cache carries from an action into the render its refresh() asks for
 // is not known here, so these are for a page's reads: what an action
 // writes from is read afresh, the cookie as much as the store, as amend
@@ -83,9 +112,8 @@ interface Open {
 // scenarios kept are read once a request too.
 const readPage = cache(async (): Promise<Open> => readOpen(false));
 const readPageHeld = cache(async (): Promise<Held> => heldIn(await readPage()));
-const readBaseline = cache(
-  async (): Promise<Household> =>
-    heldIn({ latest: await readLatest(getDb(), ""), scenario: "" }).household,
+const readBaseline = cache(async (): Promise<Held & Read> =>
+  heldIn({ latest: await readLatest(getDb(), ""), scenario: "" }),
 );
 const readScenarios = cache(async (): Promise<readonly string[]> =>
   listScenarios(getDb()),
@@ -154,7 +182,7 @@ export async function amend<TResult>(
 // dashboard to set a scenario beside.
 export async function getBaseline(): Promise<Household> {
   await requireSession();
-  return readBaseline();
+  return (await readBaseline()).household;
 }
 
 // The closes kept on the branch open for the twelve months before the
@@ -178,6 +206,57 @@ export async function getClosesBack(): Promise<readonly KeptClose[]> {
     before: answerOf(() => soundKept(upcast(household))),
     month,
   }));
+}
+
+// The scenario named beside the household, as Compare sets the one
+// against the other, or null for a name no scenario could have or none
+// is kept under. The household is the household itself, whatever branch
+// is open, read once a request as the dashboard reads it. The scenario
+// is its latest version, carried through the chain and held to every
+// rule, with the decision it carries. What making it the household would
+// leave is planOver laid over the household's bookkeeping, the copy the
+// scenario was made from read for the id its next record was given, and
+// held to every rule, as adopting it holds what it writes; or the
+// scenario itself where no household is kept yet, as adopting it then
+// keeps it. A refusal on the way, the scenario's or the merge's, is
+// answered in its words rather than thrown, so the page can say why;
+// and a scenario made the household already is laid over nothing, since
+// the household runs on its plan, and an account it added would read as
+// one added to the household since it was made. The session is checked
+// first, as every read's is.
+export async function getCompared(name: string): Promise<Compared | null> {
+  await requireSession();
+  const { data: scenario } = scenarioName.safeParse(name);
+  if (scenario === undefined) {
+    return null;
+  }
+  const db = getDb();
+  const [latest, first, household] = await Promise.all([
+    readLatest(db, scenario),
+    readFirst(db, scenario),
+    readBaseline(),
+  ]);
+  if (latest === null || first === null) {
+    return null;
+  }
+  const { decided } = latest;
+  const kept = answerOf(() => soundKept(upcast(latest.household)).kept);
+  const read = { household, scenario: kept, version: latest.version };
+  const decision =
+    decided === undefined
+      ? null
+      : {
+          kind: decided.decision,
+          on: dayOf(decided.savedAt),
+          reason: decided.reason,
+        };
+  return decision?.kind === "adopted"
+    ? { ...read, decision, over: null }
+    : {
+        ...read,
+        decision,
+        over: answerOf(() => overOf(household, kept, first.household)),
+      };
 }
 
 export async function getHousehold(): Promise<Household> {
@@ -278,8 +357,9 @@ export async function isCloseDue(): Promise<boolean> {
   try {
     await requireSession();
     const { scenario } = await readPage();
-    const { points } =
-      scenario === "" ? (await readPageHeld()).household : await readBaseline();
+    const { points } = (
+      scenario === "" ? await readPageHeld() : await readBaseline()
+    ).household;
     return isDue(points, closingOn(today()));
   } catch (error: unknown) {
     unstable_rethrow(error);
@@ -327,6 +407,30 @@ function heldIn({ latest, scenario }: Open): Held & Read {
     scenario,
     version: latest?.version ?? 0,
   };
+}
+
+// What making the scenario the household would leave, held to every
+// rule: the scenario as kept laid over the household's bookkeeping, the
+// copy it was made from read for its next id alone, or the scenario
+// itself where no household is kept; the scenario's own refusal where
+// it has one, thrown again for the caller to answer.
+function overOf(
+  household: Held & Read,
+  scenario: Answer<Kept>,
+  first: unknown,
+): Held {
+  if (scenario.kind === "refused") {
+    throw new Refusal(scenario.reason);
+  }
+  return soundKept(
+    household.version === 0
+      ? scenario.value
+      : planOver(
+          household.kept,
+          scenario.value,
+          fork.parse(upcast(first)).next,
+        ),
+  );
 }
 
 // The branch open and its latest version, read afresh: the scenario the
