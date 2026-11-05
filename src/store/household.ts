@@ -50,6 +50,15 @@ export type Compared = (
   readonly version: number;
 };
 
+// A decision kept on a scenario, as a page reads it: which it was, the
+// day it was made on as the UK names it, and the reason given, or null
+// where none was.
+export interface Decision {
+  readonly kind: Decided["decision"];
+  readonly on: string;
+  readonly reason: null | string;
+}
+
 // What a save works from: the household as it stands, the whole it makes
 // on the day, and the kept household it is written back as.
 export interface Held {
@@ -79,15 +88,6 @@ export interface SinceClose {
 interface Amended<TResult> {
   readonly kept: Kept;
   readonly result: TResult;
-}
-
-// A decision kept on a scenario, as a page reads it: which it was, the
-// day it was made on as the UK names it, and the reason given, or null
-// where none was.
-interface Decision {
-  readonly kind: Decided["decision"];
-  readonly on: string;
-  readonly reason: null | string;
 }
 
 // The branch a request has open and its latest version, or null before

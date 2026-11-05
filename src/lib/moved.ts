@@ -7,7 +7,7 @@ import type { MonthsOn } from "@/engine/projection";
 
 import { soundKept } from "@/data/household";
 import { ageIn, endAge } from "@/data/plan";
-import { futureOf } from "@/engine/futures";
+import { endWorthOf, futureOf } from "@/engine/futures";
 import { laidOut, monthsOn, project } from "@/engine/projection";
 import { answerOf } from "@/lib/answer";
 import { sumOf } from "@/lib/ledger";
@@ -27,6 +27,16 @@ export type Area =
 // A group of what the household keeps, as the walk takes it: the
 // balances, the rates and their sources, or everything else.
 export type Group = "balances" | "changes" | "rates";
+
+// A line of what making a scenario the household would change: a record
+// of the plan, told by what it is and its id, or a setting of it, named
+// as a screen names it, with whether only the scenario holds it, both
+// hold it but apart, or only the household holds it.
+export interface Line {
+  readonly change: "added" | "changed" | "removed";
+  readonly key: string;
+  readonly label: string;
+}
 
 // What the household has moved by since the close before the latest:
 // the age the liquid net worth is read at, the standing the month end
@@ -52,6 +62,16 @@ export interface Moved {
 // yield, the target allocation with its mappings, and the glide path.
 export type RateSource =
   "cma" | "curve" | "deductions" | "glide" | "rates" | "rateSet" | "targets";
+
+// What a plan comes to at its own rates, as the dashboard reads it: the
+// age it runs to, the age its owner retires at, or null where they never
+// do by its end, and the net worth it holds entering its last year, in
+// whole pounds of today's money.
+export interface Side {
+  readonly ends: number;
+  readonly retires: null | number;
+  readonly worth: number;
+}
 
 // What the household reads at one state of the walk: the year the
 // plan's owner retires in, or null where they never do, and the liquid
@@ -145,6 +165,96 @@ const sources: readonly {
   { keys: ["targets", "mappings"], source: "targets" },
   { keys: ["glide"], source: "glide" },
 ];
+
+// The records of a plan that a scenario and the household are told
+// apart by, each matched by its id and called by what it is beside its
+// name: an account by everything but its balance and the day it was
+// set, which are the household's bookkeeping, as the areas read one.
+const records: readonly {
+  readonly kind: string;
+  readonly read: (
+    kept: Kept,
+  ) => readonly { readonly id: number; readonly name: string }[];
+}[] = [
+  { kind: "Owner", read: ({ owners }) => owners },
+  { kind: "Child", read: ({ children }) => children ?? [] },
+  {
+    kind: "Account",
+    read: ({ accounts }) =>
+      accounts.map((account) => ({ ...account, balance: 0, setOn: null })),
+  },
+  { kind: "Income", read: ({ schedule }) => schedule.income },
+  { kind: "Expense", read: ({ schedule }) => schedule.expenses },
+  { kind: "Milestone", read: ({ milestones }) => milestones },
+];
+
+// What making a scenario the household would change, a line at a time:
+// each record of the plan, by its id, that only the scenario holds,
+// that both hold but not the same, as the store would write them, or
+// that only the household holds, in the order the scenario lists them
+// and then the household; then the order of the accounts, where the
+// scenario lists those both hold in another order than the household,
+// since the order moves the spare money, as the areas read it, which a
+// match by id alone does not see, and an account added or removed leaves
+// the rest where they stand; then each setting of the plan that differs,
+// the end age, the drawdown and each source of the rates the scenario
+// carries over, which leaves out the CMA and the curve, since those are
+// pulled into the household and planOver keeps the household's. Both
+// sides are read as kept, the scenario's own plan rather than the merge,
+// so the lines stand where the merge is refused: an account the
+// household added since the scenario was made then reads as removed,
+// which is what making the scenario the household would do.
+export function changedIn(household: Kept, scenario: Kept): readonly Line[] {
+  const settings: readonly {
+    readonly keys: readonly (keyof Kept)[];
+    readonly name: string;
+  }[] = [
+    { keys: ["ages"], name: areaNames.ages },
+    { keys: ["drawdown"], name: areaNames.drawdown },
+    ...sources
+      .filter(({ source }) => source !== "cma" && source !== "curve")
+      .map(({ keys, source }) => ({ keys, name: sourceNames[source] })),
+  ];
+  const shared = (one: Kept, other: Kept): readonly number[] => {
+    const ids = new Set(other.accounts.map(({ id }) => id));
+    return one.accounts.map(({ id }) => id).filter((id) => ids.has(id));
+  };
+  const order = "Order of the accounts";
+  return [
+    ...records.flatMap(({ kind, read }) => {
+      const theirs = new Map(read(household).map((held) => [held.id, held]));
+      const ours = new Set(read(scenario).map(({ id }) => id));
+      const lineOf = (
+        change: Line["change"],
+        { id, name }: { readonly id: number; readonly name: string },
+      ): Line => ({
+        change,
+        key: `${kind}:${String(id)}`,
+        label: `${kind} · ${name}`,
+      });
+      return [
+        ...read(scenario).flatMap((held) => {
+          const was = theirs.get(held.id);
+          if (was === undefined) {
+            return [lineOf("added", held)];
+          }
+          return differs(was, held) ? [lineOf("changed", held)] : [];
+        }),
+        ...read(household)
+          .filter(({ id }) => !ours.has(id))
+          .map((held) => lineOf("removed", held)),
+      ];
+    }),
+    ...(differs(shared(household, scenario), shared(scenario, household))
+      ? [{ change: "changed", key: order, label: order } as const]
+      : []),
+    ...settings
+      .filter(({ keys }) =>
+        keys.some((key) => differs(household[key], scenario[key])),
+      )
+      .map(({ name }): Line => ({ change: "changed", key: name, label: name })),
+  ];
+}
 
 // What moved the plan from the balances a close set and the month they
 // were as of, laid over the household now, to the household now, as
@@ -321,6 +431,18 @@ export function paidIn(now: Kept, from: Month): ReadonlyMap<string, number> {
             ),
           ]),
       );
+}
+
+// What a kept household comes to at its own rates, as the dashboard's
+// tiles read it off the one projection: the age it runs to, the age its
+// owner retires at, and the net worth entering its last year.
+export function sideOf(kept: Kept): Side {
+  const { future, plan } = futureIn(kept);
+  return {
+    ends: endAge(plan),
+    retires: future.retired === null ? null : ageIn(future.retired, plan),
+    worth: endWorthOf(future),
+  };
 }
 
 // The balances the close set against those it closed from, over the
