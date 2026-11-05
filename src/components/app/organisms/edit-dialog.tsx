@@ -8,6 +8,7 @@ import { Button } from "@/components/kit/button";
 interface EditDialogProps {
   readonly canSave?: boolean;
   readonly children: ReactNode;
+  readonly confirm?: string;
   readonly eyebrow: string;
   readonly isSaving?: boolean;
   readonly isWide?: boolean;
@@ -22,7 +23,9 @@ interface EditDialogProps {
 // it, around the fields the caller gives, with Cancel and Save beneath.
 // It is open for as long as it is mounted, so a caller renders it while
 // it holds an entry and not otherwise, and the fields inside mount fresh
-// with each entry. Cancel dismisses, as the frame's own closes do.
+// with each entry. Cancel dismisses, as the frame's own closes do. Save
+// is called what the caller says where a dialog's form does more than
+// save, as one making a decision does.
 // Save holds while the caller says the draft cannot be saved, unnamed
 // say, and spins while a save is on its way to the store, which the
 // dialog does for itself rather than every caller folding it into what
@@ -39,6 +42,7 @@ interface EditDialogProps {
 export function EditDialog({
   canSave = true,
   children,
+  confirm = "Save",
   eyebrow,
   isSaving = false,
   isWide = false,
@@ -73,7 +77,7 @@ export function EditDialog({
             onClick={onSave}
             size="sm"
           >
-            Save
+            {confirm}
           </Button>
         </>
       }

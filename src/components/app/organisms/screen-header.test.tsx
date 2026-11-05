@@ -15,6 +15,18 @@ describe("ScreenHeader", () => {
     );
   });
 
+  // Handed the focus by a screen that takes away the control holding it,
+  // as Compare does once a decision lands, and never tabbed to.
+  it("takes the focus on its title when handed it, out of the tab order", () => {
+    render(<ScreenHeader label="Sect. I · Dashboard" title="Four-day week" />);
+
+    const title = screen.getByRole("heading", { level: 1 });
+    title.focus();
+
+    expect(title).toHaveFocus();
+    expect(title).toHaveAttribute("tabindex", "-1");
+  });
+
   // The frame's phone bar carries the label below the breakpoint it shows
   // under, so the header leaves its own off there rather than repeat it.
   it("leaves the label to the phone bar below the md breakpoint", () => {

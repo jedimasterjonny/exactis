@@ -33,12 +33,29 @@ const year = z
 // and never empty.
 export const named = z.string().trim().min(1);
 
+// Text with no control character or line break in it.
+const oneLine = /^[^\p{Cc}\p{Zl}\p{Zp}]*$/u;
+
 // A scenario's name: a name as above, short enough for a menu to hold,
 // and with no control character or line break in it. The name is what
 // the scenario's cookie carries, unsealed, into every query that reads
 // the branch and every log line a failed one writes, so a cookie that is
 // not such a name counts as none before it reaches either.
-export const scenarioName = named.max(40).regex(/^[^\p{Cc}\p{Zl}\p{Zp}]*$/u);
+export const scenarioName = named.max(40).regex(oneLine);
+
+// Why a scenario was decided as it was: one line as typed less the space
+// around it, up to 200 characters and with no control character or line
+// break, as a scenario's name has none. A blank reason, or none sent,
+// reads as null.
+export const decisionReason = z
+  .string()
+  .trim()
+  .max(200)
+  .regex(oneLine)
+  .optional()
+  .transform((reason) =>
+    reason === undefined || reason === "" ? null : reason,
+  );
 
 // A sum of money: whole pounds, and never below nothing.
 export const pounds = z.number().int().nonnegative();

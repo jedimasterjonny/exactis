@@ -23,12 +23,12 @@ import Dashboard from "./page";
 
 vi.mock("@/actions/plan", () => ({ saveAges: vi.fn() }));
 vi.mock("@/actions/scenarios", () => ({
-  adoptScenario: vi.fn(),
   createScenario: vi.fn(),
   deleteScenario: vi.fn(),
   enterScenario: vi.fn(),
   leaveScenario: vi.fn(),
 }));
+vi.mock("next/navigation", () => ({ useRouter: vi.fn() }));
 vi.mock("@/store/household", () => ({
   getBaseline: vi.fn(),
   getHousehold: vi.fn(),

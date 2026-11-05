@@ -5,9 +5,11 @@ import { House, Scale } from "lucide-react";
 
 import type { Household } from "@/data/household";
 import type { Side } from "@/lib/moved";
+import type { Slot } from "@/lib/slot";
 import type { Decision } from "@/store/household";
 
 import { EmptyState } from "@/components/app/molecules/empty-state";
+import { ScenarioDecision } from "@/components/app/organisms/scenario-decision";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Screen } from "@/components/app/templates/screen";
 import { CardContent } from "@/components/kit/card";
@@ -42,9 +44,11 @@ const unnamed = "Scenario beside the household";
 // household runs on its plan and laid over it again it would read the
 // household's edits since backwards. Where the merge or the scenario is
 // refused, the screen says why and draws no figures, and the lines
-// still show where the scenario can be read. No name, or a name no
-// scenario is kept under, says so in a card. The page renders behind
-// the loading screen beside it.
+// still show where the scenario can be read. The header's actions end
+// the comparison, in a decision sent against the versions of the
+// household and the scenario read here, or open a scenario decided
+// already. No name, or a name no scenario is kept under, says so in a
+// card. The page renders behind the loading screen beside it.
 export default async function Compare({
   searchParams,
 }: Readonly<{
@@ -72,9 +76,18 @@ export default async function Compare({
   }
   const name = named.trim();
   const { decision, household, over, scenario } = compared;
+  const shown = { household: household.version, scenario: compared.version };
   if (over === null) {
     return (
       <Unshown
+        actions={
+          <ScenarioDecision
+            decision={decision.kind}
+            isAdoptable={false}
+            name={name}
+            shown={shown}
+          />
+        }
         description={`The household has run on it since ${formatDay(decision.on)}, so there is nothing to set beside it.`}
         icon={House}
         meta={metaOf(decision)}
@@ -90,6 +103,14 @@ export default async function Compare({
       : null;
   return (
     <CompareScreen
+      actions={
+        <ScenarioDecision
+          decision={decision?.kind ?? null}
+          isAdoptable={merged !== null}
+          name={name}
+          shown={shown}
+        />
+      }
       asOf={household.kept.asOf}
       household={{ ...drawnOf(household.household), side: theirs }}
       lines={
@@ -153,12 +174,14 @@ function titleOf(name: string, theirs: Side, ours: null | Side): string {
 // named, none kept by the name, or one made the household, saying so in
 // a card under its title.
 function Unshown({
+  actions,
   description,
   icon,
   meta,
   title,
   titled = unnamed,
 }: {
+  readonly actions?: Slot;
   readonly description: string;
   readonly icon: LucideIcon;
   readonly meta?: string;
@@ -166,7 +189,12 @@ function Unshown({
   readonly titled?: string;
 }): JSX.Element {
   return (
-    <Screen label={sectionLabel(dashboard)} meta={meta} title={titled}>
+    <Screen
+      actions={actions}
+      label={sectionLabel(dashboard)}
+      meta={meta}
+      title={titled}
+    >
       <SectionCard
         label={subsectionLabel(dashboard, 1)}
         title="Beside the household"

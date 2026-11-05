@@ -2,10 +2,10 @@
 
 import type { JSX } from "react";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
-  adoptScenario,
   createScenario,
   deleteScenario,
   enterScenario,
@@ -24,10 +24,9 @@ import { saved } from "@/lib/answer";
 
 // What the menu has open over the dashboard: nothing, the new
 // scenario's name as typed, or the question before the scenario open is
-// made the household or deleted.
+// deleted.
 type Asking =
   | null
-  | { readonly kind: "adopt" }
   | { readonly kind: "delete" }
   | { readonly kind: "new"; readonly name: string };
 
@@ -47,9 +46,9 @@ const branch = "branch:";
 // and each scenario kept, the one open chosen, and beneath them what can
 // be done from there. Choosing a branch opens it; New scenario asks for
 // a name and makes one from the branch open, as it stands; and while a
-// scenario is open, it can be made the household, which replaces the
-// household's plan with the scenario's and leaves its bookkeeping as it
-// stands, keeping the scenario as decided, or deleted, each asked first. The select shows the branch open, and
+// scenario is open, it can be set beside the household on Compare, which
+// is where it is made the household or decided against, with the
+// figures in view, or deleted, asked first. The select shows the branch open, and
 // goes on showing it until the dashboard is read again from the one
 // chosen, so a choice the store refuses leaves it where it was; it holds
 // while a choice is on its way. Each answer is said under a toast, and a
@@ -60,6 +59,7 @@ export function ScenarioMenu({
 }: ScenarioMenuProps): JSX.Element {
   const [asking, setAsking] = useState<Asking>(null);
   const { isSending, send } = useSender();
+  const router = useRouter();
   const open = scenario ?? "";
   const close = (): void => {
     setAsking(null);
@@ -68,7 +68,11 @@ export function ScenarioMenu({
   function choose(value: string): void {
     if (value === "new") {
       setAsking({ kind: "new", name: "" });
-    } else if (value === "adopt" || value === "delete") {
+    } else if (value === "compare") {
+      router.push(
+        `/compare?${new URLSearchParams({ scenario: open }).toString()}`,
+      );
+    } else if (value === "delete") {
       setAsking({ kind: value });
     } else if (value === branch) {
       send(
@@ -116,8 +120,8 @@ export function ScenarioMenu({
           <NativeSelectOption value="new">New scenario…</NativeSelectOption>
           {scenario !== null && (
             <>
-              <NativeSelectOption value="adopt">
-                Make this the household…
+              <NativeSelectOption value="compare">
+                Compare and decide…
               </NativeSelectOption>
               <NativeSelectOption value="delete">
                 Delete scenario…
@@ -156,30 +160,6 @@ export function ScenarioMenu({
             }}
           />
         </EditDialog>
-      )}
-      {asking?.kind === "adopt" && scenario !== null && (
-        <ConfirmDialog
-          confirm="Make the household"
-          isBusy={isSending}
-          onCancel={close}
-          onConfirm={() => {
-            send(async () => adoptScenario(scenario), {
-              failure: "Household not replaced",
-              onAccepted: close,
-              success: (isDecided) => ({
-                description: isDecided
-                  ? "Edits are saved to the household"
-                  : "Edits are saved to the household; the scenario's decision could not be kept, so it is left undecided",
-                title: `${scenario} is the household`,
-              }),
-            });
-          }}
-          title={`Make ${scenario} the household?`}
-        >
-          The household&apos;s plan is replaced by the scenario&apos;s. Its
-          balances, progress points and pulled figures stay as they stand, and
-          the scenario is kept as made the household, taking no more edits.
-        </ConfirmDialog>
       )}
       {asking?.kind === "delete" && scenario !== null && (
         <ConfirmDialog

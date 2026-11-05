@@ -56,6 +56,7 @@ function screenOf(
 ): JSX.Element {
   return (
     <CompareScreen
+      actions={undefined}
       asOf={{ month: 7, year: 2026 }}
       household={{
         accounts: [isa],
@@ -158,6 +159,7 @@ describe("CompareScreen", () => {
   it("lists what making it the household changes under how many of each there are", () => {
     render(
       <CompareScreen
+        actions={undefined}
         asOf={{ month: 7, year: 2026 }}
         household={{
           accounts: [isa],
