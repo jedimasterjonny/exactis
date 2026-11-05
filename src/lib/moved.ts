@@ -87,6 +87,29 @@ interface Step {
   readonly standing: Standing;
 }
 
+// What each record outside the rates is called, as its screen names it.
+export const areaNames: Record<Area, string> = {
+  accounts: "Accounts",
+  ages: "Plan end age",
+  children: "Children",
+  drawdown: "Drawdown",
+  milestones: "Milestones",
+  owners: "Owners",
+  schedule: "Income & expenses",
+};
+
+// What each source of the rates is called, as the assumptions screen
+// names it.
+export const sourceNames: Record<RateSource, string> = {
+  cma: "BlackRock CMA",
+  curve: "BoE curve",
+  deductions: "Fees and yield",
+  glide: "Glide path",
+  rates: "Rates typed",
+  rateSet: "Set of rates",
+  targets: "Target allocation",
+};
+
 // The records each area compares, an account by everything but its
 // balance and the day it was set, which are the balances', in the order
 // the accounts are listed, which moves the spare money.
