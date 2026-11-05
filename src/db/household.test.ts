@@ -185,21 +185,6 @@ describe("household store", () => {
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
-  it("drops a scenario's versions up to the one given, and leaves those after it", async () => {
-    await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
-    await keepAfter(db, { scenario: "Retire early", version: 1 }, named);
-    await keepAfter(db, { scenario: "Retire early", version: 2 }, reference);
-
-    await dropScenario(db, "Retire early", 2);
-
-    expect(
-      await db
-        .select({ version: householdVersions.version })
-        .from(householdVersions),
-    ).toStrictEqual([{ version: 3 }]);
-    expect(await listScenarios(db)).toStrictEqual(["Retire early"]);
-  });
-
   // A scenario's first version written raw, as an older app kept it,
   // with no shape stamped on it, then a save after it.
   it("keeps a decision as the version read copied whole after it, read back at the branch's latest alone", async () => {

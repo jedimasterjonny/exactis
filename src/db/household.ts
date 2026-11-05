@@ -131,30 +131,15 @@ export async function decideScenario(
   }
 }
 
-// Drops the versions of a scenario: every one, or those up to and
-// including the version given, so a version saved after the one an
-// adoption read is left rather than dropped unseen. The household is
-// never dropped, which the trigger holds too; asking to is a bug, so it
-// fails here before the store is asked.
-export async function dropScenario(
-  db: Database,
-  name: string,
-  through?: number,
-): Promise<void> {
+// Drops every version of a scenario, its decisions with them. The
+// household is never dropped, which the trigger holds too; asking to is
+// a bug, so it fails here before the store is asked.
+export async function dropScenario(db: Database, name: string): Promise<void> {
   if (name === "") {
     throw new Error("The household is never dropped");
   }
   await queried(
-    db
-      .delete(householdVersions)
-      .where(
-        and(
-          eq(householdVersions.scenario, name),
-          through === undefined
-            ? undefined
-            : lte(householdVersions.version, through),
-        ),
-      ),
+    db.delete(householdVersions).where(eq(householdVersions.scenario, name)),
   );
 }
 
@@ -404,10 +389,7 @@ export async function readCloses(
 
 // The first version kept on the branch, or null before anything is. A
 // scenario's is the copy it was made from, which stays until the
-// scenario is adopted or dropped, so what it was made from is read back
-// off it; one saved to the scenario while it was being adopted outlives
-// the drop and stands as its first after, so a scenario left that way
-// reads as made from a later copy than it was.
+// scenario is dropped, so what it was made from is read back off it.
 export async function readFirst(
   db: Database,
   scenario: string,

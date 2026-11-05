@@ -11,8 +11,8 @@ interface ScenarioBannerProps {
 // The bar across the top of every screen while a scenario is open,
 // naming it in the caution tone, since an edit made beneath it is kept
 // in the scenario rather than the household, with the way back to the
-// household beside it. A scenario the store no longer keeps, adopted or
-// deleted from another device, is named as gone, since the screens show
+// household beside it. A scenario the store no longer keeps, deleted
+// from another device, is named as gone, since the screens show
 // the household while every save is refused, and leaving is the way
 // out; the state comes before the name, so a long name on a narrow
 // screen loses its tail rather than the state. Leaving is a form

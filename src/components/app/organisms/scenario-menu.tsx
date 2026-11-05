@@ -49,7 +49,7 @@ const branch = "branch:";
 // a name and makes one from the branch open, as it stands; and while a
 // scenario is open, it can be made the household, which replaces the
 // household's plan with the scenario's and leaves its bookkeeping as it
-// stands, or deleted, each asked first. The select shows the branch open, and
+// stands, keeping the scenario as decided, or deleted, each asked first. The select shows the branch open, and
 // goes on showing it until the dashboard is read again from the one
 // chosen, so a choice the store refuses leaves it where it was; it holds
 // while a choice is on its way. Each answer is said under a toast, and a
@@ -166,8 +166,10 @@ export function ScenarioMenu({
             send(async () => adoptScenario(scenario), {
               failure: "Household not replaced",
               onAccepted: close,
-              success: () => ({
-                description: "Edits are saved to the household",
+              success: (isDecided) => ({
+                description: isDecided
+                  ? "Edits are saved to the household"
+                  : "Edits are saved to the household; the scenario's decision could not be kept, so it is left undecided",
                 title: `${scenario} is the household`,
               }),
             });
@@ -176,7 +178,7 @@ export function ScenarioMenu({
         >
           The household&apos;s plan is replaced by the scenario&apos;s. Its
           balances, progress points and pulled figures stay as they stand, and
-          the scenario is deleted.
+          the scenario is kept as made the household, taking no more edits.
         </ConfirmDialog>
       )}
       {asking?.kind === "delete" && scenario !== null && (
@@ -195,7 +197,8 @@ export function ScenarioMenu({
           }}
           title={`Delete ${scenario}?`}
         >
-          Every save made in it goes with it. The household is not touched.
+          Every save made in it goes with it, and so does any decision kept on
+          it. The household is not touched.
         </ConfirmDialog>
       )}
     </>

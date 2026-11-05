@@ -194,7 +194,7 @@ describe("ScenarioMenu", () => {
   });
 
   it("makes the scenario open the household once asked, saying what that replaces", async () => {
-    vi.mocked(adoptScenario).mockResolvedValue(saved(undefined));
+    vi.mocked(adoptScenario).mockResolvedValue(saved(true));
     renderMenu();
 
     choose("adopt");
@@ -204,7 +204,7 @@ describe("ScenarioMenu", () => {
     });
 
     expect(question).toHaveAccessibleDescription(
-      "The household's plan is replaced by the scenario's. Its balances, progress points and pulled figures stay as they stand, and the scenario is deleted.",
+      "The household's plan is replaced by the scenario's. Its balances, progress points and pulled figures stay as they stand, and the scenario is kept as made the household, taking no more edits.",
     );
 
     fireEvent.click(
@@ -221,6 +221,20 @@ describe("ScenarioMenu", () => {
     });
   });
 
+  it("says the scenario is left undecided where the household was replaced but its decision not kept", async () => {
+    vi.mocked(adoptScenario).mockResolvedValue(saved(false));
+    renderMenu();
+
+    choose("adopt");
+    fireEvent.click(screen.getByRole("button", { name: "Make the household" }));
+
+    expect(adoptScenario).toHaveBeenCalledExactlyOnceWith("Retire early");
+    await toasted(
+      "Retire early is the household",
+      "Edits are saved to the household; the scenario's decision could not be kept, so it is left undecided",
+    );
+  });
+
   it("deletes the scenario open once asked", async () => {
     vi.mocked(deleteScenario).mockResolvedValue(saved(undefined));
     renderMenu();
@@ -232,7 +246,7 @@ describe("ScenarioMenu", () => {
     });
 
     expect(question).toHaveAccessibleDescription(
-      "Every save made in it goes with it. The household is not touched.",
+      "Every save made in it goes with it, and so does any decision kept on it. The household is not touched.",
     );
 
     fireEvent.click(within(question).getByRole("button", { name: "Delete" }));
