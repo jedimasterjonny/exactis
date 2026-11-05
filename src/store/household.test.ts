@@ -31,6 +31,7 @@ import {
   amend,
   getBaseline,
   getClosesBack,
+  getCompared,
   getHousehold,
   getOpened,
   getScenario,
@@ -753,6 +754,155 @@ describe("the household store", () => {
     });
   });
 
+  // The household kept as the reference, a scenario made from it whose
+  // plan runs to 95, and the household's pension since set to £420,000
+  // on the tenth, read with another scenario open.
+  it("reads a scenario laid over the household's bookkeeping, as making it the household would leave it", async () => {
+    const recorded = {
+      ...reference,
+      accounts: reference.accounts.map((account) =>
+        account.id === 6
+          ? { ...account, balance: 420_000, setOn: "2026-09-10" }
+          : account,
+      ),
+    };
+    const planned = { ...reference, ages: { ends: 95 } };
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+    await keepAfter(db, { scenario: "Four-day week", version: 0 }, reference);
+    await keepAfter(db, { scenario: "Four-day week", version: 1 }, planned);
+    await keepAfter(db, { scenario: "", version: 1 }, recorded);
+    await keepAfter(db, { scenario: "Bonds sooner", version: 0 }, blank);
+    vi.mocked(openedScenario).mockResolvedValue("Bonds sooner");
+
+    expect(await getCompared(" Four-day week ")).toStrictEqual({
+      decision: null,
+      household: { ...soundKept(recorded), scenario: "", version: 2 },
+      over: saved(soundKept({ ...recorded, ages: { ends: 95 } })),
+      scenario: saved(soundKept(planned).kept),
+      version: 2,
+    });
+  });
+
+  // A cash ISA opened in the household since the scenario was made,
+  // under the id the household's next stood at then.
+  it("says why a scenario cannot be laid over a household that added an account since it was made, and still reads the scenario", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+    await keepAfter(db, { scenario: "Four-day week", version: 0 }, reference);
+    await keepAfter(
+      db,
+      { scenario: "", version: 1 },
+      {
+        ...reference,
+        accounts: [
+          ...reference.accounts,
+          {
+            balance: 12_000,
+            growth: { kind: "fixed", rate: 0.04 },
+            id: 20,
+            kind: "cash",
+            name: "Cash ISA",
+          },
+        ],
+        next: 21,
+      },
+    );
+
+    expect(await getCompared("Four-day week")).toMatchObject({
+      household: { version: 2 },
+      over: refused(
+        "An account was added to the household since this scenario was made, so the scenario cannot be laid over it; delete it from the household first, and add it again after",
+      ),
+      scenario: saved(soundKept(reference).kept),
+      version: 1,
+    });
+  });
+
+  it("reads the scenario itself as what making it the household would leave before anything is kept there", async () => {
+    await keepAfter(db, { scenario: "Four-day week", version: 0 }, blank);
+
+    expect(await getCompared("Four-day week")).toMatchObject({
+      household: { version: 0 },
+      over: saved(soundKept(blank)),
+      scenario: saved(soundKept(blank).kept),
+    });
+  });
+
+  it("reads nothing for a name no scenario is kept under, or none could have", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+
+    expect(await getCompared("Four-day week")).toBeNull();
+    expect(await getCompared("")).toBeNull();
+    expect(await getCompared("x".repeat(41))).toBeNull();
+  });
+
+  // Decided against late on the third of July, which is the fourth in
+  // the UK's summer time; made the household on the fourth of November;
+  // and one written past the rules, as a version kept before they
+  // tightened, decided against with no reason.
+  it("reads the decision a scenario carries, with its UK day, and lays one made the household over nothing", async () => {
+    const twice = {
+      ...reference,
+      accounts: [...reference.accounts, ...reference.accounts],
+    };
+    await db.insert(householdVersions).values([
+      { household: reference, scenario: "", version: 1 },
+      { household: reference, scenario: "Four-day week", version: 1 },
+      {
+        decision: "rejected",
+        household: reference,
+        reason: "Too tight in the early years",
+        savedAt: new Date("2026-07-03T23:30:00Z"),
+        scenario: "Four-day week",
+        version: 2,
+      },
+      { household: reference, scenario: "Sabbatical year", version: 1 },
+      {
+        decision: "adopted",
+        household: reference,
+        reason: null,
+        savedAt: new Date("2026-11-04T12:00:00Z"),
+        scenario: "Sabbatical year",
+        version: 2,
+      },
+      { household: twice, scenario: "Bonds sooner", version: 1 },
+      {
+        decision: "rejected",
+        household: twice,
+        reason: null,
+        savedAt: new Date("2026-11-04T12:00:00Z"),
+        scenario: "Bonds sooner",
+        version: 2,
+      },
+    ]);
+
+    expect(await getCompared("Four-day week")).toMatchObject({
+      decision: {
+        kind: "rejected",
+        on: "2026-07-04",
+        reason: "Too tight in the early years",
+      },
+      over: { kind: "saved" },
+      version: 2,
+    });
+    expect(await getCompared("Sabbatical year")).toMatchObject({
+      decision: { kind: "adopted", on: "2026-11-04", reason: null },
+      over: null,
+    });
+
+    const refusedWhole = await getCompared("Bonds sooner");
+
+    expect(refusedWhole).toMatchObject({
+      decision: { kind: "rejected", reason: null },
+      scenario: {
+        kind: "refused",
+        reason: expect.stringContaining(
+          "A record's id is held by no other record",
+        ) as unknown,
+      },
+    });
+    expect(refusedWhole?.over).toStrictEqual(refusedWhole?.scenario);
+  });
+
   it("reads no scenario, no list of them and no baseline without a session", async () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
@@ -760,6 +910,7 @@ describe("the household store", () => {
     await expect(getOpened()).rejects.toThrow("redirected");
     await expect(getScenarios()).rejects.toThrow("redirected");
     await expect(getBaseline()).rejects.toThrow("redirected");
+    await expect(getCompared("Four-day week")).rejects.toThrow("redirected");
     expect(getDb).not.toHaveBeenCalled();
   });
 });
