@@ -595,14 +595,57 @@ describe("the household store", () => {
   it("opens on the household without a scenario's cookie, and lists the scenarios kept", async () => {
     expect(await getScenario()).toBeNull();
     expect(await getOpened()).toBeNull();
-    expect(await getScenarios()).toStrictEqual([]);
+    expect(await getScenarios()).toStrictEqual({
+      adopted: [],
+      open: [],
+      rejected: [],
+    });
     expect(await getBaseline()).toStrictEqual(await getHousehold());
 
     await keepAfter(db, { scenario: "Retire early", version: 0 }, blank);
     await keepAfter(db, { scenario: "Move house", version: 0 }, blank);
 
     expect(await getScenario()).toBeNull();
-    expect(await getScenarios()).toStrictEqual(["Move house", "Retire early"]);
+    expect(await getScenarios()).toStrictEqual({
+      adopted: [],
+      open: ["Move house", "Retire early"],
+      rejected: [],
+    });
+  });
+
+  // Two scenarios decided against, on the first and the fourth of
+  // November, and two made the household, on the second and the third,
+  // beside one still open.
+  it("lists the scenarios decided apart from those open, each decision the latest first", async () => {
+    const decidedOn = (
+      scenario: string,
+      decision: "adopted" | "rejected",
+      day: string,
+    ): readonly (typeof householdVersions.$inferInsert)[] => [
+      { household: blank, scenario, version: 1 },
+      {
+        decision,
+        household: blank,
+        savedAt: new Date(`${day}T12:00:00Z`),
+        scenario,
+        version: 2,
+      },
+    ];
+    await db
+      .insert(householdVersions)
+      .values([
+        ...decidedOn("Bonds sooner", "rejected", "2026-11-01"),
+        ...decidedOn("Four-day week", "adopted", "2026-11-02"),
+        ...decidedOn("Move house", "adopted", "2026-11-03"),
+        ...decidedOn("Sabbatical year", "rejected", "2026-11-04"),
+        { household: blank, scenario: "Retire early", version: 1 },
+      ]);
+
+    expect(await getScenarios()).toStrictEqual({
+      adopted: ["Move house", "Four-day week"],
+      open: ["Retire early"],
+      rejected: ["Sabbatical year", "Bonds sooner"],
+    });
   });
 
   // The household kept as the reference, and a scenario beside it

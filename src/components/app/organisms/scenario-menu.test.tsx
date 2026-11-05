@@ -7,6 +7,8 @@ import {
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { Scenarios } from "@/store/household";
+
 import {
   createScenario,
   deleteScenario,
@@ -41,12 +43,18 @@ function menu(): HTMLSelectElement {
   return screen.getByRole<HTMLSelectElement>("combobox", { name: "Scenario" });
 }
 
-// The menu over two scenarios kept, the one named open or the household
-// where none is. Each answer reports through the toast manager, which
-// needs its Toaster mounted.
-function renderMenu(scenario: null | string = "Retire early"): void {
+// The menu over two scenarios open, and none decided unless some are
+// given, the one named open or the household where none is. Each answer
+// reports through the toast manager, which needs its Toaster mounted.
+function renderMenu(
+  scenario: null | string = "Retire early",
+  decided: Omit<Scenarios, "open"> = { adopted: [], rejected: [] },
+): void {
   render(
-    <ScenarioMenu names={["Move house", "Retire early"]} scenario={scenario} />,
+    <ScenarioMenu
+      scenario={scenario}
+      scenarios={{ ...decided, open: ["Move house", "Retire early"] }}
+    />,
     { wrapper: Toaster },
   );
 }
@@ -93,6 +101,60 @@ describe("ScenarioMenu", () => {
       "Retire early",
       "New scenario…",
     ]);
+  });
+
+  // Two decided against, the latest first, and one made the household.
+  it("lists the decided scenarios after the commands, apart by their decision", () => {
+    renderMenu("Retire early", {
+      adopted: ["Sabbatical year"],
+      rejected: ["Four-day week", "Bonds sooner"],
+    });
+
+    expect(
+      within(menu())
+        .getAllByRole("option")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual([
+      "Household",
+      "Move house",
+      "Retire early",
+      "New scenario…",
+      "Compare and decide…",
+      "Delete scenario…",
+      "Four-day week",
+      "Bonds sooner",
+      "Sabbatical year",
+    ]);
+    expect(
+      within(menu())
+        .getAllByRole("group")
+        .map((group) => group.getAttribute("label")),
+    ).toStrictEqual(["Scenarios", "Decided against", "Made the household"]);
+  });
+
+  // A name with a space, which the query carries encoded.
+  it("sets a decided scenario chosen beside the household on Compare, without opening it", () => {
+    renderMenu(null, { adopted: ["Sabbatical year"], rejected: [] });
+
+    choose("branch:Sabbatical year");
+
+    expect(push).toHaveBeenCalledExactlyOnceWith(
+      "/compare?scenario=Sabbatical+year",
+    );
+    expect(enterScenario).not.toHaveBeenCalled();
+    expect(menu()).toHaveValue("branch:");
+  });
+
+  // Opened from Compare, to make a new scenario from it or delete it.
+  it("shows a decided scenario open as the one chosen, in its group", () => {
+    renderMenu("Four-day week", { adopted: [], rejected: ["Four-day week"] });
+
+    expect(menu()).toHaveValue("branch:Four-day week");
+    expect(
+      within(
+        within(menu()).getByRole("group", { name: "Decided against" }),
+      ).getByRole("option", { selected: true }),
+    ).toHaveTextContent("Four-day week");
   });
 
   it("opens the scenario chosen, and says so", async () => {
@@ -201,8 +263,12 @@ describe("ScenarioMenu", () => {
   it("sets the scenario open beside the household on Compare, where it is decided", () => {
     render(
       <ScenarioMenu
-        names={["Bonds & cash", "Retire early"]}
         scenario="Bonds & cash"
+        scenarios={{
+          adopted: [],
+          open: ["Bonds & cash", "Retire early"],
+          rejected: [],
+        }}
       />,
       { wrapper: Toaster },
     );

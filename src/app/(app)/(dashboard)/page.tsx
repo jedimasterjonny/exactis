@@ -37,7 +37,8 @@ import { ProjectionBoard } from "./projection-board";
 // plan runs to, so the whole of it renders behind the loading screen
 // beside it rather than the chart alone. The scenarios' menu sits in the
 // header beside the assumptions, given the scenario open and every one
-// kept, read with the household. While a scenario is open the household
+// kept, open and decided apart, read with the household. While a
+// scenario is open the household
 // itself is read too, and the board sets the scenario against it: its
 // accounts, milestones, plan, lines and spread, which is all the board
 // projects, rather than the whole household carried to the browser.
@@ -60,7 +61,7 @@ export default async function Dashboard(): Promise<JSX.Element> {
     <Screen
       actions={
         <>
-          <ScenarioMenu names={scenarios} scenario={scenario} />
+          <ScenarioMenu scenario={scenario} scenarios={scenarios} />
           <PlanAssumptions plan={plan} />
         </>
       }

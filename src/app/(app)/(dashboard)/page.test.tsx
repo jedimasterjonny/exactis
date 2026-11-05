@@ -36,6 +36,9 @@ vi.mock("@/store/household", () => ({
   getScenarios: vi.fn(),
 }));
 
+// No scenario kept, open or decided.
+const none = { adopted: [], open: [], rejected: [] };
+
 // The fixtures' records, laid over the household before anything is
 // saved as the store reads it. The fixture's plan runs to 2083 for
 // someone born in 1992, so to 91, and they retire at 61, in 2053,
@@ -53,7 +56,7 @@ describe("Dashboard", () => {
     vi.mocked(getBaseline).mockResolvedValue(household);
     vi.mocked(getHousehold).mockResolvedValue(household);
     vi.mocked(getScenario).mockResolvedValue(null);
-    vi.mocked(getScenarios).mockResolvedValue([]);
+    vi.mocked(getScenarios).mockResolvedValue(none);
     // jsdom has no Worker, and the chance of success draws its futures on two.
     stubWorkers();
     // Each test opens a page of its own, with no run kept from the last.
@@ -121,9 +124,13 @@ describe("Dashboard", () => {
     ).toBeInTheDocument();
   });
 
-  it("offers the scenarios kept in the header, the one open chosen", async () => {
+  it("offers the scenarios kept in the header, the one open chosen and the decided ones apart", async () => {
     vi.mocked(getScenario).mockResolvedValue("Retire early");
-    vi.mocked(getScenarios).mockResolvedValue(["Move house", "Retire early"]);
+    vi.mocked(getScenarios).mockResolvedValue({
+      adopted: ["Sabbatical year"],
+      open: ["Move house", "Retire early"],
+      rejected: [],
+    });
 
     render(await Dashboard());
 
@@ -136,6 +143,9 @@ describe("Dashboard", () => {
         .map(({ textContent }) => textContent)
         .slice(0, 3),
     ).toStrictEqual(["Household", "Move house", "Retire early"]);
+    expect(
+      within(menu).getByRole("group", { name: "Made the household" }),
+    ).toHaveTextContent("Sabbatical year");
   });
 
   // The household open, so nothing to set it against.
@@ -157,7 +167,10 @@ describe("Dashboard", () => {
   // household's line.
   it("reads the household while a scenario is open, and sets the scenario against it", async () => {
     vi.mocked(getScenario).mockResolvedValue("Retire early");
-    vi.mocked(getScenarios).mockResolvedValue(["Retire early"]);
+    vi.mocked(getScenarios).mockResolvedValue({
+      ...none,
+      open: ["Retire early"],
+    });
     vi.mocked(getBaseline).mockResolvedValue({
       ...household,
       plan: retiringAt(retiring, 64),

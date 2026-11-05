@@ -5,6 +5,8 @@ import type { JSX } from "react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import type { Scenarios } from "@/store/household";
+
 import {
   createScenario,
   deleteScenario,
@@ -31,8 +33,8 @@ type Asking =
   | { readonly kind: "new"; readonly name: string };
 
 interface ScenarioMenuProps {
-  readonly names: readonly string[];
   readonly scenario: null | string;
+  readonly scenarios: Scenarios;
 }
 
 // The longest name a scenario is kept under.
@@ -43,8 +45,13 @@ const longest = 40;
 const branch = "branch:";
 
 // The dashboard's scenarios, as one select in its header: the household
-// and each scenario kept, the one open chosen, and beneath them what can
-// be done from there. Choosing a branch opens it; New scenario asks for
+// and each scenario still open, the one open chosen, then what can be
+// done from there, then the scenarios decided against and those made
+// the household, each group the latest decided first, so the history
+// grows below the commands rather than pushing them down. Choosing an
+// open branch opens it, and choosing a decided one sets it beside the
+// household on Compare, which says what was decided and why, without
+// opening it, since a decided scenario takes no edits; New scenario asks for
 // a name and makes one from the branch open, as it stands; and while a
 // scenario is open, it can be set beside the household on Compare, which
 // is where it is made the household or decided against, with the
@@ -54,24 +61,29 @@ const branch = "branch:";
 // while a choice is on its way. Each answer is said under a toast, and a
 // refusal in its own words.
 export function ScenarioMenu({
-  names,
   scenario,
+  scenarios,
 }: ScenarioMenuProps): JSX.Element {
   const [asking, setAsking] = useState<Asking>(null);
   const { isSending, send } = useSender();
   const router = useRouter();
   const open = scenario ?? "";
+  const decided = new Set([...scenarios.rejected, ...scenarios.adopted]);
   const close = (): void => {
     setAsking(null);
   };
+
+  function compare(name: string): void {
+    router.push(
+      `/compare?${new URLSearchParams({ scenario: name }).toString()}`,
+    );
+  }
 
   function choose(value: string): void {
     if (value === "new") {
       setAsking({ kind: "new", name: "" });
     } else if (value === "compare") {
-      router.push(
-        `/compare?${new URLSearchParams({ scenario: open }).toString()}`,
-      );
+      compare(open);
     } else if (value === "delete") {
       setAsking({ kind: value });
     } else if (value === branch) {
@@ -88,6 +100,8 @@ export function ScenarioMenu({
           }),
         },
       );
+    } else if (decided.has(value.slice(branch.length))) {
+      compare(value.slice(branch.length));
     } else {
       send(async () => enterScenario(value.slice(branch.length)), {
         failure: "Scenario not opened",
@@ -111,7 +125,7 @@ export function ScenarioMenu({
         value={`${branch}${open}`}
       >
         <NativeSelectOption value={branch}>Household</NativeSelectOption>
-        {names.map((name) => (
+        {scenarios.open.map((name) => (
           <NativeSelectOption key={name} value={`${branch}${name}`}>
             {name}
           </NativeSelectOption>
@@ -129,6 +143,23 @@ export function ScenarioMenu({
             </>
           )}
         </NativeSelectOptGroup>
+        {(
+          [
+            ["Decided against", scenarios.rejected],
+            ["Made the household", scenarios.adopted],
+          ] as const
+        ).map(
+          ([label, names]) =>
+            names.length > 0 && (
+              <NativeSelectOptGroup key={label} label={label}>
+                {names.map((name) => (
+                  <NativeSelectOption key={name} value={`${branch}${name}`}>
+                    {name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelectOptGroup>
+            ),
+        )}
       </NativeSelect>
       {asking?.kind === "new" && (
         <EditDialog
