@@ -9,12 +9,14 @@ import { children } from "@/data/children.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
-import { owners } from "@/data/owners.fixture";
+import { incomeLines } from "@/data/income.fixture";
+import { owners, sam } from "@/data/owners.fixture";
 import { portfolios, targets } from "@/data/targets.fixture";
-import { laidOut, monthsOn } from "@/engine/projection";
+import { endWorthOf, futureOf } from "@/engine/futures";
+import { laidOut, monthsOn, project } from "@/engine/projection";
 import { Refusal } from "@/lib/answer";
 
-import { movedOver, movedSince } from "./moved";
+import { changedIn, movedOver, movedSince, sideOf } from "./moved";
 
 // The household's rules as they are, watched, so a test can have them
 // refuse a state the walk takes.
@@ -468,5 +470,198 @@ describe("movedOver", () => {
       unchecked: 0,
     });
     expect(moved.changes).toStrictEqual([]);
+  });
+});
+
+describe("changedIn", () => {
+  // The household's pension set to £420,000 on the tenth and a CMA and
+  // curve of nobody's, which are bookkeeping rather than the plan.
+  it("finds no line between a household and itself, nor in its balances, their days or what was pulled", () => {
+    expect(changedIn(kept, kept)).toStrictEqual([]);
+    expect(
+      changedIn(kept, {
+        ...kept,
+        accounts: changed(kept.accounts, 6, {
+          balance: 420_000,
+          setOn: "2026-09-10",
+        }),
+        cma: null,
+        curve: null,
+      }),
+    ).toStrictEqual([]);
+  });
+
+  // A scenario that adds Sam and Ada, retires its owner at 58, takes
+  // away the pension, earns on the current account, opens premium
+  // bonds, raises the salary, drops the childcare, renames Downsize,
+  // runs the plan to 95, draws the pension first, sets a glide path,
+  // raises the fees and runs on the CMA's rates.
+  it("lists each record the scenario added, changed or removed by its kind and name, then each setting by its name", () => {
+    const [me] = owners;
+    const scenario: Kept = {
+      ...kept,
+      accounts: [
+        ...changed(kept.accounts, 3, {
+          growth: { kind: "fixed", rate: 0.03 },
+        }).filter(({ id }) => id !== 6),
+        {
+          balance: 5000,
+          growth: { kind: "fixed", rate: 0.04 },
+          id: 20,
+          kind: "cash",
+          name: "Premium bonds",
+        },
+      ],
+      ages: { ends: 95 },
+      children: children.slice(0, 1),
+      deductions: { ...kept.deductions, fees: 0.004 },
+      drawdown: "pension-first",
+      glide: [{ age: 60, bonds: 0.4 }],
+      milestones: kept.milestones.map((milestone) =>
+        milestone.id === 8
+          ? { ...milestone, name: "Move to the coast" }
+          : milestone,
+      ),
+      next: 21,
+      owners: [
+        { ...me, retirement: [{ measure: "age", of: "years", times: 58 }] },
+        sam,
+      ],
+      rateSet: "cma",
+      schedule: {
+        expenses: kept.schedule.expenses.filter(({ id }) => id !== 12),
+        income: kept.schedule.income.map((line) =>
+          line.id === 16 ? { ...line, amount: line.amount + 1000 } : line,
+        ),
+      },
+    };
+
+    expect(changedIn(kept, scenario)).toStrictEqual([
+      { change: "changed", key: "Owner:1", label: "Owner · Me" },
+      { change: "added", key: "Owner:2", label: "Owner · Sam" },
+      { change: "added", key: "Child:20", label: "Child · Ada" },
+      {
+        change: "changed",
+        key: "Account:3",
+        label: "Account · Current account",
+      },
+      { change: "added", key: "Account:20", label: "Account · Premium bonds" },
+      {
+        change: "removed",
+        key: "Account:6",
+        label: "Account · Workplace pension",
+      },
+      { change: "changed", key: "Income:16", label: "Income · Salary" },
+      { change: "removed", key: "Expense:12", label: "Expense · Childcare" },
+      {
+        change: "changed",
+        key: "Milestone:8",
+        label: "Milestone · Move to the coast",
+      },
+      { change: "changed", key: "Plan end age", label: "Plan end age" },
+      { change: "changed", key: "Drawdown", label: "Drawdown" },
+      { change: "changed", key: "Set of rates", label: "Set of rates" },
+      { change: "changed", key: "Fees and yield", label: "Fees and yield" },
+      { change: "changed", key: "Glide path", label: "Glide path" },
+    ]);
+  });
+
+  // The scenario lists the ISA before the pension, which moves the spare
+  // money; then one that takes the pension away and opens premium bonds
+  // ahead of the rest, which moves none of them.
+  it("lists the order of the accounts where the scenario reorders those both hold, and not for one added or removed", () => {
+    const [pension, isa, ...rest] = accounts;
+    const bonds: Account = {
+      balance: 5000,
+      growth: { kind: "fixed", rate: 0.04 },
+      id: 20,
+      kind: "cash",
+      name: "Premium bonds",
+    };
+
+    expect(
+      changedIn(kept, { ...kept, accounts: [isa, pension, ...rest] }),
+    ).toStrictEqual([
+      {
+        change: "changed",
+        key: "Order of the accounts",
+        label: "Order of the accounts",
+      },
+    ]);
+    expect(
+      changedIn(kept, { ...kept, accounts: [bonds, isa, ...rest], next: 21 }),
+    ).toStrictEqual([
+      { change: "added", key: "Account:20", label: "Account · Premium bonds" },
+      {
+        change: "removed",
+        key: "Account:6",
+        label: "Account · Workplace pension",
+      },
+    ]);
+  });
+
+  // An income line and an expense line both called Bonus, the expense
+  // the scenario's alone.
+  it("tells two records of one name apart by what they are", () => {
+    const [salary] = incomeLines;
+    const [household] = expenseLines;
+    const bonuses: Kept = {
+      ...kept,
+      next: 22,
+      schedule: {
+        expenses: kept.schedule.expenses,
+        income: [...kept.schedule.income, { ...salary, id: 20, name: "Bonus" }],
+      },
+    };
+
+    expect(
+      changedIn(bonuses, {
+        ...bonuses,
+        schedule: {
+          ...bonuses.schedule,
+          expenses: [
+            ...kept.schedule.expenses,
+            { ...household, id: 21, name: "Bonus" },
+          ],
+        },
+      }),
+    ).toStrictEqual([
+      { change: "added", key: "Expense:21", label: "Expense · Bonus" },
+    ]);
+  });
+});
+
+describe("sideOf", () => {
+  // The reference household's owner, born in 1992, retires at 61 in a
+  // plan running to 91.
+  it("reads the age a plan's owner retires at and the net worth it holds entering its last year, at its own rates", () => {
+    const { accounts: held, plan, schedule } = soundKept(kept).household;
+
+    expect(sideOf(kept)).toStrictEqual({
+      ends: 91,
+      retires: 61,
+      worth: endWorthOf(
+        futureOf(project(held, schedule, plan), {
+          accounts: held,
+          plan,
+          schedule,
+        }),
+      ),
+    });
+  });
+
+  it("reads no retirement where its owner never retires by the plan's end", () => {
+    expect(
+      sideOf(
+        closing({
+          owners: [
+            {
+              ...owners[0],
+              retirement: [{ measure: "worth", of: "pounds", times: 1e12 }],
+            },
+          ],
+        }),
+      ).retires,
+    ).toBeNull();
   });
 });
