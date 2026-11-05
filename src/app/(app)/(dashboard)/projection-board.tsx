@@ -21,8 +21,8 @@ import { AgeField } from "@/components/app/molecules/age-field";
 import { MilestoneChips } from "@/components/app/molecules/milestone-chips";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ChanceTile } from "@/components/app/organisms/chance-tile";
+import { FuturesRun } from "@/components/app/organisms/futures-run";
 import { ProjectionChart } from "@/components/app/organisms/projection-chart";
-import { takesSpare } from "@/data/accounts";
 import {
   ageOf,
   conditionsOf,
@@ -40,7 +40,6 @@ import {
   runLength,
 } from "@/engine/futures";
 import { carriedBy, holdsAnything, project } from "@/engine/projection";
-import { useFutures } from "@/hooks/use-futures";
 import { useSender } from "@/hooks/use-sender";
 import { formatGbp } from "@/lib/money";
 
@@ -68,13 +67,6 @@ interface Deltas {
 interface Draft {
   readonly age: number;
   readonly over: number;
-}
-
-// What the futures are drawn over, and the run they make, as far as it
-// has been drawn, or why it cannot be.
-interface FuturesProps extends Planned {
-  readonly children: (run: Run) => JSX.Element;
-  readonly spread: Shortfall | Spread;
 }
 
 // What the board reads the scenario's tiles from: what the plan holds
@@ -211,12 +203,12 @@ export function ProjectionBoard({
   ...props
 }: ProjectionBoardProps): JSX.Element {
   return (
-    <Futures {...props} spread={spread}>
+    <FuturesRun {...props} spread={spread}>
       {(run) =>
         against === undefined ? (
           <Board {...props} run={run} scenario={scenario} />
         ) : (
-          <Futures {...against}>
+          <FuturesRun {...against}>
             {(theirs) => (
               <Board
                 {...props}
@@ -225,10 +217,10 @@ export function ProjectionBoard({
                 scenario={scenario}
               />
             )}
-          </Futures>
+          </FuturesRun>
         )
       }
-    </Futures>
+    </FuturesRun>
   );
 }
 
@@ -495,39 +487,6 @@ function deltasOf(
         : at[measure] - held[measure],
     end: endWorthOf(projected) - endWorthOf(theirs.projected),
   };
-}
-
-// What is drawn over the futures as they are drawn, at the spread
-// given, in a component of its own so the hook is never called on a
-// condition, and a second run, the household's, is a second of these.
-function Drawn({
-  children,
-  spread,
-  ...props
-}: Omit<FuturesProps, "spread"> & { readonly spread: Spread }): JSX.Element {
-  const { futures, isDone } = useFutures(props.accounts, props.schedule, {
-    count: runLength,
-    plan: props.plan,
-    spread,
-  });
-  return children({ futures, isDone });
-}
-
-// What is drawn over a plan's run of the futures: the futures as they
-// are drawn, or why there are none, while the plan has no spread or no
-// savings for them to grow.
-function Futures({ children, spread, ...props }: FuturesProps): JSX.Element {
-  if ("short" in spread) {
-    return children({ unrun: "No spread to draw the futures from" });
-  }
-  if (!props.accounts.some(takesSpare)) {
-    return children({ unrun: "No savings for the futures to grow" });
-  }
-  return (
-    <Drawn {...props} spread={spread}>
-      {children}
-    </Drawn>
-  );
 }
 
 // The futures a run has drawn so far, or none while there is nothing to
