@@ -9,6 +9,7 @@ import type { Run } from "@/components/app/organisms/chance-tile";
 import type { Household } from "@/data/household";
 import type { Month } from "@/data/schedule";
 import type { Line, Side } from "@/lib/moved";
+import type { Slot } from "@/lib/slot";
 
 import { Note } from "@/components/app/atoms/note";
 import { Worksheet } from "@/components/app/atoms/worksheet";
@@ -26,6 +27,7 @@ import { formatMonth } from "@/lib/months";
 import { dashboard, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 interface CompareScreenProps {
+  readonly actions: Slot;
   readonly asOf: Month;
   readonly household: Drawn;
   readonly lines: null | readonly Line[];
@@ -56,8 +58,8 @@ const changes = "What making it the household changes";
 
 // A scenario beside the household, as making it the household would
 // leave it: the header the page worked out, its title the verdict on
-// retirement and its meta line the decision kept on it, where there is
-// one; where the merge is refused, a caution saying so in the refusal's
+// retirement, its meta line the decision kept on it, where there is
+// one, and its actions the way to decide; where the merge is refused, a caution saying so in the refusal's
 // words in place of the figures, since a sentence that long is no
 // figure; and then two cards. The first sets the household and the
 // scenario side by side in two columns, so a long name heads none:
@@ -73,6 +75,7 @@ const changes = "What making it the household changes";
 // figures are in. The second lists what making it the household would
 // change, a line for each record or setting, or says nothing would.
 export function CompareScreen({
+  actions,
   asOf,
   household,
   lines,
@@ -82,7 +85,12 @@ export function CompareScreen({
   title,
 }: CompareScreenProps): JSX.Element {
   return (
-    <Screen label={sectionLabel(dashboard)} meta={meta} title={title}>
+    <Screen
+      actions={actions}
+      label={sectionLabel(dashboard)}
+      meta={meta}
+      title={title}
+    >
       {refusal !== null && (
         <Caution title="It cannot be made the household as things stand">
           {lines === null

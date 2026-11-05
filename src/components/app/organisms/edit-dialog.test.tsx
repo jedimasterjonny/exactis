@@ -75,6 +75,28 @@ describe("EditDialog", () => {
     expect(dialog).toHaveClass("sm:max-w-lg");
   });
 
+  it("calls its confirm what the caller says, a decision being more than a save", () => {
+    const onSave = vi.fn<() => void>();
+    render(
+      <EditDialog
+        confirm="Decide against"
+        eyebrow="Scenario"
+        onDismiss={vi.fn<() => void>()}
+        onSave={onSave}
+        title="Decide against Four-day week?"
+      >
+        <p>The fields</p>
+      </EditDialog>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Decide against" }));
+
+    expect(onSave).toHaveBeenCalledOnce();
+    expect(
+      screen.queryByRole("button", { name: "Save" }),
+    ).not.toBeInTheDocument();
+  });
+
   // Delete sits first in the footer, pushed to the far edge to set it
   // apart from the other two; it reports the press, and the caller does
   // the asking. The dialog's own Close is the cross in its corner, after

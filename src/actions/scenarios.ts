@@ -1,11 +1,12 @@
 "use server";
 
 import { refresh } from "next/cache";
+import * as z from "zod";
 
 import type { Answer } from "@/lib/answer";
 
 import { soundKept } from "@/data/household";
-import { scenarioName } from "@/data/schemas";
+import { decisionReason, scenarioName } from "@/data/schemas";
 import { upcast } from "@/data/shapes";
 import { getDb } from "@/db/client";
 import {
@@ -21,9 +22,28 @@ import { closeScenario, openedScenario, openScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 import { readHeld } from "@/store/household";
 
+// What a decision was made against: the versions of the household and
+// of the scenario the page deciding it was drawn from, the household's
+// nought where none was kept.
+interface Shown {
+  readonly household: number;
+  readonly scenario: number;
+}
+
+// Why a reason sent is refused: a reason past its length, or one holding
+// a control character or a line break, which the field holds back the
+// first of and never types the second.
+const unreasoned = "A reason is one line of up to 200 characters";
+
 // Why a scenario named is not there to enter or adopt: none was ever
 // kept by that name, or it has been dropped since the screen was drawn.
 const unkept = "No scenario is kept under that name";
+
+// The versions a decision was drawn from, as a page sends them.
+const shownAt = z.object({
+  household: z.number().int().nonnegative(),
+  scenario: z.number().int().positive(),
+});
 
 // Every action here answers a POST from anywhere, so it checks the
 // session for itself and parses the name it was sent rather than
@@ -36,17 +56,23 @@ const unkept = "No scenario is kept under that name";
 // household's next version, under the household's own check that
 // nothing was saved to it since it was read, then keeps the scenario as
 // made the household, the version adopted copied as its next with the
-// decision on it, and closes it where it is the one open. So balances
-// and progress points recorded in the household while the scenario was
-// explored are kept rather than rolled back, as planOver says;
-// and the scenario stays to be read back, taking no more saves. Both
-// sides are read from the store, so each is carried to this shape by
-// the chain first, and one a newer app kept is refused; the merge is
-// made in memory and is not. Both, and what they make, are held to
-// every rule as any save is, so one kept before a rule tightened, or a
-// merge breaking one, is refused in the rule's words. A scenario made
-// the household already is refused, since its plan laid over the
-// household again would undo every edit made there since.
+// decision and the reason given on it, and closes it where it is the
+// one open. So balances and progress points recorded in the household
+// while the scenario was explored are kept rather than rolled back, as
+// planOver says; and the scenario stays to be read back, taking no more
+// saves. It is decided against the versions of both the page deciding
+// it was drawn from, so where either has moved since, the figures the
+// page showed are not what would be written, and it is refused as stale,
+// the page drawn again from what is kept now. Both sides are read from
+// the store, so each is carried to this shape by the chain first, and
+// one a newer app kept is refused; the merge is made in memory and is
+// not. Both, and what they make, are held to every rule as any save is,
+// so one kept before a rule tightened, or a merge breaking one, is
+// refused in the rule's words. A scenario made the household already is
+// refused, since its plan laid over the household again would undo
+// every edit made there since; one decided against can be made the
+// household after all. A reason past its length or holding a line break
+// is refused, and none typed is kept as none.
 // An account added to the household since the scenario was made is
 // refused rather than merged, as planOver says, and the
 // scenario's first version, the copy it was made from, is read for the
@@ -61,9 +87,18 @@ const unkept = "No scenario is kept under that name";
 // said in the answer; any other failure is a fault the answer cannot
 // tell apart from it, so it is written to the server's log as well,
 // where a failed query keeps its statement and none of its values.
-export async function adoptScenario(name: string): Promise<Answer<boolean>> {
+export async function adoptScenario(
+  name: string,
+  shown: Shown,
+  reason?: string,
+): Promise<Answer<boolean>> {
   await requireSession();
   const scenario = scenarioName.parse(name);
+  const against = shownAt.parse(shown);
+  const why = decisionReason.safeParse(reason);
+  if (!why.success) {
+    return refused(unreasoned);
+  }
   const db = getDb();
   const [adopted, forked, household] = await Promise.all([
     readLatest(db, scenario),
@@ -75,6 +110,11 @@ export async function adoptScenario(name: string): Promise<Answer<boolean>> {
   }
   if (adopted.decided?.decision === "adopted") {
     return refused("This scenario was made the household already");
+  }
+  const moved = movedSince(against, household?.version ?? 0, adopted.version);
+  if (moved !== null) {
+    refresh();
+    return refused(moved);
   }
   try {
     const plan = soundKept(upcast(adopted.household)).kept;
@@ -100,7 +140,7 @@ export async function adoptScenario(name: string): Promise<Answer<boolean>> {
   const isDecided = await decideScenario(
     db,
     { scenario, version: adopted.version },
-    { decision: "adopted", reason: null },
+    { decision: "adopted", reason: why.data },
   ).then(
     () => true,
     (error: unknown) => {
@@ -186,9 +226,81 @@ export async function leaveScenario(): Promise<void> {
   refresh();
 }
 
+// Keeps the scenario named as decided against, the version the page
+// deciding it was drawn from copied as its next with the decision and
+// the reason given on it, and closes it where it is the one open. The
+// household is not touched, and the scenario is not held to the rules,
+// so one the rules have tightened past since can still be decided
+// against. It is decided against the versions of both the page was drawn
+// from, and refused as stale where either has moved since, as making it
+// the household is; and a scenario decided already is refused, since
+// nobody decides the same way twice, and one made the household runs
+// the household's plan. A reason past its length or holding a line
+// break is refused, and none typed is kept as none.
+export async function rejectScenario(
+  name: string,
+  shown: Shown,
+  reason?: string,
+): Promise<Answer<undefined>> {
+  await requireSession();
+  const scenario = scenarioName.parse(name);
+  const against = shownAt.parse(shown);
+  const why = decisionReason.safeParse(reason);
+  if (!why.success) {
+    return refused(unreasoned);
+  }
+  const db = getDb();
+  const [latest, household] = await Promise.all([
+    readLatest(db, scenario),
+    readLatest(db, ""),
+  ]);
+  if (latest === null) {
+    return refused(unkept);
+  }
+  if (latest.decided !== undefined) {
+    return refused("This scenario is decided already");
+  }
+  const moved = movedSince(against, household?.version ?? 0, latest.version);
+  if (moved !== null) {
+    refresh();
+    return refused(moved);
+  }
+  try {
+    await decideScenario(
+      db,
+      { scenario, version: latest.version },
+      { decision: "rejected", reason: why.data },
+    );
+  } catch (error: unknown) {
+    if (error instanceof Refusal) {
+      return refused(error.message);
+    }
+    throw error;
+  }
+  await closeIfOpen(scenario);
+  refresh();
+  return saved(undefined);
+}
+
 // Closes the scenario named where it is the one the request has open.
 async function closeIfOpen(name: string): Promise<void> {
   if ((await openedScenario()) === name) {
     await closeScenario();
   }
+}
+
+// Why a decision is refused as stale, where the household or the
+// scenario has moved from the version the page deciding it was drawn
+// from, or null where neither has.
+function movedSince(
+  shown: Shown,
+  household: number,
+  scenario: number,
+): null | string {
+  if (scenario !== shown.scenario) {
+    return "The scenario changed while this was being decided, so nothing was";
+  }
+  return household === shown.household
+    ? null
+    : "The household changed while this was being decided, so nothing was";
 }

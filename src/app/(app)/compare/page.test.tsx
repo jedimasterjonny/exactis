@@ -17,6 +17,12 @@ import { getCompared } from "@/store/household";
 import Compare from "./page";
 
 vi.mock("@/store/household", () => ({ getCompared: vi.fn() }));
+vi.mock("@/actions/scenarios", () => ({
+  adoptScenario: vi.fn(),
+  enterScenario: vi.fn(),
+  rejectScenario: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({ useRouter: vi.fn() }));
 
 // What the reference household's owner, born in 1992 and retiring at
 // 61, retires on in a scenario, each invented: at 58, at 62, or once
@@ -64,6 +70,12 @@ function heldOf(household: Kept): Held {
     ...held,
     household: { ...held.household, spread: { short: "No CMA is pulled" } },
   };
+}
+
+// What the header offers to end the comparison, by what each button
+// says.
+function offered(): (null | string)[] {
+  return screen.getAllByRole("button").map(({ textContent }) => textContent);
 }
 
 describe("Compare", () => {
@@ -162,6 +174,10 @@ describe("Compare", () => {
     ).toStrictEqual(["Owner · MeChanged"]);
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
     expect(screen.queryByText(/^Decided against/u)).not.toBeInTheDocument();
+    expect(offered()).toStrictEqual([
+      "Make this the household…",
+      "Decide against…",
+    ]);
   });
 
   it.each([
@@ -241,6 +257,10 @@ describe("Compare", () => {
         "Decided against on 4 Nov 2026 · ‘Too tight in the early years’",
       ),
     ).toBeInTheDocument();
+    expect(offered()).toStrictEqual([
+      "Make this the household…",
+      "Open the scenario",
+    ]);
 
     vi.mocked(getCompared).mockResolvedValue({
       ...comparedOf(kept),
@@ -281,6 +301,7 @@ describe("Compare", () => {
       "Its plan is the household'sThe household has run on it since 4 Nov 2026, so there is nothing to set beside it.",
     );
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(offered()).toStrictEqual(["Open the scenario"]);
   });
 
   // The household has opened an account since the scenario was made.
@@ -300,6 +321,7 @@ describe("Compare", () => {
     );
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(offered()).toStrictEqual(["Decide against…"]);
   });
 
   // Written past the rules, as a scenario kept before they tightened.

@@ -8,7 +8,6 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  adoptScenario,
   createScenario,
   deleteScenario,
   enterScenario,
@@ -20,12 +19,16 @@ import { field, openDialog } from "@/test/dom";
 
 import { ScenarioMenu } from "./scenario-menu";
 
+const push = vi.hoisted(() => vi.fn());
+
 vi.mock("@/actions/scenarios", () => ({
-  adoptScenario: vi.fn(),
   createScenario: vi.fn(),
   deleteScenario: vi.fn(),
   enterScenario: vi.fn(),
   leaveScenario: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: (): { readonly push: typeof push } => ({ push }),
 }));
 
 // Chooses an option of the menu by what it reports.
@@ -71,12 +74,12 @@ describe("ScenarioMenu", () => {
       "Move house",
       "Retire early",
       "New scenario…",
-      "Make this the household…",
+      "Compare and decide…",
       "Delete scenario…",
     ]);
   });
 
-  it("offers nothing to make the household or delete while the household is open", () => {
+  it("offers nothing to compare or delete while the household is open", () => {
     renderMenu(null);
 
     expect(menu()).toHaveValue("branch:");
@@ -193,46 +196,24 @@ describe("ScenarioMenu", () => {
     ).toBeInTheDocument();
   });
 
-  it("makes the scenario open the household once asked, saying what that replaces", async () => {
-    vi.mocked(adoptScenario).mockResolvedValue(saved(true));
-    renderMenu();
-
-    choose("adopt");
-
-    const question = screen.getByRole("alertdialog", {
-      name: "Make Retire early the household?",
-    });
-
-    expect(question).toHaveAccessibleDescription(
-      "The household's plan is replaced by the scenario's. Its balances, progress points and pulled figures stay as they stand, and the scenario is kept as made the household, taking no more edits.",
+  // A name with a space and an ampersand, which the query carries
+  // encoded.
+  it("sets the scenario open beside the household on Compare, where it is decided", () => {
+    render(
+      <ScenarioMenu
+        names={["Bonds & cash", "Retire early"]}
+        scenario="Bonds & cash"
+      />,
+      { wrapper: Toaster },
     );
 
-    fireEvent.click(
-      within(question).getByRole("button", { name: "Make the household" }),
+    choose("compare");
+
+    expect(push).toHaveBeenCalledExactlyOnceWith(
+      "/compare?scenario=Bonds+%26+cash",
     );
-
-    expect(adoptScenario).toHaveBeenCalledExactlyOnceWith("Retire early");
-    await toasted(
-      "Retire early is the household",
-      "Edits are saved to the household",
-    );
-    await waitFor(() => {
-      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-    });
-  });
-
-  it("says the scenario is left undecided where the household was replaced but its decision not kept", async () => {
-    vi.mocked(adoptScenario).mockResolvedValue(saved(false));
-    renderMenu();
-
-    choose("adopt");
-    fireEvent.click(screen.getByRole("button", { name: "Make the household" }));
-
-    expect(adoptScenario).toHaveBeenCalledExactlyOnceWith("Retire early");
-    await toasted(
-      "Retire early is the household",
-      "Edits are saved to the household; the scenario's decision could not be kept, so it is left undecided",
-    );
+    expect(menu()).toHaveValue("branch:Bonds & cash");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
   it("deletes the scenario open once asked", async () => {
@@ -271,14 +252,14 @@ describe("ScenarioMenu", () => {
   it("drops a question or a new name on cancel and sends nothing", () => {
     renderMenu();
 
-    choose("adopt");
+    choose("delete");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     choose("new");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(adoptScenario).not.toHaveBeenCalled();
+    expect(deleteScenario).not.toHaveBeenCalled();
     expect(createScenario).not.toHaveBeenCalled();
   });
 });
