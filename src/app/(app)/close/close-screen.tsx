@@ -10,7 +10,7 @@ import type { Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 import type { Answer } from "@/lib/answer";
 import type { KeptClose, Landed, Passed } from "@/lib/landed";
-import type { Area, Group, Moved, RateSource, Standing } from "@/lib/moved";
+import type { Group, Moved, RateSource, Standing } from "@/lib/moved";
 import type { SinceClose } from "@/store/household";
 
 import { Ledger } from "@/components/app/atoms/ledger";
@@ -40,7 +40,7 @@ import {
   monthName,
   monthsBetween,
 } from "@/lib/months";
-import { movedOver, movedSince } from "@/lib/moved";
+import { areaNames, movedOver, movedSince, sourceNames } from "@/lib/moved";
 import { cogitator, monthEnd, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 // A band of the futures as the card where the invested balances landed
@@ -66,35 +66,12 @@ const groupNames: Record<Group, string> = {
   rates: "Rates and their sources",
 };
 
-// What each source of the rates is called, as the assumptions screen
-// names it.
-const sourceNames: Record<RateSource, string> = {
-  cma: "BlackRock CMA",
-  curve: "BoE curve",
-  deductions: "Fees and yield",
-  glide: "Glide path",
-  rates: "Rates typed",
-  rateSet: "Set of rates",
-  targets: "Target allocation",
-};
-
 // The sources each tab of the assumptions screen holds, in its order.
 const tabs: readonly (readonly RateSource[])[] = [
   ["rateSet", "rates", "cma", "curve", "deductions"],
   ["targets"],
   ["glide"],
 ];
-
-// What each record outside the rates is called, as its screen names it.
-const areaNames: Record<Area, string> = {
-  accounts: "Accounts",
-  ages: "Plan end age",
-  children: "Children",
-  drawdown: "Drawdown",
-  milestones: "Milestones",
-  owners: "Owners",
-  schedule: "Income & expenses",
-};
 
 interface CloseScreenProps {
   readonly closes: null | Promise<readonly KeptClose[]>;

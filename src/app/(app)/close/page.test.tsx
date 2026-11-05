@@ -38,7 +38,13 @@ vi.mock("@/store/household", () => ({
 vi.mock("@/actions/accounts", () => ({ closeBalances: vi.fn() }));
 vi.mock("@/actions/targets", () => ({ importTargets: vi.fn() }));
 vi.mock("@/lib/landed", () => ({ landedSince: vi.fn() }));
-vi.mock("@/lib/moved", () => ({ movedOver: vi.fn(), movedSince: vi.fn() }));
+// The walks stood in for, and the names of what they walk kept as they
+// are, since the screen says them.
+vi.mock(import("@/lib/moved"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  movedOver: vi.fn(),
+  movedSince: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({
   useRouter: (): { readonly replace: typeof replace } => ({ replace }),
 }));
