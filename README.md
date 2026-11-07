@@ -15,7 +15,8 @@ in Postgres on Neon and the app on Vercel.
   retirement is on conditions, a draggable retirement age.
 - Chance of success — the plan across a thousand simulated futures of the
   markets, and where it breaks: the retirement age and the share of the spending
-  planned that nine in ten of them last on.
+  planned that nine in ten of them last on, and how many last at a retirement
+  age tried.
 - Accounts & assets — the owners and children, and every balance, house, car and
   debt.
 - Income & expenses — the income and expense lines, the milestones, and what a

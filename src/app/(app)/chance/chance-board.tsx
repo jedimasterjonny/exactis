@@ -26,7 +26,7 @@ import {
   runLength,
 } from "@/engine/futures";
 import { project } from "@/engine/projection";
-import { useBreaks } from "@/hooks/use-futures";
+import { useBreaks, useLastingAt } from "@/hooks/use-futures";
 
 interface ChanceBoardProps {
   readonly accounts: readonly Account[];
@@ -39,9 +39,10 @@ interface ChanceBoardProps {
 }
 
 // What the plan's futures come to, as many as have come in: graded,
-// where the plan breaks, searched once the whole run has come in, the
-// run fanned over the plan's years, every milestone and when the
-// run reaches it, and the count beneath them. The screen reads the run
+// where the plan breaks, searched once the whole run has come in, with
+// a retirement age to try there, the run fanned over the plan's years,
+// every milestone and when the run reaches it, and the count beneath
+// them. The screen reads the run
 // and hands the futures down, since its header reads them too, so the
 // board reads none of its own. The plan at its own rates is read as a
 // future, for what it is worth at the end beside the middle future and
@@ -146,7 +147,9 @@ function AtItsRates({
 
 // Where the plan breaks, over the run searched once it is drawn whole,
 // in a component of its own so the search starts only once the run it
-// searches is drawn, and never on workers beside the run's own.
+// searches is drawn, and never on workers beside the run's own; with
+// the retirement age tried there, as useLastingAt holds it, which
+// changes nothing else.
 function Searched({
   accounts,
   futures,
@@ -158,5 +161,6 @@ function Searched({
   "accounts" | "futures" | "plan" | "schedule" | "spread"
 >): JSX.Element {
   const breaks = useBreaks(accounts, schedule, { futures, plan, spread });
-  return <FuturesBreaks plan={plan} searched={{ breaks }} />;
+  const tried = useLastingAt(accounts, schedule, { breaks, plan, spread });
+  return <FuturesBreaks plan={plan} searched={{ breaks }} tried={tried} />;
 }
