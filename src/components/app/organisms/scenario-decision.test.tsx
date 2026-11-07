@@ -99,6 +99,14 @@ describe("ScenarioDecision", () => {
       name: "Make Four-day week the household?",
     });
 
+    // The dialog hands the focus to its first field a frame after it
+    // opens. Deciding before that frame, as no one can, lets it land
+    // after the title has the focus and before the dialog is gone, so it
+    // takes the focus into a field about to be removed.
+    await waitFor(() => {
+      expect(field("Why", dialog)).toHaveFocus();
+    });
+
     expect(within(dialog).getByText("Scenario")).toHaveClass("text-brand");
     expect(
       within(dialog)
