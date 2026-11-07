@@ -102,6 +102,16 @@ export const screens: readonly Screen[] = [
   cogitator,
 ];
 
+// The screens a phone reaches from the bar along its foot, in navigation
+// order, so the month end sits beside the cogitator it hands off to. The
+// rest are reached through the bar's More, which opens the sidebar.
+export const tabs: readonly Screen[] = [
+  dashboard,
+  progress,
+  monthEnd,
+  cogitator,
+];
+
 // Section numerals are roman, decorative and consistent, never the only
 // way to identify a screen. There are eight screens and no screen has
 // more than six cards, so the numerals are listed rather than worked

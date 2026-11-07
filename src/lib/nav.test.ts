@@ -15,6 +15,7 @@ import {
   sectionLabel,
   sectionNumeral,
   subsectionLabel,
+  tabs,
 } from "./nav";
 
 describe("sectionLabel", () => {
@@ -65,5 +66,11 @@ describe("screenAt", () => {
     expect(screenAt("/plan")).toBe(plan);
     expect(screenAt("/plan/extra")).toBeUndefined();
     expect(screenAt("/login")).toBeUndefined();
+  });
+});
+
+describe("tabs", () => {
+  it("puts four screens on the phone's bar, in navigation order", () => {
+    expect(tabs).toStrictEqual([dashboard, progress, monthEnd, cogitator]);
   });
 });

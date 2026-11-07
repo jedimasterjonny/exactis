@@ -15,7 +15,11 @@ describe("AppFrame", () => {
   it("frames the screen in the main landmark beside the sidebar it is handed", () => {
     stubViewport(1024);
     render(
-      <AppFrame banner={null} sidebar={<span>Sidebar</span>}>
+      <AppFrame
+        banner={null}
+        nav={<nav aria-label="Tab bar" />}
+        sidebar={<span>Sidebar</span>}
+      >
         <p>Screen</p>
       </AppFrame>,
     );
@@ -30,10 +34,28 @@ describe("AppFrame", () => {
     expect(within(main).queryByText("Sidebar")).not.toBeInTheDocument();
   });
 
+  it("sets the tab bar it is handed after the main column, padded at its foot on a phone to clear the bar", () => {
+    stubViewport(390);
+    render(
+      <AppFrame banner={null} nav={<nav aria-label="Tab bar" />} sidebar={null}>
+        <p>Screen</p>
+      </AppFrame>,
+    );
+
+    const main = screen.getByRole("main");
+    const bar = screen.getByRole("navigation", { name: "Tab bar" });
+
+    expect(main).toHaveClass("max-md:pb-(--phone-nav)");
+    expect(within(main).queryByRole("navigation")).not.toBeInTheDocument();
+    expect(main.compareDocumentPosition(bar)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
   it("names the current screen's section in the bar above it on a phone", () => {
     stubViewport(390);
     render(
-      <AppFrame banner={null} sidebar={null}>
+      <AppFrame banner={null} nav={null} sidebar={null}>
         <p>Screen</p>
       </AppFrame>,
     );
@@ -49,7 +71,7 @@ describe("AppFrame", () => {
   it("heads the main column with the banner it is handed, above the phone's bar", () => {
     stubViewport(390);
     render(
-      <AppFrame banner={<p>Banner</p>} sidebar={null}>
+      <AppFrame banner={<p>Banner</p>} nav={null} sidebar={null}>
         <p>Screen</p>
       </AppFrame>,
     );

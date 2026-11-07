@@ -130,6 +130,9 @@
   --chart-5-3: #8b908c;
   --chart-6: #536f9d;
   --radius: 0.5rem; /* controls on the lg step at 8px; the card takes xl, about 11px */
+  /* The height of the tab bar along the foot of a phone's screen, which
+     the main column, a control scrolled into view and the toasts clear */
+  --phone-nav: 3.5rem;
   /* Ink sidebar, identical in both themes, so the dark scope leaves it be */
   --sidebar: var(--grey-900);
   --sidebar-foreground: var(--grey-25);
@@ -237,6 +240,19 @@
   --caution: var(--ochre-300);
 }
 
+/* The toasts rise above the phone's tab bar. This is the one rule here
+   that overrides a vendored utility, the registry's bottom-4 on the
+   toasts' viewport, and it can only because it sits outside every layer;
+   the registry's Toaster takes no class for its viewport, so the kit
+   cannot pass one. It finds the viewport by its data-slot,
+   "toast-viewport": if upstream renames the slot, the rule stops
+   matching and the toasts lie over the bar again. */
+[data-slot="toast-viewport"] {
+  @variant max-md {
+    bottom: calc(var(--phone-nav) + 1rem);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -248,8 +264,10 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+  /* Below md the tab bar covers the foot of the screen, so a control
+     scrolled into view, as one tabbed to is, stops above it. */
   html {
-    @apply font-sans;
+    @apply font-sans max-md:scroll-pb-(--phone-nav);
   }
 }
 

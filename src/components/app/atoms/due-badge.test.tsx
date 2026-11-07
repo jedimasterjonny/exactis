@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { bySlot } from "@/test/dom";
+
 import { DueBadge } from "./due-badge";
 
 // Whether last month is still to be closed, as reads already answered,
@@ -26,5 +28,21 @@ describe("DueBadge", () => {
     const { container } = render(<DueBadge isDue={closed} />);
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("draws a dot where it is placed, saying Due to a screen reader alone", () => {
+    render(<DueBadge className="top-1" isDue={due} shape="dot" />);
+
+    expect(screen.getByText(bySlot("due-dot"))).toHaveClass(
+      "absolute",
+      "bg-caution",
+      "top-1",
+    );
+    expect(screen.getByText(bySlot("due-dot"))).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(screen.getByText("Due")).toHaveClass("sr-only");
+    expect(screen.getByText("Due")).not.toHaveAttribute("data-variant");
   });
 });
