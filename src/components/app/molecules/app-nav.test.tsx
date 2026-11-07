@@ -1,7 +1,15 @@
-import { render, screen, within } from "@testing-library/react";
+import type { JSX } from "react";
+
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { SidebarProvider } from "@/components/kit/sidebar";
+import { Sidebar, SidebarProvider, useSidebar } from "@/components/kit/sidebar";
 import { stubViewport } from "@/test/dom";
 
 import { AppNav } from "./app-nav";
@@ -23,6 +31,21 @@ const due = Object.assign(Promise.resolve(true), {
   status: "fulfilled",
   value: true,
 });
+
+// A button opening the phone's sheet from outside it.
+function Opener(): JSX.Element {
+  const { setOpenMobile } = useSidebar();
+  return (
+    <button
+      onClick={() => {
+        setOpenMobile(true);
+      }}
+      type="button"
+    >
+      Open
+    </button>
+  );
+}
 
 // The navigation in the provider the frame gives it, on the current
 // screen given, with last month to be closed or not.
@@ -93,5 +116,34 @@ describe("AppNav", () => {
       "caution",
     );
     expect(within(monthEnd).getByText("VII")).toHaveClass("label");
+  });
+
+  it("closes the phone's sheet when a screen is chosen in it", async () => {
+    stubViewport(390);
+    pathname.current = "/";
+    render(
+      <SidebarProvider>
+        <Sidebar>
+          <AppNav isDue={closed} />
+        </Sidebar>
+        <Opener />
+      </SidebarProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    const accounts = within(await screen.findByRole("dialog")).getByRole(
+      "link",
+      { name: "Accounts & assets" },
+    );
+    // With no router to take it, the link's click would fall through to
+    // a navigation, which jsdom cannot make and says so on the console.
+    accounts.addEventListener("click", (event) => {
+      event.preventDefault();
+    });
+    fireEvent.click(accounts);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
   });
 });
