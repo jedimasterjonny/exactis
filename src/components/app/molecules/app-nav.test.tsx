@@ -41,15 +41,16 @@ describe("AppNav", () => {
     vi.unstubAllGlobals();
   });
 
-  it("links every screen with its numeral and marks the current one", () => {
+  it("links every screen with its numeral in the Screens navigation and marks the current one", () => {
     renderNav("/progress", closed);
 
-    const dashboard = screen.getByRole("link", { name: /^Dashboard/ });
-    const chance = screen.getByRole("link", { name: /^Chance of success/ });
-    const accounts = screen.getByRole("link", { name: /^Accounts/ });
-    const plan = screen.getByRole("link", { name: /^Income & expenses/ });
-    const progress = screen.getByRole("link", { name: /^Progress/ });
-    const assumptions = screen.getByRole("link", { name: /^Assumptions/ });
+    const nav = within(screen.getByRole("navigation", { name: "Screens" }));
+    const dashboard = nav.getByRole("link", { name: "Dashboard" });
+    const chance = nav.getByRole("link", { name: "Chance of success" });
+    const accounts = nav.getByRole("link", { name: "Accounts & assets" });
+    const plan = nav.getByRole("link", { name: "Income & expenses" });
+    const progress = nav.getByRole("link", { name: "Progress" });
+    const assumptions = nav.getByRole("link", { name: "Assumptions" });
 
     expect(dashboard).toHaveAttribute("href", "/");
     expect(dashboard).not.toHaveAttribute("data-active");
@@ -69,7 +70,17 @@ describe("AppNav", () => {
     expect(assumptions).toHaveAttribute("href", "/assumptions");
     expect(assumptions).not.toHaveAttribute("data-active");
     expect(within(assumptions).getByText("VI")).toHaveClass("label");
-    expect(screen.queryByText("Due")).not.toBeInTheDocument();
+    expect(nav.getByRole("link", { current: "page" })).toBe(progress);
+    expect(nav.queryByText("Due")).not.toBeInTheDocument();
+  });
+
+  // The numeral is decorative, so a screen reader hears the label alone.
+  it("hides each numeral from a screen reader", () => {
+    renderNav("/", closed);
+
+    for (const numeral of ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]) {
+      expect(screen.getByText(numeral)).toHaveAttribute("aria-hidden", "true");
+    }
   });
 
   it("badges the month end while last month is still to be closed", () => {
