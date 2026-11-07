@@ -131,8 +131,9 @@
   --chart-6: #536f9d;
   --radius: 0.5rem; /* controls on the lg step at 8px; the card takes xl, about 11px */
   /* The height of the tab bar along the foot of a phone's screen, which
-     the main column, a control scrolled into view and the toasts clear */
-  --phone-nav: 3.5rem;
+     the main column, a control scrolled into view and the toasts clear:
+     56px of tabs over the home indicator's inset */
+  --phone-nav: calc(3.5rem + env(safe-area-inset-bottom));
   /* Ink sidebar, identical in both themes, so the dark scope leaves it be */
   --sidebar: var(--grey-900);
   --sidebar-foreground: var(--grey-25);
@@ -240,14 +241,20 @@
   --caution: var(--ochre-300);
 }
 
-/* The toasts rise above the phone's tab bar. This is the one rule here
-   that overrides a vendored utility, the registry's bottom-4 on the
-   toasts' viewport, and it can only because it sits outside every layer;
-   the registry's Toaster takes no class for its viewport, so the kit
-   cannot pass one. It finds the viewport by its data-slot,
+/* The toasts clear the home indicator and, from sm up, a notch at the
+   right, and rise above the phone's tab bar. This is the one rule here
+   that overrides vendored utilities, the registry's bottom-4 and right-4
+   on the toasts' viewport, and it can only because it sits outside every
+   layer; the registry's Toaster takes no class for its viewport, so the
+   kit cannot pass one. It finds the viewport by its data-slot,
    "toast-viewport": if upstream renames the slot, the rule stops
-   matching and the toasts lie over the bar again. */
+   matching and the toasts lie over the bar again. The phone's bottom is
+   written last, so below md it wins. */
 [data-slot="toast-viewport"] {
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  @variant sm {
+    right: calc(1rem + env(safe-area-inset-right));
+  }
   @variant max-md {
     bottom: calc(var(--phone-nav) + 1rem);
   }
@@ -284,8 +291,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* The page clears a notch at either side, as a phone on its side has.
+     The sidebar is fixed, so it clears the left one itself. */
   body {
     @apply bg-background text-foreground;
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
   }
   button:not(:disabled),
   [role="button"]:not(:disabled) {

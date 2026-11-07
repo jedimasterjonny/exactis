@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import RootLayout, { metadata } from "./layout";
+import RootLayout, { metadata, viewport } from "./layout";
 
 // next/font/google's loaders are rewritten by the Next compiler at build time
 // and cannot run outside it, so each is stubbed with the shape it returns.
@@ -34,6 +34,12 @@ describe("RootLayout", () => {
     expect(markup).toContain("--font-geist-sans");
     expect(markup).toContain("--font-space-grotesk");
     expect(markup).toContain("<p>child</p>");
+  });
+});
+
+describe("viewport", () => {
+  it("draws the page to the screen's edges", () => {
+    expect(viewport).toStrictEqual({ viewportFit: "cover" });
   });
 });
 

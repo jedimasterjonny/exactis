@@ -23,7 +23,8 @@ interface AppFrameProps {
 // the main column, so it is reached after the screen, and inside the
 // provider, so it can open the sheet. On a phone the main column is
 // padded at its foot by the bar's height, so its last card scrolls clear
-// of the bar.
+// of the bar. The sidebar is fixed, so on a wide screen it clears a notch
+// at the left itself, as the page does through its padding.
 export function AppFrame({
   banner,
   children,
@@ -32,7 +33,7 @@ export function AppFrame({
 }: AppFrameProps): JSX.Element {
   return (
     <SidebarProvider>
-      <Sidebar>{sidebar}</Sidebar>
+      <Sidebar className="ml-[env(safe-area-inset-left)]">{sidebar}</Sidebar>
       <SidebarInset className="max-md:pb-(--phone-nav)">
         {banner}
         {children}

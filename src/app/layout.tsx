@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { JSX } from "react";
 
 import "./globals.css";
@@ -22,6 +22,15 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = { title: "exactis" };
+
+// The page is drawn to the screen's edges, under a notch and the home
+// indicator, rather than letterboxed inside them, so the phone's tab bar
+// can meet the foot of the screen. What would sit under either is
+// padded clear of it by the safe-area insets where it is drawn: the tab
+// bar, the sidebar's footer and the toasts at the foot, and the page and
+// the sidebar at the sides. Next merges this over its own width and
+// scale, which stay.
+export const viewport: Viewport = { viewportFit: "cover" };
 
 export default function RootLayout({
   children,

@@ -146,4 +146,13 @@ describe("PhoneNav", () => {
 
     expect(bar).toHaveClass("fixed", "bottom-0", "md:hidden");
   });
+
+  it("lifts its tabs above the home indicator", () => {
+    const bar = barOn("/", closed);
+
+    expect(bar).toHaveClass(
+      "h-(--phone-nav)",
+      "pb-[env(safe-area-inset-bottom)]",
+    );
+  });
 });
