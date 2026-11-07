@@ -28,6 +28,7 @@ import {
   getOpened,
   getSinceClose,
 } from "@/store/household";
+import { bySlot } from "@/test/dom";
 
 import Close from "./page";
 
@@ -141,6 +142,28 @@ const julyClosed = Object.assign(Promise.resolve(julyCloses), {
   value: julyCloses,
 });
 
+// The bars beneath the rows of what moved, top to bottom, each the place
+// and width of a step's bar, where it has one, and its pin's place.
+function bars(): string[][] {
+  return within(
+    screen.getByRole("table", { name: "What moved the plan, worked out" }),
+  )
+    .queryAllByText(bySlot("step-bar"), { suggest: false })
+    .map((bar) => [
+      ...within(bar)
+        .queryAllByText(bySlot("step-bar-fill"), { suggest: false })
+        .map(({ style }) => `${style.left} ${style.width}`),
+      within(bar).getByText(bySlot("step-bar-pin")).style.left,
+    ]);
+}
+
+// The caption of what moved.
+function caption(): null | string {
+  return within(screen.getByRole("region", { name: "What moved" })).getByText(
+    /^Since the close of/u,
+  ).textContent;
+}
+
 // The line beneath a row of what moved, which describes its name.
 function detail(name: string): HTMLElement {
   return screen.getByRole("rowheader", { name });
@@ -169,6 +192,13 @@ function links(): (null | string)[][] {
   return within(screen.getByRole("region", { name: "Trades" }))
     .getAllByRole("link")
     .map((link) => [link.textContent, link.getAttribute("href")]);
+}
+
+// The notes beneath what moved.
+function notes(): (null | string)[] {
+  return within(screen.getByRole("region", { name: "What moved" }))
+    .getAllByRole("paragraph")
+    .map((note) => note.textContent);
 }
 
 // The month end at the address given on the day given, over the
@@ -277,9 +307,9 @@ describe("Close", () => {
     expect(within(balances).getByText("£902,140")).toBeInTheDocument();
 
     const what = screen.getByRole("region", { name: "What moved" });
-    expect(
-      within(what).getByText("Since the close of July 2026"),
-    ).toBeInTheDocument();
+    expect(caption()).toBe(
+      "Since the close of July 2026, taking the balances first, then the rates, then your changes",
+    );
     expect(
       within(what).getByRole("columnheader", { name: "Liquid at 61" }),
     ).toBeInTheDocument();
@@ -302,9 +332,19 @@ describe("Close", () => {
     expect(detail("Your changes")).toHaveAccessibleDescription(
       "Accounts, Income & expenses",
     );
-    expect(within(what).getByRole("paragraph")).toHaveTextContent(
-      /^Each row is worked out after the ones above it/,
-    );
+    expect(notes()).toStrictEqual([
+      "Each row is worked out after the ones above it. Liquid net worth leaves out the property, the vehicles and a pension its owner cannot yet draw, in today's money.",
+      "Each bar runs from where the row above left the liquid worth at 61 to the dot where its own row leaves it, on a scale from the lowest it reaches, £580,000, to the highest, £605,000.",
+    ]);
+    // £580,000 to £605,000: the expected £600,000 at 80%, then each step
+    // from where the row above left it to its own pin, and now at 42%.
+    expect(bars()).toStrictEqual([
+      ["80%"],
+      ["80% 20%", "100%"],
+      ["0% 100%", "0%"],
+      ["0% 42%", "42%"],
+      ["42%"],
+    ]);
 
     expect(trades()).toStrictEqual([
       "The plan paid £1,250 into the ISAs and GIA in August 2026.",
@@ -483,6 +523,8 @@ describe("Close", () => {
       "As the month end expected",
       "Now",
     ]);
+    expect(caption()).toBe("Since the close of July 2026");
+    expect(bars()).toStrictEqual([]);
     expect(trades()).toStrictEqual([
       "The plan paid nothing into the ISAs and GIA in August 2026.",
     ]);
@@ -517,6 +559,32 @@ describe("Close", () => {
     ).toHaveAccessibleDescription(
       "£2,000 below what was expected · £1,500 paid in · £3,000 moved · Accounts, Income & expenses",
     );
+    expect(caption()).toBe("Since the close of July 2026");
+    expect(bars()).toStrictEqual([]);
+  });
+
+  // The balances and the rates each moved the plan, but by nothing, as
+  // a rename does: the walk spans nothing, so no bar has a scale.
+  it("draws no bar where every step moved the liquid worth by nothing", async () => {
+    vi.mocked(movedSince).mockReturnValue({
+      ...moved,
+      now: moved.expected,
+      steps: [
+        { groups: ["balances"], standing: moved.expected },
+        { groups: ["rates"], standing: moved.expected },
+      ],
+    });
+    await renderClose();
+
+    expect(rows().slice(1, -1)).toStrictEqual([
+      ["Balances against the plan", "Unchanged", "£0"],
+      ["Rates and their sources", "Unchanged", "£0"],
+    ]);
+    expect(caption()).toBe("Since the close of July 2026");
+    expect(bars()).toStrictEqual([]);
+    expect(notes()).toStrictEqual([
+      "Each row is worked out after the ones above it. Liquid net worth leaves out the property, the vehicles and a pension its owner cannot yet draw, in today's money.",
+    ]);
   });
 
   it.each([
@@ -547,6 +615,11 @@ describe("Close", () => {
         title,
       );
       expect(rows()[1]?.[1]).toBe(step);
+      expect(bars()).toStrictEqual([]);
+      expect(notes()).toStrictEqual([
+        "Each row is worked out after the ones above it. Liquid net worth leaves out the property, the vehicles and a pension its owner cannot yet draw, in today's money.",
+        "Where a row moves retirement, the liquid worth is still read at 61, so that row's figure also takes in the drawing on the savings starting sooner, later or not at all.",
+      ]);
     },
   );
 
@@ -725,6 +798,7 @@ describe("Close", () => {
     expect(detail("As the month end expected")).toHaveAccessibleDescription(
       "July 2026's balances carried 1 month on as today's plan expects",
     );
+    expect(bars()).toStrictEqual([]);
     expect(
       within(screen.getByRole("region", { name: "What moved" }))
         .getAllByRole("paragraph")

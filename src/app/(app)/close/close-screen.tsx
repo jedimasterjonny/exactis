@@ -18,6 +18,7 @@ import type { SinceClose } from "@/store/household";
 import { Ledger } from "@/components/app/atoms/ledger";
 import { Note } from "@/components/app/atoms/note";
 import { PortfolioImport } from "@/components/app/atoms/portfolio-import";
+import { StepBar } from "@/components/app/atoms/step-bar";
 import { Worksheet } from "@/components/app/atoms/worksheet";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { MonthEnd } from "@/components/app/organisms/month-end";
@@ -120,6 +121,14 @@ type Place = "between" | "first" | "latest";
 // Where the plan stood at a month end, as a point keeps it.
 type PointStanding = NonNullable<KeptPoint["standing"]>;
 
+// The liquid worth a walk of what moved reaches, from its lowest to its
+// highest, and whether its steps are drawn as bars on that scale.
+interface Span {
+  readonly hi: number;
+  readonly isDrawn: boolean;
+  readonly lo: number;
+}
+
 // A standing kept at a month end, with the month it was kept at and
 // its liquid worth carried into today's money.
 interface Stood {
@@ -137,7 +146,11 @@ interface Stood {
 // with no point kept. Once it is, the balances the close set against those it
 // closed from, with what the plan paid in beside what Portfolio
 // Performance says was, where it says, what moved the plan since the
-// close before as the steps movedSince takes, and what the plan paid into
+// close before as the steps movedSince takes, drawn as a waterfall of
+// the liquid worth where two steps or more moved it, the caption saying
+// the order they are taken in and a note the ends of the scale, with a
+// note where a step moved retirement that the worth is still read at
+// the same age, and what the plan paid into
 // the ISAs and the GIAs, offered to the cogitator, and between the two
 // where the invested balances landed among the futures of a close in
 // the year before and the track record of that reading month by month,
@@ -254,7 +267,8 @@ export function CloseScreen({
   }
   const { asOf, isLaid, moved } = compared.value;
   const { plan } = household;
-  const rows = rowsOf(compared.value, plan);
+  const span = spanOf(moved);
+  const rows = rowsOf(compared.value, plan, span);
   const most = rows
     .slice(1, -1)
     .toSorted((one, other) => Math.abs(other.liquid) - Math.abs(one.liquid))[0];
@@ -303,7 +317,7 @@ export function CloseScreen({
         </CardContent>
       </SectionCard>
       <SectionCard
-        caption={`Since the close of ${formatMonth(asOf)}`}
+        caption={captionOf(asOf, span)}
         label={subsectionLabel(monthEnd, 2)}
         title="What moved"
       >
@@ -323,6 +337,9 @@ export function CloseScreen({
             leaves out the property, the vehicles and a pension its owner cannot
             yet draw, in today&apos;s money.
           </Note>
+          {notesOf(moved, span).map((note) => (
+            <Note key={note}>{note}</Note>
+          ))}
         </CardContent>
       </SectionCard>
       {closes !== null && since !== null && (
@@ -364,6 +381,16 @@ function aboveOf(share: number): string {
   return share === 1
     ? "Above every one of the futures"
     : `Above ${formatWholePercent(share)} of the futures`;
+}
+
+// The caption of what moved: since the close it compares with, and,
+// where the steps are drawn, the order the walk takes them in, which
+// holds whichever of them took a row.
+function captionOf(asOf: Month, { isDrawn }: Span): string {
+  const since = `Since the close of ${formatMonth(asOf)}`;
+  return isDrawn
+    ? `${since}, taking the balances first, then the rates, then your changes`
+    : since;
 }
 
 // What moved the plan since the close before the latest, with the month
@@ -658,6 +685,32 @@ function missingOf({ point }: Entry, place: Place): string {
     : "Closed, but no reading was kept";
 }
 
+// The notes beneath what moved after the one every walk carries: where
+// the steps are drawn, what each bar runs between and the ends of its
+// scale; and where a step moved retirement, that the liquid worth is
+// still read at the same age.
+function notesOf(
+  { age, expected, steps }: Moved,
+  { hi, isDrawn, lo }: Span,
+): readonly string[] {
+  const at = String(age);
+  const standings = [expected, ...steps.map(({ standing }) => standing)];
+  return [
+    ...(isDrawn
+      ? [
+          `Each bar runs from where the row above left the liquid worth at ${at} to the dot where its own row leaves it, on a scale from the lowest it reaches, ${formatGbp(lo)}, to the highest, ${formatGbp(hi)}.`,
+        ]
+      : []),
+    ...(standings
+      .slice(1)
+      .some(({ retired }, index) => retired !== standings[index]?.retired)
+      ? [
+          `Where a row moves retirement, the liquid worth is still read at ${at}, so that row's figure also takes in the drawing on the savings starting sooner, later or not at all.`,
+        ]
+      : []),
+  ];
+}
+
 // How a reading counts what was paid in: as Portfolio Performance gives
 // it for the accounts it names, with how far that is from what the plan
 // paid, or that it is the same to the pound, and as the plan paid it for
@@ -737,11 +790,15 @@ function recordOf(points: readonly KeptPoint[]): readonly Entry[] {
 // plan now where the balances alone were laid over it, a row a step with
 // how far it moved the retirement and the liquid worth, and the standing
 // now, each with how far it moved the liquid worth beside it, for the
-// meta line to say which moved it most.
+// meta line to say which moved it most; and, where the span is drawn,
+// each with a bar on its scale, a pin at the worth the row leaves, and
+// a step's bar from where the row above left it.
 function rowsOf(
   { asOf, isLaid, moved }: Compared,
   plan: Plan,
+  { hi, isDrawn, lo }: Span,
 ): readonly { readonly liquid: number; readonly row: WorksheetRow }[] {
+  const place = (liquid: number): number => (100 * (liquid - lo)) / (hi - lo);
   let standing = moved.expected;
   const steps = moved.steps.map(({ groups, standing: next }) => {
     const from = standing;
@@ -750,6 +807,9 @@ function rowsOf(
     return {
       liquid: next.liquid - from.liquid,
       row: {
+        ...(isDrawn && {
+          bar: <StepBar from={place(from.liquid)} to={place(next.liquid)} />,
+        }),
         detail: groups.map((group) => detailOf(group, moved)).join(" · "),
         figures: [
           yearsMoved(from, next, plan),
@@ -763,6 +823,7 @@ function rowsOf(
     {
       liquid: 0,
       row: {
+        ...(isDrawn && { bar: <StepBar to={place(moved.expected.liquid)} /> }),
         detail: `${formatMonth(asOf)}'s balances carried ${counted(moved.months, "month")} on as ${isLaid ? "today's plan expects" : "the plan expected"}`,
         figures: figuresOf(moved.expected, plan),
         label: "As the month end expected",
@@ -772,6 +833,7 @@ function rowsOf(
     {
       liquid: 0,
       row: {
+        ...(isDrawn && { bar: <StepBar to={place(moved.now.liquid)} /> }),
         figures: figuresOf(moved.now, plan),
         isResult: true,
         label: "Now",
@@ -786,6 +848,20 @@ function shiftOf(years: number): string {
   const count = Math.abs(years);
   const span = count === 1 ? "A year" : `${String(count)} years`;
   return `${span} ${years < 0 ? "sooner" : "later"}`;
+}
+
+// The span of the liquid worth a walk reaches, over the standing
+// expected and each step's, the standing now being the last of them;
+// drawn where there are two steps or more to compare, since one always
+// fills the track, and they span more than nothing.
+function spanOf({ expected, steps }: Moved): Span {
+  const worths = [
+    expected.liquid,
+    ...steps.map(({ standing }) => standing.liquid),
+  ];
+  const hi = Math.max(...worths);
+  const lo = Math.min(...worths);
+  return { hi, isDrawn: steps.length > 1 && hi > lo, lo };
 }
 
 // The title, which gives the answer: how far the close moved the
