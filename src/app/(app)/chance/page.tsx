@@ -1,8 +1,12 @@
+import type { Metadata } from "next";
 import type { JSX } from "react";
 
+import { chance } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
 
 import { ChanceScreen } from "./chance-screen";
+
+export const metadata: Metadata = { title: chance.label };
 
 // The chance of success, over the accounts, the lines, the milestones
 // the years are marked by and the run is read against, the plan and

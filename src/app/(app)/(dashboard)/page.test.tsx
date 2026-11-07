@@ -19,7 +19,7 @@ import {
 } from "@/store/household";
 import { stubWorkers } from "@/test/futures-worker";
 
-import Dashboard from "./page";
+import Dashboard, { metadata } from "./page";
 
 vi.mock("@/actions/plan", () => ({ saveAges: vi.fn() }));
 vi.mock("@/actions/scenarios", () => ({
@@ -61,6 +61,10 @@ describe("Dashboard", () => {
     stubWorkers();
     // Each test opens a page of its own, with no run kept from the last.
     forget();
+  });
+
+  it("titles the page by its label in the navigation", () => {
+    expect(metadata).toStrictEqual({ title: "Dashboard" });
   });
 
   it("opens with the dashboard header, titled with the age the plan runs to", async () => {

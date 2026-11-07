@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { JSX } from "react";
 
 import type { Account } from "@/data/accounts";
@@ -23,6 +24,8 @@ import {
 import { formatGbp } from "@/lib/money";
 import { plan as planScreen, sectionLabel } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
+
+export const metadata: Metadata = { title: planScreen.label };
 
 // The reference's plan screen holds accounts, events and the income and
 // expense schedules on three tabs. The accounts have a screen of their

@@ -30,7 +30,7 @@ import {
 } from "@/store/household";
 import { bySlot } from "@/test/dom";
 
-import Close from "./page";
+import Close, { metadata } from "./page";
 
 const replace = vi.hoisted(() => vi.fn());
 
@@ -270,6 +270,10 @@ describe("Close", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("titles the page by its label in the navigation", () => {
+    expect(metadata).toStrictEqual({ title: "Month end" });
   });
 
   // August's point is the latest, and on the fifteenth of September

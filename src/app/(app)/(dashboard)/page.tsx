@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { JSX } from "react";
 
 import { PlanAssumptions } from "@/components/app/organisms/plan-assumptions";
@@ -15,6 +16,8 @@ import {
 } from "@/store/household";
 
 import { ProjectionBoard } from "./projection-board";
+
+export const metadata: Metadata = { title: dashboard.label };
 
 // The dashboard, over the accounts, the lines, the milestones, the plan
 // and the spread its rates carry, read from the store behind the

@@ -21,7 +21,12 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
 });
 
-export const metadata: Metadata = { title: "exactis" };
+// Each screen is titled by its label in the navigation and then the
+// app's name, so the title read out on a move between screens says
+// where it went; a page that gives no title is titled by the name alone.
+export const metadata: Metadata = {
+  title: { default: "exactis", template: "%s · exactis" },
+};
 
 // The page is drawn to the screen's edges, under a notch and the home
 // indicator, rather than letterboxed inside them, so the phone's tab bar

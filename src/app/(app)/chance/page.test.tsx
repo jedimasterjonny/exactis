@@ -8,7 +8,7 @@ import { forget } from "@/hooks/use-futures";
 import { getHousehold } from "@/store/household";
 import { stubWorkers } from "@/test/futures-worker";
 
-import Chance from "./page";
+import Chance, { metadata } from "./page";
 
 vi.mock("@/actions/milestones", () => ({
   removeMilestone: vi.fn(),
@@ -26,6 +26,10 @@ describe("Chance", () => {
     stubWorkers();
     // Each test opens a page of its own, with no run kept from the last.
     forget();
+  });
+
+  it("titles the page by its label in the navigation", () => {
+    expect(metadata).toStrictEqual({ title: "Chance of success" });
   });
 
   it("hands the store's spread to the screen, which says why there is nothing to draw", async () => {

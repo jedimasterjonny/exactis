@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { JSX } from "react";
 
 import { CalendarCheck } from "lucide-react";
@@ -16,6 +17,8 @@ import { accountsAndAssets, monthEnd, sectionLabel } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
 
 import { AccountLedger } from "./account-ledger";
+
+export const metadata: Metadata = { title: accountsAndAssets.label };
 
 // The reference's plan screen opened on its accounts tab, with that tab
 // split in two: the wrappers, cash and the loans on one, the real assets on the
