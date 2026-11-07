@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { Plan, Spread } from "@/data/plan";
@@ -6,7 +6,16 @@ import type { Schedule } from "@/engine/cash-flow";
 import type { Breaks, Future, Trial } from "@/engine/futures";
 import type { Slice, Tried } from "@/hooks/futures.worker";
 
-import { breaksIn, defaultSeed } from "@/engine/futures";
+import { breaksIn, defaultSeed, lastingAt } from "@/engine/futures";
+
+// What a screen trying retirement ages has counted over one search of a
+// run, found by where the run breaks: the brackets as the counts so far
+// have narrowed them, and the count at each age counted.
+interface Counted {
+  readonly ages: NonNullable<Breaks["ages"]>;
+  readonly breaks: Breaks;
+  readonly counts: ReadonlyMap<number, number>;
+}
 
 // The runs kept, the one read last first, and the seed every one of
 // them is drawn from.
@@ -284,6 +293,86 @@ export function useFutures(
   return { futures, isDone: futures.length >= count };
 }
 
+// A retirement age tried over where the plan's run breaks, as useBreaks
+// hands it: the age, the plan's own until another is given; how many of
+// the futures last retiring at it, as lastingAt counts them off where the
+// run breaks, on as many workers as a run is drawn on, as poolOf starts
+// them: nothing while it counts, nor where the run has no age searched;
+// and how another age is given. Each count is kept on the screen with
+// the brackets it narrowed, which the next count reads, so an age
+// counted before reads its count at once; and the age given, the counts
+// and the brackets are all dropped for where the run breaks handed
+// afresh, as a plan changed and changed back hands the run kept for it,
+// so the age reads the plan's again. No worker starts until a future is
+// left open at the age, so the plan's own age, or any the brackets
+// settle, starts none. An age given while another counts stops the
+// workers and counts the new one, hearing nothing more from the old,
+// and so does a screen hidden or taken down; one shown again counts its
+// age afresh. ponytail: a pool for each count, started cold; one pool
+// kept for the screen, its queue dropped as a newer age is given, is
+// the upgrade if starting the workers shows.
+export function useLastingAt(
+  accounts: readonly Account[],
+  schedule: Schedule,
+  {
+    breaks,
+    plan,
+    spread,
+  }: {
+    readonly breaks: Breaks | undefined;
+    readonly plan: Plan;
+    readonly spread: Spread;
+  },
+): {
+  readonly age: number;
+  readonly lasted: number | undefined;
+  readonly onAge: (age: number) => void;
+} {
+  const seed = useSyncExternalStore(subscribe, readSeed, readSeed);
+  const run = useMemo(
+    () => ({ accounts, plan, schedule, seed, spread }),
+    [accounts, plan, schedule, seed, spread],
+  );
+  const [given, setGiven] = useState<
+    undefined | { readonly age: number; readonly breaks: Breaks | undefined }
+  >(undefined);
+  const [counted, setCounted] = useState<Counted | undefined>(undefined);
+  const age =
+    given !== undefined && given.breaks === breaks ? given.age : plan.retires;
+  const mine = counted?.breaks === breaks ? counted : undefined;
+  const lasted = mine?.counts.get(age);
+  useEffect(() => {
+    const ages = mine?.ages ?? breaks?.ages;
+    if (breaks === undefined || ages === undefined || lasted !== undefined) {
+      return undefined;
+    }
+    const lanes = workersOf();
+    const { stop, tried } = poolOf(run, lanes);
+    let isCurrent = true;
+    void lastingAt(ages, age, { lanes, tried }).then((count) => {
+      stop();
+      if (isCurrent) {
+        setCounted({
+          ages: count.ages,
+          breaks,
+          counts: new Map(mine?.counts).set(age, count.lasted),
+        });
+      }
+    });
+    return (): void => {
+      isCurrent = false;
+      stop();
+    };
+  }, [age, breaks, lasted, mine, run]);
+  return {
+    age,
+    lasted,
+    onAge: (tried: number): void => {
+      setGiven({ age: tried, breaks });
+    },
+  };
+}
+
 // Keeps the runs given, telling every screen reading them.
 function keep(next: Drawn): void {
   kept = next;
@@ -292,11 +381,12 @@ function keep(next: Drawn): void {
   }
 }
 
-// Workers trying the futures of the run given again, the count given of
-// them, each handed one future to try at a time and the next as it
-// answers, what the run was drawn over posted with each: how a future
-// is tried on them, and how they are let go, hearing nothing more from
-// them.
+// Workers trying the futures of the run given again, up to the count
+// given of them, each started only when a try finds none free, so a
+// count leaving one future open starts one, and each handed one future
+// to try at a time and the next as it answers, what the run was drawn
+// over posted with each: how a future is tried on them, and how they
+// are let go, hearing nothing more from them.
 function poolOf(
   run: Omit<Tried, "future" | "trial">,
   workers: number,
@@ -304,11 +394,8 @@ function poolOf(
   readonly stop: () => void;
   readonly tried: (trial: Trial, future: number) => Promise<boolean>;
 } {
-  const pool = Array.from(
-    { length: workers },
-    () => new Worker(new URL("./futures.worker.ts", import.meta.url)),
-  );
-  const free = [...pool];
+  const pool: Worker[] = [];
+  const free: Worker[] = [];
   const queued: {
     readonly posted: Tried;
     readonly settle: (lasts: boolean) => void;
@@ -339,6 +426,13 @@ function poolOf(
         },
         settle,
       });
+      if (free.length === 0 && pool.length < workers) {
+        const started = new Worker(
+          new URL("./futures.worker.ts", import.meta.url),
+        );
+        pool.push(started);
+        free.push(started);
+      }
       const worker = free.pop();
       if (worker !== undefined) {
         hand(worker);
@@ -390,11 +484,12 @@ function trimmed(runs: readonly Kept[]): readonly Kept[] {
   });
 }
 
-// How many workers draw a run, or search one, between them: one for
-// each core the browser says it has, up to mostWorkers, and one where it
-// says none or gives no count at all, each run its own, so two runs
-// drawn side by side start twice as many. WebKit says four on fewer
-// than eight cores and eight on more, whatever the device holds.
+// How many workers draw a run, search one, or try one at an age,
+// between them: one for each core the browser says it has, up to
+// mostWorkers, and one where it says none or gives no count at all,
+// each run its own, so two runs drawn side by side start twice as many.
+// WebKit says four on fewer than eight cores and eight on more,
+// whatever the device holds.
 function workersOf(): number {
   const cores = navigator.hardwareConcurrency;
   return Number.isFinite(cores) ? Math.min(mostWorkers, Math.max(1, cores)) : 1;
