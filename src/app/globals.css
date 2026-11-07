@@ -229,6 +229,14 @@
   --destructive: var(--red-700);
 }
 
+/* The sidebar is ink in both themes, and the light theme's caution is
+   tuned for paper: the Due badge read 3.1:1 on ink. Inside the sidebar,
+   the desktop panel and the phone's sheet alike, caution takes the dark
+   theme's ochre, 6.8:1 on the badge's tint over ink. */
+[data-sidebar="sidebar"] {
+  --caution: var(--ochre-300);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
