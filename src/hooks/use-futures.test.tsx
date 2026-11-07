@@ -3,13 +3,13 @@ import { Activity } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
-import type { Future } from "@/engine/futures";
+import type { Breaks, Future, Trial } from "@/engine/futures";
 import type { Slice, Tried } from "@/hooks/futures.worker";
 
 import { expenseLines } from "@/data/expenses.fixture";
 import { retiringAt } from "@/data/milestones";
 import { working } from "@/data/owners.fixture";
-import { breaksIn, futuresOf, lastsTried } from "@/engine/futures";
+import { breaksIn, futuresOf, lastingAt, lastsTried } from "@/engine/futures";
 import { FuturesWorker } from "@/test/futures-worker";
 
 import { drawAgain, forget, useBreaks, useFutures } from "./use-futures";
@@ -659,7 +659,9 @@ describe("useBreaks", () => {
   // Ten futures to the slice, the run is one slice on one worker, and
   // the search starts two more, each handed one future at a time; the
   // household's run beside it, five futures on a worker of its own, is
-  // left unsearched.
+  // left unsearched. The two find the figures one lane finds, in
+  // brackets of their own, since which future lands first is the
+  // workers', and the count at an age off either is the same.
   it("searches a run drawn whole for where it breaks on two workers trying a future at a time, and keeps it with that run alone", async () => {
     const started = watchWorkers();
     const household = { count: 5, plan, spread };
@@ -676,15 +678,27 @@ describe("useBreaks", () => {
     await act(async () => {
       await vi.runAllTimersAsync();
     });
-    expect(result.current).toStrictEqual(
-      await breaksIn(futures, run.plan, {
-        lanes: 1,
-        tried: async (trial, future) =>
-          Promise.resolve(
-            lastsTried(accounts, schedule, { ...run, future, trial }),
-          ),
-      }),
-    );
+    const tried = async (trial: Trial, future: number): Promise<boolean> =>
+      Promise.resolve(
+        lastsTried(accounts, schedule, { ...run, future, trial }),
+      );
+    const oneLane = await breaksIn(futures, run.plan, { lanes: 1, tried });
+    const countedAt = async (
+      ages: Breaks["ages"],
+      age: number,
+    ): Promise<number> => {
+      expect(ages).toHaveLength(10);
+      return (await lastingAt(ages ?? [], age, { lanes: 1, tried })).lasted;
+    };
+    expect({
+      age: result.current?.age,
+      cut: result.current?.cut,
+    }).toStrictEqual({ age: oneLane.age, cut: oneLane.cut });
+    for (const age of [35, 37]) {
+      expect(await countedAt(result.current?.ages, age)).toBe(
+        await countedAt(oneLane.ages, age),
+      );
+    }
     const [, , ...searching] = started;
     expect(searching).toHaveLength(2);
     for (const worker of searching) {

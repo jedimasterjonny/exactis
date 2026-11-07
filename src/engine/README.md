@@ -20,8 +20,9 @@ pensions, and the savings are those with the cash and the GIAs. A run reads a
 point a year, the balances entering it. A month can also be read on its own,
 without the run around it, and where it then knows less than the run, the
 section says what it assumes. The futures the chance of success reads, in
-`futures.ts`, carry the run along paths of the markets, and they and the search
-of the run for where it breaks are specified beside that code, not here.
+`futures.ts`, carry the run along paths of the markets, and they, the search of
+the run for where it breaks, and the count at an age tried are specified beside
+that code, not here.
 
 ## The month
 
@@ -174,11 +175,11 @@ to.
 
 The search of a run for the earliest age nine in ten of its futures last
 retiring at, for one retiring at an age, carries each future over each age it
-tries through the step a run on conditions is carried through, `retimed` in
-`projection.ts`, which makes every owner's line again from the owners, as the
-household's read makes them, so each age pays the State Pension its own years
-earn, and a line dropped at the plan's own age is paid at a later age whose
-years earn it.
+tries, and so does the count at an age tried, through the step a run on
+conditions is carried through, `retimed` in `projection.ts`, which makes every
+owner's line again from the owners, as the household's read makes them, so each
+age pays the State Pension its own years earn, and a line dropped at the plan's
+own age is paid at a later age whose years earn it.
 
 ## Salaries and what they feed
 

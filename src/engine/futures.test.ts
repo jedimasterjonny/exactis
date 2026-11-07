@@ -15,13 +15,14 @@ import { statePensionLines } from "@/data/state-pension";
 import { monthsOn, project } from "@/engine/projection";
 import { normalsFrom } from "@/lib/random";
 
-import type { Breaks, Future } from "./futures";
+import type { Breaks, Future, Trial } from "./futures";
 
 import {
   breaksIn,
   futureOf,
   futuresOf,
   gradingOf,
+  lastingAt,
   lastsTried,
   markersIn,
   monthsAlong,
@@ -653,6 +654,50 @@ describe("futuresOf", () => {
     return { breaks, tries };
   }
 
+  // How many of a run's futures last retiring at the age given, as
+  // lastingAt counts them off the brackets given, a lane at a time; and
+  // every future tried, at its place in the run, in the order tried.
+  async function countedAt(
+    accounts: readonly Account[],
+    ages: NonNullable<Breaks["ages"]>,
+    {
+      age,
+      plan: on,
+      schedule,
+      spread,
+    }: {
+      readonly age: number;
+      readonly plan: Plan;
+      readonly schedule: Schedule;
+      readonly spread: Spread;
+    },
+  ): Promise<{
+    readonly ages: NonNullable<Breaks["ages"]>;
+    readonly lasted: number;
+    readonly tries: readonly number[];
+  }> {
+    const tries: number[] = [];
+    const counted = await lastingAt(ages, age, {
+      lanes: 1,
+      tried: async (trial, future) => {
+        tries.push(future);
+        return Promise.resolve(
+          lastsTried(accounts, schedule, { future, plan: on, spread, trial }),
+        );
+      },
+    });
+    return { ...counted, tries };
+  }
+
+  // The figures a search finds, without the brackets it left the futures
+  // in, which hang on the order the futures were tried in.
+  function figuresOf({ age, cut }: Breaks): {
+    readonly age: null | number | undefined;
+    readonly cut: null | number;
+  } {
+    return { age, cut };
+  }
+
   // £1,000 a month over the plan's five years is £60,000: £40,000 lasts
   // on 66% of it, £39,600, and not on 67%, £40,200; £70,000 lasts on
   // 116%, £69,600, and not on 117%; £20,000 falls short even on half of
@@ -768,8 +813,10 @@ describe("futuresOf", () => {
       expect(lasting(cut)).toBeGreaterThanOrEqual(36);
       expect(lasting(cut - 1)).toBeLessThan(36);
       expect(
-        (await breaksOver(saved, { ...run, count: 40, lanes: 4 })).breaks,
-      ).toStrictEqual(breaks);
+        figuresOf(
+          (await breaksOver(saved, { ...run, count: 40, lanes: 4 })).breaks,
+        ),
+      ).toStrictEqual(figuresOf(breaks));
     }
   });
 
@@ -853,7 +900,11 @@ describe("futuresOf", () => {
   // £35,000 at 5% straying 15% a year, earning as it spends until the
   // owner retires at 40, lasts in some futures and falls short in others,
   // fewer than nine in ten of 40 retiring then; £70,000 lasts in more.
-  it("finds an age nine in ten futures last retiring at and fewer do a year sooner, the plan's own or sooner exactly where nine in ten last as the run counts them", async () => {
+  // Searched on one lane and on four, the search leaves the futures in
+  // brackets that hang on the order they were tried in, and counted off
+  // either, at every age from the plan's opening to its end, the count is
+  // what trying every future at that age gives.
+  it("finds an age nine in ten futures last retiring at and fewer do a year sooner, the plan's own or sooner exactly where nine in ten last as the run counts them, and counts every age off its brackets as trying each future there does", async () => {
     const run = {
       plan: { ...tenYears, rate: 0.05 },
       spread: { inflation: 0.02, rate: 0.15 },
@@ -863,9 +914,20 @@ describe("futuresOf", () => {
       [70000, true],
     ] as const) {
       const saved = [{ ...isa, balance }];
+      // Each future tried once at each age however often it is asked, so
+      // the counts below cost no tries of their own.
+      const verdicts = new Map<string, boolean>();
+      const lastsAt = (trial: Trial, future: number): boolean => {
+        const key = JSON.stringify([trial, future]);
+        const hasLasted =
+          verdicts.get(key) ??
+          lastsTried(saved, earning, { ...run, future, trial });
+        verdicts.set(key, hasLasted);
+        return hasLasted;
+      };
       const lasting = (age: number): number =>
         Array.from({ length: 40 }, (_, future) =>
-          lastsTried(saved, earning, { ...run, future, trial: { age } }),
+          lastsAt({ age }, future),
         ).filter(Boolean).length;
       const { breaks } = await breaksOver(saved, {
         ...run,
@@ -882,7 +944,86 @@ describe("futuresOf", () => {
       expect(age <= 40).toBe(isNine);
       expect(lasting(age)).toBeGreaterThanOrEqual(36);
       expect(age === 34 || lasting(age - 1) < 36).toBe(true);
+      const { breaks: fourLanes } = await breaksOver(saved, {
+        ...run,
+        count: 40,
+        lanes: 4,
+        schedule: earning,
+      });
+      const countAt = async (
+        ages: Breaks["ages"],
+        tried: number,
+        lanes: number,
+      ): Promise<number> => {
+        expect(ages).toHaveLength(40);
+        return (
+          await lastingAt(ages ?? [], tried, {
+            lanes,
+            tried: async (trial, future) =>
+              Promise.resolve(lastsAt(trial, future)),
+          })
+        ).lasted;
+      };
+      expect(figuresOf(fourLanes)).toStrictEqual(figuresOf(breaks));
+      for (let tried = 34; tried <= 44; tried += 1) {
+        expect(await countAt(breaks.ages, tried, 1)).toBe(lasting(tried));
+        expect(await countAt(fourLanes.ages, tried, 4)).toBe(lasting(tried));
+      }
+      expect(await countAt(breaks.ages, age, 1)).toBeGreaterThanOrEqual(36);
+      expect(age === 34 || (await countAt(breaks.ages, age - 1, 1)) < 36).toBe(
+        true,
+      );
     }
+  });
+
+  // £35,000 as above, where fewer than nine in ten last retiring at 40,
+  // so the search tries later ages alone: each future lasting at 40
+  // holds there or sooner and each falling short fails there or later,
+  // all between the ends past the plan's ages, so the count at 40 tries
+  // nothing and is the chance's own. At 38 it tries exactly the futures
+  // lasting at 40, which no try has settled there, leaving the brackets
+  // it was given as they were; asked again at 38 with the ones it hands
+  // back, it tries none.
+  it("reads the count at the plan's own age off the brackets, and tries only the futures they leave open at another, narrowing a copy", async () => {
+    const run = {
+      plan: { ...tenYears, rate: 0.05 },
+      schedule: earning,
+      spread: { inflation: 0.02, rate: 0.15 },
+    };
+    const saved = [{ ...isa, balance: 35000 }];
+    const futures = futuresOf(saved, earning, run).take(40).toArray();
+    const isLastingAt40 = futures.map(
+      ({ fell, retired }) => fell === null && retired !== null,
+    );
+    const { breaks } = await breaksOver(saved, { ...run, count: 40 });
+    const ages = breaks.ages ?? [];
+    const before = structuredClone(ages);
+
+    expect(ages.map(({ future }) => future)).toStrictEqual(
+      futures.map((_, future) => future),
+    );
+    expect(
+      ages.every(
+        ({ fails, holds }) => fails >= 33 && fails < holds && holds <= 45,
+      ),
+    ).toBe(true);
+    expect(ages.map(({ holds }) => holds <= 40)).toStrictEqual(isLastingAt40);
+    expect(ages.map(({ fails }) => fails < 40)).toStrictEqual(isLastingAt40);
+    expect(await countedAt(saved, ages, { ...run, age: 40 })).toStrictEqual({
+      ages,
+      lasted: readingOf(futures).lasted,
+      tries: [],
+    });
+    const counted = await countedAt(saved, ages, { ...run, age: 38 });
+    expect(counted.tries).toStrictEqual(
+      isLastingAt40.flatMap((isLasting, future) => (isLasting ? [future] : [])),
+    );
+    expect(counted.tries.length).toBeGreaterThan(0);
+    expect(ages).toStrictEqual(before);
+    expect(counted.ages).not.toStrictEqual(before);
+    expect(
+      await countedAt(saved, counted.ages, { ...run, age: 38 }),
+    ).toStrictEqual({ ...counted, tries: [] });
   });
 
   // Born in 1962, 64 as the plan opens and paid the State Pension from
