@@ -14,11 +14,13 @@ type FooterActionProps = Readonly<
 // face is the atom's and not a caller's, which is the point of it;
 // everything else the button takes passes through, so the export's menu
 // renders its trigger as this and sign-out submits its form with it.
+// Below the md breakpoint, in the phone's sheet, it is 44px tall, for a
+// thumb.
 export function FooterAction(props: FooterActionProps): JSX.Element {
   return (
     <SidebarMenuButton
       {...props}
-      className="-mx-2 label text-xs text-sidebar-foreground/60 [&_svg]:size-3.5"
+      className="-mx-2 label text-xs text-sidebar-foreground/60 max-md:h-11 [&_svg]:size-3.5"
     />
   );
 }

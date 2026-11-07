@@ -34,6 +34,7 @@ interface AppNavProps {
 // navigation draws at once and the badge joins it when the read is in.
 // A client component, since the pathname is read on the client and an
 // icon is a component, which cannot cross the server boundary as a prop.
+// In the sheet each row is 44px tall, for a thumb.
 export function AppNav({ isDue }: AppNavProps): JSX.Element {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
@@ -49,6 +50,7 @@ export function AppNav({ isDue }: AppNavProps): JSX.Element {
             >
               <SidebarMenuButton
                 aria-current={isCurrent ? "page" : undefined}
+                className="max-md:h-11"
                 isActive={isCurrent}
                 onClick={() => {
                   setOpenMobile(false);

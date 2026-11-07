@@ -30,10 +30,15 @@ interface AppSidebarProps {
 // drawn as the same button: the export a menu of the two files the route
 // hands out, and the import asking before a file replaces what is open.
 // The footer clears the home indicator, which the sidebar runs down to.
+// In the phone's sheet the wordmark, the screens and the footer sit
+// together at its foot, where a thumb reaches, and the space left over
+// is above the wordmark rather than between it and the screens it heads.
+// The screens take only their own height there, so the wordmark can sit
+// on them; the list still scrolls if a phone is too short for all three.
 export function AppSidebar({ isDue }: AppSidebarProps): JSX.Element {
   return (
     <>
-      <SidebarHeader className="px-4 pt-5 pb-4">
+      <SidebarHeader className="px-4 pt-5 pb-4 max-md:mt-auto">
         <span className="flex items-center gap-2 font-heading text-lg font-bold tracking-[-0.03em] uppercase">
           Exactis
           <span
@@ -42,7 +47,7 @@ export function AppSidebar({ isDue }: AppSidebarProps): JSX.Element {
           />
         </span>
       </SidebarHeader>
-      <SidebarContent className="px-2">
+      <SidebarContent className="px-2 max-md:flex-initial">
         <AppNav isDue={isDue} />
       </SidebarContent>
       <SidebarFooter className="gap-3 px-4 pb-[calc(--spacing(5)+env(safe-area-inset-bottom))]">
