@@ -10,6 +10,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/kit/sidebar";
 import { monthEnd, screens, sectionNumeral } from "@/lib/nav";
 
@@ -22,13 +23,18 @@ interface AppNavProps {
 // named Screens. The current screen is marked from the pathname, for the
 // eye and as the page to a screen reader, and the numeral, which is
 // decorative, is hidden from one, so a link is named by its label alone.
-// The month end is badged Due while last month is still to be closed,
-// which the layout reads from the store and hands down unawaited, so the
-// navigation draws at once and the badge joins it when the read is in. A
-// client component, since the pathname is read on the client and an icon
-// is a component, which cannot cross the server boundary as a prop.
+// On a phone, where the navigation sits in a sheet over the screen,
+// choosing a screen closes the sheet, which the frame would otherwise
+// keep open across the navigation; the current screen's own link closes
+// it too. The month end is badged Due while last month is still to be
+// closed, which the layout reads from the store and hands down
+// unawaited, so the navigation draws at once and the badge joins it when
+// the read is in. A client component, since the pathname is read on the
+// client and an icon is a component, which cannot cross the server
+// boundary as a prop.
 export function AppNav({ isDue }: AppNavProps): JSX.Element {
   const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
   return (
     <nav aria-label="Screens">
       <SidebarMenu>
@@ -39,6 +45,9 @@ export function AppNav({ isDue }: AppNavProps): JSX.Element {
               <SidebarMenuButton
                 aria-current={isCurrent ? "page" : undefined}
                 isActive={isCurrent}
+                onClick={() => {
+                  setOpenMobile(false);
+                }}
                 render={<Link href={screen.href} />}
               >
                 <screen.icon aria-hidden />
