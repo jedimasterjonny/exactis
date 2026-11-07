@@ -79,6 +79,18 @@ function closing(changes: Partial<Kept> = {}): Kept {
   };
 }
 
+// The liquid net worth a kept household's own projection holds in the
+// first year at or after the age given, read directly rather than
+// walked to.
+function liquidAt(household: Kept, age: number): number | undefined {
+  const { accounts: held, plan, schedule } = soundKept(household).household;
+  return futureOf(project(held, schedule, plan), {
+    accounts: held,
+    plan,
+    schedule,
+  }).measured.find((year) => year.age >= age)?.liquid;
+}
+
 const before = closing();
 const asPlanned = closed(before);
 
@@ -273,6 +285,118 @@ describe("movedSince", () => {
     expect(moved.steps).toStrictEqual([
       { groups: ["rates"], standing: { liquid: 80_636, retired: 2038 } },
     ]);
+  });
+
+  // Under the CMA's rates, with the ISA an invented £10,000 over the
+  // plan: the same allocation imported again on a new day, at invented
+  // values and holdings, with what was paid in, one category renamed and
+  // the categories in the other order; the mappings made in the other
+  // order; and the fees confirmed still right. None moves a rate, so the
+  // walk is the balances' step alone, and it ends where the household
+  // now reads.
+  it("takes no rates step for an import or a confirmation that moves no rate", () => {
+    const live = closing({ rateSet: "cma" });
+    const planned = closed(live);
+    const isa = changed(planned.accounts, 2, {
+      balance: (planned.accounts[1]?.balance ?? 0) + 10_000,
+    });
+    const now = closed(live, {
+      accounts: isa,
+      deductions: { ...live.deductions, setOn: "2026-09-26" },
+      mappings: live.mappings.toReversed(),
+      targets: {
+        categories: targets.categories
+          .map((category, index) => ({
+            ...category,
+            accounts: [{ name: "Stocks & shares ISA", value: 1000 + index }],
+            isImplemented: true,
+            name: index === 0 ? "Invented" : category.name,
+            value: category.value + 777 + index,
+          }))
+          .toReversed(),
+        importedOn: "2026-09-26",
+        portfolios,
+      },
+    });
+    const moved = movedSince(live, now);
+
+    expect(moved.rates).toStrictEqual([]);
+    expect(moved.steps.map(({ groups }) => groups)).toStrictEqual([
+      ["balances"],
+    ]);
+    expect(moved.now).toStrictEqual(
+      movedSince(live, closed(live, { accounts: isa })).now,
+    );
+    expect(moved.now.liquid).toBe(liquidAt(now, moved.age));
+  });
+
+  // The same allocation imported again with an invented 5 points moved
+  // from the first category asking for a share to the second, which are
+  // mapped onto different classes: a source the rates read changed.
+  it("takes a re-import that moves a share as a rates step", () => {
+    const live = closing({ rateSet: "cma" });
+    const planned = closed(live);
+    const [from, to] = targets.categories.filter(({ share }) => share > 0);
+    const by = new Map([
+      [from?.id, -0.05],
+      [to?.id, 0.05],
+    ]);
+    const moved = movedSince(
+      live,
+      closed(live, {
+        accounts: changed(planned.accounts, 2, {
+          balance: (planned.accounts[1]?.balance ?? 0) + 10_000,
+        }),
+        targets: {
+          ...targets,
+          categories: targets.categories.map((category) => ({
+            ...category,
+            share: category.share + (by.get(category.id) ?? 0),
+          })),
+          importedOn: "2026-09-26",
+        },
+      }),
+    );
+
+    expect(moved.rates).toStrictEqual(["targets"]);
+    expect(moved.steps.map(({ groups }) => groups)).toStrictEqual([
+      ["balances"],
+      ["rates"],
+    ]);
+    expect(moved.steps[1]?.standing.liquid).not.toBe(
+      moved.steps[0]?.standing.liquid,
+    );
+  });
+
+  // The same allocation imported again beside an invented £300 a month
+  // of spending: the spending is the household's change, and the import
+  // is named nowhere.
+  it("takes a re-import beside an expense as the expense's change alone", () => {
+    const live = closing({ rateSet: "cma" });
+    const planned = closed(live);
+    const moved = movedSince(
+      live,
+      closed(live, {
+        accounts: changed(planned.accounts, 2, {
+          balance: (planned.accounts[1]?.balance ?? 0) + 10_000,
+        }),
+        next: 31,
+        schedule: {
+          ...live.schedule,
+          expenses: [
+            ...live.schedule.expenses,
+            { ...expenseLines[0], amount: 300, id: 30, name: "Invented" },
+          ],
+        },
+        targets: { ...targets, importedOn: "2026-09-26", portfolios },
+      }),
+    );
+
+    expect(moved.steps.map(({ groups }) => groups)).toStrictEqual([
+      ["balances"],
+      ["changes"],
+    ]);
+    expect([moved.changes, moved.rates]).toStrictEqual([["schedule"], []]);
   });
 
   // An invented line of £500 a month from 2026, a child and a plan
@@ -537,6 +661,18 @@ describe("changedIn", () => {
         curve: null,
       }),
     ).toStrictEqual([]);
+  });
+
+  // The household's allocation imported again since the scenario was
+  // made, and the scenario's fees confirmed still right: adopting the
+  // scenario writes both whole, so both are lines.
+  it("lists the target allocation and the fees where the two differ only in an import's day and a confirmation", () => {
+    expect(
+      changedIn(
+        { ...kept, targets: { ...targets, importedOn: "2026-09-26" } },
+        { ...kept, deductions: { ...kept.deductions, setOn: "2026-09-26" } },
+      ).map(({ label }) => label),
+    ).toStrictEqual(["Fees and yield", "Target allocation"]);
   });
 
   // A scenario that adds Sam and Ada, retires its owner at 58, takes
