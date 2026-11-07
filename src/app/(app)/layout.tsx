@@ -4,6 +4,7 @@ import { Suspense, use } from "react";
 
 import type { Opened } from "@/store/household";
 
+import { PhoneNav } from "@/components/app/molecules/phone-nav";
 import { ScenarioBanner } from "@/components/app/molecules/scenario-banner";
 import { AppSidebar } from "@/components/app/organisms/app-sidebar";
 import { AppFrame } from "@/components/app/templates/app-frame";
@@ -26,19 +27,27 @@ interface OpenScenarioProps {
 // promise down rather than awaiting it. The read sits above the screens'
 // error boundary, which catches nothing this layout throws, so a read
 // that fails is caught around the frame, which is drawn again with the
-// error screen in place of the screen and the banner both. Whether last
-// month is still to be closed is read the same way, for the navigation
-// to badge the month end.
+// error screen in place of the screen and the banner both. The frame is
+// handed the phone's tab bar as well, along the foot of the screen below
+// the md breakpoint. Whether last month is still to be closed is read the
+// same way, once, for the sidebar's navigation and the tab bar both to
+// badge the month end. The tab bar is drawn as an element apiece for the
+// frame and the boundary, where the sidebar is one shared by both: the
+// bar sits in the frame's row of children, and an element shared with
+// the boundary's props reaches the browser as the one the props carried,
+// unchecked for a key in that row, so React warns of a missing one.
 export default function AppLayout({ children }: LayoutProps<"/">): JSX.Element {
-  const sidebar = <AppSidebar isDue={isCloseDue()} />;
+  const isDue = isCloseDue();
+  const sidebar = <AppSidebar isDue={isDue} />;
   return (
-    <FrameCatch sidebar={sidebar}>
+    <FrameCatch nav={<PhoneNav isDue={isDue} />} sidebar={sidebar}>
       <AppFrame
         banner={
           <Suspense fallback={null}>
             <OpenScenario scenario={getOpened()} />
           </Suspense>
         }
+        nav={<PhoneNav isDue={isDue} />}
         sidebar={sidebar}
       >
         {children}

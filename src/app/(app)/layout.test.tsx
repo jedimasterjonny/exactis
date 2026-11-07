@@ -78,7 +78,16 @@ describe("AppLayout", () => {
       within(screen.getByRole("main")).getByRole("paragraph"),
     ).toHaveTextContent("Screen");
     expect(
-      screen.getByRole("link", { name: /^Dashboard/ }),
+      within(screen.getByRole("navigation", { name: "Screens" })).getByRole(
+        "link",
+        { name: "Dashboard" },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Tab bar" })).getByRole(
+        "link",
+        { name: "Dashboard" },
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
@@ -89,9 +98,16 @@ describe("AppLayout", () => {
 
     renderLayout();
 
-    expect(
-      within(screen.getByRole("link", { name: /^Month end/ })).getByText("Due"),
-    ).toBeInTheDocument();
+    for (const name of ["Screens", "Tab bar"]) {
+      expect(
+        within(
+          within(screen.getByRole("navigation", { name })).getByRole("link", {
+            name: /^Month end/,
+          }),
+        ).getByText("Due"),
+      ).toBeInTheDocument();
+    }
+    expect(isCloseDue).toHaveBeenCalledOnce();
   });
 
   it("heads the main column with the scenario open", () => {
@@ -113,7 +129,16 @@ describe("AppLayout", () => {
       "The store did not answer",
     );
     expect(
-      screen.getByRole("link", { name: /^Dashboard/ }),
+      within(screen.getByRole("navigation", { name: "Screens" })).getByRole(
+        "link",
+        { name: "Dashboard" },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Tab bar" })).getByRole(
+        "link",
+        { name: "Dashboard" },
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByText("This screen could not be drawn"),

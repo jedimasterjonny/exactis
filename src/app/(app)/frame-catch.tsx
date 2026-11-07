@@ -10,6 +10,7 @@ import { AppFrame } from "@/components/app/templates/app-frame";
 import ScreenError from "./error";
 
 interface FrameCatchProps {
+  readonly nav: ReactNode;
   readonly sidebar: ReactNode;
 }
 
@@ -22,10 +23,11 @@ interface FrameCatchProps {
 // such a failure took the whole page to Next's own. The screen goes
 // with the banner even where its own reads came back, since a screen
 // drawn without the banner could be edited by someone taking a scenario
-// for the household.
+// for the household. The phone's tab bar is drawn again as the layout
+// drew it, as the sidebar is, so a phone keeps its way to another screen.
 export const FrameCatch = catchError(
-  ({ sidebar }: FrameCatchProps, info: ErrorInfo): JSX.Element => (
-    <AppFrame banner={null} sidebar={sidebar}>
+  ({ nav, sidebar }: FrameCatchProps, info: ErrorInfo): JSX.Element => (
+    <AppFrame banner={null} nav={nav} sidebar={sidebar}>
       <ScreenError {...info} />
     </AppFrame>
   ),
