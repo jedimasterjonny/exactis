@@ -149,8 +149,10 @@ interface Stood {
 // close before as the steps movedSince takes, drawn as a waterfall of
 // the liquid worth where two steps or more moved it, the caption saying
 // the order they are taken in and a note the ends of the scale, with a
-// note where a step moved retirement that the worth is still read at
-// the same age, and what the plan paid into
+// note where the plan now ends before the age the worth is held at that
+// every row reads it where the plan ends, and where a step moved
+// retirement that the worth is still read at the same age, and what the
+// plan paid into
 // the ISAs and the GIAs, offered to the cogitator, and between the two
 // where the invested balances landed among the futures of a close in
 // the year before and the track record of that reading month by month,
@@ -686,16 +688,23 @@ function missingOf({ point }: Entry, place: Place): string {
 }
 
 // The notes beneath what moved after the one every walk carries: where
-// the steps are drawn, what each bar runs between and the ends of its
-// scale; and where a step moved retirement, that the liquid worth is
-// still read at the same age.
+// the plan now ends before the age the liquid worth is held at, the end
+// the month end expected or the retirement, that every row reads it
+// where the plan now ends; where the steps are drawn, what each bar runs
+// between and the ends of its scale; and where a step moved retirement,
+// that the liquid worth is still read at the same age.
 function notesOf(
-  { age, expected, steps }: Moved,
+  { age, expected, fixed, steps }: Moved,
   { hi, isDrawn, lo }: Span,
 ): readonly string[] {
   const at = String(age);
   const standings = [expected, ...steps.map(({ standing }) => standing)];
+  const ends =
+    expected.retired === null
+      ? `The month end expected the plan to run to ${String(fixed)}, but it now ends at ${at}, so every row reads the liquid worth at ${at}.`
+      : `The month end expected retirement at ${String(fixed)}, but the plan now ends at ${at}, so every row reads the liquid worth at ${at}.`;
   return [
+    ...(age < fixed ? [ends] : []),
     ...(isDrawn
       ? [
           `Each bar runs from where the row above left the liquid worth at ${at} to the dot where its own row leaves it, on a scale from the lowest it reaches, ${formatGbp(lo)}, to the highest, ${formatGbp(hi)}.`,

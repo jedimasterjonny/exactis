@@ -86,6 +86,7 @@ const moved: Moved = {
   },
   changes: ["accounts", "schedule"],
   expected: { liquid: 600_000, retired: 2053 },
+  fixed: 61,
   invested: 1250,
   months: 1,
   now: { liquid: 590_500, retired: 2053 },
@@ -622,6 +623,58 @@ describe("Close", () => {
       ]);
     },
   );
+
+  // Never retiring, the month end expected the plan to run to 91, and it
+  // has since been cut to end at 85, where every row is read.
+  it("says every row is read where the plan now ends, before the end the month end expected", async () => {
+    vi.mocked(movedSince).mockReturnValue({
+      ...moved,
+      age: 85,
+      expected: { liquid: 600_000, retired: null },
+      fixed: 91,
+      now: { liquid: 640_000, retired: null },
+      steps: [
+        { groups: ["balances"], standing: { liquid: 640_000, retired: null } },
+        { groups: ["changes"], standing: { liquid: 640_000, retired: null } },
+      ],
+    });
+    await renderClose();
+
+    expect(
+      screen.getByRole("columnheader", { name: "Liquid at 85" }),
+    ).toBeInTheDocument();
+    expect(notes()).toStrictEqual([
+      "Each row is worked out after the ones above it. Liquid net worth leaves out the property, the vehicles and a pension its owner cannot yet draw, in today's money.",
+      "The month end expected the plan to run to 91, but it now ends at 85, so every row reads the liquid worth at 85.",
+      "Each bar runs from where the row above left the liquid worth at 85 to the dot where its own row leaves it, on a scale from the lowest it reaches, £600,000, to the highest, £640,000.",
+    ]);
+  });
+
+  // The month end expected retirement at 61, in 2053, and the plan has
+  // since been cut to end at 58, with retirement moved to 55.
+  it("says every row is read where the plan now ends, before the retirement the month end expected", async () => {
+    vi.mocked(movedSince).mockReturnValue({
+      ...moved,
+      age: 58,
+      fixed: 61,
+      now: { liquid: 450_000, retired: 2047 },
+      steps: [
+        { groups: ["balances"], standing: { liquid: 610_000, retired: 2053 } },
+        { groups: ["changes"], standing: { liquid: 450_000, retired: 2047 } },
+      ],
+    });
+    await renderClose();
+
+    expect(
+      screen.getByRole("columnheader", { name: "Liquid at 58" }),
+    ).toBeInTheDocument();
+    expect(notes()).toStrictEqual([
+      "Each row is worked out after the ones above it. Liquid net worth leaves out the property, the vehicles and a pension its owner cannot yet draw, in today's money.",
+      "The month end expected retirement at 61, but the plan now ends at 58, so every row reads the liquid worth at 58.",
+      "Each bar runs from where the row above left the liquid worth at 58 to the dot where its own row leaves it, on a scale from the lowest it reaches, £450,000, to the highest, £610,000.",
+      "Where a row moves retirement, the liquid worth is still read at 58, so that row's figure also takes in the drawing on the savings starting sooner, later or not at all.",
+    ]);
+  });
 
   it("says where a retirement out of reach came within it, and where it stays out", async () => {
     vi.mocked(movedSince).mockReturnValue({

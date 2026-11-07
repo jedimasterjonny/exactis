@@ -112,6 +112,7 @@ describe("movedSince", () => {
       },
       changes: [],
       expected: { liquid: 330_154, retired: 2041 },
+      fixed: 49,
       invested: 0,
       months: 1,
       now: { liquid: 330_154, retired: 2041 },
@@ -403,6 +404,53 @@ describe("movedSince", () => {
 
     expect(moved.age).toBe(91);
     expect(moved.expected.retired).toBeNull();
+  });
+
+  // Never retiring, with the ISA an invented £10,000 over the plan and
+  // the plan cut to end at 85 rather than 91: every state is read at 85,
+  // which every state reaches, and cutting the end moves nothing there.
+  it("reads every row at the age the plan now ends at, where it ends before the age held", () => {
+    const never = closing({
+      owners: [
+        {
+          ...owners[0],
+          retirement: [{ measure: "worth", of: "pounds", times: 100_000_000 }],
+        },
+      ],
+    });
+    const planned = closed(never);
+    const moved = movedSince(
+      never,
+      closed(never, {
+        accounts: changed(planned.accounts, 2, {
+          balance: (planned.accounts[1]?.balance ?? 0) + 10_000,
+        }),
+        ages: { ends: 85 },
+      }),
+    );
+
+    expect([moved.age, moved.fixed]).toStrictEqual([85, 91]);
+    expect(moved.steps.map(({ groups }) => groups)).toStrictEqual([
+      ["balances"],
+      ["changes"],
+    ]);
+    expect(moved.steps[1]?.standing).toStrictEqual(moved.steps[0]?.standing);
+  });
+
+  // Never retiring, with the plan run on to 95: the worth is still read
+  // at 91, the end the month end expected.
+  it("holds the age where the plan now ends after it", () => {
+    const never = closing({
+      owners: [
+        {
+          ...owners[0],
+          retirement: [{ measure: "worth", of: "pounds", times: 100_000_000 }],
+        },
+      ],
+    });
+    const moved = movedSince(never, closed(never, { ages: { ends: 95 } }));
+
+    expect([moved.age, moved.fixed]).toStrictEqual([91, 91]);
   });
 
   // With none of the reference's spending the month pays the ISA a
