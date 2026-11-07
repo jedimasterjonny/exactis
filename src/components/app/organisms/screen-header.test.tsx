@@ -27,14 +27,14 @@ describe("ScreenHeader", () => {
     expect(title).toHaveAttribute("tabindex", "-1");
   });
 
-  // The frame's phone bar carries the label below the breakpoint it shows
-  // under, so the header leaves its own off there rather than repeat it.
-  it("leaves the label to the phone bar below the md breakpoint", () => {
+  // Nothing else names the section on a phone, so the header shows its
+  // label at every width.
+  it("shows the label at every width", () => {
     render(
       <ScreenHeader label="Sect. I · Dashboard" title="Projected to age 91" />,
     );
 
-    expect(screen.getByText("Sect. I · Dashboard")).toHaveClass(
+    expect(screen.getByText("Sect. I · Dashboard")).not.toHaveClass(
       "max-md:hidden",
     );
   });

@@ -14,10 +14,10 @@ interface ScreenHeaderProps {
 // to the right, on the title's baseline row, and wrap beneath when the
 // screen is too narrow for both. The side gutter is the screen body's,
 // halving on a phone as it does, so the title stays over the cards. The
-// label is left off below the md breakpoint, where the frame's phone bar
-// carries it beside the sidebar's trigger. The title takes the focus
-// when it is handed it, as a screen that takes away the control that
-// had it hands it, and is never tabbed to.
+// label shows at every width, so a phone, where the sidebar and its
+// numerals are off canvas, still names the section. The title takes
+// the focus when it is handed it, as a screen that takes away the
+// control that had it hands it, and is never tabbed to.
 export function ScreenHeader({
   actions,
   children,
@@ -27,9 +27,7 @@ export function ScreenHeader({
   return (
     <header className="flex flex-wrap items-end justify-between gap-4 border-b bg-card px-4 pt-6 pb-5 sm:px-8">
       <div className="grid gap-1.5">
-        <span className="label text-muted-foreground max-md:hidden">
-          {label}
-        </span>
+        <span className="label text-muted-foreground">{label}</span>
         <h1 className="heading text-3xl" tabIndex={-1}>
           {title}
         </h1>
