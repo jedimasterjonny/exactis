@@ -46,14 +46,12 @@ interface Step {
 // sources takes it from another. The CMA is compared by the classes its
 // latest vintage prices, by name, since neither the previous vintage
 // nor the day it was published moves a rate; the curve whole, since the
-// day it stood on sets how much of RPI's wedge comes off; the target
-// allocation by each category's share and the class it is mapped onto,
-// by id, since neither an import's day, nor a name, nor the order a
-// mapping was made in moves a rate; and the fees and yield without the
-// day they were set. The curve moves the inflation, and so the real
-// return, and leaves the plan rate, which is nominal, where it was; the
-// yield moves nothing but the split of stocks' return, so a step of
-// fees and yield is the fees'.
+// day it stood on sets how much of RPI's wedge comes off; and the target
+// allocation and the fees and yield as blendedBy and deductedBy read
+// them. The curve moves the inflation, and so the real return, and
+// leaves the plan rate, which is nominal, where it was; the yield moves
+// nothing but the split of stocks' return, so a step of fees and yield
+// is the fees'.
 const steps: readonly {
   readonly read: (sources: Sources) => unknown;
   readonly source: Source;
@@ -73,19 +71,12 @@ const steps: readonly {
     take: (into, { curve }) => ({ ...into, curve }),
   },
   {
-    read: ({ mappings, targets }) => ({
-      classes: mappings
-        .toSorted((one, other) => one.category.localeCompare(other.category))
-        .map(({ asset, category }) => [category, asset]),
-      shares: (targets?.categories ?? [])
-        .toSorted((one, other) => one.id.localeCompare(other.id))
-        .map(({ id, share }) => [id, share]),
-    }),
+    read: blendedBy,
     source: "targets",
     take: (into, { mappings, targets }) => ({ ...into, mappings, targets }),
   },
   {
-    read: ({ deductions: { dividends, fees } }) => ({ dividends, fees }),
+    read: deductedBy,
     source: "deductions",
     take: (into, { deductions }) => ({ ...into, deductions }),
   },
@@ -145,6 +136,31 @@ function apart(to: Standing, from: Standing): Standing {
     planRate: to.planRate - from.planRate,
     real: to.real - from.real,
   };
+}
+
+// The target allocation as a rate reads it: each category's share and
+// the class it is mapped onto, by id, since neither an import's day, nor
+// a name, nor the order a mapping was made in moves a rate.
+function blendedBy({
+  mappings,
+  targets,
+}: Pick<Sources, "mappings" | "targets">): unknown {
+  return {
+    classes: mappings
+      .toSorted((one, other) => one.category.localeCompare(other.category))
+      .map(({ asset, category }) => [category, asset]),
+    shares: (targets?.categories ?? [])
+      .toSorted((one, other) => one.id.localeCompare(other.id))
+      .map(({ id, share }) => [id, share]),
+  };
+}
+
+// The fees and yield as a rate reads them, without the day they were
+// set, since confirming them still right moves no rate.
+function deductedBy({
+  deductions: { dividends, fees },
+}: Pick<Sources, "deductions">): unknown {
+  return { dividends, fees };
 }
 
 // What a set of sources comes to at the split given, or at its own
