@@ -38,9 +38,12 @@ export type Bands = Pick<
 
 // Where a run of futures breaks, as breaksIn finds it: the least cut to
 // the spending nine in ten of them last with, and the earliest age nine
-// in ten last retiring at, for a plan isAgeSearched searches the age of.
+// in ten last retiring at, for a plan isAgeSearched searches the age of,
+// with the brackets that search left each future in, in its place in
+// the run, which lastingAt counts an age tried off.
 export interface Breaks {
   readonly age?: null | number;
+  readonly ages?: readonly Bracket[];
   readonly cut: null | number;
 }
 
@@ -114,6 +117,15 @@ export interface Reading {
 // spending cut by the points given, or its owner retiring at the age
 // given.
 export type Trial = { readonly age: number } | { readonly cut: number };
+
+// Where the tries of a search left one of a run's futures: the most it
+// fell short at and the least it lasted at, an end past the range
+// standing for a side it was never tried on, and its place in the run.
+interface Bracket {
+  readonly fails: number;
+  readonly future: number;
+  readonly holds: number;
+}
 
 // How many futures a run draws: enough to pin the chance to within two
 // points either way, and few enough that the run is a matter of
@@ -199,8 +211,10 @@ export function bandsOf(figures: readonly number[]): Bands {
 // in ten last as the tries read them; but since every verdict at the
 // plan itself is the chance's own, the cut is nothing or less, and the
 // age the plan's own or sooner, exactly where nine in ten futures last
-// as the chance counts them. A plan isAgeSearched passes over has the
-// spending alone searched.
+// as the chance counts them. Where it searches the age it hands back,
+// beside the figures, where the tries left each future: the latest age
+// it fell short retiring at and the earliest it lasted retiring at. A
+// plan isAgeSearched passes over has the spending alone searched.
 export async function breaksIn(
   futures: readonly Future[],
   plan: Plan,
@@ -235,10 +249,14 @@ export async function breaksIn(
         )
       : undefined,
   ]);
-  const spending = cut > deepestCut ? null : cut;
+  const spending = cut.value > deepestCut ? null : cut.value;
   return age === undefined
     ? { cut: spending }
-    : { age: age > last ? null : age, cut: spending };
+    : {
+        age: age.value > last ? null : age.value,
+        ages: age.brackets,
+        cut: spending,
+      };
 }
 
 // What a future is worth entering the plan's last year: the net worth
@@ -366,6 +384,40 @@ export function isAgeSearched(plan: Plan): boolean {
   return (
     retiresOn(plan) === undefined && plan.retires >= ageIn(plan.from, plan)
   );
+}
+
+// How many of a run's futures last retiring at the age given, spending
+// as planned, off the brackets breaksIn's search of the age left them
+// in, as Breaks holds them. Lasting is as the chance counts it, never
+// falling short and retiring. A future the brackets settle is read off
+// them: lasting where it lasted retiring at that age or sooner, and
+// short where it fell short retiring at that age or later. Every future
+// they leave open is tried at the age, as lastsTried tries one, given
+// the future's place in the run, as many at once as the lanes given.
+// At the plan's own age the brackets settle every future, so none is
+// tried and the count is the chance's own; at any other age it is as
+// exact as the search, counting the futures that last as the run and
+// the tries read them, for the reason breaksIn gives. The brackets
+// given are left as they are, and a copy narrowed by the tries is
+// handed back beside the count, for a count at another age to read.
+export async function lastingAt(
+  ages: readonly Bracket[],
+  age: number,
+  {
+    lanes,
+    tried,
+  }: {
+    readonly lanes: number;
+    readonly tried: (trial: Trial, future: number) => Promise<boolean>;
+  },
+): Promise<{ readonly ages: readonly Bracket[]; readonly lasted: number }> {
+  const narrowed = ages.map((each) => ({ ...each }));
+  const lasted = await lastingOver(narrowed, age, {
+    isSettled: () => false,
+    lanes,
+    tried: async (value, future) => tried({ age: value }, future),
+  });
+  return { ages: narrowed, lasted };
 }
 
 // Whether the future at the place given in a run of the plan's futures
@@ -719,7 +771,8 @@ async function boundary(
 // it between the ends given, each past the range, from the value given
 // that the run's verdicts were read at: each future kept between the
 // most it fell short at and the least it lasted at, and at each value
-// asked about only those it falls between tried, a lane at a time.
+// asked about only those it falls between tried, a lane at a time. It
+// hands back the value with the brackets the tries left each future in.
 async function breakingAt(
   lasting: readonly boolean[],
   {
@@ -734,7 +787,7 @@ async function breakingAt(
     readonly lanes: number;
     readonly tried: (value: number, future: number) => Promise<boolean>;
   },
-): Promise<number> {
+): Promise<{ readonly brackets: readonly Bracket[]; readonly value: number }> {
   const needed = Math.ceil(lastingShare * lasting.length);
   const known = lasting.map((hasLasted, future) => ({
     fails: hasLasted ? below : pivot,
@@ -750,9 +803,10 @@ async function breakingAt(
     });
     return lasted >= needed;
   }
-  return lasting.filter(Boolean).length >= needed
+  const value = await (lasting.filter(Boolean).length >= needed
     ? boundary(below, pivot, isEnough)
-    : boundary(pivot, above, isEnough);
+    : boundary(pivot, above, isEnough));
+  return { brackets: known, value };
 }
 
 // The run with its spending cut by the points given, every expense line
