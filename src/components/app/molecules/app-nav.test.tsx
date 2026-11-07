@@ -121,6 +121,16 @@ describe("AppNav", () => {
     ]);
   });
 
+  it("gives each row 44px for a thumb below the md breakpoint", () => {
+    renderNav("/", closed);
+
+    for (const link of within(
+      screen.getByRole("navigation", { name: "Screens" }),
+    ).getAllByRole("link")) {
+      expect(link).toHaveClass("h-8", "max-md:h-11");
+    }
+  });
+
   // The numeral is decorative, so a screen reader hears the label alone.
   it("hides each numeral from a screen reader", () => {
     renderNav("/", closed);

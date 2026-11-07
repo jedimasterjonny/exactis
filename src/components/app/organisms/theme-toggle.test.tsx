@@ -75,4 +75,13 @@ describe("ThemeToggle", () => {
     expect(markup).toContain("Daylight");
     expect(markup).not.toContain("Night watch");
   });
+
+  it("stands 44px tall for a thumb below the md breakpoint", () => {
+    render(<ThemeToggle />);
+
+    expect(
+      // eslint-disable-next-line testing-library/no-node-access -- the label is the switch's parent and has no role or text of its own to query by
+      screen.getByRole("switch", { name: "Daylight" }).closest("label"),
+    ).toHaveClass("h-8", "max-md:h-11");
+  });
 });

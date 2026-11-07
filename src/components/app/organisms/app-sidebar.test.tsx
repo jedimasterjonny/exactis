@@ -86,6 +86,23 @@ describe("AppSidebar", () => {
     );
   });
 
+  // The header's auto margin takes the space left over only once the
+  // content stops taking it all, as the registry's flex-1 would.
+  it("sets the wordmark and the screens together at the foot of a phone's sheet", () => {
+    renderSidebar();
+
+    expect(screen.getByText(bySlot("sidebar-header"))).toHaveClass(
+      "max-md:mt-auto",
+    );
+    expect(screen.getByText(bySlot("sidebar-content"))).toHaveClass(
+      "flex-1",
+      "max-md:flex-initial",
+    );
+    expect(screen.getByText(bySlot("sidebar-content"))).not.toHaveClass(
+      "max-md:justify-end-safe",
+    );
+  });
+
   it("keeps the footer clear of the home indicator", () => {
     renderSidebar();
 
