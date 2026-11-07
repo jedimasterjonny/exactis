@@ -742,27 +742,12 @@ async function breakingAt(
     holds: hasLasted ? pivot : above,
   }));
   async function isEnough(value: number): Promise<boolean> {
-    const open = known.filter(
-      ({ fails, holds }) => fails < value && value < holds,
-    );
-    let lasted = known.filter(({ holds }) => holds <= value).length;
-    let left = open.length;
-    const isSettled = (): boolean => lasted >= needed || lasted + left < needed;
-    async function lane(): Promise<void> {
-      for (let next = open.shift(); next !== undefined; next = open.shift()) {
-        if (isSettled()) {
-          return;
-        }
-        if (await tried(value, next.future)) {
-          next.holds = value;
-          lasted += 1;
-        } else {
-          next.fails = value;
-        }
-        left -= 1;
-      }
-    }
-    await Promise.all(Array.from({ length: lanes }, lane));
+    const lasted = await lastingOver(known, value, {
+      isSettled: (counted, left) =>
+        counted >= needed || counted + left < needed,
+      lanes,
+      tried,
+    });
     return lasted >= needed;
   }
   return lasting.filter(Boolean).length >= needed
@@ -839,6 +824,48 @@ function lastingOf(
     fell: points.find(isShort)?.year ?? null,
     retired: retirementIn(points, run),
   };
+}
+
+// How many of a run's futures last at the value given, each kept
+// between the most it fell short at and the least it lasted at: those
+// it settles read off it, and those it leaves open tried at the value,
+// a lane at a time, each narrowed to the value by what its try says,
+// until the stop given, told how many have lasted so far and how many
+// are left open, says enough is known.
+async function lastingOver(
+  known: readonly { fails: number; readonly future: number; holds: number }[],
+  value: number,
+  {
+    isSettled,
+    lanes,
+    tried,
+  }: {
+    readonly isSettled: (lasted: number, left: number) => boolean;
+    readonly lanes: number;
+    readonly tried: (value: number, future: number) => Promise<boolean>;
+  },
+): Promise<number> {
+  const open = known.filter(
+    ({ fails, holds }) => fails < value && value < holds,
+  );
+  let lasted = known.filter(({ holds }) => holds <= value).length;
+  let left = open.length;
+  async function lane(): Promise<void> {
+    for (let next = open.shift(); next !== undefined; next = open.shift()) {
+      if (isSettled(lasted, left)) {
+        return;
+      }
+      if (await tried(value, next.future)) {
+        next.holds = value;
+        lasted += 1;
+      } else {
+        next.fails = value;
+      }
+      left -= 1;
+    }
+  }
+  await Promise.all(Array.from({ length: lanes }, lane));
+  return lasted;
 }
 
 // Whether a run lasts, projected as a future of it is and read as the
