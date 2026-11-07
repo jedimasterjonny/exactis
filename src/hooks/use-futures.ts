@@ -126,65 +126,18 @@ export function useBreaks(
   );
   useEffect(() => {
     const isSearched = searchedFor(run.futures) !== undefined;
-    const pool = Array.from(
-      { length: isSearched ? 0 : workersOf() },
-      () => new Worker(new URL("./futures.worker.ts", import.meta.url)),
-    );
-    const free = [...pool];
-    const queued: {
-      readonly posted: Tried;
-      readonly settle: (lasts: boolean) => void;
-    }[] = [];
-    function hand(worker: Worker): void {
-      const next = queued.shift();
-      if (next === undefined) {
-        free.push(worker);
-        return;
-      }
-      worker.onmessage = ({ data: hasLasted }: MessageEvent<boolean>): void => {
-        next.settle(hasLasted);
-        hand(worker);
-      };
-      worker.postMessage(next.posted);
-    }
-    async function tried(trial: Trial, future: number): Promise<boolean> {
-      return new Promise((settle) => {
-        queued.push({
-          posted: {
-            accounts: run.accounts,
-            future,
-            plan: run.plan,
-            schedule: run.schedule,
-            seed: run.seed,
-            spread: run.spread,
-            trial,
-          },
-          settle,
-        });
-        const worker = free.pop();
-        if (worker !== undefined) {
-          hand(worker);
-        }
-      });
-    }
-    function stop(): void {
-      for (const worker of pool) {
-        worker.onmessage = null;
-        worker.terminate();
-      }
-    }
+    const lanes = isSearched ? 0 : workersOf();
+    const { stop, tried } = poolOf(run, lanes);
     if (!isSearched) {
-      void breaksIn(run.futures, run.plan, { lanes: pool.length, tried }).then(
-        (breaks) => {
-          keep({
-            ...kept,
-            runs: kept.runs.map((each) =>
-              each.futures === run.futures ? { ...each, breaks } : each,
-            ),
-          });
-          stop();
-        },
-      );
+      void breaksIn(run.futures, run.plan, { lanes, tried }).then((breaks) => {
+        keep({
+          ...kept,
+          runs: kept.runs.map((each) =>
+            each.futures === run.futures ? { ...each, breaks } : each,
+          ),
+        });
+        stop();
+      });
     }
     return stop;
   }, [run]);
@@ -337,6 +290,68 @@ function keep(next: Drawn): void {
   for (const listener of listeners) {
     listener();
   }
+}
+
+// Workers trying the futures of the run given again, the count given of
+// them, each handed one future to try at a time and the next as it
+// answers, what the run was drawn over posted with each: how a future
+// is tried on them, and how they are let go, hearing nothing more from
+// them.
+function poolOf(
+  run: Omit<Tried, "future" | "trial">,
+  workers: number,
+): {
+  readonly stop: () => void;
+  readonly tried: (trial: Trial, future: number) => Promise<boolean>;
+} {
+  const pool = Array.from(
+    { length: workers },
+    () => new Worker(new URL("./futures.worker.ts", import.meta.url)),
+  );
+  const free = [...pool];
+  const queued: {
+    readonly posted: Tried;
+    readonly settle: (lasts: boolean) => void;
+  }[] = [];
+  function hand(worker: Worker): void {
+    const next = queued.shift();
+    if (next === undefined) {
+      free.push(worker);
+      return;
+    }
+    worker.onmessage = ({ data: hasLasted }: MessageEvent<boolean>): void => {
+      next.settle(hasLasted);
+      hand(worker);
+    };
+    worker.postMessage(next.posted);
+  }
+  async function tried(trial: Trial, future: number): Promise<boolean> {
+    return new Promise((settle) => {
+      queued.push({
+        posted: {
+          accounts: run.accounts,
+          future,
+          plan: run.plan,
+          schedule: run.schedule,
+          seed: run.seed,
+          spread: run.spread,
+          trial,
+        },
+        settle,
+      });
+      const worker = free.pop();
+      if (worker !== undefined) {
+        hand(worker);
+      }
+    });
+  }
+  function stop(): void {
+    for (const worker of pool) {
+      worker.onmessage = null;
+      worker.terminate();
+    }
+  }
+  return { stop, tried };
 }
 
 // The seed the runs are drawn from, as a screen reads it: on the server
