@@ -4,9 +4,8 @@ import type { JSX } from "react";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, use } from "react";
 
-import { Badge } from "@/components/kit/badge";
+import { DueBadge } from "@/components/app/atoms/due-badge";
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -38,11 +37,7 @@ export function AppNav({ isDue }: AppNavProps): JSX.Element {
           >
             <screen.icon aria-hidden />
             <span>{screen.label}</span>
-            {screen === monthEnd && (
-              <Suspense fallback={null}>
-                <Due isDue={isDue} />
-              </Suspense>
-            )}
+            {screen === monthEnd && <DueBadge isDue={isDue} />}
             <span className="ml-auto label text-sidebar-foreground/60">
               {sectionNumeral(screen)}
             </span>
@@ -51,9 +46,4 @@ export function AppNav({ isDue }: AppNavProps): JSX.Element {
       ))}
     </SidebarMenu>
   );
-}
-
-// The badge saying the month end is due, or nothing while it is not.
-function Due({ isDue }: AppNavProps): JSX.Element | null {
-  return use(isDue) ? <Badge variant="caution">Due</Badge> : null;
 }
