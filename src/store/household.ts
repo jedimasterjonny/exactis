@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import type { Household, Kept, KeptBalances } from "@/data/household";
 import type { Before } from "@/data/moves";
+import type { Month } from "@/data/schedule";
 import type { Decided, Listed, Read, Version } from "@/db/household";
 import type { Answer } from "@/lib/answer";
 import type { KeptClose } from "@/lib/landed";
@@ -209,14 +210,7 @@ export async function getClosesBack(): Promise<readonly KeptClose[]> {
     readPage(),
     readPageHeld(),
   ]);
-  const closes = await readCloses(getDb(), scenario, {
-    from: { month: kept.asOf.month, year: kept.asOf.year - 1 },
-    to: monthBefore(kept.asOf),
-  });
-  return closes.map(({ household, month }) => ({
-    before: answerOf(() => soundKept(upcast(household))),
-    month,
-  }));
+  return closesBefore(scenario, kept.asOf);
 }
 
 // The scenario named beside the household, as Compare sets the one
@@ -378,6 +372,18 @@ export async function isCloseDue(): Promise<boolean> {
   }
 }
 
+// The closes kept on the household's own branch for the twelve months
+// before the month given, read afresh, as a save reads, and as
+// getClosesBack reads them: what the close of the month after keeps the
+// month end's reading against, from inside the save. The session is
+// checked first, as every read's is.
+export async function readClosesBefore(
+  month: Month,
+): Promise<readonly KeptClose[]> {
+  await requireSession();
+  return closesBefore("", month);
+}
+
 // The household held on the branch open, with the branch and the
 // version it is there, read afresh, as a save reads it, so a cookie
 // naming a scenario no longer kept is refused as a save's is: for an
@@ -397,6 +403,25 @@ export async function readHeld(): Promise<Held & Read> {
 export async function readShown(): Promise<Held & Read> {
   await requireSession();
   return heldIn(await readOpen(false));
+}
+
+// The closes kept on a branch for the twelve months before the month
+// given, oldest first, each with the month it closed and the household
+// it kept as readCloses reads it, carried through the chain and held to
+// every rule as the latest is, both as kept and as it makes it, or the
+// refusal in their words.
+async function closesBefore(
+  scenario: string,
+  month: Month,
+): Promise<readonly KeptClose[]> {
+  const closes = await readCloses(getDb(), scenario, {
+    from: { month: month.month, year: month.year - 1 },
+    to: monthBefore(month),
+  });
+  return closes.map(({ household, month: closed }) => ({
+    before: answerOf(() => soundKept(upcast(household))),
+    month: closed,
+  }));
 }
 
 // The latest version kept on a branch, carried to this shape by the

@@ -16,7 +16,7 @@ import { endWorthOf, futureOf } from "@/engine/futures";
 import { laidOut, monthsOn, project } from "@/engine/projection";
 import { Refusal } from "@/lib/answer";
 
-import { changedIn, movedOver, movedSince, sideOf } from "./moved";
+import { changedIn, movedOver, movedSince, sideOf, standingOf } from "./moved";
 
 // The household's rules as they are, watched, so a test can have them
 // refuse a state the walk takes.
@@ -663,5 +663,39 @@ describe("sideOf", () => {
         }),
       ).retires,
     ).toBeNull();
+  });
+});
+
+describe("standingOf", () => {
+  // The reference household's owner, born in 1992, retires at 61, where
+  // What moved reads the liquid worth of the household against itself.
+  it("reads the age a plan's owner retires at and the liquid worth at it, to the pound, as What moved reads them", () => {
+    const moved = movedSince(kept, kept);
+
+    expect(moved.age).toBe(61);
+    expect(standingOf(kept)).toStrictEqual({
+      age: 61,
+      liquid: Math.round(moved.expected.liquid),
+      retires: 61,
+    });
+  });
+
+  // Never retiring, the worth is read at 91, the age the plan runs to.
+  it("reads the liquid worth at the age the plan runs to, and no retirement, where its owner never retires", () => {
+    const never = closing({
+      owners: [
+        {
+          ...owners[0],
+          retirement: [{ measure: "worth", of: "pounds", times: 1e12 }],
+        },
+      ],
+    });
+    const moved = movedSince(never, never);
+
+    expect(standingOf(never)).toStrictEqual({
+      age: 91,
+      liquid: Math.round(moved.expected.liquid),
+      retires: null,
+    });
   });
 });

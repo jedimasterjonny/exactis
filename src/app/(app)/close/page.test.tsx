@@ -92,9 +92,9 @@ const moved: Moved = {
 };
 
 // Where the invested balances landed since July's close, invented: a
-// month on, in the middle half of its futures, the ISA paid £300 more
-// than the plan paid it, as Portfolio Performance says, and one of three
-// invested balances left out.
+// month on, in the middle half of its futures, above 46% of them, the
+// ISA paid £300 more than the plan paid it, as Portfolio Performance
+// says, and one of three invested balances left out.
 const landed: Landed = {
   actual: 190_412,
   asOf: { month: 6, year: 2026 },
@@ -111,6 +111,7 @@ const landed: Landed = {
   months: 1,
   paidBy: ["Stocks & shares ISA"],
   read: 2,
+  share: 0.46,
 };
 
 // The closes kept in the year before August's as reads already

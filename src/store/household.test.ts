@@ -39,6 +39,7 @@ import {
   getSinceClose,
   getSourcesDaysAgo,
   isCloseDue,
+  readClosesBefore,
 } from "./household";
 
 vi.mock("server-only", () => ({}));
@@ -511,6 +512,33 @@ describe("the household store", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
     await expect(getClosesBack()).rejects.toThrow("redirected");
+  });
+
+  // August 2025 closed, then the reference closed onto August 2026, with
+  // a scenario open: a save reads the household's own closes in the year
+  // before the month it names, and none before August 2025's.
+  it("reads for a save the household's closes kept in the year before a month, whatever branch is open", async () => {
+    const lastAugust = { month: 7, year: 2025 };
+    const closed = {
+      ...reference,
+      asOf: lastAugust,
+      points: reference.points
+        .slice(-1)
+        .map((point) => ({ ...point, month: lastAugust })),
+    };
+    await keepAfter(db, { scenario: "", version: 0 }, closed);
+    await keepAfter(db, { scenario: "", version: 1 }, reference);
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, reference);
+    vi.mocked(openedScenario).mockResolvedValue("Retire early");
+
+    expect(await readClosesBefore(reference.asOf)).toStrictEqual([
+      { before: saved(soundKept(closed)), month: lastAugust },
+    ]);
+    expect(await readClosesBefore(lastAugust)).toStrictEqual([]);
+
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(readClosesBefore(lastAugust)).rejects.toThrow("redirected");
   });
 
   // The reference closed onto July, a version with July's point its

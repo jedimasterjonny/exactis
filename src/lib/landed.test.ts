@@ -196,6 +196,41 @@ describe("landedSince", () => {
     }
   });
 
+  // The ISA at August's close emptied, as it stood, and £2,000,000 up,
+  // invented: below every future, between the bottom and the middle, and
+  // above every one; then, as it stood, with Portfolio Performance saying
+  // an invented £1,000,000 went into it, which lifts every future past it.
+  it("reads the share of the futures the invested balances landed above, after the shift for what was paid in", () => {
+    const isa = accounts[1];
+    const isaAt = (balance: number, at: Kept = now): Kept => ({
+      ...at,
+      accounts: at.accounts.map((account) =>
+        account.id === isa.id ? { ...account, balance } : account,
+      ),
+    });
+    const paid = {
+      ...now,
+      targets: {
+        ...targets,
+        importedOn: "2026-08-26",
+        portfolios: [
+          {
+            cash: 0,
+            name: "Stocks & shares ISA",
+            paid: [{ amount: 1_000_000, on: "2026-08-20" }],
+          },
+        ],
+      },
+    };
+    const stood = landedOf(before, now);
+
+    expect(landedOf(before, isaAt(0)).share).toBe(0);
+    expect(stood.share).toBeGreaterThan(0);
+    expect(stood.share).toBeLessThan(0.5);
+    expect(landedOf(before, isaAt(isa.balance + 2_000_000)).share).toBe(1);
+    expect(landedOf(before, paid).share).toBe(0);
+  });
+
   it("shifts nothing where Portfolio Performance was imported before this close", () => {
     const stale = landedOf(before, {
       ...now,
@@ -268,6 +303,7 @@ describe("bandOf", () => {
     months: 1,
     paidBy: [],
     read: 1,
+    share: 0,
   };
 
   it.each([

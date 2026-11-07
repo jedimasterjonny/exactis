@@ -1,6 +1,7 @@
 import type { Account } from "@/data/accounts";
 import type { Kept, KeptBalances } from "@/data/household";
 import type { Plan } from "@/data/plan";
+import type { KeptPoint } from "@/data/progress";
 import type { Month } from "@/data/schedule";
 import type { Future } from "@/engine/futures";
 import type { MonthsOn } from "@/engine/projection";
@@ -442,6 +443,22 @@ export function sideOf(kept: Kept): Side {
     ends: endAge(plan),
     retires: future.retired === null ? null : ageIn(future.retired, plan),
     worth: endWorthOf(future),
+  };
+}
+
+// Where a kept household's plan stands at its own rates, as a point
+// keeps it once the month after is closed: the age the liquid net worth
+// is read at, the one its owner retires at, or the one the plan runs to
+// where they never do, as What moved reads it; that worth to the pound;
+// and the age they retire at, or null.
+export function standingOf(kept: Kept): NonNullable<KeptPoint["standing"]> {
+  const { future, plan } = futureIn(kept);
+  const age =
+    future.retired === null ? endAge(plan) : ageIn(future.retired, plan);
+  return {
+    age,
+    liquid: Math.round(standingAt(future, age).liquid),
+    retires: future.retired === null ? null : age,
   };
 }
 

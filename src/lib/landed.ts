@@ -1,6 +1,7 @@
 import type { Account } from "@/data/accounts";
 import type { Household, Kept } from "@/data/household";
 import type { Spread } from "@/data/plan";
+import type { KeptPoint } from "@/data/progress";
 import type { Month } from "@/data/schedule";
 import type { Bands } from "@/engine/futures";
 import type { Answer } from "@/lib/answer";
@@ -30,8 +31,10 @@ export interface KeptClose {
 // them to, each shifted by what was paid in beyond what its plan paid,
 // as Portfolio Performance says, and that shift; the names of the
 // accounts it said that of; how many accounts were read, and how many
-// on the plan rate in that close were left out; and whether the plan at
-// its own rates leaves any of the months short.
+// on the plan rate in that close were left out; the share of the run's
+// sums, shifted the same, below what they stand at, which places a
+// reading and names no band; and whether the plan at its own rates
+// leaves any of the months short.
 export interface Landed {
   readonly actual: number;
   readonly asOf: Month;
@@ -42,6 +45,7 @@ export interface Landed {
   readonly months: number;
   readonly paidBy: readonly string[];
   readonly read: number;
+  readonly share: number;
 }
 
 // Where the invested balances landed among the futures of the oldest
@@ -75,7 +79,10 @@ interface Laid {
 
 // Where the actual sits among the bands a reading's futures carry the
 // invested balances to, in the words of the five bands.
-export function bandOf({ actual, bands }: Landed): string {
+export function bandOf({
+  actual,
+  bands,
+}: Landed): NonNullable<KeptPoint["landed"]>["band"] {
   if (actual < bands.bottomTenth) {
     return "bottom tenth";
   }
@@ -86,6 +93,18 @@ export function bandOf({ actual, bands }: Landed): string {
     return "middle half";
   }
   return actual <= bands.topTenth ? "top quarter" : "top tenth";
+}
+
+// A reading as a progress point keeps it: the band bandOf names, the
+// months it was read over, the share, and whether the plan drew on the
+// savings over them.
+export function keptOf(landed: Landed): NonNullable<KeptPoint["landed"]> {
+  return {
+    band: bandOf(landed),
+    isDrawing: landed.isDrawing,
+    months: landed.months,
+    share: landed.share,
+  };
 }
 
 // Where the invested balances landed since the oldest of the closes
@@ -102,11 +121,12 @@ export function bandOf({ actual, bands }: Landed): string {
 // invested balances, and the bands are read off the sums by bandsOf, each
 // shifted by what Portfolio Performance says was paid into those accounts
 // since that close beyond what the plan at its own rates paid them, where
-// it names them. A month is short where its cash flow over the accounts
-// that close kept, with no pension kept paid out of the savings, leaves
-// less than nothing, which is the spending monthsOn counts as unmet
-// rather than draws. A close one to twelve months before now is read, and
-// any other fails.
+// it names them, and the share is of the sums so shifted that come to
+// less than the invested balances do now. A month is short where its
+// cash flow over the accounts that close kept, with no pension kept paid
+// out of the savings, leaves less than nothing, which is the spending
+// monthsOn counts as unmet rather than draws. A close one to twelve
+// months before now is read, and any other fails.
 export function landedSince(closes: readonly KeptClose[], now: Kept): Landing {
   const passed: Passed[] = [];
   for (const { before, month } of closes) {
@@ -191,21 +211,21 @@ function landedOver(
     },
   );
   const beyond = sumOf(paidBy, (each) => each.beyond);
+  const held = sumOf([...read.values()], ({ balance }) => balance);
+  const sums = monthsAlong(accounts, schedule, { months, plan, spread })
+    .take(runLength)
+    .map(
+      (reached) =>
+        beyond +
+        sumOf(reached, ({ account, balance }) =>
+          read.has(account.id) ? balance : 0,
+        ),
+    )
+    .toArray();
   return {
-    actual: sumOf([...read.values()], ({ balance }) => balance),
+    actual: held,
     asOf,
-    bands: bandsOf(
-      monthsAlong(accounts, schedule, { months, plan, spread })
-        .take(runLength)
-        .map(
-          (reached) =>
-            beyond +
-            sumOf(reached, ({ account, balance }) =>
-              read.has(account.id) ? balance : 0,
-            ),
-        )
-        .toArray(),
-    ),
+    bands: bandsOf(sums),
     beyond,
     isDrawing: Array.from({ length: months }, (_, offset) => {
       const month = plan.month + offset;
@@ -217,5 +237,6 @@ function landedOver(
     months,
     paidBy: paidBy.map(({ name }) => name),
     read: read.size,
+    share: sums.filter((sum) => sum < held).length / sums.length,
   };
 }
