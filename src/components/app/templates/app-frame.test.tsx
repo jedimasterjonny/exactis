@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { stubViewport } from "@/test/dom";
+import { bySlot, stubViewport } from "@/test/dom";
 
 import { AppFrame } from "./app-frame";
 
@@ -27,6 +27,21 @@ describe("AppFrame", () => {
     expect(within(main).getByRole("paragraph")).toHaveTextContent("Screen");
     expect(screen.getByText("Sidebar")).toBeInTheDocument();
     expect(within(main).queryByText("Sidebar")).not.toBeInTheDocument();
+  });
+
+  // The sidebar is fixed, so the page's padding at the sides does not
+  // move it off a notch; it is set in from the left by the inset itself.
+  it("sets the wide screen's sidebar clear of a notch at the left", () => {
+    stubViewport(1024);
+    render(
+      <AppFrame banner={null} nav={null} sidebar={<span>Sidebar</span>}>
+        <p>Screen</p>
+      </AppFrame>,
+    );
+
+    expect(screen.getByText(bySlot("sidebar-container"))).toHaveClass(
+      "ml-[env(safe-area-inset-left)]",
+    );
   });
 
   it("sets the tab bar it is handed after the main column, padded at its foot on a phone to clear the bar", () => {

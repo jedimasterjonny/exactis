@@ -31,7 +31,9 @@ const classes =
 // end's tab carries a dot while last month is still to be closed, read
 // from the promise the sidebar's badge reads. The tabs are links, so
 // they work before the page hydrates; More is a button and waits for
-// it. A client component, since the pathname is read on the client.
+// it. The tabs sit above the home indicator, the bar running on beneath
+// them to the foot of the screen. A client component, since the pathname
+// is read on the client.
 export function PhoneNav({ isDue }: PhoneNavProps): JSX.Element {
   const screen = screenAt(usePathname());
   const { openMobile: isOpen, setOpenMobile } = useSidebar();
@@ -39,7 +41,7 @@ export function PhoneNav({ isDue }: PhoneNavProps): JSX.Element {
   return (
     <nav
       aria-label="Tab bar"
-      className="fixed inset-x-0 bottom-0 z-40 h-(--phone-nav) border-t bg-card md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 h-(--phone-nav) border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden"
       data-slot="phone-nav"
     >
       <ul className="flex h-full">

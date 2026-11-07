@@ -29,6 +29,7 @@ interface AppSidebarProps {
 // the navigation above. The export and the import above sign-out are
 // drawn as the same button: the export a menu of the two files the route
 // hands out, and the import asking before a file replaces what is open.
+// The footer clears the home indicator, which the sidebar runs down to.
 export function AppSidebar({ isDue }: AppSidebarProps): JSX.Element {
   return (
     <>
@@ -44,7 +45,7 @@ export function AppSidebar({ isDue }: AppSidebarProps): JSX.Element {
       <SidebarContent className="px-2">
         <AppNav isDue={isDue} />
       </SidebarContent>
-      <SidebarFooter className="gap-3 px-4 pb-5">
+      <SidebarFooter className="gap-3 px-4 pb-[calc(--spacing(5)+env(safe-area-inset-bottom))]">
         <ThemeToggle />
         <ExportMenu />
         <HouseholdImport />

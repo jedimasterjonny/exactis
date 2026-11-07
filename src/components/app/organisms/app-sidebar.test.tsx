@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { signOut } from "@/actions/auth";
 import { SidebarProvider } from "@/components/kit/sidebar";
-import { stubViewport } from "@/test/dom";
+import { bySlot, stubViewport } from "@/test/dom";
 
 import { AppSidebar } from "./app-sidebar";
 
@@ -83,6 +83,14 @@ describe("AppSidebar", () => {
     expect(screen.getByLabelText("Household file")).toHaveAttribute(
       "type",
       "file",
+    );
+  });
+
+  it("keeps the footer clear of the home indicator", () => {
+    renderSidebar();
+
+    expect(screen.getByText(bySlot("sidebar-footer"))).toHaveClass(
+      "pb-[calc(--spacing(5)+env(safe-area-inset-bottom))]",
     );
   });
 });
