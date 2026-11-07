@@ -12,7 +12,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/kit/sidebar";
-import { monthEnd, screens, sectionNumeral } from "@/lib/nav";
+import { monthEnd, screens, sectionNumeral, tabs } from "@/lib/nav";
 
 interface AppNavProps {
   readonly isDue: Promise<boolean>;
@@ -26,12 +26,14 @@ interface AppNavProps {
 // On a phone, where the navigation sits in a sheet over the screen,
 // choosing a screen closes the sheet, which the frame would otherwise
 // keep open across the navigation; the current screen's own link closes
-// it too. The month end is badged Due while last month is still to be
-// closed, which the layout reads from the store and hands down
-// unawaited, so the navigation draws at once and the badge joins it when
-// the read is in. A client component, since the pathname is read on the
-// client and an icon is a component, which cannot cross the server
-// boundary as a prop.
+// it too. Below the md breakpoint, where the sheet is, the navigation
+// leaves out the screens the phone's tab bar holds, so the sheet holds
+// the rest without scrolling, each with its own numeral still. The month
+// end is badged Due while last month is still to be closed, which the
+// layout reads from the store and hands down unawaited, so the
+// navigation draws at once and the badge joins it when the read is in.
+// A client component, since the pathname is read on the client and an
+// icon is a component, which cannot cross the server boundary as a prop.
 export function AppNav({ isDue }: AppNavProps): JSX.Element {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
@@ -41,7 +43,10 @@ export function AppNav({ isDue }: AppNavProps): JSX.Element {
         {screens.map((screen) => {
           const isCurrent = pathname === screen.href;
           return (
-            <SidebarMenuItem key={screen.href}>
+            <SidebarMenuItem
+              className={tabs.includes(screen) ? "max-md:hidden" : undefined}
+              key={screen.href}
+            >
               <SidebarMenuButton
                 aria-current={isCurrent ? "page" : undefined}
                 isActive={isCurrent}
