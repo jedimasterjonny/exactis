@@ -82,6 +82,31 @@ const steps: readonly {
   },
 ];
 
+// The target allocation as a rate reads it: each category's share and
+// the class it is mapped onto, by id, since neither an import's day, nor
+// a name, nor the order a mapping was made in moves a rate.
+export function blendedBy({
+  mappings,
+  targets,
+}: Pick<Sources, "mappings" | "targets">): unknown {
+  return {
+    classes: mappings
+      .toSorted((one, other) => one.category.localeCompare(other.category))
+      .map(({ asset, category }) => [category, asset]),
+    shares: (targets?.categories ?? [])
+      .toSorted((one, other) => one.id.localeCompare(other.id))
+      .map(({ id, share }) => [id, share]),
+  };
+}
+
+// The fees and yield as a rate reads them, without the day they were
+// set, since confirming them still right moves no rate.
+export function deductedBy({
+  deductions: { dividends, fees },
+}: Pick<Sources, "deductions">): unknown {
+  return { dividends, fees };
+}
+
 // What moved the CMA-derived rates from the sources before to the
 // sources now: each source that changed taken in turn, the CMA's, the
 // curve, the target allocation and the fees and yield, and what each
@@ -136,31 +161,6 @@ function apart(to: Standing, from: Standing): Standing {
     planRate: to.planRate - from.planRate,
     real: to.real - from.real,
   };
-}
-
-// The target allocation as a rate reads it: each category's share and
-// the class it is mapped onto, by id, since neither an import's day, nor
-// a name, nor the order a mapping was made in moves a rate.
-function blendedBy({
-  mappings,
-  targets,
-}: Pick<Sources, "mappings" | "targets">): unknown {
-  return {
-    classes: mappings
-      .toSorted((one, other) => one.category.localeCompare(other.category))
-      .map(({ asset, category }) => [category, asset]),
-    shares: (targets?.categories ?? [])
-      .toSorted((one, other) => one.id.localeCompare(other.id))
-      .map(({ id, share }) => [id, share]),
-  };
-}
-
-// The fees and yield as a rate reads them, without the day they were
-// set, since confirming them still right moves no rate.
-function deductedBy({
-  deductions: { dividends, fees },
-}: Pick<Sources, "deductions">): unknown {
-  return { dividends, fees };
 }
 
 // What a set of sources comes to at the split given, or at its own

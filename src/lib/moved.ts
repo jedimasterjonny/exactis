@@ -7,6 +7,7 @@ import type { Future } from "@/engine/futures";
 import type { MonthsOn } from "@/engine/projection";
 
 import { soundKept } from "@/data/household";
+import { blendedBy, deductedBy } from "@/data/moves";
 import { ageIn, endAge } from "@/data/plan";
 import { endWorthOf, futureOf } from "@/engine/futures";
 import { laidOut, monthsOn, project } from "@/engine/projection";
@@ -44,7 +45,8 @@ export interface Line {
 // expected, a step for each group that changed, or for two or more
 // taken together, with the standing it leaves, and the standing now,
 // which the last step leaves; the balances the close set; the sources
-// and the records that changed; what the plan paid into the ISAs and
+// that changed what could move a rate, and the records that changed;
+// what the plan paid into the ISAs and
 // the GIAs over the months closed; how many months those were; and the
 // age the liquid net worth is held at, which is the one it is read at
 // but where the plan now ends before it.
@@ -156,17 +158,25 @@ const areas: readonly {
 
 // The keys each source of the rates holds, in the order the
 // assumptions screen lays them out: the rates tab, then the target
-// allocation, then the glide path.
+// allocation, then the glide path; and, for the fees and yield and the
+// target allocation, what of them could move a rate, as Assumptions
+// reads them: the fees and yield without the day they were set, and the
+// allocation by each category's share and the class it is mapped onto,
+// by id, without an import's day, its values, holdings or portfolios,
+// or the categories' names and order. A reorder alone is taken as no
+// change, though it can move a rate by its last bits, so a walk over
+// one ends on the household now to the pound rather than to the bit.
 const sources: readonly {
   readonly keys: readonly (keyof Kept)[];
+  readonly read?: (kept: Kept) => unknown;
   readonly source: RateSource;
 }[] = [
   { keys: ["rateSet"], source: "rateSet" },
   { keys: ["rates", "allocation"], source: "rates" },
   { keys: ["cma"], source: "cma" },
   { keys: ["curve"], source: "curve" },
-  { keys: ["deductions"], source: "deductions" },
-  { keys: ["targets", "mappings"], source: "targets" },
+  { keys: ["deductions"], read: deductedBy, source: "deductions" },
+  { keys: ["targets", "mappings"], read: blendedBy, source: "targets" },
   { keys: ["glide"], source: "glide" },
 ];
 
@@ -202,7 +212,8 @@ const records: readonly {
 // match by id alone does not see, and an account added or removed leaves
 // the rest where they stand; then each setting of the plan that differs,
 // the end age, the drawdown and each source of the rates the scenario
-// carries over, which leaves out the CMA and the curve, since those are
+// carries over, each whole, as planOver carries it over, which leaves
+// out the CMA and the curve, since those are
 // pulled into the household and planOver keeps the household's. Both
 // sides are read as kept, the scenario's own plan rather than the merge,
 // so the lines stand where the merge is refused: an account the
@@ -317,7 +328,11 @@ export function movedOver(closed: KeptBalances, now: Kept): Moved {
 // with the groups after it until the state is sound, the step naming
 // each of them that changed something, so the steps always end on the
 // household now: the last group is taken to carry a refused one there
-// even where it changed nothing itself, and is then not named. Each step is
+// even where it changed nothing itself, and is then not named. A
+// source of the rates is compared by what of it could move a rate, as
+// Assumptions compares it, so an import or a confirmation that moves
+// none is no step, and what of it moves no rate can be left as it was,
+// so the steps end on the household now to the pound. Each step is
 // worked out after the ones before it, so taken in another order a
 // group's share of the move could differ. The balances' sums and what
 // the plan paid in run over the accounts the close set alone. Refused
@@ -352,7 +367,11 @@ export function movedSince(
       balance: nowById.get(account.id)?.balance ?? account.balance,
     }));
   const rates = sources
-    .filter(({ keys }) => keys.some((key) => differs(before[key], now[key])))
+    .filter(({ keys, read }) =>
+      read === undefined
+        ? keys.some((key) => differs(before[key], now[key]))
+        : differs(read(before), read(now)),
+    )
     .map(({ source }) => source);
   const changes = areas
     .filter(({ read }) => differs(read(before), read(now)))
