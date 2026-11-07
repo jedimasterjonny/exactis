@@ -3,17 +3,20 @@ import type { JSX } from "react";
 import type { Plan } from "@/data/plan";
 import type { Breaks } from "@/engine/futures";
 
+import { Panel } from "@/components/app/atoms/panel";
+import { AgeField } from "@/components/app/molecules/age-field";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { CardContent } from "@/components/kit/card";
 import { retiresOn } from "@/data/milestones";
 import { ageIn, endAge } from "@/data/plan";
-import { deepestCut, isAgeSearched } from "@/engine/futures";
-import { counted } from "@/lib/count";
+import { deepestCut, isAgeSearched, runLength } from "@/engine/futures";
+import { counted, formatCount } from "@/lib/count";
 import { chance, subsectionLabel } from "@/lib/nav";
 
 interface FuturesBreaksProps {
   readonly plan: Plan;
   readonly searched?: { readonly breaks: Breaks | undefined };
+  readonly tried?: Tried;
 }
 
 // A figure the card shows: what it is, the figure and its unit where it
@@ -27,6 +30,15 @@ interface Shown {
   readonly way?: string;
 }
 
+// A retirement age tried on the card: the age, how many futures last
+// retiring at it, unknown while they are counted, and what to call with
+// an age committed.
+interface Tried {
+  readonly age: number;
+  readonly lasted: number | undefined;
+  readonly onAge: (age: number) => void;
+}
+
 // Where the plan breaks, under what the futures come to: one sentence
 // saying at what retirement age, or on how much of the spending
 // planned, nine in ten futures last, and the two as figures, each with
@@ -35,10 +47,15 @@ interface Shown {
 // in ten last with. A plan isAgeSearched passes over has no age
 // searched, and the spending says why. The figures wait until the
 // search is done: before it they say it waits on the futures, and while
-// it runs that it is searching them.
+// it runs that it is searching them. Once it is done, where it hands
+// back the brackets its search of the age left the futures in, which
+// an age tried is counted off, the card has a retirement age to try
+// beneath the figures, as AgeTried lays it out, where one is given, even
+// where no age was found.
 export function FuturesBreaks({
   plan,
   searched,
+  tried,
 }: FuturesBreaksProps): JSX.Element {
   const isAge = isAgeSearched(plan);
   const breaks = searched?.breaks;
@@ -97,6 +114,9 @@ export function FuturesBreaks({
             </div>
           ))}
         </dl>
+        {breaks?.ages !== undefined && tried !== undefined && (
+          <AgeTried plan={plan} tried={tried} />
+        )}
       </CardContent>
     </SectionCard>
   );
@@ -137,6 +157,74 @@ function ageShown(age: null | number, plan: Plan): Shown {
     value: String(age),
     way: `retiring at ${String(age)}`,
   };
+}
+
+// A retirement age tried on the card alone, in a sunken panel beneath
+// the figures, the box beside the sentence saying how many of the
+// futures last retiring at it from the width of a small screen and
+// above it below: at the plan's own age as the plan stands, and at any
+// other spending as planned, as retiringAs says the age, with an
+// ellipsis in place of the count while it is counted. The hint names
+// the age the plan retires at, since the age tried changes nothing. A
+// screen reader hears the sentence again once the count is in, and
+// never while it is counted, so nothing ticks; and, the count in, the
+// sentence shown is hidden from it, so browsing reads it once.
+function AgeTried({
+  plan,
+  tried: { age, lasted, onAge },
+}: {
+  readonly plan: Plan;
+  readonly tried: Tried;
+}): JSX.Element {
+  const opens = ageIn(plan.from, plan);
+  const retiring = retiringAs(age, plan);
+  const last = ` of ${formatCount(runLength)} futures last ${
+    age === plan.retires
+      ? `as the plan stands, ${retiring}.`
+      : `${retiring}, spending as planned.`
+  }`;
+  const count = lasted === undefined ? undefined : formatCount(lasted);
+  return (
+    <Panel
+      className="sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:gap-x-6"
+      variant="subtle"
+    >
+      <div className="w-52">
+        <AgeField
+          hasSlider={false}
+          hint={`Tried here only; the plan retires ${
+            plan.retires === opens ? "this year" : `at ${String(plan.retires)}`
+          }`}
+          label="Retirement age to try"
+          max={endAge(plan)}
+          min={opens}
+          onValueCommitted={onAge}
+          value={age}
+        />
+      </div>
+      <p
+        aria-hidden={count !== undefined}
+        className="text-sm text-pretty text-muted-foreground"
+      >
+        <span className="figure text-foreground">{count ?? "…"}</span>
+        {last}
+      </p>
+      <p aria-live="polite" className="sr-only">
+        {count === undefined ? "" : `${count}${last}`}
+      </p>
+    </Panel>
+  );
+}
+
+// Retiring at the age given, as the age tried says it: the age the plan
+// opens at as this year, and its last as working to it.
+function retiringAs(age: number, plan: Plan): string {
+  if (age === ageIn(plan.from, plan)) {
+    return "retiring this year";
+  }
+  return age === endAge(plan)
+    ? `working to ${String(age)}`
+    : `retiring at ${String(age)}`;
 }
 
 // The retirement the spending is read against, as its caption ends: at
