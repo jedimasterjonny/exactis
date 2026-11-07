@@ -97,6 +97,30 @@ describe("AppNav", () => {
     expect(nav.queryByText("Due")).not.toBeInTheDocument();
   });
 
+  // The phone's tab bar holds four screens, so the sheet leaves them out
+  // where the bar is shown, and lists the rest in their places.
+  it("leaves the tab bar's screens out below the md breakpoint", () => {
+    renderNav("/", closed);
+
+    expect(
+      within(screen.getByRole("navigation", { name: "Screens" }))
+        .getAllByRole("listitem")
+        .map((item) => [
+          item.textContent,
+          item.classList.contains("max-md:hidden"),
+        ]),
+    ).toStrictEqual([
+      ["DashboardI", true],
+      ["Chance of successII", false],
+      ["Accounts & assetsIII", false],
+      ["Income & expensesIV", false],
+      ["ProgressV", true],
+      ["AssumptionsVI", false],
+      ["Month endVII", true],
+      ["CogitatorVIII", true],
+    ]);
+  });
+
   // The numeral is decorative, so a screen reader hears the label alone.
   it("hides each numeral from a screen reader", () => {
     renderNav("/", closed);
