@@ -1,3 +1,5 @@
+import type { RenderHookResult } from "@testing-library/react";
+
 import { act, renderHook } from "@testing-library/react";
 import { Activity } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,12 +9,25 @@ import type { Breaks, Future, Trial } from "@/engine/futures";
 import type { Slice, Tried } from "@/hooks/futures.worker";
 
 import { expenseLines } from "@/data/expenses.fixture";
+import { incomeLines } from "@/data/income.fixture";
 import { retiringAt } from "@/data/milestones";
 import { working } from "@/data/owners.fixture";
-import { breaksIn, futuresOf, lastingAt, lastsTried } from "@/engine/futures";
+import {
+  breaksIn,
+  futuresOf,
+  lastingAt,
+  lastsTried,
+  readingOf,
+} from "@/engine/futures";
 import { FuturesWorker } from "@/test/futures-worker";
 
-import { drawAgain, forget, useBreaks, useFutures } from "./use-futures";
+import {
+  drawAgain,
+  forget,
+  useBreaks,
+  useFutures,
+  useLastingAt,
+} from "./use-futures";
 
 // An ISA drawn £1,000 a month over three years at 5%, straying 15% a
 // year, so each future is drawn in a moment and no two alike.
@@ -50,9 +65,12 @@ const spread = { inflation: 0.02, rate: 0.15 };
 const took = 150;
 
 // A worker that keeps the place in the run of each slice it is handed,
-// and of each future it is handed to try, and takes a while over each.
+// and of each future it is handed to try, with all it was handed to try
+// it, and takes a while over each.
 class Watched extends FuturesWorker {
   public readonly handed: number[] = [];
+
+  public readonly posted: Tried[] = [];
 
   public readonly tried: number[] = [];
 
@@ -61,6 +79,7 @@ class Watched extends FuturesWorker {
   public override postMessage(posted: Slice | Tried): void {
     if ("trial" in posted) {
       this.tried.push(posted.future);
+      this.posted.push(posted);
     } else {
       this.handed.push(posted.from);
     }
@@ -786,5 +805,290 @@ describe("useBreaks", () => {
     expect(breaks).toBeDefined();
     expect(result.current).toStrictEqual(breaks);
     expect(started).toHaveLength(searching);
+  });
+});
+
+describe("useLastingAt", () => {
+  // Each test opens a page of its own, the futures drawn from the seed
+  // the engine draws from.
+  beforeEach(() => {
+    forget();
+  });
+
+  // £12,000 a year earned until the owner retires, as much as is spent,
+  // so a year worked costs the savings nothing and retiring later lasts
+  // in more of the futures.
+  const earning = {
+    ...schedule,
+    income: [
+      {
+        ...incomeLines[0],
+        amount: 12000,
+        bonus: 0,
+        feeds: null,
+        growth: "nominal" as const,
+        lastYear: null,
+        rsu: 0,
+        sacrifice: 0,
+      },
+    ],
+  };
+
+  // Retiring at 35 on the £30,000, of ten futures none last retiring at
+  // 34, eight at 35 and all ten at 36 and 37. The search from 35 tries
+  // one future at 36, which lasts and makes nine, so it leaves the eight
+  // lasting at 35 open at 34, and the one it did not try open at 36 and
+  // 37.
+  const run = { plan: retiringAt(plan, 35), spread };
+
+  // Where the run's ten futures break, searched a lane at a time on the
+  // test's own thread, with the futures and how one is tried there.
+  async function searched(): Promise<{
+    readonly breaks: Breaks;
+    readonly futures: readonly Future[];
+    readonly tried: (trial: Trial, future: number) => Promise<boolean>;
+  }> {
+    const futures = futuresOf(accounts, earning, run).take(10).toArray();
+    const tried = async (trial: Trial, future: number): Promise<boolean> =>
+      Promise.resolve(lastsTried(accounts, earning, { ...run, future, trial }));
+    const breaks = await breaksIn(futures, run.plan, { lanes: 1, tried });
+    return { breaks, futures, tried };
+  }
+
+  // The count at the age given off where the run breaks, as lastingAt
+  // reads it a lane at a time on the test's own thread.
+  async function countAt(
+    { breaks, tried }: Awaited<ReturnType<typeof searched>>,
+    age: number,
+  ): Promise<number> {
+    return (await lastingAt(breaks.ages ?? [], age, { lanes: 1, tried }))
+      .lasted;
+  }
+
+  // What the hook hands back over the breaks given, rendered again with
+  // whichever the test gives next.
+  function counting(
+    breaks: Breaks | undefined,
+  ): RenderHookResult<
+    ReturnType<typeof useLastingAt>,
+    { readonly breaks: Breaks | undefined }
+  > {
+    return renderHook(
+      (props) => useLastingAt(accounts, earning, { ...run, ...props }),
+      { initialProps: { breaks } },
+    );
+  }
+
+  // An age given to the hook, as the card commits one.
+  function give(
+    result: { readonly current: ReturnType<typeof useLastingAt> },
+    age: number,
+  ): void {
+    act(() => {
+      result.current.onAge(age);
+    });
+  }
+
+  async function landed(): Promise<void> {
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+  }
+
+  it("counts at the plan's own age off the brackets, as the run's own lasted, starting no worker", async () => {
+    const started = watchWorkers();
+    const { breaks, futures } = await searched();
+    const { result } = counting(breaks);
+
+    await landed();
+
+    expect(result.current.age).toBe(35);
+    expect(result.current.lasted).toBe(readingOf(futures).lasted);
+    expect(result.current.lasted).toBe(8);
+    expect(started).toHaveLength(0);
+  });
+
+  it("counts another age given on two workers, each handed a future and the age alone over the plan as it was, and lets them go once it lands", async () => {
+    const started = watchWorkers();
+    const search = await searched();
+    const before = structuredClone(run.plan);
+    const { result } = counting(search.breaks);
+
+    give(result, 34);
+
+    expect(result.current.age).toBe(34);
+    expect(result.current.lasted).toBeUndefined();
+    await landed();
+    expect(result.current.lasted).toBe(await countAt(search, 34));
+    expect(started).toHaveLength(2);
+    const posted = started.flatMap((worker) => worker.posted);
+    expect(
+      posted.map(({ future }) => future).toSorted((one, other) => one - other),
+    ).toStrictEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    for (const { plan: on, trial } of posted) {
+      expect(trial).toStrictEqual({ age: 34 });
+      expect(on).toStrictEqual(run.plan);
+    }
+    expect(run.plan).toStrictEqual(before);
+    for (const worker of started) {
+      expect(worker.terminate).toHaveBeenCalled();
+    }
+  });
+
+  // The count at 36 tries the one future left open there, on one worker
+  // of the two it may start, and that future lasts, so it is settled at
+  // 37 too.
+  it("starts a worker only for a try that finds none free, reads an age counted before at once, and counts off the brackets the counts before narrowed", async () => {
+    const started = watchWorkers();
+    const { breaks } = await searched();
+    const { result } = counting(breaks);
+    give(result, 36);
+    await landed();
+
+    expect(result.current.lasted).toBe(10);
+    expect(started.map(({ tried }) => tried)).toStrictEqual([[9]]);
+    give(result, 37);
+    await landed();
+    expect(result.current.lasted).toBe(10);
+    give(result, 36);
+    expect(result.current.lasted).toBe(10);
+    expect(started).toHaveLength(1);
+  });
+
+  // The plan's own age is read and then 34 is given before its count
+  // lands, and 36 once the first two tries at 34 are back, two more on
+  // their way.
+  it("stops a count when another age is given, dropping what it would land, and counts the newer age", async () => {
+    const started = watchWorkers();
+    const search = await searched();
+    const { result } = counting(search.breaks);
+    give(result, 34);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(took);
+    });
+
+    give(result, 36);
+
+    for (const worker of started.slice(0, 2)) {
+      expect(worker.terminate).toHaveBeenCalled();
+      expect(worker.onmessage).toBeNull();
+    }
+    await landed();
+    expect(result.current.lasted).toBe(10);
+    expect(
+      started.map(({ posted }) => posted.map(({ trial }) => trial)),
+    ).toStrictEqual([
+      [{ age: 34 }, { age: 34 }],
+      [{ age: 34 }, { age: 34 }],
+      [{ age: 36 }],
+    ]);
+    give(result, 35);
+    expect(result.current.lasted).toBeUndefined();
+    await landed();
+    expect(result.current.lasted).toBe(8);
+    give(result, 34);
+    expect(result.current.lasted).toBeUndefined();
+    await landed();
+    expect(result.current.lasted).toBe(await countAt(search, 34));
+    expect(started).toHaveLength(5);
+  });
+
+  // Next hides a route navigated away from rather than taking it down,
+  // which clears its effects and runs them again when it is shown, its
+  // state kept.
+  it("stops a count when the screen is hidden, and counts the age given afresh when it is shown again", async () => {
+    const started = watchWorkers();
+    const search = await searched();
+    const mode = { current: "visible" as "hidden" | "visible" };
+    const { rerender, result } = renderHook(
+      () => useLastingAt(accounts, earning, { ...run, breaks: search.breaks }),
+      {
+        wrapper: ({ children }) => (
+          <Activity mode={mode.current}>{children}</Activity>
+        ),
+      },
+    );
+    give(result, 34);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(took);
+    });
+
+    mode.current = "hidden";
+    rerender();
+
+    for (const worker of started) {
+      expect(worker.terminate).toHaveBeenCalled();
+      expect(worker.onmessage).toBeNull();
+    }
+    mode.current = "visible";
+    rerender();
+    await landed();
+    expect(result.current.age).toBe(34);
+    expect(result.current.lasted).toBe(await countAt(search, 34));
+    expect(started).toHaveLength(4);
+  });
+
+  // The run searched again hands where it breaks in a new object, as a
+  // plan changed and changed back hands the run kept for it: the age
+  // given, the count at 36 kept and the brackets it narrowed are all the
+  // old one's.
+  it("drops the age given, every count and the brackets for where the run breaks handed afresh, stopping a count on its way, so the age reads the plan's again", async () => {
+    const started = watchWorkers();
+    const first = await searched();
+    const again = await searched();
+    const { rerender, result } = counting(first.breaks);
+    give(result, 36);
+    await landed();
+    give(result, 34);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(took);
+    });
+
+    rerender({ breaks: again.breaks });
+
+    expect(result.current.age).toBe(35);
+    expect(result.current.lasted).toBeUndefined();
+    for (const worker of started.slice(1, 3)) {
+      expect(worker.terminate).toHaveBeenCalled();
+      expect(worker.onmessage).toBeNull();
+    }
+    await landed();
+    expect(result.current.lasted).toBe(8);
+    give(result, 36);
+    expect(result.current.lasted).toBeUndefined();
+    await landed();
+    expect(result.current.lasted).toBe(10);
+    expect(started).toHaveLength(4);
+  });
+
+  it("counts nothing, starting no worker, before the run is searched or where its age is not", async () => {
+    const started = watchWorkers();
+    const { rerender, result } = counting(undefined);
+    await landed();
+
+    expect(result.current.age).toBe(35);
+    expect(result.current.lasted).toBeUndefined();
+    rerender({ breaks: { cut: 3 } });
+    await landed();
+    expect(result.current.lasted).toBeUndefined();
+    expect(started).toHaveLength(0);
+  });
+
+  it("stops the workers when the screen is taken down part way", async () => {
+    const started = watchWorkers();
+    const { breaks } = await searched();
+    const { result, unmount } = counting(breaks);
+    give(result, 34);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(took);
+    });
+
+    unmount();
+
+    expect(started).toHaveLength(2);
+    for (const worker of started) {
+      expect(worker.terminate).toHaveBeenCalled();
+      expect(worker.onmessage).toBeNull();
+    }
   });
 });
