@@ -12,6 +12,7 @@ import type { CarValues } from "@/data/cars";
 import type { Kept } from "@/data/household";
 import type { HouseValues } from "@/data/houses";
 import type { IncomeLine } from "@/data/income";
+import type { KeptPoint } from "@/data/progress";
 import type { Month } from "@/data/schedule";
 import type { Secured, SecuredRecords } from "@/data/secured";
 import type { Answer } from "@/lib/answer";
@@ -36,11 +37,13 @@ import { moving } from "@/data/milestones";
 import { pointOf } from "@/data/progress";
 import { month, named, pounds, recordId, target } from "@/data/schemas";
 import { Refusal } from "@/lib/answer";
+import { keptOf, landedSince } from "@/lib/landed";
 import { cutOf, isOnOrBefore, monthsBetween, today } from "@/lib/months";
+import { standingOf } from "@/lib/moved";
 import { found, holdUnchanged, replaced, written } from "@/lib/records";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
-import { amend } from "@/store/household";
+import { amend, readClosesBefore } from "@/store/household";
 
 // What a car may carry, checked against the model's own list and its
 // own soundness so the two cannot drift: the figures whole and never
@@ -232,25 +235,35 @@ const order = z
 // it otherwise; a month before the latest moves the balances and
 // records nothing, since the balances read now are not what the
 // accounts held then, and the points before the latest are never
-// touched. A month not cut by today is refused, since its balances are
-// read on its cut, and so is one before the plan's owner was born,
-// since the plan would run from it; a balance against
-// an id no account has is refused as well, and so is a list naming one
-// twice, which the worksheet could not have sent. The month, the
-// balances and the point land together or not at all, and a balance
-// the household's rules refuse, such as one below nothing on anything
-// but a debt, is refused in their words. A month is closed in the
-// household alone, and refused while a scenario is open, since it would
-// be lost there whichever way the scenario went: adopting one keeps the
-// household's bookkeeping over the scenario's, and dropping one deletes
-// it. Checked as a save is.
+// touched. A point recorded after the latest, while the balances are
+// still as of the latest's month, has the latest keep the month end's
+// reading of the household as it stands before this close: where the
+// invested balances landed among the futures of the oldest close in the
+// year before it that gives a reading, as VII.iii reads it, and where
+// the plan stands. The latest is still the latest when it is given
+// them. The closes are read only then, once nothing above has refused,
+// so a month closed again or closed back reads none and keeps nothing;
+// and a month may keep a reading VII.iii never drew, since What moved's
+// gate is not asked. An error of the engine's in the reading fails the
+// close, as anything thrown that is no refusal does. A month not cut by
+// today is refused, since its balances are read on its cut, and so is
+// one before the plan's owner was born, since the plan would run from
+// it; a balance against an id no account has is refused as well, and so
+// is a list naming one twice, which the worksheet could not have sent.
+// The month, the balances, the point and the reading land together or
+// not at all, and a balance the household's rules refuse, such as one
+// below nothing on anything but a debt, is refused in their words. A
+// month is closed in the household alone, and refused while a scenario
+// is open, since it would be lost there whichever way the scenario
+// went: adopting one keeps the household's bookkeeping over the
+// scenario's, and dropping one deletes it. Checked as a save is.
 export async function closeBalances(
   draft: Closed,
 ): Promise<Answer<{ readonly asOf: Month; readonly isRecorded: boolean }>> {
   await requireSession();
   const { asOf, balances } = closed.parse(draft);
   const scenario = await openedScenario();
-  return amend(({ household, kept }) => {
+  return amend(async ({ household, kept }) => {
     if (scenario !== null) {
       throw new Refusal("Leave the scenario to close the month");
     }
@@ -275,11 +288,18 @@ export async function closeBalances(
     );
     const latest = kept.points.at(-1);
     const isRecorded = latest === undefined || isOnOrBefore(latest.month, asOf);
+    const held =
+      latest !== undefined &&
+      monthsBetween(latest.month, asOf) > 0 &&
+      monthsBetween(kept.asOf, latest.month) === 0
+        ? [
+            ...kept.points.slice(0, -1),
+            { ...latest, ...(await readingOf(kept)) },
+          ]
+        : kept.points;
     const points = isRecorded
       ? [
-          ...kept.points.filter(
-            (point) => monthsBetween(point.month, asOf) > 0,
-          ),
+          ...held.filter((point) => monthsBetween(point.month, asOf) > 0),
           pointOf(accounts, asOf),
         ]
       : kept.points;
@@ -507,6 +527,21 @@ function loanIn(
           ? [...schedule.expenses, payments]
           : replaced(schedule.expenses, payments),
     },
+  };
+}
+
+// The month end's reading of the household as held, for its latest
+// point to keep: where the invested balances landed among the futures
+// of the oldest close in the year before that gives a reading, as
+// VII.iii reads it, read only where one does, and where the plan
+// stands.
+async function readingOf(
+  kept: Kept,
+): Promise<Pick<KeptPoint, "landed" | "standing">> {
+  const { landed } = landedSince(await readClosesBefore(kept.asOf), kept);
+  return {
+    ...(landed !== null && { landed: keptOf(landed) }),
+    standing: standingOf(kept),
   };
 }
 
