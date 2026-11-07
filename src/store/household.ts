@@ -130,8 +130,9 @@ const readScenarios = cache(async (): Promise<Scenarios> =>
 );
 
 // Saves the household as the edit makes it, and answers with what the
-// edit says to hand back. The edit works from the latest version and is
-// held to every rule before anything is written, so a save that breaks
+// edit says to hand back. The edit works from the latest version, and
+// may await what it reads of the store before it makes the household,
+// which is held to every rule before anything is written, so a save that breaks
 // one is answered as a refusal in its words and leaves the store as it
 // was, and anything else thrown on the way stays a failure; and the whole household
 // is written as the version after the one read, in one statement, so a
@@ -156,7 +157,7 @@ const readScenarios = cache(async (): Promise<Scenarios> =>
 // refusal leaves the page as it is. An action answers a POST from
 // anywhere, so this checks the session for itself, as every read does.
 export async function amend<TResult>(
-  edit: (held: Held) => Amended<TResult>,
+  edit: (held: Held) => Amended<TResult> | Promise<Amended<TResult>>,
   on?: null | string,
 ): Promise<Answer<TResult>> {
   await requireSession();
@@ -173,7 +174,7 @@ export async function amend<TResult>(
         "This scenario is decided, so it takes no edits; make a new scenario from it to change it",
       );
     }
-    const { kept, result } = edit(held);
+    const { kept, result } = await edit(held);
     await keepAfter(getDb(), { scenario, version }, soundKept(kept).kept);
     refresh();
     return saved(result);

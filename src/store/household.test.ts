@@ -23,7 +23,7 @@ import { decideScenario, keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { householdVersions } from "@/db/schema";
 import { standUp } from "@/db/store.fixture";
-import { refused, saved, Stale } from "@/lib/answer";
+import { Refusal, refused, saved, Stale } from "@/lib/answer";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 
@@ -283,6 +283,35 @@ describe("the household store", () => {
       version: 2,
     });
     expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  // An edit reading the store before it makes the household, as a close
+  // reads the closes before it: what it read reaches what it keeps and
+  // what it hands back, and a refusal it reaches after reading is
+  // answered in its words, as one made at once is.
+  it("keeps the household an edit makes after awaiting a read of the store", async () => {
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+
+    const result = await amend(async ({ kept }) => {
+      const read = await readLatest(db, "");
+      return {
+        kept: { ...kept, next: kept.next + (read?.version ?? 0) },
+        result: read?.version,
+      };
+    });
+
+    expect(result).toStrictEqual(saved(1));
+    expect(await readLatest(db, "")).toMatchObject({
+      household: { next: reference.next + 1 },
+      version: 2,
+    });
+    await expect(
+      amend(async () => {
+        await readLatest(db, "");
+        throw new Refusal("A rule the read turned up");
+      }),
+    ).resolves.toStrictEqual(refused("A rule the read turned up"));
+    expect(await readLatest(db, "")).toMatchObject({ version: 2 });
   });
 
   it("keeps the first save as the first version", async () => {
