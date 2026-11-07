@@ -30,7 +30,7 @@ import { laidOut } from "@/engine/projection";
 import { answerOf, refused } from "@/lib/answer";
 import { counted, formatCount } from "@/lib/count";
 import { listed } from "@/lib/feeders";
-import { landedSince } from "@/lib/landed";
+import { bandOf, landedSince } from "@/lib/landed";
 import { formatGbp, formatSignedGbp } from "@/lib/money";
 import {
   cutOf,
@@ -303,21 +303,6 @@ export function CloseScreen({
       <Trades month={due} moved={moved} targets={household.targets} />
     </Screen>
   );
-}
-
-// Where the actual sits among the bands a reading's futures carry the
-// invested balances to, in the words of the five bands.
-function bandOf({ actual, bands }: Landed): string {
-  if (actual < bands.bottomTenth) {
-    return "bottom tenth";
-  }
-  if (actual < bands.bottomQuarter) {
-    return "bottom quarter";
-  }
-  if (actual <= bands.topQuarter) {
-    return "middle half";
-  }
-  return actual <= bands.topTenth ? "top quarter" : "top tenth";
 }
 
 // What moved the plan since the close before the latest, with the month

@@ -16,7 +16,7 @@ import { cutOf } from "@/lib/months";
 
 import type { KeptClose, Landed } from "./landed";
 
-import { landedSince } from "./landed";
+import { bandOf, landedSince } from "./landed";
 
 // The reference household with its balances as of the month given, each
 // set on that month's cut, as a close of it sets them, with whatever a
@@ -244,5 +244,42 @@ describe("landedSince", () => {
     expect(landed?.asOf).toStrictEqual(july);
     expect(landedSince(passing, now)).toStrictEqual({ landed: null, passed });
     expect(landedSince([], now)).toStrictEqual({ landed: null, passed: [] });
+  });
+});
+
+describe("bandOf", () => {
+  // A reading of invented bands at 10, 20, 30, 40 and 50. The bottom
+  // two are counted below the actual and the top two at or below it, so
+  // an actual on one of the bottom two's edges falls in the band above
+  // it, and one on the top two's in the band below.
+  const landed: Landed = {
+    actual: 0,
+    asOf: july,
+    bands: {
+      bottomQuarter: 20,
+      bottomTenth: 10,
+      middle: 30,
+      topQuarter: 40,
+      topTenth: 50,
+    },
+    beyond: 0,
+    isDrawing: false,
+    left: 0,
+    months: 1,
+    paidBy: [],
+    read: 1,
+  };
+
+  it.each([
+    [9, "bottom tenth"],
+    [10, "bottom quarter"],
+    [19, "bottom quarter"],
+    [20, "middle half"],
+    [40, "middle half"],
+    [41, "top quarter"],
+    [50, "top quarter"],
+    [51, "top tenth"],
+  ] as const)("names an actual of %i the %s", (actual, band) => {
+    expect(bandOf({ ...landed, actual })).toBe(band);
   });
 });
