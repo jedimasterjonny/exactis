@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  atOf,
   closingOn,
   cutOf,
   daysBetween,
@@ -11,14 +12,41 @@ import {
   formatMonthShort,
   isOnOrBefore,
   isToCome,
+  labelOf,
   monthAfter,
   monthBefore,
   monthIn,
   monthName,
+  monthsBack,
   monthsBetween,
   thisMonth,
   today,
 } from "./months";
+
+describe("atOf", () => {
+  it("places a month at its year and the share of the year before it", () => {
+    expect(atOf({ month: 0, year: 2027 })).toBe(2027);
+    expect(atOf({ month: 6, year: 2027 })).toBe(2027.5);
+    expect(atOf({ month: 11, year: 2026 })).toBeCloseTo(2026 + 11 / 12, 12);
+  });
+});
+
+describe("labelOf", () => {
+  // Every month of a year and a half placed and labelled back, so the
+  // share of the year a month sits at reads back as that month.
+  it("writes a January as its year and any other month by name, as it is placed", () => {
+    expect(labelOf(atOf({ month: 0, year: 2027 }))).toBe("2027");
+    expect(labelOf(atOf({ month: 1, year: 2027 }))).toBe("Feb 2027");
+    expect(labelOf(atOf({ month: 11, year: 2026 }))).toBe("Dec 2026");
+    expect(
+      Array.from({ length: 18 }, (_, offset) =>
+        labelOf(
+          atOf({ month: offset % 12, year: 2026 + Math.floor(offset / 12) }),
+        ),
+      ).filter((label) => !label.includes(" ")),
+    ).toStrictEqual(["2026", "2027"]);
+  });
+});
 
 describe("closingOn", () => {
   // October 2026 is cut on Friday the 23rd, its 25th being a Sunday.
@@ -114,6 +142,27 @@ describe("monthName", () => {
     expect(monthName(8, "short")).toBe("Sep");
     expect(monthName(10, "short")).toBe("Nov");
     expect(monthName(11, "short")).toBe("Dec");
+  });
+});
+
+describe("monthsBack", () => {
+  it("counts months back from a month, across the turn of a year", () => {
+    expect(monthsBack({ month: 5, year: 2027 }, 0)).toStrictEqual({
+      month: 5,
+      year: 2027,
+    });
+    expect(monthsBack({ month: 2, year: 2027 }, 1)).toStrictEqual({
+      month: 1,
+      year: 2027,
+    });
+    expect(monthsBack({ month: 1, year: 2027 }, 3)).toStrictEqual({
+      month: 10,
+      year: 2026,
+    });
+    expect(monthsBack({ month: 1, year: 2027 }, 14)).toStrictEqual({
+      month: 11,
+      year: 2025,
+    });
   });
 });
 

@@ -22,6 +22,12 @@ const ukDay = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
 });
 
+// Where a month falls along a chart's axis of months: its year and the
+// share of the year before it, so a January falls on its year.
+export function atOf({ month, year }: Month): number {
+  return year + month / 12;
+}
+
 // The month whose balances were cut last on the day given, an ISO date:
 // the month the day falls in from its cut on, and the month before it
 // until then, which is the month a close is due for.
@@ -105,6 +111,14 @@ export function isToCome(month: Month): boolean {
   return !isOnOrBefore(month, thisMonth());
 }
 
+// What a chart's axis of months writes where a month falls, as atOf
+// places it: a January's year, or any other month as a table names it.
+export function labelOf(at: number): string {
+  const year = Math.floor(at);
+  const month = Math.round((at - year) * 12);
+  return month === 0 ? String(year) : formatMonthShort({ month, year });
+}
+
 // The month after a month, December's being the January of the year
 // after: the month a plan starts in, from the one its balances are as
 // of.
@@ -139,6 +153,12 @@ export function monthIn(moment: Date): Month {
 export function monthName(month: number, form: MonthForm): string {
   const name = names.format(Date.UTC(2000, month));
   return form === "long" ? name : name.slice(0, 3);
+}
+
+// A month as many months before another as given.
+export function monthsBack({ month, year }: Month, count: number): Month {
+  const from = month - count;
+  return { month: ((from % 12) + 12) % 12, year: year + Math.floor(from / 12) };
 }
 
 // The months from one month to another, none for the same month and

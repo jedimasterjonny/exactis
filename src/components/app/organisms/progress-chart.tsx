@@ -30,7 +30,13 @@ import {
   formatBalance,
 } from "@/lib/balances";
 import { formatAxisGbp, formatGbp } from "@/lib/money";
-import { formatMonthShort, monthsBetween } from "@/lib/months";
+import {
+  atOf,
+  formatMonthShort,
+  labelOf,
+  monthsBack,
+  monthsBetween,
+} from "@/lib/months";
 import { progress, subsectionLabel } from "@/lib/nav";
 
 interface ProgressChartProps {
@@ -283,25 +289,6 @@ export function ProgressChart({
       </CardContent>
     </SectionCard>
   );
-}
-
-// Where a month falls along the chart.
-function atOf({ month, year }: Month): number {
-  return year + month / 12;
-}
-
-// What the axis writes where a month falls: a January's year, or any
-// other month by name.
-function labelOf(at: number): string {
-  const year = Math.floor(at);
-  const month = Math.round((at - year) * 12);
-  return month === 0 ? String(year) : formatMonthShort({ month, year });
-}
-
-// A month as many months before another as given.
-function monthsBack({ month, year }: Month, count: number): Month {
-  const from = month - count;
-  return { month: ((from % 12) + 12) % 12, year: year + Math.floor(from / 12) };
 }
 
 // The months the points span, each with the point kept for it, and
