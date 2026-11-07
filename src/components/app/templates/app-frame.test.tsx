@@ -5,8 +5,6 @@ import { stubViewport } from "@/test/dom";
 
 import { AppFrame } from "./app-frame";
 
-vi.mock("next/navigation", () => ({ usePathname: (): string => "/" }));
-
 describe("AppFrame", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -27,9 +25,6 @@ describe("AppFrame", () => {
     const main = screen.getByRole("main");
 
     expect(within(main).getByRole("paragraph")).toHaveTextContent("Screen");
-    expect(
-      within(main).getByRole("button", { name: "Toggle Sidebar" }),
-    ).toBeInTheDocument();
     expect(screen.getByText("Sidebar")).toBeInTheDocument();
     expect(within(main).queryByText("Sidebar")).not.toBeInTheDocument();
   });
@@ -52,7 +47,9 @@ describe("AppFrame", () => {
     );
   });
 
-  it("names the current screen's section in the bar above it on a phone", () => {
+  // The tab bar's More opens the sheet and the screen's header names its
+  // section, so nothing is drawn over the screen on a phone.
+  it("draws no bar above the screen on a phone", () => {
     stubViewport(390);
     render(
       <AppFrame banner={null} nav={null} sidebar={null}>
@@ -62,13 +59,11 @@ describe("AppFrame", () => {
 
     const main = screen.getByRole("main");
 
-    expect(
-      within(main).getByRole("button", { name: "Toggle Sidebar" }),
-    ).toBeInTheDocument();
-    expect(within(main).getByText("Sect. I · Dashboard")).toHaveClass("label");
+    expect(within(main).queryByRole("button")).not.toBeInTheDocument();
+    expect(main).toHaveTextContent(/^Screen$/);
   });
 
-  it("heads the main column with the banner it is handed, above the phone's bar", () => {
+  it("heads the main column with the banner it is handed", () => {
     stubViewport(390);
     render(
       <AppFrame banner={<p>Banner</p>} nav={null} sidebar={null}>
@@ -76,12 +71,10 @@ describe("AppFrame", () => {
       </AppFrame>,
     );
 
-    const main = screen.getByRole("main");
-
     expect(
-      within(main)
-        .getAllByText(/^(Banner|Sect\. I · Dashboard|Screen)$/)
+      within(screen.getByRole("main"))
+        .getAllByRole("paragraph")
         .map(({ textContent }) => textContent),
-    ).toStrictEqual(["Banner", "Sect. I · Dashboard", "Screen"]);
+    ).toStrictEqual(["Banner", "Screen"]);
   });
 });
