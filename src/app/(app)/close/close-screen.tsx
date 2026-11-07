@@ -5,8 +5,10 @@ import Link from "next/link";
 import { Suspense, use } from "react";
 
 import type { WorksheetRow } from "@/components/app/atoms/worksheet";
+import type { TrackRow } from "@/components/app/organisms/track-record";
 import type { Household, Kept } from "@/data/household";
 import type { Plan } from "@/data/plan";
+import type { KeptPoint } from "@/data/progress";
 import type { Month } from "@/data/schedule";
 import type { Answer } from "@/lib/answer";
 import type { KeptClose, Landed, Passed } from "@/lib/landed";
@@ -20,27 +22,39 @@ import { Worksheet } from "@/components/app/atoms/worksheet";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { MonthEnd } from "@/components/app/organisms/month-end";
 import { SectionCard } from "@/components/app/organisms/section-card";
+import {
+  TrackRecord,
+  TrackRecordPending,
+} from "@/components/app/organisms/track-record";
 import { Screen } from "@/components/app/templates/screen";
 import { buttonVariants } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
-import { ageIn } from "@/data/plan";
+import { ageIn, risenBy } from "@/data/plan";
 import { isDue } from "@/data/progress";
 import { runLength } from "@/engine/futures";
 import { laidOut } from "@/engine/projection";
 import { answerOf, refused } from "@/lib/answer";
 import { counted, formatCount } from "@/lib/count";
 import { listed } from "@/lib/feeders";
-import { bandOf, landedSince } from "@/lib/landed";
-import { formatGbp, formatSignedGbp } from "@/lib/money";
+import { bandOf, keptOf, landedSince } from "@/lib/landed";
+import { formatGbp, formatSignedGbp, formatWholePercent } from "@/lib/money";
 import {
   cutOf,
   formatDay,
   formatMonth,
+  formatMonthShort,
   monthAfter,
   monthName,
+  monthsBack,
   monthsBetween,
 } from "@/lib/months";
-import { areaNames, movedOver, movedSince, sourceNames } from "@/lib/moved";
+import {
+  areaNames,
+  movedOver,
+  movedSince,
+  sourceNames,
+  standingOf,
+} from "@/lib/moved";
 import { cogitator, monthEnd, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 // A band of the futures as the card where the invested balances landed
@@ -92,6 +106,28 @@ interface Compared {
   readonly moved: Moved;
 }
 
+// A month of the track record, with the point kept for it, the latest's
+// with the readings VII.iii reads now, or null for a month not closed.
+interface Entry {
+  readonly month: Month;
+  readonly point: KeptPoint | null;
+}
+
+// Where a month falls in the track record: its first, its latest, or
+// one between.
+type Place = "between" | "first" | "latest";
+
+// Where the plan stood at a month end, as a point keeps it.
+type PointStanding = NonNullable<KeptPoint["standing"]>;
+
+// A standing kept at a month end, with the month it was kept at and
+// its liquid worth carried into today's money.
+interface Stood {
+  readonly liquid: number;
+  readonly month: Month;
+  readonly standing: PointStanding;
+}
+
 // The month end: the month whose balances were cut last closed onto the
 // household, and once it is, what moved the plan since the close before.
 // The title gives the answer. Until the month is closed, which its latest
@@ -104,8 +140,10 @@ interface Compared {
 // close before as the steps movedSince takes, and what the plan paid into
 // the ISAs and the GIAs, offered to the cogitator, and between the two
 // where the invested balances landed among the futures of a close in
-// the year before, once the closes given are read, in a boundary of its
-// own so the rest is drawn first; with the next close
+// the year before and the track record of that reading month by month,
+// once the closes given are read, in a boundary of its own so the rest
+// is drawn first, which holds the track record's height while it waits
+// where a reading is kept; with the next close
 // due and what mostly moved said in the meta line, and the balances to
 // update in the header, which opens the same worksheet on the month
 // closed, for a close to be made again or another month picked, with the
@@ -290,19 +328,42 @@ export function CloseScreen({
       {closes !== null && since !== null && (
         <Suspense
           fallback={
-            <LandedCard>
-              <p className="text-sm text-muted-foreground">
-                Drawing the futures…
-              </p>
-            </LandedCard>
+            <>
+              <LandedCard>
+                <p className="text-sm text-muted-foreground">
+                  Drawing the futures…
+                </p>
+              </LandedCard>
+              {household.points.some(({ landed }) => landed !== undefined) && (
+                <RecordCard>
+                  <TrackRecordPending />
+                </RecordCard>
+              )}
+            </>
           }
         >
-          <LandedSince closes={closes} now={since.now} />
+          <LandedSince
+            closes={closes}
+            from={asOf}
+            inflation={plan.inflation}
+            now={since.now}
+          />
         </Suspense>
       )}
       <Trades month={due} moved={moved} targets={household.targets} />
     </Screen>
   );
+}
+
+// What a reading says of where the invested balances landed: above a
+// share of the futures, or above or below every one of them.
+function aboveOf(share: number): string {
+  if (share === 0) {
+    return "Below every one of the futures";
+  }
+  return share === 1
+    ? "Above every one of the futures"
+    : `Above ${formatWholePercent(share)} of the futures`;
 }
 
 // What moved the plan since the close before the latest, with the month
@@ -422,6 +483,41 @@ function figuresOf(standing: Standing, plan: Plan): readonly string[] {
   ];
 }
 
+// The headline of the track record, which sets the standing kept at the
+// close given, its liquid worth carried into today's money, against the
+// standing now: how far retirement has moved since, into or out of
+// reach, or that it is still where it was, with how far the liquid
+// worth at the same age has moved, to the pound, where it is read at
+// the same age.
+function headlineOf(
+  { liquid, month, standing }: Stood,
+  now: PointStanding,
+): string {
+  const since = `Since ${formatMonth(month)}'s close, retirement`;
+  if (standing.retires === now.retires) {
+    const still =
+      now.retires === null
+        ? "is still out of reach"
+        : `is still at ${String(now.retires)}`;
+    if (standing.age !== now.age) {
+      return `${since} ${still}.`;
+    }
+    const apart = Math.round(now.liquid - liquid);
+    const worth = `${since} ${still}, and the liquid worth at ${String(now.age)} is`;
+    if (apart === 0) {
+      return `${worth} where it was.`;
+    }
+    const side = apart < 0 ? "lower" : "higher";
+    return `${worth} ${formatGbp(Math.abs(apart))} ${side}.`;
+  }
+  if (now.retires === null) {
+    return `${since} has moved out of reach.`;
+  }
+  return standing.retires === null
+    ? `${since} has come within reach, at ${String(now.retires)}.`
+    : `${since} has moved ${shiftOf(now.retires - standing.retires).toLowerCase()}, to ${String(now.retires)}.`;
+}
+
 // How long since the close a reading is against, as its verdict opens:
 // the month, the year, or the months between.
 function horizonOf(months: number): string {
@@ -481,49 +577,85 @@ function LandedCard({
 // close passed over on the way, and why. Where no close gives a reading
 // it says so in one sentence: none was closed in the year, none checked
 // an invested balance at both it and this close, or none can be read,
-// each passed over said after it.
+// each passed over said after it. Beside it, from the same reading, the
+// track record of the month ends before it, with what moved compared
+// from the close given.
 function LandedSince({
   closes,
+  from,
+  inflation,
   now,
 }: {
   readonly closes: Promise<readonly KeptClose[]>;
+  readonly from: Month;
+  readonly inflation: number;
   readonly now: Kept;
 }): JSX.Element {
   const { landed, passed } = landedSince(use(closes), now);
   const passedOver = passed.map((each) => (
     <Note key={keyOf(each.month)}>{passedOverOf(each)}</Note>
   ));
+  const record = (
+    <TrackRecordSince
+      from={from}
+      inflation={inflation}
+      landed={landed}
+      now={now}
+    />
+  );
   if (landed === null) {
     return (
-      <LandedCard>
-        <p className="text-sm text-muted-foreground">
-          {emptyOf(passed, now.asOf)}
-        </p>
-        {passed.some(({ kind }) => kind !== "unchecked") && passedOver}
-      </LandedCard>
+      <>
+        <LandedCard>
+          <p className="text-sm text-muted-foreground">
+            {emptyOf(passed, now.asOf)}
+          </p>
+          {passed.some(({ kind }) => kind !== "unchecked") && passedOver}
+        </LandedCard>
+        {record}
+      </>
     );
   }
   const { actual, asOf, bands } = landed;
   return (
-    <LandedCard caption={`Since the close of ${formatMonth(asOf)}`}>
-      <p className="heading text-xl text-balance">
-        {`Over ${horizonOf(landed.months)} since ${formatMonth(asOf)}'s close, the invested balances landed in the ${bandOf(landed)} of the futures its plan drew.`}
-      </p>
-      <p className="text-sm text-muted-foreground">
-        {`${formatGbp(actual)} invested on ${formatDay(cutOf(now.asOf))}. The middle future of the ${formatCount(runLength)} came to ${banded.format(bands.middle)}; the middle half ran from ${banded.format(bands.bottomQuarter)} to ${banded.format(bands.topQuarter)}, and the middle 80% from ${banded.format(bands.bottomTenth)} to ${banded.format(bands.topTenth)}.`}
-      </p>
-      <Note>{investedOf(landed.left)}</Note>
-      <Note>{paidInOf(landed, now)}</Note>
-      {landed.isDrawing && (
-        <Note>
-          The plan draws on the savings in at least one of these months, but the
-          futures here draw nothing, so the invested balances can land lower
-          among them than the markets alone would put them.
-        </Note>
-      )}
-      {passedOver}
-    </LandedCard>
+    <>
+      <LandedCard caption={`Since the close of ${formatMonth(asOf)}`}>
+        <p className="heading text-xl text-balance">
+          {`Over ${horizonOf(landed.months)} since ${formatMonth(asOf)}'s close, the invested balances landed in the ${bandOf(landed)} of the futures its plan drew.`}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {`${formatGbp(actual)} invested on ${formatDay(cutOf(now.asOf))}. The middle future of the ${formatCount(runLength)} came to ${banded.format(bands.middle)}; the middle half ran from ${banded.format(bands.bottomQuarter)} to ${banded.format(bands.topQuarter)}, and the middle 80% from ${banded.format(bands.bottomTenth)} to ${banded.format(bands.topTenth)}.`}
+        </p>
+        <Note>{investedOf(landed.left)}</Note>
+        <Note>{paidInOf(landed, now)}</Note>
+        {landed.isDrawing && (
+          <Note>
+            The plan draws on the savings in at least one of these months, but
+            the futures here draw nothing, so the invested balances can land
+            lower among them than the markets alone would put them.
+          </Note>
+        )}
+        {passedOver}
+      </LandedCard>
+      {record}
+    </>
   );
+}
+
+// Why a month of the track record has no reading, as the crosshair and
+// the table say it: the latest has none for the reason VII.iii gives, a
+// month not closed has none, and one closed with none is where the
+// record starts, at the first, or one none was kept for.
+function missingOf({ point }: Entry, place: Place): string {
+  if (place === "latest") {
+    return "No reading this month, for the reason given above";
+  }
+  if (point === null) {
+    return "Not closed, so no reading";
+  }
+  return place === "first"
+    ? "Where the record starts"
+    : "Closed, but no reading was kept";
 }
 
 // How a reading counts what was paid in: as Portfolio Performance gives
@@ -551,6 +683,54 @@ function paidInOf({ beyond, paidBy, read }: Landed, now: Kept): string {
 // Why a close was passed over, as its note says it.
 function passedOverOf({ kind, month }: Passed): string {
   return `${formatMonth(month)}'s close is passed over, since ${passedWhy[kind]}.`;
+}
+
+// The card of the track record, under the caption given, held to the
+// screen's width in one column as the fan's card is, since the plot's
+// box widens to keep its ratio over its floor and a column sized to
+// what it holds would widen with it past a phone's edge; and letting the
+// crosshair run past its edge.
+function RecordCard({
+  caption,
+  children,
+}: {
+  readonly caption?: string;
+  readonly children: ReactNode;
+}): JSX.Element {
+  return (
+    <SectionCard
+      {...(caption !== undefined && { caption })}
+      className="min-w-0 overflow-visible"
+      label={subsectionLabel(monthEnd, 4)}
+      title="Track record"
+    >
+      <CardContent className="grid grid-cols-1 gap-4">{children}</CardContent>
+    </SectionCard>
+  );
+}
+
+// The months of the track record: from the earliest point keeping a
+// standing to the latest, each with its point, and each month between
+// two points with none. The latest always keeps one, so the record is
+// never empty.
+function recordOf(points: readonly KeptPoint[]): readonly Entry[] {
+  const kept = points.slice(
+    points.findIndex(({ standing }) => standing !== undefined),
+  );
+  return kept.flatMap((point, index): Entry[] => {
+    const before = kept[index - 1];
+    if (before === undefined) {
+      return [{ month: point.month, point }];
+    }
+    const steps = monthsBetween(before.month, point.month);
+    return [
+      ...Array.from({ length: steps - 1 }, (_, gap) => ({
+        month: monthsBack(point.month, steps - 1 - gap),
+        point: null,
+      })),
+      { month: point.month, point },
+    ];
+  });
 }
 
 // The rows of what moved: the standing the month end expected, by the
@@ -600,6 +780,14 @@ function rowsOf(
   ];
 }
 
+// How far a retirement moved by the years given, in words: a year or
+// more sooner or later.
+function shiftOf(years: number): string {
+  const count = Math.abs(years);
+  const span = count === 1 ? "A year" : `${String(count)} years`;
+  return `${span} ${years < 0 ? "sooner" : "later"}`;
+}
+
 // The title, which gives the answer: how far the close moved the
 // retirement, where it did; and otherwise how far the balances closed
 // from what the plan expected, or that they closed on it, with where
@@ -625,6 +813,159 @@ function titleOf(moved: Moved, month: string, plan: Plan): string {
   }
   const side = apart > 0 ? "ahead of" : "behind";
   return `${month} closed ${formatGbp(Math.abs(apart))} ${side} plan; ${still}`;
+}
+
+// The track record of where the invested balances landed at each month
+// end, the latest read now as VII.iii reads it and the rest as kept when
+// the month after each closed, with where the plan stood; drawn once
+// any month end gives a reading, and otherwise left out, since VII.iii
+// says why there is none. With one reading it says that the record
+// starts there and when it is charted from. With two or more it opens
+// on how retirement has moved since the oldest standing kept in the
+// year before the latest, where that is older than the close what moved
+// compares from, so it never says what moved says, with what that
+// counts; then the readings, charted; what a sound record looks like,
+// which readings look back less than a year where one does, that a
+// reading is kept as it stood, and that the plan draws on the savings
+// where a reading drew; and every reading as a table, folded, newest
+// first. Each liquid worth kept is carried into today's money at the
+// plan's inflation, from the money of the month after its own.
+function TrackRecordSince({
+  from,
+  inflation,
+  landed,
+  now,
+}: {
+  readonly from: Month;
+  readonly inflation: number;
+  readonly landed: Landed | null;
+  readonly now: Kept;
+}): JSX.Element | null {
+  const live = {
+    ...(landed !== null && { landed: keptOf(landed) }),
+    standing: standingOf(now),
+  };
+  const entries = recordOf(
+    now.points.map((point, index) =>
+      index === now.points.length - 1 ? { ...point, ...live } : point,
+    ),
+  );
+  const readings = entries.flatMap(({ point }) =>
+    point?.landed === undefined ? [] : [point.landed],
+  );
+  if (readings.length === 0) {
+    return null;
+  }
+  const { month: first } = entries.reduce((found) => found);
+  const { month: latest } = entries.reduce((_, entry) => entry);
+  const next = monthName(monthAfter(latest).month, "long");
+  if (readings.length === 1) {
+    return (
+      <RecordCard>
+        <p className="text-sm text-muted-foreground">
+          {`The track record starts with this reading. Each month end keeps where the invested balances landed, and from ${next}'s close they are charted here, with how retirement has moved since ${formatMonth(first)}'s close.`}
+        </p>
+      </RecordCard>
+    );
+  }
+  const carry = (month: Month, { liquid }: PointStanding): number =>
+    liquid *
+    risenBy(inflation, { from: month.year, month: month.month }, now.asOf);
+  const standings = entries.flatMap(({ month, point }): Stood[] =>
+    point?.standing === undefined
+      ? []
+      : [
+          {
+            liquid: carry(month, point.standing),
+            month,
+            standing: point.standing,
+          },
+        ],
+  );
+  const oldest = standings.find(
+    ({ month }) => monthsBetween(month, latest) <= 12,
+  );
+  const isMoved = oldest !== undefined && monthsBetween(oldest.month, from) > 0;
+  const placeOf = (index: number): Place => {
+    if (index === entries.length - 1) {
+      return "latest";
+    }
+    return index === 0 ? "first" : "between";
+  };
+  const views = entries.map((entry, index) =>
+    viewOf(entry, placeOf(index), carry),
+  );
+  const isOneAge =
+    new Set(standings.map(({ standing }) => standing.age)).size === 1;
+  const moving =
+    landed === null
+      ? ""
+      : ` ${monthName(latest.month, "long")}'s is the one above, and moves with its balances or a Portfolio Performance import until ${next} closes.`;
+  return (
+    <RecordCard caption="Middle half and middle 80% of the futures, with a reading each month end">
+      {isMoved && (
+        <div className="grid gap-1">
+          <p className="heading text-xl text-balance">
+            {headlineOf(oldest, live.standing)}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            This counts your own changes to the plan as well as the markets. The
+            chart sets the markets apart: where the invested balances landed at
+            each month end.
+          </p>
+        </div>
+      )}
+      <TrackRecord
+        rows={views.map(({ row }) => row)}
+        title={`Where the invested balances landed among the futures at each month end since ${formatMonth(first)}`}
+      />
+      <Note>
+        Over the years, a plan whose rates hold up lands in each band about as
+        often as the band is tall: half the time in the middle half, and one
+        time in ten in the top tenth, as in the bottom. Each reading looks back
+        up to a year, so neighbouring readings share most of their months, and a
+        run of low ones is one lean stretch of the markets, not a lean month
+        after another.
+      </Note>
+      {readings.some(({ months }) => months < 12) && (
+        <Note>
+          Hollow readings look back less than a year, as every one in the first
+          year must, or where the close a year before was not kept or could not
+          be read.
+        </Note>
+      )}
+      <Note>
+        {`Each reading is kept as it stood when the month after it closed, and is not read again.${moving} Earlier liquid worth is carried into today's money at the plan's inflation.`}
+      </Note>
+      {readings.some(({ isDrawing }) => isDrawing) && (
+        <Note>
+          The plan draws on the savings in some of these months, but the futures
+          draw nothing, so readings over those months land lower among them than
+          the markets alone would put them.
+        </Note>
+      )}
+      <details>
+        <summary className="cursor-pointer text-sm font-medium">
+          Every reading, as a table
+        </summary>
+        <div className="pt-3">
+          <Worksheet
+            columns={[
+              "Landed in",
+              "Retires at",
+              isOneAge
+                ? `Liquid at ${String(live.standing.age)}`
+                : "Liquid at that age",
+            ]}
+            label="Every reading kept, newest first"
+            rows={views
+              .flatMap(({ table }) => (table === null ? [] : [table]))
+              .toReversed()}
+          />
+        </div>
+      </details>
+    </RecordCard>
+  );
 }
 
 // The offer of the cash each securities account holds uninvested to the
@@ -697,7 +1038,7 @@ function Trades({
           </Link>
         </>
       }
-      label={subsectionLabel(monthEnd, 4)}
+      label={subsectionLabel(monthEnd, 5)}
       title="Trades"
     >
       <CardContent className="grid gap-4">
@@ -717,6 +1058,78 @@ function Trades({
   );
 }
 
+// What a month of the track record says: in the crosshair, its reading,
+// above a share of the futures in the band they named and over the
+// months since the close it was read from, where it has one, or why it
+// has none, and where the plan stood, retiring and liquid, where it kept
+// that; and, for a month closed, the same as a row of the table, the
+// band set first. The latest says that its reading is the one above.
+// The liquid worth is carried into today's money as given.
+function viewOf(
+  entry: Entry,
+  place: Place,
+  carry: (month: Month, standing: PointStanding) => number,
+): { readonly row: TrackRow; readonly table: null | WorksheetRow } {
+  const { month, point } = entry;
+  const standing = point?.standing;
+  const stands =
+    standing === undefined
+      ? null
+      : {
+          liquid: formatGbp(carry(month, standing)),
+          name: `Liquid at ${String(standing.age)}`,
+          retires:
+            standing.retires === null ? "Never" : String(standing.retires),
+        };
+  const figures =
+    stands === null
+      ? []
+      : [
+          ["Retires at", stands.retires] as const,
+          [stands.name, stands.liquid] as const,
+        ];
+  const kept = stands === null ? ["—", "—"] : [stands.retires, stands.liquid];
+  const label = formatMonthShort(month);
+  const landed = point?.landed;
+  if (landed === undefined) {
+    const note = missingOf(entry, place);
+    return {
+      row: { figures, isShort: false, lines: [], month, note, share: null },
+      table:
+        point === null
+          ? null
+          : {
+              detail: note,
+              figures: [place === "first" ? "—" : "No reading", ...kept],
+              label,
+            },
+    };
+  }
+  const close = monthsBack(month, landed.months);
+  const above = aboveOf(landed.share);
+  return {
+    row: {
+      figures,
+      isShort: landed.months < 12,
+      lines: [
+        `${above}, in the ${landed.band}`,
+        `Over ${horizonOf(landed.months)} since ${formatMonthShort(close)}'s close`,
+      ],
+      month,
+      note: place === "latest" ? "This month's, as read above" : null,
+      share: landed.share,
+    },
+    table: {
+      detail: `${above}, over ${horizonOf(landed.months)} since ${formatMonth(close)}'s close`,
+      figures: [
+        `${landed.band.charAt(0).toUpperCase()}${landed.band.slice(1)}`,
+        ...kept,
+      ],
+      label,
+    },
+  };
+}
+
 // How far a step moved the retirement, in words rather than a signed
 // figure: a year or more sooner or later, unchanged, into never or out
 // of it to an age.
@@ -730,8 +1143,5 @@ function yearsMoved(from: Standing, to: Standing, plan: Plan): string {
   if (from.retired === null) {
     return `Now at ${String(ageIn(to.retired, plan))}`;
   }
-  const years = to.retired - from.retired;
-  const count = Math.abs(years);
-  const span = count === 1 ? "A year" : `${String(count)} years`;
-  return `${span} ${years < 0 ? "sooner" : "later"}`;
+  return shiftOf(to.retired - from.retired);
 }

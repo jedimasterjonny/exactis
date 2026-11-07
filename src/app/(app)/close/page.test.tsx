@@ -8,16 +8,20 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Kept } from "@/data/household";
+import type { KeptPoint } from "@/data/progress";
 import type { KeptClose, Landed, Landing } from "@/lib/landed";
 import type { Moved } from "@/lib/moved";
 
 import { closeBalances } from "@/actions/accounts";
 import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
+import { risenBy } from "@/data/plan";
+import { points } from "@/data/progress.fixture";
 import { portfolios, targets } from "@/data/targets.fixture";
 import { Refusal, refused, saved } from "@/lib/answer";
 import { landedSince } from "@/lib/landed";
-import { movedOver, movedSince } from "@/lib/moved";
+import { formatGbp } from "@/lib/money";
+import { movedOver, movedSince, standingOf } from "@/lib/moved";
 import {
   getClosesBack,
   getHousehold,
@@ -43,12 +47,13 @@ vi.mock(import("@/lib/landed"), async (importOriginal) => ({
   ...(await importOriginal()),
   landedSince: vi.fn(),
 }));
-// The walks stood in for, and the names of what they walk kept as they
-// are, since the screen says them.
+// The walks and the standing now stood in for, and the names of what
+// they walk kept as they are, since the screen says them.
 vi.mock(import("@/lib/moved"), async (importOriginal) => ({
   ...(await importOriginal()),
   movedOver: vi.fn(),
   movedSince: vi.fn(),
+  standingOf: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
   useRouter: (): { readonly replace: typeof replace } => ({ replace }),
@@ -113,6 +118,10 @@ const landed: Landed = {
   read: 2,
   share: 0.46,
 };
+
+// Where the plan stands now, invented: its owner retiring at 61 with
+// £600,000 liquid then.
+const atSixtyOne = { age: 61, liquid: 600_000, retires: 61 };
 
 // The closes kept in the year before August's as reads already
 // answered: none, and July's. Each is marked the way React marks a
@@ -225,6 +234,7 @@ describe("Close", () => {
   beforeEach(() => {
     vi.mocked(movedSince).mockReturnValue(moved);
     vi.mocked(landedSince).mockReturnValue({ landed: null, passed: [] });
+    vi.mocked(standingOf).mockReturnValue(atSixtyOne);
   });
 
   afterEach(() => {
@@ -797,6 +807,7 @@ describe("Where the invested balances landed", () => {
 
   beforeEach(() => {
     vi.mocked(movedSince).mockReturnValue(moved);
+    vi.mocked(standingOf).mockReturnValue(atSixtyOne);
   });
 
   afterEach(() => {
@@ -813,7 +824,7 @@ describe("Where the invested balances landed", () => {
     expect(within(card).getByText("Sect. VII.iii")).toHaveClass("label");
     expect(
       within(screen.getByRole("region", { name: "Trades" })).getByText(
-        "Sect. VII.iv",
+        "Sect. VII.v",
       ),
     ).toHaveClass("label");
     expect(landing()).toStrictEqual({
@@ -960,6 +971,399 @@ describe("Where the invested balances landed", () => {
       "May 2026's close is passed over, since it is in a form this app cannot read.",
       "June 2026's close is passed over, since its plan has no spread to draw futures from.",
       "July 2026's close is passed over, since no invested balance was checked at both it and this one.",
+    ]);
+  });
+});
+
+describe("Track record", () => {
+  const [inMarch, inApril, inMay, inJune, inJuly, inAugust] = points;
+
+  // Where the plan stood at March's close, where the record starts:
+  // retiring at 61 with £590,000 liquid, invented.
+  const first = { standing: { age: 61, liquid: 590_000, retires: 61 } };
+
+  // April's reading, invented: a month back to March's close, above 20%
+  // of the futures in the bottom quarter, and the plan then retiring at
+  // 61 with £595,000 liquid.
+  const april = {
+    landed: { band: "bottom quarter", isDrawing: false, months: 1, share: 0.2 },
+    standing: { age: 61, liquid: 595_000, retires: 61 },
+  } as const;
+
+  // July's, invented: four months back to March's close, above 62% of
+  // the futures in the middle half, retiring at 61 with £598,000.
+  const julyRead = {
+    landed: { band: "middle half", isDrawing: false, months: 4, share: 0.62 },
+    standing: { age: 61, liquid: 598_000, retires: 61 },
+  } as const;
+
+  // March's close, April's reading, May not closed, June closed with no
+  // reading kept, July's reading, and August, the latest.
+  const record = [
+    { ...inMarch, ...first },
+    { ...inApril, ...april },
+    inJune,
+    { ...inJuly, ...julyRead },
+    inAugust,
+  ];
+
+  // The reference household keeping the points given, at the inflation
+  // given or none, so a liquid worth kept reads in today's money as it
+  // was kept.
+  function keeping(held: readonly KeptPoint[], inflation = 0): Kept {
+    return { ...kept, points: held, rates: { ...kept.rates, inflation } };
+  }
+
+  // The month end over the household given, closed from July's close,
+  // with VII.iii reading as given and the plan standing now as given.
+  async function renderRecord(
+    now: Kept,
+    reading: Landed | null = landed,
+    standing: NonNullable<KeptPoint["standing"]> = atSixtyOne,
+  ): Promise<void> {
+    vi.mocked(landedSince).mockReturnValue({ landed: reading, passed: [] });
+    vi.mocked(standingOf).mockReturnValue(standing);
+    await renderClose({
+      closes: julyClosed,
+      household: now,
+      since: { balances: null, before: saved(july), now },
+    });
+  }
+
+  // The card of the track record.
+  function card(): HTMLElement {
+    return screen.getByRole("region", { name: "Track record" });
+  }
+
+  // The card's lines, its headline and its notes among them, in order.
+  function lines(): (null | string)[] {
+    return within(card())
+      .getAllByRole("paragraph")
+      .map((line) => line.textContent);
+  }
+
+  // The rows of the table of every reading, each its month and figures.
+  function table(): (null | string)[][] {
+    return within(
+      within(card()).getByRole("table", {
+        name: "Every reading kept, newest first",
+      }),
+    )
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => [
+        within(row).getByRole("rowheader").textContent,
+        ...within(row)
+          .getAllByRole("cell")
+          .map((cell) => cell.textContent),
+      ]);
+  }
+
+  beforeEach(() => {
+    vi.mocked(movedSince).mockReturnValue(moved);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("charts every reading from where the record starts, with how retirement has moved since the oldest close in the year, the notes, and every reading as a table, newest first", async () => {
+    await renderRecord(keeping(record));
+
+    expect(within(card()).getByText("Sect. VII.iv")).toHaveClass("label");
+    expect(
+      within(card()).getByText(
+        "Middle half and middle 80% of the futures, with a reading each month end",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(card()).getByRole("application", {
+        name: "Where the invested balances landed among the futures at each month end since March 2026",
+      }),
+    ).toBeInTheDocument();
+    expect(lines()).toStrictEqual([
+      "Since March 2026's close, retirement is still at 61, and the liquid worth at 61 is £10,000 higher.",
+      "This counts your own changes to the plan as well as the markets. The chart sets the markets apart: where the invested balances landed at each month end.",
+      "Over the years, a plan whose rates hold up lands in each band about as often as the band is tall: half the time in the middle half, and one time in ten in the top tenth, as in the bottom. Each reading looks back up to a year, so neighbouring readings share most of their months, and a run of low ones is one lean stretch of the markets, not a lean month after another.",
+      "Hollow readings look back less than a year, as every one in the first year must, or where the close a year before was not kept or could not be read.",
+      "Each reading is kept as it stood when the month after it closed, and is not read again. August's is the one above, and moves with its balances or a Portfolio Performance import until September closes. Earlier liquid worth is carried into today's money at the plan's inflation.",
+    ]);
+    expect(
+      within(card()).getByRole("columnheader", { name: "Liquid at 61" }),
+    ).toBeInTheDocument();
+    expect(table()).toStrictEqual([
+      ["Aug 2026", "Middle half", "61", "£600,000"],
+      ["Jul 2026", "Middle half", "61", "£598,000"],
+      ["Jun 2026", "No reading", "—", "—"],
+      ["Apr 2026", "Bottom quarter", "61", "£595,000"],
+      ["Mar 2026", "—", "61", "£590,000"],
+    ]);
+    for (const [month, detail] of [
+      [
+        "Aug 2026",
+        "Above 46% of the futures, over the month since July 2026's close",
+      ],
+      [
+        "Jul 2026",
+        "Above 62% of the futures, over the 4 months since March 2026's close",
+      ],
+      ["Jun 2026", "Closed, but no reading was kept"],
+      ["Mar 2026", "Where the record starts"],
+    ] as const) {
+      expect(
+        within(card()).getByRole("rowheader", { name: month }),
+      ).toHaveAccessibleDescription(detail);
+    }
+    expect(screen.getByRole("region", { name: "Trades" })).toBeInTheDocument();
+  });
+
+  // The crosshair steps a month a press, the first onto April, and
+  // recharts moves it a frame later.
+  it("reads each month under the crosshair, where the record starts, a month not closed, one closed with no reading and this month's among them", async () => {
+    await renderRecord(keeping(record));
+
+    const chart = within(card()).getByRole("application");
+    chart.focus();
+    const reads = async (text: string): Promise<void> => {
+      await waitFor(() => {
+        expect(within(card()).getByRole("status")).toHaveTextContent(text);
+      });
+    };
+
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    await reads(
+      "Apr 2026Above 20% of the futures, in the bottom quarterOver the month since Mar 2026's closeRetires at61Liquid at 61£595,000",
+    );
+
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    await reads("May 2026Not closed, so no reading");
+
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    await reads("Jun 2026Closed, but no reading was kept");
+
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    await reads(
+      "Aug 2026This month's, as read aboveAbove 46% of the futures, in the middle halfOver the month since Jul 2026's closeRetires at61Liquid at 61£600,000",
+    );
+
+    for (let press = 0; press < 5; press += 1) {
+      fireEvent.keyDown(chart, { key: "ArrowLeft" });
+    }
+
+    await reads(
+      "Mar 2026Where the record startsRetires at61Liquid at 61£590,000",
+    );
+  });
+
+  // July's close keeps where the plan stood alone, and August's is the
+  // one reading.
+  it("says the record starts with the one reading, with no chart or headline", async () => {
+    await renderRecord(
+      keeping([
+        inMarch,
+        inApril,
+        inMay,
+        inJune,
+        { ...inJuly, ...first },
+        inAugust,
+      ]),
+    );
+
+    expect(lines()).toStrictEqual([
+      "The track record starts with this reading. Each month end keeps where the invested balances landed, and from September's close they are charted here, with how retirement has moved since July 2026's close.",
+    ]);
+    expect(within(card()).queryByRole("application")).not.toBeInTheDocument();
+  });
+
+  it("draws no track record where no month end gives a reading", async () => {
+    await renderRecord(keeping([...points]), null);
+
+    expect(
+      screen.queryByRole("region", { name: "Track record" }),
+    ).not.toBeInTheDocument();
+  });
+
+  // July's reading is the oldest standing in the year before August, and
+  // what moved compares from July's close already.
+  it("says nothing of how retirement has moved while the oldest standing in the year is no older than the close what moved compares from", async () => {
+    await renderRecord(
+      keeping([
+        inMarch,
+        inApril,
+        inMay,
+        inJune,
+        { ...inJuly, ...julyRead },
+        inAugust,
+      ]),
+    );
+
+    expect(lines()[0]).toMatch(/^Over the years, a plan whose rates hold up/u);
+    expect(
+      within(card()).getByRole("application", {
+        name: "Where the invested balances landed among the futures at each month end since July 2026",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  // March's standing against the one now, invented, each case with the
+  // column of liquid worth named by the age, or by none where they differ.
+  it.each([
+    [
+      { age: 61, liquid: 590_000, retires: 61 },
+      { age: 62, liquid: 600_000, retires: 62 },
+      [
+        "Since March 2026's close, retirement has moved a year later, to 62.",
+        "Liquid at that age",
+      ],
+    ],
+    [
+      { age: 61, liquid: 590_000, retires: 61 },
+      { age: 59, liquid: 600_000, retires: 59 },
+      [
+        "Since March 2026's close, retirement has moved 2 years sooner, to 59.",
+        "Liquid at that age",
+      ],
+    ],
+    [
+      { age: 61, liquid: 590_000, retires: 61 },
+      { age: 91, liquid: 20_000, retires: null },
+      [
+        "Since March 2026's close, retirement has moved out of reach.",
+        "Liquid at that age",
+      ],
+    ],
+    [
+      { age: 91, liquid: 20_000, retires: null },
+      { age: 63, liquid: 600_000, retires: 63 },
+      [
+        "Since March 2026's close, retirement has come within reach, at 63.",
+        "Liquid at that age",
+      ],
+    ],
+    [
+      { age: 91, liquid: 20_000, retires: null },
+      { age: 91, liquid: 17_700, retires: null },
+      [
+        "Since March 2026's close, retirement is still out of reach, and the liquid worth at 91 is £2,300 lower.",
+        "Liquid at 91",
+      ],
+    ],
+    [
+      { age: 90, liquid: 20_000, retires: null },
+      { age: 91, liquid: 17_700, retires: null },
+      [
+        "Since March 2026's close, retirement is still out of reach.",
+        "Liquid at that age",
+      ],
+    ],
+    [
+      { age: 61, liquid: 600_000, retires: 61 },
+      atSixtyOne,
+      [
+        "Since March 2026's close, retirement is still at 61, and the liquid worth at 61 is where it was.",
+        "Liquid at 61",
+      ],
+    ],
+  ] as const)(
+    "says how retirement has moved since the oldest close in the year: from %o to %o",
+    async (then, now, [headline, column]) => {
+      await renderRecord(
+        keeping([
+          { ...inMarch, standing: then },
+          inApril,
+          inMay,
+          inJune,
+          { ...inJuly, landed: julyRead.landed, standing: then },
+          inAugust,
+        ]),
+        landed,
+        now,
+      );
+
+      expect(lines()[0]).toBe(headline);
+      expect(
+        within(card()).getByRole("columnheader", { name: column }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  // March's reading below every one of the futures over a year that drew
+  // on the savings, and April's above every one, neither hollow; and no
+  // reading from VII.iii this month.
+  it("says where readings drew on the savings, draws no note on hollow readings where none is, and leaves this month unread where VII.iii has no reading", async () => {
+    const atYear = (
+      share: number,
+      isDrawing: boolean,
+    ): NonNullable<KeptPoint["landed"]> => ({
+      band: share === 0 ? "bottom tenth" : "top tenth",
+      isDrawing,
+      months: 12,
+      share,
+    });
+    await renderRecord(
+      keeping([
+        { ...inMarch, landed: atYear(0, true), standing: atSixtyOne },
+        { ...inApril, landed: atYear(1, false), standing: atSixtyOne },
+        inMay,
+        inJune,
+        inJuly,
+        inAugust,
+      ]),
+      null,
+    );
+
+    expect(lines()).toStrictEqual([
+      "Since March 2026's close, retirement is still at 61, and the liquid worth at 61 is where it was.",
+      "This counts your own changes to the plan as well as the markets. The chart sets the markets apart: where the invested balances landed at each month end.",
+      "Over the years, a plan whose rates hold up lands in each band about as often as the band is tall: half the time in the middle half, and one time in ten in the top tenth, as in the bottom. Each reading looks back up to a year, so neighbouring readings share most of their months, and a run of low ones is one lean stretch of the markets, not a lean month after another.",
+      "Each reading is kept as it stood when the month after it closed, and is not read again. Earlier liquid worth is carried into today's money at the plan's inflation.",
+      "The plan draws on the savings in some of these months, but the futures draw nothing, so readings over those months land lower among them than the markets alone would put them.",
+    ]);
+    for (const [month, detail] of [
+      ["Aug 2026", "No reading this month, for the reason given above"],
+      [
+        "Apr 2026",
+        "Above every one of the futures, over the year since April 2025's close",
+      ],
+      [
+        "Mar 2026",
+        "Below every one of the futures, over the year since March 2025's close",
+      ],
+    ] as const) {
+      expect(
+        within(card()).getByRole("rowheader", { name: month }),
+      ).toHaveAccessibleDescription(detail);
+    }
+    expect(table()[0]).toStrictEqual([
+      "Aug 2026",
+      "No reading",
+      "61",
+      "£600,000",
+    ]);
+  });
+
+  // At an invented 2% a year, March's £590,000 is carried five months on
+  // into the money of the month after August.
+  it("carries each liquid worth kept into today's money at the plan's inflation", async () => {
+    await renderRecord(keeping(record, 0.02));
+
+    const carried =
+      first.standing.liquid *
+      risenBy(0.02, { from: 2026, month: 2 }, { month: 7, year: 2026 });
+
+    expect(lines()[0]).toBe(
+      `Since March 2026's close, retirement is still at 61, and the liquid worth at 61 is ${formatGbp(atSixtyOne.liquid - carried)} higher.`,
+    );
+    expect(table().at(-1)).toStrictEqual([
+      "Mar 2026",
+      "—",
+      "61",
+      formatGbp(carried),
     ]);
   });
 });
