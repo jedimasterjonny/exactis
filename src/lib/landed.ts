@@ -73,6 +73,21 @@ interface Laid {
   readonly read: ReadonlyMap<number, Account>;
 }
 
+// Where the actual sits among the bands a reading's futures carry the
+// invested balances to, in the words of the five bands.
+export function bandOf({ actual, bands }: Landed): string {
+  if (actual < bands.bottomTenth) {
+    return "bottom tenth";
+  }
+  if (actual < bands.bottomQuarter) {
+    return "bottom quarter";
+  }
+  if (actual <= bands.topQuarter) {
+    return "middle half";
+  }
+  return actual <= bands.topTenth ? "top quarter" : "top tenth";
+}
+
 // Where the invested balances landed since the oldest of the closes
 // given, oldest first, that gives a reading, beside the household now.
 // The invested balances are the accounts a close holds on the plan rate,

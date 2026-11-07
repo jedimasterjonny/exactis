@@ -37,7 +37,12 @@ vi.mock("@/store/household", () => ({
 }));
 vi.mock("@/actions/accounts", () => ({ closeBalances: vi.fn() }));
 vi.mock("@/actions/targets", () => ({ importTargets: vi.fn() }));
-vi.mock("@/lib/landed", () => ({ landedSince: vi.fn() }));
+// The reading stood in for, and the band it is named by kept as it is,
+// since the screen says it.
+vi.mock(import("@/lib/landed"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  landedSince: vi.fn(),
+}));
 // The walks stood in for, and the names of what they walk kept as they
 // are, since the screen says them.
 vi.mock(import("@/lib/moved"), async (importOriginal) => ({
