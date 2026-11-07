@@ -253,6 +253,33 @@
   }
 }
 
+/* The phone's tab bar steps aside while a field raising the keyboard has
+   the focus, as a native tab bar does, since iOS lays a fixed bar out
+   against the page and can float it over the field. Only on a touch
+   screen, so a narrow window under a mouse keeps it. A switch, a radio, a
+   slider, a file picker and a read-only field raise no keyboard and leave
+   it be, and so does a select: iOS keeps one focused once its picker
+   closes, so the bar would stay away until a tap elsewhere. The main
+   column keeps its padding, so nothing below the field moves. */
+:root:has(
+    :is(
+        input:not(
+          [type="checkbox"],
+          [type="file"],
+          [type="radio"],
+          [type="range"]
+        ),
+        textarea
+      ):not([readonly]):focus
+  )
+  [data-slot="phone-nav"] {
+  @variant max-md {
+    @variant pointer-coarse {
+      display: none;
+    }
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
