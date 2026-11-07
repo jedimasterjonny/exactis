@@ -45,12 +45,15 @@ export interface Line {
 // taken together, with the standing it leaves, and the standing now,
 // which the last step leaves; the balances the close set; the sources
 // and the records that changed; what the plan paid into the ISAs and
-// the GIAs over the months closed; and how many months those were.
+// the GIAs over the months closed; how many months those were; and the
+// age the liquid net worth is held at, which is the one it is read at
+// but where the plan now ends before it.
 export interface Moved {
   readonly age: number;
   readonly balances: Balances;
   readonly changes: readonly Area[];
   readonly expected: Standing;
+  readonly fixed: number;
   readonly invested: number;
   readonly months: number;
   readonly now: Standing;
@@ -307,8 +310,10 @@ export function movedOver(closed: KeptBalances, now: Kept): Moved {
 // read for when the plan's owner retires and its liquid net worth at an
 // age held fixed, the one they retire at as the month end expected, or
 // the one the plan runs to where they never do, so a year moved does
-// not move where the worth is read. A group that changed nothing is
-// skipped, and one leaving a state the rules refuse is taken together
+// not move where the worth is read, or the age the plan now ends at
+// where it ends before that, so every state is read at an age it
+// reaches. A group that changed nothing is skipped, and one leaving a
+// state the rules refuse is taken together
 // with the groups after it until the state is sound, the step naming
 // each of them that changed something, so the steps always end on the
 // household now: the last group is taken to carry a refused one there
@@ -337,8 +342,9 @@ export function movedSince(
   };
   const opening = futureIn(expected);
   const { retired } = opening.future;
-  const age =
+  const fixed =
     retired === null ? endAge(opening.plan) : ageIn(retired, opening.plan);
+  const age = Math.min(fixed, endAge(soundKept(now).household.plan));
   const nowById = new Map(now.accounts.map((account) => [account.id, account]));
   const closed = (accounts: readonly Account[]): readonly Account[] =>
     accounts.map((account) => ({
@@ -393,6 +399,7 @@ export function movedSince(
     balances: balancesOf(carried, nowById, paidIn(now, before.asOf)),
     changes,
     expected: standing,
+    fixed,
     invested: Math.round(
       sumOf(
         carried.filter(({ account }) =>
