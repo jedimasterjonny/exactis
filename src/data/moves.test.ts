@@ -86,6 +86,28 @@ describe("movesBetween", () => {
     expect(moves?.before.planRate).toBeCloseTo(rateOf(reference), 15);
   });
 
+  // August's vintage as kept before how bonds and equities move together
+  // was read, which earns no rebalancing, then pulled again with it.
+  it("moves the plan rate by a vintage pulled again with how bonds and equities move together", () => {
+    const uncorrelated: Cma = {
+      asOf: cma.asOf,
+      assets: cma.assets,
+      vintage: cma.vintage,
+    };
+    const before = {
+      ...reference,
+      cma: { latest: uncorrelated, previous: null },
+    };
+    const moves = movesBetween(before, reference);
+
+    expect(moves?.steps.map(({ sources }) => sources)).toStrictEqual([["cma"]]);
+    expect(moves?.steps[0]?.by.planRate).toBeGreaterThan(0);
+    expect(moves?.steps[0]?.by.planRate).toBeCloseTo(
+      rateOf(reference) - rateOf(before),
+      15,
+    );
+  });
+
   // The plan rate is nominal, so the curve leaves it where it was.
   it("moves the inflation and the real return by a new curve, and not the plan rate", () => {
     const moves = movesBetween(reference, { ...reference, curve: higher });

@@ -44,24 +44,26 @@ interface Step {
 // Each source as the steps take it: what of it is compared, so a change
 // that could move no rate is not counted as one, and how a set of
 // sources takes it from another. The CMA is compared by the classes its
-// latest vintage prices, by name, since neither the previous vintage
-// nor the day it was published moves a rate; the curve whole, since the
-// day it stood on sets how much of RPI's wedge comes off; and the target
-// allocation and the fees and yield as blendedBy and deductedBy read
-// them. The curve moves the inflation, and so the real return, and
-// leaves the plan rate, which is nominal, where it was; the yield moves
-// nothing but the split of stocks' return, so a step of fees and yield
-// is the fees'.
+// latest vintage prices, by name, and by how bonds and equities move
+// together in it, since neither the previous vintage nor the day it was
+// published moves a rate; the curve whole, since the day it stood on
+// sets how much of RPI's wedge comes off; and the target allocation and
+// the fees and yield as blendedBy and deductedBy read them. The curve
+// moves the inflation, and so the real return, and leaves the plan
+// rate, which is nominal, where it was; the yield moves nothing but the
+// split of stocks' return, so a step of fees and yield is the fees'.
 const steps: readonly {
   readonly read: (sources: Sources) => unknown;
   readonly source: Source;
   readonly take: (into: Sources, from: Sources) => Sources;
 }[] = [
   {
-    read: ({ cma }) =>
-      (cma?.latest.assets ?? []).toSorted((one, other) =>
+    read: ({ cma }) => ({
+      assets: (cma?.latest.assets ?? []).toSorted((one, other) =>
         one.name.localeCompare(other.name),
       ),
+      correlation: cma?.latest.correlation,
+    }),
     source: "cma",
     take: (into, { cma }) => ({ ...into, cma }),
   },
