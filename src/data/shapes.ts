@@ -35,6 +35,15 @@ type Step = (document: Record<string, unknown>) => Record<string, unknown>;
 // as the plan's owner's, as it drops any key it does not hold, so a
 // child's milestone falls in a year of the owner's, and saving it back
 // that way.
+//
+// 3 to 4: a progress point may keep the month end's reading of the
+// plan, once the month after it is closed. One kept in the third shape
+// keeps none, so the step carries it as it is. It is taken for the
+// reason the step to the third is: so that a build of the third shape
+// refuses a household of the fourth rather than reading it with every
+// reading dropped, as it drops any key it does not hold, and saving it
+// back that way, since a reading is what the plan said then and nothing
+// can work it out again.
 const steps: readonly Step[] = [
   (document): Record<string, unknown> => {
     const { accounts } = document;
@@ -42,6 +51,7 @@ const steps: readonly Step[] = [
       ? { ...document, accounts: accounts.map(unmarked) }
       : document;
   },
+  (document): Record<string, unknown> => document,
   (document): Record<string, unknown> => document,
 ];
 

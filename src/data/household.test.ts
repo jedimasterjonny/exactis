@@ -18,7 +18,7 @@ import type { Curve } from "@/data/inflation";
 import type { Condition, Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Plan, Spread } from "@/data/plan";
-import type { ProgressPoint } from "@/data/progress";
+import type { KeptPoint } from "@/data/progress";
 import type { Allocation, Anchor, Rates, RateSet } from "@/data/rates";
 import type { Month } from "@/data/schedule";
 import type { SecuredRecords } from "@/data/secured";
@@ -87,7 +87,7 @@ interface Inputs {
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
-  readonly points: readonly ProgressPoint[];
+  readonly points: readonly KeptPoint[];
   readonly rates: Rates;
   readonly rateSet: RateSet;
   readonly schedule: {
@@ -131,6 +131,15 @@ const sound: Inputs = {
   spread: { inflation: 0.02, rate: 0.14 },
   targets,
 };
+
+// A month end's reading as a point keeps it, invented: the invested
+// balances above 41.2% of the futures of a close five months before, in
+// the middle half, the plan drawing on nothing over those months, and
+// the plan's owner retiring at 61 with £512,300 liquid then.
+const reading = {
+  landed: { band: "middle half", isDrawing: false, months: 5, share: 0.412 },
+  standing: { age: 61, liquid: 512_300, retires: 61 },
+} as const;
 
 // Every input the engine throws on, in the words it throws in, as the
 // household refuses it. The tax year's count of months is the one throw
@@ -787,6 +796,38 @@ const held: readonly Case[] = [
     "A point's house is no more than its property and vehicles",
     (given): Inputs =>
       recorded(given, (point) => ({ ...point, house: point.assets + 1 })),
+  ],
+  [
+    "Too big: expected number to be <=1",
+    (given): Inputs =>
+      recorded(given, (point) => ({
+        ...point,
+        landed: { ...reading.landed, share: 1.2 },
+      })),
+  ],
+  [
+    "Too small: expected number to be >=1",
+    (given): Inputs =>
+      recorded(given, (point) => ({
+        ...point,
+        landed: { ...reading.landed, months: 0 },
+      })),
+  ],
+  [
+    "Too big: expected number to be <=12",
+    (given): Inputs =>
+      recorded(given, (point) => ({
+        ...point,
+        landed: { ...reading.landed, months: 13 },
+      })),
+  ],
+  [
+    "Invalid input: expected int, received number",
+    (given): Inputs =>
+      recorded(given, (point) => ({
+        ...point,
+        standing: { ...reading.standing, liquid: 512_300.5 },
+      })),
   ],
   [
     "A point is recorded once a month, oldest first",
@@ -1652,7 +1693,7 @@ describe("soundKept", () => {
   // read off the accounts carries both.
   it("keeps a point's cash and GIAs as read, or none", () => {
     const [first] = points;
-    const firstIn = (value: unknown): ProgressPoint | undefined =>
+    const firstIn = (value: unknown): KeptPoint | undefined =>
       soundKept(value).household.points[0];
 
     expect(
@@ -1663,6 +1704,32 @@ describe("soundKept", () => {
     ).toMatchObject({ cash: 9000, taxable: 550 });
     expect(firstIn(kept)).not.toHaveProperty("cash");
     expect(firstIn(kept)).not.toHaveProperty("taxable");
+  });
+
+  // The reading above, and one below every one of the futures over a
+  // year the plan drew on the savings in, its owner never retiring, so
+  // its worth is read at the age the plan runs to.
+  it("keeps the month end's reading a point keeps, retiring or never, or none", () => {
+    const [first, second] = points;
+    const never = {
+      landed: { band: "bottom tenth", isDrawing: true, months: 12, share: 0 },
+      standing: { age: 91, liquid: -4200, retires: null },
+    } as const;
+    const read = soundKept({
+      ...kept,
+      points: [
+        { ...first, ...reading },
+        { ...second, ...never },
+        ...points.slice(2),
+      ],
+    }).household.points;
+
+    expect(read.slice(0, 2)).toStrictEqual([
+      { ...first, ...reading },
+      { ...second, ...never },
+    ]);
+    expect(soundKept(kept).household.points[0]).not.toHaveProperty("landed");
+    expect(soundKept(kept).household.points[0]).not.toHaveProperty("standing");
   });
 
   // A household kept before the plan chose a drawdown holds none, which
@@ -2128,7 +2195,7 @@ function priced(
 // The household with its first progress point changed.
 function recorded(
   given: Inputs,
-  change: (point: ProgressPoint) => ProgressPoint,
+  change: (point: KeptPoint) => KeptPoint,
 ): Inputs {
   return {
     ...given,
