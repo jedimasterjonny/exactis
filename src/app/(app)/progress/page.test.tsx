@@ -10,7 +10,7 @@ import { pointOf } from "@/data/progress";
 import { points } from "@/data/progress.fixture";
 import { getHousehold } from "@/store/household";
 
-import Progress from "./page";
+import Progress, { metadata } from "./page";
 
 vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
 vi.mock("@/actions/house-prices", () => ({ pullHousePrices: vi.fn() }));
@@ -32,6 +32,10 @@ async function renderProgress(
 describe("Progress", () => {
   beforeEach(() => {
     vi.stubEnv("HOUSE_PRICE_REGION", "shropshire");
+  });
+
+  it("titles the page by its label in the navigation", () => {
+    expect(metadata).toStrictEqual({ title: "Progress" });
   });
 
   // The points are loaded rather than typed, so the header's one

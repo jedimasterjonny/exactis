@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { Metadata } from "next";
 import type { JSX } from "react";
 
 import { House, Scale } from "lucide-react";
@@ -19,6 +20,10 @@ import { dashboard, sectionLabel, subsectionLabel } from "@/lib/nav";
 import { getCompared } from "@/store/household";
 
 import { CompareScreen } from "./compare-screen";
+
+// Compare is reached from the scenario menu rather than the navigation,
+// so it is titled by a name of its own rather than a label there.
+export const metadata: Metadata = { title: "Compare" };
 
 // What each decision is called where the header says when it was made.
 const decisionNames: Record<Decision["kind"], string> = {

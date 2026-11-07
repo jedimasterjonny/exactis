@@ -12,7 +12,7 @@ import { incomeLines, plan } from "@/data/income.fixture";
 import { owners } from "@/data/owners.fixture";
 import { getHousehold } from "@/store/household";
 
-import Accounts from "./page";
+import Accounts, { metadata } from "./page";
 
 vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
 vi.mock("@/actions/accounts", () => ({
@@ -45,6 +45,10 @@ async function renderAccounts({
 }
 
 describe("Accounts", () => {
+  it("titles the page by its label in the navigation", () => {
+    expect(metadata).toStrictEqual({ title: "Accounts & assets" });
+  });
+
   it("opens with the header, the month its balances are as of, and the month end that moves it", async () => {
     await renderAccounts();
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { JSX } from "react";
 
 import type { RateSet as Chosen } from "@/data/rates";
@@ -15,6 +16,8 @@ import { formatPercent } from "@/lib/money";
 import { today } from "@/lib/months";
 import { assumptions, sectionLabel } from "@/lib/nav";
 import { getHousehold, getSourcesDaysAgo } from "@/store/household";
+
+export const metadata: Metadata = { title: assumptions.label };
 
 // What the header calls each set of rates.
 const setNames: Record<Chosen, string> = {

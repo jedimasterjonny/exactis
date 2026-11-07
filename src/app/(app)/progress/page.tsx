@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { JSX } from "react";
 
 import type { HousePrices } from "@/data/house-prices";
@@ -16,6 +17,8 @@ import { formatDay, formatMonthShort, monthsBetween } from "@/lib/months";
 import { progress, sectionLabel } from "@/lib/nav";
 import { plannedOf } from "@/lib/planned";
 import { getHousehold } from "@/store/household";
+
+export const metadata: Metadata = { title: progress.label };
 
 // The progress points, read from the store behind the session, under a
 // header saying how many there are, over which months and how many of

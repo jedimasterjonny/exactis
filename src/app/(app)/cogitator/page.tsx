@@ -1,11 +1,15 @@
+import type { Metadata } from "next";
 import type { JSX } from "react";
 
 import * as z from "zod";
 
 import { blendsOf } from "@/data/cma";
+import { cogitator } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
 
 import { CogitatorScreen } from "./cogitator-screen";
+
+export const metadata: Metadata = { title: cogitator.label };
 
 // An amount the month end offers, as its link writes it: whole pounds,
 // something, the month whose close paid it in, as year and month, and

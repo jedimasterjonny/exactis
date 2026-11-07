@@ -24,7 +24,7 @@ import {
 import { getHousehold, getSourcesDaysAgo } from "@/store/household";
 import { worksheet } from "@/test/dom";
 
-import Assumptions from "./page";
+import Assumptions, { metadata } from "./page";
 
 vi.mock("@/store/household", () => ({
   getHousehold: vi.fn(),
@@ -77,6 +77,10 @@ describe("Assumptions", () => {
   beforeEach(() => {
     vi.mocked(getHousehold).mockResolvedValue(household);
     vi.mocked(getSourcesDaysAgo).mockResolvedValue(null);
+  });
+
+  it("titles the page by its label in the navigation", () => {
+    expect(metadata).toStrictEqual({ title: "Assumptions" });
   });
 
   it("says what the plan grows at and what its prices rise by, and hands the store's rates, split and curve to their cards", async () => {

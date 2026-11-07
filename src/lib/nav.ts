@@ -13,10 +13,11 @@ import {
 } from "lucide-react";
 
 // A screen as the navigation lists it and its header names it: where
-// it is, its icon and its label in the navigation, and the title its
-// header opens with, which the screen and the header standing in for
-// it while the store answers both read, so the two cannot drift. The
-// dashboard's title is completed with the age the plan runs to.
+// it is, its icon and its label in the navigation, which titles its
+// page too, and the title its header opens with, which the screen and
+// the header standing in for it while the store answers both read, so
+// the two cannot drift. The dashboard's title is completed with the age
+// the plan runs to.
 export interface Screen {
   readonly href: Route;
   readonly icon: LucideIcon;

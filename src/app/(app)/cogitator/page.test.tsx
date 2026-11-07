@@ -9,7 +9,7 @@ import { targetsUnder } from "@/data/targets.fixture";
 import { getHousehold } from "@/store/household";
 import { field } from "@/test/dom";
 
-import Cogitator from "./page";
+import Cogitator, { metadata } from "./page";
 
 vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
 
@@ -21,6 +21,10 @@ async function cogitator(
 }
 
 describe("Cogitator", () => {
+  it("titles the page by its label in the navigation", () => {
+    expect(metadata).toStrictEqual({ title: "Cogitator" });
+  });
+
   it("lays the board out over the target allocation the store holds", async () => {
     vi.mocked(getHousehold).mockResolvedValue(soundKept(kept).household);
 

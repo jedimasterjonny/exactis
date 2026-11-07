@@ -1,7 +1,9 @@
+import type { Metadata } from "next";
 import type { JSX } from "react";
 
 import { isDue } from "@/data/progress";
 import { closingOn, today } from "@/lib/months";
+import { monthEnd } from "@/lib/nav";
 import {
   getClosesBack,
   getHousehold,
@@ -10,6 +12,8 @@ import {
 } from "@/store/household";
 
 import { CloseScreen } from "./close-screen";
+
+export const metadata: Metadata = { title: monthEnd.label };
 
 // The month end, read from the store behind the session: the household,
 // whether a scenario is open, and, only where the screen will compare

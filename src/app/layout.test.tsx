@@ -44,7 +44,10 @@ describe("viewport", () => {
 });
 
 describe("metadata", () => {
-  it("names the app", () => {
-    expect(metadata.title).toBe("exactis");
+  it("names the app, after each screen's title where it gives one", () => {
+    expect(metadata.title).toStrictEqual({
+      default: "exactis",
+      template: "%s · exactis",
+    });
   });
 });

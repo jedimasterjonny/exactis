@@ -14,7 +14,7 @@ import { formatGbp } from "@/lib/money";
 import { sideOf } from "@/lib/moved";
 import { getCompared } from "@/store/household";
 
-import Compare from "./page";
+import Compare, { metadata } from "./page";
 
 vi.mock("@/store/household", () => ({ getCompared: vi.fn() }));
 vi.mock("@/actions/scenarios", () => ({
@@ -81,6 +81,10 @@ function offered(): (null | string)[] {
 describe("Compare", () => {
   beforeEach(() => {
     forget();
+  });
+
+  it("titles the page by a name of its own, since the navigation does not list it", () => {
+    expect(metadata).toStrictEqual({ title: "Compare" });
   });
 
   it("says no scenario is chosen without a name, and reads nothing", async () => {

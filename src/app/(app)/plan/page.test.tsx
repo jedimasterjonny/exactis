@@ -11,7 +11,7 @@ import { milestones } from "@/data/milestones.fixture";
 import { owners } from "@/data/owners.fixture";
 import { getHousehold } from "@/store/household";
 
-import Plan from "./page";
+import Plan, { metadata } from "./page";
 
 vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
 vi.mock("@/actions/milestones", () => ({
@@ -32,6 +32,10 @@ const [salary] = incomeLines;
 const { household } = soundKept(blank);
 
 describe("Plan", () => {
+  it("titles the page by its label in the navigation", () => {
+    expect(metadata).toStrictEqual({ title: "Income & expenses" });
+  });
+
   // The fixture's first year: the salary's £12,000 a month, less the
   // £1,200 sacrificed into the pension and the tax on the rest, against
   // the household's £3,350, and the pension's and the ISA's fixed sums
