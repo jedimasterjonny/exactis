@@ -4,6 +4,14 @@ import type { Month } from "@/data/schedule";
 import { isAsset, isPension } from "@/data/accounts";
 import { isOnOrBefore, monthsBetween } from "@/lib/months";
 
+// A progress point as the household keeps it: its balances, and, once
+// the month after it is closed, the month end's reading of the plan. A
+// point kept before the readings were, and the latest, carry neither.
+export type KeptPoint = ProgressPoint & {
+  readonly landed?: KeptLanded;
+  readonly standing?: KeptStanding;
+};
+
 // A progress point is the household's balances as they were read at a
 // month's cut, each summed over the accounts it holds: the pensions,
 // the ISAs, the GIAs, the cash, what the property and vehicles were
@@ -28,6 +36,38 @@ export interface ProgressPoint {
   readonly taxable?: number;
   readonly unsecured: number;
 }
+
+// Where a month end's invested balances landed among the futures of a
+// close up to a year before, as its point keeps it: the band they
+// landed in, in the words the bands gave; how many months back that
+// close was; the share of the futures' sums below the balances; and
+// whether the plan drew on the savings in any of those months.
+interface KeptLanded {
+  readonly band: (typeof landedBands)[number];
+  readonly isDrawing: boolean;
+  readonly months: number;
+  readonly share: number;
+}
+
+// Where the plan stood at a month end, as its point keeps it: the age
+// the liquid net worth is read at, that worth in whole pounds of the
+// money of the month the plan then started in, and the age the plan's
+// owner retires at, or null where they never do.
+interface KeptStanding {
+  readonly age: number;
+  readonly liquid: number;
+  readonly retires: null | number;
+}
+
+// The five bands of a run's futures, lowest first, in the words a
+// reading names them by.
+export const landedBands = [
+  "bottom tenth",
+  "bottom quarter",
+  "middle half",
+  "top quarter",
+  "top tenth",
+] as const;
 
 // Which accounts each of a point's balances sums, as the accounts screen
 // groups them: the pensions, the ISAs, the GIAs, the cash, every house,

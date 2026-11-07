@@ -18,7 +18,7 @@ import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
 import type { Drawdown, Plan, PlanAges, Spread } from "@/data/plan";
-import type { ProgressPoint } from "@/data/progress";
+import type { KeptPoint } from "@/data/progress";
 import type { Allocation, Anchor, Rates, RateSet } from "@/data/rates";
 import type { Month, Tie } from "@/data/schedule";
 import type { Target, Targets } from "@/data/targets";
@@ -45,6 +45,7 @@ import {
   planOf,
   rateFrom,
 } from "@/data/plan";
+import { landedBands } from "@/data/progress";
 import {
   allInStocks,
   bondsAt,
@@ -109,7 +110,7 @@ export interface Household {
   readonly milestones: readonly Milestone[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
-  readonly points: readonly ProgressPoint[];
+  readonly points: readonly KeptPoint[];
   readonly rates: Rates;
   readonly rateSet: RateSet;
   readonly schedule: {
@@ -155,7 +156,7 @@ export interface Kept {
   readonly milestones: readonly Milestone[];
   readonly next: number;
   readonly owners: readonly Owner[];
-  readonly points: readonly ProgressPoint[];
+  readonly points: readonly KeptPoint[];
   readonly rates: Rates;
   readonly rateSet: RateSet;
   readonly schedule: Household["schedule"];
@@ -400,7 +401,11 @@ const owners = z
 // balances held nothing or more and the two debts nothing or less, in
 // the words an account is held to the same, cash and the GIAs absent on
 // a point not read with them rather than nothing, and the house nothing
-// or more and no more than the property and vehicles it is a share of.
+// or more and no more than the property and vehicles it is a share of;
+// and the month end's reading, absent on a point that keeps none: the
+// band one of the five, the months whole from one to twelve, the share
+// from none of the futures to all of them, the ages whole and the
+// liquid worth whole pounds.
 const point = z
   .object({
     assets: z.number().int().nonnegative(rules.belowNothing),
@@ -408,15 +413,30 @@ const point = z
     deferred: z.number().int().nonnegative(rules.belowNothing),
     free: z.number().int().nonnegative(rules.belowNothing),
     house: z.number().int().nonnegative(rules.belowNothing),
+    landed: z
+      .object({
+        band: z.enum(landedBands),
+        isDrawing: z.boolean(),
+        months: z.number().int().min(1).max(12),
+        share: z.number().min(0).max(1),
+      })
+      .exactOptional(),
     loans: z.number().int().nonpositive(rules.owes),
     month,
+    standing: z
+      .object({
+        age: z.number().int().positive(),
+        liquid: z.number().int(),
+        retires: z.number().int().positive().nullable(),
+      })
+      .exactOptional(),
     taxable: z.number().int().nonnegative(rules.belowNothing).exactOptional(),
     unsecured: z.number().int().nonpositive(rules.owes),
   })
   .refine(
     (point) => point.house <= point.assets,
     "A point's house is no more than its property and vehicles",
-  ) satisfies z.ZodType<ProgressPoint>;
+  ) satisfies z.ZodType<KeptPoint>;
 
 // The progress points, oldest first and each in a month after the one
 // before it, so a month is recorded once and a screen reads them in
