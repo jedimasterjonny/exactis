@@ -11,7 +11,7 @@ import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { owners, sam } from "@/data/owners.fixture";
-import { portfolios, targets } from "@/data/targets.fixture";
+import { portfolios, targets, targetsUnder } from "@/data/targets.fixture";
 import { endWorthOf, futureOf } from "@/engine/futures";
 import { laidOut, monthsOn, project } from "@/engine/projection";
 import { Refusal } from "@/lib/answer";
@@ -691,15 +691,53 @@ describe("changedIn", () => {
   });
 
   // The household's allocation imported again since the scenario was
-  // made, and the scenario's fees confirmed still right: adopting the
-  // scenario writes both whole, so both are lines.
-  it("lists the target allocation and the fees where the two differ only in an import's day and a confirmation", () => {
+  // made, each category holding an invented £500 more and renamed, the
+  // file listing them the other way up, with every account's cash and
+  // paid in, and its mappings made in another order; and the scenario's
+  // fees confirmed still right. None of it moves a rate.
+  it("lists neither the target allocation nor the fees where the two differ only in an import and a confirmation", () => {
     expect(
       changedIn(
-        { ...kept, targets: { ...targets, importedOn: "2026-09-26" } },
+        {
+          ...kept,
+          mappings: kept.mappings.toReversed(),
+          targets: {
+            categories: targets.categories
+              .map((category) => ({
+                ...category,
+                name: `${category.name} fund`,
+                value: category.value + 500,
+              }))
+              .toReversed(),
+            importedOn: "2026-09-26",
+            portfolios,
+          },
+        },
         { ...kept, deductions: { ...kept.deductions, setOn: "2026-09-26" } },
-      ).map(({ label }) => label),
-    ).toStrictEqual(["Fees and yield", "Target allocation"]);
+      ),
+    ).toStrictEqual([]);
+  });
+
+  // The household's allocation imported again since, and a scenario
+  // asking for equity alone, mapping one category fewer, or charging
+  // fees of an invented 0.15%.
+  it("lists the target allocation where the scenario moves a share or a mapping, whatever was imported since, and the fees where it changes them", () => {
+    const imported = {
+      ...kept,
+      targets: { ...targets, importedOn: "2026-09-26", portfolios },
+    };
+    const labelled = (scenario: Kept): readonly string[] =>
+      changedIn(imported, scenario).map(({ label }) => label);
+
+    expect(
+      labelled({ ...kept, targets: targetsUnder("Equity") }),
+    ).toStrictEqual(["Target allocation"]);
+    expect(
+      labelled({ ...kept, mappings: kept.mappings.slice(1) }),
+    ).toStrictEqual(["Target allocation"]);
+    expect(
+      labelled({ ...kept, deductions: { ...kept.deductions, fees: 0.0015 } }),
+    ).toStrictEqual(["Fees and yield"]);
   });
 
   // A scenario that adds Sam and Ada, retires its owner at 58, takes

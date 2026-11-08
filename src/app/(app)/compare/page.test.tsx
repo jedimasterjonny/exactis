@@ -8,10 +8,12 @@ import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
 import { atAge } from "@/data/milestones";
 import { owners } from "@/data/owners.fixture";
+import { portfolios, targets } from "@/data/targets.fixture";
 import { forget } from "@/hooks/use-futures";
 import { refused, saved } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
 import { sideOf } from "@/lib/moved";
+import { planOver } from "@/lib/plan-over";
 import { getCompared } from "@/store/household";
 
 import Compare, { metadata } from "./page";
@@ -223,6 +225,53 @@ describe("Compare", () => {
     expect(
       screen.getByRole("rowheader", { name: "Retires at" }),
     ).toHaveAccessibleDescription("The same");
+  });
+
+  // The household's allocation imported again on the 26th of September,
+  // after the scenario was made, each category holding an invented £500
+  // more and a cash reserve listed beneath the bonds asking for nothing,
+  // which the household then mapped onto UK cash.
+  it("says nothing differs for a scenario made before the household's latest import, nor for a category it lists at 0%", async () => {
+    const household = {
+      ...kept,
+      mappings: [
+        ...kept.mappings,
+        { asset: "UK cash", category: "Asset Allocation/Bonds/Cash reserve" },
+      ],
+      targets: {
+        categories: [
+          ...targets.categories.map((category) => ({
+            ...category,
+            value: category.value + 500,
+          })),
+          {
+            accounts: [],
+            classes: ["Bonds"],
+            id: "Asset Allocation/Bonds/Cash reserve",
+            isImplemented: false,
+            name: "Cash reserve",
+            share: 0,
+            value: 0,
+          },
+        ],
+        importedOn: "2026-09-26",
+        portfolios,
+      },
+    };
+    vi.mocked(getCompared).mockResolvedValue({
+      ...comparedOf(kept, household),
+      over: saved(heldOf(planOver(household, kept, household.next))),
+    });
+
+    await draw({ scenario: "Four-day week" });
+
+    expect(
+      screen.getByRole("region", {
+        name: "What making it the household changes",
+      }),
+    ).toHaveTextContent(
+      "The same plan as the household'sNothing in the scenario's plan differs from the household's, so its figures are the household's too.",
+    );
   });
 
   // A scenario that runs the plan to 95 and retires the owner at 62.

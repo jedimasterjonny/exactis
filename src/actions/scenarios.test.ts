@@ -4,12 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
 
 import type { Kept } from "@/data/household";
+import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
 import { soundKept } from "@/data/household";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { homePart, homeValues } from "@/data/houses.fixture";
 import { currentShape, stamped, upcast } from "@/data/shapes";
+import { portfolios, targets } from "@/data/targets.fixture";
 import {
   decideScenario,
   keepAfter,
@@ -366,6 +368,50 @@ describe("adoptScenario", () => {
     });
     expect(closeScenario).toHaveBeenCalledOnce();
     expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  // The household's allocation imported again on the 26th of September,
+  // after the scenario was made, each category holding an invented £500
+  // more, with every account's cash and paid in; and the scenario
+  // retargeted from 48% in developed equity and 14% in global bonds to
+  // 40% and 22%, on the copy of the file it was made with.
+  it("keeps the holdings the household imported since the scenario was made, under the scenario's retargeted shares", async () => {
+    const asked = new Map([
+      ["Asset Allocation/Bonds/Global bonds, hedged", 0.22],
+      ["Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK", 0.4],
+    ]);
+    const retargeted = (from: Targets): Targets => ({
+      ...from,
+      categories: from.categories.map((category) => ({
+        ...category,
+        share: asked.get(category.id) ?? category.share,
+      })),
+    });
+    const since = {
+      categories: targets.categories.map((category) => ({
+        ...category,
+        value: category.value + 500,
+      })),
+      importedOn: "2026-09-26",
+      portfolios,
+    };
+    const scenario = { ...reference, targets: retargeted(targets) };
+    await keepFirst("", reference);
+    await keepAfter(
+      db,
+      { scenario: "", version: 1 },
+      { ...reference, targets: since },
+    );
+    await keepFirst("Four-day week", reference);
+    await keepAfter(db, { scenario: "Four-day week", version: 1 }, scenario);
+
+    expect(
+      await adoptScenario("Four-day week", await shownNow("Four-day week")),
+    ).toStrictEqual(saved(true));
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped({ ...scenario, targets: retargeted(since) }),
+      version: 3,
+    });
   });
 
   // Made the household once, then asked again, as from a tab drawn
