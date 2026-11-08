@@ -271,6 +271,27 @@ describe("CogitatorScreen", () => {
     expect(field("Amount to invest")).not.toHaveAccessibleDescription();
   });
 
+  // The plan pays the £2,000 into the ISAs and GIA in September, its
+  // first month; typed over, it is the screen's own.
+  it("opens on what the plan pays into the ISAs and GIA in its first month, saying so until it is typed over", () => {
+    render(
+      <CogitatorScreen
+        planned={{ amount: 2000, month: { month: 8, year: 2026 } }}
+        targets={reference}
+      />,
+    );
+
+    expect(field("Amount to invest")).toHaveValue("£2,000");
+    expect(field("Amount to invest")).toHaveAccessibleDescription(
+      "Planned for the ISAs and GIA in September",
+    );
+    expect(toned("inverse")).toHaveTextContent("A£1,745");
+
+    invest("1,500");
+
+    expect(field("Amount to invest")).not.toHaveAccessibleDescription();
+  });
+
   it("shows the amount and sales held when their fields come back", () => {
     const { rerender } = render(<CogitatorScreen targets={reference} />);
     invest("2000");
