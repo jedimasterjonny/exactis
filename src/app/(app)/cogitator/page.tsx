@@ -5,6 +5,7 @@ import * as z from "zod";
 
 import { blendsOf } from "@/data/cma";
 import { laidOut, monthsOn } from "@/engine/projection";
+import { today } from "@/lib/months";
 import { investedIn } from "@/lib/moved";
 import { cogitator } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
@@ -49,7 +50,9 @@ const offer = z.object({
 // the offer or the plan's figure changes, as leaving the month end's
 // link for the bare address does, which Next draws without remounting
 // it; otherwise the offered amount would stay while its mark went. The
-// page renders behind the loading screen beside it.
+// day is read once the store has been, as the assumptions screen reads
+// it, for how old the import is. The page renders behind the loading
+// screen beside it.
 export default async function Cogitator({
   searchParams,
 }: Readonly<{
@@ -90,6 +93,7 @@ export default async function Cogitator({
           },
         })}
       targets={targets}
+      today={today()}
     />
   );
 }

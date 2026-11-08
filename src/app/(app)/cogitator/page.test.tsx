@@ -4,13 +4,14 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { soundKept } from "@/data/household";
-import { kept } from "@/data/household.fixture";
+import { kept, today } from "@/data/household.fixture";
 import { targetsUnder } from "@/data/targets.fixture";
 import { getHousehold } from "@/store/household";
 import { field } from "@/test/dom";
 
 import Cogitator, { metadata } from "./page";
 
+vi.mock("@/actions/targets", () => ({ importTargets: vi.fn() }));
 vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
 
 // The page at an address holding what is given.
@@ -25,7 +26,9 @@ describe("Cogitator", () => {
     expect(metadata).toStrictEqual({ title: "Cogitator" });
   });
 
-  it("lays the board out over the target allocation the store holds", async () => {
+  // Read on the fixture's day, eight days after its import.
+  it("lays the board out over the target allocation the store holds, saying how old the import is", async () => {
+    vi.setSystemTime(today);
     vi.mocked(getHousehold).mockResolvedValue(soundKept(kept).household);
 
     render(await cogitator());
@@ -33,7 +36,9 @@ describe("Cogitator", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Next best trades",
     );
-    expect(screen.getByText("Imported 7 Sep 2026")).toBeInTheDocument();
+    expect(
+      screen.getByText("Imported 7 Sep 2026 · 8 days old"),
+    ).toBeInTheDocument();
   });
 
   // All in equities while the plan holds a quarter in bonds now, and

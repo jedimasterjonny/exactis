@@ -8,6 +8,7 @@ import { useState } from "react";
 import type { Month } from "@/data/schedule";
 import type { Targets } from "@/data/targets";
 
+import { PortfolioImport } from "@/components/app/atoms/portfolio-import";
 import {
   CountField,
   MoneyField,
@@ -16,7 +17,7 @@ import { SelectField } from "@/components/app/molecules/select-field";
 import { Screen } from "@/components/app/templates/screen";
 import { Badge } from "@/components/kit/badge";
 import { formatGbp } from "@/lib/money";
-import { formatDay, monthName } from "@/lib/months";
+import { formatDated, monthName } from "@/lib/months";
 import { cogitator, sectionLabel } from "@/lib/nav";
 
 import { CogitatorBoard } from "./cogitator-board";
@@ -30,17 +31,20 @@ interface CogitatorScreenProps {
   };
   readonly planned?: { readonly amount: number; readonly month: Month };
   readonly targets: null | Targets;
+  readonly today: string;
 }
 
 // The next best trades for the pounds typed in the header. The header
-// says when the targets were imported and what they hold in all, and
-// takes the amount to invest and the most sales to make once there is
-// something to buy toward, the sales held to a few, since every
-// choice of them is tried; and, once the allocation says what each
-// securities account holds, which account the trades are placed in,
-// all of them until one is chosen, the accounts listed by name. All
-// three are the screen's own and forgotten when it is left, since
-// they are chosen afresh at each visit to the broker, so they are
+// says when the targets were imported and how long ago, on the day the
+// page was drawn, and what they hold in all, beside the import that
+// takes them afresh, as the month end's does, or that import alone
+// before any are; and it takes the amount to invest and the most sales
+// to make once there is something to buy toward, the sales held to a
+// few, since every choice of them is tried; and, once the allocation
+// says what each securities account holds, which account the trades are
+// placed in, all of them until one is chosen, the accounts listed by
+// name. All three are the screen's own and forgotten when it is left,
+// since they are chosen afresh at each visit to the broker, so they are
 // held here, beside the route, where both the header that takes them
 // and the board beneath that lays out the trades for them can reach
 // them. All accounts is the choice of no name, so an account read
@@ -65,6 +69,7 @@ export function CogitatorScreen({
   offered,
   planned,
   targets,
+  today,
 }: CogitatorScreenProps): JSX.Element {
   const [amount, setAmount] = useState(offered?.amount ?? planned?.amount ?? 0);
   const [sales, setSales] = useState(0);
@@ -121,13 +126,16 @@ export function CogitatorScreen({
       }
       label={sectionLabel(cogitator)}
       meta={
-        targets === null ? undefined : (
+        targets === null ? (
+          <PortfolioImport />
+        ) : (
           <>
             <Badge variant="secondary">
               <FolderSync aria-hidden />
-              {`Imported ${formatDay(targets.importedOn)}`}
+              {`Imported ${formatDated(targets.importedOn, today)}`}
             </Badge>
             {`${formatGbp(held)} held`}
+            <PortfolioImport />
           </>
         )
       }
