@@ -58,7 +58,8 @@ const shownAt = z.object({
 // made the household, the version adopted copied as its next with the
 // decision and the reason given on it, and closes it where it is the
 // one open. So balances and progress points recorded in the household
-// while the scenario was explored are kept rather than rolled back, as
+// while the scenario was explored, and the holdings imported from
+// Portfolio Performance since, are kept rather than rolled back, as
 // planOver says; and the scenario stays to be read back, taking no more
 // saves. It is decided against the versions of both the page deciding
 // it was drawn from, so where either has moved since, the figures the
@@ -73,10 +74,11 @@ const shownAt = z.object({
 // every edit made there since; one decided against can be made the
 // household after all. A reason past its length or holding a line break
 // is refused, and none typed is kept as none.
-// An account added to the household since the scenario was made is
-// refused rather than merged, as planOver says, and the
-// scenario's first version, the copy it was made from, is read for the
-// id its next record was given to tell.
+// An account added to the household since the scenario was made, or a
+// target allocation imported there since that lists other categories
+// with a target above 0%, is refused rather than merged, as planOver
+// says, and the scenario's first version, the copy it was made from, is
+// read for the id its next record was given to tell the account.
 // The store runs no transaction, so the household is written first, and
 // the answer says whether the decision was kept after it: a decision
 // that fails once the household is written, refused because a save

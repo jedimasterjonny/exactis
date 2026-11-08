@@ -212,23 +212,29 @@ const records: readonly {
 // match by id alone does not see, and an account added or removed leaves
 // the rest where they stand; then each setting of the plan that differs,
 // the end age, the drawdown and each source of the rates the scenario
-// carries over, each whole, as planOver carries it over, which leaves
-// out the CMA and the curve, since those are
-// pulled into the household and planOver keeps the household's. Both
-// sides are read as kept, the scenario's own plan rather than the merge,
-// so the lines stand where the merge is refused: an account the
+// carries over, each by the plan it holds rather than the bookkeeping
+// beside it, as What moved reads it, which leaves out the CMA and the
+// curve, since those are pulled into the household and planOver keeps
+// the household's. It is handed what adopting the scenario would write
+// where that can be written, so a category kept at 0% from the
+// household's import reads as adopting leaves it, and the scenario as
+// kept where it is refused, so the lines still stand: an account the
 // household added since the scenario was made then reads as removed,
 // which is what making the scenario the household would do.
 export function changedIn(household: Kept, scenario: Kept): readonly Line[] {
   const settings: readonly {
     readonly keys: readonly (keyof Kept)[];
     readonly name: string;
+    readonly read?: (kept: Kept) => unknown;
   }[] = [
     { keys: ["ages"], name: areaNames.ages },
     { keys: ["drawdown"], name: areaNames.drawdown },
     ...sources
       .filter(({ source }) => source !== "cma" && source !== "curve")
-      .map(({ keys, source }) => ({ keys, name: sourceNames[source] })),
+      .map(({ source, ...setting }) => ({
+        ...setting,
+        name: sourceNames[source],
+      })),
   ];
   const shared = (one: Kept, other: Kept): readonly number[] => {
     const ids = new Set(other.accounts.map(({ id }) => id));
@@ -264,8 +270,10 @@ export function changedIn(household: Kept, scenario: Kept): readonly Line[] {
       ? [{ change: "changed", key: order, label: order } as const]
       : []),
     ...settings
-      .filter(({ keys }) =>
-        keys.some((key) => differs(household[key], scenario[key])),
+      .filter(({ keys, read }) =>
+        read === undefined
+          ? keys.some((key) => differs(household[key], scenario[key]))
+          : differs(read(household), read(scenario)),
       )
       .map(({ name }): Line => ({ change: "changed", key: name, label: name })),
   ];

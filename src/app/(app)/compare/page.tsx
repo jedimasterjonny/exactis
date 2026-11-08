@@ -14,6 +14,7 @@ import { ScenarioDecision } from "@/components/app/organisms/scenario-decision";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Screen } from "@/components/app/templates/screen";
 import { CardContent } from "@/components/kit/card";
+import { saved } from "@/lib/answer";
 import { formatDay } from "@/lib/months";
 import { changedIn, sideOf } from "@/lib/moved";
 import { dashboard, sectionLabel, subsectionLabel } from "@/lib/nav";
@@ -106,6 +107,7 @@ export default async function Compare({
     over.kind === "saved"
       ? { ...drawnOf(over.value.household), side: sideOf(over.value.kept) }
       : null;
+  const laid = over.kind === "saved" ? saved(over.value.kept) : scenario;
   return (
     <CompareScreen
       actions={
@@ -119,9 +121,7 @@ export default async function Compare({
       asOf={household.kept.asOf}
       household={{ ...drawnOf(household.household), side: theirs }}
       lines={
-        scenario.kind === "saved"
-          ? changedIn(household.kept, scenario.value)
-          : null
+        laid.kind === "saved" ? changedIn(household.kept, laid.value) : null
       }
       meta={decision === null ? undefined : metaOf(decision)}
       refusal={over.kind === "refused" ? over.reason : null}
