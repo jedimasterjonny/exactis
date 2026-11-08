@@ -97,7 +97,9 @@ describe("FuturesOutcomes", () => {
       name: "What the futures come to",
     });
 
-    expect(within(band).getAllByRole("paragraph")[0]).toHaveClass("figure");
+    expect(within(band).getAllByRole("paragraph")[0]).toHaveClass(
+      "display-figure",
+    );
     expect(paragraphs()).toStrictEqual([
       "87%",
       "± 2.1 points",

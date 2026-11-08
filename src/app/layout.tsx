@@ -8,9 +8,10 @@ import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 
 import { Toaster } from "@/components/kit/toast";
 
-// Space Grotesk for headings only, Geist for body and UI text, Geist Mono
-// for every figure. next/font downloads each face at build time and serves
-// it from the app, so nothing is fetched from Google at runtime.
+// Space Grotesk for headings only, Geist for body and UI text and the
+// figure a screen opens on, Geist Mono for every other figure. next/font
+// downloads each face at build time and serves it from the app, so
+// nothing is fetched from Google at runtime.
 const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 const geistMono = Geist_Mono({
   subsets: ["latin"],

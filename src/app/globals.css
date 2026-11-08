@@ -308,11 +308,23 @@
   }
 }
 
-/* Every figure is mono and tabular so columns of money align, and held to
-   one line, so a minus never breaks from its pounds nor a cadence from its
-   sum where a figure shares a row with words that wrap. No exceptions. */
+/* Every figure is tabular so columns of money align, and held to one
+   line, so a minus never breaks from its pounds nor a cadence from its
+   sum where a figure shares a row with words that wrap. Every figure is
+   mono too, save the one a screen opens on, which display-figure sets. */
 @utility figure {
   @apply font-mono whitespace-nowrap tabular-nums;
+}
+
+/* The figure a screen opens on, the one set larger than text-3xl and in
+   no column: tabular and on one line as every figure is, but in the body
+   face. The mono face gives a comma a digit's whole cell and ships no
+   narrower one, which at that size opens a gap ten times the one between
+   its digits and reads one sum as two. Geist's tabular digits are the
+   mono cell's width, so only the comma, the pound sign and the percent
+   narrow. */
+@utility display-figure {
+  @apply font-sans whitespace-nowrap tabular-nums;
 }
 
 /* Micro-labels: field labels, table headers, section numerals, card eyebrows.

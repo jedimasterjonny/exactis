@@ -48,6 +48,9 @@ describe("ProgressYear", () => {
 
     const band = screen.getByRole("region", { name: "What the year came to" });
 
+    expect(within(band).getAllByRole("paragraph")[0]).toHaveClass(
+      "display-figure",
+    );
     expect(
       within(band)
         .getAllByRole("paragraph")

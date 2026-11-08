@@ -56,7 +56,7 @@ export function ProgressYear({ year }: ProgressYearProps): JSX.Element {
     <Card aria-label="What the year came to" role="region">
       <CardContent className="grid gap-6 lg:grid-cols-[auto_minmax(0,1fr)] lg:gap-x-10 xl:grid-cols-[auto_minmax(0,1fr)_20rem]">
         <div className="grid content-start gap-3">
-          <p className="figure text-5xl font-medium tracking-tighter">
+          <p className="display-figure text-5xl font-medium tracking-tighter">
             {formatSignedGbp(moved)}
           </p>
           <p className="text-xs text-muted-foreground">
