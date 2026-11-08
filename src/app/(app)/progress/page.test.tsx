@@ -184,7 +184,7 @@ describe("Progress", () => {
 
     expect(within(chart).getByText("Aug 2027")).toBeInTheDocument();
     expect(screen.getAllByRole("paragraph").at(-2)).toHaveTextContent(
-      "The plan runs on from the latest point for a year, each month in its own pounds, by what it pays in and what each account grows by.",
+      "The plan runs on from the latest point for a year, by what it pays in and what each account grows by.",
     );
   });
 

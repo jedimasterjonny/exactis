@@ -56,8 +56,8 @@ export default async function Progress(): Promise<JSX.Element> {
       </Note>
       {planned.length > 0 && (
         <Note>
-          The plan runs on from the latest point for a year, each month in its
-          own pounds, by what it pays in and what each account grows by.
+          The plan runs on from the latest point for a year, by what it pays in
+          and what each account grows by.
         </Note>
       )}
       <Note>{houseNoteOf(housePrices)}</Note>

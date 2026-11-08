@@ -137,6 +137,8 @@ const worthDot = {
 // says it was not kept. The months the plan carries, where it does,
 // run on from the latest point: net worth drawn dashed in ink from it,
 // and nothing else, with the latest month marked where the dash begins.
+// Every figure is in each month's own pounds, as the points were read
+// and the plan carries them, and the caption says so.
 // The crosshair reads the month, each balance and net worth, or net
 // worth alone for a month planned, on hover and on the arrow keys, and
 // is announced to a screen reader as it moves.
@@ -171,8 +173,8 @@ export function ProgressChart({
     <SectionCard
       caption={
         isPlanned
-          ? "Held above the rule, owed below, net worth between, and the plan dashed ahead"
-          : "Held above the rule, owed below, net worth between"
+          ? "Held above the rule, owed below, net worth between, and the plan dashed ahead, in each month's own pounds"
+          : "Held above the rule, owed below, net worth between, in each month's own pounds"
       }
       className="min-w-0 overflow-visible"
       label={subsectionLabel(progress, 1)}

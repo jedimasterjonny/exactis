@@ -298,7 +298,7 @@ describe("ProgressChart", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Held above the rule, owed below, net worth between, and the plan dashed ahead",
+        "Held above the rule, owed below, net worth between, and the plan dashed ahead, in each month's own pounds",
       ),
     ).toBeInTheDocument();
   });
@@ -339,10 +339,15 @@ describe("ProgressChart", () => {
     );
   });
 
-  it("draws no dash and no mark where nothing is planned", () => {
+  it("draws no dash and no mark where nothing is planned, and leaves the plan out of the caption", () => {
     render(<ProgressChart planned={[]} points={points} />);
 
     expect(drawn("recharts-line-curve")).toHaveLength(1);
     expect(drawn("recharts-reference-line-line")).toHaveLength(0);
+    expect(
+      screen.getByText(
+        "Held above the rule, owed below, net worth between, in each month's own pounds",
+      ),
+    ).toBeInTheDocument();
   });
 });
