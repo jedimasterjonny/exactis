@@ -16,7 +16,14 @@ import { endWorthOf, futureOf } from "@/engine/futures";
 import { laidOut, monthsOn, project } from "@/engine/projection";
 import { Refusal } from "@/lib/answer";
 
-import { changedIn, movedOver, movedSince, sideOf, standingOf } from "./moved";
+import {
+  changedIn,
+  investedIn,
+  movedOver,
+  movedSince,
+  sideOf,
+  standingOf,
+} from "./moved";
 
 // The household's rules as they are, watched, so a test can have them
 // refuse a state the walk takes.
@@ -583,6 +590,26 @@ describe("movedSince", () => {
     const spare = closing({ schedule: { ...kept.schedule, expenses: [] } });
 
     expect(movedSince(spare, closed(spare)).invested).toBe(1667);
+  });
+});
+
+describe("investedIn", () => {
+  // The reference's pension, ISA and current account, and a GIA beside
+  // them, each paid an invented sum: the ISA's £1,000.40 and the GIA's
+  // £200.30 come to £1,200.70, the pension's and the cash's left out.
+  it("sums what the months paid into the ISAs and the GIAs, in whole pounds", () => {
+    const [pension, isa, current] = accounts;
+    const paid = [
+      { account: pension, paid: 500 },
+      { account: isa, paid: 1000.4 },
+      { account: current, paid: 300 },
+      {
+        account: { ...isa, id: 99, kind: "taxable" as const, name: "GIA" },
+        paid: 200.3,
+      },
+    ].map(({ account, paid }) => ({ account, balance: 0, paid }));
+
+    expect(investedIn(paid)).toBe(1201);
   });
 });
 

@@ -271,6 +271,19 @@ export function changedIn(household: Kept, scenario: Kept): readonly Line[] {
   ];
 }
 
+// What the months monthsOn carried paid into the ISAs and the GIAs, the
+// tax-free and taxable accounts, in whole pounds.
+export function investedIn(months: readonly MonthsOn[]): number {
+  return Math.round(
+    sumOf(
+      months.filter(({ account }) =>
+        ["tax-free", "taxable"].includes(account.kind),
+      ),
+      ({ paid }) => paid,
+    ),
+  );
+}
+
 // What moved the plan from the balances a close set and the month they
 // were as of, laid over the household now, to the household now, as
 // movedSince walks it: an account both hold opens on the balance the
@@ -419,14 +432,7 @@ export function movedSince(
     changes,
     expected: standing,
     fixed,
-    invested: Math.round(
-      sumOf(
-        carried.filter(({ account }) =>
-          ["tax-free", "taxable"].includes(account.kind),
-        ),
-        ({ paid }) => paid,
-      ),
-    ),
+    invested: investedIn(carried),
     months,
     now: steps.at(-1)?.standing ?? standing,
     rates,
