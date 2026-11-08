@@ -80,7 +80,9 @@ describe("Cogitator", () => {
   });
 
   // The month end's link for an invented £1,250 paid in over August.
-  // Then the bare address, as the navigation's link to the screen goes.
+  // Then the bare address, as the navigation's link to the screen goes,
+  // which opens at nothing here: the reference household runs short in
+  // September, its plan's first month, and pays its ISA nothing.
   it("opens the amount at what the month end offers, saying which close it came from, and at nothing again without it", async () => {
     vi.mocked(getHousehold).mockResolvedValue(soundKept(kept).household);
 
@@ -97,6 +99,31 @@ describe("Cogitator", () => {
 
     expect(field("Amount to invest")).toHaveValue("£0");
     expect(field("Amount to invest")).not.toHaveAccessibleDescription();
+  });
+
+  // The reference household with its expenses dropped: its ISA takes
+  // its £20,000 a year fixed, £1,667 in September, the plan's first
+  // month. Then the month end's link, whose offer comes first.
+  it("opens the amount at what the plan pays into the ISAs and GIA in its first month, saying so, where the address offers none", async () => {
+    const { household } = soundKept(kept);
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      schedule: { ...household.schedule, expenses: [] },
+    });
+
+    const { rerender } = render(await cogitator());
+
+    expect(field("Amount to invest")).toHaveValue("£1,667");
+    expect(field("Amount to invest")).toHaveAccessibleDescription(
+      "Planned for the ISAs and GIA in September",
+    );
+
+    rerender(await cogitator({ amount: "1250", from: "2026-08" }));
+
+    expect(field("Amount to invest")).toHaveValue("£1,250");
+    expect(field("Amount to invest")).toHaveAccessibleDescription(
+      "From August's close",
+    );
   });
 
   // The month end's link for the cash the fixture's brokerage account

@@ -4,6 +4,8 @@ import type { JSX } from "react";
 import * as z from "zod";
 
 import { blendsOf } from "@/data/cma";
+import { laidOut, monthsOn } from "@/engine/projection";
+import { investedIn } from "@/lib/moved";
 import { cogitator } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
 
@@ -38,30 +40,35 @@ const offer = z.object({
 // nothing is said. An amount the month end offers in the address, as
 // ?amount=1250&from=2026-08 does, is handed on with the month it came
 // from, and with the account it is held in where ?account= names one;
-// one the address holds that is not such an amount is left, and the
-// amount opens at nothing. The screen holds the amount it opens on
-// as its own, so it is drawn afresh whenever the offer changes, as
-// leaving the month end's link for the bare address does, which Next
-// draws without remounting it; otherwise the offered amount would stay
-// while its mark went. The page renders behind the loading screen
-// beside it.
+// one the address holds that is not such an amount is left. Without
+// an offer the screen is handed what the plan pays into the ISAs and
+// GIA in its first month, in whole pounds, as the month end reads what
+// its months paid in, with the month, where it pays them anything; and
+// where it pays nothing the amount opens at nothing. The screen holds
+// the amount it opens on as its own, so it is drawn afresh whenever
+// the offer or the plan's figure changes, as leaving the month end's
+// link for the bare address does, which Next draws without remounting
+// it; otherwise the offered amount would stay while its mark went. The
+// page renders behind the loading screen beside it.
 export default async function Cogitator({
   searchParams,
 }: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>): Promise<JSX.Element> {
-  const [{ cma, mappings, split, targets }, address] = await Promise.all([
-    getHousehold(),
-    searchParams,
-  ]);
+  const [{ accounts, cma, mappings, plan, schedule, split, targets }, address] =
+    await Promise.all([getHousehold(), searchParams]);
   const blends = cma === null ? null : blendsOf(cma.latest, targets, mappings);
   const targeted =
     blends === null || "short" in blends ? null : blends.bonds.share;
   const now = 1 - split.stocks;
   const offered = offer.safeParse(address);
+  const laid = laidOut(accounts, schedule, plan);
+  const paying = investedIn(
+    monthsOn(accounts, laid.schedule, { months: 1, plan: laid.plan }),
+  );
   return (
     <CogitatorScreen
-      key={offered.success ? JSON.stringify(offered.data) : ""}
+      key={offered.success ? JSON.stringify(offered.data) : String(paying)}
       {...(targeted !== null &&
         Math.round(targeted * 100) !== Math.round(now * 100) && {
           bonds: { now, targeted },
@@ -75,6 +82,13 @@ export default async function Cogitator({
           month: offered.data.from,
         },
       })}
+      {...(!offered.success &&
+        paying > 0 && {
+          planned: {
+            amount: paying,
+            month: { month: laid.plan.month, year: laid.plan.from },
+          },
+        })}
       targets={targets}
     />
   );
