@@ -76,7 +76,7 @@ describe("CogitatorScreen", () => {
     expect(screen.getByText("No allocation imported yet")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Assumptions › Target allocation" }),
-    ).toHaveAttribute("href", "/assumptions");
+    ).toHaveAttribute("href", "/assumptions?tab=target-allocation");
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
