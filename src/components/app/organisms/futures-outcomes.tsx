@@ -100,7 +100,7 @@ export function FuturesOutcomes({
         ) : (
           <>
             <div className="grid content-start gap-3">
-              <p className="figure text-6xl font-medium tracking-tighter">
+              <p className="display-figure text-6xl font-medium tracking-tighter">
                 {formatChance(reading.chance)}
               </p>
               <p className="text-xs text-muted-foreground">
