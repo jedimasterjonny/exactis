@@ -1,11 +1,13 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Target, Targets } from "@/data/targets";
 
 import { commit, field } from "@/test/dom";
 
 import { CogitatorScreen } from "./cogitator-screen";
+
+vi.mock("@/actions/targets", () => ({ importTargets: vi.fn() }));
 
 // An allocation of the categories given, imported on the seventh of
 // September 2026.
@@ -44,15 +46,21 @@ function toned(tone: string): HTMLElement {
 }
 
 describe("CogitatorScreen", () => {
-  it("heads the screen as the eighth, saying when the targets were imported and what they hold", () => {
-    render(<CogitatorScreen targets={reference} />);
+  // Read on the fifteenth, eight days after the import.
+  it("heads the screen as the eighth, saying when the targets were imported, how long ago and what they hold, beside the import", () => {
+    render(<CogitatorScreen targets={reference} today="2026-09-15" />);
 
     expect(screen.getByText("Sect. VIII · Cogitator")).toHaveClass("label");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Next best trades",
     );
-    expect(screen.getByText("Imported 7 Sep 2026")).toBeInTheDocument();
+    expect(
+      screen.getByText("Imported 7 Sep 2026 · 8 days old"),
+    ).toBeInTheDocument();
     expect(screen.getByText("£5,450 held")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Import from Portfolio Performance" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
@@ -62,6 +70,7 @@ describe("CogitatorScreen", () => {
       <CogitatorScreen
         bonds={{ now: 0.4, targeted: 0.3 }}
         targets={reference}
+        today="2026-09-15"
       />,
     );
 
@@ -70,13 +79,17 @@ describe("CogitatorScreen", () => {
     );
   });
 
-  it("says no allocation is imported yet, pointing to where one is, and takes no amount", () => {
-    render(<CogitatorScreen targets={null} />);
+  it("says no allocation is imported yet, pointing to where one is and offering the import, and takes no amount", () => {
+    render(<CogitatorScreen targets={null} today="2026-09-15" />);
 
     expect(screen.getByText("No allocation imported yet")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Assumptions › Target allocation" }),
     ).toHaveAttribute("href", "/assumptions?tab=target-allocation");
+    expect(
+      screen.getByRole("button", { name: "Import from Portfolio Performance" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Imported /u)).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
@@ -84,6 +97,7 @@ describe("CogitatorScreen", () => {
     render(
       <CogitatorScreen
         targets={allocation([target("A", 0.6, 0), target("B", 0.4, 0)])}
+        today="2026-09-15"
       />,
     );
 
@@ -98,6 +112,7 @@ describe("CogitatorScreen", () => {
           target("A", 0, 1000),
           { ...target("B", 1, 0), isImplemented: false },
         ])}
+        today="2026-09-15"
       />,
     );
 
@@ -105,7 +120,7 @@ describe("CogitatorScreen", () => {
   });
 
   it("asks for the amount before any is typed, and reads the allocation as it stands", () => {
-    render(<CogitatorScreen targets={reference} />);
+    render(<CogitatorScreen targets={reference} today="2026-09-15" />);
 
     expect(screen.getAllByText("Type an amount to invest.")).toHaveLength(1);
     expect(screen.getAllByText("No trade")).toHaveLength(3);
@@ -116,7 +131,7 @@ describe("CogitatorScreen", () => {
   });
 
   it("tiles the trades recommended, the largest set apart, and lays the ladder with the rung recommended flagged and those past it muted", () => {
-    render(<CogitatorScreen targets={reference} />);
+    render(<CogitatorScreen targets={reference} today="2026-09-15" />);
     invest("2000");
 
     expect(toned("inverse")).toHaveTextContent("A£1,745");
@@ -147,7 +162,7 @@ describe("CogitatorScreen", () => {
   });
 
   it("recommends no trade for an amount under the minimum, saying what the first would put in", () => {
-    render(<CogitatorScreen targets={reference} />);
+    render(<CogitatorScreen targets={reference} today="2026-09-15" />);
     invest("50");
 
     expect(
@@ -161,6 +176,7 @@ describe("CogitatorScreen", () => {
     render(
       <CogitatorScreen
         targets={allocation([target("A", 0.5, 1000), target("B", 0.5, 1000)])}
+        today="2026-09-15"
       />,
     );
     invest("100");
@@ -176,6 +192,7 @@ describe("CogitatorScreen", () => {
     render(
       <CogitatorScreen
         targets={allocation([target("A", 0.5, 2000), target("B", 0.5, 3000)])}
+        today="2026-09-15"
       />,
     );
     invest("1000");
@@ -196,6 +213,7 @@ describe("CogitatorScreen", () => {
           target("B", 0.25, 1500),
           target("C", 0.25, 950),
         ])}
+        today="2026-09-15"
       />,
     );
     commit(field("Sales at most"), "2");
@@ -234,6 +252,7 @@ describe("CogitatorScreen", () => {
     render(
       <CogitatorScreen
         targets={allocation([target("A", 0.5, 1000), target("B", 0.5, 1500)])}
+        today="2026-09-15"
       />,
     );
     invest("50");
@@ -257,6 +276,7 @@ describe("CogitatorScreen", () => {
       <CogitatorScreen
         offered={{ amount: 2000, month: { month: 7, year: 2026 } }}
         targets={reference}
+        today="2026-09-15"
       />,
     );
 
@@ -278,6 +298,7 @@ describe("CogitatorScreen", () => {
       <CogitatorScreen
         planned={{ amount: 2000, month: { month: 8, year: 2026 } }}
         targets={reference}
+        today="2026-09-15"
       />,
     );
 
@@ -293,11 +314,13 @@ describe("CogitatorScreen", () => {
   });
 
   it("shows the amount and sales held when their fields come back", () => {
-    const { rerender } = render(<CogitatorScreen targets={reference} />);
+    const { rerender } = render(
+      <CogitatorScreen targets={reference} today="2026-09-15" />,
+    );
     invest("2000");
     commit(field("Sales at most"), "3");
-    rerender(<CogitatorScreen targets={null} />);
-    rerender(<CogitatorScreen targets={reference} />);
+    rerender(<CogitatorScreen targets={null} today="2026-09-15" />);
+    rerender(<CogitatorScreen targets={reference} today="2026-09-15" />);
 
     expect(field("Amount to invest")).toHaveValue("£2,000");
     expect(field("Sales at most")).toHaveValue("3");
@@ -323,6 +346,7 @@ describe("CogitatorScreen", () => {
             ],
           },
         ])}
+        today="2026-09-15"
       />,
     );
     commit(field("Sales at most"), "1");
@@ -356,7 +380,7 @@ describe("CogitatorScreen", () => {
         },
       ]);
     const { rerender } = render(
-      <CogitatorScreen targets={listed(["ISA", ""])} />,
+      <CogitatorScreen targets={listed(["ISA", ""])} today="2026-09-15" />,
     );
     commit(field("Sales at most"), "1");
 
@@ -372,12 +396,17 @@ describe("CogitatorScreen", () => {
 
     expect(toned("default")).toHaveTextContent("B−£400");
 
-    rerender(<CogitatorScreen targets={listed(["GIA"])} />);
+    rerender(<CogitatorScreen targets={listed(["GIA"])} today="2026-09-15" />);
 
     expect(toned("default")).toHaveTextContent("B−£1,000");
 
-    rerender(<CogitatorScreen targets={allocation([target("A", 1, 1000)])} />);
-    rerender(<CogitatorScreen targets={listed(["ISA"])} />);
+    rerender(
+      <CogitatorScreen
+        targets={allocation([target("A", 1, 1000)])}
+        today="2026-09-15"
+      />,
+    );
+    rerender(<CogitatorScreen targets={listed(["ISA"])} today="2026-09-15" />);
 
     expect(screen.getByRole("combobox", { name: "Account" })).toHaveValue("");
     expect(toned("default")).toHaveTextContent("B−£1,000");
@@ -395,6 +424,7 @@ describe("CogitatorScreen", () => {
       <CogitatorScreen
         offered={{ account: "ISA", amount: 400, month }}
         targets={listed}
+        today="2026-09-15"
       />,
     );
 
@@ -407,6 +437,7 @@ describe("CogitatorScreen", () => {
       <CogitatorScreen
         offered={{ account: "Pension", amount: 400, month }}
         targets={listed}
+        today="2026-09-15"
       />,
     );
 
@@ -418,7 +449,9 @@ describe("CogitatorScreen", () => {
       target("A", 0.5, 1000),
       { ...target("B", 0.5, 3000), accounts: [{ name: "ISA", value: 400 }] },
     ]);
-    const { rerender } = render(<CogitatorScreen targets={listed} />);
+    const { rerender } = render(
+      <CogitatorScreen targets={listed} today="2026-09-15" />,
+    );
     commit(field("Sales at most"), "1");
     fireEvent.change(screen.getByRole("combobox", { name: "Account" }), {
       target: { value: "ISA" },
@@ -429,12 +462,13 @@ describe("CogitatorScreen", () => {
           { ...target("A", 0, 1000), accounts: [{ name: "ISA", value: 1000 }] },
           { ...target("B", 1, 0), isImplemented: false },
         ])}
+        today="2026-09-15"
       />,
     );
 
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
 
-    rerender(<CogitatorScreen targets={listed} />);
+    rerender(<CogitatorScreen targets={listed} today="2026-09-15" />);
 
     expect(screen.getByRole("combobox", { name: "Account" })).toHaveValue(
       "ISA",
@@ -450,6 +484,7 @@ describe("CogitatorScreen", () => {
           target("B", 0, 1000),
           { ...target("C", 0.5, 1000), isImplemented: false },
         ])}
+        today="2026-09-15"
       />,
     );
     invest("1000");

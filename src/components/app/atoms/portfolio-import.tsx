@@ -11,11 +11,12 @@ import { useSender } from "@/hooks/use-sender";
 import { formatDay } from "@/lib/months";
 import { readPortfolios, readTargets } from "@/lib/portfolio-file";
 
-// The month end's button importing the holdings, the target allocation
-// with what each category holds and each securities account's cash and
-// what was paid into it, from a Portfolio Performance file
-// chosen on this device, as the assumptions screen imports them, so the
-// trades are worked out over the holdings as they stand at the close.
+// The button importing the holdings, on the month end and the
+// cogitator, the target allocation with what each category holds and
+// each securities account's cash and what was paid into it, from a
+// Portfolio Performance file chosen on this device, as the assumptions
+// screen imports them, so the trades are worked out over the holdings
+// as they stand at the close.
 // The file is read here in the browser and the store is sent what the
 // reader reads out of it alone. The import spins while the file is read
 // and the store asked, and the store's answer draws the screen again,
