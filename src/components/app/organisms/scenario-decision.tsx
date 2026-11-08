@@ -159,7 +159,7 @@ export function ScenarioDecision({
         >
           <p className="text-sm text-muted-foreground">
             {asking.kind === "adopt"
-              ? "The household's plan is replaced by the scenario's. Its balances, progress points and pulled figures stay as they stand, and the scenario is kept under Made the household."
+              ? "The scenario's plan, its target allocation included, replaces the household's. The household keeps its balances, progress points and pulled figures as they stand, and the holdings last imported. The scenario is kept under Made the household."
               : "The household is not touched. The scenario is kept under Decided against in the scenario menu, and can be opened again from there."}
           </p>
           <TextField

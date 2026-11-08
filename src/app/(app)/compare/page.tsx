@@ -38,7 +38,8 @@ const unnamed = "Scenario beside the household";
 // A scenario set beside the household, at /compare?scenario= and its
 // name, read from the store behind the session as making it the
 // household would leave it: its plan laid over the household's
-// balances, progress points and pulled figures as they stand. It is
+// balances, progress points and pulled figures as they stand, and over
+// the newer of the two imports from Portfolio Performance. It is
 // reached from the scenario menu rather than the navigation, so it
 // takes the dashboard's label and lights no screen there. The title
 // gives the answer, how the scenario moves retirement at each plan's
