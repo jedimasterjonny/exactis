@@ -20,6 +20,7 @@ import {
 interface FuturesOutcomesProps {
   readonly count: number;
   readonly grading: Grading;
+  readonly headlineId?: string;
   readonly outcomes: Readonly<Record<Outcome, number>>;
   readonly plan: Plan;
   readonly reading: Reading;
@@ -43,10 +44,13 @@ const lastedAs: Readonly<Record<(typeof lastingOutcomes)[number], string>> = {
 // or the ages bounding it, which is where the bar's fills are named. Most is said only of more than half, many otherwise, and where
 // two outcomes hold as many the better is said. Read over the futures
 // drawn so far while the run comes in, the bar's rest shrinking as it
-// does, and saying only that it is drawing before the first are in.
+// does, and saying only that it is drawing before the first are in. The
+// sentence saying how many last takes the id it is handed, so a chart
+// can be described by it.
 export function FuturesOutcomes({
   count,
   grading,
+  headlineId,
   outcomes,
   plan,
   reading,
@@ -132,7 +136,12 @@ export function FuturesOutcomes({
                   fell short
                 </span>
               </p>
-              <h2 className="mt-3 heading text-2xl text-balance">{verdict}</h2>
+              <h2
+                className="mt-3 heading text-2xl text-balance"
+                id={headlineId}
+              >
+                {verdict}
+              </h2>
               <p className="text-sm text-pretty text-muted-foreground">
                 {`${shortfall} The middle one leaves ${formatGbp(reading.middle)}.`}
               </p>

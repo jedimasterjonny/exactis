@@ -40,6 +40,7 @@ interface FanTooltipProps {
 }
 
 interface FuturesFanProps {
+  readonly "aria-describedby"?: string;
   readonly futures: readonly Future[];
   readonly milestones: readonly Milestone[];
   readonly plan: Plan;
@@ -112,8 +113,10 @@ const tenths = ({ bottomTenth, topTenth }: FutureYear): number[] => [
 // While the first futures are drawn there is nothing to fan, and the
 // card says so in the plot's place. The card lets the crosshair's
 // figures out past its edge rather than clipping them, as the
-// dashboard's does.
+// dashboard's does. The chart is described by the element whose id it
+// is handed, as the sentence saying how many futures last.
 export function FuturesFan({
+  "aria-describedby": describedBy,
   futures,
   milestones,
   plan,
@@ -165,6 +168,7 @@ export function FuturesFan({
           <div className={cn("flex flex-col", plotBox)}>
             <ChartContainer className="aspect-auto min-h-0 flex-1" config={{}}>
               <ComposedChart
+                aria-describedby={describedBy}
                 data={years}
                 margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
                 title="What the futures are worth as each year opens"

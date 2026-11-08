@@ -118,8 +118,10 @@ describe("Progress", () => {
       screen.queryByRole("region", { name: "What the year came to" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("region", { name: "Month by month" }),
-    ).toBeInTheDocument();
+      within(screen.getByRole("region", { name: "Month by month" })).getByRole(
+        "application",
+      ),
+    ).not.toHaveAccessibleDescription();
   });
 
   // A point alone has nothing to move from.
@@ -183,6 +185,14 @@ describe("Progress", () => {
     });
 
     expect(within(chart).getByText("Aug 2027")).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole("region", { name: "What the year came to" }),
+      ).getByRole("heading", { level: 2 }),
+    ).toHaveTextContent("Net worth rose £36,786 in the 5 months to August.");
+    expect(chart).toHaveAccessibleDescription(
+      "Net worth rose £36,786 in the 5 months to August.",
+    );
     expect(screen.getAllByRole("paragraph").at(-2)).toHaveTextContent(
       "The plan runs on from the latest point for a year, by what it pays in and what each account grows by.",
     );

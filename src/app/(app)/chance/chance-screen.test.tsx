@@ -152,6 +152,13 @@ describe("ChanceScreen", () => {
     ).toHaveTextContent(
       "1,000 of 1,000 futures last to 37, most of them comfortably.",
     );
+    expect(
+      screen.getByRole("application", {
+        name: "What the futures are worth as each year opens",
+      }),
+    ).toHaveAccessibleDescription(
+      "1,000 of 1,000 futures last to 37, most of them comfortably.",
+    );
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 

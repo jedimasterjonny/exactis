@@ -40,6 +40,7 @@ import {
 import { progress, subsectionLabel } from "@/lib/nav";
 
 interface ProgressChartProps {
+  readonly "aria-describedby"?: string | undefined;
   readonly planned: readonly PlannedMonth[];
   readonly points: readonly ProgressPoint[];
 }
@@ -141,7 +142,9 @@ const worthDot = {
 // and the plan carries them, and the caption says so.
 // The crosshair reads the month, each balance and net worth, or net
 // worth alone for a month planned, on hover and on the arrow keys, and
-// is announced to a screen reader as it moves.
+// is announced to a screen reader as it moves, and is described by the
+// element it is handed the id of, as the sentence saying how far the
+// year moved net worth.
 // The pounds reach below nothing only as far as the debts or the plan
 // do, and above it as far as everything held or the plan does. The
 // years are marked at each January, the plan's among them, where the
@@ -149,6 +152,7 @@ const worthDot = {
 // too, since a span kept with no January would otherwise be marked by
 // no more than the year the plan runs into, or not at all.
 export function ProgressChart({
+  "aria-describedby": describedBy,
   planned,
   points,
 }: ProgressChartProps): JSX.Element {
@@ -184,6 +188,7 @@ export function ProgressChart({
         <div className={cn("flex flex-col", plotBox)}>
           <ChartContainer className="aspect-auto min-h-0 flex-1" config={{}}>
             <ComposedChart
+              aria-describedby={describedBy}
               data={rows}
               margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
               stackOffset="sign"

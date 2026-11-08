@@ -33,13 +33,17 @@ export const metadata: Metadata = { title: progress.label };
 // runs the plan on a year from the latest point where it can. The notes
 // at the foot say what net worth counts, how the plan runs on where the
 // chart draws it, and what the house is held at, the index to the month
-// it ran to or the sheet before one is pulled. The page renders behind
-// the loading screen beside it.
+// it ran to or the sheet before one is pulled. The chart is described by
+// the year's sentence where both are drawn, through an id fixed for this
+// screen, since Next keeps a screen left in the document, hidden, and an
+// id shared by two screens would name both. The page renders behind the
+// loading screen beside it.
 export default async function Progress(): Promise<JSX.Element> {
   const household = await getHousehold();
   const { housePrices, points } = household;
   const planned = points.length > 1 ? plannedOf(household) : [];
   const year = latestYearOf(points);
+  const headline = "progress-headline";
   return (
     <Screen
       actions={<HousePricesPull />}
@@ -47,8 +51,14 @@ export default async function Progress(): Promise<JSX.Element> {
       meta={spanOf(points)}
       title={progress.title}
     >
-      {year !== undefined && <ProgressYear year={year} />}
-      {points.length > 1 && <ProgressChart planned={planned} points={points} />}
+      {year !== undefined && <ProgressYear headlineId={headline} year={year} />}
+      {points.length > 1 && (
+        <ProgressChart
+          aria-describedby={year === undefined ? undefined : headline}
+          planned={planned}
+          points={points}
+        />
+      )}
       <ProgressPoints points={points} />
       <Note>
         Net worth counts every balance a point was read with; the sheet&apos;s
