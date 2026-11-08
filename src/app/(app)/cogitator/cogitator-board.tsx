@@ -421,7 +421,7 @@ function Unready({
         <EmptyState description={description} icon={icon} title={title}>
           <Link
             className="underline underline-offset-4"
-            href={assumptions.href}
+            href={`${assumptions.href}?tab=target-allocation`}
           >
             {`${assumptions.label} › Target allocation`}
           </Link>
