@@ -18,6 +18,7 @@ import { formatGbp, formatSignedGbp } from "@/lib/money";
 import { formatMonthShort, monthName, monthsBetween } from "@/lib/months";
 
 interface ProgressYearProps {
+  readonly headlineId?: string;
   readonly year: LatestYear;
 }
 
@@ -35,8 +36,13 @@ interface ProgressYearProps {
 // the latest was read with more; and each balance's
 // move beside where it stands now, which is
 // where the bar's fills are named. A debt paid down adds and one run
-// up takes away, as it moves net worth.
-export function ProgressYear({ year }: ProgressYearProps): JSX.Element {
+// up takes away, as it moves net worth. The sentence saying how far net
+// worth moved takes the id it is handed, so a chart can be described by
+// it.
+export function ProgressYear({
+  headlineId,
+  year,
+}: ProgressYearProps): JSX.Element {
   const { before, from, to } = year;
   const over = sharedBy(from, to);
   const months = monthsBetween(from.month, to.month);
@@ -79,7 +85,7 @@ export function ProgressYear({ year }: ProgressYearProps): JSX.Element {
               taken away
             </span>
           </p>
-          <h2 className="mt-3 heading text-2xl text-balance">
+          <h2 className="mt-3 heading text-2xl text-balance" id={headlineId}>
             {verdictOf(moved, span, before)}
           </h2>
           <p className="text-sm text-pretty text-muted-foreground">

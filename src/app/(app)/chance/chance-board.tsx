@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 
 import type { Account } from "@/data/accounts";
 import type { Milestone } from "@/data/milestones";
@@ -49,8 +49,9 @@ interface ChanceBoardProps {
 // as its owner retires, which the futures that last are graded against.
 // A plan that falls short even at its own rates is said to before what
 // the futures come to, since the chance then reads how often the
-// markets would carry a plan that does not work as it stands. What the
-// run was drawn from closes the screen.
+// markets would carry a plan that does not work as it stands. The fan
+// is described by the sentence saying how many futures last, through an
+// id of the board's own. What the run was drawn from closes the screen.
 export function ChanceBoard({
   accounts,
   futures,
@@ -67,6 +68,7 @@ export function ChanceBoard({
     [accounts, plan, schedule],
   );
   const projected = readingOf([asProjected]);
+  const headlineId = useId();
   const grading = useMemo(
     () => gradingOf(asProjected, plan),
     [asProjected, plan],
@@ -77,6 +79,7 @@ export function ChanceBoard({
       <FuturesOutcomes
         count={runLength}
         grading={grading}
+        headlineId={headlineId}
         outcomes={outcomesOf(futures, grading)}
         plan={plan}
         reading={reading}
@@ -92,7 +95,12 @@ export function ChanceBoard({
       ) : (
         <FuturesBreaks plan={plan} />
       )}
-      <FuturesFan futures={futures} milestones={milestones} plan={plan} />
+      <FuturesFan
+        aria-describedby={headlineId}
+        futures={futures}
+        milestones={milestones}
+        plan={plan}
+      />
       <MilestoneSpreads
         futures={futures}
         milestones={milestones}
