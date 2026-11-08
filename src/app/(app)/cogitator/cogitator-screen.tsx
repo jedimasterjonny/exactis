@@ -85,7 +85,7 @@ export function CogitatorScreen({
     <Screen
       actions={
         isReady ? (
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <MoneyField
               hint={
                 offered?.amount === amount
@@ -115,7 +115,7 @@ export function CogitatorScreen({
                 ]}
               />
             )}
-          </>
+          </div>
         ) : undefined
       }
       label={sectionLabel(cogitator)}
