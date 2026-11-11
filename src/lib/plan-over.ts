@@ -6,12 +6,21 @@ import type { Kept } from "@/data/household";
 
 import { deductedBy } from "@/data/moves";
 import { recordId } from "@/data/schemas";
+import { upcast } from "@/data/shapes";
 import { Refusal } from "@/lib/answer";
 
-// The id the next record is given, read off the copy a scenario was made
-// from and nothing else: the copy was sound when it was kept, and a rule
-// tightened since would otherwise refuse an adoption it has no part in.
-export const fork = z.object({ next: recordId });
+// The copy a scenario was made from, its first version, read for the
+// ids of its accounts and nothing else: the copy was sound when it was
+// kept, and a rule tightened since would otherwise refuse an adoption it
+// has no part in.
+const fork = z.object({ accounts: z.array(z.object({ id: recordId })) });
+
+// The ids of the accounts in the copy a scenario was made from, carried
+// through the chain and read as fork reads them, an account listed
+// twice once.
+export function forkOf(copy: unknown): ReadonlySet<number> {
+  return new Set(fork.parse(upcast(copy)).accounts.map(({ id }) => id));
+}
 
 // The household a scenario leaves when it is adopted: the scenario's
 // plan over the household's bookkeeping. The bookkeeping is what was
@@ -42,24 +51,21 @@ export const fork = z.object({ next: recordId });
 // same, dated no later, and the scenario's otherwise. Balances go by
 // the account's id: an account in both takes the household's balance,
 // one only the scenario holds keeps its own, and one only the household
-// holds is gone, since the scenario deleted it. That holds only while
-// the household holds no account added since the scenario was made:
-// each branch gives its next record the id the household's next stood
-// at when the scenario was made, so an account added to each would be
-// read as one, the scenario's taking the household's balance and the
-// household's gone unsaid, and one added to the household alone would
-// go unsaid too. A household holding an account with an id from that
-// one on is refused, so the operator takes the account out of the
-// household and puts it back after. The merged household gives its next
+// holds is gone, since the scenario deleted it. That holds only for an
+// account the scenario's own first version held, whose ids are handed
+// in as forked: one the household holds that it did not would be gone
+// unsaid, or read as the scenario's own under the same id, its balance
+// laid over that one. So a household holding an account whose id is not
+// among them is refused. The merged household gives its next
 // record the higher of the two ids, since an id only ever counts up and
 // each branch's next stands where its own additions moved it, an
 // account since taken out among them.
 export function planOver(
   household: Kept,
   scenario: Kept,
-  forkedAt: number,
+  forked: ReadonlySet<number>,
 ): Kept {
-  if (household.accounts.some(({ id }) => id >= forkedAt)) {
+  if (household.accounts.some(({ id }) => !forked.has(id))) {
     throw new Refusal(
       "An account was added to the household since this scenario was made, so the scenario cannot be laid over it; delete it from the household first, and add it again after",
     );

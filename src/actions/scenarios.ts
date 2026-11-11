@@ -17,7 +17,7 @@ import {
   readLatest,
 } from "@/db/household";
 import { Refusal, refused, saved } from "@/lib/answer";
-import { fork, planOver } from "@/lib/plan-over";
+import { forkOf, planOver } from "@/lib/plan-over";
 import { closeScenario, openedScenario, openScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 import { readHeld } from "@/store/household";
@@ -78,7 +78,7 @@ const shownAt = z.object({
 // target allocation imported there since that lists other categories
 // with a target above 0%, is refused rather than merged, as planOver
 // says, and the scenario's first version, the copy it was made from, is
-// read for the id its next record was given to tell the account.
+// read for the ids of its accounts to tell the account.
 // The store runs no transaction, so the household is written first, and
 // the answer says whether the decision was kept after it: a decision
 // that fails once the household is written, refused because a save
@@ -129,7 +129,7 @@ export async function adoptScenario(
           : planOver(
               soundKept(upcast(household.household)).kept,
               plan,
-              fork.parse(upcast(forked.household)).next,
+              forkOf(forked.household),
             ),
       ).kept,
     );

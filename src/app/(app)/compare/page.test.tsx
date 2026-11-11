@@ -13,7 +13,7 @@ import { forget } from "@/hooks/use-futures";
 import { refused, saved } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
 import { sideOf } from "@/lib/moved";
-import { planOver } from "@/lib/plan-over";
+import { forkOf, planOver } from "@/lib/plan-over";
 import { getCompared } from "@/store/household";
 
 import Compare, { metadata } from "./page";
@@ -260,7 +260,7 @@ describe("Compare", () => {
     };
     vi.mocked(getCompared).mockResolvedValue({
       ...comparedOf(kept, household),
-      over: saved(heldOf(planOver(household, kept, household.next))),
+      over: saved(heldOf(planOver(household, kept, forkOf(kept)))),
     });
 
     await draw({ scenario: "Four-day week" });
