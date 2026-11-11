@@ -13,6 +13,8 @@ import { soundKept } from "@/data/household";
 import { kept, today } from "@/data/household.fixture";
 import { homePart, homeValues } from "@/data/houses.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { atAge } from "@/data/milestones";
+import { owners } from "@/data/owners.fixture";
 import { upcast } from "@/data/shapes";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -1494,6 +1496,26 @@ describe("the account actions", () => {
       expect(soundKept(await latest()).kept.points[5]).toStrictEqual({
         ...kept.points[5],
         standing: standingOf(kept),
+      });
+    });
+
+    // The reference's owner retired at an invented 30, before the plan
+    // opens at 34: once September is closed, August's point keeps the
+    // worth read in the plan's first year beside that year's age, and
+    // the age retired at.
+    it("keeps the age the plan opens at on the point, where its owner retired before it opens", async () => {
+      const retired: Kept = {
+        ...kept,
+        owners: [{ ...owners[0], retirement: atAge(30) }],
+      };
+      await keepAfter(db, { scenario: "", version: 2 }, retired);
+      vi.setSystemTime(new Date("2026-09-25T12:00:00Z"));
+      await moveTo({ month: 8, year: 2026 });
+
+      expect(soundKept(await latest()).kept.points[5]?.standing).toStrictEqual({
+        age: 34,
+        liquid: standingOf(retired).liquid,
+        retires: 30,
       });
     });
 

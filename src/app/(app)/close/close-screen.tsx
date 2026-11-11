@@ -150,7 +150,9 @@ interface Stood {
 // the liquid worth where two steps or more moved it, the caption saying
 // the order they are taken in and a note the ends of the scale, with a
 // note where the plan now ends before the age the worth is held at that
-// every row reads it where the plan ends, and where a step moved
+// every row reads it where the plan ends, and where the retirement the
+// month end expected is before the plan starts that every row reads it
+// where the plan starts, and where a step moved
 // retirement that the worth is still read at the same age, and what the
 // plan paid into
 // the ISAs and the GIAs, offered to the cogitator, and between the two
@@ -690,7 +692,9 @@ function missingOf({ point }: Entry, place: Place): string {
 // The notes beneath what moved after the one every walk carries: where
 // the plan now ends before the age the liquid worth is held at, the end
 // the month end expected or the retirement, that every row reads it
-// where the plan now ends; where the steps are drawn, what each bar runs
+// where the plan now ends; where the retirement the month end expected
+// is before the age the plan starts at, that every row reads it where
+// the plan starts; where the steps are drawn, what each bar runs
 // between and the ends of its scale; and where a step moved retirement,
 // that the liquid worth is still read at the same age.
 function notesOf(
@@ -705,6 +709,11 @@ function notesOf(
       : `The month end expected retirement at ${String(fixed)}, but the plan now ends at ${at}, so every row reads the liquid worth at ${at}.`;
   return [
     ...(age < fixed ? [ends] : []),
+    ...(age > fixed
+      ? [
+          `The month end expected retirement at ${String(fixed)}, but the plan starts at ${at}, so every row reads the liquid worth at ${at}.`,
+        ]
+      : []),
     ...(isDrawn
       ? [
           `Each bar runs from where the row above left the liquid worth at ${at} to the dot where its own row leaves it, on a scale from the lowest it reaches, ${formatGbp(lo)}, to the highest, ${formatGbp(hi)}.`,

@@ -49,8 +49,9 @@ export interface Line {
 // that changed what could move a rate, and the records that changed;
 // what the plan paid into the ISAs and
 // the GIAs over the months closed; how many months those were; and the
-// age the liquid net worth is held at, which is the one it is read at
-// but where the plan now ends before it.
+// age the liquid net worth is held at, as the month end expected it,
+// which is the one it is read at but where the plan opens after it or
+// now ends before it.
 export interface Moved {
   readonly age: number;
   readonly balances: Balances;
@@ -344,9 +345,11 @@ export function movedOver(closed: KeptBalances, now: Kept): Moved {
 // read for when the plan's owner retires and its liquid net worth at an
 // age held fixed, the one they retire at as the month end expected, or
 // the one the plan runs to where they never do, so a year moved does
-// not move where the worth is read, or the age the plan now ends at
-// where it ends before that, so every state is read at an age it
-// reaches. A group that changed nothing is skipped, and one leaving a
+// not move where the worth is read, or the age that plan opens at where
+// it opens after that, or the age the plan now ends at where it ends
+// before either, so every state is read at an age it reaches but for a
+// birth year or plan's owner changed since. A group that changed
+// nothing is skipped, and one leaving a
 // state the rules refuse is taken together
 // with the groups after it until the state is sound, the step naming
 // each of them that changed something, so the steps always end on the
@@ -382,7 +385,10 @@ export function movedSince(
   const { retired } = opening.future;
   const fixed =
     retired === null ? endAge(opening.plan) : ageIn(retired, opening.plan);
-  const age = Math.min(fixed, endAge(soundKept(now).household.plan));
+  const age = Math.min(
+    Math.max(fixed, ageIn(opening.plan.from, opening.plan)),
+    endAge(soundKept(now).household.plan),
+  );
   const nowById = new Map(now.accounts.map((account) => [account.id, account]));
   const closed = (accounts: readonly Account[]): readonly Account[] =>
     accounts.map((account) => ({
@@ -491,17 +497,14 @@ export function sideOf(kept: Kept): Side {
 // Where a kept household's plan stands at its own rates, as a point
 // keeps it once the month after is closed: the age the liquid net worth
 // is read at, the one its owner retires at, or the one the plan runs to
-// where they never do, as What moved reads it; that worth to the pound;
-// and the age they retire at, or null.
+// where they never do, or the one the plan opens at where it opens after
+// that, as What moved reads it; that worth to the pound; and the age
+// they retire at, or null.
 export function standingOf(kept: Kept): NonNullable<KeptPoint["standing"]> {
   const { future, plan } = futureIn(kept);
-  const age =
-    future.retired === null ? endAge(plan) : ageIn(future.retired, plan);
-  return {
-    age,
-    liquid: Math.round(standingAt(future, age).liquid),
-    retires: future.retired === null ? null : age,
-  };
+  const retires = future.retired === null ? null : ageIn(future.retired, plan);
+  const age = Math.max(retires ?? endAge(plan), ageIn(plan.from, plan));
+  return { age, liquid: Math.round(standingAt(future, age).liquid), retires };
 }
 
 // The balances the close set against those it closed from, over the

@@ -680,6 +680,36 @@ describe("Close", () => {
     ]);
   });
 
+  // The month end expected retirement at an invented 30, in 2022, before
+  // the plan starts at 34, where every row is read; the balances moved
+  // the worth alone.
+  it("says every row is read where the plan starts, after the retirement the month end expected", async () => {
+    vi.mocked(movedSince).mockReturnValue({
+      ...moved,
+      age: 34,
+      expected: { liquid: 112_000, retired: 2022 },
+      fixed: 30,
+      now: { liquid: 122_000, retired: 2022 },
+      steps: [
+        { groups: ["balances"], standing: { liquid: 122_000, retired: 2022 } },
+      ],
+    });
+    await renderClose();
+
+    expect(
+      screen.getByRole("columnheader", { name: "Liquid at 34" }),
+    ).toBeInTheDocument();
+    expect(rows()[0]).toStrictEqual([
+      "As the month end expected",
+      "30",
+      "£112,000",
+    ]);
+    expect(notes()).toStrictEqual([
+      "Each row is worked out after the ones above it. Liquid net worth leaves out the property, the vehicles and a pension its owner cannot yet draw, in today's money.",
+      "The month end expected retirement at 30, but the plan starts at 34, so every row reads the liquid worth at 34.",
+    ]);
+  });
+
   it("says where a retirement out of reach came within it, and where it stays out", async () => {
     vi.mocked(movedSince).mockReturnValue({
       ...moved,
@@ -1389,6 +1419,14 @@ describe("Track record", () => {
       { age: 91, liquid: 17_700, retires: null },
       [
         "Since March 2026's close, retirement is still out of reach.",
+        "Liquid at that age",
+      ],
+    ],
+    [
+      { age: 30, liquid: 110_000, retires: 30 },
+      { age: 34, liquid: 112_000, retires: 30 },
+      [
+        "Since March 2026's close, retirement is still at 30.",
         "Liquid at that age",
       ],
     ],
