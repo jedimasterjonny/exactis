@@ -22,7 +22,14 @@ import { milestones } from "@/data/milestones.fixture";
 import { working } from "@/data/owners.fixture";
 import { saved } from "@/lib/answer";
 import { placed } from "@/lib/span";
-import { bySlot, field, openEntry, openRow, pressRow } from "@/test/dom";
+import {
+  bySlot,
+  field,
+  openEntry,
+  openRow,
+  pressRow,
+  styled,
+} from "@/test/dom";
 
 import { MilestoneSpreads } from "./milestone-spreads";
 
@@ -127,7 +134,9 @@ describe("MilestoneSpreads", () => {
     // The bars sit on the plan's span, ruled at retirement, which falls
     // past its end.
     expect(medians()).toStrictEqual(
-      [2034, 2034, 2026, 2026].map((year) => `${String(placed(year, plan))}%`),
+      [2034, 2034, 2026, 2026].map((year) =>
+        styled("left", `${String(placed(year, plan))}%`),
+      ),
     );
     expect(
       within(card)
@@ -171,7 +180,9 @@ describe("MilestoneSpreads", () => {
         .getAllByText(bySlot("pin-bar-pin"), { suggest: false })
         .map(({ style }) => style.left),
     ).toStrictEqual(
-      [2040, 2040, 2059, 2059].map((year) => `${String(placed(year, plan))}%`),
+      [2040, 2040, 2059, 2059].map((year) =>
+        styled("left", `${String(placed(year, plan))}%`),
+      ),
     );
     // The ruler marks 2040 with its age too, so the row's are read off
     // the list.
@@ -241,7 +252,9 @@ describe("MilestoneSpreads", () => {
         .getAllByText(bySlot("pin-bar-pin"), { suggest: false })
         .map(({ style }) => style.left),
     ).toStrictEqual(
-      [2033, 2033].map((year) => `${String(placed(year, plan))}%`),
+      [2033, 2033].map((year) =>
+        styled("left", `${String(placed(year, plan))}%`),
+      ),
     );
     expect(screen.getAllByText("Age 41")).toHaveLength(2);
   });
@@ -300,13 +313,13 @@ describe("MilestoneSpreads", () => {
     // Each is held to the gap to its nearest point, so none covers
     // another's where the years fall close: two years for the first
     // three and three for the last.
-    const years = (count: number): string =>
-      placed(plan.from + count, plan).toFixed(6);
     expect(
-      points
-        .slice(0, 4)
-        .map(({ style }) => Number.parseFloat(style.maxWidth).toFixed(6)),
-    ).toStrictEqual([2, 2, 2, 3].map(years));
+      points.slice(0, 4).map(({ style }) => Number.parseFloat(style.maxWidth)),
+    ).toStrictEqual(
+      [2, 2, 2, 3].map((count): unknown =>
+        expect.closeTo(placed(plan.from + count, plan), 4),
+      ),
+    );
 
     // Focus moved by the keyboard opens it, as a pointer's hover does;
     // the focus is real, since the tooltip asks whether it is visible.

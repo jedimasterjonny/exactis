@@ -20,7 +20,7 @@ import { atAge, retiringAt } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { saved } from "@/lib/answer";
 import { laneColumns } from "@/lib/span";
-import { bySlot, commit, field, openEntry, openRow } from "@/test/dom";
+import { bySlot, commit, field, openEntry, openRow, styled } from "@/test/dom";
 
 import { MilestoneList } from "./milestone-list";
 
@@ -127,7 +127,9 @@ describe("MilestoneList", () => {
         .getAllByText(bySlot("pin-bar-pin"), { suggest: false })
         .map((pin) => pin.style.left),
     ).toStrictEqual(
-      [14, 14, 27, 27, 33, 33].map((years) => `${String((years / 57) * 100)}%`),
+      [14, 14, 27, 27, 33, 33].map((years) =>
+        styled("left", `${String((years / 57) * 100)}%`),
+      ),
     );
     // Laid out in the schedules' columns, retirement's lock row as wide
     // in its span as a row with a pencil and a bin.
