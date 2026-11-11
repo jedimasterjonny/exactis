@@ -14,6 +14,7 @@ import { laidOut, monthsOn, project } from "@/engine/projection";
 import { answerOf } from "@/lib/answer";
 import { sumOf } from "@/lib/ledger";
 import { cutOf, monthsBetween } from "@/lib/months";
+import { pulledOver } from "@/lib/plan-over";
 
 // A record outside the rates that the walk tells apart, for the step of
 // changes to name.
@@ -213,16 +214,18 @@ const records: readonly {
 // the rest where they stand; then each setting of the plan that differs,
 // the end age, the drawdown and each source of the rates the scenario
 // carries over, each by the plan it holds rather than the bookkeeping
-// beside it, as What moved reads it, which leaves out the CMA and the
-// curve, since those are pulled into the household and planOver keeps
-// the household's. It is handed what adopting the scenario would write
-// where that can be written, so a category kept at 0% from the
-// household's import reads as adopting leaves it, and the scenario as
-// kept where it is refused, so the lines still stand: an account the
-// household holds that was not in the scenario when it was made then
-// reads as removed, unless the scenario holds it now, as making the
-// scenario the household would leave it.
-export function changedIn(household: Kept, scenario: Kept): readonly Line[] {
+// beside it, as What moved reads it, and the CMA and the curve as
+// adopting lays them, the newer pull of each, so a scenario holding an
+// older one or none lists neither, the merge refused or not. It is
+// handed what adopting the scenario would write where that can be
+// written, so a category kept at 0% from the household's import reads
+// as adopting leaves it, and the scenario as kept where it is refused,
+// so the lines still stand: an account the household holds that was
+// not in the scenario when it was made then reads as removed, unless
+// the scenario holds it now, as making the scenario the household
+// would leave it.
+export function changedIn(household: Kept, kept: Kept): readonly Line[] {
+  const scenario = { ...kept, ...pulledOver(household, kept) };
   const settings: readonly {
     readonly keys: readonly (keyof Kept)[];
     readonly name: string;
@@ -230,12 +233,10 @@ export function changedIn(household: Kept, scenario: Kept): readonly Line[] {
   }[] = [
     { keys: ["ages"], name: areaNames.ages },
     { keys: ["drawdown"], name: areaNames.drawdown },
-    ...sources
-      .filter(({ source }) => source !== "cma" && source !== "curve")
-      .map(({ source, ...setting }) => ({
-        ...setting,
-        name: sourceNames[source],
-      })),
+    ...sources.map(({ source, ...setting }) => ({
+      ...setting,
+      name: sourceNames[source],
+    })),
   ];
   const shared = (one: Kept, other: Kept): readonly number[] => {
     const ids = new Set(other.accounts.map(({ id }) => id));

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Kept } from "@/data/household";
 import type { Compared, Held } from "@/store/household";
 
+import { cma } from "@/data/cma.fixture";
 import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
 import { atAge } from "@/data/milestones";
@@ -42,6 +43,20 @@ const never = [
 // it was made keeps the two apart, as the merge says it.
 const added =
   "The household holds an account that was not in this scenario when it was made, so the scenario cannot be laid over the household; delete the account from the household first, and add it again after if it is still wanted; if this scenario holds it now, redo its changes in a new scenario made from the household instead";
+
+// The reference household with an invented November 2026 vintage and a
+// curve the Bank gave on the first of October pulled over its own.
+const pulled: Kept = {
+  ...kept,
+  cma: {
+    latest: { ...cma, asOf: "2026-10-30", vintage: { month: 10, year: 2026 } },
+    previous: cma,
+  },
+  curve: {
+    asOf: "2026-10-01",
+    implied: { 5: 0.0331, 10: 0.0327, 20: 0.0322, 30: 0.0318 },
+  },
+};
 
 // The household given, or the reference, beside the scenario given as
 // the store reads it undecided, laid over the household as its own
@@ -272,6 +287,40 @@ describe("Compare", () => {
     ).toHaveTextContent(
       "The same plan as the household'sNothing in the scenario's plan differs from the household's, so its figures are the household's too.",
     );
+  });
+
+  it("lists the CMA and the curve a scenario pulled since it was made", async () => {
+    vi.mocked(getCompared).mockResolvedValue({
+      ...comparedOf(pulled),
+      over: saved(heldOf(planOver(kept, pulled, forkOf(kept)))),
+    });
+
+    await draw({ scenario: "Four-day week" });
+
+    expect(
+      within(
+        screen.getByRole("region", {
+          name: "What making it the household changes",
+        }),
+      )
+        .getAllByRole("listitem")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual(["BlackRock CMAChanged", "BoE curveChanged"]);
+  });
+
+  // The household pulled since the scenario was made, and has opened an
+  // account the scenario never held, so the merge is refused.
+  it("lists no CMA or curve for a scenario holding older ones, even where the merge is refused", async () => {
+    vi.mocked(getCompared).mockResolvedValue({
+      ...comparedOf({ ...kept, owners: at58 }, pulled),
+      over: refused(added),
+    });
+
+    await draw({ scenario: "Four-day week" });
+
+    expect(
+      screen.getAllByRole("listitem").map(({ textContent }) => textContent),
+    ).toStrictEqual(["Owner · MeChanged"]);
   });
 
   // A scenario that runs the plan to 95 and retires the owner at 62.
