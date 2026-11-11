@@ -1,9 +1,11 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { Owner } from "@/data/owners";
 import type { Plan } from "@/data/plan";
 import type { Breaks } from "@/engine/futures";
 
+import { atAge } from "@/data/milestones";
 import { working } from "@/data/owners.fixture";
 import { commit, field } from "@/test/dom";
 
@@ -21,6 +23,12 @@ const plan: Plan = {
   retires: 58,
   years: 52,
 };
+
+// Robin, the plan's owner; Kit, retiring with them, two years older;
+// and Ash, two years younger, retiring at an age of their own, 56.
+const robin: Owner = { ...working, born: 1988, name: "Robin" };
+const kit: Owner = { born: 1986, id: 2, name: "Kit", retirement: "retirement" };
+const ash: Owner = { born: 1990, id: 3, name: "Ash", retirement: atAge(56) };
 
 function card(): HTMLElement {
   return screen.getByRole("region", { name: "Where the plan breaks" });
@@ -434,5 +442,148 @@ describe("FuturesBreaks", () => {
       />,
     );
     expect(within(card()).queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  // The age tried and the age found move Robin, and Kit with them at
+  // Kit's own age, so a partner tied reads as one owner does; Ash stays
+  // at 56, so where Ash is listed every age phrase names Robin.
+  it.each([
+    [
+      [robin],
+      "",
+      [
+        "3 years after the plan retires, spending as planned",
+        "As the plan retires, spending as planned",
+      ],
+    ],
+    [
+      [robin, kit],
+      "",
+      [
+        "3 years after the plan retires, spending as planned",
+        "As the plan retires, spending as planned",
+      ],
+    ],
+    [
+      [robin, ash],
+      "with Robin ",
+      [
+        "For Robin, 3 years after the plan retires, spending as planned",
+        "For Robin, as the plan retires, spending as planned",
+      ],
+    ],
+    [
+      [robin, kit, ash],
+      "with Robin ",
+      [
+        "For Robin, 3 years after the plan retires, spending as planned",
+        "For Robin, as the plan retires, spending as planned",
+      ],
+    ],
+  ] as const)(
+    "names the plan's owner in its age phrases only where another retires at an age of their own: %o",
+    (owners, named, [after, as]) => {
+      const { rerender } = render(
+        <FuturesBreaks
+          plan={{ ...plan, owners }}
+          searched={searchedAt(61, 7)}
+          tried={triedAt(58, 874)}
+        />,
+      );
+
+      expect(verdict()).toBe(
+        `9 in 10 futures last ${named}retiring at 61, or on 93% of the spending planned.`,
+      );
+      expect(figures()).toStrictEqual([
+        ["Retirement age", "61 yrs", after],
+        [
+          "Spending",
+          "93%",
+          `Of the spending planned, from this year on, ${named}retiring at 58`,
+        ],
+      ]);
+      expect(triedSays()[1]).toBe(
+        `874 of 1,000 futures last as the plan stands, ${named}retiring at 58.`,
+      );
+      rerender(
+        <FuturesBreaks
+          plan={{ ...plan, owners }}
+          searched={searchedAt(58, 7)}
+          tried={triedAt(64, 812)}
+        />,
+      );
+      expect(figures()[0]?.[2]).toBe(as);
+      expect(triedSays()[1]).toBe(
+        `812 of 1,000 futures last ${named}retiring at 64, spending as planned.`,
+      );
+    },
+  );
+
+  // With a cut found and no age, the verdict has no age phrase to name
+  // Robin in, while the figure's note and the age tried still do.
+  it("names the plan's owner at either end, and in no verdict without an age phrase", () => {
+    const owners = [robin, ash];
+    const { rerender } = render(
+      <FuturesBreaks
+        plan={{ ...plan, owners }}
+        searched={searchedAt(38, 7)}
+        tried={triedAt(38, 640)}
+      />,
+    );
+
+    expect(verdict()).toBe(
+      "9 in 10 futures last with Robin retiring this year, or on 93% of the spending planned.",
+    );
+    expect(figures()[0]).toStrictEqual([
+      "Retirement age",
+      "Now",
+      "9 in 10 last with Robin retiring this year",
+    ]);
+    expect(triedSays()[1]).toBe(
+      "640 of 1,000 futures last with Robin retiring this year, spending as planned.",
+    );
+    rerender(
+      <FuturesBreaks
+        plan={{ ...plan, owners }}
+        searched={searchedAt(null, 20)}
+        tried={triedAt(90, 951)}
+      />,
+    );
+    expect(verdict()).toBe(
+      "9 in 10 futures last on 80% of the spending planned.",
+    );
+    expect(figures()[0]).toStrictEqual([
+      "Retirement age",
+      "—",
+      "Fewer than 9 in 10 last even with Robin working to 90",
+    ]);
+    expect(triedSays()[1]).toBe(
+      "951 of 1,000 futures last with Robin working to 90, spending as planned.",
+    );
+    rerender(
+      <FuturesBreaks
+        plan={{ ...plan, owners }}
+        searched={searchedAt(null, null)}
+      />,
+    );
+    expect(verdict()).toBe(
+      "Fewer than 9 in 10 futures last, even with Robin working to 90 or on half the spending planned.",
+    );
+  });
+
+  // Robin was added after the owner added first, who has since been
+  // removed: listed first, Robin holds the higher id and is the plan's
+  // owner, and Ash, listed after, keeps an age of their own.
+  it("names the plan's owner by their place in the list, whatever their id", () => {
+    render(
+      <FuturesBreaks
+        plan={{ ...plan, owners: [{ ...robin, id: 24 }, ash] }}
+        searched={searchedAt(61, 7)}
+      />,
+    );
+
+    expect(verdict()).toBe(
+      "9 in 10 futures last with Robin retiring at 61, or on 93% of the spending planned.",
+    );
   });
 });
