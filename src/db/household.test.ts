@@ -27,6 +27,7 @@ import {
   readClosed,
   readCloses,
   readFirst,
+  readHighestNext,
   readLatest,
 } from "./household";
 
@@ -218,6 +219,35 @@ describe("household store", () => {
         savedAt: day("2026-11-03"),
       },
     ]);
+  });
+
+  // The household counted on to 21, one scenario open at 2,021 and
+  // another decided against at 4,021, each next invented.
+  it("reads the highest next id any branch's latest version holds, decided or not, and nought before anything is kept", async () => {
+    expect(await readHighestNext(db)).toBe(0);
+
+    await db.insert(householdVersions).values([
+      { household: { ...blank, next: 20 }, scenario: "", version: 1 },
+      { household: { ...blank, next: 21 }, scenario: "", version: 2 },
+      {
+        household: { ...blank, next: 2021 },
+        scenario: "Four-day week",
+        version: 1,
+      },
+      {
+        household: { ...blank, next: 4021 },
+        scenario: "Sabbatical year",
+        version: 1,
+      },
+      {
+        decision: "rejected",
+        household: { ...blank, next: 4021 },
+        scenario: "Sabbatical year",
+        version: 2,
+      },
+    ]);
+
+    expect(await readHighestNext(db)).toBe(4021);
   });
 
   it("drops every version of a scenario and nothing else, and never the household", async () => {

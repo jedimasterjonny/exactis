@@ -181,6 +181,29 @@ describe("planOver", () => {
     ).toThrow(new Refusal(added));
   });
 
+  // A cash ISA opened in the household under the id its next stood at,
+  // and premium bonds opened in a parent scenario under the first id of
+  // its own range, 2,000 past it, before this one was made from it.
+  it("refuses a household account the copy never held where the account a parent opened beside it took an id from the parent's own range", () => {
+    const copy = {
+      ...kept,
+      accounts: [...kept.accounts, { ...opened, id: 2020 }],
+      next: 4021,
+    };
+
+    expect(() =>
+      planOver(
+        {
+          ...household,
+          accounts: [...household.accounts, { ...opened, name: "Cash ISA" }],
+          next: 21,
+        },
+        scenarioOf({ accounts: copy.accounts, next: 4021 }),
+        forkOf(copy),
+      ),
+    ).toThrow(new Refusal(added));
+  });
+
   // Premium bonds opened in a parent scenario before this one was made
   // from it, which the household holds since at a balance set on the
   // twelfth, through a sibling or the parent made the household.

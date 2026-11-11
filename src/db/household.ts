@@ -86,6 +86,12 @@ const failure = z.object({
   query: z.string(),
 });
 
+// The highest next id as the store hands it back: the one row an
+// aggregate makes, holding a whole number.
+const highestOf = z.tuple([
+  z.object({ highest: z.number().int().nonnegative() }),
+]);
+
 // Every query below names the branch it reads or writes, the household
 // being the scenario with no name, and none defaults it, so a branch
 // forgotten is a type error rather than a save written to the household.
@@ -413,6 +419,34 @@ export async function readFirst(
   scenario: string,
 ): Promise<null | Version> {
   return readEnd(db, scenario, asc);
+}
+
+// The highest next id any branch's latest version holds, the household's
+// and every scenario's, decided or not, or nought where nothing is kept:
+// past every id a branch has given out, since each branch's next only
+// counts up. One query, reading the documents of the latest versions
+// alone, as listScenarios picks them. It reads next in SQL, outside the
+// chain of shapes, so a step that renames or moves next changes this
+// query too.
+export async function readHighestNext(db: Database): Promise<number> {
+  const { household, scenario, version } = householdVersions;
+  const latest = db
+    .selectDistinctOn([scenario], { scenario, version })
+    .from(householdVersions)
+    .orderBy(asc(scenario), desc(version))
+    .as("latest");
+  const rows = await queried(
+    db
+      .select({
+        highest: sql<number>`coalesce(max((${household} ->> 'next')::int), 0)`,
+      })
+      .from(householdVersions)
+      .innerJoin(
+        latest,
+        and(eq(scenario, latest.scenario), eq(version, latest.version)),
+      ),
+  );
+  return highestOf.parse(rows)[0].highest;
 }
 
 // The latest version kept on the branch, or null before anything is.

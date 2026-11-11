@@ -14,6 +14,7 @@ import {
   dropScenario,
   keepAfter,
   readFirst,
+  readHighestNext,
   readLatest,
 } from "@/db/household";
 import { Refusal, refused, saved } from "@/lib/answer";
@@ -161,17 +162,29 @@ export async function adoptScenario(
   return saved(isDecided);
 }
 
+// How far a new scenario's own ids start above the highest next id any
+// branch keeps.
+// ponytail: a scenario's ids start 2,000 above the highest next kept, so
+// about 500 scenarios can be made under idsBelow's 1,000,000. Deleting
+// any but the newest frees nothing, and past it New scenario is refused in
+// the cap's words. Renumber a branch's ids, or raise the cap, if a
+// household nears it.
+const scenarioGap = 2_000;
+
 // Makes a scenario of the name typed from the household open, its kept
-// version copied whole as the scenario's first, and opens it, handing
-// back the name as kept. The household open may itself be a scenario,
-// so one is made from another as readily as from the household, a
-// decided one among them, which is how a decided scenario is changed. A
-// name a scenario is kept under already is refused, decided or not, so a
-// name comes free only once its scenario is deleted; and so is a
-// household open that breaks a rule since tightened, or a scenario open that has
-// been dropped since, each in its own words, as adopting is; the second
-// of two made under one name at once is refused as any save that lost a
-// race is.
+// version copied whole as the scenario's first but for its next id,
+// which starts scenarioGap above the highest next id any branch's latest
+// version keeps, so the records the scenario adds take ids no other
+// branch has given out, and opens it, handing back the name as kept. The
+// household open may itself be a scenario, so one is made from another
+// as readily as from the household, a decided one among them, which is
+// how a decided scenario is changed. A name a scenario is kept under
+// already is refused, decided or not, so a name comes free only once its
+// scenario is deleted; and so is a household open that breaks a rule
+// since tightened, or a scenario open that has been dropped since, each
+// in its own words, as adopting is, and a copy whose next id would pass
+// the cap on ids, in the cap's; the second of two made under one name at
+// once is refused as any save that lost a race is.
 export async function createScenario(name: string): Promise<Answer<string>> {
   await requireSession();
   const scenario = scenarioName.parse(name);
@@ -182,8 +195,16 @@ export async function createScenario(name: string): Promise<Answer<string>> {
     );
   }
   try {
-    const { kept } = await readHeld();
-    await keepAfter(db, { scenario, version: 0 }, kept);
+    const [{ kept }, highest] = await Promise.all([
+      readHeld(),
+      readHighestNext(db),
+    ]);
+    await keepAfter(
+      db,
+      { scenario, version: 0 },
+      soundKept({ ...kept, next: Math.max(kept.next, highest) + scenarioGap })
+        .kept,
+    );
   } catch (error: unknown) {
     if (error instanceof Refusal) {
       return refused(error.message);
