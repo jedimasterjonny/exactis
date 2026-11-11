@@ -219,8 +219,9 @@ const records: readonly {
 // where that can be written, so a category kept at 0% from the
 // household's import reads as adopting leaves it, and the scenario as
 // kept where it is refused, so the lines still stand: an account the
-// household added since the scenario was made then reads as removed,
-// which is what making the scenario the household would do.
+// household holds that was not in the scenario when it was made then
+// reads as removed, unless the scenario holds it now, as making the
+// scenario the household would leave it.
 export function changedIn(household: Kept, scenario: Kept): readonly Line[] {
   const settings: readonly {
     readonly keys: readonly (keyof Kept)[];

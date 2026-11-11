@@ -910,7 +910,7 @@ describe("the household store", () => {
     expect(await getCompared("Four-day week")).toMatchObject({
       household: { version: 2 },
       over: refused(
-        "An account was added to the household since this scenario was made, so the scenario cannot be laid over it; delete it from the household first, and add it again after",
+        "The household holds an account that was not in this scenario when it was made, so the scenario cannot be laid over the household; delete the account from the household first, and add it again after if it is still wanted; if this scenario holds it now, redo its changes in a new scenario made from the household instead",
       ),
       scenario: saved(soundKept(reference).kept),
       version: 1,

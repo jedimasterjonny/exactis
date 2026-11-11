@@ -59,7 +59,7 @@ const longer = { ...blank, ages: { ends: 97 } };
 // Why a scenario cannot be laid over a household holding an account the
 // scenario's own copy never held, as the merge says it.
 const added =
-  "An account was added to the household since this scenario was made, so the scenario cannot be laid over it; delete it from the household first, and add it again after";
+  "The household holds an account that was not in this scenario when it was made, so the scenario cannot be laid over the household; delete the account from the household first, and add it again after if it is still wanted; if this scenario holds it now, redo its changes in a new scenario made from the household instead";
 
 // The reference household's accounts, by name and balance.
 const held = namedIn(reference);
@@ -607,7 +607,7 @@ describe("adoptScenario", () => {
       adoptScenario("Retire early", await shownNow("Retire early")),
     ).resolves.toStrictEqual(
       refused(
-        "An account was added to the household since this scenario was made, so the scenario cannot be laid over it; delete it from the household first, and add it again after",
+        "The household holds an account that was not in this scenario when it was made, so the scenario cannot be laid over the household; delete the account from the household first, and add it again after if it is still wanted; if this scenario holds it now, redo its changes in a new scenario made from the household instead",
       ),
     );
     expect(await readLatest(db, "")).toMatchObject({ version: 2 });
