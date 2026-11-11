@@ -29,6 +29,7 @@ interface Asking {
 interface ScenarioDecisionProps {
   readonly decision: Decision["kind"] | null;
   readonly isAdoptable: boolean;
+  readonly isRetargeted?: boolean;
   readonly name: string;
   readonly shown: Parameters<typeof adoptScenario>[1];
 }
@@ -40,8 +41,10 @@ const longest = 200;
 // actions: making it the household or deciding against it, each asked
 // in a dialog whose title is the question, with a line on why, which
 // may be left blank, and sent against the versions the page was drawn
-// from; or opening it, for a scenario decided already, to edit a new
-// one made from it or to delete it, which takes it to the dashboard.
+// from, the Make dialog saying too, where adopting moves a share of the
+// target allocation, that the next import replaces it; or opening it,
+// for a scenario decided already, to edit a new one made from it or to
+// delete it, which takes it to the dashboard.
 // An undecided scenario offers both decisions, one decided against
 // offers making it the household and opening it, and one made the
 // household opening it alone, so nobody decides the same way twice.
@@ -57,6 +60,7 @@ const longest = 200;
 export function ScenarioDecision({
   decision,
   isAdoptable,
+  isRetargeted = false,
   name,
   shown,
 }: ScenarioDecisionProps): JSX.Element {
@@ -158,10 +162,19 @@ export function ScenarioDecision({
               : `Decide against ${name}?`
           }
         >
-          <DialogDescription>
-            {asking.kind === "adopt"
-              ? "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the holdings imported are each the newer of the two. The scenario is kept under Made the household."
-              : "The household is not touched. The scenario is kept under Decided against in the scenario menu, and can be opened again from there."}
+          <DialogDescription className="grid gap-4" render={<div />}>
+            <p>
+              {asking.kind === "adopt"
+                ? "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the holdings imported are each the newer of the two. The scenario is kept under Made the household."
+                : "The household is not touched. The scenario is kept under Decided against in the scenario menu, and can be opened again from there."}
+            </p>
+            {asking.kind === "adopt" && isRetargeted && (
+              <p>
+                Each import takes the targets the Portfolio Performance file
+                holds, so the next one replaces the scenario&apos;s unless the
+                file holds them too.
+              </p>
+            )}
           </DialogDescription>
           <TextField
             hint={`Optional, up to ${String(longest)} characters. Kept with the decision, to read back later.`}

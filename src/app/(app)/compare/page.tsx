@@ -14,6 +14,7 @@ import { ScenarioDecision } from "@/components/app/organisms/scenario-decision";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Screen } from "@/components/app/templates/screen";
 import { CardContent } from "@/components/kit/card";
+import { blendedBy } from "@/data/moves";
 import { saved } from "@/lib/answer";
 import { formatDay } from "@/lib/months";
 import { changedIn, sideOf } from "@/lib/moved";
@@ -109,12 +110,25 @@ export default async function Compare({
       ? { ...drawnOf(over.value.household), side: sideOf(over.value.kept) }
       : null;
   const laid = over.kind === "saved" ? saved(over.value.kept) : scenario;
+  // Whether adopting moves a share of the target allocation, read as a
+  // rate reads one but with the mappings held at the household's on both
+  // sides, since an import writes the shares and never the mappings, so
+  // the next one replaces a share the scenario set and leaves a remap.
+  const isRetargeted =
+    over.kind === "saved" &&
+    JSON.stringify(
+      blendedBy({
+        mappings: household.kept.mappings,
+        targets: over.value.kept.targets,
+      }),
+    ) !== JSON.stringify(blendedBy(household.kept));
   return (
     <CompareScreen
       actions={
         <ScenarioDecision
           decision={decision?.kind ?? null}
           isAdoptable={merged !== null}
+          isRetargeted={isRetargeted}
           name={name}
           shown={shown}
         />

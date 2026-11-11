@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Kept } from "@/data/household";
@@ -9,7 +9,7 @@ import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
 import { atAge } from "@/data/milestones";
 import { owners } from "@/data/owners.fixture";
-import { portfolios, targets } from "@/data/targets.fixture";
+import { portfolios, targets, targetsUnder } from "@/data/targets.fixture";
 import { forget } from "@/hooks/use-futures";
 import { refused, saved } from "@/lib/answer";
 import { formatGbp } from "@/lib/money";
@@ -57,6 +57,13 @@ const pulled: Kept = {
     implied: { 5: 0.0331, 10: 0.0327, 20: 0.0322, 30: 0.0318 },
   },
 };
+
+// What the Make dialog says of every adoption, and what it adds where
+// adopting moves a share of the target allocation.
+const made =
+  "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the holdings imported are each the newer of the two. The scenario is kept under Made the household.";
+const replaced =
+  "Each import takes the targets the Portfolio Performance file holds, so the next one replaces the scenario's unless the file holds them too.";
 
 // The household given, or the reference, beside the scenario given as
 // the store reads it undecided, laid over the household as its own
@@ -321,6 +328,49 @@ describe("Compare", () => {
     expect(
       screen.getAllByRole("listitem").map(({ textContent }) => textContent),
     ).toStrictEqual(["Owner · MeChanged"]);
+  });
+
+  // A scenario asking for equity alone.
+  it("says in the Make dialog that the next import replaces the targets where adopting moves a share", async () => {
+    vi.mocked(getCompared).mockResolvedValue(
+      comparedOf({ ...kept, targets: targetsUnder("Equity") }),
+    );
+
+    await draw({ scenario: "Four-day week" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Make this the household…" }),
+    );
+
+    expect(screen.getByRole("dialog")).toHaveAccessibleDescription(
+      `${made} ${replaced}`,
+    );
+  });
+
+  // A scenario mapping the global small cap onto UK equities, its shares
+  // the household's, which the next import leaves standing.
+  it("says nothing of the next import where the scenario only remaps a category, though it lists the target allocation", async () => {
+    vi.mocked(getCompared).mockResolvedValue(
+      comparedOf({
+        ...kept,
+        mappings: kept.mappings.map((mapping) =>
+          mapping.category === "Asset Allocation/Equity/Global small cap"
+            ? { ...mapping, asset: "UK large cap equities" }
+            : mapping,
+        ),
+      }),
+    );
+
+    await draw({ scenario: "Four-day week" });
+
+    expect(
+      screen.getAllByRole("listitem").map(({ textContent }) => textContent),
+    ).toStrictEqual(["Target allocationChanged"]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Make this the household…" }),
+    );
+
+    expect(screen.getByRole("dialog")).toHaveAccessibleDescription(made);
   });
 
   // A scenario that runs the plan to 95 and retires the owner at 62.
