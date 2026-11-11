@@ -8,15 +8,19 @@ import { soundKept } from "@/data/household";
 import { blank, kept as reference } from "@/data/household.fixture";
 import { pointOf } from "@/data/progress";
 import { points } from "@/data/progress.fixture";
-import { getHousehold } from "@/store/household";
+import { getHousehold, getOpened } from "@/store/household";
 
 import Progress, { metadata } from "./page";
 
-vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
+vi.mock("@/store/household", () => ({
+  getHousehold: vi.fn(),
+  getOpened: vi.fn(),
+}));
 vi.mock("@/actions/house-prices", () => ({ pullHousePrices: vi.fn() }));
 
 // The page over the blank household, as the store reads it, with the
-// points a test gives and the index pulled, or none.
+// points a test gives and the index pulled, or none, and no scenario
+// open.
 async function renderProgress(
   kept: readonly ProgressPoint[] = points,
   housePrices: HousePrices | null = null,
@@ -26,6 +30,7 @@ async function renderProgress(
     housePrices,
     points: kept,
   });
+  vi.mocked(getOpened).mockResolvedValue(null);
   render(await Progress());
 }
 
@@ -54,7 +59,27 @@ describe("Progress", () => {
       within(screen.getByRole("banner")).getByRole("button", {
         name: "Pull house prices",
       }),
-    ).toBeInTheDocument();
+    ).toBeEnabled();
+  });
+
+  // An invented scenario open, as the banner reads the cookie.
+  it("holds the pull while a scenario is open, saying why", async () => {
+    vi.mocked(getHousehold).mockResolvedValue(soundKept(blank).household);
+    vi.mocked(getOpened).mockResolvedValue({
+      isKept: true,
+      name: "Four-day week",
+    });
+
+    render(await Progress());
+
+    const pull = within(screen.getByRole("banner")).getByRole("button", {
+      name: "Pull house prices",
+    });
+
+    expect(pull).toBeDisabled();
+    expect(pull).toHaveAccessibleDescription(
+      "Leave the scenario to pull house prices.",
+    );
   });
 
   // Six points from March to August 2026, net worth rising from

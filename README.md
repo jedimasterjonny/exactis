@@ -43,10 +43,10 @@ beside the household, laid over the household's books as adopting it would, and
 is where it is adopted or decided against, with a line on why. Adopting one
 makes its plan the household's, keeping the household's own bookkeeping:
 balances, progress points and what was pulled in. The holdings kept are the
-newer of the two imports from Portfolio Performance. So the month is closed in
-the household alone, and refused while a scenario is open. A decided scenario is
-kept, with its decision, and takes no more edits; it is changed by making a new
-scenario from it.
+newer of the two imports from Portfolio Performance. So the month is closed and
+house prices are pulled in the household alone, and both are refused while a
+scenario is open. A decided scenario is kept, with its decision, and takes no
+more edits; it is changed by making a new scenario from it.
 
 ## Getting started
 

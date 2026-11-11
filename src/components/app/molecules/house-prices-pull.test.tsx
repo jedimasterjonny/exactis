@@ -12,10 +12,11 @@ import { HousePricesPull } from "./house-prices-pull";
 
 vi.mock("@/actions/house-prices", () => ({ pullHousePrices: vi.fn() }));
 
-// The button as the header mounts it. A pull reports through the toast
-// manager, which needs its Toaster mounted.
-function pullButton(): HTMLElement {
-  render(<HousePricesPull />, { wrapper: Toaster });
+// The button as the header mounts it, in the household unless said
+// otherwise. A pull reports through the toast manager, which needs its
+// Toaster mounted.
+function pullButton(isInScenario = false): HTMLElement {
+  render(<HousePricesPull isInScenario={isInScenario} />, { wrapper: Toaster });
   return screen.getByRole("button", { name: "Pull house prices" });
 }
 
@@ -52,6 +53,18 @@ describe("HousePricesPull", () => {
     await waitFor(() => {
       expect(button).not.toHaveAttribute("aria-busy");
     });
+  });
+
+  it("holds the pull while a scenario is open, saying why", () => {
+    const button = pullButton(true);
+
+    fireEvent.click(button);
+
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(
+      "Leave the scenario to pull house prices.",
+    );
+    expect(pullHousePrices).not.toHaveBeenCalled();
   });
 
   it("says why when the pull is refused", async () => {
