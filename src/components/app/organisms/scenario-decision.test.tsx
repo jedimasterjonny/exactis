@@ -141,6 +141,36 @@ describe("ScenarioDecision", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();
   });
 
+  // Making Four-day week the household moves a share of the target
+  // allocation, which deciding against it does not touch.
+  it("says the next import replaces the targets where making the scenario the household moves a share", () => {
+    render(
+      <ScenarioDecision
+        decision={null}
+        isAdoptable
+        isRetargeted
+        name="Four-day week"
+        shown={shown}
+      />,
+      { wrapper: Toaster },
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Make this the household…" }),
+    );
+
+    expect(openDialog()).toHaveAccessibleDescription(
+      "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the holdings imported are each the newer of the two. The scenario is kept under Made the household. Each import takes the targets the Portfolio Performance file holds, so the next one replaces the scenario's unless the file holds them too.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Decide against…" }));
+
+    expect(openDialog()).toHaveAccessibleDescription(
+      "The household is not touched. The scenario is kept under Decided against in the scenario menu, and can be opened again from there.",
+    );
+  });
+
   it("says the scenario is left undecided where the household was replaced but its decision not kept", async () => {
     vi.mocked(adoptScenario).mockResolvedValue(saved(false));
     renderDecision("rejected");
