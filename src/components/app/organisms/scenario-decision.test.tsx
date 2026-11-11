@@ -109,7 +109,7 @@ describe("ScenarioDecision", () => {
 
     expect(within(dialog).getByText("Scenario")).toHaveClass("text-brand");
     expect(dialog).toHaveAccessibleDescription(
-      "The scenario's plan, its target allocation included, replaces the household's. The household keeps its balances, progress points and pulled figures as they stand, and the holdings last imported. The scenario is kept under Made the household.",
+      "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the holdings imported are each the newer of the two. The scenario is kept under Made the household.",
     );
     expect(field("Why", dialog)).toHaveAccessibleDescription(
       "Optional, up to 200 characters. Kept with the decision, to read back later.",
