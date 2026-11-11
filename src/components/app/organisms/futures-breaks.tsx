@@ -51,7 +51,9 @@ interface Tried {
 // back the brackets its search of the age left the futures in, which
 // an age tried is counted off, the card has a retirement age to try
 // beneath the figures, as AgeTried lays it out, where one is given, even
-// where no age was found.
+// where no age was found. Where another owner retires at an age of their
+// own, the verdict, the age's figure, the spending's caption and the age
+// tried name the plan's owner in their age phrases, as withOwner says it.
 export function FuturesBreaks({
   plan,
   searched,
@@ -124,14 +126,18 @@ export function FuturesBreaks({
 
 // The age by which nine in ten futures last retiring, against the age
 // the plan retires at, the age the plan opens at reading as now; or a
-// dash where fewer last even working to the end.
+// dash where fewer last even working to the end. Where another owner
+// retires at an age of their own, each names the plan's owner: "with"
+// them before the age phrase, or "For" them before the age against the
+// plan's.
 function ageShown(age: null | number, plan: Plan): Shown {
   const label = "Retirement age";
+  const named = withOwner(plan);
   if (age === null) {
     return {
       label,
       notes: [
-        `Fewer than 9 in 10 last even working to ${String(endAge(plan))}`,
+        `Fewer than 9 in 10 last even ${named}working to ${String(endAge(plan))}`,
       ],
       value: "—",
     };
@@ -139,23 +145,28 @@ function ageShown(age: null | number, plan: Plan): Shown {
   if (age === ageIn(plan.from, plan)) {
     return {
       label,
-      notes: ["9 in 10 last retiring this year"],
+      notes: [`9 in 10 last ${named}retiring this year`],
       value: "Now",
-      way: "retiring this year",
+      way: `${named}retiring this year`,
     };
   }
   const after = age - plan.retires;
   const side = after > 0 ? "after" : "before";
   const against =
     after === 0
-      ? "As the plan retires"
+      ? "as the plan retires"
       : `${counted(Math.abs(after), "year")} ${side} the plan retires`;
+  const note = [
+    ...ownerNamed(plan).map((name) => `For ${name}`),
+    against,
+    "spending as planned",
+  ].join(", ");
   return {
     label,
-    notes: [`${against}, spending as planned`],
+    notes: [`${note.charAt(0).toUpperCase()}${note.slice(1)}`],
     unit: "yrs",
     value: String(age),
-    way: `retiring at ${String(age)}`,
+    way: `${named}retiring at ${String(age)}`,
   };
 }
 
@@ -163,12 +174,13 @@ function ageShown(age: null | number, plan: Plan): Shown {
 // the figures, the box beside the sentence saying how many of the
 // futures last retiring at it from the width of a small screen and
 // above it below: at the plan's own age as the plan stands, and at any
-// other spending as planned, as retiringAs says the age, with an
-// ellipsis in place of the count while it is counted. The hint names
-// the age the plan retires at, since the age tried changes nothing. A
-// screen reader hears the sentence again once the count is in, and
-// never while it is counted, so nothing ticks; and, the count in, the
-// sentence shown is hidden from it, so browsing reads it once.
+// other spending as planned, as retiringAs says the age, naming the
+// plan's owner where it does, with an ellipsis in place of the count
+// while it is counted. The hint names the age the plan retires at, since
+// the age tried changes nothing. A screen reader hears the sentence
+// again once the count is in, and never while it is counted, so nothing
+// ticks; and, the count in, the sentence shown is hidden from it, so
+// browsing reads it once.
 function AgeTried({
   plan,
   tried: { age, lasted, onAge },
@@ -216,22 +228,35 @@ function AgeTried({
   );
 }
 
+// The plan's owner's name, where another owner retires at an age of
+// their own and so stays put while an age searched or tried moves the
+// plan's owner and whoever retires with them; none otherwise.
+function ownerNamed({ owners }: Plan): readonly string[] {
+  return owners.slice(1).some(({ retirement }) => retirement !== "retirement")
+    ? owners.slice(0, 1).map(({ name }) => name)
+    : [];
+}
+
 // Retiring at the age given, as the age tried says it: the age the plan
-// opens at as this year, and its last as working to it.
+// opens at as this year, and its last as working to it, with the plan's
+// owner where another owner retires at an age of their own.
 function retiringAs(age: number, plan: Plan): string {
+  const named = withOwner(plan);
   if (age === ageIn(plan.from, plan)) {
-    return "retiring this year";
+    return `${named}retiring this year`;
   }
   return age === endAge(plan)
-    ? `working to ${String(age)}`
-    : `retiring at ${String(age)}`;
+    ? `${named}working to ${String(age)}`
+    : `${named}retiring at ${String(age)}`;
 }
 
 // The retirement the spending is read against, as its caption ends: at
-// the plan's age, on its conditions, or nothing for one already begun.
+// the plan's age, with the plan's owner where another owner retires at
+// an age of their own, on its conditions, or nothing for one already
+// begun.
 function retiringOf(plan: Plan): string {
   if (isAgeSearched(plan)) {
-    return `, retiring at ${String(plan.retires)}`;
+    return `, ${withOwner(plan)}retiring at ${String(plan.retires)}`;
   }
   return retiresOn(plan) === undefined ? "" : ", retiring on its conditions";
 }
@@ -279,7 +304,9 @@ function unsearchedOf(plan: Plan): readonly string[] {
 // age, and on how much of the spending, nine in ten futures last, each
 // as its figure says it, left out where none was found, and where
 // neither was, that fewer last even at the ends searched, the age's
-// among them where it is searched.
+// among them where it is searched. Each age phrase names the plan's
+// owner where another owner retires at an age of their own, so with a
+// cut found and no age, it names no one.
 function verdictOf(
   figures: readonly Shown[],
   isAge: boolean,
@@ -290,11 +317,19 @@ function verdictOf(
     return `9 in 10 futures last ${ways.join(", or ")}.`;
   }
   return isAge
-    ? `Fewer than 9 in 10 futures last, even working to ${String(endAge(plan))} or on half the spending planned.`
+    ? `Fewer than 9 in 10 futures last, even ${withOwner(plan)}working to ${String(endAge(plan))} or on half the spending planned.`
     : "Fewer than 9 in 10 futures last, even on half the spending planned.";
 }
 
 // A figure waiting on the search, beside nothing it rests on yet.
 function waiting(label: string): Shown {
   return { label, notes: [], value: "…" };
+}
+
+// "with" the plan's owner, before an age phrase, where ownerNamed names
+// them; nothing otherwise.
+function withOwner(plan: Plan): string {
+  return ownerNamed(plan)
+    .map((name) => `with ${name} `)
+    .join("");
 }
