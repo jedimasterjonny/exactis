@@ -15,6 +15,7 @@ import {
 import { TextField } from "@/components/app/molecules/text-field";
 import { EditDialog } from "@/components/app/organisms/edit-dialog";
 import { Button } from "@/components/kit/button";
+import { DialogDescription } from "@/components/kit/dialog";
 import { useSender } from "@/hooks/use-sender";
 import { dashboard } from "@/lib/nav";
 
@@ -157,11 +158,11 @@ export function ScenarioDecision({
               : `Decide against ${name}?`
           }
         >
-          <p className="text-sm text-muted-foreground">
+          <DialogDescription>
             {asking.kind === "adopt"
               ? "The scenario's plan, its target allocation included, replaces the household's. The household keeps its balances, progress points and pulled figures as they stand, and the holdings last imported. The scenario is kept under Made the household."
               : "The household is not touched. The scenario is kept under Decided against in the scenario menu, and can be opened again from there."}
-          </p>
+          </DialogDescription>
           <TextField
             hint={`Optional, up to ${String(longest)} characters. Kept with the decision, to read back later.`}
             label="Why"

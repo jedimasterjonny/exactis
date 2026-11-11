@@ -108,11 +108,7 @@ describe("ScenarioDecision", () => {
     });
 
     expect(within(dialog).getByText("Scenario")).toHaveClass("text-brand");
-    expect(
-      within(dialog)
-        .getAllByRole("paragraph")
-        .map(({ textContent }) => textContent),
-    ).toContain(
+    expect(dialog).toHaveAccessibleDescription(
       "The scenario's plan, its target allocation included, replaces the household's. The household keeps its balances, progress points and pulled figures as they stand, and the holdings last imported. The scenario is kept under Made the household.",
     );
     expect(field("Why", dialog)).toHaveAccessibleDescription(
@@ -175,11 +171,7 @@ describe("ScenarioDecision", () => {
       name: "Decide against Four-day week?",
     });
 
-    expect(
-      within(dialog)
-        .getAllByRole("paragraph")
-        .map(({ textContent }) => textContent),
-    ).toContain(
+    expect(dialog).toHaveAccessibleDescription(
       "The household is not touched. The scenario is kept under Decided against in the scenario menu, and can be opened again from there.",
     );
 
