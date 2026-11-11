@@ -120,11 +120,13 @@ export function CompareScreen({
                     />
                     <Note>
                       The scenario is laid over the household&apos;s balances,
-                      progress points and pulled figures as they stand, and over
-                      the holdings last imported, as making it the household
-                      today would. The dashboard sets the scenario&apos;s own
-                      balances, as they stood when it was made, against the
-                      household, so its differences can read otherwise.
+                      progress points and house prices as they stand, as making
+                      it the household today would. The BlackRock CMA, the BoE
+                      curve and the holdings imported are each the newer of the
+                      two. The dashboard sets the scenario&apos;s own balances,
+                      as they stood when it was made or as typed in it since,
+                      against the household, so its differences can read
+                      otherwise.
                     </Note>
                     <Note>
                       {`Retirement and net worth are at each plan's own rates, in today's money. The chance of success runs both plans over the same ${formatCount(runLength)} futures.`}
