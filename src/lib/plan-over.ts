@@ -1,13 +1,14 @@
 import * as z from "zod";
 
 import type { Account } from "@/data/accounts";
-import type { Deductions } from "@/data/cma";
+import type { Deductions, Vintages } from "@/data/cma";
 import type { Kept } from "@/data/household";
 
 import { deductedBy } from "@/data/moves";
 import { recordId } from "@/data/schemas";
 import { upcast } from "@/data/shapes";
 import { Refusal } from "@/lib/answer";
+import { monthsBetween } from "@/lib/months";
 
 // The copy a scenario was made from, its first version, read for the
 // ids of its accounts and nothing else: the copy was sound when it was
@@ -26,10 +27,11 @@ export function forkOf(copy: unknown): ReadonlySet<number> {
 // plan over the household's bookkeeping. The bookkeeping is what was
 // recorded of the household rather than planned for it: each account's
 // balance and the day it was set, the month the balances are as of, the
-// progress points, what was pulled from outside, the house price index,
-// the CMA and the inflation curve, and the holdings last imported from
-// Portfolio Performance, the newer of the two imports, with the day,
-// the cash and what was paid in. The rest is the plan, and the
+// progress points, the house price index, and then, each the newer of
+// the two, the household's on a tie or where the scenario holds none,
+// the CMA and the inflation curve, taken whole as pulledOver says, and
+// the holdings imported from Portfolio Performance, with the day, the
+// cash and what was paid in. The rest is the plan, and the
 // scenario's: the owners, the children, the accounts and what pays into
 // them, the milestones, both schedules, the ages, the rates typed and
 // which set is live, the drawdown, the split, the glide path, the
@@ -77,13 +79,32 @@ export function planOver(
       return kept === undefined ? account : balancedAs(account, kept);
     }),
     asOf: household.asOf,
-    cma: household.cma,
-    curve: household.curve,
     deductions: deductionsOver(household, scenario),
     housePrices: household.housePrices,
     next: Math.max(household.next, scenario.next),
     points: household.points,
+    ...pulledOver(household, scenario),
     ...targetsOver(household, scenario),
+  };
+}
+
+// The CMA and the inflation curve the scenario leaves, as planOver
+// says: each the newer pull of the two, taken whole, a CMA by its
+// latest vintage and then the day that vintage's data are as of, a
+// curve by the day it stood on, and a side holding none older than
+// any; the household's on a tie.
+export function pulledOver(
+  household: Kept,
+  scenario: Kept,
+): Pick<Kept, "cma" | "curve"> {
+  const { curve } = scenario;
+  return {
+    cma: isNewer(scenario.cma, household.cma) ? scenario.cma : household.cma,
+    curve:
+      curve !== null &&
+      (household.curve === null || curve.asOf > household.curve.asOf)
+        ? curve
+        : household.curve,
   };
 }
 
@@ -108,6 +129,16 @@ function deductionsOver(household: Kept, scenario: Kept): Deductions {
     (scenario.deductions.setOn ?? "") <= (household.deductions.setOn ?? "")
     ? household.deductions
     : scenario.deductions;
+}
+
+// Whether the CMA given is a newer pull than the other, as pulledOver
+// reads one.
+function isNewer(ours: null | Vintages, theirs: null | Vintages): boolean {
+  if (ours === null || theirs === null) {
+    return theirs === null && ours !== null;
+  }
+  const later = monthsBetween(theirs.latest.vintage, ours.latest.vintage);
+  return later > 0 || (later === 0 && ours.latest.asOf > theirs.latest.asOf);
 }
 
 // The target allocation and the mappings the scenario leaves, as

@@ -6,10 +6,12 @@ import type { Kept } from "@/data/household";
 
 import { accounts, sipp } from "@/data/accounts.fixture";
 import { children } from "@/data/children.fixture";
+import { cma } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
 import { incomeLines } from "@/data/income.fixture";
+import { curve } from "@/data/inflation.fixture";
 import { owners, sam } from "@/data/owners.fixture";
 import { portfolios, targets, targetsUnder } from "@/data/targets.fixture";
 import { endWorthOf, futureOf } from "@/engine/futures";
@@ -673,8 +675,9 @@ describe("movedOver", () => {
 });
 
 describe("changedIn", () => {
-  // The household's pension set to £420,000 on the tenth and a CMA and
-  // curve of nobody's, which are bookkeeping rather than the plan.
+  // The household's pension set to £420,000 on the tenth, and no CMA or
+  // curve pulled in the scenario, which adopting fills from the
+  // household's.
   it("finds no line between a household and itself, nor in its balances, their days or what was pulled", () => {
     expect(changedIn(kept, kept)).toStrictEqual([]);
     expect(
@@ -688,6 +691,50 @@ describe("changedIn", () => {
         curve: null,
       }),
     ).toStrictEqual([]);
+  });
+
+  // The household on August's vintage and September's curve, and a
+  // scenario that pulled an invented November vintage and a curve the
+  // Bank gave on the first of October; the two the other way about; and
+  // a scenario holding August's again, with an invented April vintage
+  // before it, and a curve of September's day at other rates.
+  it("lists the CMA and the curve where the scenario pulled a later one or the household holds none, and neither where its pull is earlier, the same or none", () => {
+    const later: Kept = {
+      ...kept,
+      cma: {
+        latest: {
+          ...cma,
+          asOf: "2026-10-30",
+          vintage: { month: 10, year: 2026 },
+        },
+        previous: cma,
+      },
+      curve: {
+        asOf: "2026-10-01",
+        implied: { 5: 0.0331, 10: 0.0327, 20: 0.0322, 30: 0.0318 },
+      },
+    };
+    const tied: Kept = {
+      ...kept,
+      cma: {
+        latest: cma,
+        previous: {
+          ...cma,
+          asOf: "2026-03-31",
+          vintage: { month: 3, year: 2026 },
+        },
+      },
+      curve: { ...curve, implied: { 5: 0.03, 10: 0.03, 20: 0.03, 30: 0.03 } },
+    };
+    const none: Kept = { ...kept, cma: null, curve: null };
+    const labelled = (household: Kept, scenario: Kept): readonly string[] =>
+      changedIn(household, scenario).map(({ label }) => label);
+
+    expect(labelled(kept, later)).toStrictEqual(["BlackRock CMA", "BoE curve"]);
+    expect(labelled(none, kept)).toStrictEqual(["BlackRock CMA", "BoE curve"]);
+    expect(labelled(later, kept)).toStrictEqual([]);
+    expect(labelled(kept, tied)).toStrictEqual([]);
+    expect(labelled(later, none)).toStrictEqual([]);
   });
 
   // The household's allocation imported again since the scenario was

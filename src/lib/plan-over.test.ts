@@ -1,17 +1,30 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import type { Cma, Vintages } from "@/data/cma";
 import type { Kept } from "@/data/household";
+import type { Curve } from "@/data/inflation";
 import type { Target, Targets } from "@/data/targets";
 
+import { cma } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
+import { curve } from "@/data/inflation.fixture";
 import { currentShape, stamped } from "@/data/shapes";
 import { portfolios, targets } from "@/data/targets.fixture";
 import { Refusal } from "@/lib/answer";
 
 import { forkOf, planOver } from "./plan-over";
+
+// A pull the scenario holds and the household's beside it, either
+// none, and whose the merge keeps.
+interface Pulling<TPull> {
+  readonly name: string;
+  readonly ours: TPull;
+  readonly side: "household" | "scenario";
+  readonly theirs: TPull;
+}
 
 // Why a household holding an account the scenario's own copy never held
 // keeps the two apart, as the merge says it.
@@ -79,6 +92,27 @@ const september: Targets = { ...targets, importedOn: "2026-09-26", portfolios };
 
 // The household as it stands, imported in September.
 const household: Kept = { ...kept, targets: september };
+
+// The pulls the tests make, each invented: November 2026's vintage,
+// every class priced a fifth of a point above August's, kept over
+// August's; April's, kept before August's; and a curve the Bank gave on
+// the first of October.
+const november: Cma = {
+  ...cma,
+  asOf: "2026-10-30",
+  assets: cma.assets.map((asset) => ({ ...asset, rate: asset.rate + 0.002 })),
+  vintage: { month: 10, year: 2026 },
+};
+const april: Cma = {
+  ...cma,
+  asOf: "2026-03-31",
+  vintage: { month: 3, year: 2026 },
+};
+const pulledNovember: Vintages = { latest: november, previous: cma };
+const october: Curve = {
+  asOf: "2026-10-01",
+  implied: { 5: 0.0331, 10: 0.0327, 20: 0.0322, 30: 0.0318 },
+};
 
 // The scenario laid over the household given, or the September one.
 function adopted(scenario: Kept, over: Kept = household): Kept {
@@ -446,5 +480,158 @@ describe("planOver", () => {
     expect(
       adopted(scenarioOf(), { ...household, deductions: dated }).deductions,
     ).toBe(dated);
+  });
+
+  it.each<Pulling<null | Vintages>>([
+    {
+      name: "the scenario's at a later vintage",
+      ours: pulledNovember,
+      side: "scenario",
+      theirs: kept.cma,
+    },
+    {
+      name: "the scenario's of the same vintage, published later",
+      ours: { latest: { ...cma, asOf: "2026-07-15" }, previous: null },
+      side: "scenario",
+      theirs: kept.cma,
+    },
+    {
+      name: "the scenario's where the household holds none",
+      ours: kept.cma,
+      side: "scenario",
+      theirs: null,
+    },
+    {
+      name: "the household's on the same vintage and day, whatever came before it",
+      ours: { latest: cma, previous: april },
+      side: "household",
+      theirs: kept.cma,
+    },
+    {
+      name: "the household's over an earlier vintage",
+      ours: kept.cma,
+      side: "household",
+      theirs: pulledNovember,
+    },
+    {
+      name: "the household's over the same vintage, published earlier",
+      ours: { latest: { ...cma, asOf: "2026-06-15" }, previous: null },
+      side: "household",
+      theirs: kept.cma,
+    },
+    {
+      name: "the household's where the scenario holds none",
+      ours: null,
+      side: "household",
+      theirs: kept.cma,
+    },
+    {
+      name: "none where neither holds one",
+      ours: null,
+      side: "household",
+      theirs: null,
+    },
+  ])(
+    "keeps the newer CMA of the two whole, the household's on a tie: $name",
+    ({ ours, side, theirs }) => {
+      const merged = adopted(scenarioOf({ cma: ours }), {
+        ...household,
+        cma: theirs,
+      });
+
+      expect(merged.cma).toBe(side === "scenario" ? ours : theirs);
+    },
+  );
+
+  it.each<Pulling<Curve | null>>([
+    {
+      name: "the scenario's on a later day",
+      ours: october,
+      side: "scenario",
+      theirs: curve,
+    },
+    {
+      name: "the scenario's where the household holds none",
+      ours: curve,
+      side: "scenario",
+      theirs: null,
+    },
+    {
+      name: "the household's on the same day, whatever the rates",
+      ours: { ...october, asOf: curve.asOf },
+      side: "household",
+      theirs: curve,
+    },
+    {
+      name: "the household's over an earlier day",
+      ours: { ...october, asOf: "2026-08-01" },
+      side: "household",
+      theirs: curve,
+    },
+    {
+      name: "the household's where the scenario holds none",
+      ours: null,
+      side: "household",
+      theirs: curve,
+    },
+    {
+      name: "none where neither holds one",
+      ours: null,
+      side: "household",
+      theirs: null,
+    },
+  ])(
+    "keeps the newer curve of the two, the household's on a tie: $name",
+    ({ ours, side, theirs }) => {
+      const merged = adopted(scenarioOf({ curve: ours }), {
+        ...household,
+        curve: theirs,
+      });
+
+      expect(merged.curve).toBe(side === "scenario" ? ours : theirs);
+    },
+  );
+
+  // The scenario pulled November's vintage after it was made, and the
+  // household imported again since, both on the CMA's rates.
+  it("derives the scenario's own rates and spread from its later vintage, under the household's later import", () => {
+    const scenario = scenarioOf({ cma: pulledNovember, rateSet: "cma" });
+    const merged = adopted(scenario, { ...household, rateSet: "cma" });
+    const ours = soundKept(scenario).household;
+    const laid = soundKept(merged).household;
+
+    expect(merged.cma).toBe(scenario.cma);
+    expect(merged.targets?.importedOn).toBe(september.importedOn);
+    expect(laid.liveRates).toStrictEqual(ours.liveRates);
+    expect(laid.spread).toStrictEqual(ours.spread);
+  });
+
+  // November's vintage with its small cap class under another name, and
+  // the scenario's small cap remapped onto it, which August's does not
+  // price.
+  it("derives where the scenario maps onto a class only its later vintage prices", () => {
+    const renamed = "Global smaller companies equities";
+    const scenario = scenarioOf({
+      cma: {
+        latest: {
+          ...november,
+          assets: november.assets.map((asset) =>
+            asset.name === "Global small cap equities"
+              ? { ...asset, name: renamed }
+              : asset,
+          ),
+        },
+        previous: cma,
+      },
+      mappings: kept.mappings.map((mapping) =>
+        mapping.category === smaller ? { ...mapping, asset: renamed } : mapping,
+      ),
+      rateSet: "cma",
+    });
+
+    expect(
+      soundKept(adopted(scenario, { ...household, rateSet: "cma" })).household
+        .liveRates,
+    ).toStrictEqual(soundKept(scenario).household.liveRates);
   });
 });

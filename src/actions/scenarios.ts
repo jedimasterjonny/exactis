@@ -60,7 +60,8 @@ const shownAt = z.object({
 // decision and the reason given on it, and closes it where it is the
 // one open. So balances and progress points recorded in the household
 // while the scenario was explored, and the holdings imported from
-// Portfolio Performance since, are kept rather than rolled back, as
+// Portfolio Performance since, are kept rather than rolled back, and so
+// is the newer CMA and curve of the two, wherever each was pulled, as
 // planOver says; and the scenario stays to be read back, taking no more
 // saves. It is decided against the versions of both the page deciding
 // it was drawn from, so where either has moved since, the figures the

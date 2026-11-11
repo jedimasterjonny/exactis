@@ -7,6 +7,7 @@ import type { Kept } from "@/data/household";
 import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
+import { cma } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { blank, kept as reference, today } from "@/data/household.fixture";
@@ -605,6 +606,48 @@ describe("adoptScenario", () => {
     ).toStrictEqual(saved(true));
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped({ ...scenario, targets: retargeted(since) }),
+      version: 3,
+    });
+  });
+
+  // One scenario pulling an invented November vintage and a curve the
+  // Bank gave on the first of October after it was made, and another
+  // made beside it running the plan to 95; the first made the household,
+  // then the second.
+  it("keeps the newer CMA and curve of the two, the scenario's where it pulled since and the household's where the household did", async () => {
+    const pulling = (kept: Kept): Kept => ({
+      ...kept,
+      cma: {
+        latest: {
+          ...cma,
+          asOf: "2026-10-30",
+          vintage: { month: 10, year: 2026 },
+        },
+        previous: cma,
+      },
+      curve: {
+        asOf: "2026-10-01",
+        implied: { 5: 0.0331, 10: 0.0327, 20: 0.0322, 30: 0.0318 },
+      },
+    });
+    await keepFirst("", reference);
+    await keepFirst("Later pulls", reference);
+    await save("Later pulls", pulling);
+    await keepFirst("Plan to 95", reference);
+    await save("Plan to 95", (kept) => ({ ...kept, ages: { ends: 95 } }));
+
+    expect(
+      await adoptScenario("Later pulls", await shownNow("Later pulls")),
+    ).toStrictEqual(saved(true));
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped(pulling(reference)),
+      version: 2,
+    });
+    expect(
+      await adoptScenario("Plan to 95", await shownNow("Plan to 95")),
+    ).toStrictEqual(saved(true));
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped({ ...pulling(reference), ages: { ends: 95 } }),
       version: 3,
     });
   });
