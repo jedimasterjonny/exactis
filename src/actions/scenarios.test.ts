@@ -29,7 +29,7 @@ import { requireSession } from "@/lib/session";
 import { getCompared } from "@/store/household";
 
 import { takeConsoleOutput } from "../../vitest.setup";
-import { closeBalances, saveHouse } from "./accounts";
+import { closeBalances, saveAccount, saveHouse } from "./accounts";
 import { importHousehold } from "./household";
 import {
   adoptScenario,
@@ -220,14 +220,14 @@ describe("createScenario", () => {
     expect(openScenario).not.toHaveBeenCalled();
   });
 
-  it("copies the household open as the first version of a scenario of the name trimmed, opens it and draws the page again", async () => {
+  it("copies the household open as the first version of a scenario of the name trimmed, its next id 2,000 past the household's, opens it and draws the page again", async () => {
     await keepFirst("", reference);
 
     expect(await createScenario("  Retire early ")).toStrictEqual(
       saved("Retire early"),
     );
     expect(await readLatest(db, "Retire early")).toStrictEqual({
-      household: stamped(reference),
+      household: stamped({ ...reference, next: 2020 }),
       version: 1,
     });
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
@@ -240,13 +240,14 @@ describe("createScenario", () => {
       saved("Retire early"),
     );
     expect(await readLatest(db, "Retire early")).toStrictEqual({
-      household: stamped(blank),
+      household: stamped({ ...blank, next: 2002 }),
       version: 1,
     });
     expect(await readLatest(db, "")).toBeNull();
   });
 
-  it("copies the scenario open, not the household, where one is", async () => {
+  // The household counted on to 20, past the scenario open.
+  it("copies the scenario open, not the household, where one is, its next id 2,000 past the highest any branch keeps", async () => {
     await keepFirst("", reference);
     await keepFirst("Retire early", blank);
     await keepAfter(db, { scenario: "Retire early", version: 1 }, longer);
@@ -256,9 +257,70 @@ describe("createScenario", () => {
       saved("Retire earlier"),
     );
     expect(await readLatest(db, "Retire earlier")).toStrictEqual({
-      household: stamped(longer),
+      household: stamped({ ...longer, next: 2020 }),
       version: 1,
     });
+  });
+
+  // The household counted on to 20 and a scenario decided against to an
+  // invented 3,000, and premium bonds then saved in a new scenario made
+  // from the household.
+  it("gives a record saved in a new scenario an id 2,000 past the highest next id any branch keeps, leaving the household's next where it was", async () => {
+    await keepFirst("", reference);
+    await keepFirst("Move house", { ...reference, next: 3000 });
+    await decideScenario(
+      db,
+      { scenario: "Move house", version: 1 },
+      { decision: "rejected", reason: null },
+    );
+
+    expect(await createScenario("Retire early")).toStrictEqual(
+      saved("Retire early"),
+    );
+
+    vi.mocked(openedScenario).mockResolvedValue("Retire early");
+
+    expect(
+      await saveAccount(
+        null,
+        {
+          balance: 2500,
+          balloon: 0,
+          cadence: "month",
+          cap: 0,
+          contribution: 0,
+          funding: "fixed",
+          growth: "fixed",
+          isDroppable: false,
+          kind: "cash",
+          name: "Premium bonds",
+          owner: null,
+          rate: 0.04,
+          shares: [],
+        },
+        null,
+      ),
+    ).toMatchObject(saved({ id: 5000, name: "Premium bonds" }));
+    expect(await latestOf("Retire early")).toMatchObject({ next: 5001 });
+    expect(await latestOf("")).toMatchObject({ next: 20 });
+  });
+
+  // The household counted on to an invented 997,999, so the first
+  // scenario made ends its range on the last id there is, and the next
+  // would start past it.
+  it("refuses, in the cap's words, a scenario whose ids would start past the cap on ids, and keeps and opens nothing", async () => {
+    await keepFirst("", { ...reference, next: 997_999 });
+
+    expect(await createScenario("Retire early")).toStrictEqual(
+      saved("Retire early"),
+    );
+    expect(await latestOf("Retire early")).toMatchObject({ next: 999_999 });
+
+    await expect(createScenario("Retire earlier")).resolves.toStrictEqual(
+      refused("A record's id is below 1000000"),
+    );
+    expect(await namesIn()).toStrictEqual(["Retire early"]);
+    expect(openScenario).toHaveBeenCalledExactlyOnceWith("Retire early");
   });
 
   it("refuses a name a scenario is kept under, decided or not, and writes nothing", async () => {
@@ -290,7 +352,7 @@ describe("createScenario", () => {
       saved("Retire earlier"),
     );
     expect(await readLatest(db, "Retire earlier")).toStrictEqual({
-      household: stamped(longer),
+      household: stamped({ ...longer, next: 2002 }),
       version: 1,
     });
   });
@@ -1486,6 +1548,71 @@ describe("a scenario made from the household or another", () => {
     );
 
     expect(await laidOver("Parent")).toStrictEqual({
+      adopted: refused(added),
+      compared: refused(added),
+      held: [...held, ["Premium bonds", 4000]],
+    });
+  });
+
+  // Premium bonds opened in a parent and a cash ISA in the household,
+  // each the first record either adds after the parent was made; a
+  // child made from the parent after, adding a gym membership; and a
+  // grandchild made from the child.
+  it("refuses a child, and a grandchild, of a scenario that opened an account as the household opened another", async () => {
+    await keepFirst("", reference);
+    await make("Parent");
+    await save("Parent", opening("Premium bonds", 4000));
+    await save("", opening("Cash ISA", 9000));
+    await make("Child", "Parent");
+    await save("Child", spending);
+    await make("Grandchild", "Child");
+
+    for (const scenario of ["Child", "Grandchild"]) {
+      expect(await laidOver(scenario)).toStrictEqual({
+        adopted: refused(added),
+        compared: refused(added),
+        held: [...held, ["Cash ISA", 9000]],
+      });
+    }
+  });
+
+  // Premium bonds opened in a parent, a child made from it opening a
+  // savings account, the parent then opening an ISA, a second child
+  // made from the parent, and the first child made the household.
+  it("refuses a child once a sibling made the household brings in an account the sibling opened after both were made", async () => {
+    await keepFirst("", reference);
+    await make("Parent");
+    await save("Parent", opening("Premium bonds", 4000));
+    await make("Child", "Parent");
+    await save("Child", opening("Easy access saver", 2000));
+    await save("Parent", opening("Stocks ISA", 3000));
+    await make("Sibling", "Parent");
+    expect(await adoptScenario("Child", await shownNow("Child"))).toStrictEqual(
+      saved(true),
+    );
+
+    expect(await laidOver("Sibling")).toStrictEqual({
+      adopted: refused(added),
+      compared: refused(added),
+      held: [...held, ["Premium bonds", 4000], ["Easy access saver", 2000]],
+    });
+  });
+
+  // Two scenarios made from the household with nothing saved there
+  // between them, each opening an account, the first made the household,
+  // and a child made from the second after.
+  it("refuses a child of a scenario made beside another from the same household once the other is made the household", async () => {
+    await keepFirst("", reference);
+    await make("Variant A");
+    await make("Variant B");
+    await save("Variant A", opening("Premium bonds", 4000));
+    await save("Variant B", opening("Cash ISA", 9000));
+    expect(
+      await adoptScenario("Variant A", await shownNow("Variant A")),
+    ).toStrictEqual(saved(true));
+    await make("Child", "Variant B");
+
+    expect(await laidOver("Child")).toStrictEqual({
       adopted: refused(added),
       compared: refused(added),
       held: [...held, ["Premium bonds", 4000]],
