@@ -4,12 +4,29 @@ import { describe, expect, it } from "vitest";
 import type { Kept } from "@/data/household";
 import type { Target, Targets } from "@/data/targets";
 
+import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
+import { currentShape, stamped } from "@/data/shapes";
 import { portfolios, targets } from "@/data/targets.fixture";
 import { Refusal } from "@/lib/answer";
 
-import { planOver } from "./plan-over";
+import { forkOf, planOver } from "./plan-over";
+
+// Why a household holding an account the scenario's own copy never held
+// keeps the two apart, as the merge says it.
+const added =
+  "An account was added to the household since this scenario was made, so the scenario cannot be laid over it; delete it from the household first, and add it again after";
+
+// An invented cash account under the id the reference household's next
+// stands at, as a save there or in a scenario made from it gives one.
+const opened = {
+  balance: 4000,
+  growth: { kind: "fixed", rate: 0.04 },
+  id: 20,
+  kind: "cash",
+  name: "Premium bonds",
+} as const;
 
 // Why the household's import and the scenario's cannot be merged where
 // one lists a category asking a share that the other does not, as the
@@ -65,7 +82,7 @@ const household: Kept = { ...kept, targets: september };
 
 // The scenario laid over the household given, or the September one.
 function adopted(scenario: Kept, over: Kept = household): Kept {
-  return planOver(over, scenario, kept.next);
+  return planOver(over, scenario, forkOf(kept));
 }
 
 // An import with its categories, by id, changed as given.
@@ -118,7 +135,68 @@ function scenarioOf(changes: Partial<Kept> = {}): Kept {
   };
 }
 
+describe("forkOf", () => {
+  // The copy listing an account twice with its next below every id, as
+  // a version kept before those rules tightened would break them; and
+  // one a newer app kept.
+  it("reads the copy a scenario was made from for its accounts' ids alone, through the chain, so a rule it breaks refuses nothing", () => {
+    expect(
+      forkOf(
+        stamped({
+          ...kept,
+          accounts: [...kept.accounts, ...kept.accounts.slice(0, 1)],
+          next: 1,
+        }),
+      ),
+    ).toStrictEqual(new Set([2, 3, 4, 5, 6]));
+    expect(() => forkOf({ ...kept, shape: currentShape + 1 })).toThrow(
+      new Refusal("This household was saved by a newer app than this one"),
+    );
+  });
+});
+
 describe("planOver", () => {
+  // A cash ISA opened in the household after the copy was made, under
+  // the id the copy's next stood at; and the same where the copy is a
+  // parent scenario's that had given that id to a line of its own, so the
+  // id sits below the copy's next while no account of the copy holds it.
+  it("refuses, in its words, a household holding an account the scenario's own copy never held, wherever its id falls", () => {
+    const over = {
+      ...household,
+      accounts: [...household.accounts, { ...opened, name: "Cash ISA" }],
+      next: 21,
+    };
+    const parent = {
+      ...kept,
+      next: 21,
+      schedule: {
+        ...kept.schedule,
+        expenses: [...expenseLines, { ...expenseLines[0], id: 20 }],
+      },
+    };
+
+    expect(() => adopted(scenarioOf(), over)).toThrow(new Refusal(added));
+    expect(() =>
+      planOver(over, scenarioOf({ next: 21 }), forkOf(parent)),
+    ).toThrow(new Refusal(added));
+  });
+
+  // Premium bonds opened in a parent scenario before this one was made
+  // from it, which the household holds since at a balance set on the
+  // twelfth, through a sibling or the parent made the household.
+  it("lays the scenario over a household holding only accounts its copy held, each at the household's balance", () => {
+    const recorded = { ...opened, balance: 4100, setOn: "2026-09-12" };
+    const copy = { ...kept, accounts: [...kept.accounts, opened], next: 21 };
+    const merged = planOver(
+      { ...household, accounts: [...household.accounts, recorded], next: 21 },
+      scenarioOf({ accounts: copy.accounts, next: 21 }),
+      forkOf(copy),
+    );
+
+    expect(merged.accounts).toStrictEqual([...kept.accounts, recorded]);
+    expect(soundKept(merged).kept).toStrictEqual(merged);
+  });
+
   it("keeps the household's import, its day, cash and paid in, under the scenario's shares, where the household imported since the scenario was made", () => {
     const merged = adopted(scenarioOf());
 

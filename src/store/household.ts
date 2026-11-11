@@ -31,7 +31,7 @@ import {
 } from "@/db/household";
 import { answerOf, Refusal, refused, saved, Stale } from "@/lib/answer";
 import { closingOn, dayOf, monthBefore, thisMonth, today } from "@/lib/months";
-import { fork, planOver } from "@/lib/plan-over";
+import { forkOf, planOver } from "@/lib/plan-over";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 
@@ -220,7 +220,7 @@ export async function getClosesBack(): Promise<readonly KeptClose[]> {
 // is its latest version, carried through the chain and held to every
 // rule, with the decision it carries. What making it the household would
 // leave is planOver laid over the household's bookkeeping, the copy the
-// scenario was made from read for the id its next record was given, and
+// scenario was made from read for the ids of its accounts, and
 // held to every rule, as adopting it holds what it writes; or the
 // scenario itself where no household is kept yet, as adopting it then
 // keeps it. A refusal on the way, the scenario's or the merge's, is
@@ -447,7 +447,7 @@ function heldIn({ latest, scenario }: Open): Held & Read {
 
 // What making the scenario the household would leave, held to every
 // rule: the scenario as kept laid over the household's bookkeeping, the
-// copy it was made from read for its next id alone, or the scenario
+// copy it was made from read for its accounts' ids alone, or the scenario
 // itself where no household is kept; the scenario's own refusal where
 // it has one, thrown again for the caller to answer.
 function overOf(
@@ -461,11 +461,7 @@ function overOf(
   return soundKept(
     household.version === 0
       ? scenario.value
-      : planOver(
-          household.kept,
-          scenario.value,
-          fork.parse(upcast(first)).next,
-        ),
+      : planOver(household.kept, scenario.value, forkOf(first)),
   );
 }
 

@@ -7,6 +7,7 @@ import type { Kept } from "@/data/household";
 import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
+import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { homePart, homeValues } from "@/data/houses.fixture";
@@ -25,9 +26,11 @@ import { refused, saved } from "@/lib/answer";
 import { found } from "@/lib/records";
 import { closeScenario, openedScenario, openScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
+import { getCompared } from "@/store/household";
 
 import { takeConsoleOutput } from "../../vitest.setup";
 import { closeBalances, saveHouse } from "./accounts";
+import { importHousehold } from "./household";
 import {
   adoptScenario,
   createScenario,
@@ -53,16 +56,131 @@ const { db } = memory;
 // The household before anything is saved, its plan run to 97.
 const longer = { ...blank, ages: { ends: 97 } };
 
+// Why a scenario cannot be laid over a household holding an account the
+// scenario's own copy never held, as the merge says it.
+const added =
+  "An account was added to the household since this scenario was made, so the scenario cannot be laid over it; delete it from the household first, and add it again after";
+
+// The reference household's accounts, by name and balance.
+const held = namedIn(reference);
+
 standUp(memory, { today });
+
+// What making a scenario the household would leave, as Compare reads it
+// and as making it the household answers, and the household's accounts
+// after.
+interface Laid {
+  readonly adopted: Answer<boolean>;
+  readonly compared: Answer<readonly Named[]> | null | undefined;
+  readonly held: readonly Named[];
+}
+
+// An account of the household's, or of what making a scenario the
+// household would leave, by its name and balance.
+type Named = readonly [string, number];
+
+// The household with the account named deleted.
+function closing(name: string): (kept: Kept) => Kept {
+  return (kept) => ({
+    ...kept,
+    accounts: kept.accounts.filter((account) => account.name !== name),
+  });
+}
+
+// What Compare reads making the scenario named the household would
+// leave, by each account's name and balance, or why it cannot be laid
+// over the household.
+async function comparing(
+  name: string,
+): Promise<Answer<readonly Named[]> | null | undefined> {
+  const over = (await getCompared(name))?.over;
+  return over?.kind === "saved" ? saved(namedIn(over.value.kept)) : over;
+}
 
 // Keeps the household given as the first version of the branch named.
 async function keepFirst(scenario: string, household: Kept): Promise<void> {
   await keepAfter(db, { scenario, version: 0 }, household);
 }
 
+// What Compare reads for the scenario named, then what making it the
+// household answers on the same store, and the household's accounts
+// after.
+async function laidOver(name: string): Promise<Laid> {
+  const compared = await comparing(name);
+  const adopted = await adoptScenario(name, await shownNow(name));
+  return { adopted, compared, held: namedIn(await latestOf("")) };
+}
+
+// The branch's latest version, as the rules read it.
+async function latestOf(branch: string): Promise<Kept> {
+  return soundKept(upcast((await readLatest(db, branch))?.household)).kept;
+}
+
+// Makes a scenario of the name given through New scenario…, from the
+// scenario named open or from the household, and leaves the household
+// open.
+async function make(name: string, from: null | string = null): Promise<void> {
+  vi.mocked(openedScenario).mockResolvedValue(from);
+  expect(await createScenario(name)).toStrictEqual(saved(name));
+  vi.mocked(openedScenario).mockResolvedValue(null);
+}
+
+// Each account the household given holds, by its name and balance.
+function namedIn({ accounts }: Kept): readonly Named[] {
+  return accounts.map(({ balance, name }) => [name, balance]);
+}
+
 // The names of the scenarios kept, in order.
 async function namesIn(): Promise<readonly string[]> {
   return (await listScenarios(db)).map(({ name }) => name);
+}
+
+// The household with an invented account of the name, balance and kind
+// given opened under its next id, as a save opens one.
+function opening(
+  name: string,
+  balance: number,
+  kind: "cash" | "debt" = "cash",
+): (kept: Kept) => Kept {
+  return (kept) => ({
+    ...kept,
+    accounts: [
+      ...kept.accounts,
+      {
+        balance,
+        growth: { kind: "fixed", rate: 0.04 },
+        id: kept.next,
+        kind,
+        name,
+      },
+    ],
+    next: kept.next + 1,
+  });
+}
+
+// The household with the account named holding the balance given, set
+// on the twelfth.
+function recording(name: string, balance: number): (kept: Kept) => Kept {
+  return (kept) => ({
+    ...kept,
+    accounts: kept.accounts.map((account) =>
+      account.name === name
+        ? { ...account, balance, setOn: "2026-09-12" }
+        : account,
+    ),
+  });
+}
+
+// Keeps the edit given of the branch's latest version as the version
+// after it, as a save from a page drawn in it does, so a record it adds
+// takes the branch's own next id.
+async function save(branch: string, edit: (kept: Kept) => Kept): Promise<void> {
+  const latest = await readLatest(db, branch);
+  await keepAfter(
+    db,
+    { scenario: branch, version: latest?.version ?? 0 },
+    edit(await latestOf(branch)),
+  );
 }
 
 // The versions of the household and of the scenario named as they stand,
@@ -76,6 +194,21 @@ async function shownNow(
     readLatest(db, scenario),
   ]);
   return { household: household?.version ?? 0, scenario: latest?.version ?? 1 };
+}
+
+// The household with an invented gym membership laid under its next id.
+function spending(kept: Kept): Kept {
+  return {
+    ...kept,
+    next: kept.next + 1,
+    schedule: {
+      ...kept.schedule,
+      expenses: [
+        ...kept.schedule.expenses,
+        { ...expenseLines[0], amount: 45, id: kept.next, name: "Gym" },
+      ],
+    },
+  };
 }
 
 describe("createScenario", () => {
@@ -535,7 +668,7 @@ describe("adoptScenario", () => {
   // The copy the scenario was made from lists an account twice, as a
   // version kept before a rule tightened would break it, while the
   // scenario since and the household are sound.
-  it("reads the copy the scenario was made from for its next id alone, so a rule it breaks refuses nothing", async () => {
+  it("reads the copy the scenario was made from for its accounts alone, so a rule it breaks refuses nothing", async () => {
     await keepFirst("", reference);
     await keepFirst("Retire early", {
       ...reference,
@@ -1049,5 +1182,313 @@ describe("rejectScenario", () => {
       rejectScenario("Four-day week", { household: 0, scenario: 1 }),
     ).rejects.toThrow("redirected");
     expect(await readLatest(db, "Four-day week")).toMatchObject({ version: 1 });
+  });
+});
+
+describe("a scenario made from the household or another", () => {
+  // A cash ISA opened in the household after a scenario was made from
+  // it.
+  it("refuses, in Compare and in making it the household, a scenario made from the household once the household opens an account", async () => {
+    await keepFirst("", reference);
+    await make("Parent");
+    await save("", opening("Cash ISA", 9000));
+
+    expect(await laidOver("Parent")).toStrictEqual({
+      adopted: refused(added),
+      compared: refused(added),
+      held: [...held, ["Cash ISA", 9000]],
+    });
+  });
+
+  // A gym membership added to one parent left open and to another then
+  // decided against, a cash ISA opened in the household after, and a
+  // child made from each parent: each child's copy is its parent's,
+  // which never held the ISA.
+  it("refuses a child of a scenario open or decided against once the household holds an account its parent never held", async () => {
+    await keepFirst("", reference);
+    await make("Parent");
+    await make("Rejected parent");
+    await save("Parent", spending);
+    await save("Rejected parent", spending);
+    expect(
+      await rejectScenario(
+        "Rejected parent",
+        await shownNow("Rejected parent"),
+      ),
+    ).toStrictEqual(saved(undefined));
+    await save("", opening("Cash ISA", 9000));
+    await make("Child", "Parent");
+    await make("Rejected parent's child", "Rejected parent");
+
+    for (const child of ["Child", "Rejected parent's child"]) {
+      expect(await laidOver(child)).toStrictEqual({
+        adopted: refused(added),
+        compared: refused(added),
+        held: [...held, ["Cash ISA", 9000]],
+      });
+    }
+  });
+
+  // Premium bonds opened in a parent, two variants made from it while
+  // it is open, the first made the household, and the bonds' balance
+  // then recorded in the household.
+  it("lays a sibling over the household once the other is made the household, the parent's account at the household's balance", async () => {
+    await keepFirst("", reference);
+    await make("Parent");
+    await save("Parent", opening("Premium bonds", 4000));
+    await make("Variant A", "Parent");
+    await make("Variant B", "Parent");
+    expect(
+      await adoptScenario("Variant A", await shownNow("Variant A")),
+    ).toStrictEqual(saved(true));
+    await save("", recording("Premium bonds", 4100));
+    const after = [...held, ["Premium bonds", 4100]];
+
+    expect(await laidOver("Variant B")).toStrictEqual({
+      adopted: saved(true),
+      compared: saved(after),
+      held: after,
+    });
+  });
+
+  // Premium bonds opened in a parent, a child made from it, the parent
+  // then made the household, and the bonds' balance recorded there.
+  it("lays a child over the household once its parent is made the household after it", async () => {
+    await keepFirst("", reference);
+    await make("Parent");
+    await save("Parent", opening("Premium bonds", 4000));
+    await make("Child", "Parent");
+    expect(
+      await adoptScenario("Parent", await shownNow("Parent")),
+    ).toStrictEqual(saved(true));
+    await save("", recording("Premium bonds", 4100));
+    const after = [...held, ["Premium bonds", 4100]];
+
+    expect(await laidOver("Child")).toStrictEqual({
+      adopted: saved(true),
+      compared: saved(after),
+      held: after,
+    });
+  });
+
+  // Premium bonds opened in a parent made the household as the store
+  // fails before its decision is kept, so the parent reads as open; a
+  // child made from it then; and a cash ISA opened in the household
+  // after.
+  it("lays a child over the household where its parent's decision failed to be kept, and refuses it once the household opens an account", async () => {
+    await keepFirst("", reference);
+    await make("Parent");
+    await save("Parent", opening("Premium bonds", 4000));
+    const insert = db.insert.bind(db);
+    vi.spyOn(db, "insert")
+      .mockImplementationOnce((table) => insert(table))
+      .mockImplementationOnce(() => {
+        throw new Error("The store is down");
+      });
+    expect(
+      await adoptScenario("Parent", await shownNow("Parent")),
+    ).toStrictEqual(saved(false));
+    expect(takeConsoleOutput()).toStrictEqual([
+      expect.stringMatching(
+        /^console\.error: A scenario was made the household, but its decision could not be kept/u,
+      ),
+    ]);
+    await make("Child", "Parent");
+
+    expect(await comparing("Child")).toStrictEqual(
+      saved([...held, ["Premium bonds", 4000]]),
+    );
+
+    await save("", opening("Cash ISA", 9000));
+
+    expect(await laidOver("Child")).toStrictEqual({
+      adopted: refused(added),
+      compared: refused(added),
+      held: [...held, ["Premium bonds", 4000], ["Cash ISA", 9000]],
+    });
+  });
+
+  // Two scenarios made from the household with a gym membership added
+  // there between them, and the first opening bonds and made the
+  // household: the second's copy never held the bonds.
+  it("refuses a scenario once another made the household brings in an account its copy never held", async () => {
+    await keepFirst("", reference);
+    await make("Bonds sooner");
+    await save("", spending);
+    await make("Four-day week");
+    await save("Bonds sooner", opening("Bonds", 5000));
+    expect(
+      await adoptScenario("Bonds sooner", await shownNow("Bonds sooner")),
+    ).toStrictEqual(saved(true));
+
+    expect(await laidOver("Four-day week")).toStrictEqual({
+      adopted: refused(added),
+      compared: refused(added),
+      held: [...held, ["Bonds", 5000]],
+    });
+  });
+
+  // Premium bonds opened in a parent made the household, a child made
+  // from it after, and a cash ISA then opened in the household.
+  it("lays a child of a scenario made the household over it, and refuses it once the household opens an account", async () => {
+    await keepFirst("", reference);
+    await make("Parent");
+    await save("Parent", opening("Premium bonds", 4000));
+    expect(
+      await adoptScenario("Parent", await shownNow("Parent")),
+    ).toStrictEqual(saved(true));
+    await make("Child", "Parent");
+
+    expect(await comparing("Child")).toStrictEqual(
+      saved([...held, ["Premium bonds", 4000]]),
+    );
+
+    await save("", opening("Cash ISA", 9000));
+
+    expect(await laidOver("Child")).toStrictEqual({
+      adopted: refused(added),
+      compared: refused(added),
+      held: [...held, ["Premium bonds", 4000], ["Cash ISA", 9000]],
+    });
+  });
+
+  // A gym membership added to one parent left open and to another then
+  // decided against, a child made from each adding a line of its own, a
+  // cash ISA opened in the household, and a grandchild made from each
+  // child after.
+  it("refuses a grandchild through a scenario open or decided against once the household holds an account the line never held", async () => {
+    await keepFirst("", reference);
+    await make("Parent");
+    await make("Rejected parent");
+    await save("Parent", spending);
+    await save("Rejected parent", spending);
+    expect(
+      await rejectScenario(
+        "Rejected parent",
+        await shownNow("Rejected parent"),
+      ),
+    ).toStrictEqual(saved(undefined));
+    await make("Child", "Parent");
+    await make("Rejected parent's child", "Rejected parent");
+    await save("Child", spending);
+    await save("Rejected parent's child", spending);
+    await save("", opening("Cash ISA", 9000));
+    await make("Grandchild", "Child");
+    await make("Rejected parent's grandchild", "Rejected parent's child");
+
+    for (const grandchild of ["Grandchild", "Rejected parent's grandchild"]) {
+      expect(await laidOver(grandchild)).toStrictEqual({
+        adopted: refused(added),
+        compared: refused(added),
+        held: [...held, ["Cash ISA", 9000]],
+      });
+    }
+  });
+
+  // Premium bonds opened in a parent made the household, a child made
+  // from it adding a gym membership, a grandchild made from the child,
+  // and a cash ISA then opened in the household.
+  it("lays a grandchild through a scenario made the household over it, and refuses it once the household opens an account", async () => {
+    await keepFirst("", reference);
+    await make("Parent");
+    await save("Parent", opening("Premium bonds", 4000));
+    expect(
+      await adoptScenario("Parent", await shownNow("Parent")),
+    ).toStrictEqual(saved(true));
+    await make("Child", "Parent");
+    await save("Child", spending);
+    await make("Grandchild", "Child");
+
+    expect(await comparing("Grandchild")).toStrictEqual(
+      saved([...held, ["Premium bonds", 4000]]),
+    );
+
+    await save("", opening("Cash ISA", 9000));
+
+    expect(await laidOver("Grandchild")).toStrictEqual({
+      adopted: refused(added),
+      compared: refused(added),
+      held: [...held, ["Premium bonds", 4000], ["Cash ISA", 9000]],
+    });
+  });
+
+  // An old ISA the household held when it was saved to a file, deleted
+  // before a scenario was made, and the file imported into the household
+  // after.
+  it("refuses a scenario once the household imports a file holding an account its copy never held", async () => {
+    await keepFirst("", reference);
+    await save("", opening("Old ISA", 3000));
+    const file = JSON.stringify((await readLatest(db, ""))?.household);
+    await save("", closing("Old ISA"));
+    await make("Parent");
+    expect(await importHousehold(file)).toStrictEqual(saved(undefined));
+
+    expect(await laidOver("Parent")).toStrictEqual({
+      adopted: refused(added),
+      compared: refused(added),
+      held: [...held, ["Old ISA", 3000]],
+    });
+  });
+
+  // A scenario whose copy is the household's then, its next among it,
+  // kept straight to the store as an older build kept one, and adding a
+  // gym membership; a cash ISA then opened in the household; and a child
+  // made from the scenario after, through New scenario….
+  it("refuses a scenario kept by an older build, and a child made from it since, once the household opens an account, reading the copy as it reads any", async () => {
+    await keepFirst("", reference);
+    await keepFirst("Parent", reference);
+    await save("Parent", spending);
+    await save("", opening("Cash ISA", 9000));
+    await make("Child", "Parent");
+
+    for (const scenario of ["Parent", "Child"]) {
+      expect(await laidOver(scenario)).toStrictEqual({
+        adopted: refused(added),
+        compared: refused(added),
+        held: [...held, ["Cash ISA", 9000]],
+      });
+    }
+  });
+
+  // A car loan the household holds, which a parent made from it pays off
+  // and deletes, and a child made from the parent after: the child's
+  // copy never held the loan, though the household held it before either
+  // was made. The way out the refusal names is the plan's own result.
+  it("refuses a child of a scenario that deleted an account the household still holds, where the scenario itself lays over it with the account gone", async () => {
+    await keepFirst("", reference);
+    await save("", opening("Car loan", -6000, "debt"));
+    await make("Parent");
+    await save("Parent", closing("Car loan"));
+    await make("Child", "Parent");
+
+    expect(await laidOver("Child")).toStrictEqual({
+      adopted: refused(added),
+      compared: refused(added),
+      held: [...held, ["Car loan", -6000]],
+    });
+    expect(await laidOver("Parent")).toStrictEqual({
+      adopted: saved(true),
+      compared: saved(held),
+      held,
+    });
+  });
+
+  // Premium bonds opened in a parent after it was made, a child made from
+  // the parent and made the household, and the parent compared after: it
+  // holds the bonds, but its copy never did.
+  it("refuses a scenario once a child made from it brings the scenario's own account into the household", async () => {
+    await keepFirst("", reference);
+    await make("Parent");
+    await save("Parent", opening("Premium bonds", 4000));
+    await make("Child", "Parent");
+    expect(await adoptScenario("Child", await shownNow("Child"))).toStrictEqual(
+      saved(true),
+    );
+
+    expect(await laidOver("Parent")).toStrictEqual({
+      adopted: refused(added),
+      compared: refused(added),
+      held: [...held, ["Premium bonds", 4000]],
+    });
   });
 });
