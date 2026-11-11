@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ProgressPoint } from "@/data/progress";
 
-import { bySlot } from "@/test/dom";
+import { bySlot, styled } from "@/test/dom";
 
 import { ProgressPoints } from "./progress-points";
 
@@ -203,7 +203,11 @@ describe("ProgressPoints", () => {
       within(yearRow("2024"))
         .getAllByText(bySlot("move-bar-side"), { suggest: false })
         .map((side) => side.style.width),
-    ).toStrictEqual(["11.11111111111111%", "33.33333333333333%"]);
+    ).toStrictEqual(
+      ["11.11111111111111%", "33.33333333333333%"].map((width) =>
+        styled("width", width),
+      ),
+    );
   });
 
   // April and May 2025 read off the accounts, with £8,000 and then

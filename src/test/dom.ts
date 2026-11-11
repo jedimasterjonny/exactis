@@ -89,6 +89,18 @@ export function stubViewport(width: number): void {
   );
 }
 
+// A length as an element's inline style holds it, read back through the
+// document's own CSS, which may round it, so a style an element was given
+// is compared with the value it was given, read the same way.
+export function styled(
+  property: "left" | "maxWidth" | "width",
+  value: string,
+): string {
+  const probe = document.createElement("div");
+  probe.style[property] = value;
+  return probe.style[property];
+}
+
 // A worksheet's rows by its name, each its name and then its figures, as
 // read across, and whatever box it sits in.
 export function worksheet(
