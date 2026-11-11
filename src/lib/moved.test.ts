@@ -12,6 +12,7 @@ import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { curve } from "@/data/inflation.fixture";
+import { atAge } from "@/data/milestones";
 import { owners, sam } from "@/data/owners.fixture";
 import { portfolios, targets, targetsUnder } from "@/data/targets.fixture";
 import { endWorthOf, futureOf } from "@/engine/futures";
@@ -586,6 +587,46 @@ describe("movedSince", () => {
     expect([moved.age, moved.fixed]).toStrictEqual([91, 91]);
   });
 
+  // Retired at an invented 30, before the plan opens at 34, with the ISA
+  // an invented £10,000 over the plan: every state is read in the plan's
+  // first year, at 34, while the month end still expected retirement at
+  // 30.
+  it("reads every row at the age the plan opens at, where its owner retired before it opens", () => {
+    const retired = closing({
+      owners: [{ ...owners[0], retirement: atAge(30) }],
+    });
+    const planned = closed(retired);
+    const now = closed(retired, {
+      accounts: changed(planned.accounts, 2, {
+        balance: (planned.accounts[1]?.balance ?? 0) + 10_000,
+      }),
+    });
+    const moved = movedSince(retired, now);
+
+    expect([moved.age, moved.fixed]).toStrictEqual([34, 30]);
+    expect(moved.steps.map(({ groups }) => groups)).toStrictEqual([
+      ["balances"],
+    ]);
+    expect(moved.now.liquid).toBe(liquidAt(now, 34));
+  });
+
+  // Retired at 30 as the month end expected, then moved to an invented
+  // 40 in the household's changes: the worth is still read at 34, the
+  // age the month end's plan opens at, and retirement now falls in 2032,
+  // the year the owner, born in 1992, turns 40.
+  it("holds the age the month end's plan opens at where retirement has since moved past it", () => {
+    const retired = closing({
+      owners: [{ ...owners[0], retirement: atAge(30) }],
+    });
+    const moved = movedSince(
+      retired,
+      closed(retired, { owners: [{ ...owners[0], retirement: atAge(40) }] }),
+    );
+
+    expect([moved.age, moved.fixed]).toStrictEqual([34, 30]);
+    expect(moved.now.retired).toBe(2032);
+  });
+
   // With none of the reference's spending the month pays the ISA a
   // twelfth of its £20,000.
   it("says what the plan paid into the ISAs and the GIAs over the months closed", () => {
@@ -992,6 +1033,28 @@ describe("standingOf", () => {
       age: 91,
       liquid: Math.round(moved.expected.liquid),
       retires: null,
+    });
+  });
+
+  // Retired at an invented 30, before the plan opens at 34: the worth is
+  // read in the plan's first year, labelled with that year's age, and
+  // the retirement is kept as the age it came at.
+  it("reads the liquid worth at the age the plan opens at, and the age its owner retired at, where they retired before it opens", () => {
+    const retired = closing({
+      owners: [{ ...owners[0], retirement: atAge(30) }],
+    });
+    const { accounts: held, plan, schedule } = soundKept(retired).household;
+    const [first] = futureOf(project(held, schedule, plan), {
+      accounts: held,
+      plan,
+      schedule,
+    }).measured;
+
+    expect(first?.age).toBe(34);
+    expect(standingOf(retired)).toStrictEqual({
+      age: first?.age,
+      liquid: Math.round(first?.liquid ?? 0),
+      retires: 30,
     });
   });
 });
