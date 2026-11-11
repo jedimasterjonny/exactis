@@ -10,6 +10,7 @@ import { counted } from "@/lib/count";
 import { download } from "@/lib/download";
 import { formatMonth, isOnOrBefore, today } from "@/lib/months";
 import { replaced } from "@/lib/records";
+import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 import { amend, getHousehold } from "@/store/household";
 
@@ -40,9 +41,18 @@ interface House {
 // it did, so a block reads apart from an outage; so is an answer no
 // index can be read from, in the reader's words, and one running to a
 // month before the one already pulled, as a stale copy of it would.
-// Nothing is kept on a refusal: the screen says why under a toast.
+// Nothing is kept on a refusal: the screen says why under a toast. The
+// index is pulled in the household alone, and refused while a scenario
+// is open, since it would be lost there whichever way the scenario
+// went: adopting one keeps the household's points and index over the
+// scenario's, and dropping one deletes them. That is read off the
+// cookie before the house is read or the Registry asked, so nothing
+// goes out for a pull that could not be kept.
 export async function pullHousePrices(): Promise<Answer<Pulled>> {
   await requireSession();
+  if ((await openedScenario()) !== null) {
+    return refused("Leave the scenario to pull house prices");
+  }
   const asked = houseIn((await getHousehold()).accounts);
   if ("short" in asked) {
     return refused(asked.short);

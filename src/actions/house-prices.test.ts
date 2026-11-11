@@ -11,6 +11,7 @@ import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
+import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 
 import { pullHousePrices } from "./house-prices";
@@ -205,6 +206,21 @@ describe("pullHousePrices", () => {
     );
     expect(fetch).not.toHaveBeenCalled();
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+  });
+
+  // A scenario made from the household, open as the pull is asked for.
+  it("refuses before asking the Registry while a scenario is open, and writes to neither branch", async () => {
+    const fetch = registrySends(new Response(file));
+    await keepAfter(db, { scenario: "", version: 0 }, withHouse);
+    await keepAfter(db, { scenario: "Downsize", version: 0 }, withHouse);
+    vi.mocked(openedScenario).mockResolvedValue("Downsize");
+
+    expect(await pullHousePrices()).toStrictEqual(
+      refused("Leave the scenario to pull house prices"),
+    );
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+    expect(await readLatest(db, "Downsize")).toMatchObject({ version: 1 });
   });
 
   it("refuses before asking the Registry while the household lists two houses, and keeps nothing", async () => {
