@@ -56,6 +56,7 @@ export function CurveChart({ curve, derived }: CurveChartProps): JSX.Element {
       <LineChart
         data={points}
         margin={{ bottom: 0, left: 0, right: 16, top: 20 }}
+        title="What inflation the gilt curve implies at each maturity"
       >
         <CartesianGrid vertical={false} />
         <XAxis

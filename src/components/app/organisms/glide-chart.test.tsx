@@ -46,7 +46,11 @@ describe("GlideChart", () => {
   it("draws the plan's ages ruled at each decade and the share scaled to the quarter above the highest the path reaches", () => {
     renderChart();
 
-    expect(screen.getByRole("application")).toHaveClass("recharts-surface");
+    expect(
+      screen.getByRole("application", {
+        name: "How the savings are split at each age",
+      }),
+    ).toHaveClass("recharts-surface");
     expect(ticks()).toStrictEqual([
       "40",
       "50",

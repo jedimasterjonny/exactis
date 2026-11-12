@@ -22,7 +22,11 @@ describe("CurveChart", () => {
   it("draws the curve along the maturities read, with no legend", () => {
     renderChart();
 
-    expect(screen.getByRole("application")).toHaveClass("recharts-surface");
+    expect(
+      screen.getByRole("application", {
+        name: "What inflation the gilt curve implies at each maturity",
+      }),
+    ).toHaveClass("recharts-surface");
     expect(
       screen
         .getAllByText(byClass("recharts-cartesian-axis-tick-value"), {

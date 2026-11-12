@@ -74,6 +74,7 @@ export function GlideChart({ glide, plan }: GlideChartProps): JSX.Element {
       <AreaChart
         data={rows}
         margin={{ bottom: 0, left: 0, right: 12, top: 20 }}
+        title="How the savings are split at each age"
       >
         <CartesianGrid vertical={false} />
         <XAxis
