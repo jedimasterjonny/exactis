@@ -29,8 +29,8 @@ interface Drawn {
 // the plan it is, the slices of it drawn so far, each at the place it
 // falls in the run, a slice not yet drawn left empty, the futures the
 // screens have been handed of them, and where the run breaks once it
-// has been searched, with the brackets the age's search left each
-// future in.
+// has been searched, with the brackets the cut's search, and the age's
+// where it is searched, left each future in.
 interface Kept {
   readonly breaks?: Breaks;
   readonly for: string;

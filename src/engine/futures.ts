@@ -37,14 +37,17 @@ export type Bands = Pick<
 >;
 
 // Where a run of futures breaks, as breaksIn finds it: the least cut to
-// the spending nine in ten of them last with, and the earliest age nine
-// in ten last retiring at, for a plan isAgeSearched searches the age of,
-// with the brackets that search left each future in, in its place in
-// the run, which lastingAt counts an age tried off.
+// the spending nine in ten of them last with, with the brackets that
+// search left each future in, in its place in the run, which lastingOn
+// counts each share of the spending off; and the earliest age nine in
+// ten last retiring at, for a plan isAgeSearched searches the age of,
+// with the brackets that search left each future in, which lastingAt
+// counts an age tried off.
 export interface Breaks {
   readonly age?: null | number;
   readonly ages?: readonly Bracket[];
   readonly cut: null | number;
+  readonly cuts: readonly Bracket[];
 }
 
 // One future the plan was run over, as the chance of success reads it:
@@ -118,9 +121,10 @@ export interface Reading {
 // given.
 export type Trial = { readonly age: number } | { readonly cut: number };
 
-// Where the tries of a search left one of a run's futures: the most it
-// fell short at and the least it lasted at, an end past the range
-// standing for a side it was never tried on, and its place in the run.
+// Where the tries of a search left one of a run's futures, the age or
+// the cut it was searched over: the most it fell short at and the least
+// it lasted at, an end past the range standing for a side it was never
+// tried on, and its place in the run.
 interface Bracket {
   readonly fails: number;
   readonly future: number;
@@ -150,6 +154,16 @@ export const deepestCut = 50;
 // The share of a run's futures the search for where it breaks finds the
 // cut and the age for: nine in ten.
 const lastingShare = 0.9;
+
+// The cuts to the spending lastingOn counts the futures lasting at,
+// every ten points from half the spending to half as much again, in the
+// order it counts them: the plan's own spending, which the search has
+// settled; the two ends, half as much again and then half, where a
+// future lasting even on the one or falling short even on the other is
+// settled by its one try; then each side of the plan, the dearer first,
+// halved breadth first, so each try narrows the futures left open for
+// the counts after it.
+const sampledCuts = [0, -50, 50, -30, -40, -20, -10, 20, 10, 30, 40];
 
 // The lines a run of futures is graded on, as gradingOf draws them for
 // a plan: the year from which a future falling short has reached the
@@ -211,10 +225,12 @@ export function bandsOf(figures: readonly number[]): Bands {
 // in ten last as the tries read them; but since every verdict at the
 // plan itself is the chance's own, the cut is nothing or less, and the
 // age the plan's own or sooner, exactly where nine in ten futures last
-// as the chance counts them. Where it searches the age it hands back,
-// beside the figures, where the tries left each future: the latest age
-// it fell short retiring at and the earliest it lasted retiring at. A
-// plan isAgeSearched passes over has the spending alone searched.
+// as the chance counts them. It hands back, beside the figures, where
+// the tries left each future: the deepest cut it fell short with and
+// the shallowest it lasted with, and, where it searches the age, the
+// latest age it fell short retiring at and the earliest it lasted
+// retiring at. A plan isAgeSearched passes over has the spending alone
+// searched.
 export async function breaksIn(
   futures: readonly Future[],
   plan: Plan,
@@ -251,11 +267,12 @@ export async function breaksIn(
   ]);
   const spending = cut.value > deepestCut ? null : cut.value;
   return age === undefined
-    ? { cut: spending }
+    ? { cut: spending, cuts: cut.brackets }
     : {
         age: age.value > last ? null : age.value,
         ages: age.brackets,
         cut: spending,
+        cuts: cut.brackets,
       };
 }
 
@@ -418,6 +435,54 @@ export async function lastingAt(
     tried: async (value, future) => tried({ age: value }, future),
   });
   return { ages: narrowed, lasted };
+}
+
+// How many of a run's futures last on each share of the spending
+// planned, from half the spending to half as much again every ten
+// points, and on the share nine in ten last on where that falls between
+// them, off the brackets breaksIn's search of the cut left them in, as
+// Breaks holds them: each cut with its count, the least share first.
+// Lasting is as the chance counts it, never falling short and retiring.
+// A future the brackets settle is read off them: lasting where it
+// lasted with that cut or a shallower one, and short where it fell
+// short with that cut or a deeper one. Every future they leave open is
+// tried at the cut, as lastsTried tries one, given the future's place
+// in the run, as many at once as the lanes given, the cuts counted one
+// after another in the order sampledCuts lists them, so each count's
+// tries narrow the brackets for the counts after it. On the plan's own
+// spending the brackets settle every future, so none is tried and the
+// count is the chance's own; on the share nine in ten last on it is
+// nine in ten or more, since the search counted that many lasting there
+// and a try only ever lowers the least cut a future lasted with; on any
+// other it is as exact as the search, counting the futures that last as
+// the run and the tries read them, for the reason breaksIn gives. The
+// brackets given are left as they are.
+export async function lastingOn(
+  { cut, cuts }: Pick<Breaks, "cut" | "cuts">,
+  {
+    lanes,
+    tried,
+  }: {
+    readonly lanes: number;
+    readonly tried: (trial: Trial, future: number) => Promise<boolean>;
+  },
+): Promise<readonly { readonly cut: number; readonly lasted: number }[]> {
+  const narrowed = cuts.map((each) => ({ ...each }));
+  const counted: { readonly cut: number; readonly lasted: number }[] = [];
+  for (const value of [
+    ...sampledCuts,
+    ...(cut === null || sampledCuts.includes(cut) ? [] : [cut]),
+  ]) {
+    counted.push({
+      cut: value,
+      lasted: await lastingOver(narrowed, value, {
+        isSettled: () => false,
+        lanes,
+        tried: async (at, future) => tried({ cut: at }, future),
+      }),
+    });
+  }
+  return counted.toSorted((one, other) => other.cut - one.cut);
 }
 
 // Whether the future at the place given in a run of the plan's futures

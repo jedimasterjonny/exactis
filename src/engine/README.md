@@ -21,8 +21,8 @@ point a year, the balances entering it. A month can also be read on its own,
 without the run around it, and where it then knows less than the run, the
 section says what it assumes. The futures the chance of success reads, in
 `futures.ts`, carry the run along paths of the markets, and they, the search of
-the run for where it breaks, and the count at an age tried are specified beside
-that code, not here.
+the run for where it breaks, the count at an age tried and the count at each
+share of the spending are specified beside that code, not here.
 
 ## The month
 

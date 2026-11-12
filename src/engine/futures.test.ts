@@ -19,10 +19,12 @@ import type { Breaks, Future, Trial } from "./futures";
 
 import {
   breaksIn,
+  deepestCut,
   futureOf,
   futuresOf,
   gradingOf,
   lastingAt,
+  lastingOn,
   lastsTried,
   markersIn,
   monthsAlong,
@@ -889,12 +891,13 @@ describe("futuresOf", () => {
     };
     const saved = [{ ...isa, balance: 40000 }];
 
-    expect(
-      (await breaksOver(saved, { plan: onConditions })).breaks,
-    ).toStrictEqual({ cut: 34 });
-    expect(
-      (await breaksOver(saved, { plan: retiringAt(planned, 30) })).breaks,
-    ).toStrictEqual({ cut: 34 });
+    for (const on of [onConditions, retiringAt(planned, 30)]) {
+      const { breaks } = await breaksOver(saved, { plan: on });
+
+      expect(figuresOf(breaks)).toStrictEqual({ age: undefined, cut: 34 });
+      expect(breaks).not.toHaveProperty("ages");
+      expect(breaks.cuts).toHaveLength(1);
+    }
   });
 
   // £35,000 at 5% straying 15% a year, earning as it spends until the
@@ -1024,6 +1027,153 @@ describe("futuresOf", () => {
     expect(
       await countedAt(saved, counted.ages, { ...run, age: 38 }),
     ).toStrictEqual({ ...counted, tries: [] });
+  });
+
+  // Twelve futures as the search leaves them on the plan's spending,
+  // each lasting with any cut from a least cut of its own, ten points
+  // apart: the six lasting as planned needing from -55, past the range,
+  // to -5, and the six falling short from 5 to 55, past it. So every cut
+  // sampled but the plan's own leaves one open when it comes to be
+  // counted, and so does a share nine in ten last on of 66%, and the
+  // cuts tried, a lane at a time, run in the order they are counted.
+  it("counts the plan's spending first, trying nothing there, then the dearer end and the cheaper, each side halved breadth first, and the share nine in ten last on last, between the shares sampled", async () => {
+    const least = [-55, -45, -35, -25, -15, -5, 5, 15, 25, 35, 45, 55];
+    const cuts = least.map((needed, future) => ({
+      fails: needed <= 0 ? -51 : 0,
+      future,
+      holds: needed <= 0 ? 0 : 51,
+    }));
+    const before = structuredClone(cuts);
+    const tries: number[] = [];
+    const points = await lastingOn(
+      { cut: 34, cuts },
+      {
+        lanes: 1,
+        tried: async (trial, future) => {
+          const at = "cut" in trial ? trial.cut : Number.NaN;
+          tries.push(at);
+          return Promise.resolve(at >= (least[future] ?? 0));
+        },
+      },
+    );
+
+    expect(tries.filter((at, index) => at !== tries[index - 1])).toStrictEqual([
+      -50, 50, -30, -40, -20, -10, 20, 10, 30, 40, 34,
+    ]);
+    expect(points).toStrictEqual(
+      [50, 40, 34, 30, 20, 10, 0, -10, -20, -30, -40, -50].map((cut) => ({
+        cut,
+        lasted: least.filter((needed) => needed <= cut).length,
+      })),
+    );
+    expect(cuts).toStrictEqual(before);
+  });
+
+  // The ten-year plan retiring at 40, at 5% straying 15% a year on the
+  // £12,000 a year spent, over 40 futures.
+  const lastingRun = {
+    plan: { ...tenYears, rate: 0.05 },
+    spread: { inflation: 0.02, rate: 0.15 },
+  };
+
+  // The run's 40 futures and where they break, over the balance given in
+  // the ISA, searched on the lanes given, one unless told otherwise; and
+  // how one of them is tried, each future tried once at each value
+  // however often it is asked, so a second search or count off the same
+  // run costs no tries of its own.
+  async function searchedOver(
+    balance: number,
+    lanes = 1,
+  ): Promise<{
+    readonly breaks: Breaks;
+    readonly futures: readonly Future[];
+    readonly lastsAt: (trial: Trial, future: number) => boolean;
+  }> {
+    const saved = [{ ...isa, balance }];
+    const verdicts = new Map<string, boolean>();
+    const lastsAt = (trial: Trial, future: number): boolean => {
+      const key = JSON.stringify([trial, future]);
+      const hasLasted =
+        verdicts.get(key) ??
+        lastsTried(saved, short, { ...lastingRun, future, trial });
+      verdicts.set(key, hasLasted);
+      return hasLasted;
+    };
+    const futures = futuresOf(saved, short, lastingRun).take(40).toArray();
+    const breaks = await breaksIn(futures, lastingRun.plan, {
+      lanes,
+      tried: async (trial, future) => Promise.resolve(lastsAt(trial, future)),
+    });
+    return { breaks, futures, lastsAt };
+  }
+
+  // £100,000 lasts on 66% of the spending, between the shares sampled.
+  // Counted off the brackets the cut search leaves, searched and counted
+  // on one lane and on four, every share reads what trying every future
+  // there gives.
+  it("counts the futures lasting on each share of the spending off the cut search's brackets as trying each future there does, the plan's own trying none, and nine in ten or more on the share nine in ten last on", async () => {
+    const { breaks, futures, lastsAt } = await searchedOver(100000);
+    const before = structuredClone(breaks.cuts);
+    const tries: Trial[] = [];
+    const countOn = async (
+      searched: Breaks,
+      lanes: number,
+    ): Promise<Awaited<ReturnType<typeof lastingOn>>> =>
+      lastingOn(searched, {
+        lanes,
+        tried: async (trial, future) => {
+          tries.push(trial);
+          return Promise.resolve(lastsAt(trial, future));
+        },
+      });
+    const lasting = (cut: number): number =>
+      futures.filter((_, future) => lastsAt({ cut }, future)).length;
+
+    const points = await countOn(breaks, 1);
+
+    expect(breaks.cut).toBe(34);
+    expect(breaks.cuts).toHaveLength(40);
+    expect(points.map(({ cut }) => cut)).toStrictEqual([
+      50, 40, 34, 30, 20, 10, 0, -10, -20, -30, -40, -50,
+    ]);
+    for (const { cut, lasted } of points) {
+      expect(lasted).toBe(lasting(cut));
+    }
+    expect(points.find(({ cut }) => cut === 0)?.lasted).toBe(
+      readingOf(futures).lasted,
+    );
+    expect(points.find(({ cut }) => cut === 34)?.lasted).toBeGreaterThanOrEqual(
+      36,
+    );
+    expect(tries).not.toContainEqual({ cut: 0 });
+    expect(tries.every((trial) => "cut" in trial)).toBe(true);
+    expect(breaks.cuts).toStrictEqual(before);
+    const { breaks: fourLanes } = await searchedOver(100000, 4);
+    expect(await countOn(fourLanes, 4)).toStrictEqual(points);
+  });
+
+  // £40,000 falls short even on half the spending, and £250,000 lasts
+  // even on half as much again, the dearest share sampled: neither adds
+  // a share to the ones sampled, every ten points from 50% to 150%.
+  it("adds no share to the ones sampled where nine in ten fall short even on half the spending, or last on a share sampled", async () => {
+    for (const [balance, cut] of [
+      [40000, null],
+      [250000, -deepestCut],
+    ] as const) {
+      const { breaks, futures, lastsAt } = await searchedOver(balance);
+      const points = await lastingOn(breaks, {
+        lanes: 1,
+        tried: async (trial, future) => Promise.resolve(lastsAt(trial, future)),
+      });
+
+      expect(breaks.cut).toBe(cut);
+      expect(points.map((point) => point.cut)).toStrictEqual(
+        Array.from({ length: 11 }, (_, step) => deepestCut - 10 * step),
+      );
+      expect(points.find((point) => point.cut === 0)?.lasted).toBe(
+        readingOf(futures).lasted,
+      );
+    }
   });
 
   // Born in 1962, 64 as the plan opens and paid the State Pension from
