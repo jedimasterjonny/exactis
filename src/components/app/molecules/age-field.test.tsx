@@ -1,7 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { commit, slider } from "@/test/dom";
+import { bySlot, commit, slider } from "@/test/dom";
 
 import { AgeField } from "./age-field";
 
@@ -141,6 +141,93 @@ describe("AgeField", () => {
     fireEvent.keyDown(slider("Retirement age"), { key: "ArrowLeft" });
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(60);
+  });
+
+  // Shift steps the slider by its large step: ten years where it floats,
+  // as Base UI's default has it, and five held in the flow, as the box
+  // steps.
+  it("steps the floating slider ten years with Shift", () => {
+    const onValueCommitted = vi.fn<(age: number) => void>();
+    render(
+      <AgeField
+        label="Retirement age"
+        max={91}
+        min={34}
+        onValueCommitted={onValueCommitted}
+        value={61}
+      />,
+    );
+
+    fireEvent.keyDown(slider("Retirement age"), {
+      key: "ArrowRight",
+      shiftKey: true,
+    });
+
+    expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(71);
+  });
+
+  // jsdom applies no stylesheet, so where the slider sits is read off
+  // its classes, as the floating one's is.
+  it("holds the slider in the flow beneath the box when asked, always shown and in the tab order, its control a finger's height below a tablet's width", () => {
+    render(
+      <AgeField
+        hint="Tried here only"
+        isSliderInFlow
+        label="Retirement age"
+        max={91}
+        min={34}
+        onValueCommitted={vi.fn<(age: number) => void>()}
+        value={61}
+      />,
+    );
+
+    const panel = screen.getByText(bySlot("age-slider"), { suggest: false });
+
+    expect(panel).not.toHaveClass("invisible");
+    expect(panel).not.toHaveClass("absolute");
+    expect(panel).not.toHaveClass("top-full");
+    expect(panel).not.toHaveAttribute("tabindex");
+    expect(panel).toContainElement(slider("Retirement age"));
+    expect(
+      screen
+        .getByRole("textbox", { name: "Retirement age" })
+        .compareDocumentPosition(slider("Retirement age")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(slider("Retirement age")).toHaveValue("61");
+    expect(slider("Retirement age")).toHaveAttribute("min", "34");
+    expect(slider("Retirement age")).toHaveAttribute("max", "91");
+    expect(
+      within(panel).getByText(bySlot("slider"), { suggest: false }),
+    ).toHaveClass("max-md:*:h-11", "[&_[data-slot=slider-track]]:bg-input");
+    expect(screen.getByRole("paragraph")).toHaveTextContent("Tried here only");
+  });
+
+  // The arrow keys move the thumb as a drag does, Shift by five years,
+  // reporting the age it moves to and committing it in the one step.
+  it("reports each age the slider in the flow moves through, five years with Shift, and commits the one it stops at", () => {
+    const onValueChange = vi.fn<(age: number) => void>();
+    const onValueCommitted = vi.fn<(age: number) => void>();
+    render(
+      <AgeField
+        isSliderInFlow
+        label="Retirement age"
+        max={91}
+        min={34}
+        onValueChange={onValueChange}
+        onValueCommitted={onValueCommitted}
+        value={61}
+      />,
+    );
+
+    fireEvent.keyDown(slider("Retirement age"), {
+      key: "ArrowRight",
+      shiftKey: true,
+    });
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowLeft" });
+
+    expect(onValueChange.mock.calls).toStrictEqual([[66], [60]]);
+    expect(onValueCommitted.mock.calls).toStrictEqual([[66], [60]]);
   });
 
   it("is the box alone when asked for no slider, committing as it does with one", () => {
