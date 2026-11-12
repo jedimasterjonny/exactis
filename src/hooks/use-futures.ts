@@ -6,7 +6,7 @@ import type { Schedule } from "@/engine/cash-flow";
 import type { Breaks, Future, Trial } from "@/engine/futures";
 import type { Slice, Tried } from "@/hooks/futures.worker";
 
-import { breaksIn, defaultSeed, lastingAt } from "@/engine/futures";
+import { breaksIn, defaultSeed, lastingAt, lastingOn } from "@/engine/futures";
 
 // What a screen trying retirement ages has counted over one search of a
 // run, found by where the run breaks: the brackets as the counts so far
@@ -30,11 +30,13 @@ interface Drawn {
 // falls in the run, a slice not yet drawn left empty, the futures the
 // screens have been handed of them, and where the run breaks once it
 // has been searched, with the brackets the cut's search, and the age's
-// where it is searched, left each future in.
+// where it is searched, left each future in, and how many of the
+// futures last on each share of the spending once they are counted.
 interface Kept {
   readonly breaks?: Breaks;
   readonly for: string;
   readonly futures: readonly Future[];
+  readonly lasting?: Awaited<ReturnType<typeof lastingOn>>;
   readonly slices: (readonly Future[])[];
 }
 
@@ -307,11 +309,13 @@ export function useFutures(
 // plan changed and changed back hands the run kept for it, so the age
 // reads the plan's again. No worker starts until a future is left open
 // at the age, so the plan's own age, or any the brackets settle, starts
-// none. An age given while another counts drops the old count's queue
-// and counts the new one on the same workers, and a count dropped whose
-// last tries were already on their way is not kept when they land; a
-// screen hidden or taken down stops the pool, and one shown again counts
-// its age afresh.
+// none. Its tries go ahead of the count on each share of the spending,
+// as useLastingOn draws it, since the age is what the screen is
+// watching. An age given while another counts drops the old count's
+// queue and counts the new one on the same workers, and a count dropped
+// whose last tries were already on their way is not kept when they
+// land; a screen hidden or taken down stops the pool, and one shown
+// again counts its age afresh.
 export function useLastingAt(
   pool: ReturnType<typeof poolOf>,
   {
@@ -336,7 +340,7 @@ export function useLastingAt(
     if (breaks === undefined || ages === undefined || lasted !== undefined) {
       return undefined;
     }
-    const { drop, tried } = pool.queue();
+    const { drop, tried } = pool.queue({ isAhead: true });
     let isCurrent = true;
     void lastingAt(ages, age, { lanes: workersOf(), tried }).then((count) => {
       if (isCurrent) {
@@ -359,6 +363,46 @@ export function useLastingAt(
       setGiven({ age: tried, breaks });
     },
   };
+}
+
+// How many of the futures last on each share of the spending planned,
+// from half the spending to half as much again, as lastingOn counts them
+// off where the run breaks, as useBreaks hands it, on the screen's pool,
+// as usePool keeps it, through a queue of the count's own, on as many
+// workers as a run is drawn on, once the run is searched and on its own:
+// each cut with its count, the least share first, or nothing until
+// every share is counted. The counts are kept with the run beside where
+// it breaks, as useBreaks keeps that, and dropped with it, so a run
+// handed back, as a plan changed and changed back hands the run kept
+// for it, reads its counts at once, and so does a screen shown again
+// over it. They wait behind an age tried, as useLastingAt counts one.
+// Where the run breaks handed afresh drops the count's queue and counts
+// the new run, and a screen hidden or taken down stops the pool, hearing
+// nothing more from the workers; one shown again before every share was
+// counted counts from the start.
+export function useLastingOn(
+  pool: ReturnType<typeof poolOf>,
+  { breaks }: { readonly breaks: Breaks | undefined },
+): Awaited<ReturnType<typeof lastingOn>> | undefined {
+  const readLasting = (): Awaited<ReturnType<typeof lastingOn>> | undefined =>
+    kept.runs.find((run) => run.breaks === breaks)?.lasting;
+  const lasting = useSyncExternalStore(subscribe, readLasting, readLasting);
+  useEffect(() => {
+    if (breaks === undefined || lasting !== undefined) {
+      return undefined;
+    }
+    const { drop, tried } = pool.queue();
+    void lastingOn(breaks, { lanes: workersOf(), tried }).then((counted) => {
+      keep({
+        ...kept,
+        runs: kept.runs.map((each) =>
+          each.breaks === breaks ? { ...each, lasting: counted } : each,
+        ),
+      });
+    });
+    return drop;
+  }, [breaks, lasting, pool]);
+  return lasting;
 }
 
 // The workers a screen tries the futures of its run again on, as poolOf
@@ -399,13 +443,16 @@ function keep(next: Drawn): void {
 // and each handed one future to try at a time and the next as it
 // answers, what the run was drawn over posted with each. The tries wait
 // their turn in the order asked, each reader's through a queue of its
-// own, which it can drop: none of its tries still waiting is posted,
-// nor any it asks after, and those are never answered, while a try
-// already posted still lands. Stopped, the workers are let go, hearing
-// nothing more from them, and every try waiting is dropped with them,
-// so the next try starts the pool afresh.
+// own, and those of a queue asked to go ahead are put before every try
+// waiting as they are asked, so a count the screen is watching waits
+// on no more than the tries already posted. A reader can drop its
+// queue: none of its tries still waiting is posted, nor any it asks
+// after, and those are never answered, while a try already posted
+// still lands. Stopped, the workers are let go, hearing nothing more
+// from them, and every try waiting is dropped with them, so the next
+// try starts the pool afresh.
 function poolOf(run: Omit<Tried, "future" | "trial">): {
-  readonly queue: () => Queue;
+  readonly queue: (asked?: { readonly isAhead?: boolean }) => Queue;
   readonly stop: () => void;
 } {
   const pool: Worker[] = [];
@@ -427,7 +474,7 @@ function poolOf(run: Omit<Tried, "future" | "trial">): {
     };
     worker.postMessage(next.posted);
   }
-  function queue(): Queue {
+  function queue({ isAhead = false } = {}): Queue {
     const by = { isDropped: false };
     return {
       drop: (): void => {
@@ -439,7 +486,7 @@ function poolOf(run: Omit<Tried, "future" | "trial">): {
           if (by.isDropped) {
             return;
           }
-          queued.push({
+          const waiting = {
             by,
             posted: {
               accounts: run.accounts,
@@ -451,7 +498,12 @@ function poolOf(run: Omit<Tried, "future" | "trial">): {
               trial,
             },
             settle,
-          });
+          };
+          if (isAhead) {
+            queued.unshift(waiting);
+          } else {
+            queued.push(waiting);
+          }
           if (free.length === 0 && pool.length < workersOf()) {
             const started = new Worker(
               new URL("./futures.worker.ts", import.meta.url),
@@ -514,12 +566,12 @@ function trimmed(runs: readonly Kept[]): readonly Kept[] {
   });
 }
 
-// How many workers draw a run, search one, or try one at an age,
-// between them: one for each core the browser says it has, up to
-// mostWorkers, and one where it says none or gives no count at all,
-// each run its own, so two runs drawn side by side start twice as many.
-// WebKit says four on fewer than eight cores and eight on more,
-// whatever the device holds.
+// How many workers draw a run, search one, try one at an age, or count
+// one on each share of the spending, between them: one for each core
+// the browser says it has, up to mostWorkers, and one where it says
+// none or gives no count at all, each run its own, so two runs drawn
+// side by side start twice as many. WebKit says four on fewer than
+// eight cores and eight on more, whatever the device holds.
 function workersOf(): number {
   const cores = navigator.hardwareConcurrency;
   return Number.isFinite(cores) ? Math.min(mostWorkers, Math.max(1, cores)) : 1;
