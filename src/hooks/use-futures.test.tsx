@@ -1372,17 +1372,14 @@ describe("useLastingOn", () => {
   function reading(
     futures: readonly Future[],
   ): RenderHookResult<
-    {
-      readonly breaks: Breaks | undefined;
-      readonly lasting: ReturnType<typeof useLastingOn>;
-    },
+    ReturnType<typeof useLastingOn> & { readonly breaks: Breaks | undefined },
     { readonly futures: readonly Future[]; readonly over: typeof run }
   > {
     return renderHook(
       ({ futures: given, over }) => {
         const pool = usePool(accounts, schedule, over);
         const breaks = useBreaks(pool, { futures: given, plan: over.plan });
-        return { breaks, lasting: useLastingOn(pool, { breaks }) };
+        return { breaks, ...useLastingOn(pool, { breaks }) };
       },
       { initialProps: { futures, over: run } },
     );
@@ -1396,7 +1393,7 @@ describe("useLastingOn", () => {
 
     await landed();
 
-    expect(result.current).toBeUndefined();
+    expect(result.current.lasting).toBeUndefined();
     expect(started).toHaveLength(0);
   });
 
@@ -1432,6 +1429,62 @@ describe("useLastingOn", () => {
     expect(started).toHaveLength(5);
   });
 
+  // The counts on each share start on two workers of their own once the
+  // run is searched, and the percent is read each time a try's time has
+  // passed, until the counts are in.
+  it("hands over how much of the count on each share is done, in whole percent, rising as its tries land, and nothing once the counts are kept", async () => {
+    watchWorkers();
+    const futures = drawn();
+    const breaks = await searched(futures);
+    const { result } = reading(futures);
+    const dones = [result.current.done];
+
+    for (
+      let step = 0;
+      step < 1000 && result.current.lasting === undefined;
+      step += 1
+    ) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(took);
+      });
+      dones.push(result.current.done);
+    }
+
+    expect(dones[0]).toBe(0);
+    expect(
+      dones.slice(1, -1).every((done, index) => done >= (dones[index] ?? 0)),
+    ).toBe(true);
+    expect(dones.some((done) => done > 0 && done < 100)).toBe(true);
+    expect(result.current.lasting).toStrictEqual(await countedOn(breaks));
+    expect(result.current.done).toBe(0);
+  });
+
+  // The counts start on two workers of their own, and the screen is
+  // handed no run while the first two tries are on their way, on the
+  // same pool, so they still land.
+  it("hears nothing of a dropped count's tries landing after it is dropped", async () => {
+    const started = watchWorkers();
+    const futures = drawn();
+    const breaks = await searched(futures);
+    const { rerender, result } = renderHook(
+      ({ breaks: given }) =>
+        useLastingOn(usePool(accounts, schedule, run), { breaks: given }),
+      { initialProps: { breaks } },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(took - 1);
+    });
+    expect(started.slice(3).flatMap(({ posted }) => posted)).toHaveLength(2);
+
+    rerender({ breaks: undefined });
+    await landed();
+
+    expect(result.current).toStrictEqual({ done: 0, lasting: undefined });
+    for (const worker of started.slice(3)) {
+      expect(worker.terminate).not.toHaveBeenCalled();
+    }
+  });
+
   // Next hides a route navigated away from rather than taking it down,
   // which clears its effects and runs them again when it is shown.
   it("counts from the start when the screen is hidden part way and shown again, and starts no worker shown again once counted", async () => {
@@ -1450,6 +1503,7 @@ describe("useLastingOn", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(took);
     });
+    expect(result.current.done).toBeGreaterThan(0);
 
     mode.current = "hidden";
     rerender();
@@ -1460,15 +1514,19 @@ describe("useLastingOn", () => {
     }
     mode.current = "visible";
     rerender();
+    expect(result.current.done).toBe(0);
     await landed();
-    expect(result.current).toStrictEqual(await countedOn(breaks));
+    expect(result.current).toStrictEqual({
+      done: 0,
+      lasting: await countedOn(breaks),
+    });
     expect(started).toHaveLength(7);
     mode.current = "hidden";
     rerender();
     mode.current = "visible";
     rerender();
     await landed();
-    expect(result.current).toStrictEqual(await countedOn(breaks));
+    expect(result.current.lasting).toStrictEqual(await countedOn(breaks));
     expect(started).toHaveLength(7);
   });
 
@@ -1539,7 +1597,7 @@ describe("useLastingOn", () => {
     const { result } = renderHook(() => {
       const pool = usePool(accounts, schedule, run);
       return {
-        lasting: useLastingOn(pool, { breaks }),
+        ...useLastingOn(pool, { breaks }),
         tried: useLastingAt(pool, { breaks, plan: run.plan }),
       };
     });
