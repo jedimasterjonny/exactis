@@ -5,6 +5,7 @@ import { Activity } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
+import type { Spread } from "@/data/plan";
 import type { Breaks, Future, Trial } from "@/engine/futures";
 import type { Slice, Tried } from "@/hooks/futures.worker";
 
@@ -27,6 +28,7 @@ import {
   useBreaks,
   useFutures,
   useLastingAt,
+  usePool,
 } from "./use-futures";
 
 // An ISA drawn £1,000 a month over three years at 5%, straying 15% a
@@ -675,32 +677,51 @@ describe("useBreaks", () => {
     return result.current.futures;
   }
 
+  // Where the futures given break, searched on a pool of the screen's
+  // own over the run, as the card searches them.
+  function searching(
+    futures: readonly Future[],
+  ): RenderHookResult<Breaks | undefined, unknown> {
+    return renderHook(() =>
+      useBreaks(usePool(accounts, schedule, run), { futures, plan: run.plan }),
+    );
+  }
+
+  // Whether one of the run's futures lasts tried as given, on the test's
+  // own thread.
+  async function tried(trial: Trial, future: number): Promise<boolean> {
+    return Promise.resolve(
+      lastsTried(accounts, schedule, { ...run, future, trial }),
+    );
+  }
+
+  // A worker taking the time given over what it is handed.
+  function taking(took: number): typeof FuturesWorker {
+    return class extends FuturesWorker {
+      protected override readonly took = took;
+    };
+  }
+
   // Ten futures to the slice, the run is one slice on one worker, and
   // the search starts two more, each handed one future at a time; the
   // household's run beside it, five futures on a worker of its own, is
   // left unsearched. The two find the figures one lane finds, in
   // brackets of their own, since which future lands first is the
-  // workers', and the count at an age off either is the same.
-  it("searches a run drawn whole for where it breaks on two workers trying a future at a time, and keeps it with that run alone", async () => {
+  // workers', and the count at an age off either is the same. The two
+  // are kept for the screen once the search lands, and let go with it.
+  it("searches a run drawn whole for where it breaks on two workers trying a future at a time, keeps it with that run alone, and keeps the workers until the screen is taken down", async () => {
     const started = watchWorkers();
     const household = { count: 5, plan, spread };
     const { result: other } = renderHook(() =>
       useFutures(accounts, schedule, household),
     );
     const futures = drawn();
-    const searched = { ...run, futures };
-    const { result, unmount } = renderHook(() =>
-      useBreaks(accounts, schedule, searched),
-    );
+    const { result, unmount } = searching(futures);
 
     expect(result.current).toBeUndefined();
     await act(async () => {
       await vi.runAllTimersAsync();
     });
-    const tried = async (trial: Trial, future: number): Promise<boolean> =>
-      Promise.resolve(
-        lastsTried(accounts, schedule, { ...run, future, trial }),
-      );
     const oneLane = await breaksIn(futures, run.plan, { lanes: 1, tried });
     const countedAt = async (
       ages: Breaks["ages"],
@@ -718,60 +739,58 @@ describe("useBreaks", () => {
         await countedAt(oneLane.ages, age),
       );
     }
-    const [, , ...searching] = started;
-    expect(searching).toHaveLength(2);
-    for (const worker of searching) {
+    const [, , ...searchers] = started;
+    expect(searchers).toHaveLength(2);
+    for (const worker of searchers) {
       expect(worker.tried.length).toBeGreaterThan(0);
-      expect(worker.terminate).toHaveBeenCalled();
+      expect(worker.terminate).not.toHaveBeenCalled();
     }
     unmount();
+    for (const worker of searchers) {
+      expect(worker.terminate).toHaveBeenCalled();
+      expect(worker.onmessage).toBeNull();
+    }
     const { result: again } = renderHook(() =>
-      useBreaks([{ ...isa }], { ...schedule }, { ...searched }),
+      useBreaks(usePool([{ ...isa }], { ...schedule }, { ...run }), {
+        futures,
+        plan: { ...run.plan },
+      }),
     );
     expect(again.current).toStrictEqual(result.current);
     expect(started).toHaveLength(4);
     expect(
       renderHook(() =>
-        useBreaks(accounts, schedule, {
-          ...household,
+        useBreaks(usePool(accounts, schedule, household), {
           futures: other.current.futures,
+          plan,
         }),
       ).result.current,
     ).toBeUndefined();
   });
 
   // Taken down after the first two tries are back, others on their way.
-  it("stops the workers when the screen is taken down part way, and searches afresh when shown again", () => {
+  it("stops the workers when the screen is taken down part way, and searches afresh when opened again", () => {
     const started = watchWorkers();
-    const searched = { ...run, futures: drawn() };
-    const { unmount } = renderHook(() =>
-      useBreaks(accounts, schedule, searched),
-    );
+    const futures = drawn();
+    const { unmount } = searching(futures);
     act(() => {
       vi.advanceTimersByTime(took);
     });
 
     unmount();
 
-    const [, ...searching] = started;
-    for (const worker of searching) {
+    const [, ...searchers] = started;
+    for (const worker of searchers) {
       expect(worker.terminate).toHaveBeenCalled();
       expect(worker.onmessage).toBeNull();
     }
-    const { result } = renderHook(() =>
-      useBreaks(accounts, schedule, searched),
-    );
+    const { result } = searching(futures);
     act(() => {
       vi.advanceTimersByTime(took);
     });
     expect(result.current).toBeUndefined();
     expect(started).toHaveLength(5);
   });
-
-  // A worker taking a minute over what it is handed.
-  class Late extends FuturesWorker {
-    protected override readonly took = 60000;
-  }
 
   // Two screens read the one run, the second's worker a minute over the
   // slice the first's draws in 150 ms, and a third, opened once the run
@@ -782,7 +801,7 @@ describe("useBreaks", () => {
     const started = watchWorkers();
     const watching = globalThis.Worker;
     renderHook(() => useFutures(accounts, schedule, run));
-    vi.stubGlobal("Worker", Late);
+    vi.stubGlobal("Worker", taking(60000));
     renderHook(() => useFutures(accounts, schedule, run));
     vi.stubGlobal("Worker", watching);
     act(() => {
@@ -790,13 +809,16 @@ describe("useBreaks", () => {
     });
     const { result } = renderHook(() => {
       const { futures } = useFutures(accounts, schedule, run);
-      return useBreaks(accounts, schedule, { ...run, futures });
+      return useBreaks(usePool(accounts, schedule, run), {
+        futures,
+        plan: run.plan,
+      });
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30000);
     });
     const breaks = result.current;
-    const searching = started.length;
+    const searchers = started.length;
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60000);
@@ -804,7 +826,55 @@ describe("useBreaks", () => {
 
     expect(breaks).toBeDefined();
     expect(result.current).toStrictEqual(breaks);
-    expect(started).toHaveLength(searching);
+    expect(started).toHaveLength(searchers);
+  });
+
+  // As above, but the second screen's slice lands a second in, while
+  // the run is searched: the search is begun again over the run handed
+  // over, on the same two workers, and finds what one lane finds.
+  it("searches the run afresh on the same workers when another screen hands it over while it is searched", async () => {
+    const started = watchWorkers();
+    const watching = globalThis.Worker;
+    renderHook(() => useFutures(accounts, schedule, run));
+    vi.stubGlobal("Worker", taking(1000));
+    renderHook(() => useFutures(accounts, schedule, run));
+    vi.stubGlobal("Worker", watching);
+    act(() => {
+      vi.advanceTimersByTime(took);
+    });
+    const { result } = renderHook(() => {
+      const { futures } = useFutures(accounts, schedule, run);
+      return {
+        breaks: useBreaks(usePool(accounts, schedule, run), {
+          futures,
+          plan: run.plan,
+        }),
+        futures,
+      };
+    });
+    const first = result.current.futures;
+    const searchers = started.slice(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000 - took);
+    });
+
+    expect(result.current.futures).not.toBe(first);
+    expect(result.current.futures).toStrictEqual(first);
+    expect(result.current.breaks).toBeUndefined();
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+    const oneLane = await breaksIn(first, run.plan, { lanes: 1, tried });
+    expect({
+      age: result.current.breaks?.age,
+      cut: result.current.breaks?.cut,
+    }).toStrictEqual({ age: oneLane.age, cut: oneLane.cut });
+    expect(started).toHaveLength(3);
+    expect(searchers).toHaveLength(2);
+    for (const worker of searchers) {
+      expect(worker.terminate).not.toHaveBeenCalled();
+    }
   });
 });
 
@@ -865,16 +935,27 @@ describe("useLastingAt", () => {
       .lasted;
   }
 
-  // What the hook hands back over the breaks given, rendered again with
-  // whichever the test gives next.
+  // What the hook hands back over the breaks given, on a pool of the
+  // screen's own over the run, the spread given or the run's, rendered
+  // again with whichever the test gives next.
   function counting(
     breaks: Breaks | undefined,
   ): RenderHookResult<
     ReturnType<typeof useLastingAt>,
-    { readonly breaks: Breaks | undefined }
+    { readonly breaks: Breaks | undefined; readonly over?: Spread }
   > {
     return renderHook(
-      (props) => useLastingAt(accounts, earning, { ...run, ...props }),
+      ({
+        breaks: given,
+        over = spread,
+      }: {
+        readonly breaks: Breaks | undefined;
+        readonly over?: Spread;
+      }) =>
+        useLastingAt(usePool(accounts, earning, { ...run, spread: over }), {
+          breaks: given,
+          plan: run.plan,
+        }),
       { initialProps: { breaks } },
     );
   }
@@ -895,6 +976,12 @@ describe("useLastingAt", () => {
     });
   }
 
+  // What each worker has been handed to try, in the order the workers
+  // started and the order each was handed them.
+  function trials(started: readonly Watched[]): readonly Trial[][] {
+    return started.map(({ posted }) => posted.map(({ trial }) => trial));
+  }
+
   it("counts at the plan's own age off the brackets, as the run's own lasted, starting no worker", async () => {
     const started = watchWorkers();
     const { breaks, futures } = await searched();
@@ -908,11 +995,11 @@ describe("useLastingAt", () => {
     expect(started).toHaveLength(0);
   });
 
-  it("counts another age given on two workers, each handed a future and the age alone over the plan as it was, and lets them go once it lands", async () => {
+  it("counts another age given on two workers, each handed a future and the age alone over the plan as it was, and keeps them once it lands until the screen is taken down", async () => {
     const started = watchWorkers();
     const search = await searched();
     const before = structuredClone(run.plan);
-    const { result } = counting(search.breaks);
+    const { result, unmount } = counting(search.breaks);
 
     give(result, 34);
 
@@ -931,7 +1018,12 @@ describe("useLastingAt", () => {
     }
     expect(run.plan).toStrictEqual(before);
     for (const worker of started) {
+      expect(worker.terminate).not.toHaveBeenCalled();
+    }
+    unmount();
+    for (const worker of started) {
       expect(worker.terminate).toHaveBeenCalled();
+      expect(worker.onmessage).toBeNull();
     }
   });
 
@@ -957,8 +1049,9 @@ describe("useLastingAt", () => {
 
   // The plan's own age is read and then 34 is given before its count
   // lands, and 36 once the first two tries at 34 are back, two more on
-  // their way.
-  it("stops a count when another age is given, dropping what it would land, and counts the newer age", async () => {
+  // their way. The one future open at 36 waits for a worker, and the
+  // first back takes it; the other, with nothing waiting, is left free.
+  it("drops a count's queue when another age is given, counting the newer age on the same workers and dropping what the older would land", async () => {
     const started = watchWorkers();
     const search = await searched();
     const { result } = counting(search.breaks);
@@ -969,18 +1062,15 @@ describe("useLastingAt", () => {
 
     give(result, 36);
 
-    for (const worker of started.slice(0, 2)) {
-      expect(worker.terminate).toHaveBeenCalled();
-      expect(worker.onmessage).toBeNull();
+    for (const worker of started) {
+      expect(worker.terminate).not.toHaveBeenCalled();
+      expect(worker.onmessage).not.toBeNull();
     }
     await landed();
     expect(result.current.lasted).toBe(10);
-    expect(
-      started.map(({ posted }) => posted.map(({ trial }) => trial)),
-    ).toStrictEqual([
+    expect(trials(started)).toStrictEqual([
+      [{ age: 34 }, { age: 34 }, { age: 36 }],
       [{ age: 34 }, { age: 34 }],
-      [{ age: 34 }, { age: 34 }],
-      [{ age: 36 }],
     ]);
     give(result, 35);
     expect(result.current.lasted).toBeUndefined();
@@ -990,18 +1080,68 @@ describe("useLastingAt", () => {
     expect(result.current.lasted).toBeUndefined();
     await landed();
     expect(result.current.lasted).toBe(await countAt(search, 34));
-    expect(started).toHaveLength(5);
+    expect(started).toHaveLength(2);
+  });
+
+  // 36 is given while both workers try 34, so its one try waits for a
+  // worker, and 37 before either is back: the try at 36 is never
+  // posted, and the one at 37 is.
+  it("posts none of a dropped count's tries still waiting for a worker", async () => {
+    const started = watchWorkers();
+    const { breaks } = await searched();
+    const { result } = counting(breaks);
+    give(result, 34);
+
+    give(result, 36);
+    give(result, 37);
+    await landed();
+
+    expect(result.current.lasted).toBe(10);
+    expect(trials(started)).toStrictEqual([
+      [{ age: 34 }, { age: 37 }],
+      [{ age: 34 }],
+    ]);
+  });
+
+  // 36 leaves one future open, its one try posted at once, and 34 is
+  // given before it lands, so the count at 36 is done once it lands and
+  // is neither shown nor kept: 36 given again counts afresh.
+  it("keeps no count dropped whose last tries land after another age is given", async () => {
+    const started = watchWorkers();
+    const search = await searched();
+    const { result } = counting(search.breaks);
+    give(result, 36);
+
+    give(result, 34);
+    await landed();
+
+    expect(result.current.lasted).toBe(await countAt(search, 34));
+    give(result, 36);
+    expect(result.current.lasted).toBeUndefined();
+    await landed();
+    expect(result.current.lasted).toBe(10);
+    expect(
+      started.flatMap(({ posted }) =>
+        posted.flatMap(({ future, trial }) =>
+          "age" in trial && trial.age === 36 ? [future] : [],
+        ),
+      ),
+    ).toStrictEqual([9, 9]);
   });
 
   // Next hides a route navigated away from rather than taking it down,
   // which clears its effects and runs them again when it is shown, its
   // state kept.
-  it("stops a count when the screen is hidden, and counts the age given afresh when it is shown again", async () => {
+  it("stops the pool when the screen is hidden, and counts the age given afresh on workers it starts again when shown, which serve the counts after", async () => {
     const started = watchWorkers();
     const search = await searched();
     const mode = { current: "visible" as "hidden" | "visible" };
     const { rerender, result } = renderHook(
-      () => useLastingAt(accounts, earning, { ...run, breaks: search.breaks }),
+      () =>
+        useLastingAt(usePool(accounts, earning, run), {
+          breaks: search.breaks,
+          plan: run.plan,
+        }),
       {
         wrapper: ({ children }) => (
           <Activity mode={mode.current}>{children}</Activity>
@@ -1026,13 +1166,17 @@ describe("useLastingAt", () => {
     expect(result.current.age).toBe(34);
     expect(result.current.lasted).toBe(await countAt(search, 34));
     expect(started).toHaveLength(4);
+    give(result, 36);
+    await landed();
+    expect(result.current.lasted).toBe(10);
+    expect(started).toHaveLength(4);
   });
 
   // The run searched again hands where it breaks in a new object, as a
   // plan changed and changed back hands the run kept for it: the age
   // given, the count at 36 kept and the brackets it narrowed are all the
-  // old one's.
-  it("drops the age given, every count and the brackets for where the run breaks handed afresh, stopping a count on its way, so the age reads the plan's again", async () => {
+  // old one's, and so is the count at 34 on its way, dropped.
+  it("drops the age given, every count and the brackets for where the run breaks handed afresh, dropping a count on its way, so the age reads the plan's again", async () => {
     const started = watchWorkers();
     const first = await searched();
     const again = await searched();
@@ -1048,17 +1192,44 @@ describe("useLastingAt", () => {
 
     expect(result.current.age).toBe(35);
     expect(result.current.lasted).toBeUndefined();
-    for (const worker of started.slice(1, 3)) {
-      expect(worker.terminate).toHaveBeenCalled();
-      expect(worker.onmessage).toBeNull();
-    }
     await landed();
     expect(result.current.lasted).toBe(8);
     give(result, 36);
     expect(result.current.lasted).toBeUndefined();
     await landed();
     expect(result.current.lasted).toBe(10);
+    expect(started).toHaveLength(2);
+    for (const worker of started) {
+      expect(worker.terminate).not.toHaveBeenCalled();
+    }
+  });
+
+  // The spread handed afresh, as a plan changed hands the run in new
+  // objects, while 34 is counted, two tries on their way: the count
+  // starts afresh on two workers of the new run's.
+  it("stops the pool for a run changed, the next try starting workers of the new run's own", async () => {
+    const started = watchWorkers();
+    const search = await searched();
+    const { rerender, result } = counting(search.breaks);
+    give(result, 34);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(took);
+    });
+
+    rerender({ breaks: search.breaks, over: { ...spread } });
+
+    const [old, older, ...fresh] = started;
+    for (const worker of [old, older]) {
+      expect(worker?.terminate).toHaveBeenCalled();
+      expect(worker?.onmessage).toBeNull();
+    }
+    expect(fresh).toHaveLength(2);
+    await landed();
+    expect(result.current.lasted).toBe(await countAt(search, 34));
     expect(started).toHaveLength(4);
+    for (const worker of fresh) {
+      expect(worker.terminate).not.toHaveBeenCalled();
+    }
   });
 
   it("counts nothing, starting no worker, before the run is searched or where its age is not", async () => {
@@ -1089,6 +1260,50 @@ describe("useLastingAt", () => {
     for (const worker of started) {
       expect(worker.terminate).toHaveBeenCalled();
       expect(worker.onmessage).toBeNull();
+    }
+  });
+
+  // The card's search of the run, drawn by a screen left open on one
+  // worker, and the age tried there, on one pool, as the card reads
+  // them: the count at 34 is posted to the search's two workers.
+  it("shares one pool with the search, counting on the search's workers and starting none of its own", async () => {
+    const started = watchWorkers();
+    const drawing = { ...run, count: 10 };
+    const { result: drawn } = renderHook(() =>
+      useFutures(accounts, earning, drawing),
+    );
+    act(() => {
+      vi.runAllTimers();
+    });
+    const { futures } = drawn.current;
+    const { result } = renderHook(() => {
+      const pool = usePool(accounts, earning, run);
+      const breaks = useBreaks(pool, { futures, plan: run.plan });
+      return { breaks, tried: useLastingAt(pool, { breaks, plan: run.plan }) };
+    });
+    await landed();
+    expect(result.current.breaks).toBeDefined();
+    expect(started).toHaveLength(3);
+
+    give({ current: result.current.tried }, 34);
+    await landed();
+
+    const tried = async (trial: Trial, future: number): Promise<boolean> =>
+      Promise.resolve(lastsTried(accounts, earning, { ...run, future, trial }));
+    expect(result.current.tried.lasted).toBe(
+      (
+        await lastingAt(result.current.breaks?.ages ?? [], 34, {
+          lanes: 1,
+          tried,
+        })
+      ).lasted,
+    );
+    expect(started).toHaveLength(3);
+    for (const worker of started.slice(1)) {
+      expect(
+        worker.posted.some(({ trial }) => "age" in trial && trial.age === 34),
+      ).toBe(true);
+      expect(worker.terminate).not.toHaveBeenCalled();
     }
   });
 });
