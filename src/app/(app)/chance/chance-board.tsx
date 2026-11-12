@@ -180,7 +180,7 @@ function Searched({
   const pool = usePool(accounts, schedule, { plan, spread });
   const breaks = useBreaks(pool, { futures, plan });
   const tried = useLastingAt(pool, { breaks, plan });
-  const lasting = useLastingOn(pool, { breaks });
+  const { lasting } = useLastingOn(pool, { breaks });
   return (
     <FuturesBreaks plan={plan} searched={{ breaks, lasting }} tried={tried} />
   );

@@ -379,11 +379,22 @@ export function useLastingAt(
 // Where the run breaks handed afresh drops the count's queue and counts
 // the new run, and a screen hidden or taken down stops the pool, hearing
 // nothing more from the workers; one shown again before every share was
-// counted counts from the start.
+// counted counts from the start. While the shares are counted it also
+// hands back how much of the count is done, in whole percent, as
+// lastingOn tells it after each try, so the screen is drawn again only
+// as the percent moves. That is nothing before the first try lands, and
+// nothing again once the counts are kept or the count is dropped, so a
+// screen shown again or handed another run fills from nothing. A count
+// dropped whose last tries were on their way is not heard when they
+// land.
 export function useLastingOn(
   pool: ReturnType<typeof poolOf>,
   { breaks }: { readonly breaks: Breaks | undefined },
-): Awaited<ReturnType<typeof lastingOn>> | undefined {
+): {
+  readonly done: number;
+  readonly lasting: Awaited<ReturnType<typeof lastingOn>> | undefined;
+} {
+  const [done, setDone] = useState(0);
   const readLasting = (): Awaited<ReturnType<typeof lastingOn>> | undefined =>
     kept.runs.find((run) => run.breaks === breaks)?.lasting;
   const lasting = useSyncExternalStore(subscribe, readLasting, readLasting);
@@ -392,7 +403,16 @@ export function useLastingOn(
       return undefined;
     }
     const { drop, tried } = pool.queue();
-    void lastingOn(breaks, { lanes: workersOf(), tried }).then((counted) => {
+    let isCurrent = true;
+    void lastingOn(breaks, {
+      lanes: workersOf(),
+      onCounting: (part) => {
+        if (isCurrent) {
+          setDone(Math.floor(part * 100));
+        }
+      },
+      tried,
+    }).then((counted) => {
       keep({
         ...kept,
         runs: kept.runs.map((each) =>
@@ -400,9 +420,13 @@ export function useLastingOn(
         ),
       });
     });
-    return drop;
+    return (): void => {
+      isCurrent = false;
+      drop();
+      setDone(0);
+    };
   }, [breaks, lasting, pool]);
-  return lasting;
+  return { done, lasting };
 }
 
 // The workers a screen tries the futures of its run again on, as poolOf
