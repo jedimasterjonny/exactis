@@ -38,7 +38,8 @@ carries the `positive` and `caution` tones this app needs and base-nova does not
 ship, and `alert` the `caution` one; `button` spins while its action runs, which
 `alert-dialog` passes on to its confirm; `table` makes each table the container
 its rows fold by and lines its cells up with a card's edge; and `chart` closes
-its tooltip when a finger lands outside it.
+its tooltip when a finger lands outside it, and rings it while it has the
+keyboard's focus.
 
 A customisation that has to survive an update belongs in the wrapper. Putting it
 in the vendored file works until the next refresh silently discards it.

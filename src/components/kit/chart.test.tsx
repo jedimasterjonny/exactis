@@ -2,6 +2,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { Line, LineChart, XAxis } from "recharts";
 import { describe, expect, it } from "vitest";
 
+import { bySlot } from "@/test/dom";
+
 import { ChartContainer, ChartTooltip } from "./chart";
 
 // Rests the pointer on the middle of the chart, and hands back its
@@ -85,6 +87,29 @@ describe("ChartContainer", () => {
     fireEvent.pointerDown(surface, { pointerType: "touch" });
 
     expect(screen.getByText("Open")).toBeInTheDocument();
+  });
+
+  // jsdom applies no stylesheet, so the ring is read off the classes:
+  // drawn on the surface while it has the keyboard's focus, beside the
+  // vendored class hiding its outline, and beside the caller's own.
+  it("rings the chart's surface while it has the keyboard's focus, keeping the classes it is given", () => {
+    render(
+      <ChartContainer className="aspect-auto" config={{}}>
+        <LineChart data={[{ x: 1, y: 1 }]}>
+          <Line dataKey="y" />
+        </LineChart>
+      </ChartContainer>,
+    );
+
+    expect(screen.getByText(bySlot("chart"), { suggest: false })).toHaveClass(
+      "[&_.recharts-surface]:outline-hidden",
+      "[&_.recharts-surface:focus-visible]:rounded-md",
+      "[&_.recharts-surface:focus-visible]:outline-3",
+      "[&_.recharts-surface:focus-visible]:outline-offset-2",
+      "[&_.recharts-surface:focus-visible]:outline-ring/50",
+      "[&_.recharts-surface:focus-visible]:outline-solid",
+      "aspect-auto",
+    );
   });
 
   // A mouse leaves the chart before it can press outside it, and
