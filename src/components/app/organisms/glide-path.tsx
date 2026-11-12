@@ -3,7 +3,7 @@
 import type { JSX } from "react";
 
 import { Plus, TrendingDown } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import type { Plan } from "@/data/plan";
 import type { Allocation, Anchor } from "@/data/rates";
@@ -55,7 +55,8 @@ interface Opened {
 // between two between them, and the nearest anchor's beyond them, under
 // whichever rates are live, setting the split typed aside; a household
 // with no anchors holds the one split for life, and the card says so in
-// place of the chart and the table.
+// place of the chart and the table. The caption says what the chart
+// draws, so the chart is described by it, through an id of its own.
 //
 // An anchor is two figures, so its dialog is the age beside the bond
 // share, the age typed with no slider, since it is set on purpose. A
@@ -73,6 +74,7 @@ export function GlidePath({ glide, plan, split }: GlidePathProps): JSX.Element {
   const [opened, setOpened] = useState<null | Opened>(null);
   const [doomed, setDoomed] = useState<Anchor | null>(null);
   const { isSending, send } = useSender();
+  const captionId = useId();
   const now = ageIn(plan.from, plan);
 
   function save({ draft, savedAt }: Opened): void {
@@ -123,6 +125,7 @@ export function GlidePath({ glide, plan, split }: GlidePathProps): JSX.Element {
           </Button>
         }
         caption="The share in bonds by age. Straight between anchors and flat beyond them, in place of the split set with the rates."
+        captionId={captionId}
         className="pb-0"
         label={subsectionLabel(assumptions, 4)}
         title="Glide path"
@@ -136,7 +139,11 @@ export function GlidePath({ glide, plan, split }: GlidePathProps): JSX.Element {
         ) : (
           <>
             <CardContent>
-              <GlideChart glide={glide} plan={plan} />
+              <GlideChart
+                aria-describedby={captionId}
+                glide={glide}
+                plan={plan}
+              />
             </CardContent>
             <Table>
               <TableHeader>

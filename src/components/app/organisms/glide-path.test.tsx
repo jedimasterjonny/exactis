@@ -45,8 +45,15 @@ describe("GlidePath", () => {
     const section = screen.getByRole("region", { name: "Glide path" });
 
     expect(within(section).getByText("Sect. VI.iv")).toHaveClass("label");
-    expect(within(section).getByRole("application")).toHaveClass(
-      "recharts-surface",
+    expect(
+      within(section).getByRole("application", {
+        name: "How the savings are split at each age",
+      }),
+    ).toHaveClass("recharts-surface");
+    expect(
+      within(section).getByRole("application"),
+    ).toHaveAccessibleDescription(
+      "The share in bonds by age. Straight between anchors and flat beyond them, in place of the split set with the rates.",
     );
     expect(
       within(section)
