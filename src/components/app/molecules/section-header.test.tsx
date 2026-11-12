@@ -24,6 +24,23 @@ describe("SectionHeader", () => {
     );
   });
 
+  it("gives the meta line the id it is given, for what the card holds to be described by", () => {
+    render(
+      <SectionHeader
+        captionId="glide-caption"
+        label="Sect. VI.iv"
+        title="Glide path"
+      >
+        {"The share in bonds by age."}
+      </SectionHeader>,
+    );
+
+    expect(screen.getByText("The share in bonds by age.")).toHaveAttribute(
+      "id",
+      "glide-caption",
+    );
+  });
+
   it("renders the meta line beneath and the actions beside when given", () => {
     render(
       <SectionHeader
@@ -37,7 +54,7 @@ describe("SectionHeader", () => {
 
     expect(
       screen.getByText("2026, age 34, in today's money"),
-    ).toBeInTheDocument();
+    ).not.toHaveAttribute("id");
     expect(
       screen.getByRole("button", { name: "Add income line" }),
     ).toBeInTheDocument();

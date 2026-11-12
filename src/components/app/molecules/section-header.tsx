@@ -4,6 +4,7 @@ import type { Slot } from "@/lib/slot";
 
 interface SectionHeaderProps {
   readonly actions?: Slot;
+  readonly captionId?: string | undefined;
   readonly children?: string | undefined;
   readonly id?: string;
   readonly label: string;
@@ -17,10 +18,12 @@ interface SectionHeaderProps {
 // too narrow for both, and wrap among themselves when it is too narrow
 // for all of them in a row, as a phone is for a badge beside a long
 // button. The heading takes the id it is given, so a card can be named
-// by its title. Composes nothing of ours and no kit; the caller puts it
-// in the card's header.
+// by its title, and the meta line the one given for it, so what the card
+// holds can be described by it. Composes nothing of ours and no kit; the
+// caller puts it in the card's header.
 export function SectionHeader({
   actions,
+  captionId,
   children,
   id,
   label,
@@ -34,7 +37,9 @@ export function SectionHeader({
           {title}
         </h2>
         {children !== undefined && (
-          <span className="text-sm text-muted-foreground">{children}</span>
+          <span className="text-sm text-muted-foreground" id={captionId}>
+            {children}
+          </span>
         )}
       </div>
       {actions !== undefined && (

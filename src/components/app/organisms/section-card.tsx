@@ -10,6 +10,7 @@ import { Card, CardHeader } from "@/components/kit/card";
 interface SectionCardProps {
   readonly actions?: Slot;
   readonly caption?: string;
+  readonly captionId?: string;
   readonly children: ReactNode;
   readonly className?: string;
   readonly controls?: Slot;
@@ -26,10 +27,12 @@ interface SectionCardProps {
 // caller's, for a card whose content runs to its bottom edge. Controls
 // that set what the whole card shows, as the cash-flow card's year
 // does, sit in the header beneath the section header, set apart from
-// it, rather than in the content they steer.
+// it, rather than in the content they steer. The caption takes the id it
+// is handed, so what the card holds can be described by it.
 export function SectionCard({
   actions,
   caption,
+  captionId,
   children,
   className,
   controls,
@@ -40,7 +43,13 @@ export function SectionCard({
   return (
     <Card aria-labelledby={id} className={className} role="region">
       <CardHeader className={controls === undefined ? undefined : "gap-4"}>
-        <SectionHeader actions={actions} id={id} label={label} title={title}>
+        <SectionHeader
+          actions={actions}
+          captionId={captionId}
+          id={id}
+          label={label}
+          title={title}
+        >
           {caption}
         </SectionHeader>
         {controls}
