@@ -3,6 +3,8 @@ import type { ComponentProps, JSX } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { bySlot } from "@/test/dom";
+
 import { FuturesLasting } from "./futures-lasting";
 
 // Invented counts, the least share first: 998 of 1,000 lasting on half
@@ -29,9 +31,9 @@ const caption =
 const verdict =
   "9 in 10 futures last retiring at 61, or on 93% of the spending planned.";
 
-// What recharts draws with the class given: a rule, a ring or a tick.
-// None has a role or a name, so no query is more accessible than the
-// class and none can be suggested.
+// What recharts draws with the class given, a rule, a ring or a tick,
+// or the box it is drawn in. None has a role or a name, so no query is
+// more accessible than the class and none can be suggested.
 function drawn(className: string): HTMLElement[] {
   return screen.queryAllByText(
     (_content, element) => element?.classList.contains(className) === true,
@@ -50,7 +52,8 @@ async function label(words: string): Promise<HTMLElement> {
 }
 
 // The chart beneath the verdict it is described by, over the counts
-// given and ringing the figure given, 93% unless told otherwise.
+// given and ringing the figure given, 93% unless told otherwise, with
+// none of the counting done.
 function lasting(
   given: Partial<ComponentProps<typeof FuturesLasting>> = {},
 ): JSX.Element {
@@ -60,6 +63,7 @@ function lasting(
       <FuturesLasting
         aria-describedby="verdict"
         caption={caption}
+        done={0}
         figure={{ cut: 7, label: "93%" }}
         points={points}
         {...given}
@@ -173,13 +177,30 @@ describe("FuturesLasting", () => {
     );
   });
 
-  it("says it counts the shares in the plot's place while they are counted, the caption beneath it", () => {
-    render(lasting({ points: undefined }));
+  it("says it counts the shares in the plot's place while they are counted, a bar beneath named by the words filling with how much is done, the caption beneath it", () => {
+    render(lasting({ done: 33, points: undefined }));
 
     expect(screen.queryByRole("application")).not.toBeInTheDocument();
+    const bar = screen.getByRole("progressbar", {
+      name: "Counting the futures on each share of the spending…",
+      value: { max: 100, min: 0, now: 33 },
+    });
+    const [box] = drawn("h-48");
+    expect(box).toHaveClass("lg:h-64");
+    expect(box).toContainElement(bar);
     expect(
       screen.getByText("Counting the futures on each share of the spending…"),
-    ).toHaveClass("h-48", "lg:h-64");
+    ).toHaveAttribute("aria-hidden", "true");
+    expect(
+      screen.getByText(bySlot("counting-fill"), { suggest: false }),
+    ).toHaveStyle({ width: "33%" });
     expect(screen.getByText(caption, { suggest: false })).toBeInTheDocument();
+  });
+
+  it("draws no bar once the shares are counted", () => {
+    render(lasting({ done: 100 }));
+
+    expect(screen.getByRole("application")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 });
