@@ -1,10 +1,13 @@
 import type { JSX } from "react";
 
+import { useId } from "react";
+
 import type { Plan } from "@/data/plan";
 import type { Breaks } from "@/engine/futures";
 
 import { Panel } from "@/components/app/atoms/panel";
 import { AgeField } from "@/components/app/molecules/age-field";
+import { FuturesLasting } from "@/components/app/organisms/futures-lasting";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { CardContent } from "@/components/kit/card";
 import { retiresOn } from "@/data/milestones";
@@ -15,7 +18,11 @@ import { chance, subsectionLabel } from "@/lib/nav";
 
 interface FuturesBreaksProps {
   readonly plan: Plan;
-  readonly searched?: { readonly breaks: Breaks | undefined };
+  readonly searched?: {
+    readonly breaks: Breaks | undefined;
+    readonly lasting?:
+      readonly { readonly cut: number; readonly lasted: number }[] | undefined;
+  };
   readonly tried?: Tried;
 }
 
@@ -47,18 +54,24 @@ interface Tried {
 // in ten last with. A plan isAgeSearched passes over has no age
 // searched, and the spending says why. The figures wait until the
 // search is done: before it they say it waits on the futures, and while
-// it runs that it is searching them. Once it is done, where it hands
-// back the brackets its search of the age left the futures in, which
-// an age tried is counted off, the card has a retirement age to try
-// beneath the figures, as AgeTried lays it out, where one is given, even
-// where no age was found. Where another owner retires at an age of their
-// own, the verdict, the age's figure, the spending's caption and the age
-// tried name the plan's owner in their age phrases, as withOwner says it.
+// it runs that it is searching them. Once it is done, the figures are
+// followed by how many futures last on each share of the spending, as
+// FuturesLasting draws it, ringing the spending's figure, described by
+// the verdict and captioned with the retirement the spending is read
+// against, saying it counts until the counts are handed in. Beneath it,
+// where the search hands back the brackets its search of the age left
+// the futures in, which an age tried is counted off, the card has a
+// retirement age to try, as AgeTried lays it out, where one is given,
+// even where no age was found. Where another owner retires at an age of
+// their own, the verdict, the age's figure, the spending's caption, the
+// curve's caption and the age tried name the plan's owner in their age
+// phrases, as withOwner says it.
 export function FuturesBreaks({
   plan,
   searched,
   tried,
 }: FuturesBreaksProps): JSX.Element {
+  const verdictId = useId();
   const isAge = isAgeSearched(plan);
   const breaks = searched?.breaks;
   const isDone = breaks !== undefined;
@@ -78,7 +91,7 @@ export function FuturesBreaks({
     >
       <CardContent className="grid gap-6">
         {isDone ? (
-          <p className="heading text-xl text-balance">
+          <p className="heading text-xl text-balance" id={verdictId}>
             {verdictOf(figures, isAge, plan)}
           </p>
         ) : (
@@ -116,6 +129,14 @@ export function FuturesBreaks({
             </div>
           ))}
         </dl>
+        {isDone && (
+          <FuturesLasting
+            aria-describedby={verdictId}
+            caption={`Futures lasting, of ${formatCount(runLength)}, on each share of the spending planned, from this year on${retiringOf(plan)}`}
+            figure={cut === null ? undefined : { cut, label: spending.value }}
+            points={searched?.lasting}
+          />
+        )}
         {breaks?.ages !== undefined && tried !== undefined && (
           <AgeTried plan={plan} tried={tried} />
         )}

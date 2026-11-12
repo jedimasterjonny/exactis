@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Owner } from "@/data/owners";
@@ -58,6 +64,46 @@ function searchedAt(
   };
 }
 
+// Invented counts on each share of the spending, the least share first:
+// 998 of 1,000 lasting on half the spending, 874 on the plan's own and
+// 410 on half as much again, with 900 on 93%.
+const lasting = [
+  { cut: 50, lasted: 998 },
+  { cut: 40, lasted: 991 },
+  { cut: 30, lasted: 975 },
+  { cut: 20, lasted: 952 },
+  { cut: 10, lasted: 921 },
+  { cut: 7, lasted: 900 },
+  { cut: 0, lasted: 874 },
+  { cut: -10, lasted: 812 },
+  { cut: -20, lasted: 731 },
+  { cut: -30, lasted: 640 },
+  { cut: -40, lasted: 533 },
+  { cut: -50, lasted: 410 },
+];
+
+// The curve of how many futures last on each share of the spending.
+function curve(): HTMLElement {
+  return within(card()).getByRole("application", {
+    name: "How many futures last on each share of the spending planned",
+  });
+}
+
+// What the curve's caption says, beneath the box.
+function curveCaption(): null | string {
+  return within(card()).getAllByRole("paragraph")[1]?.textContent ?? null;
+}
+
+// The svg text recharts draws reading the words given, as the curve's
+// ring is named.
+function ringedAs(words: string): HTMLElement | null {
+  return within(card()).queryByText(
+    (_content, element) =>
+      element?.tagName === "text" && element.textContent === words,
+    { suggest: false },
+  );
+}
+
 // An age tried at the age given, the count of futures lasting at it
 // given where it is in, calling back with every age committed.
 function triedAt(
@@ -71,23 +117,23 @@ function triedAt(
   return { age, lasted, onAge: vi.fn<(age: number) => void>() };
 }
 
-// What a screen reader reads beneath the card's verdict, in its order:
-// the age tried's hint, its readout while it is counted, and what it is
-// told of it.
+// What a screen reader reads beneath the card's verdict and the curve's
+// caption, in its order: the age tried's hint, its readout while it is
+// counted, and what it is told of it.
 function triedHeard(): (null | string)[] {
   return within(card())
     .getAllByRole("paragraph")
-    .slice(1)
+    .slice(2)
     .map(({ textContent }) => textContent);
 }
 
-// What the card shows beneath its verdict, in its order, whether or not
-// a screen reader reads it: the age tried's hint, its readout, and what
-// a screen reader is told of it.
+// What the card shows beneath its verdict and the curve's caption, in
+// its order, whether or not a screen reader reads it: the age tried's
+// hint, its readout, and what a screen reader is told of it.
 function triedSays(): (null | string)[] {
   return within(card())
     .getAllByRole("paragraph", { hidden: true, suggest: false })
-    .slice(1)
+    .slice(2)
     .map(({ textContent }) => textContent);
 }
 
@@ -105,6 +151,141 @@ describe("FuturesBreaks", () => {
       ["Retirement age", "…"],
       ["Spending", "…"],
     ]);
+  });
+
+  it("draws no curve before the search is done", () => {
+    const { rerender } = render(<FuturesBreaks plan={plan} />);
+
+    expect(within(card()).queryByRole("application")).not.toBeInTheDocument();
+    expect(within(card()).getAllByRole("paragraph")).toHaveLength(1);
+    rerender(
+      <FuturesBreaks plan={plan} searched={{ breaks: undefined, lasting }} />,
+    );
+    expect(within(card()).queryByRole("application")).not.toBeInTheDocument();
+    expect(within(card()).getAllByRole("paragraph")).toHaveLength(1);
+  });
+
+  // The ring is drawn a pass after the rest, as recharts lays its layers.
+  it("draws how many futures last on each share once the search is done, after the figures and before the age tried, described by the verdict and ringing the spending's figure", async () => {
+    render(
+      <FuturesBreaks
+        plan={plan}
+        searched={{ ...searchedAt(61, 7), lasting }}
+        tried={triedAt(58, 874)}
+      />,
+    );
+
+    expect(curve()).toHaveAccessibleDescription(
+      "9 in 10 futures last retiring at 61, or on 93% of the spending planned.",
+    );
+    expect(curveCaption()).toBe(
+      "Futures lasting, of 1,000, on each share of the spending planned, from this year on, retiring at 58",
+    );
+    expect(
+      within(card()).queryByText(
+        "Counting the futures on each share of the spending…",
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      within(card())
+        .getAllByRole("definition")
+        .at(-1)
+        ?.compareDocumentPosition(curve()) ?? Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(
+      curve().compareDocumentPosition(field("Retirement age to try", card())) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await waitFor(() => {
+      expect(ringedAs("93%")).toBeInTheDocument();
+    });
+  });
+
+  it("says it counts the futures on each share while they are counted, its caption beneath", () => {
+    render(<FuturesBreaks plan={plan} searched={searchedAt(61, 7)} />);
+
+    expect(within(card()).queryByRole("application")).not.toBeInTheDocument();
+    expect(
+      within(card()).getByText(
+        "Counting the futures on each share of the spending…",
+      ),
+    ).toBeInTheDocument();
+    expect(curveCaption()).toBe(
+      "Futures lasting, of 1,000, on each share of the spending planned, from this year on, retiring at 58",
+    );
+  });
+
+  // Fewer than nine in ten last even on half the spending, so the
+  // spending's figure has no share to ring.
+  it("rings no share where fewer than nine in ten last even on half the spending", async () => {
+    const { rerender } = render(
+      <FuturesBreaks
+        plan={plan}
+        searched={{ ...searchedAt(64, 7), lasting }}
+      />,
+    );
+    await waitFor(() => {
+      expect(ringedAs("93%")).toBeInTheDocument();
+    });
+
+    rerender(
+      <FuturesBreaks
+        plan={plan}
+        searched={{ ...searchedAt(64, null), lasting }}
+      />,
+    );
+
+    expect(curve()).toBeInTheDocument();
+    await waitFor(() => {
+      expect(ringedAs("93%")).not.toBeInTheDocument();
+    });
+    expect(ringedAs("Under 50%")).not.toBeInTheDocument();
+  });
+
+  // The curve is drawn on the plan as it retires, whatever age is
+  // tried, so its caption reads as the spending's note does.
+  it("captions the curve with the retirement the spending is read against, naming the plan's owner where another retires at an age of their own", () => {
+    const onConditions = {
+      ...plan,
+      owners: [
+        {
+          ...working,
+          born: 1988,
+          retirement: [
+            { measure: "worth", of: "pounds", times: 900000 } as const,
+          ],
+        },
+      ],
+    };
+    const { rerender } = render(
+      <FuturesBreaks
+        plan={onConditions}
+        searched={{ ...searchedAt(undefined, 7), lasting }}
+      />,
+    );
+
+    expect(curveCaption()).toBe(
+      "Futures lasting, of 1,000, on each share of the spending planned, from this year on, retiring on its conditions",
+    );
+    rerender(
+      <FuturesBreaks
+        plan={{ ...plan, retires: 35 }}
+        searched={{ ...searchedAt(undefined, 7), lasting }}
+      />,
+    );
+    expect(curveCaption()).toBe(
+      "Futures lasting, of 1,000, on each share of the spending planned, from this year on",
+    );
+    rerender(
+      <FuturesBreaks
+        plan={{ ...plan, owners: [robin, ash] }}
+        searched={{ ...searchedAt(61, 7), lasting }}
+        tried={triedAt(58, 874)}
+      />,
+    );
+    expect(curveCaption()).toBe(
+      "Futures lasting, of 1,000, on each share of the spending planned, from this year on, with Robin retiring at 58",
+    );
   });
 
   it("says the futures are being searched while the search runs, the figures held until it is done", () => {

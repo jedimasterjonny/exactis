@@ -26,7 +26,12 @@ import {
   runLength,
 } from "@/engine/futures";
 import { project } from "@/engine/projection";
-import { useBreaks, useLastingAt, usePool } from "@/hooks/use-futures";
+import {
+  useBreaks,
+  useLastingAt,
+  useLastingOn,
+  usePool,
+} from "@/hooks/use-futures";
 
 interface ChanceBoardProps {
   readonly accounts: readonly Account[];
@@ -40,7 +45,8 @@ interface ChanceBoardProps {
 
 // What the plan's futures come to, as many as have come in: graded,
 // where the plan breaks, searched once the whole run has come in, with
-// a retirement age to try there, the run fanned over the plan's years,
+// how many last on each share of the spending and a retirement age to
+// try there, the run fanned over the plan's years,
 // every milestone and when the run reaches it, and the count beneath
 // them. The screen reads the run
 // and hands the futures down, since its header reads them too, so the
@@ -156,9 +162,11 @@ function AtItsRates({
 // Where the plan breaks, over the run searched once it is drawn whole,
 // in a component of its own so the search starts only once the run it
 // searches is drawn, and never on workers beside the run's own; with
-// the retirement age tried there, as useLastingAt holds it, which
-// changes nothing else. The search and the age tried share one pool of
-// workers, kept for as long as the card is shown over the run.
+// the retirement age tried there, as useLastingAt holds it, and how
+// many futures last on each share of the spending, as useLastingOn
+// counts them, neither of which changes anything else. The search, the
+// age tried and the shares share one pool of workers, kept for as long
+// as the card is shown over the run.
 function Searched({
   accounts,
   futures,
@@ -172,5 +180,8 @@ function Searched({
   const pool = usePool(accounts, schedule, { plan, spread });
   const breaks = useBreaks(pool, { futures, plan });
   const tried = useLastingAt(pool, { breaks, plan });
-  return <FuturesBreaks plan={plan} searched={{ breaks }} tried={tried} />;
+  const lasting = useLastingOn(pool, { breaks });
+  return (
+    <FuturesBreaks plan={plan} searched={{ breaks, lasting }} tried={tried} />
+  );
 }
