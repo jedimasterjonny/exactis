@@ -171,16 +171,21 @@ function ageShown(age: null | number, plan: Plan): Shown {
 }
 
 // A retirement age tried on the card alone, in a sunken panel beneath
-// the figures, the box beside the sentence saying how many of the
-// futures last retiring at it from the width of a small screen and
-// above it below: at the plan's own age as the plan stands, and at any
-// other spending as planned, as retiringAs says the age, naming the
-// plan's owner where it does, with an ellipsis in place of the count
-// while it is counted. The hint names the age the plan retires at, since
-// the age tried changes nothing. A screen reader hears the sentence
-// again once the count is in, and never while it is counted, so nothing
-// ticks; and, the count in, the sentence shown is hidden from it, so
-// browsing reads it once.
+// the figures, the box with its slider held beneath it beside the
+// sentence saying how many of the futures last retiring at it from the
+// width of a small screen, and below it the sentence first, so a thumb
+// on the slider does not cover it, though it is read after the box: at
+// the plan's own age as the plan stands, and at any other spending as
+// planned, as retiringAs says the age, naming the plan's owner where it
+// does, with an ellipsis in place of the count while it is counted. The
+// slider gives every age it is dragged through, and each starts a count
+// that the next age drops, so the latest wins: an age passed before its
+// count lands is not counted, and is counted afresh when the slider
+// comes back to it, while an age counted before reads at once. The hint
+// names the age the plan retires at, since the age tried changes
+// nothing. A screen reader hears the sentence again once the count is
+// in, and never while it is counted, so nothing ticks; and, the count
+// in, the sentence shown is hidden from it, so browsing reads it once.
 function AgeTried({
   plan,
   tried: { age, lasted, onAge },
@@ -203,20 +208,21 @@ function AgeTried({
     >
       <div className="w-52">
         <AgeField
-          hasSlider={false}
           hint={`Tried here only; the plan retires ${
             plan.retires === opens ? "this year" : `at ${String(plan.retires)}`
           }`}
+          isSliderInFlow
           label="Retirement age to try"
           max={endAge(plan)}
           min={opens}
+          onValueChange={onAge}
           onValueCommitted={onAge}
           value={age}
         />
       </div>
       <p
         aria-hidden={count !== undefined}
-        className="text-sm text-pretty text-muted-foreground"
+        className="text-sm text-pretty text-muted-foreground max-sm:order-first"
       >
         <span className="figure text-foreground">{count ?? "…"}</span>
         {last}

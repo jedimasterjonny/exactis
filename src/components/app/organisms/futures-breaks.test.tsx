@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Owner } from "@/data/owners";
@@ -7,7 +7,7 @@ import type { Breaks } from "@/engine/futures";
 
 import { atAge } from "@/data/milestones";
 import { working } from "@/data/owners.fixture";
-import { commit, field } from "@/test/dom";
+import { bySlot, commit, field, slider } from "@/test/dom";
 
 import { FuturesBreaks } from "./futures-breaks";
 
@@ -375,6 +375,55 @@ describe("FuturesBreaks", () => {
     commit(box, "95");
 
     expect(vi.mocked(tried.onAge).mock.calls).toStrictEqual([[64], [38], [90]]);
+  });
+
+  // A drag gives every age the thumb passes and the one it is let go
+  // at, which jsdom cannot drag; a key step and a change to the thumb's
+  // input each give the age as it changes and again as it is committed.
+  it("holds a slider beneath the box over the plan's ages, calling back with each age it moves to and nothing else", () => {
+    const tried = triedAt(58, 874);
+    render(
+      <FuturesBreaks plan={plan} searched={searchedAt(61, 7)} tried={tried} />,
+    );
+    const thumb = slider("Retirement age to try");
+
+    expect(thumb).toHaveValue("58");
+    expect(thumb).toHaveAttribute("min", "38");
+    expect(thumb).toHaveAttribute("max", "90");
+    expect(
+      within(card()).getByText(bySlot("age-slider"), { suggest: false }),
+    ).not.toHaveClass("invisible");
+    fireEvent.keyDown(thumb, { key: "ArrowRight" });
+    fireEvent.change(thumb, { target: { value: "64" } });
+
+    expect(vi.mocked(tried.onAge).mock.calls).toStrictEqual([
+      [59],
+      [59],
+      [64],
+      [64],
+    ]);
+  });
+
+  // The readout is read after the box and its slider, and drawn before
+  // them on a phone, where a thumb on the slider would cover it.
+  it("draws the readout before the age tried on a phone, and reads it after", () => {
+    render(
+      <FuturesBreaks
+        plan={plan}
+        searched={searchedAt(61, 7)}
+        tried={triedAt(64)}
+      />,
+    );
+    const readout = within(card()).getByText(
+      "of 1,000 futures last retiring at 64, spending as planned.",
+      { exact: false, suggest: false },
+    );
+
+    expect(readout).toHaveClass("max-sm:order-first");
+    expect(
+      field("Retirement age to try", card()).compareDocumentPosition(readout) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("tries an age where fewer than nine in ten last even working to the end", () => {
