@@ -230,6 +230,38 @@ describe("AgeField", () => {
     expect(onValueCommitted.mock.calls).toStrictEqual([[66], [60]]);
   });
 
+  // Base UI's thumb answers a key dispatched straight at it even while
+  // disabled, leaning on the browser never to focus a disabled input, so
+  // what is checked of the slider is the attribute the browser holds it
+  // by, not a key.
+  it("holds the box and the slider in the flow disabled when asked, at the age given, out of the tab order", () => {
+    const onValueChange = vi.fn<(age: number) => void>();
+    const onValueCommitted = vi.fn<(age: number) => void>();
+    render(
+      <AgeField
+        isDisabled
+        isSliderInFlow
+        label="Retirement age"
+        max={91}
+        min={34}
+        onValueChange={onValueChange}
+        onValueCommitted={onValueCommitted}
+        value={61}
+      />,
+    );
+    const input = screen.getByRole("textbox", { name: "Retirement age" });
+
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    fireEvent.blur(input);
+
+    expect(input).toBeDisabled();
+    expect(input).toHaveValue("61");
+    expect(slider("Retirement age")).toBeDisabled();
+    expect(slider("Retirement age")).toHaveValue("61");
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(onValueCommitted).not.toHaveBeenCalled();
+  });
+
   it("is the box alone when asked for no slider, committing as it does with one", () => {
     const onValueCommitted = vi.fn<(age: number) => void>();
     render(

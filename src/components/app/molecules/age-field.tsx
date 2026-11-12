@@ -12,6 +12,7 @@ import { thumbOf } from "@/lib/slider";
 interface AgeFieldProps {
   readonly hasSlider?: boolean;
   readonly hint?: string;
+  readonly isDisabled?: boolean;
   readonly isSliderInFlow?: boolean;
   readonly label: string;
   readonly max: number;
@@ -49,10 +50,14 @@ const format: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };
 // shows on a sunken panel, and its control 44px tall below the width of
 // a tablet, so a finger has a target as tall as a row's. An age set on
 // purpose rather than watched as it moves asks for no slider, and is
-// the field alone, committing as it does with one.
+// the field alone, committing as it does with one. An age that cannot
+// be tried yet is held: the box and the slider show the age given,
+// dimmed, out of the tab order and read as unavailable, until the
+// caller lets them be.
 export function AgeField({
   hasSlider = true,
   hint,
+  isDisabled = false,
   isSliderInFlow = false,
   label,
   max,
@@ -66,6 +71,7 @@ export function AgeField({
     <Field hint={hint} label={label}>
       <FigureInput
         format={format}
+        isDisabled={isDisabled}
         largeStep={5}
         max={max}
         min={min}
@@ -90,6 +96,7 @@ export function AgeField({
             ? "max-md:*:h-11 [&_[data-slot=slider-track]]:bg-input"
             : undefined
         }
+        disabled={isDisabled}
         largeStep={isSliderInFlow ? 5 : undefined}
         max={max}
         min={min}

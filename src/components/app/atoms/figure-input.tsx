@@ -17,6 +17,7 @@ export type Figure =
 
 type FigureInputProps = Figure & {
   readonly format: Intl.NumberFormatOptions;
+  readonly isDisabled?: boolean | undefined;
   readonly isReadOnly?: boolean | undefined;
   readonly label?: string | undefined;
   readonly largeStep: number;
@@ -43,6 +44,8 @@ type FigureInputProps = Figure & {
 // be focused, selected and read out, but not typed over or stepped, and
 // it is set on the muted ground in either theme, over the input's own
 // dark ground, so it reads as shown rather than asked for. A figure
+// that cannot be set yet is disabled: shown, dimmed, and neither focused
+// nor typed over nor stepped until its caller lets it be. A figure
 // with no field of its own, in a cell of a table where there is no room
 // for a label, is named for a screen reader by the label it is given,
 // as a select in a cell is; one in a field is named by the field's.
@@ -51,6 +54,7 @@ type FigureInputProps = Figure & {
 export function FigureInput({
   defaultValue,
   format,
+  isDisabled = false,
   isReadOnly = false,
   label,
   largeStep,
@@ -64,6 +68,7 @@ export function FigureInput({
   return (
     <NumberField.Root
       defaultValue={defaultValue}
+      disabled={isDisabled}
       format={format}
       largeStep={largeStep}
       locale="en-GB"
