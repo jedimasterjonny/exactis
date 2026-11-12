@@ -2,19 +2,18 @@
 
 import type { JSX } from "react";
 
-import { Download, Landmark } from "lucide-react";
+import { Landmark } from "lucide-react";
 import { useId } from "react";
 
 import type { Curve } from "@/data/inflation";
 
-import { pullCurve } from "@/actions/inflation";
+import { CurvePull } from "@/components/app/atoms/curve-pull";
 import { Ledger } from "@/components/app/atoms/ledger";
 import { Panel } from "@/components/app/atoms/panel";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { CurveChart } from "@/components/app/organisms/curve-chart";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Badge } from "@/components/kit/badge";
-import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import {
   horizon,
@@ -23,7 +22,6 @@ import {
   rpiAligned,
   rpiWedge,
 } from "@/data/inflation";
-import { useSender } from "@/hooks/use-sender";
 import { formatCurveRate, formatPercent, formatPoints } from "@/lib/money";
 import { formatDay, monthName } from "@/lib/months";
 import { assumptions, subsectionLabel } from "@/lib/nav";
@@ -36,10 +34,7 @@ interface InflationSourceProps {
 // gives and how it is derived, which the plan takes while it runs on the
 // CMA-derived rates, and which is there to check the inflation typed
 // against while it runs on the rates typed by hand. The header names the source and pulls the Bank's latest
-// curve; the pull spins while it is on its way, and the store's answer
-// draws the screen again from the curve kept, with a toast saying what
-// it derives, or says why under a toast when the Bank or its file is
-// refused. Beneath, the steps from the curve to the derived rate are
+// curve. Beneath, the steps from the curve to the derived rate are
 // laid out as a ledger: the implied rate at the horizon on the curve's day, the share
 // of RPI's wedge the years before 2030 carry, and the premium held for
 // protection, with the derived rate closing the ledger. Beside them the
@@ -47,18 +42,6 @@ interface InflationSourceProps {
 // foreground, since it is the one derived from. Before a curve has been
 // pulled there are no steps to lay out, and the card says so.
 export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
-  const { isSending: isPulling, send } = useSender();
-
-  function pull(): void {
-    send(pullCurve, {
-      failure: "Curve not pulled",
-      success: (pulled) => ({
-        description: `As at ${formatDay(pulled.asOf)}, derived inflation ${formatPercent(inflationOf(pulled).rate)}`,
-        title: "Curve pulled",
-      }),
-    });
-  }
-
   return (
     <SectionCard
       actions={
@@ -67,10 +50,7 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
             <Landmark aria-hidden />
             BoE implied curve
           </Badge>
-          <Button isBusy={isPulling} onClick={pull} size="sm" variant="outline">
-            <Download aria-hidden />
-            Pull latest curve
-          </Button>
+          <CurvePull />
         </>
       }
       label={subsectionLabel(assumptions, 2)}

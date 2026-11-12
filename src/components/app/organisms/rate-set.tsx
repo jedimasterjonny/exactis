@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { Check, Download } from "lucide-react";
+import { Check } from "lucide-react";
 import { useId, useOptimistic } from "react";
 
 import type { Deductions, Mapping, Vintages } from "@/data/cma";
@@ -11,8 +11,8 @@ import type { Before } from "@/data/moves";
 import type { Allocation, RateSet as Chosen, Rates } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 
-import { pullCma } from "@/actions/cma";
 import { saveDeductions, saveRateSet } from "@/actions/plan";
+import { CmaPull } from "@/components/app/atoms/cma-pull";
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { Caution } from "@/components/app/molecules/caution";
 import { RateField } from "@/components/app/molecules/figure-field";
@@ -65,10 +65,7 @@ const runsOn: Record<Chosen, string> = {
 // draws the screen again from the set kept, under a toast, or puts the
 // choice back and says why under a toast, as when the CMA gives no
 // rates for want of a class. Historical returns are offered and refused
-// until they are built. The pull spins while it is on its way, and the
-// store's answer draws the screen again from the vintage kept, under a
-// toast, or says why under a toast when BlackRock or its workbook is
-// refused.
+// until they are built.
 //
 // The two deductions the CMA's returns are taken down by, the fee drag
 // and the dividend yield, are typed in the card under either set: at the
@@ -108,7 +105,6 @@ export function RateSet({
     }),
   );
   const { isSending, send } = useSender();
-  const { isSending: isPulling, send: sendPull } = useSender();
   const asideId = useId();
 
   function sendDeductions(
@@ -153,16 +149,6 @@ export function RateSet({
         }),
       },
     );
-  }
-
-  function pull(): void {
-    sendPull(pullCma, {
-      failure: "CMA not pulled",
-      success: (pulled) => ({
-        description: `${vintageName(pulled)}, data as of ${formatDay(pulled.asOf)}`,
-        title: "CMA pulled",
-      }),
-    });
   }
 
   const fields = (
@@ -215,12 +201,7 @@ export function RateSet({
         </Caution>
       )}
       <SectionCard
-        actions={
-          <Button isBusy={isPulling} onClick={pull} size="sm" variant="outline">
-            <Download aria-hidden />
-            Pull CMA workbook
-          </Button>
-        }
+        actions={<CmaPull />}
         {...(chosen === "cma" && { caption: sourceOf(cma, targets, mappings) })}
         controls={
           <RadioGroup
