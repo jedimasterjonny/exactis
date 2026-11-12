@@ -1239,7 +1239,7 @@ describe("useLastingAt", () => {
 
     expect(result.current.age).toBe(35);
     expect(result.current.lasted).toBeUndefined();
-    rerender({ breaks: { cut: 3 } });
+    rerender({ breaks: { cut: 3, cuts: [] } });
     await landed();
     expect(result.current.lasted).toBeUndefined();
     expect(started).toHaveLength(0);

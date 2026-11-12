@@ -53,7 +53,9 @@ function searchedAt(
   age: null | number | undefined,
   cut: null | number,
 ): { readonly breaks: Breaks } {
-  return { breaks: { ...(age !== undefined && { age, ages: [] }), cut } };
+  return {
+    breaks: { ...(age !== undefined && { age, ages: [] }), cut, cuts: [] },
+  };
 }
 
 // An age tried at the age given, the count of futures lasting at it
@@ -459,7 +461,7 @@ describe("FuturesBreaks", () => {
     rerender(
       <FuturesBreaks
         plan={plan}
-        searched={{ breaks: { age: 61, cut: 7 } }}
+        searched={{ breaks: { age: 61, cut: 7, cuts: [] } }}
         tried={triedAt(58)}
       />,
     );
