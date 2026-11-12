@@ -23,6 +23,7 @@ import { Worksheet } from "@/components/app/atoms/worksheet";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { MonthEnd } from "@/components/app/organisms/month-end";
 import { SectionCard } from "@/components/app/organisms/section-card";
+import { SourcePulls } from "@/components/app/organisms/source-pulls";
 import {
   TrackRecord,
   TrackRecordPending,
@@ -141,7 +142,8 @@ interface Stood {
 // household, and once it is, what moved the plan since the close before.
 // The title gives the answer. Until the month is closed, which its latest
 // progress point says, the screen is the worksheet that closes it,
-// opening on that month, and says since when a month has been due: the
+// opening on that month, headed by the sources its balances rest on to
+// pull first, and says since when a month has been due: the
 // cut of the month after the latest point's, or that none is closed yet
 // with no point kept. Once it is, the balances the close set against those it
 // closed from, with what the plan paid in beside what Portfolio
@@ -230,6 +232,9 @@ export function CloseScreen({
           month={due}
           plan={plan}
           schedule={schedule}
+          sources={
+            <SourcePulls household={household} month={due} today={today} />
+          }
           today={today}
         />
       </Screen>

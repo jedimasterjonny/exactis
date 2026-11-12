@@ -27,7 +27,9 @@ in Postgres on Neon and the app on Vercel.
   inflation curve, BlackRock's capital market assumptions and a target
   allocation imported from Portfolio Performance; the glide path; and each
   owner's State Pension.
-- Month end — the balances cut on the 25th, or the working day before, checked
+- Month end — the balances cut on the 25th, or the working day before, with
+  BlackRock's assumptions, the inflation curve and the house price index offered
+  to pull first, each marked stale once a newer one should be out, checked
   against what the plan expected, which records a progress point, then what
   moved the plan since the close before, as a waterfall, where the invested
   balances landed among the futures of the oldest close in the year before that
