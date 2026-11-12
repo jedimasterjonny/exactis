@@ -12,6 +12,7 @@ import { thumbOf } from "@/lib/slider";
 interface AgeFieldProps {
   readonly hasSlider?: boolean;
   readonly hint?: string;
+  readonly isSliderInFlow?: boolean;
   readonly label: string;
   readonly max: number;
   readonly min: number;
@@ -40,12 +41,19 @@ const format: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };
 // tab order and the accessibility tree with it, so the box and the
 // panel need no state and no handlers between them; the panel takes
 // the focus itself when it is pressed anywhere but the thumb, so
-// pressing the track leaves the focus inside and the panel open. An age
-// set on purpose rather than watched as it moves asks for no slider,
-// and is the field alone, committing as it does with one.
+// pressing the track leaves the focus inside and the panel open. Asked
+// to hold the slider in the flow, as a card that clips what floats over
+// its edge does, the field keeps it beneath the box, always shown and
+// in the tab order after it, stepping five years with Shift or a page
+// key as the box does, its track drawn in the box's border grey so it
+// shows on a sunken panel, and its control 44px tall below the width of
+// a tablet, so a finger has a target as tall as a row's. An age set on
+// purpose rather than watched as it moves asks for no slider, and is
+// the field alone, committing as it does with one.
 export function AgeField({
   hasSlider = true,
   hint,
+  isSliderInFlow = false,
   label,
   max,
   min,
@@ -70,6 +78,40 @@ export function AgeField({
   if (!hasSlider) {
     return field;
   }
+  const slider = (
+    <>
+      <span className="sr-only" id={sliderLabelId}>
+        {label}
+      </span>
+      <Slider
+        aria-labelledby={sliderLabelId}
+        className={
+          isSliderInFlow
+            ? "max-md:*:h-11 [&_[data-slot=slider-track]]:bg-input"
+            : undefined
+        }
+        largeStep={isSliderInFlow ? 5 : undefined}
+        max={max}
+        min={min}
+        onValueChange={(ages) => {
+          onValueChange?.(thumbOf(ages));
+        }}
+        onValueCommitted={(ages) => {
+          onValueCommitted(thumbOf(ages));
+        }}
+        step={1}
+        value={[value]}
+      />
+    </>
+  );
+  if (isSliderInFlow) {
+    return (
+      <div className="grid gap-3">
+        {field}
+        <div data-slot="age-slider">{slider}</div>
+      </div>
+    );
+  }
   return (
     <div className="group/age relative">
       {field}
@@ -78,22 +120,7 @@ export function AgeField({
         data-slot="age-slider"
         tabIndex={-1}
       >
-        <span className="sr-only" id={sliderLabelId}>
-          {label}
-        </span>
-        <Slider
-          aria-labelledby={sliderLabelId}
-          max={max}
-          min={min}
-          onValueChange={(ages) => {
-            onValueChange?.(thumbOf(ages));
-          }}
-          onValueCommitted={(ages) => {
-            onValueCommitted(thumbOf(ages));
-          }}
-          step={1}
-          value={[value]}
-        />
+        {slider}
       </div>
     </div>
   );
