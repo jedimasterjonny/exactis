@@ -4,7 +4,8 @@ import type { JSX } from "react";
 
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import * as z from "zod";
 
 import type { Account } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
@@ -23,6 +24,7 @@ import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";
 import { balanceGroups } from "@/data/accounts";
+import { month as aMonth, recordId } from "@/data/schemas";
 import { monthsOn } from "@/engine/projection";
 import { useSender } from "@/hooks/use-sender";
 import { counted } from "@/lib/count";
@@ -45,6 +47,15 @@ interface Draft {
   readonly typed: ReadonlyMap<number, number>;
 }
 
+// The draft held: what it is, the month cut last it was opened on, each
+// account it touched, and whether it came back from the tab's storage.
+interface Held {
+  readonly draft: Draft;
+  readonly isRestored: boolean;
+  readonly month: Month;
+  readonly touched: readonly Touched[];
+}
+
 interface MonthEndProps {
   readonly accounts: readonly Account[];
   readonly isUpdating: boolean;
@@ -62,6 +73,27 @@ interface Row {
   readonly now: number;
   readonly paid: number;
 }
+
+// An account a draft touched, by its id, its kind and its name.
+type Touched = readonly [id: number, kind: string, name: string];
+
+// The one key a tab keeps the worksheet's draft under, so the next edit
+// writes over a draft another month or household left.
+const draftKey = "month-end-draft";
+
+// The draft as the tab keeps it, read back, its sets kept as lists.
+// Anything else is no draft.
+const keptDraft = z.object({
+  draft: z.object({
+    asOf: aMonth,
+    checked: z.array(recordId).transform((ids) => new Set(ids)),
+    typed: z
+      .array(z.tuple([recordId, z.number()]))
+      .transform((figures) => new Map(figures)),
+  }),
+  month: aMonth,
+  touched: z.array(z.tuple([recordId, z.string(), z.string()])),
+});
 
 // The month end's worksheet, the first card of its screen: every
 // balance closed onto the month whose balances were cut last, or onto
@@ -90,7 +122,24 @@ interface Row {
 // worksheet as it was and says why, and one that saves opens it afresh,
 // so a month closed that leaves the screen where it was is not saved
 // twice, or, while the balances are being updated, goes back to what
-// moved. The year picked is held between the year the plan's owner was
+// moved. The draft is kept in the tab's storage as it is edited, with
+// the month cut last it was opened on and each account it touched, by
+// id, kind and name, so a reload, or a tab the browser put away, picks
+// it up as it was left, under a note saying so beside a press that
+// starts again. It lands whole or not at all: only while each account
+// it touched is listed as it was, so one drawn again over an import
+// whose accounts differ from those by id, kind or name, or over an
+// account of its renamed or deleted, opens afresh, while one drawn over
+// the same accounts imported, an account added, or a balance a pull
+// moved, stands; and from storage only onto the month it was opened
+// on. A draft with nothing checked or typed is not kept, and a save or
+// a start again erases the copy, as a storage that refuses it does, so
+// an older draft never outlives a newer one. The server cannot read the
+// tab, so it and the hydration draw the worksheet as it opens, and the
+// draft kept lands in the render after. The note stays until the draft
+// is saved, started again or edited down to nothing, so the fields
+// below it do not move as the first figure is typed.
+// The year picked is held between the year the plan's owner was
 // born and the year of the month cut last, which hold the months the
 // store takes, so a year mistyped asks the plan for no more months than
 // it has. The day it is is given rather than read, so the
@@ -109,12 +158,44 @@ export function MonthEnd({
     checked: new Set(),
     typed: new Map(),
   });
-  const [draft, setDraft] = useState(opened);
+  const stored = useSyncExternalStore(subscribe, readDraft, noDraft);
+  const [held, setHeld] = useState<Held | null>(null);
+  const shown = held ?? restoredOf(stored, month);
+  const isShown = shown !== null && isBound(shown, accounts);
+  const draft = isShown ? shown.draft : opened();
+  const isRestored = isShown && shown.isRestored;
   const { isSending: isSaving, send } = useSender();
   const router = useRouter();
   const from: Month = { month: plan.month, year: plan.from };
   const rows = rowsOf(accounts, draft, { from, plan, schedule });
   const checked = rows.filter(({ isChecked }) => isChecked);
+
+  // The draft as edited, held and kept. Its note goes once nothing is
+  // checked or typed, since no copy is kept then to say it of.
+  function amend(next: Draft): void {
+    const amended: Held = {
+      draft: next,
+      isRestored: isRestored && !isEmpty(next),
+      month: isShown ? shown.month : month,
+      touched: touchedOf(next, accounts),
+    };
+    setHeld(amended);
+    keep(amended);
+  }
+
+  // The worksheet opened afresh, held empty rather than let go, so a
+  // copy the storage refused to erase is not read back in its place.
+  function drop(): void {
+    const dropped: Held = {
+      draft: opened(),
+      isRestored: false,
+      month,
+      touched: [],
+    };
+    setHeld(dropped);
+    keep(dropped);
+  }
+
   return (
     <SectionCard
       label={subsectionLabel(monthEnd, 1)}
@@ -125,8 +206,13 @@ export function MonthEnd({
           checked={checked}
           draft={draft}
           from={from}
+          isRestored={isRestored}
           month={month}
-          onAmend={setDraft}
+          onAmend={amend}
+          onDrop={() => {
+            drop();
+            document.querySelector<HTMLElement>("h1")?.focus();
+          }}
           plan={plan}
           rows={rows}
           today={today}
@@ -151,7 +237,7 @@ export function MonthEnd({
               {
                 failure: "Balances not saved",
                 onAccepted: () => {
-                  setDraft(opened());
+                  drop();
                   if (isUpdating) {
                     router.replace(monthEnd.href);
                   }
@@ -170,6 +256,19 @@ export function MonthEnd({
       </CardFooter>
     </SectionCard>
   );
+}
+
+// What a touch of the tab's storage, or of the text it kept, returns,
+// or nothing where it throws: a storage over its quota, or turned off,
+// which throws as `sessionStorage` is read or leaves it undefined, or
+// text that is not JSON. The draft in state stays the worksheet's, so a
+// refusal costs only the reload, and nothing is logged of it.
+function attempt<T>(touch: () => T): T | undefined {
+  try {
+    return touch();
+  } catch {
+    return undefined;
+  }
 }
 
 // A balance's field: its account's name over the figure it reads now
@@ -223,11 +322,80 @@ function Balance({
   );
 }
 
+// Whether each account a draft touched is listed as it was, by id, kind
+// and name.
+function isBound({ touched }: Held, accounts: readonly Account[]): boolean {
+  return touched.every(([id, kind, name]) =>
+    accounts.some(
+      (account) =>
+        account.id === id && account.kind === kind && account.name === name,
+    ),
+  );
+}
+
+// Whether a draft has nothing checked or typed, as one opened afresh.
+function isEmpty({ checked, typed }: Draft): boolean {
+  return checked.size === 0 && typed.size === 0;
+}
+
+// Keeps a draft in the tab's storage for a reload, or erases the copy
+// where the draft has nothing checked or typed, or where the storage
+// refuses it, so an older draft never outlives a newer one.
+function keep({ draft, month, touched }: Held): void {
+  const isKept =
+    !isEmpty(draft) &&
+    (attempt(() => {
+      sessionStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          draft: {
+            asOf: draft.asOf,
+            checked: [...draft.checked],
+            typed: [...draft.typed],
+          },
+          month,
+          touched,
+        }),
+      );
+      return true;
+    }) ??
+      false);
+  if (!isKept) {
+    attempt(() => {
+      sessionStorage.removeItem(draftKey);
+    });
+  }
+}
+
+// What the server reads of the tab's storage, which it cannot reach.
+function noDraft(): null {
+  return null;
+}
+
 // A sum that can come to a fraction of a pound either side of nothing,
 // to the pound, nothing written as nothing rather than as minus nothing.
 function pounds(amount: number): string {
   const whole = Math.round(amount);
   return formatGbp(whole === 0 ? 0 : whole);
+}
+
+// The draft the tab kept, as text, or none.
+function readDraft(): null | string {
+  return attempt(() => sessionStorage.getItem(draftKey)) ?? null;
+}
+
+// The draft the tab kept, where it reads back as one and was opened on
+// the month given, as one restored; or none.
+function restoredOf(text: null | string, month: Month): Held | null {
+  if (text === null) {
+    return null;
+  }
+  const { data } = keptDraft.safeParse(
+    attempt((): unknown => JSON.parse(text)),
+  );
+  return data !== undefined && monthsBetween(data.month, month) === 0
+    ? { ...data, isRestored: true }
+    : null;
 }
 
 // A row a balance as the draft has it. Closing the end of a month
@@ -255,21 +423,44 @@ function rowsOf(
   );
 }
 
+// The tab's storage tells no one of a change, and needs telling none:
+// this tab writes every change itself, and another tab keeps a storage
+// of its own. So the store is read on every render, the server's
+// answering nothing, and nothing is subscribed to.
+function subscribe(): () => void {
+  return (): void => {
+    // Nothing to unsubscribe from.
+  };
+}
+
+// Each account a draft checked or typed, by id, kind and name.
+function touchedOf(
+  { checked, typed }: Draft,
+  accounts: readonly Account[],
+): readonly Touched[] {
+  return accounts
+    .filter(({ id }) => checked.has(id) || typed.has(id))
+    .map(({ id, kind, name }): Touched => [id, kind, name]);
+}
+
 // What a balance reads now: what was typed, a debt's below nothing, and
 // a debt typed as nothing as nothing rather than as minus nothing.
 function typedAs(account: Account, value: number): number {
   return account.kind === "debt" ? negated(Math.abs(value)) : value;
 }
 
-// The worksheet between the card's header and its footer: the month, a
-// field a balance in its group, and the balances the month leaves, given
-// every row and the rows checked among them.
+// The worksheet between the card's header and its footer: the month,
+// the note that the draft was restored, where it was, with the press
+// that starts again, a field a balance in its group, and the balances
+// the month leaves, given every row and the rows checked among them.
 function Worksheet({
   checked,
   draft,
   from,
+  isRestored,
   month,
   onAmend,
+  onDrop,
   plan,
   rows,
   today,
@@ -277,8 +468,10 @@ function Worksheet({
   readonly checked: readonly Row[];
   readonly draft: Draft;
   readonly from: Month;
+  readonly isRestored: boolean;
   readonly month: Month;
   readonly onAmend: (draft: Draft) => void;
+  readonly onDrop: () => void;
   readonly plan: Plan;
   readonly rows: readonly Row[];
   readonly today: string;
@@ -328,6 +521,17 @@ function Worksheet({
           value={draft.asOf.year}
         />
       </FieldRow>
+      {isRestored && (
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <Note>
+            The balances are as they were left in this tab, kept until saved or
+            the tab is closed.
+          </Note>
+          <Button onClick={onDrop} size="xs" variant="outline">
+            Start again
+          </Button>
+        </div>
+      )}
       <Note>
         Each balance opens at what the plan expected. Check it or type the
         statement&apos;s figure; only checked balances are saved.
