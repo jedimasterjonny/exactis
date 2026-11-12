@@ -23,6 +23,7 @@ import { bondsAt } from "@/data/rates";
 import { formatPercent, formatWholePercent } from "@/lib/money";
 
 interface GlideChartProps {
+  readonly "aria-describedby"?: string;
   readonly glide: readonly Anchor[];
   readonly plan: Plan;
 }
@@ -58,8 +59,13 @@ const config = { bonds: { color: "var(--chart-2)", label: "Bonds" } };
 // marked with a faint rule in ink, as the milestones are. The ages
 // are ruled at each decade. What a year holds is shown on hover or on
 // the arrow keys, its age, its year and the split; the anchors are
-// listed beneath, which is the table to read them from.
-export function GlideChart({ glide, plan }: GlideChartProps): JSX.Element {
+// listed beneath, which is the table to read them from. It is named by
+// what it draws, and described by whatever the caller names.
+export function GlideChart({
+  "aria-describedby": describedBy,
+  glide,
+  plan,
+}: GlideChartProps): JSX.Element {
   const washId = useId();
   const from = ageIn(plan.from, plan);
   const to = endAge(plan);
@@ -72,6 +78,7 @@ export function GlideChart({ glide, plan }: GlideChartProps): JSX.Element {
   return (
     <ChartContainer className="aspect-[3/1] min-h-56 w-full" config={config}>
       <AreaChart
+        aria-describedby={describedBy}
         data={rows}
         margin={{ bottom: 0, left: 0, right: 12, top: 20 }}
         title="How the savings are split at each age"
