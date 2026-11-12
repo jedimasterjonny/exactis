@@ -1069,6 +1069,50 @@ describe("futuresOf", () => {
     expect(cuts).toStrictEqual(before);
   });
 
+  // The same twelve futures, counted on one lane and on four, each told
+  // after its try how much of the count is done, beside how many tries
+  // have been asked by then: on one lane only its own, and on four some
+  // with others still on their way.
+  it("tells the count after every try how much of it is done, rising each time, the whole after the last try and at no other", async () => {
+    const least = [-55, -45, -35, -25, -15, -5, 5, 15, 25, 35, 45, 55];
+    const cuts = least.map((needed, future) => ({
+      fails: needed <= 0 ? -51 : 0,
+      future,
+      holds: needed <= 0 ? 0 : 51,
+    }));
+    for (const lanes of [1, 4]) {
+      let tries = 0;
+      const told: { readonly done: number; readonly tries: number }[] = [];
+      await lastingOn(
+        { cut: 34, cuts },
+        {
+          lanes,
+          onCounting: (done) => {
+            told.push({ done, tries });
+          },
+          tried: async (trial, future) => {
+            tries += 1;
+            return Promise.resolve(
+              "cut" in trial && trial.cut >= (least[future] ?? 0),
+            );
+          },
+        },
+      );
+      const dones = told.map(({ done }) => done);
+
+      expect(told).toHaveLength(tries);
+      expect(told.every((each, index) => each.tries > index)).toBe(true);
+      expect(told.some((each, index) => each.tries > index + 1)).toBe(
+        lanes > 1,
+      );
+      expect(
+        dones.slice(1).every((done, index) => done > (dones[index] ?? 1)),
+      ).toBe(true);
+      expect(dones.at(-1)).toBe(1);
+      expect(dones.slice(0, -1).every((done) => done < 1)).toBe(true);
+    }
+  });
+
   // The ten-year plan retiring at 40, at 5% straying 15% a year on the
   // £12,000 a year spent, over 40 futures.
   const lastingRun = {

@@ -456,28 +456,57 @@ export async function lastingAt(
 // and a try only ever lowers the least cut a future lasted with; on any
 // other it is as exact as the search, counting the futures that last as
 // the run and the tries read them, for the reason breaksIn gives. The
-// brackets given are left as they are.
+// brackets given are left as they are. After each try, once it has
+// narrowed its future, it tells the onCounting given, where there is
+// one, how much of the counting is done, from nothing to the whole. That
+// is the tries so far against those and the tries still to come, where
+// each future still open on a share to count is taken to need as many
+// more as halving the shares it is open on takes: the base-two log of
+// one more than their number. So it rises with every try, further for a
+// try that settles its future on other shares too, and reads the whole
+// after the last try and at no other. Where no future is open it tells
+// nothing. ponytail: the tries to come are summed afresh over every
+// future after every try, about 0.06 ms; keep each future's term and
+// change only the tried one's if a phone shows it.
 export async function lastingOn(
   { cut, cuts }: Pick<Breaks, "cut" | "cuts">,
   {
     lanes,
+    onCounting,
     tried,
   }: {
     readonly lanes: number;
+    readonly onCounting?: (done: number) => void;
     readonly tried: (trial: Trial, future: number) => Promise<boolean>;
   },
 ): Promise<readonly { readonly cut: number; readonly lasted: number }[]> {
   const narrowed = cuts.map((each) => ({ ...each }));
   const counted: { readonly cut: number; readonly lasted: number }[] = [];
-  for (const value of [
+  const values = [
     ...sampledCuts,
     ...(cut === null || sampledCuts.includes(cut) ? [] : [cut]),
-  ]) {
+  ];
+  let tries = 0;
+  function toCome(): number {
+    return narrowed.reduce(
+      (sum, { fails, holds }) =>
+        sum +
+        Math.log2(
+          values.filter((value) => fails < value && value < holds).length + 1,
+        ),
+      0,
+    );
+  }
+  for (const value of values) {
     counted.push({
       cut: value,
       lasted: await lastingOver(narrowed, value, {
         isSettled: () => false,
         lanes,
+        onTried: () => {
+          tries += 1;
+          onCounting?.(tries / (tries + toCome()));
+        },
         tried: async (at, future) => tried({ cut: at }, future),
       }),
     });
@@ -950,17 +979,20 @@ function lastingOf(
 // it settles read off it, and those it leaves open tried at the value,
 // a lane at a time, each narrowed to the value by what its try says,
 // until the stop given, told how many have lasted so far and how many
-// are left open, says enough is known.
+// are left open, says enough is known, telling the onTried given, where
+// there is one, after each try once it has narrowed its future.
 async function lastingOver(
   known: readonly { fails: number; readonly future: number; holds: number }[],
   value: number,
   {
     isSettled,
     lanes,
+    onTried,
     tried,
   }: {
     readonly isSettled: (lasted: number, left: number) => boolean;
     readonly lanes: number;
+    readonly onTried?: () => void;
     readonly tried: (value: number, future: number) => Promise<boolean>;
   },
 ): Promise<number> {
@@ -981,6 +1013,7 @@ async function lastingOver(
         next.fails = value;
       }
       left -= 1;
+      onTried?.();
     }
   }
   await Promise.all(Array.from({ length: lanes }, lane));
