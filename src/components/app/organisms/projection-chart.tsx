@@ -401,6 +401,7 @@ export function ProjectionChart({
             key={drawable}
             margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
             stackOffset="sign"
+            title="What the plan holds and owes as each year opens"
           >
             {mark === "area" && (
               <defs>

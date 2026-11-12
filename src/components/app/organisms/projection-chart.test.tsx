@@ -251,7 +251,11 @@ describe("ProjectionChart", () => {
       />,
     );
 
-    expect(screen.getByRole("application")).toHaveClass("recharts-surface");
+    expect(
+      screen.getByRole("application", {
+        name: "What the plan holds and owes as each year opens",
+      }),
+    ).toHaveClass("recharts-surface");
     expect(screen.queryByText(pension.name)).not.toBeInTheDocument();
   });
 
