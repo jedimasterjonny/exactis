@@ -15,6 +15,7 @@ import type { Moved } from "@/lib/moved";
 import { closeBalances } from "@/actions/accounts";
 import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
+import { house, houseLoan } from "@/data/houses.fixture";
 import { risenBy } from "@/data/plan";
 import { points } from "@/data/progress.fixture";
 import { portfolios, targets } from "@/data/targets.fixture";
@@ -41,6 +42,9 @@ vi.mock("@/store/household", () => ({
   getSinceClose: vi.fn(),
 }));
 vi.mock("@/actions/accounts", () => ({ closeBalances: vi.fn() }));
+vi.mock("@/actions/cma", () => ({ pullCma: vi.fn() }));
+vi.mock("@/actions/house-prices", () => ({ pullHousePrices: vi.fn() }));
+vi.mock("@/actions/inflation", () => ({ pullCurve: vi.fn() }));
 vi.mock("@/actions/targets", () => ({ importTargets: vi.fn() }));
 // The reading stood in for, and the band it is named by kept as it is,
 // since the screen says it.
@@ -297,6 +301,9 @@ describe("Close", () => {
       name: "Balances on 25 Aug 2026",
     });
     expect(within(balances).getByText("Sect. VII.i")).toHaveClass("label");
+    expect(
+      screen.queryByRole("region", { name: "Sources" }),
+    ).not.toBeInTheDocument();
     expect(
       within(balances).getByText("1 balance left as it stood"),
     ).toBeInTheDocument();
@@ -800,7 +807,9 @@ describe("Close", () => {
       screen.getByText("September closes from 25 September"),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("region", { name: "Balances on 25 Aug 2026" }),
+      within(
+        screen.getByRole("region", { name: "Balances on 25 Aug 2026" }),
+      ).getByRole("region", { name: "Sources" }),
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole("banner")).getByRole("link", {
@@ -913,6 +922,51 @@ describe("Close", () => {
     ).not.toBeInTheDocument();
     expect(getSinceClose).not.toHaveBeenCalled();
     expect(getClosesBack).not.toHaveBeenCalled();
+  });
+
+  // September's close: August's vintage is a month before it, and the
+  // reference household runs on the custom rates, which read no curve,
+  // and lists its home as a real asset rather than a house, so the CMA
+  // alone is offered, current, ahead of the Month field.
+  it("heads the worksheet with the sources its balances rest on, to pull first", async () => {
+    await renderClose({ day: "2026-09-25" });
+
+    const sources = within(
+      screen.getByRole("region", { name: "Balances on 25 Sep 2026" }),
+    ).getByRole("region", { name: "Sources" });
+
+    expect(
+      within(sources)
+        .getAllByRole("group")
+        .map((group) => group.textContent),
+    ).toStrictEqual([
+      "BlackRock CMAAug 2026, data 30 Jun 2026 · 87 days oldPull CMA workbook",
+    ]);
+    expect(
+      sources.compareDocumentPosition(
+        screen.getByRole("combobox", { name: "Month" }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("offers house prices to pull where the household lists its house, not pulled yet", async () => {
+    await renderClose({
+      day: "2026-09-25",
+      household: {
+        ...kept,
+        accounts: [...kept.accounts.slice(0, 3), house, houseLoan],
+        housePrices: null,
+      },
+    });
+
+    expect(
+      within(screen.getByRole("group", { name: "House prices" }))
+        .getAllByRole("paragraph")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual(["House prices", "Not pulled yet"]);
+    expect(
+      screen.getByRole("button", { name: "Pull house prices" }),
+    ).toBeEnabled();
   });
 
   // In the middle of November, with September and October both cut

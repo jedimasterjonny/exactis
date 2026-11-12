@@ -11,6 +11,7 @@ import type { Account } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
+import type { Slot } from "@/lib/slot";
 
 import { closeBalances } from "@/actions/accounts";
 import { Field } from "@/components/app/atoms/field";
@@ -62,6 +63,7 @@ interface MonthEndProps {
   readonly month: Month;
   readonly plan: Plan;
   readonly schedule: Schedule;
+  readonly sources?: Slot;
   readonly today: string;
 }
 
@@ -144,13 +146,16 @@ const keptDraft = z.object({
 // store takes, so a year mistyped asks the plan for no more months than
 // it has. The day it is is given rather than read, so the
 // ages draw the same on the server as in a test, and so is the month
-// the worksheet opens on.
+// the worksheet opens on. The sources the balances rest on, which the
+// caller slots in, head the card, so they are pulled before the
+// balances are checked.
 export function MonthEnd({
   accounts,
   isUpdating,
   month,
   plan,
   schedule,
+  sources,
   today,
 }: MonthEndProps): JSX.Element {
   const opened = (): Draft => ({
@@ -202,6 +207,7 @@ export function MonthEnd({
       title={`Balances on ${formatDay(cutOf(draft.asOf))}`}
     >
       <CardContent className="grid gap-4">
+        {sources}
         <Worksheet
           checked={checked}
           draft={draft}
