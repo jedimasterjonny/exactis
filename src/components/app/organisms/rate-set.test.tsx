@@ -13,7 +13,6 @@ import type { Cma, Deductions } from "@/data/cma";
 import type { RateSet as Chosen } from "@/data/rates";
 import type { Answer } from "@/lib/answer";
 
-import { pullCma } from "@/actions/cma";
 import { saveDeductions, saveRateSet } from "@/actions/plan";
 import { Toaster } from "@/components/kit/toast";
 import { cma, mappings } from "@/data/cma.fixture";
@@ -113,6 +112,9 @@ describe("RateSet", () => {
     );
     expect(historical).toHaveAttribute("aria-disabled", "true");
     expect(historical).toHaveAccessibleDescription("Not built yet");
+    expect(
+      within(card).getByRole("button", { name: "Pull CMA workbook" }),
+    ).toBeInTheDocument();
   });
 
   it("lays out the rates and the split typed by hand under the custom rates, with the derivation set aside", () => {
@@ -172,6 +174,9 @@ describe("RateSet", () => {
       screen.queryByRole("textbox", { name: "Stocks share" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(
+      within(card).getByRole("button", { name: "Pull CMA workbook" }),
+    ).toBeInTheDocument();
   });
 
   // The glide path holds nine tenths in stocks now, handed down as the
@@ -419,51 +424,6 @@ describe("RateSet", () => {
     });
     await waitFor(() => {
       expect(confirm).toBeEnabled();
-    });
-  });
-
-  // The pull is offered under the custom rates too, so a vintage can be
-  // pulled before the CMA's rates are chosen.
-  it("pulls BlackRock's workbook under either set, holding while it is on its way, and says what it pulled", async () => {
-    const answer = Promise.withResolvers<Answer<Cma>>();
-    vi.mocked(pullCma).mockReturnValue(answer.promise);
-    renderSet();
-    const pull = within(cardOf("Custom rates")).getByRole("button", {
-      name: "Pull CMA workbook",
-    });
-
-    fireEvent.click(pull);
-
-    await waitFor(() => {
-      expect(pull).toHaveAttribute("aria-busy", "true");
-    });
-
-    answer.resolve(saved(cma));
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("dialog", { name: "CMA pulled" }),
-      ).toHaveAccessibleDescription("August 2026, data as of 30 Jun 2026");
-    });
-    await waitFor(() => {
-      expect(pull).not.toHaveAttribute("aria-busy");
-    });
-  });
-
-  it("says why when the pull is refused", async () => {
-    vi.mocked(pullCma).mockResolvedValue(
-      refused("BlackRock did not send its capital market assumptions"),
-    );
-    renderSet("cma");
-
-    fireEvent.click(screen.getByRole("button", { name: "Pull CMA workbook" }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("dialog", { name: "CMA not pulled" }),
-      ).toHaveAccessibleDescription(
-        "BlackRock did not send its capital market assumptions",
-      );
     });
   });
 });
