@@ -26,7 +26,7 @@ import {
   runLength,
 } from "@/engine/futures";
 import { project } from "@/engine/projection";
-import { useBreaks, useLastingAt } from "@/hooks/use-futures";
+import { useBreaks, useLastingAt, usePool } from "@/hooks/use-futures";
 
 interface ChanceBoardProps {
   readonly accounts: readonly Account[];
@@ -157,7 +157,8 @@ function AtItsRates({
 // in a component of its own so the search starts only once the run it
 // searches is drawn, and never on workers beside the run's own; with
 // the retirement age tried there, as useLastingAt holds it, which
-// changes nothing else.
+// changes nothing else. The search and the age tried share one pool of
+// workers, kept for as long as the card is shown over the run.
 function Searched({
   accounts,
   futures,
@@ -168,7 +169,8 @@ function Searched({
   ChanceBoardProps,
   "accounts" | "futures" | "plan" | "schedule" | "spread"
 >): JSX.Element {
-  const breaks = useBreaks(accounts, schedule, { futures, plan, spread });
-  const tried = useLastingAt(accounts, schedule, { breaks, plan, spread });
+  const pool = usePool(accounts, schedule, { plan, spread });
+  const breaks = useBreaks(pool, { futures, plan });
+  const tried = useLastingAt(pool, { breaks, plan });
   return <FuturesBreaks plan={plan} searched={{ breaks }} tried={tried} />;
 }

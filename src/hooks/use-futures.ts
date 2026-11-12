@@ -38,6 +38,13 @@ interface Kept {
   readonly slices: (readonly Future[])[];
 }
 
+// A reader's own queue on a pool of workers, as poolOf hands one out:
+// how a future is tried through it, and how it is dropped.
+interface Queue {
+  readonly drop: () => void;
+  readonly tried: (trial: Trial, future: number) => Promise<boolean>;
+}
+
 // How long the futures drawn are held before the screen is handed them,
 // in milliseconds: often enough to watch the run come in, and seldom
 // enough that the screen is not drawn again for every slice. The
@@ -104,52 +111,46 @@ export function forget(): void {
 }
 
 // Where the plan breaks over its run of the futures, the run given whole
-// as useFutures hands it, as breaksIn finds it, by as many workers as a
-// run is drawn on, each handed one future to try at a time and the next
-// as it answers: nothing until the search is done. The search is kept
-// with the run, found by the futures handed, so what the run was drawn
-// over is written out once, by useFutures, and it is dropped with the
-// run; a screen shown again over a run already searched reads where it
-// breaks rather than searching again, and so does one handed the run
-// again by another screen's hand-over, which keeps it. A plan changed
-// stops the workers and searches the new run, and so does a screen
-// taken down, hearing nothing more from them; one shown again before
-// the search was done searches from the start.
+// as useFutures hands it, as breaksIn finds it, on the screen's pool,
+// as usePool keeps it, through a queue of the search's own, by as many
+// workers as a run is drawn on, each handed one future to try at a time
+// and the next as it answers: nothing until the search is done. The
+// search is kept with the run, found by the futures handed, so what the
+// run was drawn over is written out once, by useFutures, and it is
+// dropped with the run; a screen shown again over a run already
+// searched reads where it breaks rather than searching again, and so
+// does one handed the run again by another screen's hand-over, which
+// keeps it. Once the search lands its workers are kept for the screen,
+// for the counts that follow it. The run handed over again while it is
+// searched drops the search's queue and searches it afresh on the same
+// workers; a plan changed stops the pool and searches the new run, and
+// so does a screen hidden or taken down, hearing nothing more from the
+// workers; one shown again before the search was done searches from the
+// start.
 export function useBreaks(
-  accounts: readonly Account[],
-  schedule: Schedule,
+  pool: ReturnType<typeof poolOf>,
   {
     futures,
     plan,
-    spread,
-  }: {
-    readonly futures: readonly Future[];
-    readonly plan: Plan;
-    readonly spread: Spread;
-  },
+  }: { readonly futures: readonly Future[]; readonly plan: Plan },
 ): Breaks | undefined {
-  const seed = useSyncExternalStore(subscribe, readSeed, readSeed);
-  const run = useMemo(
-    () => ({ accounts, futures, plan, schedule, seed, spread }),
-    [accounts, futures, plan, schedule, seed, spread],
-  );
   useEffect(() => {
-    const isSearched = searchedFor(run.futures) !== undefined;
-    const lanes = isSearched ? 0 : workersOf();
-    const { stop, tried } = poolOf(run, lanes);
-    if (!isSearched) {
-      void breaksIn(run.futures, run.plan, { lanes, tried }).then((breaks) => {
+    if (searchedFor(futures) !== undefined) {
+      return undefined;
+    }
+    const { drop, tried } = pool.queue();
+    void breaksIn(futures, plan, { lanes: workersOf(), tried }).then(
+      (breaks) => {
         keep({
           ...kept,
           runs: kept.runs.map((each) =>
-            each.futures === run.futures ? { ...each, breaks } : each,
+            each.futures === futures ? { ...each, breaks } : each,
           ),
         });
-        stop();
-      });
-    }
-    return stop;
-  }, [run]);
+      },
+    );
+    return drop;
+  }, [futures, plan, pool]);
   const readBreaks = (): Breaks | undefined => searchedFor(futures);
   return useSyncExternalStore(subscribe, readBreaks, readBreaks);
 }
@@ -296,43 +297,32 @@ export function useFutures(
 // A retirement age tried over where the plan's run breaks, as useBreaks
 // hands it: the age, the plan's own until another is given; how many of
 // the futures last retiring at it, as lastingAt counts them off where the
-// run breaks, on as many workers as a run is drawn on, as poolOf starts
-// them: nothing while it counts, nor where the run has no age searched;
-// and how another age is given. Each count is kept on the screen with
-// the brackets it narrowed, which the next count reads, so an age
-// counted before reads its count at once; and the age given, the counts
-// and the brackets are all dropped for where the run breaks handed
-// afresh, as a plan changed and changed back hands the run kept for it,
-// so the age reads the plan's again. No worker starts until a future is
-// left open at the age, so the plan's own age, or any the brackets
-// settle, starts none. An age given while another counts stops the
-// workers and counts the new one, hearing nothing more from the old,
-// and so does a screen hidden or taken down; one shown again counts its
-// age afresh. ponytail: a pool for each count, started cold; one pool
-// kept for the screen, its queue dropped as a newer age is given, is
-// the upgrade if starting the workers shows.
+// run breaks, on the screen's pool, as usePool keeps it, through a queue
+// of the count's own, on as many workers as a run is drawn on: nothing
+// while it counts, nor where the run has no age searched; and how
+// another age is given. Each count is kept on the screen with the
+// brackets it narrowed, which the next count reads, so an age counted
+// before reads its count at once; and the age given, the counts and the
+// brackets are all dropped for where the run breaks handed afresh, as a
+// plan changed and changed back hands the run kept for it, so the age
+// reads the plan's again. No worker starts until a future is left open
+// at the age, so the plan's own age, or any the brackets settle, starts
+// none. An age given while another counts drops the old count's queue
+// and counts the new one on the same workers, and a count dropped whose
+// last tries were already on their way is not kept when they land; a
+// screen hidden or taken down stops the pool, and one shown again counts
+// its age afresh.
 export function useLastingAt(
-  accounts: readonly Account[],
-  schedule: Schedule,
+  pool: ReturnType<typeof poolOf>,
   {
     breaks,
     plan,
-    spread,
-  }: {
-    readonly breaks: Breaks | undefined;
-    readonly plan: Plan;
-    readonly spread: Spread;
-  },
+  }: { readonly breaks: Breaks | undefined; readonly plan: Plan },
 ): {
   readonly age: number;
   readonly lasted: number | undefined;
   readonly onAge: (age: number) => void;
 } {
-  const seed = useSyncExternalStore(subscribe, readSeed, readSeed);
-  const run = useMemo(
-    () => ({ accounts, plan, schedule, seed, spread }),
-    [accounts, plan, schedule, seed, spread],
-  );
   const [given, setGiven] = useState<
     undefined | { readonly age: number; readonly breaks: Breaks | undefined }
   >(undefined);
@@ -346,11 +336,9 @@ export function useLastingAt(
     if (breaks === undefined || ages === undefined || lasted !== undefined) {
       return undefined;
     }
-    const lanes = workersOf();
-    const { stop, tried } = poolOf(run, lanes);
+    const { drop, tried } = pool.queue();
     let isCurrent = true;
-    void lastingAt(ages, age, { lanes, tried }).then((count) => {
-      stop();
+    void lastingAt(ages, age, { lanes: workersOf(), tried }).then((count) => {
       if (isCurrent) {
         setCounted({
           ages: count.ages,
@@ -361,9 +349,9 @@ export function useLastingAt(
     });
     return (): void => {
       isCurrent = false;
-      stop();
+      drop();
     };
-  }, [age, breaks, lasted, mine, run]);
+  }, [age, breaks, lasted, mine, pool]);
   return {
     age,
     lasted,
@@ -371,6 +359,30 @@ export function useLastingAt(
       setGiven({ age: tried, breaks });
     },
   };
+}
+
+// The workers a screen tries the futures of its run again on, as poolOf
+// keeps them, made for the run, what it is drawn over and its seed, and
+// shared by the search of it and every count off where it breaks, so a
+// count after the search runs on workers already warm. Nothing starts
+// until a try finds no worker free. The pool is stopped as the run
+// changes, as a plan changed or drawn again does, and as the screen is
+// hidden or taken down, hearing nothing more from its workers; the next
+// try starts them afresh. ponytail: the workers are kept idle for the
+// screen's life; an idle timeout is the upgrade if a phone's memory
+// shows.
+export function usePool(
+  accounts: readonly Account[],
+  schedule: Schedule,
+  { plan, spread }: { readonly plan: Plan; readonly spread: Spread },
+): ReturnType<typeof poolOf> {
+  const seed = useSyncExternalStore(subscribe, readSeed, readSeed);
+  const pool = useMemo(
+    () => poolOf({ accounts, plan, schedule, seed, spread }),
+    [accounts, plan, schedule, seed, spread],
+  );
+  useEffect(() => pool.stop, [pool]);
+  return pool;
 }
 
 // Keeps the runs given, telling every screen reading them.
@@ -381,22 +393,25 @@ function keep(next: Drawn): void {
   }
 }
 
-// Workers trying the futures of the run given again, up to the count
-// given of them, each started only when a try finds none free, so a
-// count leaving one future open starts one, and each handed one future
-// to try at a time and the next as it answers, what the run was drawn
-// over posted with each: how a future is tried on them, and how they
-// are let go, hearing nothing more from them.
-function poolOf(
-  run: Omit<Tried, "future" | "trial">,
-  workers: number,
-): {
+// Workers trying the futures of the run given again, as many as
+// workersOf counts as a try would start one, each started only when a
+// try finds none free, so a count leaving one future open starts one,
+// and each handed one future to try at a time and the next as it
+// answers, what the run was drawn over posted with each. The tries wait
+// their turn in the order asked, each reader's through a queue of its
+// own, which it can drop: none of its tries still waiting is posted,
+// nor any it asks after, and those are never answered, while a try
+// already posted still lands. Stopped, the workers are let go, hearing
+// nothing more from them, and every try waiting is dropped with them,
+// so the next try starts the pool afresh.
+function poolOf(run: Omit<Tried, "future" | "trial">): {
+  readonly queue: () => Queue;
   readonly stop: () => void;
-  readonly tried: (trial: Trial, future: number) => Promise<boolean>;
 } {
   const pool: Worker[] = [];
   const free: Worker[] = [];
-  const queued: {
+  let queued: {
+    readonly by: { isDropped: boolean };
     readonly posted: Tried;
     readonly settle: (lasts: boolean) => void;
   }[] = [];
@@ -412,40 +427,55 @@ function poolOf(
     };
     worker.postMessage(next.posted);
   }
-  async function tried(trial: Trial, future: number): Promise<boolean> {
-    return new Promise((settle) => {
-      queued.push({
-        posted: {
-          accounts: run.accounts,
-          future,
-          plan: run.plan,
-          schedule: run.schedule,
-          seed: run.seed,
-          spread: run.spread,
-          trial,
-        },
-        settle,
-      });
-      if (free.length === 0 && pool.length < workers) {
-        const started = new Worker(
-          new URL("./futures.worker.ts", import.meta.url),
-        );
-        pool.push(started);
-        free.push(started);
-      }
-      const worker = free.pop();
-      if (worker !== undefined) {
-        hand(worker);
-      }
-    });
+  function queue(): Queue {
+    const by = { isDropped: false };
+    return {
+      drop: (): void => {
+        by.isDropped = true;
+        queued = queued.filter((each) => each.by !== by);
+      },
+      tried: async (trial, future) =>
+        new Promise((settle) => {
+          if (by.isDropped) {
+            return;
+          }
+          queued.push({
+            by,
+            posted: {
+              accounts: run.accounts,
+              future,
+              plan: run.plan,
+              schedule: run.schedule,
+              seed: run.seed,
+              spread: run.spread,
+              trial,
+            },
+            settle,
+          });
+          if (free.length === 0 && pool.length < workersOf()) {
+            const started = new Worker(
+              new URL("./futures.worker.ts", import.meta.url),
+            );
+            pool.push(started);
+            free.push(started);
+          }
+          const worker = free.pop();
+          if (worker !== undefined) {
+            hand(worker);
+          }
+        }),
+    };
   }
   function stop(): void {
     for (const worker of pool) {
       worker.onmessage = null;
       worker.terminate();
     }
+    pool.length = 0;
+    free.length = 0;
+    queued = [];
   }
-  return { stop, tried };
+  return { queue, stop };
 }
 
 // The seed the runs are drawn from, as a screen reads it: on the server
