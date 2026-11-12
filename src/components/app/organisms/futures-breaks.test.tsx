@@ -201,7 +201,7 @@ describe("FuturesBreaks", () => {
     });
   });
 
-  it("says it counts the futures on each share while they are counted, its caption beneath", () => {
+  it("says it counts the futures on each share while they are counted, none counted until it is told, its caption beneath", () => {
     render(<FuturesBreaks plan={plan} searched={searchedAt(61, 7)} />);
 
     expect(within(card()).queryByRole("application")).not.toBeInTheDocument();
@@ -210,9 +210,31 @@ describe("FuturesBreaks", () => {
         "Counting the futures on each share of the spending…",
       ),
     ).toBeInTheDocument();
+    expect(
+      within(card()).getByRole("progressbar", {
+        name: "Counting the futures on each share of the spending…",
+        value: { now: 0 },
+      }),
+    ).toBeInTheDocument();
     expect(curveCaption()).toBe(
       "Futures lasting, of 1,000, on each share of the spending planned, from this year on, retiring at 58",
     );
+  });
+
+  it("fills the bar beneath the counting with how much of it is done", () => {
+    render(
+      <FuturesBreaks
+        plan={plan}
+        searched={{ ...searchedAt(61, 7), done: 67 }}
+      />,
+    );
+
+    expect(
+      within(card()).getByRole("progressbar", {
+        name: "Counting the futures on each share of the spending…",
+        value: { now: 67 },
+      }),
+    ).toBeInTheDocument();
   });
 
   // Fewer than nine in ten last even on half the spending, so the

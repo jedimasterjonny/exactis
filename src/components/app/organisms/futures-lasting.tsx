@@ -3,6 +3,7 @@
 import type { JSX } from "react";
 import type { TooltipContentProps } from "recharts";
 
+import { useId } from "react";
 import {
   CartesianGrid,
   Line,
@@ -20,6 +21,7 @@ import { formatCount } from "@/lib/count";
 interface FuturesLastingProps {
   readonly "aria-describedby": string;
   readonly caption: string;
+  readonly done: number;
   readonly figure: undefined | { readonly cut: number; readonly label: string };
   readonly points: readonly Lasting[] | undefined;
 }
@@ -53,14 +55,19 @@ interface Share {
 // keys read each share counted and its count, told to a screen reader as
 // they move. The chart is named for one and described by the element
 // whose id it is handed, the card's verdict, and the caption beneath
-// says over what. While the shares are counted the box says so, at the
-// height it keeps once drawn, so nothing beneath it moves.
+// says over what. While the shares are counted the box says so, and
+// beneath the words a bar fills with how much of the counting is done,
+// outlined where colours are forced. The words name the bar, and a
+// screen reader hears them only as that name. The box keeps the height
+// it has once drawn, so nothing beneath it moves.
 export function FuturesLasting({
   "aria-describedby": describedBy,
   caption,
+  done,
   figure,
   points,
 }: FuturesLastingProps): JSX.Element {
+  const countingId = useId();
   const shares = points?.map(({ cut, lasted }) => ({
     lasted,
     share: 100 - cut,
@@ -72,8 +79,28 @@ export function FuturesLasting({
   return (
     <div className="grid gap-2">
       {shares === undefined ? (
-        <div className="flex h-48 items-center justify-center text-center text-sm text-balance text-muted-foreground lg:h-64">
-          Counting the futures on each share of the spending…
+        <div className="flex h-48 flex-col items-center justify-center gap-3 lg:h-64">
+          <div
+            aria-hidden
+            className="text-center text-sm text-balance text-muted-foreground"
+            id={countingId}
+          >
+            Counting the futures on each share of the spending…
+          </div>
+          <div
+            aria-labelledby={countingId}
+            aria-valuemax={100}
+            aria-valuemin={0}
+            aria-valuenow={done}
+            className="h-1 w-full max-w-84 overflow-hidden rounded-full bg-input forced-colors:outline"
+            role="progressbar"
+          >
+            <div
+              className="h-full rounded-full bg-chart-1 ease-linear motion-safe:transition-[width] forced-colors:bg-[CanvasText]"
+              data-slot="counting-fill"
+              style={{ width: `${String(done)}%` }}
+            />
+          </div>
         </div>
       ) : (
         <div className="flex h-48 flex-col lg:h-64">

@@ -20,6 +20,7 @@ interface FuturesBreaksProps {
   readonly plan: Plan;
   readonly searched?: {
     readonly breaks: Breaks | undefined;
+    readonly done?: number;
     readonly lasting?:
       readonly { readonly cut: number; readonly lasted: number }[] | undefined;
   };
@@ -133,6 +134,7 @@ export function FuturesBreaks({
           <FuturesLasting
             aria-describedby={verdictId}
             caption={`Futures lasting, of ${formatCount(runLength)}, on each share of the spending planned, from this year on${retiringOf(plan)}`}
+            done={searched?.done ?? 0}
             figure={cut === null ? undefined : { cut, label: spending.value }}
             points={searched?.lasting}
           />
