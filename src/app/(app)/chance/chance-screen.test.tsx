@@ -7,6 +7,7 @@ import type { Schedule } from "@/engine/cash-flow";
 import { expenseLines } from "@/data/expenses.fixture";
 import { working } from "@/data/owners.fixture";
 import { forget } from "@/hooks/use-futures";
+import { field } from "@/test/dom";
 import { FuturesWorker, stubWorkers } from "@/test/futures-worker";
 
 import { ChanceScreen } from "./chance-screen";
@@ -189,18 +190,20 @@ describe("ChanceScreen", () => {
       />,
     );
 
-    expect(within(breaks()).getByRole("paragraph")).toHaveTextContent(
+    expect(within(breaks()).getAllByRole("paragraph")[0]).toHaveTextContent(
       "The search starts once the futures are drawn.",
     );
+    expect(field("Retirement age to try", breaks())).toBeDisabled();
     expect(started).toHaveLength(2);
     await within(screen.getByRole("banner")).findByText(
       "1,000 futures, age 34 to 37",
       {},
       { timeout: 5000 },
     );
-    expect(within(breaks()).getByRole("paragraph")).toHaveTextContent(
-      "Searching the futures…",
+    expect(within(breaks()).getAllByRole("paragraph")[0]).toHaveTextContent(
+      "Searching the futures for where 9 in 10 of them last…",
     );
+    expect(field("Retirement age to try", breaks())).toBeDisabled();
     expect(started).toHaveLength(4);
   });
 
