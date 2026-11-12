@@ -222,4 +222,29 @@ describe("FigureInput", () => {
     expect(input).toHaveValue("2026");
     expect(onValueCommitted).not.toHaveBeenCalled();
   });
+
+  // A browser neither focuses nor types into a disabled input, which
+  // jsdom does not hold it to, so what is checked is the attribute it is
+  // held by and the key and the blur that would step and commit it.
+  it("holds a figure that cannot be set yet disabled, stepping and committing nothing", () => {
+    const onValueCommitted = vi.fn<(value: number) => void>();
+    render(
+      <FigureInput
+        format={plain}
+        isDisabled
+        largeStep={10}
+        onValueCommitted={onValueCommitted}
+        step={1}
+        value={2026}
+      />,
+    );
+    const input = screen.getByRole("textbox");
+
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    fireEvent.blur(input);
+
+    expect(input).toBeDisabled();
+    expect(input).toHaveValue("2026");
+    expect(onValueCommitted).not.toHaveBeenCalled();
+  });
 });
