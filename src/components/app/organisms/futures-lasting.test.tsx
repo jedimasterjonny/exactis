@@ -197,6 +197,25 @@ describe("FuturesLasting", () => {
     expect(screen.getByText(caption, { suggest: false })).toBeInTheDocument();
   });
 
+  it("says when the shares are counted in the plot's place before the count begins, read as it is, with no bar and no curve even handed counts, the caption beneath", () => {
+    const { rerender } = render(
+      lasting({ done: undefined, points: undefined }),
+    );
+
+    const words = screen.getByText(
+      "The futures are counted on each share of the spending once they are searched.",
+    );
+    const [box] = drawn("h-48");
+    expect(box).toHaveClass("lg:h-64");
+    expect(box).toContainElement(words);
+    expect(words).not.toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.getByText(caption, { suggest: false })).toBeInTheDocument();
+    rerender(lasting({ done: undefined }));
+    expect(screen.queryByRole("application")).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
   it("draws no bar once the shares are counted", () => {
     render(lasting({ done: 100 }));
 

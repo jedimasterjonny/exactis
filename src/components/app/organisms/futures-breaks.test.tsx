@@ -94,6 +94,16 @@ function curveCaption(): null | string {
   return within(card()).getAllByRole("paragraph")[1]?.textContent ?? null;
 }
 
+// The box the curve is drawn in, which stands at the height it is drawn
+// at whatever it holds. It has no role or name, so no query is more
+// accessible than its class.
+function plot(): HTMLElement {
+  return within(card()).getByText(
+    (_content, element) => element?.classList.contains("h-48") === true,
+    { suggest: false },
+  );
+}
+
 // The svg text recharts draws reading the words given, as the curve's
 // ring is named.
 function ringedAs(words: string): HTMLElement | null {
@@ -142,27 +152,62 @@ function verdict(): null | string {
 }
 
 describe("FuturesBreaks", () => {
-  it("says the search waits on the futures before they are drawn, the figures held", () => {
+  // The line waiting in the verdict's place is set as the verdict is,
+  // muted, so it takes the lines the verdict lands on.
+  it("says the search waits on the futures before they are drawn, in the verdict's style, the figures held beside what each is read against", () => {
     render(<FuturesBreaks plan={plan} />);
 
     expect(within(card()).getByText("Sect. II.i")).toHaveClass("label");
     expect(verdict()).toBe("The search starts once the futures are drawn.");
+    expect(within(card()).getAllByRole("paragraph")[0]).toHaveClass(
+      "heading",
+      "text-xl",
+      "text-balance",
+      "text-muted-foreground",
+    );
     expect(figures()).toStrictEqual([
-      ["Retirement age", "…"],
-      ["Spending", "…"],
+      [
+        "Retirement age",
+        "…",
+        "Against the plan's own age, spending as planned",
+      ],
+      [
+        "Spending",
+        "…",
+        "Of the spending planned, from this year on, retiring at 58",
+      ],
     ]);
   });
 
-  it("draws no curve before the search is done", () => {
+  it("stands the curve's box and its caption before the search is done, saying when the shares are counted, with no curve and no bar, even handed counts", () => {
     const { rerender } = render(<FuturesBreaks plan={plan} />);
 
+    expect(
+      within(card()).getByText(
+        "The futures are counted on each share of the spending once they are searched.",
+      ),
+    ).toBeInTheDocument();
     expect(within(card()).queryByRole("application")).not.toBeInTheDocument();
-    expect(within(card()).getAllByRole("paragraph")).toHaveLength(1);
-    rerender(
-      <FuturesBreaks plan={plan} searched={{ breaks: undefined, lasting }} />,
+    expect(within(card()).queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(curveCaption()).toBe(
+      "Futures lasting, of 1,000, on each share of the spending planned, from this year on, retiring at 58",
     );
+    rerender(
+      <FuturesBreaks
+        plan={plan}
+        searched={{ breaks: undefined, done: 67, lasting }}
+      />,
+    );
+    expect(
+      within(card()).getByText(
+        "The futures are counted on each share of the spending once they are searched.",
+      ),
+    ).toBeInTheDocument();
     expect(within(card()).queryByRole("application")).not.toBeInTheDocument();
-    expect(within(card()).getAllByRole("paragraph")).toHaveLength(1);
+    expect(within(card()).queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(curveCaption()).toBe(
+      "Futures lasting, of 1,000, on each share of the spending planned, from this year on, retiring at 58",
+    );
   });
 
   // The ring is drawn a pass after the rest, as recharts lays its layers.
@@ -310,13 +355,29 @@ describe("FuturesBreaks", () => {
     );
   });
 
-  it("says the futures are being searched while the search runs, the figures held until it is done", () => {
+  it("says the futures are being searched while the search runs, in the verdict's style, the figures held until it is done", () => {
     render(<FuturesBreaks plan={plan} searched={{ breaks: undefined }} />);
 
-    expect(verdict()).toBe("Searching the futures…");
+    expect(verdict()).toBe(
+      "Searching the futures for where 9 in 10 of them last…",
+    );
+    expect(within(card()).getAllByRole("paragraph")[0]).toHaveClass(
+      "heading",
+      "text-xl",
+      "text-balance",
+      "text-muted-foreground",
+    );
     expect(figures()).toStrictEqual([
-      ["Retirement age", "…"],
-      ["Spending", "…"],
+      [
+        "Retirement age",
+        "…",
+        "Against the plan's own age, spending as planned",
+      ],
+      [
+        "Spending",
+        "…",
+        "Of the spending planned, from this year on, retiring at 58",
+      ],
     ]);
   });
 
@@ -419,6 +480,7 @@ describe("FuturesBreaks", () => {
       [
         "Spending",
         "…",
+        "Of the spending planned, from this year on, retiring on its conditions",
         "Retirement waits on its conditions, so only the spending is searched.",
       ],
     ]);
@@ -645,30 +707,47 @@ describe("FuturesBreaks", () => {
     );
   });
 
-  // An age found with no brackets beside it has nothing to count an age
-  // tried off, and would read an ellipsis for good.
-  it("tries no age before the search is done, where only the spending is searched, nor where no brackets are handed back", () => {
-    const { rerender } = render(
-      <FuturesBreaks plan={plan} tried={triedAt(58)} />,
-    );
+  // An age tried handed in before the brackets is not shown: the panel
+  // holds the plan's own age, and a key Base UI's disabled thumb still
+  // answers in jsdom, which no browser lets reach it, gives no age. An
+  // age found with no brackets beside it, which has nothing to count an
+  // age tried off, is held for good.
+  it("holds the age tried at the plan's own before the search is done, its box and slider disabled and its count an ellipsis, telling a screen reader nothing; and draws none where only the spending is searched", () => {
+    const tried = triedAt(64, 812);
+    const { rerender } = render(<FuturesBreaks plan={plan} tried={tried} />);
+    const held = (): void => {
+      const box = field("Retirement age to try", card());
+      expect(box).toBeDisabled();
+      expect(box).toHaveValue("58");
+      expect(slider("Retirement age to try")).toBeDisabled();
+      expect(slider("Retirement age to try")).toHaveValue("58");
+      expect(triedSays()).toStrictEqual([
+        "Tried here only; the plan retires at 58",
+        "… of 1,000 futures last as the plan stands, retiring at 58.",
+        "",
+      ]);
+      expect(triedHeard()).toStrictEqual(triedSays());
+      fireEvent.keyDown(slider("Retirement age to try"), { key: "ArrowRight" });
+    };
 
-    expect(within(card()).queryByRole("textbox")).not.toBeInTheDocument();
+    held();
     rerender(
       <FuturesBreaks
         plan={plan}
         searched={{ breaks: undefined }}
-        tried={triedAt(58)}
+        tried={tried}
       />,
     );
-    expect(within(card()).queryByRole("textbox")).not.toBeInTheDocument();
+    held();
     rerender(
       <FuturesBreaks
         plan={plan}
         searched={{ breaks: { age: 61, cut: 7, cuts: [] } }}
-        tried={triedAt(58)}
+        tried={tried}
       />,
     );
-    expect(within(card()).queryByRole("textbox")).not.toBeInTheDocument();
+    held();
+    expect(tried.onAge).not.toHaveBeenCalled();
     rerender(
       <FuturesBreaks
         plan={{ ...plan, retires: 35 }}
@@ -696,6 +775,71 @@ describe("FuturesBreaks", () => {
       />,
     );
     expect(within(card()).queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  // The screen mounts the card afresh once the run is drawn, so what is
+  // kept is from the search running to its landing. jsdom lays nothing
+  // out, so what is held is that the parts are the same nodes, the words
+  // in them changing.
+  it("keeps the curve's box, its caption and the age tried in place as the search lands, changing only their words", () => {
+    const tried = triedAt(58, 874);
+    const { rerender } = render(
+      <FuturesBreaks plan={plan} searched={{ breaks: undefined }} />,
+    );
+    const box = plot();
+    const age = field("Retirement age to try", card());
+    const caption = within(card()).getAllByRole("paragraph")[1];
+    expect(box).toHaveTextContent(
+      "The futures are counted on each share of the spending once they are searched.",
+    );
+
+    rerender(
+      <FuturesBreaks
+        plan={plan}
+        searched={{ ...searchedAt(61, 7), done: 33 }}
+        tried={tried}
+      />,
+    );
+
+    expect(plot()).toBe(box);
+    expect(box).toHaveTextContent(
+      "Counting the futures on each share of the spending…",
+    );
+    expect(field("Retirement age to try", card())).toBe(age);
+    expect(within(card()).getAllByRole("paragraph")[1]).toBe(caption);
+    expect(age).toBeEnabled();
+    expect(slider("Retirement age to try")).toBeEnabled();
+    expect(triedSays().slice(1)).toStrictEqual([
+      "874 of 1,000 futures last as the plan stands, retiring at 58.",
+      "874 of 1,000 futures last as the plan stands, retiring at 58.",
+    ]);
+    commit(age, "64");
+    expect(vi.mocked(tried.onAge).mock.calls).toStrictEqual([[64]]);
+  });
+
+  it("names the plan's owner in what the figures and the age tried wait on, where another retires at an age of their own", () => {
+    render(
+      <FuturesBreaks
+        plan={{ ...plan, owners: [robin, ash] }}
+        searched={{ breaks: undefined }}
+      />,
+    );
+
+    expect(figures()).toStrictEqual([
+      [
+        "Retirement age",
+        "…",
+        "For Robin, against the plan's own age, spending as planned",
+      ],
+      [
+        "Spending",
+        "…",
+        "Of the spending planned, from this year on, with Robin retiring at 58",
+      ],
+    ]);
+    expect(triedSays()[1]).toBe(
+      "… of 1,000 futures last as the plan stands, with Robin retiring at 58.",
+    );
   });
 
   // The age tried and the age found move Robin, and Kit with them at

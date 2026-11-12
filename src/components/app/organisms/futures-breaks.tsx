@@ -54,19 +54,25 @@ interface Tried {
 // nine in ten futures last retiring at, and a hundred less the cut nine
 // in ten last with. A plan isAgeSearched passes over has no age
 // searched, and the spending says why. The figures wait until the
-// search is done: before it they say it waits on the futures, and while
-// it runs that it is searching them. Once it is done, the figures are
+// search is done, each beside what it is read against, and in the
+// verdict's place, set as it is and muted so it takes the verdict's
+// lines, the card says before the search that it waits on the futures,
+// and while it runs that it is searching them: a state not begun ends
+// in a full stop, and one under way in an ellipsis. The figures are
 // followed by how many futures last on each share of the spending, as
 // FuturesLasting draws it, ringing the spending's figure, described by
 // the verdict and captioned with the retirement the spending is read
-// against, saying it counts until the counts are handed in. Beneath it,
-// where the search hands back the brackets its search of the age left
-// the futures in, which an age tried is counted off, the card has a
-// retirement age to try, as AgeTried lays it out, where one is given,
-// even where no age was found. Where another owner retires at an age of
-// their own, the verdict, the age's figure, the spending's caption, the
-// curve's caption and the age tried name the plan's owner in their age
-// phrases, as withOwner says it.
+// against, saying when the shares are counted until the search is done
+// and that it counts them until the counts are handed in. Beneath it,
+// wherever the age is searched, even where no age is found, the card
+// has a retirement age to try, as AgeTried lays it out, held until the
+// search hands back the brackets its search of the age left the
+// futures in, which an age tried is counted off, and an age tried is
+// given. So the card is drawn from the first paint in the shape it lands
+// in, and as the search lands only its words change. Where another
+// owner retires at an age of their own, the verdict, the age's figure,
+// the spending's caption, the curve's caption and the age tried name
+// the plan's owner in their age phrases, as withOwner says it.
 export function FuturesBreaks({
   plan,
   searched,
@@ -78,10 +84,19 @@ export function FuturesBreaks({
   const isDone = breaks !== undefined;
   const age = breaks?.age ?? null;
   const cut = breaks?.cut ?? null;
-  const spending = isDone ? spendingShown(cut, plan) : waiting("Spending");
+  const spending = isDone
+    ? spendingShown(cut, plan)
+    : waiting("Spending", spentOf(plan));
   const figures = [
     ...(isAge
-      ? [isDone ? ageShown(age, plan) : waiting("Retirement age")]
+      ? [
+          isDone
+            ? ageShown(age, plan)
+            : waiting(
+                "Retirement age",
+                asPlanned(plan, "against the plan's own age"),
+              ),
+        ]
       : []),
     { ...spending, notes: [...spending.notes, ...unsearchedOf(plan)] },
   ];
@@ -96,10 +111,10 @@ export function FuturesBreaks({
             {verdictOf(figures, isAge, plan)}
           </p>
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="heading text-xl text-balance text-muted-foreground">
             {searched === undefined
               ? "The search starts once the futures are drawn."
-              : "Searching the futures…"}
+              : "Searching the futures for where 9 in 10 of them last…"}
           </p>
         )}
         <dl className="grid gap-6 sm:grid-cols-2">
@@ -130,17 +145,18 @@ export function FuturesBreaks({
             </div>
           ))}
         </dl>
-        {isDone && (
-          <FuturesLasting
-            aria-describedby={verdictId}
-            caption={`Futures lasting, of ${formatCount(runLength)}, on each share of the spending planned, from this year on${retiringOf(plan)}`}
-            done={searched?.done ?? 0}
-            figure={cut === null ? undefined : { cut, label: spending.value }}
-            points={searched?.lasting}
+        <FuturesLasting
+          aria-describedby={verdictId}
+          caption={`Futures lasting, of ${formatCount(runLength)}, on each share of the spending planned, from this year on${retiringOf(plan)}`}
+          done={isDone ? (searched?.done ?? 0) : undefined}
+          figure={cut === null ? undefined : { cut, label: spending.value }}
+          points={searched?.lasting}
+        />
+        {isAge && (
+          <AgeTried
+            plan={plan}
+            tried={breaks?.ages === undefined ? undefined : tried}
           />
-        )}
-        {breaks?.ages !== undefined && tried !== undefined && (
-          <AgeTried plan={plan} tried={tried} />
         )}
       </CardContent>
     </SectionCard>
@@ -179,14 +195,9 @@ function ageShown(age: null | number, plan: Plan): Shown {
     after === 0
       ? "as the plan retires"
       : `${counted(Math.abs(after), "year")} ${side} the plan retires`;
-  const note = [
-    ...ownerNamed(plan).map((name) => `For ${name}`),
-    against,
-    "spending as planned",
-  ].join(", ");
   return {
     label,
-    notes: [`${note.charAt(0).toUpperCase()}${note.slice(1)}`],
+    notes: [asPlanned(plan, against)],
     unit: "yrs",
     value: String(age),
     way: `${named}retiring at ${String(age)}`,
@@ -209,21 +220,31 @@ function ageShown(age: null | number, plan: Plan): Shown {
 // nothing. A screen reader hears the sentence again once the count is
 // in, and never while it is counted, so nothing ticks; and, the count
 // in, the sentence shown is hidden from it, so browsing reads it once.
+// Until the search hands back its brackets and an age tried is given,
+// the box and the slider are held at the plan's own age, disabled, with
+// an ellipsis in place of the count, read as it is while a count is
+// under way, and the twin beneath it says nothing; no age can be given,
+// so nothing is counted.
 function AgeTried({
   plan,
-  tried: { age, lasted, onAge },
+  tried,
 }: {
   readonly plan: Plan;
-  readonly tried: Tried;
+  readonly tried: Tried | undefined;
 }): JSX.Element {
   const opens = ageIn(plan.from, plan);
+  const age = tried?.age ?? plan.retires;
   const retiring = retiringAs(age, plan);
   const last = ` of ${formatCount(runLength)} futures last ${
     age === plan.retires
       ? `as the plan stands, ${retiring}.`
       : `${retiring}, spending as planned.`
   }`;
-  const count = lasted === undefined ? undefined : formatCount(lasted);
+  const count =
+    tried?.lasted === undefined ? undefined : formatCount(tried.lasted);
+  const onAge = (given: number): void => {
+    tried?.onAge(given);
+  };
   return (
     <Panel
       className="sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:gap-x-6"
@@ -234,6 +255,7 @@ function AgeTried({
           hint={`Tried here only; the plan retires ${
             plan.retires === opens ? "this year" : `at ${String(plan.retires)}`
           }`}
+          isDisabled={tried === undefined}
           isSliderInFlow
           label="Retirement age to try"
           max={endAge(plan)}
@@ -255,6 +277,17 @@ function AgeTried({
       </p>
     </Panel>
   );
+}
+
+// What an age is read against, spending as planned, as a figure's note
+// says it, naming the plan's owner first where ownerNamed names them.
+function asPlanned(plan: Plan, against: string): string {
+  const note = [
+    ...ownerNamed(plan).map((name) => `For ${name}`),
+    against,
+    "spending as planned",
+  ].join(", ");
+  return `${note.charAt(0).toUpperCase()}${note.slice(1)}`;
 }
 
 // The plan's owner's name, where another owner retires at an age of
@@ -310,10 +343,17 @@ function spendingShown(cut: null | number, plan: Plan): Shown {
   }
   return {
     label: "Spending",
-    notes: [`Of the spending planned, from this year on${retiringOf(plan)}`],
+    notes: [spentOf(plan)],
     value: `${String(100 - cut)}%`,
     way: `on ${String(100 - cut)}% of the spending planned`,
   };
+}
+
+// What the spending is read against, as the spending's note says it:
+// the spending planned, from this year on, against the retirement
+// planned.
+function spentOf(plan: Plan): string {
+  return `Of the spending planned, from this year on${retiringOf(plan)}`;
 }
 
 // Why the plan has no age searched, as a line beneath the spending,
@@ -350,9 +390,9 @@ function verdictOf(
     : "Fewer than 9 in 10 futures last, even on half the spending planned.";
 }
 
-// A figure waiting on the search, beside nothing it rests on yet.
-function waiting(label: string): Shown {
-  return { label, notes: [], value: "…" };
+// A figure waiting on the search, beside what it is read against.
+function waiting(label: string, note: string): Shown {
+  return { label, notes: [note], value: "…" };
 }
 
 // "with" the plan's owner, before an age phrase, where ownerNamed names

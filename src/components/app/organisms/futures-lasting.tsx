@@ -21,7 +21,7 @@ import { formatCount } from "@/lib/count";
 interface FuturesLastingProps {
   readonly "aria-describedby": string;
   readonly caption: string;
-  readonly done: number;
+  readonly done: number | undefined;
   readonly figure: undefined | { readonly cut: number; readonly label: string };
   readonly points: readonly Lasting[] | undefined;
 }
@@ -59,7 +59,11 @@ interface Share {
 // beneath the words a bar fills with how much of the counting is done,
 // outlined where colours are forced. The words name the bar, and a
 // screen reader hears them only as that name. The box keeps the height
-// it has once drawn, so nothing beneath it moves.
+// it has once drawn, so nothing beneath it moves. Before the count has
+// begun, while the run it is counted over is drawn and searched, the box
+// already stands at that height, saying when the shares are counted,
+// with no bar, and its words are read as they are, since they name
+// nothing; counts handed in before then are not drawn.
 export function FuturesLasting({
   "aria-describedby": describedBy,
   caption,
@@ -78,29 +82,33 @@ export function FuturesLasting({
       : shares?.find(({ share }) => share === 100 - figure.cut);
   return (
     <div className="grid gap-2">
-      {shares === undefined ? (
+      {done === undefined || shares === undefined ? (
         <div className="flex h-48 flex-col items-center justify-center gap-3 lg:h-64">
           <div
-            aria-hidden
+            aria-hidden={done !== undefined}
             className="text-center text-sm text-balance text-muted-foreground"
             id={countingId}
           >
-            Counting the futures on each share of the spending…
+            {done === undefined
+              ? "The futures are counted on each share of the spending once they are searched."
+              : "Counting the futures on each share of the spending…"}
           </div>
-          <div
-            aria-labelledby={countingId}
-            aria-valuemax={100}
-            aria-valuemin={0}
-            aria-valuenow={done}
-            className="h-1 w-full max-w-84 overflow-hidden rounded-full bg-input forced-colors:outline"
-            role="progressbar"
-          >
+          {done !== undefined && (
             <div
-              className="h-full rounded-full bg-chart-1 ease-linear motion-safe:transition-[width] forced-colors:bg-[CanvasText]"
-              data-slot="counting-fill"
-              style={{ width: `${String(done)}%` }}
-            />
-          </div>
+              aria-labelledby={countingId}
+              aria-valuemax={100}
+              aria-valuemin={0}
+              aria-valuenow={done}
+              className="h-1 w-full max-w-84 overflow-hidden rounded-full bg-input forced-colors:outline"
+              role="progressbar"
+            >
+              <div
+                className="h-full rounded-full bg-chart-1 ease-linear motion-safe:transition-[width] forced-colors:bg-[CanvasText]"
+                data-slot="counting-fill"
+                style={{ width: `${String(done)}%` }}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex h-48 flex-col lg:h-64">
