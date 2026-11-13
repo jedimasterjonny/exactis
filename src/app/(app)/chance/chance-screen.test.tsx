@@ -142,6 +142,11 @@ describe("ChanceScreen", () => {
       "text-muted-foreground",
     );
     expect(
+      within(outcomes()).getByRole("heading", { level: 2 }),
+    ).toHaveTextContent(
+      "Drawing the futures to count how many of 1,000 last to 37…",
+    );
+    expect(
       await within(screen.getByRole("banner")).findByText(
         "1,000 futures, age 34 to 37",
         {},
@@ -227,6 +232,14 @@ describe("ChanceScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Draw again" }));
 
     expect(header.getByText("Drawing 0 of 1,000 futures…")).toBeInTheDocument();
+    expect(within(outcomes()).getAllByRole("paragraph")[0]).toHaveTextContent(
+      /^…$/,
+    );
+    expect(
+      within(outcomes()).getByRole("heading", { level: 2 }),
+    ).toHaveTextContent(
+      "Drawing the futures to count how many of 1,000 last to 37…",
+    );
   });
 
   // £30,000 at 5% drawn £10,000 a year lasts at its rates with some
