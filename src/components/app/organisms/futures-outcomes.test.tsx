@@ -109,6 +109,9 @@ describe("FuturesOutcomes", () => {
     expect(within(band).getByRole("heading", { level: 2 })).toHaveTextContent(
       "873 of 1,000 futures last to 91, most of them comfortably.",
     );
+    expect(within(band).getByRole("heading", { level: 2 })).not.toHaveClass(
+      "text-muted-foreground",
+    );
     expect(rowsOf("Lasted · 873")).toStrictEqual([
       ["Large surplus over £3,900,000", "25%"],
       ["Comfortable £650,000 to £3,900,000", "50%"],
@@ -219,7 +222,7 @@ describe("FuturesOutcomes", () => {
     ]);
   });
 
-  it("says only that it is drawing before the first futures are in", () => {
+  it("stands whole before the first futures are in, an ellipsis for every figure and both sentences waiting", () => {
     shown({
       almost: 0,
       barely: 0,
@@ -229,7 +232,53 @@ describe("FuturesOutcomes", () => {
       surplus: 0,
     });
 
-    expect(paragraphs()).toStrictEqual(["Drawing the first futures…"]);
-    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(paragraphs()).toStrictEqual([
+      "…",
+      "± … points",
+      "0 lasted0 fell short",
+      "Then when most that fall short do so, and what the middle one leaves.",
+    ]);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Drawing the futures to count how many of 1,000 last to 91…",
+    );
+    expect(screen.getByRole("heading", { level: 2 })).toHaveClass(
+      "text-muted-foreground",
+    );
+    expect(rowsOf("Lasted · 0")).toStrictEqual([
+      ["Large surplus over £3,900,000", "…"],
+      ["Comfortable £650,000 to £3,900,000", "…"],
+      ["Barely made it under £650,000", "…"],
+    ]);
+    expect(rowsOf("Fell short · 0").map(([, share]) => share)).toStrictEqual([
+      "…",
+      "…",
+      "…",
+    ]);
+  });
+
+  // 330 of the 1,000 drawn, 288 of them lasting.
+  it("reads the figures over the futures drawn so far while both sentences wait for the rest", () => {
+    shown({
+      almost: 20,
+      barely: 48,
+      comfortable: 150,
+      early: 6,
+      middle: 16,
+      surplus: 90,
+    });
+
+    expect(paragraphs()).toStrictEqual([
+      "87%",
+      "± 2.1 points",
+      "288 lasted42 fell short",
+      "Then when most that fall short do so, and what the middle one leaves.",
+    ]);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Drawing the futures to count how many of 1,000 last to 91…",
+    );
+    expect(rowsOf("Lasted · 288")[0]).toStrictEqual([
+      "Large surplus over £3,900,000",
+      "27%",
+    ]);
   });
 });

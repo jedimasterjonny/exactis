@@ -1,5 +1,7 @@
 import type { JSX } from "react";
 
+import { cn } from "cn";
+
 import type { LegendEntry } from "@/components/app/atoms/legend-table";
 import type { Plan } from "@/data/plan";
 import type { Grading, Outcome, Reading } from "@/engine/futures";
@@ -42,11 +44,17 @@ const lastedAs: Readonly<Record<(typeof lastingOutcomes)[number], string>> = {
 // middle future leaves, the bar taking the sentences' width rather than
 // the figure's; and each outcome's share of the run beside the pounds
 // or the ages bounding it, which is where the bar's fills are named. Most is said only of more than half, many otherwise, and where
-// two outcomes hold as many the better is said. Read over the futures
-// drawn so far while the run comes in, the bar's rest shrinking as it
-// does, and saying only that it is drawing before the first are in. The
-// sentence saying how many last takes the id it is handed, so a chart
-// can be described by it.
+// two outcomes hold as many the better is said. Drawn whole from the
+// first paint, so nothing beneath or beside it moves as the run comes
+// in or is drawn again, the figure's column held at the width of 100%:
+// the figure, the bar, the counts and the shares read the futures drawn
+// so far, the bar's rest shrinking as they come, with an ellipsis for a
+// figure or a share of none, while the two sentences wait in their
+// places, muted, saying what they will say once the whole run is in.
+// Said over part of the run, they wrapped to another line as its counts
+// grew and its words turned, and said of a few futures what only the
+// run can. The sentence saying how many last takes the id it is handed,
+// so a chart can be described by it.
 export function FuturesOutcomes({
   count,
   grading,
@@ -55,6 +63,8 @@ export function FuturesOutcomes({
   plan,
   reading,
 }: FuturesOutcomesProps): JSX.Element {
+  const isDrawing = reading.run < count;
+  const isEmpty = reading.run === 0;
   const short = reading.run - reading.lasted;
   const middle = ageIn(grading.middle, plan);
   const almost = ageIn(grading.almost, plan);
@@ -75,7 +85,7 @@ export function FuturesOutcomes({
         : `between ${String(middle)} and ${String(almost - 1)}`,
   };
   const shareOf = (outcome: Outcome): LegendEntry => ({
-    figure: formatWholePercent(outcomes[outcome] / reading.run),
+    figure: isEmpty ? "…" : formatWholePercent(outcomes[outcome] / reading.run),
     fill: outcomeFills[outcome],
     key: outcome,
     name: outcomeNames[outcome],
@@ -89,7 +99,9 @@ export function FuturesOutcomes({
     reading.lasted === 0
       ? ""
       : `, ${howMany(outcomes[lasted], reading.lasted).toLowerCase()} of them ${lastedAs[lasted]}`;
-  const verdict = `${formatCount(reading.lasted)} of ${formatCount(reading.run)} futures last to ${String(endAge(plan))}${lastedHow}.`;
+  const verdict = isDrawing
+    ? `Drawing the futures to count how many of ${formatCount(count)} last to ${String(endAge(plan))}…`
+    : `${formatCount(reading.lasted)} of ${formatCount(reading.run)} futures last to ${String(endAge(plan))}${lastedHow}.`;
   const shortfall =
     short === 0
       ? "None fall short."
@@ -97,67 +109,66 @@ export function FuturesOutcomes({
   return (
     <Card aria-label="What the futures come to" role="region">
       <CardContent className="grid gap-6 lg:grid-cols-[auto_minmax(0,1fr)] lg:gap-x-10 xl:grid-cols-[auto_minmax(0,1fr)_20rem]">
-        {reading.run === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Drawing the first futures…
+        <div className="grid content-start gap-3">
+          <p className="min-w-[2.5em] display-figure text-6xl font-medium tracking-tighter">
+            {isEmpty ? "…" : formatChance(reading.chance)}
           </p>
-        ) : (
-          <>
-            <div className="grid content-start gap-3">
-              <p className="display-figure text-6xl font-medium tracking-tighter">
-                {formatChance(reading.chance)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {`± ${(reading.margin * 100).toFixed(1)} points`}
-              </p>
-            </div>
-            <div className="grid content-start gap-3">
-              <SegmentBar
-                groups={[lastingOutcomes, shortOutcomes].map((group) =>
-                  group.map((outcome) => ({
-                    fill: outcomeFills[outcome],
-                    key: outcome,
-                    value: outcomes[outcome],
-                  })),
-                )}
-                total={count}
-              />
-              <p className="flex justify-between gap-4 text-xs text-muted-foreground">
-                <span>
-                  <span className="figure text-foreground">
-                    {formatCount(reading.lasted)}
-                  </span>{" "}
-                  lasted
-                </span>
-                <span>
-                  <span className="figure text-foreground">
-                    {formatCount(short)}
-                  </span>{" "}
-                  fell short
-                </span>
-              </p>
-              <h2
-                className="mt-3 heading text-2xl text-balance"
-                id={headlineId}
-              >
-                {verdict}
-              </h2>
-              <p className="text-sm text-pretty text-muted-foreground">
-                {`${shortfall} The middle one leaves ${formatGbp(reading.middle)}.`}
-              </p>
-            </div>
-            <div className="grid content-start gap-4 lg:col-span-2 lg:grid-cols-2 xl:col-span-1 xl:grid-cols-1">
-              <LegendTable
-                caption={`Lasted · ${formatCount(reading.lasted)}`}
-                entries={lastingOutcomes.map(shareOf)}
-              />
-              <LegendTable
-                caption={`Fell short · ${formatCount(short)}`}
-                entries={shortOutcomes.map(shareOf)}
-              />
-            </div>
-          </>
-        )}
+          <p className="text-xs text-muted-foreground">
+            {isEmpty
+              ? "± … points"
+              : `± ${(reading.margin * 100).toFixed(1)} points`}
+          </p>
+        </div>
+        <div className="grid content-start gap-3">
+          <SegmentBar
+            groups={[lastingOutcomes, shortOutcomes].map((group) =>
+              group.map((outcome) => ({
+                fill: outcomeFills[outcome],
+                key: outcome,
+                value: outcomes[outcome],
+              })),
+            )}
+            total={count}
+          />
+          <p className="flex justify-between gap-4 text-xs text-muted-foreground">
+            <span>
+              <span className="figure text-foreground">
+                {formatCount(reading.lasted)}
+              </span>{" "}
+              lasted
+            </span>
+            <span>
+              <span className="figure text-foreground">
+                {formatCount(short)}
+              </span>{" "}
+              fell short
+            </span>
+          </p>
+          <h2
+            className={cn(
+              "mt-3 heading text-2xl text-balance",
+              isDrawing && "text-muted-foreground",
+            )}
+            id={headlineId}
+          >
+            {verdict}
+          </h2>
+          <p className="text-sm text-pretty text-muted-foreground">
+            {isDrawing
+              ? "Then when most that fall short do so, and what the middle one leaves."
+              : `${shortfall} The middle one leaves ${formatGbp(reading.middle)}.`}
+          </p>
+        </div>
+        <div className="grid content-start gap-4 lg:col-span-2 lg:grid-cols-2 xl:col-span-1 xl:grid-cols-1">
+          <LegendTable
+            caption={`Lasted · ${formatCount(reading.lasted)}`}
+            entries={lastingOutcomes.map(shareOf)}
+          />
+          <LegendTable
+            caption={`Fell short · ${formatCount(short)}`}
+            entries={shortOutcomes.map(shareOf)}
+          />
+        </div>
       </CardContent>
     </Card>
   );
