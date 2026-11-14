@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { Check } from "lucide-react";
+import { Square, SquareCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import * as z from "zod";
@@ -280,7 +280,10 @@ function attempt<T>(touch: () => T): T | undefined {
 // A balance's field: its account's name over the figure it reads now
 // and the press that checks it, and beneath them what it was, what the
 // months paid into it and, once checked, what moved it, or until then
-// the day it was last set.
+// the day it was last set. The press is an empty box until the balance
+// is checked and a ticked one after: a tick in both, jade or grey, told
+// them apart by colour alone, and not at all under the pointer, which
+// turns either ink.
 function Balance({
   onCheck,
   onType,
@@ -317,7 +320,7 @@ function Balance({
         <RowAction
           aria-pressed={isChecked}
           className={isChecked ? "text-positive" : "text-muted-foreground"}
-          icon={Check}
+          icon={isChecked ? SquareCheck : Square}
           name={`Check ${account.name}`}
           onClick={() => {
             onCheck(account, !isChecked);

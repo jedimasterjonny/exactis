@@ -207,9 +207,15 @@ describe("MonthEnd", () => {
       saved({ asOf: { month: 8, year: 2026 }, isRecorded: true }),
     );
 
-    fireEvent.click(
-      within(sheet).getByRole("button", { name: "Check Workplace pension" }),
-    );
+    const box = within(sheet).getByRole("button", {
+      name: "Check Workplace pension",
+    });
+
+    // Unchecked, the press is an empty box.
+    // eslint-disable-next-line testing-library/no-node-access -- the box is an icon hidden from the tree, with no role or text of its own
+    expect(box.querySelector("svg")).toHaveClass("lucide-square");
+
+    fireEvent.click(box);
     fireEvent.click(
       within(sheet).getByRole("button", { name: "Check Mortgage" }),
     );
@@ -217,6 +223,9 @@ describe("MonthEnd", () => {
     expect(
       within(sheet).getByRole("button", { name: "Check Workplace pension" }),
     ).toHaveAttribute("aria-pressed", "true");
+    // Checked, it is ticked, so it reads without its colour.
+    // eslint-disable-next-line testing-library/no-node-access -- the box is an icon hidden from the tree, with no role or text of its own
+    expect(box.querySelector("svg")).toHaveClass("lucide-square-check");
     expect(field("Workplace pension")).toHaveAccessibleDescription(
       "Was £391,640 · £4,350 paid in · £1,613 moved",
     );
