@@ -67,13 +67,17 @@ describe("Dashboard", () => {
     expect(metadata).toStrictEqual({ title: "Dashboard" });
   });
 
-  it("opens with the dashboard header, titled with the age the plan runs to", async () => {
+  // The board's sentence is the next heading down, after the title.
+  it("opens with the dashboard header, titled with the age the plan runs to, and the sentence after it", async () => {
     render(await Dashboard());
 
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Projected to age 91",
-    );
+    const title = screen.getByRole("heading", { level: 1 });
+
+    expect(title).toHaveTextContent("Projected to age 91");
     expect(screen.getByText("Sect. I · Dashboard")).toHaveClass("label");
+    expect(
+      title.compareDocumentPosition(screen.getByRole("heading", { level: 2 })),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   // Born in 1992, a plan that runs 30 years from 2026 runs to 64, and

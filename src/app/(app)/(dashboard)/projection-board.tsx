@@ -30,6 +30,7 @@ import {
   retiresOn,
   retiringAt,
   timed,
+  withOwner,
 } from "@/data/milestones";
 import { ageIn, endAge, endYear } from "@/data/plan";
 import {
@@ -136,6 +137,12 @@ export const settle = 400;
 // spread, the CMA giving it none, or no savings for the futures to
 // grow, and then the tiles say which and the chart marks the
 // milestones the plan lays out alone.
+// The board opens, above the tiles, on a sentence saying who retires
+// when and whether the plan lasts at its own rates, as headlineOf says
+// it, read off the one projection and never off the futures, so it is
+// whole from the first paint, follows the age as it is dragged and
+// holds still while the run is drawn. With nothing projected there is
+// no sentence, and the chart says why.
 // One milestone is chosen at a time, from the chips beneath the chart,
 // which name what the chart's lines cannot: the tile reads what
 // the plan holds entering its year on the measure the milestone is on,
@@ -336,6 +343,7 @@ function Board({
     projected.retired === null
       ? "Not retired by the plan's end"
       : `Last working year ${String(projected.retired - 1)}`;
+  const headline = headlineOf(drafted, projected);
 
   function save(age: number): void {
     send(async () => saveAges({ retires: age }, scenario), {
@@ -377,6 +385,11 @@ function Board({
 
   return (
     <>
+      {isProjecting && (
+        <h2 className="heading text-2xl text-balance tabular-nums">
+          {headline}
+        </h2>
+      )}
       <TileGrid>
         {chosen === undefined || at === undefined ? (
           <StatTile
@@ -495,6 +508,32 @@ function futuresIn(run: Run): readonly Future[] {
   return "unrun" in run ? [] : run.futures;
 }
 
+// The sentence the board opens on, read off the plan's projection at
+// the age shown and never off its futures: who retires when, then that
+// the plan lasts to its end if its own rates hold, or that at its own
+// rates it runs out, or falls short by drawing a pension early, at an
+// age, or, said first since there is then no retirement to lead with,
+// that it never reaches the conditions it retires on. A plan that
+// lasts does so only on the condition that its rates hold, which the
+// chance of success beside it grades, while one falling short at its
+// own rates needs no better rate to say so. No figure but ages, so the
+// words a drag changes are an age of two digits and the verb, and a
+// no-break space before each age, so no line breaks between "at" or
+// "to" and the age it reads.
+function headlineOf(plan: Plan, projected: Future): string {
+  const short = shortOf(projected, plan);
+  if (projected.retired === null) {
+    const tail = short === undefined ? "" : `, and ${short}`;
+    return `The plan never reaches its retirement's conditions at its own rates${tail}.`;
+  }
+  const lead = `${withOwner(plan)}${retiringOf(plan, projected.retired)}`;
+  const verdict =
+    short === undefined
+      ? `lasts to\u00a0${String(endAge(plan))} if its own rates hold`
+      : `${short} at its own rates`;
+  return `${lead.charAt(0).toUpperCase()}${lead.slice(1)}, the plan ${verdict}.`;
+}
+
 // A plan's projection over its lines, each laid by its milestones, read
 // as a future each year measured as a milestone measures one, and the
 // plan as that future lays it out, retiring where it retired or past
@@ -521,4 +560,40 @@ function projectionOf({
     points: projection,
     projected: future,
   };
+}
+
+// When the plan's owner retires, as the sentence leads with it, the
+// year given being the one the projection retires them in: at the age
+// the plan holds, its opening age as this year, its end age or past it
+// as working to its end, an age behind its opening as retired already,
+// and on conditions at the age the projection reaches them.
+function retiringOf(plan: Plan, retired: number): string {
+  const opens = ageIn(plan.from, plan);
+  if (retiresOn(plan) !== undefined) {
+    const at = ageIn(retired, plan);
+    return at === opens
+      ? "retiring this year on its conditions"
+      : `retiring at\u00a0${String(at)} on its conditions`;
+  }
+  if (plan.retires < opens) {
+    return `retired at\u00a0${String(plan.retires)}`;
+  }
+  if (plan.retires === opens) {
+    return "retiring this year";
+  }
+  return plan.retires >= endAge(plan)
+    ? `working to\u00a0${String(endAge(plan))}`
+    : `retiring at\u00a0${String(plan.retires)}`;
+}
+
+// Where the plan falls short at its own rates, as the sentence says it:
+// where it runs out, or else where it first draws a pension early, the
+// order the chance's screen says them in; nothing where it lasts.
+function shortOf({ fell, ranOut }: Future, plan: Plan): string | undefined {
+  if (ranOut !== null) {
+    return `runs out at\u00a0${String(ageIn(ranOut, plan))}`;
+  }
+  return fell === null
+    ? undefined
+    : `falls short at\u00a0${String(ageIn(fell, plan))}`;
 }

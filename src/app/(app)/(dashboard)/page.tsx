@@ -22,9 +22,11 @@ export const metadata: Metadata = { title: dashboard.label };
 // The dashboard, over the accounts, the lines, the milestones, the plan
 // and the spread its rates carry, read from the store behind the
 // session: titled with the age the plan runs to, which the assumptions
-// in the header set, then the tiles, then the projection. The board
-// holds every tile: the milestone tile, since the milestone it reads is
-// chosen on it and the retirement age set there; the chance of success,
+// in the header set, then the sentence saying whether the plan lasts at
+// its own rates, then the tiles, then the projection. The board holds
+// the sentence, since it follows the age dragged there, and every
+// tile: the milestone tile, since the milestone it reads is chosen
+// on it and the retirement age set there; the chance of success,
 // since the futures it is read over are the board's to draw, once, for
 // the tiles and the chart alike, as the screen of that name draws them,
 // with the milestones reached when conditions hold beside it, each at

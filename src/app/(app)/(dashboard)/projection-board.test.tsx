@@ -25,7 +25,7 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { kept } from "@/data/household.fixture";
 import { retiring } from "@/data/income.fixture";
 import { atAge, retiringAt } from "@/data/milestones";
-import { working } from "@/data/owners.fixture";
+import { owners, sam, working } from "@/data/owners.fixture";
 import { futureOf } from "@/engine/futures";
 import { liquidOf, project, worthsIn } from "@/engine/projection";
 import { forget } from "@/hooks/use-futures";
@@ -132,6 +132,22 @@ function livingFrom(firstYear: number, isTied: boolean): Schedule {
   };
 }
 
+// The fixture's plan with its owner retiring once their liquid net worth
+// holds so many years of expenses, the age they would otherwise retire
+// at past its end.
+function onConditions(times: number): Plan {
+  return {
+    ...retiring,
+    owners: [
+      {
+        ...working,
+        retirement: [{ measure: "liquid", of: "expenses", times }],
+      },
+    ],
+    retires: 92,
+  };
+}
+
 // A year of a plan as the engine projects it, over the fixture's
 // schedule or the one given.
 function pointIn(
@@ -196,6 +212,14 @@ describe("ProjectionBoard", () => {
   it("leads the tiles with the milestone tile at retirement, charts the engine's projection marked there, and gives the last working year under the age", () => {
     render(board());
 
+    // The sentence above the tiles, a no-break space before each age.
+    expect(
+      screen
+        .getAllByRole("heading", { level: 2 })
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual([
+      "Retiring at\u00a061, the plan lasts to\u00a091 if its own rates hold.",
+    ]);
     expect(screen.getByText("At Retirement")).toBeInTheDocument();
     expect(screen.getByText(worthIn(retiring, 2053))).toHaveClass("figure");
     expect(screen.getByText("Net worth · 2053 · age 61")).toBeInTheDocument();
@@ -265,7 +289,35 @@ describe("ProjectionBoard", () => {
     expect(moved).not.toBe(totalIn(retiring, 2028));
     expect(screen.getByText(moved)).toHaveClass("figure");
     expect(marks()).toStrictEqual(["2026", "2031", "2034"]);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Retiring this year, the plan runs out at 42 at its own rates.",
+    );
     expect(saveAges).not.toHaveBeenCalled();
+  });
+
+  // Over the fixture's accounts as they are, the pension not droppable,
+  // retiring at 50 the plan never runs out but draws on the pension at
+  // 55, before its owner's pension age, which is falling short.
+  it("says where the plan falls short by drawing a pension early at the age moved to", () => {
+    render(board(retiring, schedule, { owned: fixture }));
+
+    typeAge("50");
+
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Retiring at 50, the plan falls short at 55 at its own rates.",
+    );
+  });
+
+  // Robin, the plan's owner, beside Sam, who retires at an age of their
+  // own: the age shown is Robin's, so the sentence names them.
+  it("names the plan's owner where another owner retires at an age of their own", () => {
+    render(
+      board({ ...retiring, owners: [{ ...owners[0], name: "Robin" }, sam] }),
+    );
+
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "With Robin retiring at 61, the plan lasts to 91 if its own rates hold.",
+    );
   });
 
   // The retirement living is tied to start at retirement, so retiring
@@ -322,6 +374,9 @@ describe("ProjectionBoard", () => {
 
     expect(screen.getByText("Net worth · 2054 · age 62")).toBeInTheDocument();
     expect(marks()).toStrictEqual(["2054"]);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Retiring at 62, the plan lasts to 91 if its own rates hold.",
+    );
     expect(saveAges).not.toHaveBeenCalled();
 
     act(() => {
@@ -471,6 +526,7 @@ describe("ProjectionBoard", () => {
     );
 
     expect(screen.getByText("Nothing to project yet")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
     expect(screen.getByText("Retirement")).toBeInTheDocument();
     expect(screen.getByText("Last working year 2052")).toBeInTheDocument();
     expect(
@@ -492,6 +548,9 @@ describe("ProjectionBoard", () => {
     );
 
     expect(screen.getByRole("application")).toHaveClass("recharts-surface");
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Retiring at 61, the plan runs out at 61 at its own rates.",
+    );
     expect(
       screen.getAllByText("No savings for the futures to grow"),
     ).toHaveLength(3);
@@ -561,7 +620,12 @@ describe("ProjectionBoard", () => {
     // which the worker double draws on the test's own thread, and the
     // run was looked for at every slice.
     const chance = screen.getByText("Drawing 0 of 1,000 futures…");
+    // The sentence reads the projection alone, so it is whole before any
+    // future is drawn and the same once the run is.
+    const headline = screen.getByRole("heading", { level: 2 });
+    const said = "Working to 37, the plan lasts to 37 if its own rates hold.";
 
+    expect(headline).toHaveTextContent(said);
     expect(screen.getByText("At Ada 18")).toBeInTheDocument();
     expect(chance).toBeInTheDocument();
     expect(screen.getAllByText("Drawing the futures…")).toHaveLength(3);
@@ -578,6 +642,7 @@ describe("ProjectionBoard", () => {
       },
       { timeout: 5000 },
     );
+    expect(headline).toHaveTextContent(said);
     expect(screen.getByText("100%")).toHaveClass("figure");
     expect(screen.getAllByText("Median of 1,000 futures · 2026")).toHaveLength(
       2,
@@ -712,16 +777,6 @@ describe("ProjectionBoard", () => {
   // of expenses it never reaches, so there is no milestone to choose and
   // the tile says so.
   it("marks a retirement on conditions where the plan at its own rates reaches them, and says what it is reached on in the age's place", () => {
-    const onConditions = (times: number): Plan => ({
-      ...retiring,
-      owners: [
-        {
-          ...working,
-          retirement: [{ measure: "liquid", of: "expenses", times }],
-        },
-      ],
-      retires: 92,
-    });
     const reached = onConditions(25);
     const { measured } = futureOf(project(accounts, schedule, reached), {
       accounts,
@@ -730,6 +785,9 @@ describe("ProjectionBoard", () => {
     });
     const { rerender } = render(board(reached));
 
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Retiring at 57 on its conditions, the plan lasts to 91 if its own rates hold.",
+    );
     expect(screen.getByText("At Retirement")).toBeInTheDocument();
     expect(
       screen.getByText("Liquid net worth · 2049 · age 57"),
@@ -762,6 +820,34 @@ describe("ProjectionBoard", () => {
       /^Retirement—yrsNot retired by the plan's end$/,
     );
     expect(marks()).toStrictEqual([]);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "The plan never reaches its retirement's conditions at its own rates.",
+    );
+  });
+
+  // A year of expenses the plan holds from its first year, so it retires
+  // then and runs out at 42, as retiring at 34 does; and spending twice
+  // as much, it never reaches ten thousand years of them, and runs out
+  // at 86 while still working.
+  it("says a retirement on conditions reached in the plan's first year, and one never reached by a plan that also runs out", () => {
+    const spending: Schedule = {
+      ...schedule,
+      expenses: schedule.expenses.map((line) => ({
+        ...line,
+        amount: line.amount * 2,
+      })),
+    };
+    const { rerender } = render(board(onConditions(1)));
+
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Retiring this year on its conditions, the plan runs out at 42 at its own rates.",
+    );
+
+    rerender(board(onConditions(10000), spending));
+
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "The plan never reaches its retirement's conditions at its own rates, and runs out at 86.",
+    );
   });
 
   // Born in 1992 and retiring at 28, the owner retired in 2020, before
@@ -773,6 +859,9 @@ describe("ProjectionBoard", () => {
       board(retired, schedule, { listed: milestones }),
     );
 
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Retired at 28, the plan runs out at 42 at its own rates.",
+    );
     expect(screen.getByText("At Kids leave home")).toBeInTheDocument();
     expect(
       within(screen.getByRole("group", { name: "Milestones" })).getAllByRole(
@@ -827,6 +916,11 @@ describe("ProjectionBoard", () => {
       />,
     );
 
+    // The sentence is the scenario's own, retiring at 61, not the
+    // household's.
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Retiring at 61, the plan lasts to 91 if its own rates hold.",
+    );
     expect(
       screen.getByText(
         signed(worthOf(retiring, 2053) - worthOf(household, 2056)),
