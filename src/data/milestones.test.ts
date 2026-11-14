@@ -23,12 +23,14 @@ import {
   isTiedTo,
   markersOf,
   moving,
+  ownerNamed,
   retirementYearOf,
   retiresBy,
   retiresOn,
   retiringAt,
   timed,
   untied,
+  withOwner,
   yearOf,
   yearsOf,
 } from "./milestones";
@@ -308,6 +310,31 @@ describe("moving", () => {
     expect(moving(cash, milestones, retiring)).toBe(cash);
     expect(moving(unlisted, milestones, retiring)).toBe(unlisted);
     expect(moving(conditional, milestones, retiring)).toBe(conditional);
+  });
+});
+
+// Robin, the plan's owner; Kit, retiring with them; and Ash, retiring
+// at an age of their own, 56.
+const robin: Owner = { ...owners[0], name: "Robin" };
+const kit: Owner = { born: 1990, id: 2, name: "Kit", retirement: "retirement" };
+const ash: Owner = { born: 1994, id: 3, name: "Ash", retirement: atAge(56) };
+
+describe("ownerNamed", () => {
+  it("names the plan's owner where another owner retires at an age of their own", () => {
+    expect(ownerNamed({ owners: [robin, ash] })).toStrictEqual(["Robin"]);
+    expect(ownerNamed({ owners: [robin, kit, ash] })).toStrictEqual(["Robin"]);
+  });
+
+  it("names nobody where every other owner retires with the plan's owner, or there is one owner", () => {
+    expect(ownerNamed({ owners: [robin, kit] })).toStrictEqual([]);
+    expect(ownerNamed({ owners: [robin] })).toStrictEqual([]);
+  });
+});
+
+describe("withOwner", () => {
+  it("says the plan's owner before an age phrase where ownerNamed names them, and nothing otherwise", () => {
+    expect(withOwner({ owners: [robin, ash] })).toBe("with Robin ");
+    expect(withOwner({ owners: [robin, kit] })).toBe("");
   });
 });
 
