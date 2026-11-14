@@ -257,6 +257,17 @@ export function moving(
     : { ...account, move: { ...move, year } };
 }
 
+// The plan's owner's name, where another owner retires at an age of
+// their own and so stays put while an age moved for the plan's owner
+// moves them and whoever retires with them; none otherwise.
+export function ownerNamed({
+  owners,
+}: Pick<Plan, "owners">): readonly string[] {
+  return owners.slice(1).some(({ retirement }) => retirement !== "retirement")
+    ? owners.slice(0, 1).map(({ name }) => name)
+    : [];
+}
+
 // The year an owner the plan carries retires in: the year they reach
 // the age, for a retirement reached at an age, and the year the plan
 // lays its owner's retirement out in, for the plan's owner retiring
@@ -376,6 +387,14 @@ export function untied<TLine extends LineValues>(
       lastYear: year - 1 + line.endsAfter,
     }),
   };
+}
+
+// "with" the plan's owner, before an age phrase, where ownerNamed names
+// them; nothing otherwise.
+export function withOwner(plan: Pick<Plan, "owners">): string {
+  return ownerNamed(plan)
+    .map((name) => `with ${name} `)
+    .join("");
 }
 
 // The year a milestone reached at an age falls in, the year whoever's

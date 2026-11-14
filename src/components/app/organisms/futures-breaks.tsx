@@ -10,7 +10,7 @@ import { AgeField } from "@/components/app/molecules/age-field";
 import { FuturesLasting } from "@/components/app/organisms/futures-lasting";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { CardContent } from "@/components/kit/card";
-import { retiresOn } from "@/data/milestones";
+import { ownerNamed, retiresOn, withOwner } from "@/data/milestones";
 import { ageIn, endAge } from "@/data/plan";
 import { deepestCut, isAgeSearched, runLength } from "@/engine/futures";
 import { counted, formatCount } from "@/lib/count";
@@ -290,15 +290,6 @@ function asPlanned(plan: Plan, against: string): string {
   return `${note.charAt(0).toUpperCase()}${note.slice(1)}`;
 }
 
-// The plan's owner's name, where another owner retires at an age of
-// their own and so stays put while an age searched or tried moves the
-// plan's owner and whoever retires with them; none otherwise.
-function ownerNamed({ owners }: Plan): readonly string[] {
-  return owners.slice(1).some(({ retirement }) => retirement !== "retirement")
-    ? owners.slice(0, 1).map(({ name }) => name)
-    : [];
-}
-
 // Retiring at the age given, as the age tried says it: the age the plan
 // opens at as this year, and its last as working to it, with the plan's
 // owner where another owner retires at an age of their own.
@@ -393,12 +384,4 @@ function verdictOf(
 // A figure waiting on the search, beside what it is read against.
 function waiting(label: string, note: string): Shown {
   return { label, notes: [note], value: "…" };
-}
-
-// "with" the plan's owner, before an age phrase, where ownerNamed names
-// them; nothing otherwise.
-function withOwner(plan: Plan): string {
-  return ownerNamed(plan)
-    .map((name) => `with ${name} `)
-    .join("");
 }
