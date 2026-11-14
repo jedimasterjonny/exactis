@@ -189,8 +189,13 @@ export const settle = 400;
 // the store has moved past. An age committed is saved once it has
 // stood for a moment, so a run of arrow steps is one save and not one
 // for each; a board taken down with a save still waiting sends it as
-// it goes. A store that refuses drops the draft, so the board shows
-// what the store holds, read afresh, and says why under a toast. A
+// it goes. As a save's timer fires, a screen reader hears the sentence,
+// from a status beside the age that is there and empty from the first
+// paint and emptied again as the age moves, so it is said once a run of
+// steps has settled, beside the control that moved it, and never as
+// the screen opens or at each step. A store that refuses drops the
+// draft, so the board shows what the store holds, read afresh, and
+// says why under a toast, the status saying the store's sentence. A
 // retirement on conditions has no age to drag, so the chart's foot
 // says what it is reached on instead, as the plan screen's milestones
 // say it.
@@ -246,6 +251,7 @@ function Board({
 }: BoardProps): JSX.Element {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [choice, setChoice] = useState<Tie>("retirement");
+  const [isHeard, setIsHeard] = useState(false);
   const pendingRef = useRef<null | Pending>(null);
   const headlineId = useId();
   const { send } = useSender();
@@ -359,6 +365,7 @@ function Board({
 
   function move(age: number): void {
     setDraft({ age, over: plan.retires });
+    setIsHeard(false);
     setChoice("retirement");
   }
 
@@ -371,7 +378,13 @@ function Board({
       pendingRef.current = null;
       save(age);
     }
-    pendingRef.current = { flush, timer: setTimeout(flush, settle) };
+    pendingRef.current = {
+      flush,
+      timer: setTimeout(() => {
+        setIsHeard(true);
+        flush();
+      }, settle),
+    };
   }
 
   // A save still waiting when the board is taken down is sent then
@@ -461,6 +474,9 @@ function Board({
                 onValueCommitted={commit}
                 value={retires}
               />
+              <p className="sr-only" role="status">
+                {isHeard && headline}
+              </p>
             </div>
           ) : undefined
         }

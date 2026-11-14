@@ -431,6 +431,49 @@ describe("ProjectionBoard", () => {
     );
   });
 
+  // The status is there and empty from the first paint, so nothing is
+  // said as the board opens, and is emptied at every step, so a run of
+  // steps is said once, as its save is sent.
+  it("says the sentence to a screen reader once a dragged age has settled, and nothing before", () => {
+    vi.useFakeTimers();
+    render(board());
+
+    const status = screen.getByRole("status");
+
+    expect(status).toBeEmptyDOMElement();
+
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowRight" });
+
+    expect(status).toBeEmptyDOMElement();
+
+    act(() => {
+      vi.advanceTimersByTime(settle - 1);
+    });
+
+    expect(status).toBeEmptyDOMElement();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(status).toHaveTextContent(
+      "Retiring at 62, the plan lasts to 91 if its own rates hold.",
+    );
+
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowLeft" });
+
+    expect(status).toBeEmptyDOMElement();
+
+    fireEvent.keyDown(slider("Retirement age"), { key: "ArrowLeft" });
+    act(() => {
+      vi.advanceTimersByTime(settle);
+    });
+
+    expect(status).toHaveTextContent(
+      "Retiring at 60, the plan lasts to 91 if its own rates hold.",
+    );
+  });
+
   it("saves a run of arrow steps once, at the age they stop on", () => {
     vi.useFakeTimers();
     render(board());
@@ -535,6 +578,7 @@ describe("ProjectionBoard", () => {
 
     expect(screen.getByText("Nothing to project yet")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByText("Retirement")).toBeInTheDocument();
     expect(screen.getByText("Last working year 2052")).toBeInTheDocument();
     expect(
@@ -813,6 +857,7 @@ describe("ProjectionBoard", () => {
     expect(
       screen.queryByRole("textbox", { name: "Retirement age" }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("paragraph").map((line) => line.textContent),
     ).toStrictEqual(["Retirement · Liquid net worth ≥ 25 years of expenses"]);
