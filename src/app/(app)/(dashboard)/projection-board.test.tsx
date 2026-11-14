@@ -220,6 +220,11 @@ describe("ProjectionBoard", () => {
     ).toStrictEqual([
       "Retiring at\u00a061, the plan lasts to\u00a091 if its own rates hold.",
     ]);
+    // The chart is described by the sentence, held to the h2's own text,
+    // since the description keeps its no-break spaces.
+    expect(screen.getByRole("application")).toHaveAccessibleDescription(
+      screen.getByRole("heading", { level: 2 }).textContent,
+    );
     expect(screen.getByText("At Retirement")).toBeInTheDocument();
     expect(screen.getByText(worthIn(retiring, 2053))).toHaveClass("figure");
     expect(screen.getByText("Net worth · 2053 · age 61")).toBeInTheDocument();
@@ -376,6 +381,9 @@ describe("ProjectionBoard", () => {
     expect(marks()).toStrictEqual(["2054"]);
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       "Retiring at 62, the plan lasts to 91 if its own rates hold.",
+    );
+    expect(screen.getByRole("application")).toHaveAccessibleDescription(
+      screen.getByRole("heading", { level: 2 }).textContent,
     );
     expect(saveAges).not.toHaveBeenCalled();
 

@@ -3,7 +3,7 @@
 import type { JSX } from "react";
 
 import { Flag, Landmark } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import type { Run } from "@/components/app/organisms/chance-tile";
 import type { Account } from "@/data/accounts";
@@ -141,8 +141,10 @@ export const settle = 400;
 // when and whether the plan lasts at its own rates, as headlineOf says
 // it, read off the one projection and never off the futures, so it is
 // whole from the first paint, follows the age as it is dragged and
-// holds still while the run is drawn. With nothing projected there is
-// no sentence, and the chart says why.
+// holds still while the run is drawn. The chart is described by it,
+// through an id of the board's own, since Next keeps a screen left in
+// the document, hidden. With nothing projected there is no sentence,
+// and the chart says why, drawing no plot to describe.
 // One milestone is chosen at a time, from the chips beneath the chart,
 // which name what the chart's lines cannot: the tile reads what
 // the plan holds entering its year on the measure the milestone is on,
@@ -245,6 +247,7 @@ function Board({
   const [draft, setDraft] = useState<Draft | null>(null);
   const [choice, setChoice] = useState<Tie>("retirement");
   const pendingRef = useRef<null | Pending>(null);
+  const headlineId = useId();
   const { send } = useSender();
   const conditions = retiresOn(plan);
   const retires =
@@ -386,7 +389,10 @@ function Board({
   return (
     <>
       {isProjecting && (
-        <h2 className="heading text-2xl text-balance tabular-nums">
+        <h2
+          className="heading text-2xl text-balance tabular-nums"
+          id={headlineId}
+        >
           {headline}
         </h2>
       )}
@@ -432,6 +438,7 @@ function Board({
       <ProjectionChart
         accounts={accounts}
         against={theirs?.drawn}
+        aria-describedby={headlineId}
         choices={
           chosen === undefined ? undefined : (
             <MilestoneChips

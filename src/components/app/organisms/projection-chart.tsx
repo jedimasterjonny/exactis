@@ -97,6 +97,7 @@ type Mark = "area" | "bar";
 interface ProjectionChartProps {
   readonly accounts: readonly Account[];
   readonly against?: Against | undefined;
+  readonly "aria-describedby"?: string | undefined;
   readonly choices?: ReactNode;
   readonly controls?: ReactNode;
   readonly foot?: string | undefined;
@@ -264,9 +265,12 @@ const axisWidth = 57;
 // part of what the stack comes to, so the total, the chosen milestone's
 // dot and the household's line leave it out, but the scale takes it in,
 // so it is not cut off and the axis does not move as it unlocks.
+// The plot is described by the element whose id it is handed, as the
+// sentence the dashboard opens on.
 export function ProjectionChart({
   accounts,
   against,
+  "aria-describedby": describedBy,
   choices,
   controls,
   foot,
@@ -397,6 +401,7 @@ export function ProjectionChart({
           config={config}
         >
           <Plot
+            aria-describedby={describedBy}
             data={points}
             key={drawable}
             margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
