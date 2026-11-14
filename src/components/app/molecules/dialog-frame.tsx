@@ -27,8 +27,10 @@ interface DialogFrameProps {
 // buttons beneath. It is open for as long as it is mounted, so a caller
 // renders it while it holds something to show and not otherwise. It
 // opens only from state, so the only change it can report is a close:
-// Escape, a press outside or its cross, all of which dismiss, and a
-// caller's own button that closes it calls the same. A wide frame fits
+// Escape or its cross, both of which dismiss, and a caller's own button
+// that closes it calls the same. A press outside it does nothing: every
+// frame holds a form, and a stray tap beside one on a phone threw away
+// whatever had been typed into it without a word. A wide frame fits
 // a form of three columns, and a caller's class may size it otherwise,
 // as the month end's worksheet widens it to two columns of balances.
 // The frame is held to the height of the screen, less the margin it
@@ -57,7 +59,7 @@ export function DialogFrame({
 }: DialogFrameProps): JSX.Element {
   const popupRef = useRef<HTMLDivElement>(null);
   return (
-    <Dialog onOpenChange={onDismiss} open>
+    <Dialog disablePointerDismissal onOpenChange={onDismiss} open>
       <DialogContent
         className={cn(
           "max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto]",

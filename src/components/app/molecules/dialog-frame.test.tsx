@@ -7,6 +7,8 @@ import {
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { bySlot } from "@/test/dom";
+
 import { DialogFrame } from "./dialog-frame";
 
 describe("DialogFrame", () => {
@@ -62,6 +64,34 @@ describe("DialogFrame", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(onDismiss).toHaveBeenCalledOnce();
+  });
+
+  // Every frame holds a form, so a stray press beside it keeps what was
+  // typed; Escape still dismisses.
+  it("holds through a press outside it, and dismisses on Escape", () => {
+    const onDismiss = vi.fn<() => void>();
+    render(
+      <DialogFrame
+        eyebrow="Edit account"
+        footer={null}
+        onDismiss={onDismiss}
+        title="Stocks & shares ISA"
+      >
+        <input aria-label="Name" />
+      </DialogFrame>,
+    );
+
+    // Hidden from the tree, so no query is better than the slot.
+    fireEvent.click(
+      screen.getByText(bySlot("dialog-overlay"), { suggest: false }),
+    );
+
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
 
     expect(onDismiss).toHaveBeenCalledOnce();
   });
