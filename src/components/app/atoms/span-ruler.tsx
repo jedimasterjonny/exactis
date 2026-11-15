@@ -17,8 +17,11 @@ interface SpanRulerProps {
 // words wherever it falls, since a mark placed out of the flow is
 // otherwise no wider than the span left past its year, and the last
 // broke its age onto a third line, past the ruler and over the row
-// beneath. Decorative, since every row writes its own years, so it is
-// hidden from the accessibility tree.
+// beneath. The age is written bare beneath its year, as each row writes
+// its own year and age, so a mark is no wider than its year and the
+// decades stand apart on a phone over any span the plan can run.
+// Decorative, since every row writes its own years, so it is hidden
+// from the accessibility tree.
 export function SpanRuler({ plan }: SpanRulerProps): JSX.Element {
   return (
     <div aria-hidden className="relative h-8" data-slot="span-ruler">
@@ -31,7 +34,7 @@ export function SpanRuler({ plan }: SpanRulerProps): JSX.Element {
         >
           <span className="figure text-xs text-muted-foreground">{year}</span>
           <span className="label text-muted-foreground">
-            {`Age ${String(ageIn(year, plan))}`}
+            {String(ageIn(year, plan))}
           </span>
         </span>
       ))}
