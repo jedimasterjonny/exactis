@@ -10,6 +10,7 @@ import type { Milestone } from "@/data/milestones";
 import type { Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 
+import { LandedStatus } from "@/components/app/atoms/landed-status";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Screen } from "@/components/app/templates/screen";
@@ -17,9 +18,10 @@ import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
 import { takesSpare } from "@/data/accounts";
 import { ageIn, endAge } from "@/data/plan";
-import { runLength } from "@/engine/futures";
+import { readingOf, runLength } from "@/engine/futures";
 import { drawAgain, useFutures } from "@/hooks/use-futures";
 import { formatCount } from "@/lib/count";
+import { formatChance } from "@/lib/money";
 import { chance, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 import { ChanceBoard } from "./chance-board";
@@ -80,11 +82,13 @@ export function ChanceScreen({
 
 // The plan's futures as they come in, under a header saying how many
 // there are and over what ages, or, while they are coming in, how many
-// have, beside a button to draw them again; then the board, drawing
-// what they come to. The run is read here, since the header and the
-// board both read it, and a second reader would start a second pair of
-// workers over the slices still to draw; the board reads only its
-// search of the run, once the run is drawn.
+// have, beside a button to draw them again, and saying the chance once
+// to a screen reader as they land, from a status there and empty from
+// the first paint; then the board, drawing what they come to. The run
+// is read here, since the header and the board both read it, and a
+// second reader would start a second pair of workers over the slices
+// still to draw; the board reads only its search of the run, once the
+// run is drawn.
 function Futures({
   accounts,
   milestones,
@@ -102,6 +106,9 @@ function Futures({
   const headline = isDone
     ? `${formatCount(runLength)} futures, age ${String(ageIn(plan.from, plan))} to ${String(endAge(plan))}`
     : `Drawing ${formatCount(futures.length)} of ${formatCount(runLength)} futures…`;
+  const said = isDone
+    ? `Chance of success ${formatChance(readingOf(futures).chance)}, of ${formatCount(runLength)} futures lasting to ${String(endAge(plan))}`
+    : "";
   return (
     <Screen
       actions={
@@ -111,7 +118,12 @@ function Futures({
         </Button>
       }
       label={sectionLabel(chance)}
-      meta={headline}
+      meta={
+        <>
+          {headline}
+          <LandedStatus isDone={isDone}>{said}</LandedStatus>
+        </>
+      }
       title={chance.title}
     >
       <ChanceBoard

@@ -11,6 +11,7 @@ import type { Month } from "@/data/schedule";
 import type { Line, Side } from "@/lib/moved";
 import type { Slot } from "@/lib/slot";
 
+import { LandedStatus } from "@/components/app/atoms/landed-status";
 import { Note } from "@/components/app/atoms/note";
 import { Worksheet } from "@/components/app/atoms/worksheet";
 import { Caution } from "@/components/app/molecules/caution";
@@ -70,10 +71,13 @@ const changes = "What making it the household changes";
 // drawn here, the household's first, which the dashboard has usually
 // drawn already, and the chance reads an ellipsis while either is
 // drawn, with the count of both together, and a dash with the reason
-// where a side has nothing to draw. Notes beneath say what the scenario
-// is laid over, why the dashboard can read it otherwise, and what the
-// figures are in. The second lists what making it the household would
-// change, a line for each record or setting, or says nothing would.
+// where a side has nothing to draw; once both are drawn, a screen
+// reader hears both chances and the line beneath them once, from a
+// status there and empty from the first paint. Notes beneath say what
+// the scenario is laid over, why the dashboard can read it otherwise,
+// and what the figures are in. The second lists what making it the
+// household would change, a line for each record or setting, or says
+// nothing would.
 export function CompareScreen({
   actions,
   asOf,
@@ -118,6 +122,9 @@ export function CompareScreen({
                         worthRow(household.side, scenario.side),
                       ]}
                     />
+                    <LandedStatus isDone={isDrawn(theirs) && isDrawn(ours)}>
+                      {chanceSaid(theirs, ours)}
+                    </LandedStatus>
                     <Note>
                       The scenario is laid over the household&apos;s balances,
                       progress points and house prices as they stand, as making
@@ -222,6 +229,13 @@ function chanceRow(theirs: Run, ours: Run): WorksheetRow {
   };
 }
 
+// The chance on each side and the line beneath it, as the status says
+// them once both runs are drawn, the line read on after a colon.
+function chanceSaid(theirs: Run, ours: Run): string {
+  const { detail = "", figures } = chanceRow(theirs, ours);
+  return `Chance of success ${figures.join(" for the household and ")} for the scenario: ${lowered(detail)}`;
+}
+
 // How many lines each change holds, as the lines card's caption counts
 // them: "3 changed, 1 added and 1 removed".
 function countsOf(lines: readonly Line[]): string {
@@ -231,6 +245,11 @@ function countsOf(lines: readonly Line[]): string {
       return count === 0 ? [] : [`${String(count)} ${change}`];
     }),
   );
+}
+
+// Whether a side's futures are all drawn.
+function isDrawn(run: Run): boolean {
+  return !("unrun" in run) && run.isDone;
 }
 
 // A sentence's opening read on from another's, its first letter lowered.

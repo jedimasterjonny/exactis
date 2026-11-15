@@ -1,3 +1,5 @@
+import type { JSX } from "react";
+
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -40,6 +42,16 @@ const futures = Array.from({ length: 10 }, (_, nth): Future => ({
   ranOut: nth < 8 ? null : 2028,
   retired: 2084,
 }));
+
+// A whole run of a thousand futures, the number given falling short in
+// 2028, so a chance moves by a tenth of a point a future, as a run's
+// does.
+function thousand(short: number): Future[] {
+  return Array.from({ length: 1000 }, (_, nth): Future => {
+    const fell = nth < short ? 2028 : null;
+    return { fell, measured: [], ranOut: fell, retired: 2084 };
+  });
+}
 
 // Thirty grand, which every future reaches at once; forty, which none
 // ever does; and a milestone reached at an age, which has no tile.
@@ -133,6 +145,101 @@ describe("ChanceTile", () => {
     expect(screen.queryByText("…")).not.toBeInTheDocument();
   });
 
+  // Eight in ten last, said once as the run lands and not at the
+  // hand-overs before it.
+  it("says the chance once to a screen reader as the run lands, from a status there and empty from the first paint", () => {
+    const { rerender } = render(
+      <ChanceTile
+        milestones={[]}
+        plan={plan}
+        run={{ futures: [], isDone: false }}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+
+    rerender(
+      <ChanceTile
+        milestones={[]}
+        plan={plan}
+        run={{ futures: futures.slice(0, 3), isDone: false }}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+
+    rerender(
+      <ChanceTile
+        milestones={[]}
+        plan={plan}
+        run={{ futures, isDone: true }}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /^Chance of success 80%, of 1,000 futures lasting to 37$/v,
+    );
+  });
+
+  // The household keeps 873 of a thousand futures: the scenario 852,
+  // landing first and then last, then 894, then the household's 873.
+  it("says a scenario's chance once both runs are drawn, whichever lands first, with how far it stands from the household's in words", () => {
+    const household = thousand(127);
+    // Each run drawn once all thousand are in.
+    const tile = (against: Future[], run: Future[]): JSX.Element => (
+      <ChanceTile
+        against={{ futures: against, isDone: against.length === 1000 }}
+        milestones={[]}
+        plan={plan}
+        run={{ futures: run, isDone: run.length === 1000 }}
+      />
+    );
+    const { rerender } = render(tile([], []));
+
+    rerender(tile(household.slice(0, 300), thousand(148)));
+
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+
+    rerender(tile(household, thousand(148)));
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /^Chance of success 85%, of 1,000 futures lasting to 37, 2\.1 points below the household's$/v,
+    );
+
+    rerender(tile(household, thousand(106).slice(0, 300)));
+
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+
+    rerender(tile(household, thousand(106)));
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /^Chance of success 89%, of 1,000 futures lasting to 37, 2\.1 points above the household's$/v,
+    );
+
+    rerender(tile(household, []));
+    rerender(tile(household, household));
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /^Chance of success 87%, of 1,000 futures lasting to 37, the same as the household's$/v,
+    );
+  });
+
+  // Back on the dashboard over both runs kept, nothing has changed to be
+  // said, and the tile is read where it is met.
+  it("says nothing as it opens over runs already drawn", () => {
+    render(
+      <ChanceTile
+        against={{ futures: thousand(127), isDone: true }}
+        milestones={[]}
+        plan={plan}
+        run={{ futures, isDone: true }}
+      />,
+    );
+
+    expect(screen.getByText("80%")).toHaveClass("figure");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
   it("says how many futures are drawn while the run is, for the chance and for each milestone", () => {
     render(
       <ChanceTile
@@ -209,6 +316,7 @@ describe("ChanceTile", () => {
     expect(
       screen.getAllByText("No spread to draw the futures from"),
     ).toHaveLength(3);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByText("Forty grand")).toHaveClass("label");
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });

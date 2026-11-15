@@ -6,6 +6,7 @@ import type { Milestone } from "@/data/milestones";
 import type { Plan } from "@/data/plan";
 import type { Future } from "@/engine/futures";
 
+import { LandedStatus } from "@/components/app/atoms/landed-status";
 import { RowAction } from "@/components/app/atoms/row-action";
 import { StatTile } from "@/components/app/molecules/stat-tile";
 import { ageOf } from "@/data/milestones";
@@ -55,7 +56,10 @@ const label = "Chance of success";
 // draws it once for the tiles and the chart alike. Set against the
 // household's run, as a scenario's is on the dashboard, the chance
 // carries the difference in percentage points once both runs are drawn,
-// and holds its place until then.
+// and holds its place until then. As the run lands, and in a scenario
+// once both have, a screen reader hears the chance once, with its
+// difference in words, from a status there and empty from the first
+// paint.
 export function ChanceTile({
   against,
   milestones,
@@ -84,6 +88,8 @@ export function ChanceTile({
   }
   const { futures, isDone } = run;
   const landed = `Of ${formatCount(runLength)} futures, lasting to ${String(endAge(plan))}`;
+  const value = isDone ? formatChance(readingOf(futures).chance) : "…";
+  const delta = deltaOf(run, against);
   return (
     <>
       <StatTile
@@ -93,12 +99,15 @@ export function ChanceTile({
             ? landed
             : `Drawing ${formatCount(futures.length)} of ${formatCount(runLength)}…`
         }
-        delta={deltaOf(run, against)}
+        delta={delta}
         deltaFormat="points"
         holds={landed}
         label={label}
-        value={isDone ? formatChance(readingOf(futures).chance) : "…"}
+        value={value}
       />
+      <LandedStatus isDone={isDone && delta !== null}>
+        {`${label} ${value}, of ${formatCount(runLength)} futures lasting to ${String(endAge(plan))}${apartOf(delta)}`}
+      </LandedStatus>
       {reached.map((milestone) => (
         <ReachedTile
           futures={futures}
@@ -110,6 +119,21 @@ export function ChanceTile({
       ))}
     </>
   );
+}
+
+// How far the chance stands from the household's, in words, as the
+// status says it once both runs are drawn: the points as a count writes
+// them, with no places held; nothing with no household set against it;
+// and the same where the points round to none, as the delta draws a
+// dash.
+function apartOf(delta: null | number | undefined): string {
+  if (delta === undefined || delta === null) {
+    return "";
+  }
+  if (Math.abs(delta).toFixed(2) === "0.00") {
+    return ", the same as the household's";
+  }
+  return `, ${formatCount(Math.abs(delta))} points ${delta > 0 ? "above" : "below"} the household's`;
 }
 
 // The chance's difference from the household it is set against, in

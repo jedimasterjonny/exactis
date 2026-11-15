@@ -110,6 +110,7 @@ describe("CompareScreen", () => {
     expect(chanceRow()).toHaveAccessibleDescription(
       "Drawing 0 of 2,000 futures…",
     );
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
 
     await waitFor(
       () => {
@@ -122,6 +123,10 @@ describe("CompareScreen", () => {
     expect(
       within(table).getByRole("row", { name: "Chance of success 100% 100%" }),
     ).toBeInTheDocument();
+    // Said once both are drawn, the row's line lowered after the colon.
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /^Chance of success 100% for the household and 100% for the scenario: as many of the same 1,000 futures last$/v,
+    );
 
     rerender(screenOf(500, { short: "No CMA is pulled" }));
 
@@ -132,6 +137,7 @@ describe("CompareScreen", () => {
     expect(chanceRow()).toHaveAccessibleDescription(
       "The scenario has no spread to draw the futures from",
     );
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
   it("reads how many more or fewer of the same futures last once both runs are drawn", async () => {
@@ -148,6 +154,9 @@ describe("CompareScreen", () => {
     expect(
       screen.getByRole("row", { name: "Chance of success 100% 0%" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /^Chance of success 100% for the household and 0% for the scenario: 1,000 fewer of the same 1,000 futures last$/v,
+    );
 
     rerender(screenOf(500, still, 1500));
 

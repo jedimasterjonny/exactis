@@ -141,6 +141,11 @@ describe("ChanceScreen", () => {
     expect(screen.getByText(/^Drawing \d+ of 1,000 futures…$/)).toHaveClass(
       "text-muted-foreground",
     );
+    // Nothing is said as the run is drawn, from a status there from the
+    // first paint, and the chance once as it lands.
+    expect(
+      within(screen.getByRole("banner")).getByRole("status"),
+    ).toBeEmptyDOMElement();
     expect(
       within(outcomes()).getByRole("heading", { level: 2 }),
     ).toHaveTextContent(
@@ -153,6 +158,11 @@ describe("ChanceScreen", () => {
         { timeout: 5000 },
       ),
     ).toHaveClass("text-muted-foreground");
+    expect(
+      within(screen.getByRole("banner")).getByRole("status"),
+    ).toHaveTextContent(
+      /^Chance of success 100%, of 1,000 futures lasting to 37$/v,
+    );
     expect(
       within(outcomes()).getByRole("heading", { level: 2 }),
     ).toHaveTextContent(
@@ -232,6 +242,7 @@ describe("ChanceScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Draw again" }));
 
     expect(header.getByText("Drawing 0 of 1,000 futures…")).toBeInTheDocument();
+    expect(header.getByRole("status")).toBeEmptyDOMElement();
     expect(within(outcomes()).getAllByRole("paragraph")[0]).toHaveTextContent(
       /^…$/,
     );
@@ -239,6 +250,16 @@ describe("ChanceScreen", () => {
       within(outcomes()).getByRole("heading", { level: 2 }),
     ).toHaveTextContent(
       "Drawing the futures to count how many of 1,000 last to 37…",
+    );
+
+    await header.findByText(
+      "1,000 futures, age 34 to 37",
+      {},
+      { timeout: 5000 },
+    );
+
+    expect(header.getByRole("status")).toHaveTextContent(
+      /^Chance of success 100%, of 1,000 futures lasting to 37$/v,
     );
   });
 
