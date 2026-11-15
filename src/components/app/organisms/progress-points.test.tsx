@@ -136,6 +136,30 @@ describe("ProgressPoints", () => {
     ]);
   });
 
+  // Five month-ends in a row; then four, February 2025 not kept.
+  it("captions the card with how many months the points span and how many between were not kept", () => {
+    const { rerender } = render(<ProgressPoints points={points} />);
+
+    const card = screen.getByRole("region", { name: "Year by year" });
+
+    expect(
+      within(card).getByText(
+        "5 month-ends from Nov 2024 to Mar 2025. Added right of the rule, taken away left.",
+      ),
+    ).toBeInTheDocument();
+
+    rerender(<ProgressPoints points={points.toSpliced(3, 1)} />);
+
+    // The count is held to its word by a no-break space, which a text
+    // query and toHaveTextContent read as any other, so the caption's
+    // own text is read whole.
+    const { textContent: caption } = within(card).getByText(/^4 month-ends/v);
+
+    expect(caption).toBe(
+      "4 month-ends from Nov 2024 to Mar 2025 · 1\u00a0missing. Added right of the rule, taken away left.",
+    );
+  });
+
   // January 2025 is read from December 2024, the year before's last,
   // and November 2024 is the first point kept, so it has nothing before
   // it to move from.

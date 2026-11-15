@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import type { JSX } from "react";
 
 import type { HousePrices } from "@/data/house-prices";
-import type { ProgressPoint } from "@/data/progress";
 
 import { Note } from "@/components/app/atoms/note";
 import { HousePricesPull } from "@/components/app/molecules/house-prices-pull";
@@ -12,8 +11,7 @@ import { ProgressYear } from "@/components/app/organisms/progress-year";
 import { Screen } from "@/components/app/templates/screen";
 import { indexedAs } from "@/data/house-prices";
 import { latestYearOf } from "@/data/progress";
-import { counted } from "@/lib/count";
-import { formatDay, formatMonthShort, monthsBetween } from "@/lib/months";
+import { formatDay, formatMonthShort } from "@/lib/months";
 import { progress, sectionLabel } from "@/lib/nav";
 import { plannedOf } from "@/lib/planned";
 import { getHousehold, getOpened } from "@/store/household";
@@ -22,22 +20,22 @@ export const metadata: Metadata = { title: progress.label };
 
 // The progress points, read from the store behind the session, with
 // whether a scenario is open, since the pull is held while one is,
-// under a header saying how many there are, over which months and how
-// many of those were not kept, with the pull of the house price index
-// as its action, and opening on what the latest year came to over the
-// balances laid month by month. The chart is drawn whenever two points
-// are kept, whether or not a year can be read: a latest point more than
-// a year after the one before it has no year, but the months before it
-// still lay out. A household keeping no point yet draws the table's
-// empty state and no more, and one keeping a point alone has no year to
-// read and nothing to lay along a chart. Where the chart is drawn it
-// runs the plan on a year from the latest point where it can. The notes
-// at the foot say what net worth counts, how the plan runs on where the
-// chart draws it, and what the house is held at, the index to the month
-// it ran to or the sheet before one is pulled. The chart is described by
-// the year's sentence where both are drawn, through an id fixed for this
-// screen, since Next keeps a screen left in the document, hidden, and an
-// id shared by two screens would name both. The page renders behind the
+// under a header saying the figures are in each month's own pounds,
+// with the pull of the house price index as its action, and opening on
+// what the latest year came to over the balances laid month by month.
+// The chart is drawn whenever two points are kept, whether or not a
+// year can be read: a latest point more than a year after the one
+// before it has no year, but the months before it still lay out. A
+// household keeping no point yet draws the table's empty state and no
+// more, and one keeping a point alone has no year to read and nothing
+// to lay along a chart. Where the chart is drawn it runs the plan on a
+// year from the latest point where it can. The notes at the foot say
+// what net worth counts, how the plan runs on where the chart draws it,
+// and what the house is held at, the index to the month it ran to or
+// the sheet before one is pulled. The chart is described by the year's
+// sentence where both are drawn, through an id fixed for this screen,
+// since Next keeps a screen left in the document, hidden, and an id
+// shared by two screens would name both. The page renders behind the
 // loading screen beside it.
 export default async function Progress(): Promise<JSX.Element> {
   const [household, opened] = await Promise.all([getHousehold(), getOpened()]);
@@ -49,7 +47,9 @@ export default async function Progress(): Promise<JSX.Element> {
     <Screen
       actions={<HousePricesPull isInScenario={opened !== null} />}
       label={sectionLabel(progress)}
-      meta={spanOf(points)}
+      meta={
+        points.length === 0 ? undefined : "Figures in each month's own pounds"
+      }
       title={progress.title}
     >
       {year !== undefined && <ProgressYear headlineId={headline} year={year} />}
@@ -86,20 +86,4 @@ function houseNoteOf(housePrices: HousePrices | null): string {
     return "The house is as the sheet gave it, until house prices are pulled.";
   }
   return `The house is at the UK House Price Index for ${indexedAs()} from ${formatMonthShort(housePrices.from)} to ${formatMonthShort(housePrices.to)}, pulled ${formatDay(housePrices.pulledOn)}.`;
-}
-
-// What the points span, as the header says it: how many, from the
-// first month to the last, and how many months between were not kept,
-// where any were not. Nothing before any is kept.
-function spanOf(points: readonly ProgressPoint[]): string | undefined {
-  const [first] = points;
-  const last = points.at(-1);
-  if (first === undefined || last === undefined) {
-    return undefined;
-  }
-  const missing = monthsBetween(first.month, last.month) + 1 - points.length;
-  return [
-    `${counted(points.length, "month-end")} from ${formatMonthShort(first.month)} to ${formatMonthShort(last.month)}`,
-    ...(missing > 0 ? [`${String(missing)} missing`] : []),
-  ].join(" · ");
 }

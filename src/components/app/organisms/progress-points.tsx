@@ -39,7 +39,7 @@ import {
 } from "@/lib/balances";
 import { counted } from "@/lib/count";
 import { formatGbp } from "@/lib/money";
-import { formatMonthShort } from "@/lib/months";
+import { formatMonthShort, monthsBetween } from "@/lib/months";
 import { progress, subsectionLabel } from "@/lib/nav";
 
 interface MoveBarProps {
@@ -58,7 +58,8 @@ interface Scale {
   readonly taken: number;
 }
 
-// The points year by year, the newest first and open: each year's row
+// The points year by year, captioned with the months they span and how
+// many between were not kept, the newest first and open: each year's row
 // says how many months were kept in it where fewer than twelve were,
 // draws what each balance added to the right of a rule and what each
 // took away to the left of it, on one scale for every year, and gives
@@ -74,7 +75,9 @@ interface Scale {
 // dot in its fill. A household keeping no point yet draws what would
 // fill the card rather than an empty one.
 export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
-  if (points.length === 0) {
+  const [first] = points;
+  const last = points.at(-1);
+  if (first === undefined || last === undefined) {
     return (
       <EmptyState
         description="Closing a month on the accounts screen records its point."
@@ -94,7 +97,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
   const newest = years.toReversed();
   return (
     <SectionCard
-      caption="Added right of the rule, taken away left"
+      caption={`${spanOf(first, last, points.length)}. Added right of the rule, taken away left.`}
       className="pb-0"
       label={subsectionLabel(progress, 2)}
       title="Year by year"
@@ -269,4 +272,20 @@ function MoveBar({ moves, scale }: MoveBarProps): JSX.Element {
       </span>
     </span>
   );
+}
+
+// What the points span, as the card's caption opens on it: how many,
+// from the first month to the last, and how many months between were
+// not kept, where any were not, the count held to its word so no line
+// breaks between them.
+function spanOf(
+  first: ProgressPoint,
+  last: ProgressPoint,
+  count: number,
+): string {
+  const missing = monthsBetween(first.month, last.month) + 1 - count;
+  return [
+    `${counted(count, "month-end")} from ${formatMonthShort(first.month)} to ${formatMonthShort(last.month)}`,
+    ...(missing > 0 ? [`${String(missing)}\u00a0missing`] : []),
+  ].join(" · ");
 }
