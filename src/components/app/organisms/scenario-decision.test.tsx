@@ -352,12 +352,27 @@ describe("ScenarioDecision", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Decide against…" }));
+
+    // The dialog hands the focus to Why a frame after it opens, as the
+    // title's test waits for, so the focus is in the dialog when it goes,
+    // as it is for anyone deciding.
+    await waitFor(() => {
+      expect(field("Why")).toHaveFocus();
+    });
+
     fireEvent.click(screen.getByRole("button", { name: "Decide against" }));
 
     await toasted(
       "Decided against Four-day week",
       "Kept in the scenario menu, under Decided against",
     );
+    // The toast lands before the dialog closes, which is a transition of
+    // its own, so the focus is read once the dialog has gone.
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: /\?$/u }),
+      ).not.toBeInTheDocument();
+    });
     expect(document.body).toHaveFocus();
   });
 });
