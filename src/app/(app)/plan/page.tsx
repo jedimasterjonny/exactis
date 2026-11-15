@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { JSX } from "react";
 
 import type { Account } from "@/data/accounts";
+import type { Condition } from "@/data/milestones";
 import type { Plan as Planned } from "@/data/plan";
 import type { Schedule, Totals } from "@/engine/cash-flow";
 import type { MovedYear, ProjectionPoint } from "@/engine/projection";
@@ -65,15 +66,16 @@ export default async function Plan(): Promise<JSX.Element> {
   const run = { accounts, plan, schedule };
   const points = project(accounts, schedule, plan);
   const years = movedYears(points, run);
+  const onConditions = retiresOn(household.plan);
   return (
     <Screen
       label={sectionLabel(planScreen)}
-      meta={headlineOf(run, { points, years })}
+      meta={headlineOf(run, { onConditions, points, years })}
       title={planScreen.title}
     >
       <MilestoneList
         milestones={milestones}
-        onConditions={retiresOn(household.plan)}
+        onConditions={onConditions}
         plan={plan}
         sales={years.flatMap(({ sales }) => sales)}
         schedule={schedule}
@@ -106,13 +108,17 @@ export default async function Plan(): Promise<JSX.Element> {
 // from the savings when it is already short; the first year after whose
 // month draws on them, and how much, since that is where the plan turns;
 // and the age the savings last to, or the age and the year they run out
-// in, or else first fall short in. A year is read by a month of it,
-// over the run the projection's moves carry it by, as the year book
-// reads it, though without what a move leaves its month short, which is
-// drawn once rather than a month at a time; and a month drawing less
-// than a pound is drawing nothing, as the book writes it. The page's
-// one projection of the plan is handed in, with its years as its moves
-// carry them.
+// in, or else first fall short in, or, said first, since the savings
+// lasting would then read as the plan doing so, that a retirement on
+// conditions is never reached at the plan's own rates, as the dashboard
+// says it. A year is read by a month of it, over the run the
+// projection's moves carry it by, as the year book reads it, though
+// without what a move leaves its month short, which is drawn once
+// rather than a month at a time; and a month drawing less than a pound
+// is drawing nothing, as the book writes it. The page's one projection
+// of the plan is handed in, with its years as its moves carry them, and
+// what the plan's owner retires on, which the plan laid out no longer
+// says.
 function headlineOf(
   run: {
     readonly accounts: readonly Account[];
@@ -120,9 +126,11 @@ function headlineOf(
     readonly schedule: Schedule;
   },
   {
+    onConditions,
     points,
     years,
   }: {
+    readonly onConditions: readonly Condition[] | undefined;
     readonly points: readonly ProjectionPoint[];
     readonly years: readonly MovedYear[];
   },
@@ -146,7 +154,7 @@ function headlineOf(
       )
         .map((year) => ({ from: year, totals: monthIn(year) }))
         .find(({ totals }) => isDrawing(totals));
-  return [
+  const said = [
     isDrawing(now)
       ? `${formatGbp(now.drawn)} a month drawn from the savings now`
       : `${formatGbp(now.saved)} a month put by now`,
@@ -155,8 +163,20 @@ function headlineOf(
       : [
           `${formatGbp(drawing.totals.drawn)} a month drawn from ${String(drawing.from)}`,
         ]),
-    shortfallOf(points) ?? `the savings last to ${String(endAge(plan))}`,
-  ].join(" · ");
+  ];
+  const short = shortfallOf(points);
+  // laidOut lays a retirement on conditions never reached past the
+  // plan's end.
+  if (onConditions !== undefined && plan.retires > endAge(plan)) {
+    return [
+      ...said,
+      "the plan never reaches its retirement's conditions at its own rates",
+      ...(short === null ? [] : [short]),
+    ].join(" · ");
+  }
+  return [...said, short ?? `the savings last to ${String(endAge(plan))}`].join(
+    " · ",
+  );
 }
 
 // Where the savings fall short, by the age and the year, or null while
