@@ -105,14 +105,14 @@ export default async function Plan(): Promise<JSX.Element> {
 // beside this one open on a figure: what a month puts by now, or draws
 // from the savings when it is already short; the first year after whose
 // month draws on them, and how much, since that is where the plan turns;
-// and the age the savings last to, or the age and the year the
-// projection first falls short of them in. A year is read by a month
-// of it, over the run the projection's moves carry it by, as the year
-// book reads it, though without what a move leaves its month short,
-// which is drawn once rather than a month at a time; and a month drawing
-// less than a pound is drawing nothing, as the book writes it. The
-// page's one projection of the plan is handed in, with its years as
-// its moves carry them.
+// and the age the savings last to, or the age and the year they run out
+// in, or else first fall short in. A year is read by a month of it,
+// over the run the projection's moves carry it by, as the year book
+// reads it, though without what a move leaves its month short, which is
+// drawn once rather than a month at a time; and a month drawing less
+// than a pound is drawing nothing, as the book writes it. The page's
+// one projection of the plan is handed in, with its years as its moves
+// carry them.
 function headlineOf(
   run: {
     readonly accounts: readonly Account[];
@@ -160,22 +160,21 @@ function headlineOf(
 }
 
 // Where the savings fall short, by the age and the year, or null while
-// they last: the first year carried only by a pension drawn before the
-// pension age, at a charge that keeps the plan going on paper alone, as
-// the chance of success counts a future that does so as falling short,
-// where that comes before they run out; and the year they run out in,
-// where they do, since the early draw is where the plan first fails and
-// the run out where the money ends.
+// they last, as the dashboard orders its one verdict: the year they run
+// out in, where they do; else the first year carried only by a pension
+// drawn before the pension age, at a charge that keeps the plan going on
+// paper alone, as the chance of success counts a future that does so as
+// falling short. Where both come, the year book's ledger says the early
+// draw in the year it falls in.
 function shortfallOf(points: readonly ProjectionPoint[]): null | string {
   const runsOut = points.find(({ uncovered }) => uncovered > 0);
+  if (runsOut !== undefined) {
+    return `the savings run out ${whenOf(runsOut)}`;
+  }
   const short = points.find(isShort);
-  const said = [
-    ...(short === undefined || short === runsOut
-      ? []
-      : [`fall short ${whenOf(short)}, carried by an early pension draw`]),
-    ...(runsOut === undefined ? [] : [`run out ${whenOf(runsOut)}`]),
-  ];
-  return said.length === 0 ? null : `the savings ${said.join(", and ")}`;
+  return short === undefined
+    ? null
+    : `the savings fall short ${whenOf(short)}, carried by an early pension draw`;
 }
 
 // A year as the headline names it, by the age reached in it.

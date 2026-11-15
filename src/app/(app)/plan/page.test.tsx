@@ -152,10 +152,11 @@ describe("Plan", () => {
   // at 34 it is a pension before the pension age, so the month is
   // carried by drawing it early at the 55% charge, and the plan falls
   // short there rather than lasting on paper. The fixture's £391,640
-  // runs out after it, at 39 in 2031, which is said too; £10,000,000
-  // never does. The pension is marked droppable, so its own fixed sum is
-  // not kept paid on top of the spending.
-  it("says when the savings are carried only by drawing a pension early, and when they then run out", async () => {
+  // runs out after it, at 39 in 2031, which is said alone, as the
+  // dashboard says it; £10,000,000 never does, so the early draw is
+  // said. The pension is marked droppable, so its own fixed sum is not
+  // kept paid on top of the spending.
+  it("says when the savings run out, and when they are carried only by drawing a pension early where they never do", async () => {
     const [pension] = accounts;
     const headlineWith = async (balance: number): Promise<null | string> => {
       vi.mocked(getHousehold).mockResolvedValue({
@@ -175,7 +176,7 @@ describe("Plan", () => {
     };
 
     expect(await headlineWith(391640)).toBe(
-      "£3,350 a month drawn from the savings now · the savings fall short at 34, in 2026, carried by an early pension draw, and run out at 39, in 2031",
+      "£3,350 a month drawn from the savings now · the savings run out at 39, in 2031",
     );
     expect(await headlineWith(10000000)).toBe(
       "£3,350 a month drawn from the savings now · the savings fall short at 34, in 2026, carried by an early pension draw",
