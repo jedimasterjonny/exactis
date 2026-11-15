@@ -37,9 +37,10 @@ re-export. One becomes a real component when it has something to add: `badge`
 carries the `positive` and `caution` tones this app needs and base-nova does not
 ship, and `alert` the `caution` one; `button` spins while its action runs, which
 `alert-dialog` passes on to its confirm; `table` makes each table the container
-its rows fold by and lines its cells up with a card's edge; and `chart` closes
-its tooltip when a finger lands outside it, and rings it while it has the
-keyboard's focus.
+its rows fold by and lines its cells up with a card's edge; `card` draws its
+edge as an outline under forced colours, where the ring, a shadow, is not drawn;
+and `chart` closes its tooltip when a finger lands outside it, and rings it
+while it has the keyboard's focus.
 
 A customisation that has to survive an update belongs in the wrapper. Putting it
 in the vendored file works until the next refresh silently discards it.
