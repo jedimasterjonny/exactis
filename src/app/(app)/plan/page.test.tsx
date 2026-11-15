@@ -67,18 +67,16 @@ describe("Plan", () => {
     expect(screen.getByText("Sect. IV · Income & expenses")).toHaveClass(
       "label",
     );
-    // The month now puts £1,200 by as the salary's sacrifice and
-    // £1,176.20 as the pension's fixed sum; from 2053, the consulting's
-    // £2,000 leaves the month £6,145.98 short, which the savings carry
-    // to the end of the plan.
-    expect(
-      screen.getByText(
-        "£2,376 a month put by now · £6,146 a month drawn from 2053 · the savings last to 91",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Figures in today's money")).toBeInTheDocument();
+    // The screen opens on its sentence, above the cards' titles: the
+    // month now puts £1,200 by as the salary's sacrifice and £1,176.20
+    // as the pension's fixed sum; from 2053, the consulting's £2,000
+    // leaves the month £6,145.98 short, which the savings carry to the
+    // end of the plan.
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
     ).toStrictEqual([
+      "A month puts by £2,376 now and draws £6,146 from\u00a02053, and the savings last to\u00a091 if the plan's own rates hold.",
       "Milestones",
       "What comes in",
       "What goes out",
@@ -109,8 +107,10 @@ describe("Plan", () => {
 
   // The salary alone, with nothing going out and no account to pay,
   // leaves all of its £12,000 a month that the tax does not take,
-  // £7,342.20.
-  it("says what a plan with no account puts by", async () => {
+  // £7,342.20, which the year book lays out; but with no account
+  // holding anything there are no savings for a sentence to speak of,
+  // so the screen opens on its cards, as the dashboard draws none.
+  it("says no sentence where no account holds anything", async () => {
     vi.mocked(getHousehold).mockResolvedValue({
       ...household,
       accounts: [],
@@ -121,22 +121,56 @@ describe("Plan", () => {
 
     render(await Plan());
 
-    // With no account to put by into, what the salary leaves is taken as
-    // spent, and the month is never short.
     expect(
-      screen.getByText("£0 a month put by now · the savings last to 91"),
-    ).toBeInTheDocument();
+      screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
+    ).toStrictEqual([
+      "Milestones",
+      "What comes in",
+      "What goes out",
+      "Year by year",
+    ]);
+    expect(screen.getByText("Figures in today's money")).toBeInTheDocument();
     expect(screen.getByText("No expenses yet")).toBeInTheDocument();
     expect(screen.getByText("£7,342")).toHaveClass("figure", "font-medium");
   });
 
-  // The household's £3,350 a month with nothing coming in and no account
-  // to draw on: the month is short now, and nothing covers it from the
-  // plan's first year.
+  // The same salary beside the current account, which takes none of
+  // what it leaves, so the month puts nothing by; and beside the ISA
+  // too, whose £20,000 a year puts £1,666.67 by a month. Neither month
+  // ever draws on the savings, which last.
+  it("says what a month puts by where it never draws on the savings", async () => {
+    const [, isa, current] = accounts;
+    const sentenceWith = async (
+      held: Household["accounts"],
+    ): Promise<null | string> => {
+      vi.mocked(getHousehold).mockResolvedValue({
+        ...household,
+        accounts: held,
+        milestones: [],
+        plan,
+        schedule: { expenses: [], income: [salary] },
+      });
+      const { unmount } = render(await Plan());
+      const [sentence] = screen.getAllByRole("heading", { level: 2 });
+      unmount();
+      return sentence?.textContent ?? null;
+    };
+
+    expect(await sentenceWith([current])).toBe(
+      "A month puts nothing by now, and the savings last to\u00a091 if the plan's own rates hold.",
+    );
+    expect(await sentenceWith([isa, current])).toBe(
+      "A month puts by £1,667 now, and the savings last to\u00a091 if the plan's own rates hold.",
+    );
+  });
+
+  // The household's £3,350 a month with nothing coming in and the
+  // current account's £16,900 to draw on: the month is short now, and
+  // the account outlasts the four months left of 2026 but not 2027.
   it("says when the month draws on the savings now and when they run out", async () => {
     vi.mocked(getHousehold).mockResolvedValue({
       ...household,
-      accounts: [],
+      accounts: [accounts[2]],
       milestones: [],
       plan,
       schedule: { expenses: [expenseLines[0]], income: [] },
@@ -144,11 +178,9 @@ describe("Plan", () => {
 
     render(await Plan());
 
-    expect(
-      screen.getByText(
-        "£3,350 a month drawn from the savings now · the savings run out at 34, in 2026",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 2 })[0]?.textContent).toBe(
+      "A month draws £3,350 from the savings now, and they run out at\u00a035 at the plan's own rates.",
+    );
   });
 
   // The same £3,350 a month with a pension the only account to draw on:
@@ -171,27 +203,25 @@ describe("Plan", () => {
         schedule: { expenses: [expenseLines[0]], income: [] },
       });
       const { unmount } = render(await Plan());
-      const { textContent } = screen.getByText(
-        /a month drawn from the savings now/,
-      );
+      const [sentence] = screen.getAllByRole("heading", { level: 2 });
       unmount();
-      return textContent;
+      return sentence?.textContent ?? null;
     };
 
     expect(await headlineWith(391640)).toBe(
-      "£3,350 a month drawn from the savings now · the savings run out at 39, in 2031",
+      "A month draws £3,350 from the savings now, and they run out at\u00a039 at the plan's own rates.",
     );
     expect(await headlineWith(10000000)).toBe(
-      "£3,350 a month drawn from the savings now · the savings fall short at 34, in 2026, carried by an early pension draw",
+      "A month draws £3,350 from the savings now, and they fall short at\u00a034 at the plan's own rates.",
     );
   });
 
   // The household of the first test with its owner retiring once it is
   // worth £90,000,000, which it never is: the plan is laid out working
   // to its end, so the savings lasting would read as the plan doing so,
-  // and the headline says the retirement is never reached instead, as
-  // the dashboard does. With the spending alone and the pension to draw
-  // on, it says where the savings run out after it.
+  // and the sentence says the retirement is never reached instead, as
+  // the dashboard does, at its own rates. With the spending alone and
+  // the pension to draw on, it says where the savings run out after it.
   it("says a retirement on conditions is never reached rather than that the savings last", async () => {
     const never = {
       ...plan,
@@ -213,9 +243,9 @@ describe("Plan", () => {
         plan: never,
       });
       const { unmount } = render(await Plan());
-      const { textContent } = screen.getByText(/ · the plan never reaches /);
+      const [sentence] = screen.getAllByRole("heading", { level: 2 });
       unmount();
-      return textContent;
+      return sentence?.textContent ?? null;
     };
 
     expect(
@@ -227,7 +257,7 @@ describe("Plan", () => {
         },
       }),
     ).toBe(
-      "£2,376 a month put by now · £6,146 a month drawn from 2053 · the plan never reaches its retirement's conditions at its own rates",
+      "A month puts by £2,376 now and draws £6,146 from\u00a02053, and the plan never reaches its retirement's conditions at its own rates.",
     );
     expect(
       await headlineWith({
@@ -235,7 +265,7 @@ describe("Plan", () => {
         schedule: { expenses: [expenseLines[0]], income: [] },
       }),
     ).toBe(
-      "£3,350 a month drawn from the savings now · the plan never reaches its retirement's conditions at its own rates · the savings run out at 39, in 2031",
+      "A month draws £3,350 from the savings now, the plan never reaches its retirement's conditions at its own rates, and the savings run out at\u00a039.",
     );
   });
   // The fixture's home moving up as the children leave home, in 2040:
