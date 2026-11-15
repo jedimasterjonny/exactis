@@ -44,8 +44,10 @@ describe("Progress", () => {
   });
 
   // The points are loaded rather than typed, so the header's one
-  // action is the pull that writes the house into them.
-  it("opens with the progress header and the pull of the house price index", async () => {
+  // action is the pull that writes the house into them; its meta says
+  // what pounds the figures are in, and the points card how many months
+  // the points span.
+  it("opens with the progress header, saying the figures are each month's own pounds, and the pull of the house price index", async () => {
     await renderProgress();
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -53,7 +55,14 @@ describe("Progress", () => {
     );
     expect(screen.getByText("Sect. V · Progress")).toHaveClass("label");
     expect(
-      screen.getByText("6 month-ends from Mar 2026 to Aug 2026"),
+      within(screen.getByRole("banner")).getByText(
+        "Figures in each month's own pounds",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "6 month-ends from Mar 2026 to Aug 2026. Added right of the rule, taken away left.",
+      ),
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole("banner")).getByRole("button", {
@@ -100,7 +109,8 @@ describe("Progress", () => {
 
   // Fourteen months of points from January 2025 with July 2025 not
   // kept, the property rising £1,000 a month: the year to February 2026
-  // is read from February 2025, and the header counts the month missing.
+  // is read from February 2025, and the points card counts the month
+  // missing.
   it("reads the year from the point a year before, and counts the months not kept", async () => {
     const monthly = Array.from({ length: 14 }, (_, index): ProgressPoint => ({
       assets: 400000 + index * 1000,
@@ -114,8 +124,18 @@ describe("Progress", () => {
     await renderProgress(monthly);
 
     expect(
-      screen.getByText("13 month-ends from Jan 2025 to Feb 2026 · 1 missing"),
+      within(screen.getByRole("banner")).getByText(
+        "Figures in each month's own pounds",
+      ),
     ).toBeInTheDocument();
+    // The count is held to its word by a no-break space, which a text
+    // query and toHaveTextContent read as any other, so the caption's
+    // own text is read whole.
+    const { textContent: caption } = screen.getByText(/^13 month-ends/v);
+
+    expect(caption).toBe(
+      "13 month-ends from Jan 2025 to Feb 2026 · 1\u00a0missing. Added right of the rule, taken away left.",
+    );
     expect(
       within(
         screen.getByRole("region", { name: "What the year came to" }),
@@ -154,7 +174,14 @@ describe("Progress", () => {
     await renderProgress(points.slice(0, 1));
 
     expect(
-      screen.getByText("1 month-end from Mar 2026 to Mar 2026"),
+      within(screen.getByRole("banner")).getByText(
+        "Figures in each month's own pounds",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "1 month-end from Mar 2026 to Mar 2026. Added right of the rule, taken away left.",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("region", { name: "What the year came to" }),
@@ -180,9 +207,12 @@ describe("Progress", () => {
     expect(rows).toHaveLength(points.length);
   });
 
-  it("draws no year, no span and the table's empty state before any point is kept", async () => {
+  it("draws no meta, no year, no span and the table's empty state before any point is kept", async () => {
     await renderProgress([]);
 
+    expect(
+      screen.queryByText("Figures in each month's own pounds"),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("region")).not.toBeInTheDocument();
     expect(screen.queryByText(/month-end/)).not.toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
