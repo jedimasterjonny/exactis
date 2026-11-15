@@ -22,7 +22,7 @@ const plan: Plan = {
 };
 
 describe("SpanRuler", () => {
-  it("rules each decade where it begins on the span, with the age reached in it, hidden from the tree", () => {
+  it("rules each decade where it begins on the span, with the age reached in it, each on one line, hidden from the tree", () => {
     render(<SpanRuler plan={plan} />);
 
     expect(screen.getByText(bySlot("span-ruler"))).toHaveAttribute(
@@ -45,6 +45,6 @@ describe("SpanRuler", () => {
       "2050Age 58",
       "2060Age 68",
     ]);
-    expect(marks[0]).toHaveClass("-translate-x-1/2");
+    expect(marks[0]).toHaveClass("w-max", "-translate-x-1/2");
   });
 });
