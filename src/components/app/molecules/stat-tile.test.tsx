@@ -47,6 +47,54 @@ describe("StatTile", () => {
     expect(screen.getByText("−1.15pp")).toHaveClass("text-destructive");
   });
 
+  // Waiting on a points delta and on the caption it lands on, which it
+  // holds unseen and unread beneath the one it shows, on a line of its
+  // own beneath the delta's ellipsis, itself seen but not read; and once
+  // landed, the caption alone.
+  it("holds room for a delta to come and the caption it lands on", () => {
+    const ownLine = (_content: string, element: Element | null): boolean =>
+      element?.classList.contains("basis-full") === true;
+    const { rerender } = render(
+      <StatTile
+        caption="Drawing 3 of 1,000…"
+        delta={null}
+        deltaFormat="points"
+        holds="Of 1,000 futures, lasting to 91"
+        label="Chance of success"
+        value="…"
+      />,
+    );
+
+    const content = screen.getByText(bySlot("card-content"));
+    const held = within(content).getByText("Of 1,000 futures, lasting to 91");
+    const toCome = within(content).getByText("…");
+
+    expect(toCome).toHaveClass("figure");
+    expect(toCome).toHaveAttribute("aria-hidden", "true");
+    expect(held).toHaveClass("invisible");
+    expect(held).toHaveAttribute("aria-hidden", "true");
+    expect(
+      within(content).getByText(ownLine, { suggest: false }),
+    ).toContainElement(held);
+    expect(
+      within(content).getByText("Drawing 3 of 1,000…"),
+    ).toBeInTheDocument();
+
+    rerender(
+      <StatTile
+        caption="Of 1,000 futures, lasting to 91"
+        holds="Of 1,000 futures, lasting to 91"
+        label="Chance of success"
+        value="80%"
+      />,
+    );
+
+    expect(
+      within(content).queryByText(ownLine, { suggest: false }),
+    ).not.toBeInTheDocument();
+    expect(content).toHaveTextContent(/^Of 1,000 futures, lasting to 91$/);
+  });
+
   it("puts an action it is given in its top corner", () => {
     render(
       <StatTile
