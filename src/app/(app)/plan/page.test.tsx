@@ -1,6 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { Household } from "@/data/household";
+import type { Plan as Planned } from "@/data/plan";
+
 import { accounts } from "@/data/accounts.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
@@ -8,7 +11,7 @@ import { blank } from "@/data/household.fixture";
 import { house, houseLoan, move } from "@/data/houses.fixture";
 import { incomeLines, plan, statePension } from "@/data/income.fixture";
 import { milestones } from "@/data/milestones.fixture";
-import { owners } from "@/data/owners.fixture";
+import { owners, working } from "@/data/owners.fixture";
 import { getHousehold } from "@/store/household";
 
 import Plan, { metadata } from "./page";
@@ -180,6 +183,59 @@ describe("Plan", () => {
     );
     expect(await headlineWith(10000000)).toBe(
       "£3,350 a month drawn from the savings now · the savings fall short at 34, in 2026, carried by an early pension draw",
+    );
+  });
+
+  // The household of the first test with its owner retiring once it is
+  // worth £90,000,000, which it never is: the plan is laid out working
+  // to its end, so the savings lasting would read as the plan doing so,
+  // and the headline says the retirement is never reached instead, as
+  // the dashboard does. With the spending alone and the pension to draw
+  // on, it says where the savings run out after it.
+  it("says a retirement on conditions is never reached rather than that the savings last", async () => {
+    const never = {
+      ...plan,
+      owners: [
+        {
+          ...working,
+          retirement: [{ measure: "worth", of: "pounds", times: 90000000 }],
+        },
+      ],
+    } satisfies Planned;
+    const headlineWith = async (
+      held: Pick<Household, "accounts" | "schedule">,
+    ): Promise<null | string> => {
+      vi.mocked(getHousehold).mockResolvedValue({
+        ...household,
+        ...held,
+        milestones: [],
+        owners: [...owners],
+        plan: never,
+      });
+      const { unmount } = render(await Plan());
+      const { textContent } = screen.getByText(/ · the plan never reaches /);
+      unmount();
+      return textContent;
+    };
+
+    expect(
+      await headlineWith({
+        accounts: [{ ...accounts[0], isDroppable: true }, ...accounts.slice(1)],
+        schedule: {
+          expenses: [...expenseLines],
+          income: [...incomeLines, statePension],
+        },
+      }),
+    ).toBe(
+      "£2,376 a month put by now · £6,146 a month drawn from 2053 · the plan never reaches its retirement's conditions at its own rates",
+    );
+    expect(
+      await headlineWith({
+        accounts: [{ ...accounts[0], isDroppable: true }],
+        schedule: { expenses: [expenseLines[0]], income: [] },
+      }),
+    ).toBe(
+      "£3,350 a month drawn from the savings now · the plan never reaches its retirement's conditions at its own rates · the savings run out at 39, in 2031",
     );
   });
   // The fixture's home moving up as the children leave home, in 2040:
