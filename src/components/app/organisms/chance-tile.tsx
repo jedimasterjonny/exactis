@@ -48,11 +48,14 @@ const label = "Chance of success";
 // it, the median alone, since a tile is one figure and the spread
 // either side is read on the chance of success, and left off a phone,
 // which keeps its row for the two the plan is steered by. While they
-// are drawn, how many have been; and a dash, saying why, while there
-// is nothing to draw them at. The run is the board's, which draws it
-// once for the tiles and the chart alike. Set against the household's
-// run, as a scenario's is on the dashboard, the chance carries the
-// difference in percentage points once both runs are drawn.
+// are drawn, how many have been, in words no wider than the caption the
+// chance lands on, which the tile holds room for, so the row is the
+// height it lands at from the first paint; and a dash, saying why,
+// while there is nothing to draw them at. The run is the board's, which
+// draws it once for the tiles and the chart alike. Set against the
+// household's run, as a scenario's is on the dashboard, the chance
+// carries the difference in percentage points once both runs are drawn,
+// and holds its place until then.
 export function ChanceTile({
   against,
   milestones,
@@ -80,33 +83,22 @@ export function ChanceTile({
     );
   }
   const { futures, isDone } = run;
-  const theirs =
-    against === undefined || "unrun" in against || !against.isDone
-      ? undefined
-      : readingOf(against.futures).chance;
+  const landed = `Of ${formatCount(runLength)} futures, lasting to ${String(endAge(plan))}`;
   return (
     <>
-      {isDone ? (
-        <StatTile
-          action={<DrawAgain />}
-          caption={`Of ${formatCount(runLength)} futures, lasting to ${String(endAge(plan))}`}
-          delta={
-            theirs === undefined
-              ? undefined
-              : (readingOf(futures).chance - theirs) * 100
-          }
-          deltaFormat="points"
-          label={label}
-          value={formatChance(readingOf(futures).chance)}
-        />
-      ) : (
-        <StatTile
-          action={<DrawAgain />}
-          caption={`Drawing ${formatCount(futures.length)} of ${formatCount(runLength)} futures…`}
-          label={label}
-          value="…"
-        />
-      )}
+      <StatTile
+        action={<DrawAgain />}
+        caption={
+          isDone
+            ? landed
+            : `Drawing ${formatCount(futures.length)} of ${formatCount(runLength)}…`
+        }
+        delta={deltaOf(run, against)}
+        deltaFormat="points"
+        holds={landed}
+        label={label}
+        value={isDone ? formatChance(readingOf(futures).chance) : "…"}
+      />
       {reached.map((milestone) => (
         <ReachedTile
           futures={futures}
@@ -118,6 +110,22 @@ export function ChanceTile({
       ))}
     </>
   );
+}
+
+// The chance's difference from the household it is set against, in
+// percentage points, once both runs are drawn; one to come while either
+// is drawn; and none with no household set against it, or one whose
+// futures have nothing to be drawn at.
+function deltaOf(
+  { futures, isDone }: Extract<Run, { readonly isDone: boolean }>,
+  against: Run | undefined,
+): null | number | undefined {
+  if (against === undefined || "unrun" in against) {
+    return undefined;
+  }
+  return isDone && against.isDone
+    ? (readingOf(futures).chance - readingOf(against.futures).chance) * 100
+    : null;
 }
 
 // The button in the corner of every tile the run is read on, drawing
@@ -163,7 +171,7 @@ function ReachedTile({
     return (
       <StatTile
         action={<DrawAgain />}
-        caption={`Reached in ${formatWholePercent(reached / runLength)} of ${formatCount(runLength)} futures`}
+        caption={`Reached in ${formatWholePercent(reached / runLength)} of the futures`}
         icon={Flag}
         isHiddenOnPhone
         label={milestone.name}

@@ -671,7 +671,7 @@ describe("ProjectionBoard", () => {
     // the chart's every column costs about as much as a slice of the run,
     // which the worker double draws on the test's own thread, and the
     // run was looked for at every slice.
-    const chance = screen.getByText("Drawing 0 of 1,000 futures…");
+    const chance = screen.getByText("Drawing 0 of 1,000…");
     // The sentence reads the projection alone, so it is whole before any
     // future is drawn and the same once the run is.
     const headline = screen.getByRole("heading", { level: 2 });
@@ -769,9 +769,7 @@ describe("ProjectionBoard", () => {
     expect(
       await screen.findByRole("button", { name: "Thirty grand 2026" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText("Drawing 20 of 1,000 futures…"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Drawing 20 of 1,000…")).toBeInTheDocument();
     expect(
       screen
         .getAllByText(bySlot("milestone-chip-unplaced"), { suggest: false })

@@ -76,8 +76,9 @@ describe("ChanceTile", () => {
   });
 
   // Eight in ten last, set against a household whose every future lasts,
-  // so twenty points fewer; and nothing set against a household whose
-  // run is still drawn, or has nothing to draw.
+  // so twenty points fewer; the difference's place held while either
+  // run is still drawn; and nothing set against a household that has
+  // nothing to draw.
   it("carries the difference from the household it is set against in percentage points once both runs are drawn", () => {
     const lasting = futures.map((future) => ({
       ...future,
@@ -105,6 +106,19 @@ describe("ChanceTile", () => {
     );
 
     expect(screen.queryByText(/pp$/)).not.toBeInTheDocument();
+    expect(screen.getByText("…")).toHaveClass("figure");
+
+    rerender(
+      <ChanceTile
+        against={{ futures: lasting, isDone: true }}
+        milestones={[]}
+        plan={plan}
+        run={{ futures: futures.slice(0, 5), isDone: false }}
+      />,
+    );
+
+    expect(screen.queryByText(/pp$/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("…")).toHaveLength(2);
 
     rerender(
       <ChanceTile
@@ -116,6 +130,7 @@ describe("ChanceTile", () => {
     );
 
     expect(screen.queryByText(/pp$/)).not.toBeInTheDocument();
+    expect(screen.queryByText("…")).not.toBeInTheDocument();
   });
 
   it("says how many futures are drawn while the run is, for the chance and for each milestone", () => {
@@ -128,7 +143,11 @@ describe("ChanceTile", () => {
     );
 
     expect(screen.getAllByText("…")).toHaveLength(3);
-    expect(screen.getByText("Drawing 3 of 1,000 futures…")).toBeInTheDocument();
+    expect(screen.getByText("Drawing 3 of 1,000…")).toBeInTheDocument();
+    // The caption the chance lands on, held unseen beneath the count.
+    expect(screen.getByText("Of 1,000 futures, lasting to 37")).toHaveClass(
+      "invisible",
+    );
     expect(screen.getAllByText("Drawing the futures…")).toHaveLength(2);
     expect(screen.queryByText("Ada 18")).not.toBeInTheDocument();
     expect(
@@ -172,7 +191,7 @@ describe("ChanceTile", () => {
     expect(screen.getByText("34")).toHaveClass("figure");
     expect(screen.getByText("yrs")).toBeInTheDocument();
     expect(
-      screen.getByText("Reached in 0% of 1,000 futures"),
+      screen.getByText("Reached in 0% of the futures"),
     ).toBeInTheDocument();
     expect(screen.getByText("—")).toHaveClass("figure");
   });
