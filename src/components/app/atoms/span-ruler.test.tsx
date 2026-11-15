@@ -40,10 +40,10 @@ describe("SpanRuler", () => {
       "85%",
     ]);
     expect(marks.map((mark) => mark.textContent)).toStrictEqual([
-      "2030Age 38",
-      "2040Age 48",
-      "2050Age 58",
-      "2060Age 68",
+      "203038",
+      "204048",
+      "205058",
+      "206068",
     ]);
     expect(marks[0]).toHaveClass("w-max", "-translate-x-1/2");
   });
