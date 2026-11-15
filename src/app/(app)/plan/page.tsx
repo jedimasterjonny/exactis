@@ -16,6 +16,7 @@ import { retiresOn } from "@/data/milestones";
 import { endAge, endYear } from "@/data/plan";
 import { cashFlow, inTodaysMoney, totalsOf } from "@/engine/cash-flow";
 import {
+  holdsAnything,
   isShort,
   laidOut,
   movedIn,
@@ -46,15 +47,21 @@ export const metadata: Metadata = { title: planScreen.label };
 // the income schedule takes the accounts too, for the pension a salary
 // may feed, and the owners, for the one a salary opens to belong to, and
 // the expense schedule the accounts, for the mortgage a line pays.
-// The header says what the plan comes to, which is read off every card
-// beneath it, so it is the page's rather than any card's. The plan is
-// read beside the rest, from the same version of the household, and
-// laid out as its own projection has it, so a retirement on conditions
-// falls where the plan at its own rates reaches them and every card and
-// dialog reads the one year; the milestones are told what it is reached
-// on, which the plan laid out no longer says, and what each move made at
-// one comes to as the plan at its own rates makes it, off the one
-// projection of the plan the headline reads too.
+// The screen opens on a sentence saying what the plan comes to, a
+// heading above the cards, since it is read off every card beneath it
+// and so is the page's rather than any card's; there is none where no
+// account holds anything, as the dashboard says none, since there are
+// then no savings for it to speak of. The header keeps its title, and
+// its meta line says the figures are in today's money, one line at
+// every width as the loading screen's is, so the header holds its
+// height as the page lands beneath it. The plan is read beside the
+// rest, from the same version of the household, and laid out as its own
+// projection has it, so a retirement on conditions falls where the plan
+// at its own rates reaches them and every card and dialog reads the one
+// year; the milestones are told what it is reached on, which the plan
+// laid out no longer says, and what each move made at one comes to as
+// the plan at its own rates makes it, off the one projection of the
+// plan the sentence reads too.
 export default async function Plan(): Promise<JSX.Element> {
   const household = await getHousehold();
   const { accounts, milestones, owners } = household;
@@ -70,9 +77,14 @@ export default async function Plan(): Promise<JSX.Element> {
   return (
     <Screen
       label={sectionLabel(planScreen)}
-      meta={headlineOf(run, { onConditions, points, years })}
+      meta="Figures in today's money"
       title={planScreen.title}
     >
+      {points.some(holdsAnything) && (
+        <h2 className="heading text-2xl text-balance tabular-nums">
+          {headlineOf(run, { onConditions, points, years })}
+        </h2>
+      )}
       <MilestoneList
         milestones={milestones}
         onConditions={onConditions}
@@ -103,22 +115,27 @@ export default async function Plan(): Promise<JSX.Element> {
   );
 }
 
-// What the plan comes to, in a month of today's money, as the screens
-// beside this one open on a figure: what a month puts by now, or draws
-// from the savings when it is already short; the first year after whose
-// month draws on them, and how much, since that is where the plan turns;
-// and the age the savings last to, or the age and the year they run out
-// in, or else first fall short in, or, said first, since the savings
-// lasting would then read as the plan doing so, that a retirement on
-// conditions is never reached at the plan's own rates, as the dashboard
-// says it. A year is read by a month of it, over the run the
+// What the plan comes to, in a month of today's money, as the sentence
+// the screen opens on says it: what a month puts by now, or that it
+// puts nothing by, or what it draws from the savings when it is already
+// short; the first year after whose month draws on them, and how much,
+// since that is where the plan turns; and that the savings last to the
+// plan's end if its own rates hold, or the age they run out at, or else
+// first fall short at, at those rates, or, said first, since the
+// savings lasting would then read as the plan doing so, that a
+// retirement on conditions is never reached at its own rates, as the
+// dashboard says it. After a month drawing now the savings are "they",
+// but for after a retirement never reached, where the plan has come
+// between. A year is read by a month of it, over the run the
 // projection's moves carry it by, as the year book reads it, though
 // without what a move leaves its month short, which is drawn once
-// rather than a month at a time; and a month drawing less than a pound
-// is drawing nothing, as the book writes it. The page's one projection
-// of the plan is handed in, with its years as its moves carry them, and
-// what the plan's owner retires on, which the plan laid out no longer
-// says.
+// rather than a month at a time; and a month putting by or drawing less
+// than a pound is doing nothing, as the book writes it. The page's one
+// projection of the plan is handed in, with its years as its moves
+// carry them, and what the plan's owner retires on, which the plan laid
+// out no longer says. A no-break space goes before each year and age,
+// so no line breaks between "from", "at" or "to" and the figure it
+// reads.
 function headlineOf(
   run: {
     readonly accounts: readonly Account[];
@@ -154,50 +171,52 @@ function headlineOf(
       )
         .map((year) => ({ from: year, totals: monthIn(year) }))
         .find(({ totals }) => isDrawing(totals));
-  const said = [
-    isDrawing(now)
-      ? `${formatGbp(now.drawn)} a month drawn from the savings now`
-      : `${formatGbp(now.saved)} a month put by now`,
-    ...(drawing === undefined
-      ? []
-      : [
-          `${formatGbp(drawing.totals.drawn)} a month drawn from ${String(drawing.from)}`,
-        ]),
-  ];
+  const put =
+    Math.round(now.saved) > 0
+      ? `puts by ${formatGbp(now.saved)} now`
+      : "puts nothing by now";
+  const turn =
+    drawing === undefined
+      ? ""
+      : ` and draws ${formatGbp(drawing.totals.drawn)} from\u00a0${String(drawing.from)}`;
+  const lead = isDrawing(now)
+    ? `A month draws ${formatGbp(now.drawn)} from the savings now`
+    : `A month ${put}${turn}`;
   const short = shortfallOf(points);
+  const never =
+    "the plan never reaches its retirement's conditions at its own rates";
   // laidOut lays a retirement on conditions never reached past the
   // plan's end.
   if (onConditions !== undefined && plan.retires > endAge(plan)) {
-    return [
-      ...said,
-      "the plan never reaches its retirement's conditions at its own rates",
-      ...(short === null ? [] : [short]),
-    ].join(" · ");
+    return short === null
+      ? `${lead}, and ${never}.`
+      : `${lead}, ${never}, and the savings ${short}.`;
   }
-  return [...said, short ?? `the savings last to ${String(endAge(plan))}`].join(
-    " · ",
-  );
+  const savings = isDrawing(now) ? "they" : "the savings";
+  const verdict =
+    short === null
+      ? `last to\u00a0${String(endAge(plan))} if the plan's own rates hold`
+      : `${short} at the plan's own rates`;
+  return `${lead}, and ${savings} ${verdict}.`;
 }
 
-// Where the savings fall short, by the age and the year, or null while
-// they last, as the dashboard orders its one verdict: the year they run
-// out in, where they do; else the first year carried only by a pension
-// drawn before the pension age, at a charge that keeps the plan going on
-// paper alone, as the chance of success counts a future that does so as
-// falling short. Where both come, the year book's ledger says the early
-// draw in the year it falls in.
+// Where the savings fall short, by the age, or null while they last, as
+// the dashboard orders its one verdict: the age they run out at, where
+// they do; else the first year carried only by a pension drawn before
+// the pension age, at a charge that keeps the plan going on paper alone,
+// as the chance of success counts a future that does so as falling
+// short. The year book's ledger says the early draw in the year it
+// falls in.
 function shortfallOf(points: readonly ProjectionPoint[]): null | string {
   const runsOut = points.find(({ uncovered }) => uncovered > 0);
   if (runsOut !== undefined) {
-    return `the savings run out ${whenOf(runsOut)}`;
+    return `run out ${whenOf(runsOut)}`;
   }
   const short = points.find(isShort);
-  return short === undefined
-    ? null
-    : `the savings fall short ${whenOf(short)}, carried by an early pension draw`;
+  return short === undefined ? null : `fall short ${whenOf(short)}`;
 }
 
-// A year as the headline names it, by the age reached in it.
-function whenOf({ age, year }: ProjectionPoint): string {
-  return `at ${String(age)}, in ${String(year)}`;
+// An age as the sentence names it.
+function whenOf({ age }: ProjectionPoint): string {
+  return `at\u00a0${String(age)}`;
 }
