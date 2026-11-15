@@ -173,6 +173,30 @@ describe("ProgressChart", () => {
     expect(runsOf("var(--chart-5-2)")).toBe(2);
   });
 
+  // Six months of 2026 read off the accounts of a household with no GIA,
+  // so each month end wrote the GIAs at £0, and whose cash ran dry in
+  // March and April: the GIAs draw no line at all, and the cash breaks
+  // over the months it held nothing, rather than either running along
+  // the top of the ISAs at £0.
+  it("draws no line for a balance over the months it holds nothing", () => {
+    const empty = Array.from({ length: 6 }, (_, index): ProgressPoint => ({
+      assets: 300000,
+      cash: index === 2 || index === 3 ? 0 : 8000,
+      deferred: 100000,
+      free: 50000,
+      house: 300000,
+      loans: -200000,
+      month: { month: index, year: 2026 },
+      taxable: 0,
+      unsecured: -1000,
+    }));
+    render(<ProgressChart planned={[]} points={empty} />);
+
+    expect(runsOf("var(--chart-4)")).toBe(2);
+    expect(runsOf("var(--chart-6)")).toBeUndefined();
+    expect(runsOf("var(--chart-1)")).toBe(1);
+  });
+
   // The cash is drawn over January and February and again from June, and
   // breaks over the months the sheet gave and May, which is drawn
   // between April and June and so carries no cash, where July, between

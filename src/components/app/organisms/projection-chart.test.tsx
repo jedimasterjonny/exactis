@@ -1512,6 +1512,58 @@ describe("ProjectionChart", () => {
     expect(curves.map((curve) => yearsIn(curve))).toStrictEqual([3, 4, 3]);
   });
 
+  // Cash spent by 2032 and the ISA by 2033, as a plan drawing its
+  // savings down spends them: each line stops at the last year it holds
+  // anything, rather than running on along the top of the stack at £0 to
+  // the plan's end, while the pension beneath runs through every year;
+  // and under the crosshair in 2032, cash, holding nothing, has no dot.
+  it("draws nothing for a series in the years it holds nothing, so an account spent leaves no line along the stack", async () => {
+    const years = [
+      { 2: 60000, 3: 20000, 6: 300000 },
+      { 2: 30000, 3: 5000, 6: 320000 },
+      { 2: 10000, 3: 0, 6: 330000 },
+      { 2: 0, 3: 0, 6: 340000 },
+    ].map((balances, place) => ({
+      age: 66 + place,
+      allowances: { 1: lumpSumAllowance },
+      balances,
+      deferred: balances[6],
+      early: 0,
+      free: balances[2],
+      uncovered: 0,
+      year: 2030 + place,
+    }));
+    render(
+      <ProjectionChart
+        accounts={[pension, isa, cash]}
+        milestones={[]}
+        plan={drawing}
+        points={years}
+      />,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Bars" }));
+    const curves = screen.getAllByText(byClass("recharts-area-curve"), {
+      suggest: false,
+    });
+
+    expect(curves.map((curve) => curve.getAttribute("stroke"))).toStrictEqual(
+      [6, 2, 3].map((id) => `var(--color-account-${String(id)})`),
+    );
+    expect(curves.map((curve) => yearsIn(curve))).toStrictEqual([4, 3, 2]);
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    await screen.findByText("2032 · Age 68");
+
+    expect(
+      screen
+        .getAllByText(byClass("recharts-dot"), { suggest: false })
+        .map((dot) => dot.getAttribute("fill")),
+    ).toStrictEqual([6, 2].map((id) => `var(--color-account-${String(id)})`));
+  });
+
   // A second ISA arriving with the household beside the pension and the
   // ISA stacks beneath the outline, as it is written, rather than above
   // it, in the order it was first drawn; a switch of basis draws nothing
