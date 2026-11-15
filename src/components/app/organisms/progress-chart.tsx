@@ -95,9 +95,10 @@ const states: Readonly<Record<Row["state"], string | undefined>> = {
 };
 
 // What each balance stands at in a month, as recharts reads a series,
-// and net worth beside them. A debt owing nothing breaks, as the
+// and net worth beside them. A balance of nothing breaks, as the
 // dashboard's does: split by sign, a series of nothing counts as held,
-// and its line would leap to the top of the stack for the month. A
+// and its line would run along the top of what is stacked beneath it,
+// a debt's leaping to the top of the stack for the month. A
 // balance the month's point was not read with is null too, which
 // recharts stacks as nothing, so what is stacked above it stays where
 // it is, and draws no line through. Made once, as the fan's bands are,
@@ -111,7 +112,7 @@ const series = balances.map((key) => ({
       return null;
     }
     const value = row.point[key] ?? null;
-    return owed.includes(key) && value === 0 ? null : value;
+    return value === 0 ? null : value;
   },
 }));
 

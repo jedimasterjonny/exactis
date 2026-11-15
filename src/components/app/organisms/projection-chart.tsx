@@ -598,25 +598,24 @@ export function ProjectionPending(): JSX.Element {
 }
 
 // What an area draws for a series, a year at a time: its figure in a
-// year it is drawn, and a break in any other, so it leaves the plot
-// rather than drawing its line along its place in the stack; save in a
-// year beside one where a pension it sums turns locked or unlocked,
-// where it stands at nothing, so its line runs down to its place in the
-// stack rather than standing on a year alone. A debt is drawn while it owes
-// anything, so it leaves the plot once paid off, since split by sign a
-// series of nothing counts as held and a debt at nothing would draw its
-// line along the top of the stack for the rest of the plan; a pension's
-// outline while it is locked; and anything else while nothing of it is,
-// so a pension's band breaks where its outline is drawn and the two
-// meet in the years either side. The stack reads a break as nothing, so
-// what stacks beyond it stacks as before.
+// year it stands at anything, and a break in any other, so it leaves the
+// plot rather than drawing its line along its place in the stack, since
+// split by sign a series of nothing counts as held, and its line would
+// run along the top of the stack for as long as it held nothing: a debt
+// once paid off, cash once spent, a pension's band while it is locked
+// and its outline once it is not. Save in a year beside one where a
+// pension it sums turns locked or unlocked, where it stands at nothing,
+// so its line runs down to its place in the stack rather than standing
+// on a year alone, and a pension's band and its outline meet in the
+// years either side. The stack reads a break as nothing, so what stacks
+// beyond it stacks as before.
 function areaOf(
   line: Pick<Series, "ids" | "valueAt">,
-  isDrawn: (point: Counted) => boolean,
 ): (point: Counted) => null | number {
   return (point) => {
-    if (isDrawn(point)) {
-      return line.valueAt(point);
+    const value = line.valueAt(point);
+    if (value !== 0) {
+      return value;
     }
     return line.ids.some((id) => point.turning.has(id)) ? 0 : null;
   };
@@ -1028,8 +1027,7 @@ function scaleOf(
 // outline, which stands at what is locked of it and is made once as
 // they are, in the colour of the pension's own band. What a series
 // stands at and what its area draws, as areaOf has it, are made once
-// with it: a debt drawn while it owes anything, and anything else while
-// nothing of it is locked.
+// with it: each drawn in the years it stands at anything.
 function seriesOf(
   accounts: readonly Account[],
 ): Record<"locked" | Basis, readonly Series[]> {
@@ -1038,19 +1036,9 @@ function seriesOf(
     secures !== undefined && assets.has(secures);
   const readers = (
     ids: readonly number[],
-    isOwed: boolean,
   ): Pick<Series, "areaAt" | "valueAt"> => {
     const valueAt = (point: Counted): number => valueIn(point, { ids });
-    return {
-      areaAt: areaOf(
-        { ids, valueAt },
-        isOwed
-          ? (point): boolean => valueAt(point) !== 0
-          : (point): boolean =>
-              valueIn({ balances: point.locked }, { ids }) === 0,
-      ),
-      valueAt,
-    };
+    return { areaAt: areaOf({ ids, valueAt }), valueAt };
   };
   const drawn = families.flatMap((family) =>
     accounts
@@ -1064,7 +1052,7 @@ function seriesOf(
             .map((loan) => loan.id),
         ];
         const series: Series = {
-          ...readers(ids, kind === "debt"),
+          ...readers(ids),
           color: `color-mix(in oklab, ${hueAt(family.hues, place)}, var(--card) ${String(Math.min(Math.floor(place / family.hues.length), 2) * 30)}%)`,
           family,
           ids,
@@ -1091,12 +1079,7 @@ function seriesOf(
           const ids = owing.flatMap((each) => each.series.ids);
           return {
             account,
-            series: {
-              ...series,
-              ...readers(ids, series.isOwed),
-              ids,
-              name: mortgage.name,
-            },
+            series: { ...series, ...readers(ids), ids, name: mortgage.name },
           };
         },
       },
@@ -1106,10 +1089,7 @@ function seriesOf(
         valueIn({ balances: point.locked }, series);
       return {
         ...series,
-        areaAt: areaOf(
-          { ids: series.ids, valueAt },
-          (point) => valueAt(point) !== 0,
-        ),
+        areaAt: areaOf({ ids: series.ids, valueAt }),
         valueAt,
       };
     }),
