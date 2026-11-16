@@ -80,6 +80,25 @@ describe("ScreenTabs", () => {
     expect(rates).toHaveStyle({ visibility: "hidden" });
   });
 
+  // A row wider than the body scrolls inside it; centred, it would spill
+  // past its start, where no scroll reaches, and at the registry's fixed
+  // height a desktop's scrollbar would be drawn over the tabs.
+  it("keeps the tabs to the body's width, scrolling them from the first", () => {
+    renderTabs();
+
+    const list = screen.getByRole("tablist");
+
+    expect(list).toHaveClass(
+      "max-w-full",
+      "overflow-x-auto",
+      "overflow-y-hidden",
+      "justify-start",
+      "group-data-horizontal/tabs:h-auto",
+    );
+    expect(list).not.toHaveClass("justify-center");
+    expect(list).not.toHaveClass("group-data-horizontal/tabs:h-8");
+  });
+
   it("lets the open panel take the focus, and rings it when it does", () => {
     renderTabs();
 
