@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 
 import { accounts } from "@/data/accounts.fixture";
@@ -29,13 +30,17 @@ vi.mock("@/actions/owners", () => ({
 }));
 
 // The page over the fixture's household, as the store reads it, with
-// the expense lines a test gives.
+// the accounts and expense lines a test gives.
 async function renderAccounts({
   expenses = [],
-}: { readonly expenses?: readonly ExpenseLine[] } = {}): Promise<void> {
+  held = accounts,
+}: {
+  readonly expenses?: readonly ExpenseLine[];
+  readonly held?: readonly Account[];
+} = {}): Promise<void> {
   vi.mocked(getHousehold).mockResolvedValue({
     ...soundKept(blank).household,
-    accounts: [...accounts],
+    accounts: [...held],
     children,
     owners,
     plan,
@@ -49,7 +54,7 @@ describe("Accounts", () => {
     expect(metadata).toStrictEqual({ title: "Accounts & assets" });
   });
 
-  it("opens with the header, the month its balances are as of, and the month end that moves it", async () => {
+  it("opens with the header, the month its balances are as of, the month end that moves it, and the net worth the plan starts from", async () => {
     await renderAccounts();
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -58,15 +63,24 @@ describe("Accounts", () => {
     expect(screen.getByText("Sect. III · Accounts & assets")).toHaveClass(
       "label",
     );
-    // The fixture's balances come to £901,462, its mortgage taking away,
-    // and £842,716 once its pension is counted at what drawing it would
-    // leave, as the plan's first year opens; its plan runs from
-    // September, so they are as of August's end.
+    // The fixture's plan runs from September, so its balances are as of
+    // August's end.
     expect(
-      screen.getByText(
-        "Starting net worth £842,716 · balances as of the end of August 2026",
-      ),
+      screen.getByText("Balances as of the end of August 2026"),
     ).toBeInTheDocument();
+    // The balances come to £901,462, the mortgage taking away, and
+    // £842,716 once the pension is counted at what drawing it would
+    // leave, as the plan's first year opens; the screen opens on that,
+    // above the cards' titles.
+    expect(
+      screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
+    ).toStrictEqual([
+      "The plan starts from a\u00a0net\u00a0worth of £842,716.",
+      "Balance sheet",
+      "Where the month's money goes",
+      "Owners",
+      "Children",
+    ]);
     // The fixture's balances were kept before their days were, so no
     // group of them is dated.
     expect(
@@ -77,6 +91,34 @@ describe("Accounts", () => {
         name: "Update balances",
       }),
     ).toHaveAttribute("href", "/close");
+  });
+
+  // With no account there is nothing for the plan to start from, and
+  // the balance sheet's empty state says so, so the screen opens on
+  // the cards.
+  it("says no sentence where there is no account", async () => {
+    await renderAccounts({ held: [] });
+
+    expect(
+      screen.getByText("Balances as of the end of August 2026"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
+    ).toStrictEqual(["Balance sheet", "Owners", "Children"]);
+    expect(
+      screen.getByText("Nothing on the balance sheet yet"),
+    ).toBeInTheDocument();
+  });
+
+  // The current account's £16,900 against the mortgage's £176,520, with
+  // no pension to count the drawing of, leaves the plan £159,620 below
+  // nothing, signed as the balance sheet's total writes it.
+  it("signs a net worth below nothing", async () => {
+    await renderAccounts({ held: [accounts[2], accounts[4]] });
+
+    expect(screen.getAllByRole("heading", { level: 2 })[0]?.textContent).toBe(
+      "The plan starts from a\u00a0net\u00a0worth of −£159,620.",
+    );
   });
 
   // The fixture's salary feeds the workplace pension, which the ledger

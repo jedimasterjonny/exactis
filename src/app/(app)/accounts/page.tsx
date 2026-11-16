@@ -35,15 +35,19 @@ export const metadata: Metadata = { title: accountsAndAssets.label };
 // projection has it, so an owner already past the conditions they
 // retire on earns no salary in that month, and the milestones it is
 // laid out by that a house may move at, for the one it moves at. The header is the
-// page's, as the plan screen's is, since it reads that month and what
-// the balances come to and nothing else: it says the starting net worth
-// and the month the balances are as of, the one before the plan starts
-// in, at whose end they were read, as the assumptions screen's says the
-// plan rate, and links to the month end, which moves the month on and
-// checks the balances against it, over the body the ledger lays its
-// sections out in, which opens on how fresh the balances are, as the
-// assumptions screen's opens on how fresh its sources are. The day is
-// read once on the server.
+// page's, as the plan screen's is, since it reads that month: it says
+// the month the balances are as of, the one before the plan starts in,
+// at whose end they were read, and links to the month end, which moves
+// the month on and checks the balances against it. The body opens on a
+// sentence saying the net worth the plan starts from, what the balances
+// come to once the pensions are counted at what drawing them would
+// leave, which is the balance sheet's own total and what the plan's
+// first year opens on, as the other screens open on their answers; with
+// no account there is no sentence, since the sheet's empty state says
+// it. No-break spaces bind "a net worth", so no line breaks inside it.
+// Beneath the sentence the strip says how fresh the balances are, as
+// the assumptions screen's says how fresh its sources are, over the
+// sections the ledger lays out. The day is read once on the server.
 export default async function Accounts(): Promise<JSX.Element> {
   const household = await getHousehold();
   const { accounts, owners } = household;
@@ -62,9 +66,14 @@ export default async function Accounts(): Promise<JSX.Element> {
         </Link>
       }
       label={sectionLabel(accountsAndAssets)}
-      meta={`Starting net worth ${formatGbp(balanceOf(accounts) - drawingTaxOf(accounts))} · balances as of the end of ${formatMonth(monthBefore({ month: plan.month, year: plan.from }))}`}
+      meta={`Balances as of the end of ${formatMonth(monthBefore({ month: plan.month, year: plan.from }))}`}
       title={accountsAndAssets.title}
     >
+      {accounts.length > 0 && (
+        <h2 className="heading text-2xl text-balance tabular-nums">
+          {`The plan starts from a\u00a0net\u00a0worth of ${formatGbp(balanceOf(accounts) - drawingTaxOf(accounts))}.`}
+        </h2>
+      )}
       <BalanceDates accounts={accounts} today={day} />
       <AccountLedger
         accounts={accounts}
