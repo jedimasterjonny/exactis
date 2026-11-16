@@ -11,6 +11,7 @@ import { RateSet } from "@/components/app/organisms/rate-set";
 import { StatePension } from "@/components/app/organisms/state-pension";
 import { TargetAllocation } from "@/components/app/organisms/target-allocation";
 import { Screen } from "@/components/app/templates/screen";
+import { realRate } from "@/data/rates";
 import { laidOut } from "@/engine/projection";
 import { formatPercent } from "@/lib/money";
 import { today } from "@/lib/months";
@@ -22,7 +23,7 @@ export const metadata: Metadata = { title: assumptions.label };
 // What the header calls each set of rates.
 const setNames: Record<Chosen, string> = {
   cma: "CMA-derived rates",
-  custom: "custom rates",
+  custom: "Custom rates",
 };
 
 // The assumptions the plan runs on, under a strip saying how old each
@@ -44,10 +45,14 @@ const setNames: Record<Chosen, string> = {
 // glide path, the bond share by age it sets. The fourth holds the State
 // Pension, each owner's qualifying years and what they earn, counted to
 // the retirement the plan lays out as its own projection has it, as the
-// plan screen lays it out. The header says what
-// the plan grows at and what its prices rise by, made from the rates
-// live, and which set those are, so the screen answers its question
-// before a card is read, whichever tab is open. The tab the address
+// plan screen lays it out. The header names the set of rates live, and
+// the body opens, above the strip and the tabs, on a sentence saying
+// the plan rate, what it comes to in today's money at the plan's
+// inflation, the rates worksheet's own real return, and that inflation,
+// so the screen answers its question before a card is read, whichever
+// tab is open; on a glide path the rate is the one it holds now, so the
+// sentence says "now". No-break spaces bind "a year" and "today's
+// money", so no line breaks inside either. The tab the address
 // names, as ?tab=glide-path does, is the one open as the screen opens.
 // The page reads the store, which reads the session first, so it
 // renders behind the loading screen beside it.
@@ -80,9 +85,12 @@ export default async function Assumptions({
   return (
     <Screen
       label={sectionLabel(assumptions)}
-      meta={`Plan rate ${formatPercent(plan.rate)} · inflation ${formatPercent(plan.inflation)} · ${setNames[rateSet]}`}
+      meta={setNames[rateSet]}
       title={assumptions.title}
     >
+      <h2 className="heading text-2xl text-balance tabular-nums">
+        {`The plan rate is ${formatPercent(plan.rate)} a\u00a0year${hasGlide ? " now" : ""}, ${formatPercent(realRate(plan.rate, plan.inflation))} in today's\u00a0money at ${formatPercent(plan.inflation)} inflation.`}
+      </h2>
       <SourceDates
         cma={cma}
         curve={curve}

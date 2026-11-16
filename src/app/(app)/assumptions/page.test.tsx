@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Household } from "@/data/household";
@@ -83,7 +89,9 @@ describe("Assumptions", () => {
     expect(metadata).toStrictEqual({ title: "Assumptions" });
   });
 
-  it("says what the plan grows at and what its prices rise by, and hands the store's rates, split and curve to their cards", async () => {
+  // 7.25% a year over prices rising 2.95% a year is 1.0725 / 1.0295, 4.18%
+  // a year in today's money, the worksheet's real return beneath.
+  it("opens on the plan rate in today's money under the set's name, and hands the store's rates, split and curve to their cards", async () => {
     vi.mocked(getHousehold).mockResolvedValue({
       ...household,
       plan: { ...retiring, inflation: 0.0295, rate: 0.0725 },
@@ -96,8 +104,15 @@ describe("Assumptions", () => {
     );
     expect(screen.getByText("Sect. VI · Assumptions")).toHaveClass("label");
     expect(
-      screen.getByText("Plan rate 7.25% · inflation 2.95% · custom rates"),
+      within(screen.getByRole("banner")).getByText("Custom rates"),
     ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
+    ).toStrictEqual([
+      "The plan rate is 7.25% a\u00a0year, 4.18% in today's\u00a0money at 2.95% inflation.",
+      "Custom rates",
+      "Inflation source",
+    ]);
     expect(screen.getByRole("textbox", { name: "Stocks growth" })).toHaveValue(
       "5.95%",
     );
@@ -171,12 +186,15 @@ describe("Assumptions", () => {
     expect(
       screen.queryByRole("region", { name: "Custom rates" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/^Plan rate .+ custom rates$/)).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 2 })[0]).toHaveTextContent(
+      /^The plan rate is .+ inflation\.$/,
+    );
   });
 
   // At 34 the glide path holds fifteen points of bonds, as it does to 52,
-  // rising to 40 by 60, which falls in 2052.
-  it("hands the glide path to its card in the third tab, and the split it holds now to the rates typed, read-only", async () => {
+  // rising to 40 by 60, which falls in 2052; the plan rate is the one it
+  // grows at now.
+  it("hands the glide path to its card in the third tab, and the split it holds now to the rates typed, read-only, and says the plan rate is the one it holds now", async () => {
     vi.mocked(getHousehold).mockResolvedValue({
       ...household,
       glide: [
@@ -188,6 +206,9 @@ describe("Assumptions", () => {
 
     render(await page());
 
+    expect(screen.getAllByRole("heading", { level: 2 })[0]?.textContent).toBe(
+      "The plan rate is 5.00% a\u00a0year now, 5.00% in today's\u00a0money at 0.00% inflation.",
+    );
     expect(screen.getByRole("textbox", { name: "Stocks share" })).toHaveValue(
       "90.00%",
     );
@@ -202,14 +223,32 @@ describe("Assumptions", () => {
     ).toBeInTheDocument();
   });
 
+  // 1% a year over prices rising 3% a year is 1.01 / 1.03, 1.94% a year
+  // less in today's money, signed as the worksheet signs it.
+  it("says a real return below nothing as its signed figure", async () => {
+    vi.mocked(getHousehold).mockResolvedValue({
+      ...household,
+      plan: { ...retiring, inflation: 0.03, rate: 0.01 },
+    });
+
+    render(await page());
+
+    expect(screen.getAllByRole("heading", { level: 2 })[0]?.textContent).toBe(
+      "The plan rate is 1.00% a\u00a0year, −1.94% in today's\u00a0money at 3.00% inflation.",
+    );
+  });
+
   // A link to the glide path names its tab in the address, and the
-  // screen opens on it rather than on the rates.
+  // screen opens on it rather than on the rates, under the same sentence.
   it("opens on the tab the address names", async () => {
     render(await page({ tab: "glide-path" }));
 
     expect(screen.getByRole("tab", { name: "Glide path" })).toHaveAttribute(
       "aria-selected",
       "true",
+    );
+    expect(screen.getAllByRole("heading", { level: 2 })[0]).toHaveTextContent(
+      /^The plan rate is .+ inflation\.$/,
     );
   });
 
@@ -310,9 +349,9 @@ describe("Assumptions", () => {
 
   // August's blends less the deductions run stocks at 7.84% in all and
   // bonds at 4.25%, so the target allocation's four fifths in stocks grow
-  // at 7.52% with what rebalancing earns, which the line above the cards
-  // reads off the plan the store hands it; the rates and the split typed
-  // by hand are kept, not shown.
+  // at 7.52% with what rebalancing earns, which the sentence above the
+  // cards reads off the plan the store hands it, 4.44% in today's money;
+  // the rates and the split typed by hand are kept, not shown.
   it("says the CMA-derived rates are live and lays out their worksheet, with the target split in place of the split typed", async () => {
     vi.mocked(getHousehold).mockResolvedValue({
       ...household,
@@ -323,8 +362,11 @@ describe("Assumptions", () => {
     render(await page());
 
     expect(
-      screen.getByText("Plan rate 7.52% · inflation 2.95% · CMA-derived rates"),
+      within(screen.getByRole("banner")).getByText("CMA-derived rates"),
     ).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 2 })[0]?.textContent).toBe(
+      "The plan rate is 7.52% a\u00a0year, 4.44% in today's\u00a0money at 2.95% inflation.",
+    );
     expect(screen.getByRole("radio", { name: "From CMA" })).toBeChecked();
     expect(
       screen.getByRole("region", { name: "CMA-derived rates" }),
