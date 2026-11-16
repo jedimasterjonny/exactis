@@ -48,15 +48,21 @@ interface Tab {
 // held when the tab is left and opened again rather than offered a
 // second time. The open panel takes the focus after the tabs, and shows
 // the ring every control here shows, which the registry's panel takes
-// away.
+// away. The tabs keep to the body's width: where their names are wider,
+// on a phone or under larger text spacing, the row scrolls sideways
+// inside it from its first tab, rather than widening the screen, and
+// the tab open as the screen opens, and one the arrow keys reach, is
+// scrolled into view. It scrolls only sideways, and is as tall as its
+// tabs, so a scrollbar a desktop draws sits beneath them rather than
+// over them.
 export function ScreenTabs({ open, tabs }: ScreenTabsProps): JSX.Element {
   const opening =
     tabs.find(
       ({ label }) => label.toLowerCase().replaceAll(" ", "-") === open,
     ) ?? tabs[0];
   return (
-    <Tabs className="relative gap-5" defaultValue={opening.label}>
-      <TabsList>
+    <Tabs className="relative min-w-0 gap-5" defaultValue={opening.label}>
+      <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden group-data-horizontal/tabs:h-auto">
         {tabs.map(({ label }) => (
           <TabsTrigger key={label} value={label}>
             {label}
