@@ -294,6 +294,83 @@ describe("ProgressChart", () => {
     );
   });
 
+  // Four months of 2026, the first two read off the sheet, so with no
+  // cash or GIAs, and the next two closed here for a household holding
+  // neither, so written at £0, the cards clear in April: the crosshair
+  // keeps a dash for a balance not read and leaves out one at £0. Each
+  // month is looked for in the crosshair alone, since recharts leaves a
+  // hidden span in the body holding the last label it measured, which a
+  // test marking these months by name before this one leaves behind.
+  it("leaves a balance holding nothing out of the crosshair, and keeps a dash for one not read", async () => {
+    const closed = Array.from({ length: 4 }, (_, index): ProgressPoint => {
+      const point = {
+        assets: 300000,
+        deferred: 100000,
+        free: 50000,
+        house: 300000,
+        loans: -200000,
+        month: { month: index, year: 2026 },
+        unsecured: index === 3 ? 0 : -1000,
+      };
+      return index < 2 ? point : { ...point, cash: 0, taxable: 0 };
+    });
+    render(<ProgressChart planned={[]} points={closed} />);
+
+    const chart = screen.getByRole("application");
+    chart.focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    expect(
+      await within(await screen.findByRole("status")).findByText("Feb 2026"),
+    ).toHaveClass("font-medium");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      [
+        "Feb 2026",
+        "Property & vehicles£300,000",
+        "Cash—",
+        "GIAs—",
+        "ISAs£50,000",
+        "Pensions£100,000",
+        "Secured loans−£200,000",
+        "Other debts−£1,000",
+        "Net worth£249,000",
+      ].join(""),
+    );
+
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    expect(
+      await within(await screen.findByRole("status")).findByText("Mar 2026"),
+    ).toHaveClass("font-medium");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      [
+        "Mar 2026",
+        "Property & vehicles£300,000",
+        "ISAs£50,000",
+        "Pensions£100,000",
+        "Secured loans−£200,000",
+        "Other debts−£1,000",
+        "Net worth£249,000",
+      ].join(""),
+    );
+
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+
+    expect(
+      await within(await screen.findByRole("status")).findByText("Apr 2026"),
+    ).toHaveClass("font-medium");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      [
+        "Apr 2026",
+        "Property & vehicles£300,000",
+        "ISAs£50,000",
+        "Pensions£100,000",
+        "Secured loans−£200,000",
+        "Net worth£250,000",
+      ].join(""),
+    );
+  });
+
   // The dash starts on the pixel net worth ends on, at December's mark,
   // and every balance stops there.
   it("draws the plan dashed from the latest point over the months planned, and no balance past it", () => {

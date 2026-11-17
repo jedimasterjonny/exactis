@@ -348,13 +348,13 @@ function rowsOf(
 }
 
 // The month under the crosshair, and for a month not kept that it was
-// not, then each balance, from the top of the stack down as the plot
-// reads, a dash for one its point was not read with, and net worth
-// beneath a rule; for a month planned, that it was planned and net
-// worth alone. A status, so a
-// screen reader reads it out as the crosshair steps. The month is found
-// by where the crosshair stands rather than read out of the entry
-// recharts hands over, which is untyped.
+// not, then each balance holding or owing anything, from the top of the
+// stack down as the plot reads, a dash for one its point was not read
+// with, and net worth beneath a rule; for a month planned, that it was
+// planned and net worth alone. A status, so a screen reader reads it
+// out as the crosshair steps. The month is found by where the crosshair
+// stands rather than read out of the entry recharts hands over, which
+// is untyped.
 function RowTooltip({
   active: isActive,
   label,
@@ -374,18 +374,20 @@ function RowTooltip({
         )}
       </span>
       {row.state !== "planned" &&
-        [...held.toReversed(), ...owed].map((key) => (
-          <span className="flex items-center gap-2" key={key}>
-            <span
-              aria-hidden
-              className={cn("h-0.5 w-3 rounded-full", balanceFills[key])}
-            />
-            <span className="text-muted-foreground">{balanceNames[key]}</span>
-            <span className="ml-auto figure font-medium">
-              {formatBalance(row.point[key])}
+        [...held.toReversed(), ...owed]
+          .filter((key) => row.point[key] !== 0)
+          .map((key) => (
+            <span className="flex items-center gap-2" key={key}>
+              <span
+                aria-hidden
+                className={cn("h-0.5 w-3 rounded-full", balanceFills[key])}
+              />
+              <span className="text-muted-foreground">{balanceNames[key]}</span>
+              <span className="ml-auto figure font-medium">
+                {formatBalance(row.point[key])}
+              </span>
             </span>
-          </span>
-        ))}
+          ))}
       <span className="flex items-center gap-2 border-t pt-1.5">
         <span className="font-medium">Net worth</span>
         <span className="ml-auto figure font-medium">
