@@ -15,4 +15,12 @@ describe("Loading", () => {
     );
     expect(screen.getByText("Reading the store…")).toBeInTheDocument();
   });
+
+  it("draws the link to the month end it lands with, live", () => {
+    render(<Loading />);
+
+    expect(
+      screen.getByRole("link", { name: "Update balances" }),
+    ).toHaveAttribute("href", "/close");
+  });
 });

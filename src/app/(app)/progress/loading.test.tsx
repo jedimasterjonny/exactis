@@ -13,4 +13,12 @@ describe("Loading", () => {
     expect(screen.getByText("Sect. V · Progress")).toHaveClass("label");
     expect(screen.getByText("Reading the store…")).toBeInTheDocument();
   });
+
+  it("draws the pull of house prices it lands with, held", () => {
+    render(<Loading />);
+
+    expect(
+      screen.getByRole("button", { name: "Pull house prices" }),
+    ).toBeDisabled();
+  });
 });
