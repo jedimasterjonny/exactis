@@ -72,8 +72,9 @@ interface Scale {
 // an account's is; a narrow table folds each
 // month to what net worth moved by since the point before it and where
 // it ended, a tap opening it to its balances a line apiece, each by a
-// dot in its fill. A household keeping no point yet draws what would
-// fill the card rather than an empty one.
+// dot in its fill, which it keeps where colours are forced, as the
+// chart of the same balances keeps its own. A household keeping no
+// point yet draws what would fill the card rather than an empty one.
 export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
   const [first] = points;
   const last = points.at(-1);
@@ -166,7 +167,7 @@ export function ProgressPoints({ points }: ProgressPointsProps): JSX.Element {
                                 <span
                                   aria-hidden
                                   className={cn(
-                                    "size-2 rounded-full",
+                                    "size-2 rounded-full forced-color-adjust-none",
                                     balanceFills[key],
                                   )}
                                 />

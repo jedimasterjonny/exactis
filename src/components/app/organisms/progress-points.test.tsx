@@ -134,6 +134,12 @@ describe("ProgressPoints", () => {
       "Secured loans−£196,000",
       "Other debts−£2,000",
     ]);
+    // jsdom forces no colours, so the class that keeps each dot's fill is
+    // what is read.
+    for (const item of within(month).getAllByRole("listitem")) {
+      // eslint-disable-next-line testing-library/no-node-access -- the dot is hidden from the tree and has no text, so it is reached from the line it opens
+      expect(item.firstElementChild).toHaveClass("forced-color-adjust-none");
+    }
   });
 
   // Five month-ends in a row; then four, February 2025 not kept.

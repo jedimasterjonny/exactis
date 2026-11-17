@@ -106,4 +106,14 @@ describe("SegmentBar", () => {
     ]);
     expect(rest()).not.toBeInTheDocument();
   });
+
+  // jsdom forces no colours, so the class that keeps them is what is
+  // read, on the bar, whose parts and rest take it from there.
+  it("keeps its fills under forced colours", () => {
+    render(<SegmentBar groups={[lasting, short]} total={1000} />);
+
+    expect(
+      screen.getByText(bySlot("segment-bar"), { suggest: false }),
+    ).toHaveClass("forced-color-adjust-none");
+  });
 });

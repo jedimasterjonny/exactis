@@ -270,6 +270,12 @@ describe("ProgressChart", () => {
         "Net worth£250,000",
       ].join(""),
     );
+    // jsdom forces no colours, so the class that keeps the stroke's is
+    // what is read.
+    const isas = within(screen.getByRole("status")).getByText("ISAs");
+
+    // eslint-disable-next-line testing-library/no-node-access -- the stroke is hidden from the tree and has no text, so it is reached from the name it keys
+    expect(isas.previousElementSibling).toHaveClass("forced-color-adjust-none");
 
     fireEvent.keyDown(chart, { key: "ArrowRight" });
     fireEvent.keyDown(chart, { key: "ArrowRight" });

@@ -48,4 +48,38 @@ describe("LegendTable", () => {
         .map((swatch) => swatch.classList.contains("bg-outcome-surplus")),
     ).toStrictEqual([true, false]);
   });
+
+  // jsdom forces no colours, so the class that keeps them is what is
+  // read.
+  it("keeps each swatch in its fill under forced colours", () => {
+    render(
+      <LegendTable
+        caption="Lasted · 900"
+        entries={[
+          {
+            figure: "60%",
+            fill: "bg-outcome-surplus",
+            key: "surplus",
+            name: "Large surplus",
+          },
+          {
+            figure: "40%",
+            fill: "bg-outcome-comfortable",
+            key: "comfortable",
+            name: "Comfortable",
+          },
+        ]}
+      />,
+    );
+
+    const swatches = screen.getAllByText(bySlot("legend-swatch"), {
+      suggest: false,
+    });
+
+    expect(swatches).toHaveLength(2);
+
+    for (const swatch of swatches) {
+      expect(swatch).toHaveClass("forced-color-adjust-none");
+    }
+  });
 });
