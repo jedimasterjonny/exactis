@@ -203,6 +203,40 @@ describe("AgeField", () => {
     expect(screen.getByRole("paragraph")).toHaveTextContent("Tried here only");
   });
 
+  // jsdom forces no colours, so the classes that do are what is read.
+  it("outlines the slider's track and fills its range in the text colour under forced colours, floating or in the flow", () => {
+    render(
+      <>
+        <AgeField
+          label="Retirement age"
+          max={91}
+          min={34}
+          onValueCommitted={vi.fn<(age: number) => void>()}
+          value={61}
+        />
+        <AgeField
+          isSliderInFlow
+          label="Pension age"
+          max={91}
+          min={34}
+          onValueCommitted={vi.fn<(age: number) => void>()}
+          value={67}
+        />
+      </>,
+    );
+
+    const controls = screen.getAllByText(bySlot("slider"), { suggest: false });
+
+    expect(controls).toHaveLength(2);
+
+    for (const control of controls) {
+      expect(control).toHaveClass(
+        "forced-colors:[&_[data-slot=slider-range]]:bg-[CanvasText]",
+        "forced-colors:[&_[data-slot=slider-track]]:outline",
+      );
+    }
+  });
+
   // The arrow keys move the thumb as a drag does, Shift by five years,
   // reporting the age it moves to and committing it in the one step.
   it("reports each age the slider in the flow moves through, five years with Shift, and commits the one it stops at", () => {

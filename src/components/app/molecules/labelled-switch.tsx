@@ -33,7 +33,10 @@ const tones: Record<
 // A switch between two states, named: an icon and the name of the state
 // the switch is in now, in the micro-label face, with the switch at the
 // right. The name is the switch's accessible name, since the label wraps
-// it, so a caller names the state and never the control.
+// it, so a caller names the state and never the control. Where colours
+// are forced, a switch on is filled in the system's highlight, its thumb
+// drawn on it, since forcing paints the fill and the thumb in the page's
+// colour alike.
 export function LabelledSwitch({
   children,
   className,
@@ -55,7 +58,10 @@ export function LabelledSwitch({
       <span className="flex-1">{children}</span>
       <Switch
         checked={isChecked}
-        className={tones[tone].switch}
+        className={cn(
+          "forced-colors:data-checked:bg-[Highlight]",
+          tones[tone].switch,
+        )}
         onCheckedChange={onCheckedChange}
         size="sm"
       />

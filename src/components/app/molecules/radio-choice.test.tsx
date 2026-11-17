@@ -68,4 +68,20 @@ describe("RadioChoice", () => {
     expect(cma).not.toBeChecked();
     expect(screen.getByRole("radio", { name: "Custom" })).toBeChecked();
   });
+
+  // jsdom forces no colours, so the classes that do are what is read.
+  it("fills a radio chosen in the text colour under forced colours, in the dark theme too", () => {
+    render(
+      <RadioGroup aria-label="Rate set" defaultValue="custom">
+        <RadioChoice label="Custom" value="custom">
+          One rate per class, typed by hand
+        </RadioChoice>
+      </RadioGroup>,
+    );
+
+    expect(screen.getByRole("radio", { name: "Custom" })).toHaveClass(
+      "forced-colors:data-checked:bg-[CanvasText]",
+      "forced-colors:dark:data-checked:bg-[CanvasText]",
+    );
+  });
 });
