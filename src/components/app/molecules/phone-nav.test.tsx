@@ -81,6 +81,18 @@ describe("PhoneNav", () => {
     ).not.toHaveAttribute("data-current");
   });
 
+  // jsdom forces no colours, so the classes that do are what is read.
+  it("draws the current tab's rule in the text colour under forced colours, as the page or through More", () => {
+    const bar = barOn("/progress", closed);
+
+    expect(within(bar).getByRole("link", { current: "page" })).toHaveClass(
+      "forced-colors:aria-[current=page]:before:bg-[CanvasText]",
+    );
+    expect(within(bar).getByRole("button", { name: "More" })).toHaveClass(
+      "forced-colors:data-current:before:bg-[CanvasText]",
+    );
+  });
+
   it("marks More on a screen it reaches, with no tab as the page", () => {
     const bar = barOn("/accounts", closed);
 

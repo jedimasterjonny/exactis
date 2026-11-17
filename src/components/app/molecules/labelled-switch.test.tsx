@@ -53,4 +53,23 @@ describe("LabelledSwitch", () => {
       "text-sidebar-foreground/60",
     );
   });
+
+  // jsdom forces no colours, so the class that does is what is read.
+  it("fills a switch on in the system's highlight under forced colours, beside the sidebar's oxide", () => {
+    render(
+      <LabelledSwitch
+        icon={Sun}
+        isChecked
+        onCheckedChange={vi.fn<(isChecked: boolean) => void>()}
+        tone="sidebar"
+      >
+        Night watch
+      </LabelledSwitch>,
+    );
+
+    expect(screen.getByRole("switch", { name: "Night watch" })).toHaveClass(
+      "forced-colors:data-checked:bg-[Highlight]",
+      "data-checked:bg-sidebar-primary",
+    );
+  });
 });

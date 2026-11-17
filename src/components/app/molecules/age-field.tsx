@@ -2,6 +2,7 @@
 
 import type { JSX } from "react";
 
+import { cn } from "cn";
 import { useId } from "react";
 
 import { Field } from "@/components/app/atoms/field";
@@ -53,7 +54,10 @@ const format: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };
 // the field alone, committing as it does with one. An age that cannot
 // be tried yet is held: the box and the slider show the age given,
 // dimmed, out of the tab order and read as unavailable, until the
-// caller lets them be.
+// caller lets them be. Where colours are forced, the slider's track is
+// outlined and its range filled in the system's text colour, since the
+// forcing paints both in the page's colour, leaving the thumb with no
+// scale.
 export function AgeField({
   hasSlider = true,
   hint,
@@ -91,11 +95,11 @@ export function AgeField({
       </span>
       <Slider
         aria-labelledby={sliderLabelId}
-        className={
-          isSliderInFlow
-            ? "max-md:*:h-11 [&_[data-slot=slider-track]]:bg-input"
-            : undefined
-        }
+        className={cn(
+          "forced-colors:[&_[data-slot=slider-range]]:bg-[CanvasText] forced-colors:[&_[data-slot=slider-track]]:outline",
+          isSliderInFlow &&
+            "max-md:*:h-11 [&_[data-slot=slider-track]]:bg-input",
+        )}
         disabled={isDisabled}
         largeStep={isSliderInFlow ? 5 : undefined}
         max={max}

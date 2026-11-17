@@ -36,6 +36,16 @@ describe("MilestoneChips", () => {
     expect(screen.getByRole("button", { name: "Retirement 2053" })).toHaveClass(
       "bg-brand",
     );
+    // jsdom forces no colours, so the classes that do are what is read.
+    expect(screen.getByRole("button", { name: "Retirement 2053" })).toHaveClass(
+      "forced-colors:bg-[Highlight]",
+      "forced-colors:text-[HighlightText]",
+      "forced-colors:forced-color-adjust-none",
+      "forced-colors:focus-visible:outline-[CanvasText]",
+    );
+    expect(
+      screen.getByRole("button", { name: "Kids leave home 2040" }),
+    ).not.toHaveClass("forced-colors:bg-[Highlight]");
     expect(
       screen.getByRole("button", { name: "Kids leave home 2040" }),
     ).toHaveAttribute("aria-pressed", "false");

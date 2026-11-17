@@ -41,7 +41,11 @@ interface Unplaced {
 // that. The chips are drawn 32px tall and reach 44px for a finger past
 // their own edges, so a row of them stays compact. The row is a group
 // named for a screen reader, and each chip says whether it is the one
-// chosen.
+// chosen. Where colours are forced, the chip chosen is filled in the
+// system's highlight, its name in the highlight's text, and is kept
+// from the forcing, which would draw the page's colour behind the name;
+// kept, its focus outline would stay unseen, so it is drawn in the
+// system's text colour.
 export function MilestoneChips({
   markers,
   onSelect,
@@ -62,7 +66,7 @@ export function MilestoneChips({
             className={cn(
               "relative inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm font-medium after:absolute after:inset-x-0 after:-inset-y-1.5 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden",
               isChosen
-                ? "border-brand bg-brand text-brand-foreground"
+                ? "border-brand bg-brand text-brand-foreground forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:forced-color-adjust-none forced-colors:focus-visible:outline-[CanvasText]"
                 : "bg-card hover:bg-muted",
             )}
             key={marker.id}
