@@ -282,6 +282,12 @@ describe("ProjectionChart", () => {
 
     expect(tooltip.getByText(pension.name)).toBeInTheDocument();
     expect(tooltip.getByText(isa.name)).toBeInTheDocument();
+    // jsdom forces no colours, so the class that keeps the stroke's is
+    // what is read.
+    // eslint-disable-next-line testing-library/no-node-access -- the stroke is hidden from the tree and has no text, so it is reached from the name it keys
+    expect(tooltip.getByText(isa.name).previousElementSibling).toHaveClass(
+      "forced-color-adjust-none",
+    );
     expect(tooltip.queryByText(sipp.name)).not.toBeInTheDocument();
     expect(tooltip.getByText("£372,562")).toHaveClass("figure");
     expect(tooltip.getByText("£305,483")).toHaveClass("figure");
@@ -894,6 +900,13 @@ describe("ProjectionChart", () => {
       "var(--chart-4)",
       "var(--chart-5)",
     ]);
+    // jsdom forces no colours, so the class that keeps them is what is
+    // read.
+    for (const swatch of screen.getAllByText(bySlot("projection-key-swatch"), {
+      suggest: false,
+    })) {
+      expect(swatch).toHaveClass("forced-color-adjust-none");
+    }
 
     fireEvent.click(screen.getByRole("switch", { name: "Liquidity" }));
 

@@ -20,6 +20,8 @@ interface LegendTableProps {
 
 // Where a bar's fills are named: a captioned table, a row a part, each
 // a swatch in its fill, its name and note, and its figure to the right.
+// The swatches keep their fills where colours are forced, as the bar
+// they key keeps its own.
 export function LegendTable({
   caption,
   entries,
@@ -35,7 +37,10 @@ export function LegendTable({
             <td className="w-5 py-1.5">
               <span
                 aria-hidden
-                className={cn("block size-3 rounded-sm", fill)}
+                className={cn(
+                  "block size-3 rounded-sm forced-color-adjust-none",
+                  fill,
+                )}
                 data-slot="legend-swatch"
               />
             </td>

@@ -26,6 +26,8 @@ interface SegmentBarProps {
 // part the words beside it name. Two groups may
 // list the same parts, as a gain and a loss do, each holding those that
 // come to something on its side, so a group is known by what it holds.
+// Where colours are forced the bar keeps its fills, as the legend that
+// names them keeps its swatches.
 export function SegmentBar({
   groups,
   total = 0,
@@ -34,7 +36,11 @@ export function SegmentBar({
     .flat()
     .reduce((sum, { value }) => sum + Math.max(0, value), 0);
   return (
-    <span aria-hidden className="flex h-3 gap-1" data-slot="segment-bar">
+    <span
+      aria-hidden
+      className="flex h-3 gap-1 forced-color-adjust-none"
+      data-slot="segment-bar"
+    >
       {groups.map((group) => {
         const held = group.filter(({ value }) => value > 0);
         const sum = held.reduce((whole, { value }) => whole + value, 0);

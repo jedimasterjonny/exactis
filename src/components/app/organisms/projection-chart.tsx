@@ -742,7 +742,8 @@ function hueAt(hues: Hues, place: number): string {
 // since its outline stacks on top of that, and before the debts, which
 // stack down from nothing; and last, while a scenario is set against
 // it, the household's dashed line. The names are muted text, as the
-// crosshair's are, and the swatches carry the colour.
+// crosshair's are, and the swatches carry the colour, which they keep
+// where colours are forced, as the chart they key keeps its own.
 function Key({
   hasHousehold,
   hasLocked,
@@ -803,7 +804,7 @@ function KeyFamily({
     <li className="flex items-center gap-1.5">
       <span
         aria-hidden
-        className="size-2.5 rounded-xs"
+        className="size-2.5 rounded-xs forced-color-adjust-none"
         data-slot="projection-key-swatch"
         style={{ backgroundColor: hues[0] }}
       />
@@ -861,7 +862,8 @@ function Placeholder({ children }: { readonly children: string }): JSX.Element {
 // year that drew on a pension early, what
 // it drew so, and for a year that came up short, what it could not
 // cover. The values lead, in mono, with
-// a stroke of the series' colour keying the name beside each. The point
+// a stroke of the series' colour keying the name beside each, kept
+// where colours are forced as the chart's colours are. The point
 // is found by the year the crosshair names rather than read out of the
 // entry recharts hands over, which is untyped. Beneath the total, where
 // a scenario is set against the household, what the household comes to
@@ -916,7 +918,7 @@ function ProjectionTooltip({
           <span className="flex items-center gap-2" key={line.key}>
             <span
               aria-hidden
-              className="h-0.5 w-3 rounded-full"
+              className="h-0.5 w-3 rounded-full forced-color-adjust-none"
               style={{ backgroundColor: `var(--color-${line.key})` }}
             />
             <span className="text-muted-foreground">{line.name}</span>

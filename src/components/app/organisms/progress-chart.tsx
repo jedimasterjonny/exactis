@@ -380,7 +380,10 @@ function RowTooltip({
             <span className="flex items-center gap-2" key={key}>
               <span
                 aria-hidden
-                className={cn("h-0.5 w-3 rounded-full", balanceFills[key])}
+                className={cn(
+                  "h-0.5 w-3 rounded-full forced-color-adjust-none",
+                  balanceFills[key],
+                )}
               />
               <span className="text-muted-foreground">{balanceNames[key]}</span>
               <span className="ml-auto figure font-medium">
