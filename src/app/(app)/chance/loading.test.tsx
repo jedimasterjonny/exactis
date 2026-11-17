@@ -15,4 +15,10 @@ describe("Loading", () => {
     );
     expect(screen.getByText("Reading the store…")).toBeInTheDocument();
   });
+
+  it("draws Draw again, which it lands with, held", () => {
+    render(<Loading />);
+
+    expect(screen.getByRole("button", { name: "Draw again" })).toBeDisabled();
+  });
 });
