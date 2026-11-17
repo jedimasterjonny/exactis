@@ -53,4 +53,15 @@ describe("Ledger", () => {
     expect(screen.getByText("Derived inflation")).toHaveClass("label");
     expect(screen.getByText("2.95%")).toHaveClass("figure", "text-3xl");
   });
+
+  // jsdom lays nothing out, so the classes that wrap the line are what
+  // is read: the name breaking the line at its own narrowest, and the
+  // figure kept to the right on a line of its own.
+  it("drops the figure the steps come to beneath its name, to the right, where the two do not fit", () => {
+    render(<Ledger steps={[]} total="£98,765,432" totalName="Net worth" />);
+
+    expect(screen.getByRole("paragraph")).toHaveClass("flex-wrap");
+    expect(screen.getByText("Net worth")).toHaveClass("flex-1");
+    expect(screen.getByText("£98,765,432")).toHaveClass("ml-auto");
+  });
 });

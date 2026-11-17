@@ -17,8 +17,9 @@ interface Step {
 // A figure laid out as the steps it is worked out in: each step a line,
 // its name and, beneath it, what its figure rests on, the figure to the
 // right, and the figure they come to closing the ledger beneath a rule,
-// under its name and large in the mono face. The steps are a list, so a
-// screen reader counts them.
+// large in the mono face, to the right of its name where the two fit
+// and beneath it, still to the right, where they do not. The steps are
+// a list, so a screen reader counts them.
 export function Ledger({ steps, total, totalName }: LedgerProps): JSX.Element {
   return (
     <div className="grid content-start">
@@ -38,9 +39,9 @@ export function Ledger({ steps, total, totalName }: LedgerProps): JSX.Element {
           </li>
         ))}
       </ul>
-      <p className="flex items-baseline justify-between gap-4 pt-6">
-        <span className="label text-muted-foreground">{totalName}</span>
-        <span className="figure text-3xl font-medium">{total}</span>
+      <p className="flex flex-wrap items-baseline justify-between gap-4 pt-6">
+        <span className="flex-1 label text-muted-foreground">{totalName}</span>
+        <span className="ml-auto figure text-3xl font-medium">{total}</span>
       </p>
     </div>
   );
