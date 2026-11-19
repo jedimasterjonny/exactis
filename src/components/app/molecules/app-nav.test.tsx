@@ -165,6 +165,21 @@ describe("AppNav", () => {
     ).toHaveClass("forced-colors:data-active:before:bg-[CanvasText]");
   });
 
+  // Forced colours box every row in the link colour and take the focus
+  // ring away, so a row is unboxed at rest and boxed only when focused.
+  it("boxes only the focused row, in the text colour, under forced colours", () => {
+    renderNav("/", closed);
+
+    for (const link of within(
+      screen.getByRole("navigation", { name: "Screens" }),
+    ).getAllByRole("link")) {
+      expect(link).toHaveClass(
+        "forced-colors:outline-[Canvas]",
+        "forced-colors:focus-visible:outline-[CanvasText]",
+      );
+    }
+  });
+
   // The numeral is decorative, so a screen reader hears the label alone.
   it("hides each numeral from a screen reader", () => {
     renderNav("/", closed);
