@@ -93,6 +93,19 @@ describe("CogitatorScreen", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
+  // jsdom has no pointer to match, so the classes that key on one are read.
+  it("draws the link to where the allocation is imported 44px tall on a touch screen", () => {
+    render(<CogitatorScreen targets={null} today="2026-09-15" />);
+
+    expect(
+      screen.getByRole("link", { name: "Assumptions › Target allocation" }),
+    ).toHaveClass(
+      "pointer-coarse:inline-flex",
+      "pointer-coarse:min-h-11",
+      "pointer-coarse:items-center",
+    );
+  });
+
   it("says nothing is held yet while every category holds nothing, as an older import left them", () => {
     render(
       <CogitatorScreen

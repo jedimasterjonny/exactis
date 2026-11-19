@@ -50,6 +50,41 @@ describe("DialogFrame", () => {
     ).toHaveClass("flex-row", "justify-end");
   });
 
+  // jsdom has no pointer to match, so the classes that key on one are
+  // read: the close is the popup's child, reached by its slot.
+  it("pins its close, 44px each way, in the corner on a touch screen, the header giving way to it", () => {
+    render(
+      <DialogFrame
+        eyebrow="Add debt"
+        footer={null}
+        onDismiss={vi.fn<() => void>()}
+        title="Loan taken out for a garden studio"
+      >
+        <p>The fields</p>
+      </DialogFrame>,
+    );
+
+    const dialog = screen.getByRole("dialog", {
+      name: "Loan taken out for a garden studio",
+    });
+
+    expect(dialog).toHaveClass(
+      "pointer-coarse:[&>[data-slot=dialog-close]]:top-0",
+      "pointer-coarse:[&>[data-slot=dialog-close]]:right-0",
+      "pointer-coarse:[&>[data-slot=dialog-close]]:min-h-11",
+      "pointer-coarse:[&>[data-slot=dialog-close]]:min-w-11",
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "Close" }),
+    ).toHaveAttribute("data-slot", "dialog-close");
+    const title = within(dialog).getByRole("heading", {
+      name: "Loan taken out for a garden studio",
+    });
+
+    // eslint-disable-next-line testing-library/no-node-access -- the header is a layout box with no role or text of its own to query by
+    expect(title.parentElement).toHaveClass("pointer-coarse:pr-7");
+  });
+
   it("reports its own close as a dismiss", () => {
     const onDismiss = vi.fn<() => void>();
     render(

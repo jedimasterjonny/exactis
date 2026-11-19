@@ -42,6 +42,8 @@ interface DialogFrameProps {
 // The footer is one row at every width, where the registry's stacks its
 // buttons the width of the dialog on a phone: the edit dialog's three,
 // held on screen, took a fifth of it from the fields.
+// On a touch screen the close is 44px each way, pinned in the corner so
+// its cross stays where it is, and the header gives way to it.
 // Opened on a touch screen, the frame takes the focus itself rather
 // than handing it to its first field, which opened the keyboard over
 // half the form before anything was asked of it; Base UI does the same
@@ -62,14 +64,14 @@ export function DialogFrame({
     <Dialog disablePointerDismissal onOpenChange={onDismiss} open>
       <DialogContent
         className={cn(
-          "max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto]",
+          "max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] pointer-coarse:[&>[data-slot=dialog-close]]:top-0 pointer-coarse:[&>[data-slot=dialog-close]]:right-0 pointer-coarse:[&>[data-slot=dialog-close]]:min-h-11 pointer-coarse:[&>[data-slot=dialog-close]]:min-w-11",
           isWide && "sm:max-w-lg",
           className,
         )}
         initialFocus={() => (isTouch() ? popupRef.current : true)}
         ref={popupRef}
       >
-        <DialogHeader>
+        <DialogHeader className="pointer-coarse:pr-7">
           <span className="label text-brand">{eyebrow}</span>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>

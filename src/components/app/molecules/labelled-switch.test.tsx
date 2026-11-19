@@ -54,6 +54,24 @@ describe("LabelledSwitch", () => {
     );
   });
 
+  // jsdom has no pointer to match, so the class that keys on one is read.
+  it("stands its row 44px tall on a touch screen", () => {
+    render(
+      <LabelledSwitch
+        icon={Sun}
+        isChecked={false}
+        onCheckedChange={vi.fn<(isChecked: boolean) => void>()}
+      >
+        Daylight
+      </LabelledSwitch>,
+    );
+
+    expect(
+      // eslint-disable-next-line testing-library/no-node-access -- the label is the row and has no role of its own to query by
+      screen.getByRole("switch", { name: "Daylight" }).closest("label"),
+    ).toHaveClass("h-8", "pointer-coarse:min-h-11");
+  });
+
   // jsdom forces no colours, so the class that does is what is read.
   it("fills a switch on in the system's highlight under forced colours, beside the sidebar's oxide", () => {
     render(

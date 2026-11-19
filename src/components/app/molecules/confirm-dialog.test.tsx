@@ -34,6 +34,31 @@ describe("ConfirmDialog", () => {
     expect(onConfirm).toHaveBeenCalledOnce();
   });
 
+  // jsdom has no pointer to match, so the classes that key on one are
+  // read: Cancel is the registry's button, the confirm the kit's.
+  it("draws Cancel and the confirm 44px tall on a touch screen", () => {
+    render(
+      <ConfirmDialog
+        onCancel={vi.fn<() => void>()}
+        onConfirm={vi.fn<() => void>()}
+        title="Delete Test mortgage?"
+      >
+        Its payments go with it.
+      </ConfirmDialog>,
+    );
+
+    const dialog = screen.getByRole("alertdialog", {
+      name: "Delete Test mortgage?",
+    });
+
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveClass(
+      "pointer-coarse:min-h-11",
+    );
+    expect(within(dialog).getByRole("button", { name: "Delete" })).toHaveClass(
+      "pointer-coarse:min-h-11",
+    );
+  });
+
   it("holds the confirm while the deletion is on its way", () => {
     render(
       <ConfirmDialog

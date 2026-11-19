@@ -281,7 +281,9 @@ function describeTake(take: Take): string {
 // and then the lines behind it as well, each a row of its own in a list
 // beneath the figure: the trigger is drawn as the row is, so the ledger
 // reads the same closed, and the panel lists what the month is paying,
-// or says when it is paying nothing.
+// or says when it is paying nothing. On a touch screen the row's
+// trigger is 44px tall, inside the row's own padding, so the row does
+// not grow.
 function Expenses({
   amount,
   spent,
@@ -293,7 +295,7 @@ function Expenses({
     <li className="py-3">
       <Accordion>
         <AccordionItem value="expenses">
-          <AccordionTrigger className="gap-3 py-0 font-normal hover:no-underline">
+          <AccordionTrigger className="gap-3 py-0 font-normal hover:no-underline pointer-coarse:-my-2.75 pointer-coarse:min-h-11 pointer-coarse:items-center">
             <span className="flex flex-1 items-baseline justify-between gap-4">
               <span>Expenses</span>
               <Figure amount={-amount} />
