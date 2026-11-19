@@ -453,6 +453,13 @@ export function usePool(
   return pool;
 }
 
+// The seed the runs are drawn from, as readSeed reads it, for a screen
+// to draw one future's markets again from: the one every run kept is
+// drawn from, and another once they are drawn again.
+export function useSeed(): number {
+  return useSyncExternalStore(subscribe, readSeed, readSeed);
+}
+
 // Keeps the runs given, telling every screen reading them.
 function keep(next: Drawn): void {
   kept = next;
