@@ -229,6 +229,22 @@ describe("FuturesFan", () => {
       ].join(""),
     );
     expect(within(tooltip).getByText("Median")).toHaveClass("font-medium");
+    // jsdom forces no colours, so the class that keeps the keys' is what
+    // is read.
+    for (const name of [
+      "Top 10%",
+      "Top 25%",
+      "Median",
+      "Bottom 25%",
+      "Bottom 10%",
+    ]) {
+      const named = within(tooltip).getByText(name);
+
+      // eslint-disable-next-line testing-library/no-node-access -- the key is hidden from the tree and has no text, so it is reached from the name it keys
+      expect(named.previousElementSibling).toHaveClass(
+        "forced-color-adjust-none",
+      );
+    }
   });
 
   it("says it is drawing in the plot's place before the first futures are in", () => {
