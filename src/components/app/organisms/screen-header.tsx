@@ -2,6 +2,8 @@ import type { JSX } from "react";
 
 import type { Slot } from "@/lib/slot";
 
+import { ScreenTitle } from "@/components/app/atoms/screen-title";
+
 interface ScreenHeaderProps {
   readonly actions?: Slot;
   readonly children?: Slot;
@@ -16,8 +18,9 @@ interface ScreenHeaderProps {
 // halving on a phone as it does, so the title stays over the cards. The
 // label shows at every width, so a phone, where the sidebar and its
 // numerals are off canvas, still names the section. The title takes
-// the focus when it is handed it, as a screen that takes away the
-// control that had it hands it, and is never tabbed to.
+// the focus when its screen is moved to, and when it is handed it, as a
+// screen that takes away the control that had it hands it, and is never
+// tabbed to.
 export function ScreenHeader({
   actions,
   children,
@@ -28,9 +31,7 @@ export function ScreenHeader({
     <header className="flex flex-wrap items-end justify-between gap-4 border-b bg-card px-4 pt-6 pb-5 sm:px-8">
       <div className="grid gap-1.5">
         <span className="label text-muted-foreground">{label}</span>
-        <h1 className="heading text-3xl" tabIndex={-1}>
-          {title}
-        </h1>
+        <ScreenTitle>{title}</ScreenTitle>
         {children !== undefined && (
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {children}
