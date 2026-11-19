@@ -121,13 +121,14 @@ describe("AppNav", () => {
     ]);
   });
 
-  it("gives each row 44px for a thumb below the md breakpoint", () => {
+  // jsdom has no pointer to match, so the class that keys on one is read.
+  it("gives each row 44px for a thumb below the md breakpoint, and on a touch screen at any width", () => {
     renderNav("/", closed);
 
     for (const link of within(
       screen.getByRole("navigation", { name: "Screens" }),
     ).getAllByRole("link")) {
-      expect(link).toHaveClass("h-8", "max-md:h-11");
+      expect(link).toHaveClass("h-8", "max-md:h-11", "pointer-coarse:h-11");
     }
   });
 

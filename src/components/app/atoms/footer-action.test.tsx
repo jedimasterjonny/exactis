@@ -27,7 +27,8 @@ describe("FooterAction", () => {
     expect(action).not.toHaveClass("text-sm");
   });
 
-  it("stands 44px tall for a thumb below the md breakpoint", () => {
+  // jsdom has no pointer to match, so the class that keys on one is read.
+  it("stands 44px tall for a thumb below the md breakpoint, and on a touch screen at any width", () => {
     stubViewport(1024);
     render(
       <SidebarProvider>
@@ -38,6 +39,7 @@ describe("FooterAction", () => {
     expect(screen.getByRole("button", { name: "Sign out" })).toHaveClass(
       "h-8",
       "max-md:h-11",
+      "pointer-coarse:h-11",
     );
   });
 });

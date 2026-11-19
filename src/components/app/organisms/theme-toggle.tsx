@@ -11,7 +11,8 @@ import { LabelledSwitch } from "@/components/app/molecules/labelled-switch";
 // Daylight is the default and the intended theme; night watch is opt-in,
 // as the reference has it. The switch takes the sidebar tone, since it
 // sits on the ink sidebar, and is 44px tall below the md breakpoint, in
-// the phone's sheet, as the footer's actions are.
+// the phone's sheet, and on a touch screen at any width, as the footer's
+// actions are.
 export function ThemeToggle(): JSX.Element {
   const { setTheme, theme } = useTheme();
   const isClient = useSyncExternalStore(subscribe, isHydrated, isServer);
