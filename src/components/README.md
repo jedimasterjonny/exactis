@@ -35,7 +35,8 @@ correctness.
 what keeps upstream churn in the rest from reaching a screen. Most are a single
 re-export. One becomes a real component when it has something to add: `badge`
 carries the `positive` and `caution` tones this app needs and base-nova does not
-ship, and `alert` the `caution` one; `button` spins while its action runs, which
+ship, and `alert` the `caution` one; `button` is at least 44px each way on a
+touch screen, as is a link drawn as one, and spins while its action runs, which
 `alert-dialog` passes on to its confirm; `table` makes each table the container
 its rows fold by and lines its cells up with a card's edge; `card` draws its
 edge as an outline under forced colours, where the ring, a shadow, is not drawn;
