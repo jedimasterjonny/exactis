@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Account } from "@/data/accounts";
 import type { Schedule } from "@/engine/cash-flow";
 
+import { FuturesWall } from "@/components/app/organisms/futures-wall";
 import { expenseLines } from "@/data/expenses.fixture";
 import { working } from "@/data/owners.fixture";
 import { forget } from "@/hooks/use-futures";
@@ -16,6 +17,17 @@ vi.mock("@/actions/milestones", () => ({
   removeMilestone: vi.fn(),
   saveMilestone: vi.fn(),
 }));
+
+// The wall has its own test, over futures of its own. Drawn here it adds
+// a thousand cells to every look at the screen once a run lands, which
+// took this file's slowest test from about 1.1s to 2s locally, past the
+// 5s limit on a slow runner; so the screen is read without it, and only
+// what the board hands it is.
+/* eslint-disable @typescript-eslint/naming-convention -- mock factory keys must mirror the exported names, which are a component's */
+vi.mock("@/components/app/organisms/futures-wall", () => ({
+  FuturesWall: vi.fn((): null => null),
+}));
+/* eslint-enable @typescript-eslint/naming-convention -- the exported names end with the factory */
 
 // Born in 1992, from January 2026 over three years, so the plan runs to
 // 37 and every future is drawn in a moment; no inflation, so every
@@ -176,6 +188,12 @@ describe("ChanceScreen", () => {
       "1,000 of 1,000 futures last to 37, most of them comfortably.",
     );
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    // The board hands the wall the whole run once it is drawn.
+    expect(vi.mocked(FuturesWall).mock.lastCall?.[0]).toMatchObject({
+      count: 1000,
+      futures: expect.objectContaining({ length: 1000 }) as unknown,
+      isDone: true,
+    });
   });
 
   // Two workers draw the run, one for each of the two cores the tests'

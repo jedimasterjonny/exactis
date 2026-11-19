@@ -16,6 +16,7 @@ import { FuturesCount } from "@/components/app/organisms/futures-count";
 import { FuturesDrawn } from "@/components/app/organisms/futures-drawn";
 import { FuturesFan } from "@/components/app/organisms/futures-fan";
 import { FuturesOutcomes } from "@/components/app/organisms/futures-outcomes";
+import { FuturesWall } from "@/components/app/organisms/futures-wall";
 import { MilestoneSpreads } from "@/components/app/organisms/milestone-spreads";
 import { ageIn } from "@/data/plan";
 import {
@@ -57,7 +58,9 @@ interface ChanceBoardProps {
 // the futures come to, since the chance then reads how often the
 // markets would carry a plan that does not work as it stands. The fan
 // is described by the sentence saying how many futures last, through an
-// id of the board's own. What the run was drawn from closes the screen.
+// id of the board's own. What the run was drawn from follows the count,
+// and every future of the run as a cell of its own, with one lived
+// through, closes the screen, beneath every card a landing could move.
 export function ChanceBoard({
   accounts,
   futures,
@@ -120,6 +123,16 @@ export function ChanceBoard({
         reading={reading}
       />
       <FuturesDrawn plan={plan} spread={spread} />
+      <FuturesWall
+        count={runLength}
+        futures={futures}
+        grading={grading}
+        isDone={isDone}
+        milestones={milestones}
+        plan={plan}
+        projected={asProjected}
+        spread={spread}
+      />
     </>
   );
 }
