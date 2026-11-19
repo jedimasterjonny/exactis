@@ -87,6 +87,22 @@ describe("ScenarioDecision", () => {
     },
   );
 
+  // jsdom lays nothing out, so the class that lets them wrap is read.
+  it("draws its buttons in a row of their own that wraps where they do not fit side by side", () => {
+    renderDecision("rejected");
+
+    const open = screen.getByRole("button", { name: "Open the scenario" });
+    const make = screen.getByRole("button", {
+      name: "Make this the household…",
+    });
+    // eslint-disable-next-line testing-library/no-node-access -- the row is a layout box with no role or text of its own to query by
+    const row = open.parentElement;
+
+    expect(row).toHaveClass("flex", "flex-wrap");
+    // eslint-disable-next-line testing-library/no-node-access -- the same row, by the same box
+    expect(make.parentElement).toBe(row);
+  });
+
   it("makes the scenario the household once asked, with why, and hands the focus to the title", async () => {
     vi.mocked(adoptScenario).mockResolvedValue(saved(true));
     renderDecision();
