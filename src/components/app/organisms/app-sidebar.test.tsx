@@ -103,6 +103,17 @@ describe("AppSidebar", () => {
     );
   });
 
+  // The footer's rows are 12px apart, so 20px above them sets them apart
+  // from the screens in the phone's sheet; the desktop's is left as it is.
+  it("sets the footer apart from the screens on a phone", () => {
+    renderSidebar();
+
+    expect(screen.getByText(bySlot("sidebar-footer"))).toHaveClass(
+      "gap-3",
+      "max-md:pt-5",
+    );
+  });
+
   it("keeps the footer clear of the home indicator", () => {
     renderSidebar();
 
