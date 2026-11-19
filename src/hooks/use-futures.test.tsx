@@ -15,6 +15,7 @@ import { retiringAt } from "@/data/milestones";
 import { working } from "@/data/owners.fixture";
 import {
   breaksIn,
+  defaultSeed,
   futuresOf,
   lastingAt,
   lastingOn,
@@ -31,6 +32,7 @@ import {
   useLastingAt,
   useLastingOn,
   usePool,
+  useSeed,
 } from "./use-futures";
 
 // An ISA drawn £1,000 a month over three years at 5%, straying 15% a
@@ -664,6 +666,26 @@ describe("useFutures", () => {
 
     expect(result.current).toStrictEqual({ futures: [], isDone: true });
     expect(started).toHaveLength(0);
+  });
+});
+
+describe("useSeed", () => {
+  // Each test opens a page of its own, with no seed drawn by the last.
+  beforeEach(() => {
+    forget();
+  });
+
+  it("reads the seed every run starts from, and the one drawn once the futures are drawn again", () => {
+    vi.spyOn(crypto, "getRandomValues").mockReturnValue(new Uint32Array([7]));
+    const { result } = renderHook(() => useSeed());
+
+    expect(result.current).toBe(defaultSeed);
+
+    act(() => {
+      drawAgain();
+    });
+
+    expect(result.current).toBe(7);
   });
 });
 
