@@ -51,12 +51,14 @@ const longest = 200;
 // Making it the household is left out while the merge is refused, since
 // it would only refuse in the same words, which the screen already
 // says; deciding against it is not, which the merge has no part in.
-// Neither leans either way, so both are outlined. Each holds while
-// anything is on its way to the store, as the dialog's confirm does,
-// and the confirm holds too while the reason runs past its length. Each
-// answer is said under a toast, a refusal in its own words. Once a
-// decision lands the button that asked for it is gone, so the focus is
-// handed to the screen's title, which says what was decided.
+// Neither leans either way, so both are outlined, in a row of their own
+// that wraps the second beneath the first where the two do not fit the
+// screen's width side by side. Each holds while anything is on its way
+// to the store, as the dialog's confirm does, and the confirm holds too
+// while the reason runs past its length. Each answer is said under a
+// toast, a refusal in its own words. Once a decision lands the button
+// that asked for it is gone, so the focus is handed to the screen's
+// title, which says what was decided.
 export function ScenarioDecision({
   decision,
   isAdoptable,
@@ -116,34 +118,41 @@ export function ScenarioDecision({
 
   return (
     <>
-      {decision !== "adopted" && isAdoptable && (
-        <Button
-          disabled={isSending}
-          onClick={() => {
-            setAsking({ kind: "adopt", reason: "" });
-          }}
-          size="sm"
-          variant="outline"
-        >
-          Make this the household…
-        </Button>
-      )}
-      {decision === null ? (
-        <Button
-          disabled={isSending}
-          onClick={() => {
-            setAsking({ kind: "reject", reason: "" });
-          }}
-          size="sm"
-          variant="outline"
-        >
-          Decide against…
-        </Button>
-      ) : (
-        <Button disabled={isSending} onClick={open} size="sm" variant="outline">
-          Open the scenario
-        </Button>
-      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {decision !== "adopted" && isAdoptable && (
+          <Button
+            disabled={isSending}
+            onClick={() => {
+              setAsking({ kind: "adopt", reason: "" });
+            }}
+            size="sm"
+            variant="outline"
+          >
+            Make this the household…
+          </Button>
+        )}
+        {decision === null ? (
+          <Button
+            disabled={isSending}
+            onClick={() => {
+              setAsking({ kind: "reject", reason: "" });
+            }}
+            size="sm"
+            variant="outline"
+          >
+            Decide against…
+          </Button>
+        ) : (
+          <Button
+            disabled={isSending}
+            onClick={open}
+            size="sm"
+            variant="outline"
+          >
+            Open the scenario
+          </Button>
+        )}
+      </div>
       {asking !== null && (
         <EditDialog
           canSave={!isSending && asking.reason.trim().length <= longest}
