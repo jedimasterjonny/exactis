@@ -35,6 +35,8 @@ interface AppSidebarProps {
 // is above the wordmark rather than between it and the screens it heads.
 // The screens take only their own height there, so the wordmark can sit
 // on them; the list still scrolls if a phone is too short for all three.
+// The footer stands apart from the screens there by more than its own
+// rows stand apart, so its first row does not read as the next screen.
 export function AppSidebar({ isDue }: AppSidebarProps): JSX.Element {
   return (
     <>
@@ -50,7 +52,7 @@ export function AppSidebar({ isDue }: AppSidebarProps): JSX.Element {
       <SidebarContent className="px-2 max-md:flex-initial">
         <AppNav isDue={isDue} />
       </SidebarContent>
-      <SidebarFooter className="gap-3 px-4 pb-[calc(--spacing(5)+env(safe-area-inset-bottom))]">
+      <SidebarFooter className="gap-3 px-4 pb-[calc(--spacing(5)+env(safe-area-inset-bottom))] max-md:pt-5">
         <ThemeToggle />
         <ExportMenu />
         <HouseholdImport />
