@@ -1,3 +1,5 @@
+import type { JSX } from "react";
+
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -30,15 +32,28 @@ const due = Object.assign(Promise.resolve(true), {
 function barOn(current: string, isDue: Promise<boolean>): HTMLElement {
   stubViewport(390);
   pathname.current = current;
-  render(
+  render(<Frame isDue={isDue} />);
+  return screen.getByRole("navigation", { name: "Tab bar" });
+}
+
+// The bar in the provider the frame gives it, beside the sidebar it
+// opens.
+function Frame({ isDue }: { readonly isDue: Promise<boolean> }): JSX.Element {
+  return (
     <SidebarProvider>
       <Sidebar>
         <span>Every screen</span>
       </Sidebar>
       <PhoneNav isDue={isDue} />
-    </SidebarProvider>,
+    </SidebarProvider>
   );
-  return screen.getByRole("navigation", { name: "Tab bar" });
+}
+
+// More's list, which a closed popover hides from the tree, names and
+// all, so it is found by its label, with no suggestion of a query by
+// role, which would say so on the console.
+function moreScreens(): HTMLElement {
+  return screen.getByLabelText("More screens", { suggest: false });
 }
 
 describe("PhoneNav", () => {
@@ -48,26 +63,94 @@ describe("PhoneNav", () => {
 
   it("lists the four tabs in navigation order, then More", () => {
     const bar = barOn("/progress", closed);
+    const items = within(bar).getAllByRole("listitem");
 
-    expect(
-      within(bar)
-        .getAllByRole("listitem")
-        .map((item) => item.textContent),
-    ).toStrictEqual([
+    expect(items.slice(0, 4).map((item) => item.textContent)).toStrictEqual([
       "Dashboard",
       "Progress",
       "Month end",
       "Cogitator",
-      "More",
     ]);
+    expect(items).toHaveLength(5);
+    expect(items.at(-1)).toContainElement(
+      within(bar).getByRole("button", { name: "More" }),
+    );
     expect(
       within(bar)
         .getAllByRole("link")
         .map((link) => link.getAttribute("href")),
     ).toStrictEqual(["/", "/progress", "/close", "/cogitator"]);
+  });
+
+  // jsdom hides a closed popover, as a browser does, and opens none.
+  it("lists the screens More reaches, which More opens before the page hydrates", () => {
+    const bar = barOn("/accounts", closed);
+    const list = moreScreens();
+
+    expect(bar).toContainElement(list);
+    expect(list).toHaveAttribute("id", "more-screens");
+    expect(list).toHaveAttribute("popover", "auto");
+    expect(within(bar).getByRole("button", { name: "More" })).toHaveAttribute(
+      "popovertarget",
+      "more-screens",
+    );
+    expect(list).not.toBeVisible();
     expect(
-      within(bar).getByRole("button", { name: "More" }),
-    ).toBeInTheDocument();
+      within(list)
+        .getAllByRole("link", { hidden: true, suggest: false })
+        .map((link) => [link.getAttribute("href"), link.textContent]),
+    ).toStrictEqual([
+      ["/chance", "Chance of successII"],
+      ["/accounts", "Accounts & assetsIII"],
+      ["/plan", "Income & expensesIV"],
+      ["/assumptions", "AssumptionsVI"],
+    ]);
+    expect(
+      within(list).getByRole("link", {
+        current: "page",
+        hidden: true,
+        suggest: false,
+      }),
+    ).toHaveAttribute("href", "/accounts");
+    expect(within(list).getByText("III", { suggest: false })).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+  });
+
+  // jsdom draws no pseudo-element and forces no colours, so the classes
+  // that do are what is read.
+  it("marks the current row of More's list with a rail, and draws its focus where colours are forced", () => {
+    barOn("/accounts", closed);
+
+    for (const link of within(moreScreens()).getAllByRole("link", {
+      hidden: true,
+      suggest: false,
+    })) {
+      expect(link).toHaveClass(
+        "min-h-11",
+        "aria-[current=page]:before:bg-brand",
+        "forced-colors:aria-[current=page]:before:bg-[CanvasText]",
+        "forced-colors:focus-visible:outline-solid",
+        "forced-colors:focus-visible:outline-2",
+        "forced-colors:focus-visible:-outline-offset-2",
+        "forced-colors:focus-visible:outline-[CanvasText]",
+      );
+    }
+  });
+
+  // An open popover sits in the top layer over whatever screen a link in
+  // it moves to, until the list is taken away.
+  it("draws More's list afresh on a move to another screen", () => {
+    stubViewport(390);
+    pathname.current = "/accounts";
+    const { rerender } = render(<Frame isDue={closed} />);
+    const before = moreScreens();
+    pathname.current = "/plan";
+    rerender(<Frame isDue={closed} />);
+
+    expect(moreScreens()).not.toBe(before);
+    expect(before).not.toBeInTheDocument();
   });
 
   it("marks the current screen's tab as the page, and not More", () => {
@@ -163,7 +246,9 @@ describe("PhoneNav", () => {
     expect(more).toHaveAttribute("aria-expanded", "false");
     expect(more).toHaveAttribute("aria-haspopup", "dialog");
 
-    fireEvent.click(more);
+    // Cancelled, so the list it opens before the page hydrates stays
+    // shut beneath the sheet.
+    expect(fireEvent.click(more)).toBe(false);
 
     expect(
       within(await screen.findByRole("dialog")).getByText("Every screen"),
