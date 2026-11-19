@@ -22,9 +22,10 @@ interface AppNavProps {
 // label and the numeral its header carries, in a navigation landmark
 // named Screens. The current screen is marked from the pathname, for the
 // eye by a rail in oxide at the sidebar's own edge, short of the row at
-// each end, and as the page to a screen reader, and the numeral, which
-// is decorative, is hidden from one, so a link is named by its label
-// alone.
+// each end, in the system's text colour where colours are forced, which
+// would paint it the sidebar's, and as the page to a screen reader, and
+// the numeral, which is decorative, is hidden from one, so a link is
+// named by its label alone.
 // On a phone, where the navigation sits in a sheet over the screen,
 // choosing a screen closes the sheet, which the frame would otherwise
 // keep open across the navigation; the current screen's own link closes
@@ -53,7 +54,7 @@ export function AppNav({ isDue }: AppNavProps): JSX.Element {
             >
               <SidebarMenuButton
                 aria-current={isCurrent ? "page" : undefined}
-                className="before:absolute before:inset-y-1.5 before:-left-2 before:w-0.5 before:rounded-full max-md:h-11 pointer-coarse:h-11 data-active:before:bg-sidebar-primary"
+                className="before:absolute before:inset-y-1.5 before:-left-2 before:w-0.5 before:rounded-full max-md:h-11 pointer-coarse:h-11 data-active:before:bg-sidebar-primary forced-colors:data-active:before:bg-[CanvasText]"
                 isActive={isCurrent}
                 onClick={() => {
                   setOpenMobile(false);

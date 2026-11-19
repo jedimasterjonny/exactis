@@ -153,6 +153,18 @@ describe("AppNav", () => {
     );
   });
 
+  // jsdom forces no colours, so the class that does is what is read.
+  it("draws the current screen's rail in the text colour under forced colours", () => {
+    renderNav("/accounts", closed);
+
+    expect(
+      within(screen.getByRole("navigation", { name: "Screens" })).getByRole(
+        "link",
+        { current: "page" },
+      ),
+    ).toHaveClass("forced-colors:data-active:before:bg-[CanvasText]");
+  });
+
   // The numeral is decorative, so a screen reader hears the label alone.
   it("hides each numeral from a screen reader", () => {
     renderNav("/", closed);
