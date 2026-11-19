@@ -3,9 +3,14 @@ import type { ComponentProps, JSX } from "react";
 import { cn } from "cn";
 import { LoaderCircle } from "lucide-react";
 
-import { Button as ButtonBase } from "@/components/ui/button";
+import {
+  Button as ButtonBase,
+  buttonVariants as variantsOf,
+} from "@/components/ui/button";
 
-export { buttonVariants } from "@/components/ui/button";
+// At least 44px each way on a touch screen, the size a finger needs,
+// whatever the button's size; under a mouse, the registry's sizes.
+const touch = "pointer-coarse:min-h-11 pointer-coarse:min-w-11";
 
 interface ButtonProps extends Readonly<ComponentProps<typeof ButtonBase>> {
   readonly isBusy?: boolean;
@@ -19,7 +24,8 @@ interface ButtonProps extends Readonly<ComponentProps<typeof ButtonBase>> {
 // press that started the action does not drop a keyboard's focus on the
 // page; Base UI still swallows its clicks, a form's Enter among them, and
 // aria-busy says why it will not press. A button held for another reason
-// stays natively disabled and does not spin.
+// stays natively disabled and does not spin. On a touch screen it is at
+// least 44px each way.
 export function Button({
   children,
   className,
@@ -32,6 +38,7 @@ export function Button({
     <ButtonBase
       aria-busy={isBusy || undefined}
       className={cn(
+        touch,
         isBusy && "cursor-progress [&>svg:not([data-slot=spinner])]:hidden",
         className,
       )}
@@ -49,4 +56,13 @@ export function Button({
       {children}
     </ButtonBase>
   );
+}
+
+// The registry's classes for a link drawn as a button, at least 44px
+// each way on a touch screen as a button is. The touch classes are
+// added after the registry's rather than merged with them: a merge
+// re-reads the registry's own classes and drops some, which would
+// redraw every such link's corners and icon, under a mouse too.
+export function buttonVariants(...args: Parameters<typeof variantsOf>): string {
+  return `${variantsOf(...args)} ${touch}`;
 }

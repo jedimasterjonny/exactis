@@ -2,9 +2,33 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { Download } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 
-import { Button } from "./button";
+import { Button, buttonVariants } from "./button";
 
 describe("Button", () => {
+  it("is at least 44px each way on a touch screen, beside the caller's classes", () => {
+    render(
+      <Button className="ml-1" size="sm">
+        Save
+      </Button>,
+    );
+
+    expect(screen.getByRole("button", { name: "Save" })).toHaveClass(
+      "pointer-coarse:min-h-11",
+      "pointer-coarse:min-w-11",
+      "h-7",
+      "ml-1",
+    );
+  });
+
+  it("styles a link as a button, 44px each way on a touch screen, keeping the registry's classes unmerged", () => {
+    const classes = buttonVariants({ size: "sm" }).split(" ");
+
+    expect(classes).toContain("pointer-coarse:min-h-11");
+    expect(classes).toContain("pointer-coarse:min-w-11");
+    // The base's corners, which a merge with the size's would drop.
+    expect(classes).toContain("rounded-lg");
+  });
+
   it("spins while busy, still focusable but swallowing presses", () => {
     const onClick = vi.fn<() => void>();
     render(
