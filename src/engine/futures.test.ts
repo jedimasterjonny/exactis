@@ -29,6 +29,7 @@ import {
   markersIn,
   monthsAlong,
   monthsOver,
+  outcomeOf,
   outcomesOf,
   pathOf,
   reachedBy,
@@ -1480,6 +1481,37 @@ describe("gradingOf", () => {
       surplus: 0,
     });
   });
+});
+
+describe("outcomeOf", () => {
+  // More than £300,000 left is a large surplus, £50,000 and on
+  // comfortable, and under that barely; falling short in 2035 and on
+  // almost made it, in 2033 and 2034 the middle, and before that early.
+  const grading = {
+    almost: 2035,
+    comfortable: 50000,
+    middle: 2033,
+    surplus: 300000,
+  };
+
+  it.each([
+    { fell: null, left: 300001, outcome: "surplus" },
+    { fell: null, left: 50000, outcome: "comfortable" },
+    { fell: null, left: 49999, outcome: "barely" },
+    { fell: 2035, left: 0, outcome: "almost" },
+    { fell: 2033, left: 0, outcome: "middle" },
+    { fell: 2032, left: 0, outcome: "early" },
+  ] as const)(
+    "grades a future falling short in $fell and leaving £$left as $outcome",
+    ({ fell, left, outcome }) => {
+      expect(
+        outcomeOf(
+          { fell, measured: worthOf([0, left]), ranOut: fell, retired: 2030 },
+          grading,
+        ),
+      ).toBe(outcome);
+    },
+  );
 });
 
 describe("outcomesOf", () => {

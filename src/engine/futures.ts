@@ -667,31 +667,37 @@ export function monthsOver(
   };
 }
 
-// A run of futures graded on the lines given, counted. A future kept
-// going only by drawing a pension early is graded by when it first did,
-// as it is counted as falling short then, and one whose owner never
-// retired fell short before retirement, and early.
+// What a future comes to on the lines given. A future kept going only
+// by drawing a pension early is graded by when it first did, as it is
+// counted as falling short then, and one whose owner never retired fell
+// short before retirement, and early.
+export function outcomeOf(
+  { fell, measured, retired }: Future,
+  grading: Grading,
+): Outcome {
+  if (fell === null && retired === null) {
+    return "early";
+  }
+  if (fell === null) {
+    const left = endWorthOf({ measured });
+    if (left > grading.surplus) {
+      return "surplus";
+    }
+    return left >= grading.comfortable ? "comfortable" : "barely";
+  }
+  if (fell >= grading.almost) {
+    return "almost";
+  }
+  return fell >= grading.middle ? "middle" : "early";
+}
+
+// A run of futures graded on the lines given, as outcomeOf grades each,
+// counted.
 export function outcomesOf(
   futures: readonly Future[],
   grading: Grading,
 ): Readonly<Record<Outcome, number>> {
-  function outcomeOf({ fell, measured, retired }: Future): Outcome {
-    if (fell === null && retired === null) {
-      return "early";
-    }
-    if (fell === null) {
-      const left = endWorthOf({ measured });
-      if (left > grading.surplus) {
-        return "surplus";
-      }
-      return left >= grading.comfortable ? "comfortable" : "barely";
-    }
-    if (fell >= grading.almost) {
-      return "almost";
-    }
-    return fell >= grading.middle ? "middle" : "early";
-  }
-  const graded = futures.map(outcomeOf);
+  const graded = futures.map((future) => outcomeOf(future, grading));
   const count = (outcome: Outcome): number =>
     graded.filter((each) => each === outcome).length;
   return {
