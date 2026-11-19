@@ -19,9 +19,10 @@ interface PhoneNavProps {
 // is foreground and a rule in brand runs along the top, in the system's
 // text colour where colours are forced, which would paint it the
 // page's. The focus ring is drawn inside, since the end cells meet the
-// screen's edges.
+// screen's edges, and where colours are forced, which take the ring
+// away, an outline in the text colour is drawn inside in its place.
 const classes =
-  "relative flex min-h-11 w-full flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground outline-none before:absolute before:inset-x-3 before:top-0 before:h-0.5 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset aria-[current=page]:text-foreground aria-[current=page]:before:bg-brand data-current:text-foreground data-current:before:bg-brand forced-colors:aria-[current=page]:before:bg-[CanvasText] forced-colors:data-current:before:bg-[CanvasText] [&_svg]:size-5";
+  "relative flex min-h-11 w-full flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground outline-none before:absolute before:inset-x-3 before:top-0 before:h-0.5 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset aria-[current=page]:text-foreground aria-[current=page]:before:bg-brand data-current:text-foreground data-current:before:bg-brand forced-colors:aria-[current=page]:before:bg-[CanvasText] forced-colors:data-current:before:bg-[CanvasText] forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-2 forced-colors:focus-visible:-outline-offset-2 forced-colors:focus-visible:outline-[CanvasText] [&_svg]:size-5";
 
 // The bar along the foot of a phone's screen, below the md breakpoint: a
 // tab for each screen in the tabs, then More, which opens the sidebar's

@@ -93,6 +93,24 @@ describe("PhoneNav", () => {
     );
   });
 
+  // Forced colours take the ring away, so an outline stands in for it,
+  // inside the cell as the ring is.
+  it("outlines the focused tab or More in the text colour under forced colours", () => {
+    const bar = barOn("/", closed);
+
+    for (const cell of [
+      ...within(bar).getAllByRole("link"),
+      within(bar).getByRole("button", { name: "More" }),
+    ]) {
+      expect(cell).toHaveClass(
+        "forced-colors:focus-visible:outline-solid",
+        "forced-colors:focus-visible:outline-2",
+        "forced-colors:focus-visible:-outline-offset-2",
+        "forced-colors:focus-visible:outline-[CanvasText]",
+      );
+    }
+  });
+
   it("marks More on a screen it reaches, with no tab as the page", () => {
     const bar = barOn("/accounts", closed);
 

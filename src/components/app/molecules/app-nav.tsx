@@ -38,7 +38,9 @@ interface AppNavProps {
 // A client component, since the pathname is read on the client and an
 // icon is a component, which cannot cross the server boundary as a prop.
 // In the sheet each row is 44px tall, for a thumb, and on a touch
-// screen it is at any width.
+// screen it is at any width. Where colours are forced, which take the
+// focus ring away and box every row in the link colour, the rows go
+// unboxed and the focused one alone is boxed, in the text colour.
 export function AppNav({ isDue }: AppNavProps): JSX.Element {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
@@ -54,7 +56,7 @@ export function AppNav({ isDue }: AppNavProps): JSX.Element {
             >
               <SidebarMenuButton
                 aria-current={isCurrent ? "page" : undefined}
-                className="before:absolute before:inset-y-1.5 before:-left-2 before:w-0.5 before:rounded-full max-md:h-11 pointer-coarse:h-11 data-active:before:bg-sidebar-primary forced-colors:data-active:before:bg-[CanvasText]"
+                className="before:absolute before:inset-y-1.5 before:-left-2 before:w-0.5 before:rounded-full max-md:h-11 forced-colors:outline-[Canvas] forced-colors:focus-visible:outline-[CanvasText] pointer-coarse:h-11 data-active:before:bg-sidebar-primary forced-colors:data-active:before:bg-[CanvasText]"
                 isActive={isCurrent}
                 onClick={() => {
                   setOpenMobile(false);
