@@ -10,6 +10,7 @@ interface LabelledSwitchProps {
   readonly className?: string | undefined;
   readonly icon: LucideIcon;
   readonly isChecked: boolean;
+  readonly isDisabled?: boolean;
   readonly onCheckedChange: (isChecked: boolean) => void;
   readonly tone?: Tone;
 }
@@ -37,12 +38,15 @@ const tones: Record<
 // screen the row is 44px tall, and a press anywhere on it turns the
 // switch. Where colours are forced, a switch on is filled in the
 // system's highlight, its thumb drawn on it, since forcing paints the
-// fill and the thumb in the page's colour alike.
+// fill and the thumb in the page's colour alike. A switch may be held
+// while what it switches is not yet there to switch, its label kept at
+// full strength as a held field's is.
 export function LabelledSwitch({
   children,
   className,
   icon,
   isChecked,
+  isDisabled = false,
   onCheckedChange,
   tone = "default",
 }: LabelledSwitchProps): JSX.Element {
@@ -63,6 +67,7 @@ export function LabelledSwitch({
           "forced-colors:data-checked:bg-[Highlight]",
           tones[tone].switch,
         )}
+        disabled={isDisabled}
         onCheckedChange={onCheckedChange}
         size="sm"
       />

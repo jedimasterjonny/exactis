@@ -30,6 +30,28 @@ describe("LabelledSwitch", () => {
     );
   });
 
+  it("holds the switch while what it switches is not there to switch, still named for its state", () => {
+    const onCheckedChange = vi.fn<(isChecked: boolean) => void>();
+    render(
+      <LabelledSwitch
+        icon={Sun}
+        isChecked={false}
+        isDisabled
+        onCheckedChange={onCheckedChange}
+      >
+        Daylight
+      </LabelledSwitch>,
+    );
+
+    const control = screen.getByRole("switch", { name: "Daylight" });
+
+    expect(control).toHaveAttribute("aria-disabled", "true");
+
+    fireEvent.click(control);
+
+    expect(onCheckedChange).not.toHaveBeenCalled();
+  });
+
   it("takes the sidebar tone and a class of the caller's", () => {
     render(
       <LabelledSwitch
