@@ -132,6 +132,27 @@ describe("AppNav", () => {
     }
   });
 
+  // jsdom draws no pseudo-element, so the classes that draw the rail are
+  // what is read: its place on every row, its colour on the current one.
+  it("marks the current screen with a rail at the sidebar's edge", () => {
+    renderNav("/accounts", closed);
+
+    const nav = within(screen.getByRole("navigation", { name: "Screens" }));
+    for (const link of nav.getAllByRole("link")) {
+      expect(link).toHaveClass(
+        "before:absolute",
+        "before:inset-y-1.5",
+        "before:-left-2",
+        "before:w-0.5",
+        "before:rounded-full",
+        "data-active:before:bg-sidebar-primary",
+      );
+    }
+    expect(nav.getByRole("link", { current: "page" })).toHaveAttribute(
+      "data-active",
+    );
+  });
+
   // The numeral is decorative, so a screen reader hears the label alone.
   it("hides each numeral from a screen reader", () => {
     renderNav("/", closed);
