@@ -4,7 +4,7 @@ import type { JSX } from "react";
 import type { TooltipContentProps } from "recharts";
 
 import { cn } from "cn";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import {
   Area,
   CartesianGrid,
@@ -28,6 +28,7 @@ import { ageOf } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { markersIn, reachedIn, yearsIn } from "@/engine/futures";
 import { axisOf } from "@/lib/axis";
+import { formatCount } from "@/lib/count";
 import { listed } from "@/lib/feeders";
 import { formatAxisGbp, formatGbp, formatWholePercent } from "@/lib/money";
 import { chance, subsectionLabel } from "@/lib/nav";
@@ -42,6 +43,7 @@ interface FanTooltipProps {
 interface FuturesFanProps {
   readonly "aria-describedby"?: string;
   readonly futures: readonly Future[];
+  readonly isDone: boolean;
   readonly milestones: readonly Milestone[];
   readonly plan: Plan;
 }
@@ -51,6 +53,10 @@ interface FuturesFanProps {
 // recharts drops it back to its own 60px whenever it renders afresh,
 // which here is on every slice of the run landing.
 const axisWidth = 57;
+
+// What the card draws, said beneath its title from the first paint.
+const caption =
+  "Median, middle half and middle 80%, in today's\u00a0money; beneath, the share out of money by each year's end";
 
 // The plot's box: three times as wide as it is tall, down to a floor,
 // and held to the card's width, in a column that grows no wider than the
@@ -82,6 +88,12 @@ const readings = [
   { fill: "bg-chart-2/20", key: "bottomTenth", name: "Bottom 10%" },
 ] as const;
 
+// The box beneath the fan for the share out of money: one height at
+// every width and in each of what it holds, from the first paint, so
+// nothing beneath it moves as the run lands or is drawn again. recharts
+// needs a parent of a definite height, which it is.
+const stepBox = "h-32 w-full";
+
 // What the band of the middle four in five spans in a year.
 const tenths = ({ bottomTenth, topTenth }: FutureYear): number[] => [
   bottomTenth,
@@ -91,15 +103,28 @@ const tenths = ({ bottomTenth, topTenth }: FutureYear): number[] => [
 // The run laid on the plan's years as a fan of what the futures are
 // worth as each year opens, their net worth in today's money: the
 // middle future as a line, the middle half of the futures shaded about
-// it, and the middle four in five more faintly beyond that. No marks
-// hang beneath it for the futures falling short: how many have run out
-// is read under the crosshair, and when they fall short is said where
-// the screen opens. The crosshair reads the year, the age and the
-// milestones falling in it, the five lines in full pounds, and the
-// share of the run out of money by then, on hover and on the arrow keys,
-// and is announced to a screen reader as it moves, the chart being
-// named for one. The milestones in the plan's years are faint lines in
-// ink, as the dashboard draws them, named by the chips beneath, and
+// it, and the middle four in five more faintly beyond that. Beneath it,
+// once the whole run is in, the share of the run out of money by the
+// end of each year, on the same years and on a scale from none of the
+// run to all of it, stepping up in the year each future runs out, in
+// the red the crosshair keys it in, or the text's colour where colours
+// are forced, as the key is. The fan's bands stop at the bottom tenth,
+// so the futures that run out are drawn beneath it rather than in it.
+// The step is drawn from the year before the first runs out, where it
+// leaves nothing, so no red runs along the baseline through the years
+// none has; where none runs out its box says so instead, and while the
+// run is drawn it says the step is drawn once it is in, holding its
+// height throughout. To a screen reader the step is an image, named for
+// what it draws and described by when the first ran out and how many of
+// the run had by the end, its plot hidden and taking no focus. One
+// crosshair crosses both plots, the step's following the fan's, and the
+// step takes no pointer of its own, so the two never read different
+// years. The crosshair reads the year, the age and the milestones
+// falling in it, the five lines in full pounds, and the share of the
+// run out of money by then, on hover and on the arrow keys, and is
+// announced to a screen reader as it moves, the chart being named for
+// one. The milestones in the plan's years are faint lines in ink through
+// both plots, as the dashboard draws them, named by the chips beneath, and
 // the one chosen is drawn solid until it is chosen again: one reached
 // at an age where the plan lays it, and one reached when conditions
 // hold in the year by which half the futures drawn so far have reached
@@ -119,10 +144,13 @@ const tenths = ({ bottomTenth, topTenth }: FutureYear): number[] => [
 export function FuturesFan({
   "aria-describedby": describedBy,
   futures,
+  isDone,
   milestones,
   plan,
 }: FuturesFanProps): JSX.Element {
   const [chosen, setChosen] = useState<Tie | undefined>();
+  const syncId = useId();
+  const stepDescriptionId = useId();
   const end = endYear(plan);
   const markers = markersIn(futures, milestones, plan).filter(
     (marker) => marker.year >= plan.from && marker.year <= end,
@@ -144,13 +172,34 @@ export function FuturesFan({
             ).length / futures.length,
     }));
   const years = useMemo(() => yearsIn(futures, plan), [futures, plan]);
+  const first = years.find(({ outOfMoney }) => outOfMoney > 0);
+  const shares = useMemo(
+    () =>
+      years.map(({ outOfMoney, year }) => ({
+        share:
+          first === undefined || year < first.year - 1
+            ? null
+            : outOfMoney / futures.length,
+        year,
+      })),
+    [first, futures.length, years],
+  );
   const axis = axisOf(
     Math.min(0, ...years.map(({ bottomTenth }) => bottomTenth)),
     Math.max(0, ...years.map(({ topTenth }) => topTenth)),
   );
+  const rules = markers.map((marker) => (
+    <ReferenceLine
+      key={marker.id}
+      stroke="var(--foreground)"
+      strokeOpacity={marker.id === chosen ? 1 : 0.35}
+      strokeWidth={marker.id === chosen ? 1.5 : 1}
+      x={marker.year}
+    />
+  ));
   return (
     <SectionCard
-      caption="Median, middle half and middle 80%, in today's money"
+      caption={caption}
       className="min-w-0 overflow-visible"
       label={subsectionLabel(chance, 2)}
       title="Year by year"
@@ -172,6 +221,7 @@ export function FuturesFan({
                 aria-describedby={describedBy}
                 data={years}
                 margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
+                syncId={syncId}
                 title="What the futures are worth as each year opens"
               >
                 <CartesianGrid vertical={false} />
@@ -228,17 +278,85 @@ export function FuturesFan({
                   strokeWidth={2}
                   type="monotone"
                 />
-                {markers.map((marker) => (
-                  <ReferenceLine
-                    key={marker.id}
-                    stroke="var(--foreground)"
-                    strokeOpacity={marker.id === chosen ? 1 : 0.35}
-                    strokeWidth={marker.id === chosen ? 1.5 : 1}
-                    x={marker.year}
-                  />
-                ))}
+                {rules}
               </ComposedChart>
             </ChartContainer>
+          </div>
+        )}
+        {!isDone && (
+          <p
+            className={cn(
+              "flex items-center justify-center text-center text-sm text-balance text-muted-foreground",
+              stepBox,
+            )}
+          >
+            The share out of money is drawn once all the futures are in.
+          </p>
+        )}
+        {isDone && first === undefined && (
+          <p
+            className={cn(
+              "flex items-center justify-center text-center text-sm text-balance",
+              stepBox,
+            )}
+          >
+            None of the futures run out of money.
+          </p>
+        )}
+        {isDone && first !== undefined && (
+          <div
+            aria-describedby={stepDescriptionId}
+            aria-label="How many futures have run out of money by each year's end"
+            className={cn(
+              "pointer-events-none flex flex-col text-destructive",
+              stepBox,
+            )}
+            role="img"
+          >
+            <ChartContainer
+              aria-hidden
+              className="aspect-auto min-h-0 flex-1"
+              config={{}}
+            >
+              <ComposedChart
+                accessibilityLayer={false}
+                data={shares}
+                margin={{ bottom: 0, left: 0, right: 12, top: 8 }}
+                syncId={syncId}
+              >
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  axisLine={false}
+                  dataKey="year"
+                  minTickGap={40}
+                  tickLine={false}
+                  tickMargin={8}
+                />
+                <YAxis
+                  axisLine={false}
+                  domain={[0, 1]}
+                  tickFormatter={formatWholePercent}
+                  tickLine={false}
+                  ticks={[0, 0.5, 1]}
+                  width={axisWidth}
+                />
+                <ChartTooltip content={() => null} />
+                <Area
+                  activeDot={{ r: 4, stroke: "var(--card)", strokeWidth: 2 }}
+                  dataKey="share"
+                  fill="currentColor"
+                  fillOpacity={0.1}
+                  isAnimationActive={false}
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  type="stepAfter"
+                />
+                {rules}
+              </ComposedChart>
+            </ChartContainer>
+            <p hidden id={stepDescriptionId}>
+              {`The first in ${String(first.year)}, at ${String(ageIn(first.year, plan))}, and ${formatCount(futures.filter(({ ranOut }) => ranOut !== null).length)} of the ${formatCount(futures.length)} by ${String(end)}, at ${String(ageIn(end, plan))}.`}
+            </p>
           </div>
         )}
         {(markers.length > 0 || unplaced.length > 0) && (
@@ -259,10 +377,11 @@ export function FuturesFan({
 // The year under the crosshair, the age reached that year and the
 // milestones falling in it; what the futures are worth at each of the
 // fan's lines, the median heavier; and the share of the run out of
-// money by then. A status, so a screen reader reads it out as the
-// crosshair steps, as recharts' own tooltip is. The year is found by the label the crosshair names
-// rather than read out of the entry recharts hands over, which is
-// untyped.
+// money by the year's end, as the step beneath draws it, its key in the
+// text's colour where colours are forced, as the step is. A status, so
+// a screen reader reads it out as the crosshair steps, as recharts' own
+// tooltip is. The year is found by the label the crosshair names rather
+// than read out of the entry recharts hands over, which is untyped.
 function FanTooltip({
   active: isActive,
   label,
@@ -309,7 +428,10 @@ function FanTooltip({
         </span>
       ))}
       <span className="flex items-center gap-2 border-t pt-1.5">
-        <span aria-hidden className="size-2 rounded-full bg-destructive" />
+        <span
+          aria-hidden
+          className="size-2 rounded-full bg-destructive forced-colors:bg-[CanvasText]"
+        />
         <span className="text-muted-foreground">Out of money</span>
         <span className="ml-auto figure font-medium">
           {formatWholePercent(year.outOfMoney / run)}

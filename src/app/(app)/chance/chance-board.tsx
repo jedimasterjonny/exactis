@@ -47,7 +47,8 @@ interface ChanceBoardProps {
 // What the plan's futures come to, as many as have come in: graded,
 // where the plan breaks, searched once the whole run has come in, with
 // how many last on each share of the spending and a retirement age to
-// try there, the run fanned over the plan's years,
+// try there, the run fanned over the plan's years, with how many have
+// run out of money by each year's end beneath it once the run is whole,
 // every milestone and when the run reaches it, and the count beneath
 // them. The screen reads the run
 // and hands the futures down, since its header reads them too, so the
@@ -107,6 +108,7 @@ export function ChanceBoard({
       <FuturesFan
         aria-describedby={headlineId}
         futures={futures}
+        isDone={isDone}
         milestones={milestones}
         plan={plan}
       />

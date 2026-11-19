@@ -62,6 +62,13 @@ const home: Account = {
 
 const nothingStrays = { inflation: 0, rate: 0 };
 
+// The card fanning the run over the plan's years, which the share out of
+// money is looked for in before the run is drawn or once it has landed,
+// and never polled for.
+function fan(): HTMLElement {
+  return screen.getByRole("region", { name: "Year by year" });
+}
+
 // The card saying what the futures come to. What the run comes to is
 // looked for in it, or in the header, rather than over the screen: the
 // worker double draws the run on the test's own thread, a look over the
@@ -163,6 +170,9 @@ describe("ChanceScreen", () => {
     ).toHaveTextContent(
       "Drawing the futures to count how many of 1,000 last to 37…",
     );
+    expect(within(fan()).getAllByRole("paragraph").at(-1)).toHaveTextContent(
+      "The share out of money is drawn once all the futures are in.",
+    );
     expect(
       await within(screen.getByRole("banner")).findByText(
         "1,000 futures, age 34 to 37",
@@ -186,6 +196,10 @@ describe("ChanceScreen", () => {
       }),
     ).toHaveAccessibleDescription(
       "1,000 of 1,000 futures last to 37, most of them comfortably.",
+    );
+    // The whole run is in, and none of it ran out.
+    expect(within(fan()).getAllByRole("paragraph").at(-1)).toHaveTextContent(
+      "None of the futures run out of money.",
     );
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
     // The board hands the wall the whole run once it is drawn.
@@ -268,6 +282,9 @@ describe("ChanceScreen", () => {
       within(outcomes()).getByRole("heading", { level: 2 }),
     ).toHaveTextContent(
       "Drawing the futures to count how many of 1,000 last to 37…",
+    );
+    expect(within(fan()).getAllByRole("paragraph").at(-1)).toHaveTextContent(
+      "The share out of money is drawn once all the futures are in.",
     );
 
     await header.findByText(
