@@ -582,6 +582,35 @@ export function markersIn(
   );
 }
 
+// The path the future at the place given in a run of the plan's futures
+// is carried along, as futuresOf carries it there: its years drawn from
+// that future's own stream, and their months from another, seeded half
+// the generator's cycle on from the years', so that no stretch of the
+// generator one stream draws meets another's over a run of ten thousand
+// futures two hundred years long, as its test holds; from the seed
+// given or the one every run starts from. A future drawn is read back
+// along it, year by year and month by month.
+export function marketsOf({
+  future,
+  plan,
+  seed = defaultSeed,
+  spread,
+}: {
+  readonly future: number;
+  readonly plan: Pick<Plan, "byYear" | "inflation" | "rate" | "years">;
+  readonly seed?: number;
+  readonly spread: Spread;
+}): Required<Path> {
+  const yearsSeed = seed + future * step;
+  const years = pathOf(plan, spread, normalsFrom(yearsSeed));
+  const { months = [] } = monthsOver(
+    years,
+    spread,
+    normalsFrom(yearsSeed + 2 ** 31),
+  );
+  return { ...years, months };
+}
+
 // The months of a month end carried along each future of the markets,
 // drawn one at a time without end from the place in the run given, its
 // first unless another is: every account carried the months given on
@@ -926,12 +955,8 @@ function cutBy(run: Run, cut: number): Run {
 }
 
 // The run of the future at the place given in a run of the plan's
-// futures: the plan carried along the path drawn from that future's
-// own streams, its years' and its months', over the years given or
-// else the plan's, the months' seeded half the generator's cycle on
-// from the years', so that no stretch of the generator one stream
-// draws meets another's over a run of ten thousand futures two hundred
-// years long, as its test holds.
+// futures: the plan carried along the path marketsOf draws for it, over
+// the years given or else the plan's.
 function drawnOver(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -949,13 +974,14 @@ function drawnOver(
     readonly years?: number;
   },
 ): Run {
-  const yearsSeed = seed + future * step;
-  const path = monthsOver(
-    pathOf({ ...plan, years }, spread, normalsFrom(yearsSeed)),
-    spread,
-    normalsFrom(yearsSeed + 2 ** 31),
-  );
-  return { accounts, plan: { ...plan, path }, schedule };
+  return {
+    accounts,
+    plan: {
+      ...plan,
+      path: marketsOf({ future, plan: { ...plan, years }, seed, spread }),
+    },
+    schedule,
+  };
 }
 
 // Whether a future lasted, as the chance counts it: it never fell short,

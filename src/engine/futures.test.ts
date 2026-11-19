@@ -27,6 +27,7 @@ import {
   lastingOn,
   lastsTried,
   markersIn,
+  marketsOf,
   monthsAlong,
   monthsOver,
   outcomeOf,
@@ -1480,6 +1481,100 @@ describe("gradingOf", () => {
       comfortable: 0,
       surplus: 0,
     });
+  });
+});
+
+describe("marketsOf", () => {
+  // Born in 1992, 34 as the plan opens in January 2026, with prices
+  // still and nothing coming in or going out, so an ISA on the plan
+  // rate is worth each year what the year before left it, grown by the
+  // year's return alone, to the pound a balance is kept to.
+  const planned = {
+    born: 1992,
+    from: 2026,
+    inflation: 0,
+    month: 0,
+    owners: [working],
+    rate: 0.05,
+    retires: 92,
+    years: 4,
+  };
+
+  const isa: Account = {
+    balance: 30000,
+    growth: { kind: "plan" },
+    id: 1,
+    kind: "tax-free",
+    name: "ISA",
+    owner: 1,
+  };
+
+  const nothing: Schedule = { expenses: [], income: [] };
+
+  const spread = { inflation: 0, rate: 0.14 };
+
+  // What each year of a future grew the ISA by, read off what it is
+  // worth entering that year and the next.
+  function grownIn({ measured }: Future): number[] {
+    return measured
+      .slice(1)
+      .map(({ worth }, year) => worth / (measured[year]?.worth ?? 0) - 1);
+  }
+
+  // What the months given compound to.
+  function compounded(months: readonly number[]): number {
+    return months.reduce((grown, month) => grown * (1 + month), 1) - 1;
+  }
+
+  it.each([{ seed: undefined }, { seed: 7 }])(
+    "reads back the years a future at each place in the run was carried along, from the seed $seed",
+    ({ seed }) => {
+      const run = {
+        plan: planned,
+        spread,
+        ...(seed !== undefined && { seed }),
+      };
+      const futures = futuresOf([isa], nothing, run).take(3).toArray();
+
+      const read = futures.map((_, future) => marketsOf({ ...run, future }));
+
+      expect(read.map(({ rate }) => rate.length)).toStrictEqual([4, 4, 4]);
+      expect(new Set(read.map(({ rate }) => rate[0])).size).toBe(3);
+
+      futures.forEach((future, place) => {
+        grownIn(future).forEach((grown, year) => {
+          expect(grown).toBeCloseTo(read[place]?.rate[year] ?? Number.NaN, 4);
+        });
+      });
+    },
+  );
+
+  // Opening in September, the plan holds the first year's last four
+  // months alone, so the ISA grows by those four entering 2027, and by
+  // each later year's twelve after.
+  it("reads back the months the run carried a future along, twelve a year from January", () => {
+    const september = { ...planned, month: 8 };
+    const [future] = futuresOf([isa], nothing, { plan: september, spread })
+      .take(1)
+      .toArray();
+
+    const { months } = marketsOf({ future: 0, plan: september, spread });
+
+    expect(months).toHaveLength(48);
+    expect(future === undefined ? [] : grownIn(future)).toStrictEqual(
+      [
+        months.slice(8, 12),
+        months.slice(12, 24),
+        months.slice(24, 36),
+        months.slice(36, 48),
+      ].map((year): unknown => expect.closeTo(compounded(year), 4)),
+    );
+  });
+
+  it("draws other years from another seed", () => {
+    expect(
+      marketsOf({ future: 0, plan: planned, seed: 7, spread }).rate,
+    ).not.toStrictEqual(marketsOf({ future: 0, plan: planned, spread }).rate);
   });
 });
 
