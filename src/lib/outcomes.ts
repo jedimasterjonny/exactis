@@ -36,3 +36,14 @@ export const outcomeFills: Readonly<Record<Outcome, string>> = {
   middle: "bg-outcome-middle",
   surplus: "bg-outcome-surplus",
 };
+
+// The ink each outcome's mark is drawn in where it is a line rather
+// than a fill, the same colours as its fill.
+export const outcomeInks: Readonly<Record<Outcome, string>> = {
+  almost: "text-outcome-almost",
+  barely: "text-outcome-barely",
+  comfortable: "text-outcome-comfortable",
+  early: "text-outcome-early",
+  middle: "text-outcome-middle",
+  surplus: "text-outcome-surplus",
+};
