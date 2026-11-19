@@ -84,6 +84,16 @@ const futures = Array.from({ length: 10 }, (_, nth): Future => ({
   retired: 2084,
 }));
 
+// What the first million's bar is named, over the run alone and with
+// the children leaving home ruled across it, and independence's, which
+// every share reaches at once.
+const reachedNamed =
+  "First million: Earliest 5% and Earliest 10% 2030, age 38; Earliest 25% 2032, age 40; Median 2034, age 42; Latest 25% 2037, age 45; Latest 10% and Latest 5%, never";
+const firstMillionNamed =
+  "First million: Earliest 5% and Earliest 10% 2030, age 38; Earliest 25% 2032, age 40; Median 2034, age 42; Latest 25% 2037, age 45; Kids leave home 2040, age 48; Latest 10% and Latest 5%, never";
+const independenceNamed =
+  "Financial independence: Earliest 5%, Earliest 10%, Earliest 25%, Median, Latest 25%, Latest 10% and Latest 5% 2026, age 34; Kids leave home 2040, age 48";
+
 // Where each row's median dot sits on the span, folded and unfolded, a
 // row's two bars one after the other.
 function medians(): string[] {
@@ -194,35 +204,30 @@ describe("MilestoneSpreads", () => {
     // The share is written once a row, in its columns, for the two
     // reached when conditions hold alone.
     expect(within(card).getAllByText("reach it")).toHaveLength(2);
-    // A point for the children leaving home on every bar, each drawn
-    // twice, the pin's own among them and not named for its row again,
-    // and none for the downsize or retirement past the span.
+    // The bars of the two reached when conditions hold name the children
+    // leaving home among their shares, each drawn twice, and none names
+    // the downsize or retirement past the span; a pinned row's bar marks
+    // alone, the year and the age beside it.
     expect(
       within(card)
-        .getAllByRole("button", { name: /Kids leave home: / })
-        .map((point) => point.getAttribute("aria-label")),
-    ).toStrictEqual(
-      [
-        "",
-        "",
-        "Downsize, ",
-        "Downsize, ",
-        "First million, ",
-        "First million, ",
-        "Financial independence, ",
-        "Financial independence, ",
-      ].map((row) => `${row}Kids leave home: 2040 · age 48`),
-    );
+        .getAllByRole("button", { name: /Kids leave home 2040, age 48/ })
+        .map((bar) => bar.getAttribute("aria-label")),
+    ).toStrictEqual([
+      firstMillionNamed,
+      firstMillionNamed,
+      independenceNamed,
+      independenceNamed,
+    ]);
     expect(
-      within(card).queryAllByRole("button", { name: /(Downsize|Retirement):/ }),
-    ).toStrictEqual([]);
-    // Beside it, four points on the first million's bar and one on
-    // independence's, where every share is reached at once.
-    expect(
-      within(card).getAllByRole("button", {
-        name: /^(First million|Financial independence), /,
+      within(card).queryAllByRole("button", {
+        name: /^(Kids leave home|Downsize):/,
       }),
-    ).toHaveLength(14);
+    ).toStrictEqual([]);
+    expect(
+      within(card).queryAllByRole("button", {
+        name: /(Downsize|Retirement) \d/,
+      }),
+    ).toStrictEqual([]);
     // Three milestones' years rule each of the eight tracks.
     expect(
       within(card).getAllByText(bySlot("pin-bar-mark"), { suggest: false }),
@@ -278,6 +283,11 @@ describe("MilestoneSpreads", () => {
     expect(screen.getByText("Median")).toHaveClass("label");
     expect(screen.getByText("Median —")).toBeInTheDocument();
     expect(medians()).toStrictEqual([]);
+    expect(
+      screen.getAllByRole("button", {
+        name: "First million: Earliest 5%, Earliest 10%, Earliest 25%, Median, Latest 25%, Latest 10% and Latest 5%, never",
+      }),
+    ).toHaveLength(2);
 
     rerender(
       <MilestoneSpreads
@@ -290,54 +300,57 @@ describe("MilestoneSpreads", () => {
 
     expect(screen.getAllByText("…")).toHaveLength(3);
     expect(screen.getByText("Median …")).toBeInTheDocument();
+    // Before any future is drawn the bar names its rules alone, and
+    // retirement's falls past the span, so it names nothing.
+    expect(
+      screen.queryByRole("button", { name: /^First million: / }),
+    ).not.toBeInTheDocument();
   });
 
-  // Each year a share is reached by is a point on the bar, a button
-  // named for the milestone and its shares, folded and in its columns,
-  // the shares reached in the same year together and those never
-  // reached with no point; either says the same on hover or focus.
-  it("says at each point on the bar, hovered or focused, the year and age the run reaches a milestone by at its shares", async () => {
+  // A bar is one button, folded and in its columns, named for the
+  // milestone and every year on it, the shares reached in the same year
+  // together and those never reached last; hovered or focused, it lists
+  // each name on a line of its own, a dash for a share never reached.
+  it("names every year on a bar on its one target, hovered or focused, the years and ages the run reaches a milestone by at its shares", async () => {
     renderList();
 
-    const named = [
-      "First million, Earliest 5% · Earliest 10%: 2030 · age 38",
-      "First million, Earliest 25%: 2032 · age 40",
-      "First million, Median: 2034 · age 42",
-      "First million, Latest 25%: 2037 · age 45",
-    ];
-    const points = screen.getAllByRole("button", { name: /^First million, / });
-    expect(
-      points.map((point) => point.getAttribute("aria-label")),
-    ).toStrictEqual([...named, ...named]);
-    expect(points[0]).toHaveStyle({ left: `${String(placed(2030, plan))}%` });
-    // Each is held to the gap to its nearest point, so none covers
-    // another's where the years fall close: two years for the first
-    // three and three for the last.
-    expect(
-      points.slice(0, 4).map(({ style }) => Number.parseFloat(style.maxWidth)),
-    ).toStrictEqual(
-      [2, 2, 2, 3].map((count): unknown =>
-        expect.closeTo(placed(plan.from + count, plan), 4),
-      ),
-    );
+    const bars = screen.getAllByRole("button", { name: /^First million: / });
+    expect(bars.map((bar) => bar.getAttribute("aria-label"))).toStrictEqual([
+      reachedNamed,
+      reachedNamed,
+    ]);
+    // On a touch screen the press goes through it to the row, which is
+    // the one target there, at least 44px tall; jsdom has no pointer, so
+    // the classes that key on one are read.
+    expect(bars[0]).toHaveClass("h-6", "pointer-coarse:pointer-events-none");
+    for (const row of screen.getAllByRole("listitem")) {
+      expect(row).toHaveClass("pointer-coarse:min-h-11");
+    }
 
     // Focus moved by the keyboard opens it, as a pointer's hover does;
     // the focus is real, since the tooltip asks whether it is visible.
-    const median = screen.getAllByRole("button", {
-      name: "First million, Median: 2034 · age 42",
-    });
     act(() => {
-      median[0]?.focus();
+      bars[0]?.focus();
     });
 
     expect(
       await screen.findByText(bySlot("tooltip-content"), { suggest: false }),
-    ).toHaveTextContent("Median2034 · age 42");
+    ).toHaveTextContent(
+      [
+        "Earliest 5%2030 · age 38",
+        "Earliest 10%2030 · age 38",
+        "Earliest 25%2032 · age 40",
+        "Median2034 · age 42",
+        "Latest 25%2037 · age 45",
+        "Latest 10%—",
+        "Latest 5%—",
+      ].join(""),
+    );
   });
 
-  // A point is kept while its year moves as more of the run is drawn,
+  // The bar is kept while its years move as more of the run is drawn,
   // so one hovered or focused stays so rather than being drawn anew.
-  it("keeps a point on the bar while its year moves", () => {
+  it("keeps a bar's target while its years move", () => {
     // The same run a year later, each future worth what it was a year
     // before.
     const later = futures.map(({ measured, ...future }) => ({
@@ -356,9 +369,7 @@ describe("MilestoneSpreads", () => {
         schedule={nothing}
       />,
     );
-    const [median] = screen.getAllByRole("button", {
-      name: "First million, Median: 2034 · age 42",
-    });
+    const [bar] = screen.getAllByRole("button", { name: reachedNamed });
 
     rerender(
       <MilestoneSpreads
@@ -371,9 +382,9 @@ describe("MilestoneSpreads", () => {
 
     expect(
       screen.getAllByRole("button", {
-        name: "First million, Median: 2035 · age 43",
+        name: /^First million: .*Median 2035, age 43;/,
       })[0],
-    ).toBe(median);
+    ).toBe(bar);
   });
 
   it("draws the empty state for none", () => {
@@ -433,6 +444,14 @@ describe("MilestoneSpreads", () => {
     expect(
       within(card).getAllByRole("link", { name: "Retirement" }),
     ).toHaveLength(2);
+    // Its bar is a link too, so a press on it goes where its name does.
+    const bars = within(card).getAllByRole("link", {
+      name: "Retirement: Earliest 5% and Earliest 10% 2030, age 38; Earliest 25% 2032, age 40; Median 2034, age 42; Latest 25% 2037, age 45; Latest 10% and Latest 5%, never",
+    });
+    expect(bars).toHaveLength(2);
+    for (const bar of bars) {
+      expect(bar).toHaveAttribute("href", "/plan");
+    }
   });
 
   // The dialog opens on conditions, since that is what this card reads,
@@ -505,22 +524,15 @@ describe("MilestoneSpreads", () => {
     expect(field("Age", dialog)).toHaveValue("48");
   });
 
-  // A point on a bar opens its row when pressed, as the rest of the bar
-  // lets a press through to do, the pin's own among them.
-  it("opens a milestone from a point on its bar", () => {
+  // A bar opens its row when pressed, as the rest of the row does.
+  it("opens a milestone from its bar", () => {
     renderList(milestones);
 
-    pressRow("First million, Median: 2034 · age 42");
-    const dialog = screen.getByRole("dialog", { name: "First million" });
-
-    expect(field("At least", dialog)).toHaveValue("£1,000,000");
-
-    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
-    pressRow("Kids leave home: 2040 · age 48");
+    pressRow(firstMillionNamed);
 
     expect(
-      field("Age", screen.getByRole("dialog", { name: "Kids leave home" })),
-    ).toHaveValue("48");
+      field("At least", screen.getByRole("dialog", { name: "First million" })),
+    ).toHaveValue("£1,000,000");
   });
 
   // A saved milestone's dialog is where it is deleted from: the Delete
