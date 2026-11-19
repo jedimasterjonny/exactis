@@ -33,10 +33,11 @@ const tones: Record<
 // A switch between two states, named: an icon and the name of the state
 // the switch is in now, in the micro-label face, with the switch at the
 // right. The name is the switch's accessible name, since the label wraps
-// it, so a caller names the state and never the control. Where colours
-// are forced, a switch on is filled in the system's highlight, its thumb
-// drawn on it, since forcing paints the fill and the thumb in the page's
-// colour alike.
+// it, so a caller names the state and never the control. On a touch
+// screen the row is 44px tall, and a press anywhere on it turns the
+// switch. Where colours are forced, a switch on is filled in the
+// system's highlight, its thumb drawn on it, since forcing paints the
+// fill and the thumb in the page's colour alike.
 export function LabelledSwitch({
   children,
   className,
@@ -49,7 +50,7 @@ export function LabelledSwitch({
   return (
     <label
       className={cn(
-        "flex h-8 items-center gap-2 label",
+        "flex h-8 items-center gap-2 label pointer-coarse:min-h-11",
         tones[tone].label,
         className,
       )}

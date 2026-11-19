@@ -29,7 +29,8 @@ interface ConfirmDialogProps {
 // is Cancel or Escape, both of which cancel. The confirm spins while
 // the caller says the deletion is on its way to the store. It says
 // Delete unless the caller names what it does, for a question whose
-// answer writes over something rather than deleting it.
+// answer writes over something rather than deleting it. On a touch
+// screen Cancel is 44px tall, as the confirm is.
 export function ConfirmDialog({
   children,
   confirm = "Delete",
@@ -46,7 +47,9 @@ export function ConfirmDialog({
           <AlertDialogDescription>{children}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel size="sm">Cancel</AlertDialogCancel>
+          <AlertDialogCancel className="pointer-coarse:min-h-11" size="sm">
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction
             isBusy={isBusy}
             onClick={onConfirm}

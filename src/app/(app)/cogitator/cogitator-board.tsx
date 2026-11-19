@@ -405,7 +405,8 @@ function Trades({
 }
 
 // The screen with nothing to lay out, saying why where the ladder
-// would be, and where the allocation is imported.
+// would be, and where the allocation is imported, by a link 44px tall
+// on a touch screen.
 function Unready({
   description,
   icon,
@@ -420,7 +421,7 @@ function Unready({
       <CardContent>
         <EmptyState description={description} icon={icon} title={title}>
           <Link
-            className="underline underline-offset-4"
+            className="underline underline-offset-4 pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
             href={`${assumptions.href}?tab=target-allocation`}
           >
             {`${assumptions.label} › Target allocation`}

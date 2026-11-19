@@ -489,6 +489,25 @@ describe("CashFlowCard", () => {
     ]);
   });
 
+  // jsdom has no pointer to match, so the classes that key on one are
+  // read: the trigger grows into the row's own padding, centred on it.
+  it("draws the expenses figure's trigger 44px tall on a touch screen, inside its row's padding", () => {
+    render(
+      <CashFlowCard
+        accounts={[]}
+        milestones={milestones}
+        plan={plan}
+        schedule={schedule}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /^Expenses/ })).toHaveClass(
+      "pointer-coarse:-my-2.75",
+      "pointer-coarse:min-h-11",
+      "pointer-coarse:items-center",
+    );
+  });
+
   // A mortgage in two sub-accounts pays both in 2026, listed as the one
   // line of the mortgage; by 2040 the first has cleared and the second
   // pays alone, still under the mortgage's name.

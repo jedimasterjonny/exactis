@@ -49,8 +49,9 @@ const format: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };
 // in the tab order after it, stepping five years with Shift or a page
 // key as the box does, its track drawn in the box's border grey so it
 // shows on a sunken panel, and its control 44px tall below the width of
-// a tablet, so a finger has a target as tall as a row's. An age set on
-// purpose rather than watched as it moves asks for no slider, and is
+// a tablet, so a finger has a target as tall as a row's. On a touch
+// screen the control is that tall wherever the slider sits. An age set
+// on purpose rather than watched as it moves asks for no slider, and is
 // the field alone, committing as it does with one. An age that cannot
 // be tried yet is held: the box and the slider show the age given,
 // dimmed, out of the tab order and read as unavailable, until the
@@ -96,7 +97,7 @@ export function AgeField({
       <Slider
         aria-labelledby={sliderLabelId}
         className={cn(
-          "forced-colors:[&_[data-slot=slider-range]]:bg-[CanvasText] forced-colors:[&_[data-slot=slider-track]]:outline",
+          "pointer-coarse:*:min-h-11 forced-colors:[&_[data-slot=slider-range]]:bg-[CanvasText] forced-colors:[&_[data-slot=slider-track]]:outline",
           isSliderInFlow &&
             "max-md:*:h-11 [&_[data-slot=slider-track]]:bg-input",
         )}

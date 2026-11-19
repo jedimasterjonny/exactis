@@ -99,6 +99,15 @@ describe("ScreenTabs", () => {
     expect(list).not.toHaveClass("group-data-horizontal/tabs:h-8");
   });
 
+  // jsdom has no pointer to match, so the class that keys on one is read.
+  it("draws each tab 44px tall on a touch screen", () => {
+    renderTabs();
+
+    for (const tab of screen.getAllByRole("tab")) {
+      expect(tab).toHaveClass("pointer-coarse:min-h-11");
+    }
+  });
+
   it("lets the open panel take the focus, and rings it when it does", () => {
     renderTabs();
 
