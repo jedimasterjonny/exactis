@@ -72,7 +72,8 @@ const quarters = ({ bottomQuarter, topQuarter }: FutureYear): number[] => [
 // The lines the crosshair reads a year at, from the top of the fan down
 // as the plot reads, each keyed as the band it bounds is drawn: the
 // tenths' at a fifth, and the quarters' where their band lies over the
-// tenths', at about a half.
+// tenths', at about a half. The keys keep those colours where colours
+// are forced, as the fan they key keeps its own.
 const readings = [
   { fill: "bg-chart-2/20", key: "topTenth", name: "Top 10%" },
   { fill: "bg-chart-2/50", key: "topQuarter", name: "Top 25%" },
@@ -291,7 +292,10 @@ function FanTooltip({
       </span>
       {readings.map(({ fill, key, name }) => (
         <span className="flex items-center gap-2" key={key}>
-          <span aria-hidden className={cn("size-2 rounded-full", fill)} />
+          <span
+            aria-hidden
+            className={cn("size-2 rounded-full forced-color-adjust-none", fill)}
+          />
           <span
             className={
               key === "middle" ? "font-medium" : "text-muted-foreground"
