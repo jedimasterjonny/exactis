@@ -104,6 +104,26 @@ describe("MilestoneChips", () => {
     expect(within(chip).getByText("reached in")).toHaveClass("sr-only");
   });
 
+  // jsdom lays nothing out, so the class that sizes the reach is read: a
+  // box 44px tall about the chip's middle, whatever its border.
+  it("reaches 44px tall for a finger about each chip, past its drawn edges", () => {
+    render(
+      <MilestoneChips
+        markers={markers}
+        onSelect={vi.fn<(tie: Tie) => void>()}
+        selected="retirement"
+      />,
+    );
+
+    for (const chip of screen.getAllByRole("button")) {
+      expect(chip).toHaveClass(
+        "h-8",
+        "after:absolute",
+        "after:inset-y-[calc(50%-22px)]",
+      );
+    }
+  });
+
   it("reports the milestone a chip chooses", () => {
     const onSelect = vi.fn<(tie: Tie) => void>();
     render(

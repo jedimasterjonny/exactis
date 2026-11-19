@@ -39,7 +39,9 @@ interface Unplaced {
 // ellipsis where its year will be while they are drawn, and once they
 // are, the share of them that reach it, said to a screen reader as
 // that. The chips are drawn 32px tall and reach 44px for a finger past
-// their own edges, so a row of them stays compact. The row is a group
+// their own edges, so a row of them stays compact; the reach is laid
+// about the chip's middle, since one laid from its edges starts inside
+// its border and comes up 2px short. The row is a group
 // named for a screen reader, and each chip says whether it is the one
 // chosen. Where colours are forced, the chip chosen is filled in the
 // system's highlight, its name in the highlight's text, and is kept
@@ -64,7 +66,7 @@ export function MilestoneChips({
           <button
             aria-pressed={isChosen}
             className={cn(
-              "relative inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm font-medium after:absolute after:inset-x-0 after:-inset-y-1.5 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden",
+              "relative inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm font-medium after:absolute after:inset-x-0 after:inset-y-[calc(50%-22px)] focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden",
               isChosen
                 ? "border-brand bg-brand text-brand-foreground forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:forced-color-adjust-none forced-colors:focus-visible:outline-[CanvasText]"
                 : "bg-card hover:bg-muted",
