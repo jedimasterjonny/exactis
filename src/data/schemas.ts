@@ -59,13 +59,13 @@ export const decisionReason = z
 
 // The most characters a note on a month closed holds, counted as zod
 // counts a string's length, by code point.
-const longestNote = 200;
+export const longestNote = 200;
 
 // A note on a month closed: one line as typed less the space around it,
 // up to the most above and with no control character or line break, as
 // a decision's reason is, refused in the rule's words wherever it is
 // held.
-const noted = `A note is one line of up to ${String(longestNote)} characters`;
+export const noted = `A note is one line of up to ${String(longestNote)} characters`;
 const noteLine = z
   .string()
   .trim()
@@ -75,6 +75,11 @@ const noteLine = z
 // A note as a progress point keeps it: never blank, since a point
 // keeping none carries no note at all.
 export const pointNote = noteLine.min(1, noted);
+
+// A note as a close sends it: a blank one, or none sent, reads as none.
+export const sentNote = noteLine
+  .optional()
+  .transform((note) => (note === "" ? undefined : note));
 
 // A sum of money: whole pounds, and never below nothing.
 export const pounds = z.number().int().nonnegative();

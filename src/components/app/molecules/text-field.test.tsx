@@ -39,4 +39,40 @@ describe("TextField", () => {
       "As it appears on the statement",
     );
   });
+
+  // The caller holds the text, so the field shows what it is given and
+  // reports what is typed, and the error given marks it invalid.
+  it("shows the value given and the error given beneath the hint", () => {
+    const onValueChange = vi.fn<(value: string) => void>();
+    const { rerender } = render(
+      <TextField
+        hint="Optional"
+        label="Note"
+        onValueChange={onValueChange}
+        value="Boiler replaced"
+      />,
+    );
+    const input = screen.getByRole("textbox", { name: "Note" });
+
+    expect(input).toHaveValue("Boiler replaced");
+    expect(input).not.toHaveAttribute("aria-invalid");
+
+    fireEvent.change(input, { target: { value: "Boiler" } });
+
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith("Boiler");
+    expect(input).toHaveValue("Boiler replaced");
+
+    rerender(
+      <TextField
+        error="A note is one line"
+        hint="Optional"
+        label="Note"
+        value="Boiler"
+      />,
+    );
+
+    expect(input).toHaveValue("Boiler");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAccessibleDescription("Optional A note is one line");
+  });
 });
