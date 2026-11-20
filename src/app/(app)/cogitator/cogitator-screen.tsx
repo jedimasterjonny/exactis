@@ -63,7 +63,8 @@ interface CogitatorScreenProps {
 // where the page hands it on, and the field says so, and for which
 // month, the same way. One offered in an account opens the account
 // choice on it, or on all accounts where the allocation does not list
-// it.
+// it. The fields line up by their labels, so the amount's hint beneath
+// its box sets the others no lower.
 export function CogitatorScreen({
   bonds,
   offered,
@@ -95,7 +96,7 @@ export function CogitatorScreen({
     <Screen
       actions={
         isReady ? (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-start gap-2">
             <MoneyField
               hint={hintOf(amount, offered, planned)}
               label="Amount to invest"

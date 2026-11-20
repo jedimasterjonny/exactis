@@ -313,6 +313,24 @@ describe("CogitatorScreen", () => {
     expect(field("Amount to invest")).not.toHaveAccessibleDescription();
   });
 
+  // jsdom lays nothing out, so the class that lines the fields up is read.
+  it("lines the header's fields up by their labels while the amount holds a hint", () => {
+    render(
+      <CogitatorScreen
+        offered={{ amount: 2000, month: { month: 7, year: 2026 } }}
+        targets={reference}
+        today="2026-09-15"
+      />,
+    );
+
+    const label = screen.getByText("Amount to invest");
+    // eslint-disable-next-line testing-library/no-node-access -- the row is the label's field's parent and has no role or text of its own to query by
+    const row = label.parentElement?.parentElement;
+
+    expect(row).toContainElement(field("Sales at most"));
+    expect(row).toHaveClass("items-start");
+  });
+
   // The plan pays the £2,000 into the ISAs and GIA in September, its
   // first month; typed over, it is the screen's own.
   it("opens on what the plan pays into the ISAs and GIA in its first month, saying so until it is typed over", () => {
