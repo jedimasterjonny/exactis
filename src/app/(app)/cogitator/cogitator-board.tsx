@@ -4,7 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
 
 import { cn } from "cn";
-import { Ban, ChartPie, Flag, FolderSync, TriangleAlert } from "lucide-react";
+import { Ban, ChartPie, FolderSync, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
 import type { Target, Targets } from "@/data/targets";
@@ -75,7 +75,7 @@ const unimplemented = "No fund assigned";
 // sells, how far off target it leaves the allocation and how much
 // nearer it brings it than the rung before it, which with sales may
 // make two fewer trades, or stand nearer, with the rung recommended
-// flagged and those past it or with a trade under the minimum muted,
+// saying so and those past it or with a trade under the minimum muted,
 // since neither is worth placing, which the card's caption says in
 // pounds once one is recommended; then where the recommended trades
 // leave each category against its target. A sale is written in pounds
@@ -292,10 +292,7 @@ function Trades({
                     <span className="flex flex-wrap items-center gap-3">
                       {nameOf(rung)}
                       {isRecommended && (
-                        <Badge variant="positive">
-                          <Flag aria-hidden />
-                          Recommended
-                        </Badge>
+                        <Badge variant="positive">Recommended</Badge>
                       )}
                     </span>
                   </TableCell>

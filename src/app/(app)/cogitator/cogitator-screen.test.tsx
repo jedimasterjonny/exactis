@@ -143,7 +143,7 @@ describe("CogitatorScreen", () => {
     ).toHaveLength(1);
   });
 
-  it("tiles the trades recommended, the largest set apart, and lays the ladder with the rung recommended flagged and those past it muted", () => {
+  it("tiles the trades recommended, the largest set apart, and lays the ladder with the rung recommended saying so and those past it muted", () => {
     render(<CogitatorScreen targets={reference} today="2026-09-15" />);
     invest("2000");
 
@@ -168,6 +168,15 @@ describe("CogitatorScreen", () => {
     expect(within(rows[2] ?? ladder).getAllByText("Recommended")).toHaveLength(
       2,
     );
+    // The badge says it in its word and its tone, with no glyph beside
+    // them, as the folded line does.
+    const badge = within(rows[2] ?? ladder).getByText(
+      (_content, element) =>
+        element?.getAttribute("data-variant") === "positive",
+    );
+    expect(badge).toHaveTextContent("Recommended");
+    // eslint-disable-next-line testing-library/no-node-access -- the glyph was an icon hidden from the tree, with no role or text of its own
+    expect(badge.querySelector("svg")).toBeNull();
     expect(rows[3]).toHaveClass("text-muted-foreground");
     expect(rows[2]).not.toHaveClass("text-muted-foreground");
     expect(within(rows[0] ?? ladder).getAllByText("—")).not.toHaveLength(0);
