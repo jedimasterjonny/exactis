@@ -41,7 +41,10 @@ interface StatePensionProps {
 // through, each typed in the row, and what the years earn a year in
 // today's money and from which year, or none under ten, counted to the
 // retirement the plan given lays out. The household pays each owner what
-// the row says, on a line of its own the plan screen lists locked.
+// the row says, on a line of its own the plan screen lists locked. The
+// years and the tax year sit in columns as narrow as their fields, and
+// the tax year's head is held wide enough for two lines in capitals
+// rather than three.
 //
 // The years and the tax year are typed where they are shown, with no
 // dialog, and saved together as the focus leaves either, for that owner
@@ -94,7 +97,9 @@ export function StatePension({ owners, plan }: StatePensionProps): JSX.Element {
           <TableRow>
             <TableHead>Owner</TableHead>
             <TableHead className="text-right">Qualifying years</TableHead>
-            <TableHead className="text-right">Through tax year</TableHead>
+            <TableHead className="min-w-28 text-right">
+              Through tax year
+            </TableHead>
             <TableHead className="text-right">A year</TableHead>
           </TableRow>
         </TableHeader>

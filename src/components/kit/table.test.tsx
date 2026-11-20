@@ -39,6 +39,39 @@ describe("Table", () => {
     );
   });
 
+  // The label's own face, size and weight live in a utility tailwind-merge
+  // cannot see into, so the registry's foreground and nowrap are what
+  // the merge has to drop.
+  it("sets every head as a muted label free to wrap, on the head row's rule", () => {
+    render(
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Account</TableHead>
+            <TableHead className="min-w-28">Through tax year</TableHead>
+          </TableRow>
+        </TableHeader>
+      </Table>,
+    );
+
+    const head = screen.getByRole("columnheader", { name: "Account" });
+
+    expect(head).toHaveClass(
+      "label",
+      "text-muted-foreground",
+      "whitespace-normal",
+    );
+    expect(head).not.toHaveClass("text-foreground");
+    expect(head).not.toHaveClass("whitespace-nowrap");
+    expect(
+      screen.getByRole("columnheader", { name: "Through tax year" }),
+    ).toHaveClass("label", "min-w-28");
+    expect(screen.getByRole("rowgroup")).toHaveClass(
+      "[&_th]:align-bottom",
+      "[&_th]:pb-1.5",
+    );
+  });
+
   // The container is what the folded and unfolded variants measure: the
   // table's own width, not the screen's.
   it("sits the table in a container its rows can fold by", () => {
