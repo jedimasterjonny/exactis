@@ -34,7 +34,7 @@ import {
 import { account as heldAccount } from "@/data/household";
 import { isSound, statuses, toRecords } from "@/data/houses";
 import { moving } from "@/data/milestones";
-import { pointOf } from "@/data/progress";
+import { netWorthOf, pointOf } from "@/data/progress";
 import {
   month,
   named,
@@ -54,6 +54,7 @@ import {
   today,
 } from "@/lib/months";
 import { standingOf } from "@/lib/moved";
+import { plannedOf } from "@/lib/planned";
 import { found, holdUnchanged, replaced, written } from "@/lib/records";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
@@ -261,8 +262,10 @@ const order = z
 // still as of the latest's month, has the latest keep the month end's
 // reading of the household as it stands before this close: where the
 // invested balances landed among the futures of the oldest close in the
-// year before it that gives a reading, as VII.iii reads it, and where
-// the plan stands. The latest is still the latest when it is given
+// year before it that gives a reading, as VII.iii reads it, where the
+// plan stands, and the twelve months after it as the plan carries the
+// household then, as what net worth moves by from the latest's, where
+// the plan gives them. The latest is still the latest when it is given
 // them. The closes are read only then, once nothing above has refused,
 // so a month closed again or closed back reads none and keeps nothing;
 // and a month may keep a reading VII.iii never drew, since What moved's
@@ -326,7 +329,7 @@ export async function closeBalances(
       monthsBetween(kept.asOf, latest.month) === 0
         ? [
             ...kept.points.slice(0, -1),
-            { ...latest, ...(await readingOf(kept)) },
+            { ...latest, ...(await readingOf({ household, kept }, latest)) },
           ]
         : kept.points;
     const points = isRecorded
@@ -563,16 +566,23 @@ function loanIn(
 }
 
 // The month end's reading of the household as held, for its latest
-// point to keep: where the invested balances landed among the futures
-// of the oldest close in the year before that gives a reading, as
-// VII.iii reads it, read only where one does, and where the plan
-// stands.
+// point, the one given, to keep: where the invested balances landed
+// among the futures of the oldest close in the year before that gives a
+// reading, as VII.iii reads it, read only where one does; where the plan
+// stands; and the year planned, the twelve months plannedOf carries the
+// household over, each what net worth moves by from the point's, kept
+// only where plannedOf gives them.
 async function readingOf(
-  kept: Kept,
-): Promise<Pick<KeptPoint, "landed" | "standing">> {
+  { household, kept }: Held,
+  latest: KeptPoint,
+): Promise<Pick<KeptPoint, "landed" | "planned" | "standing">> {
   const { landed } = landedSince(await readClosesBefore(kept.asOf), kept);
+  const ahead = plannedOf(household);
   return {
     ...(landed !== null && { landed: keptOf(landed) }),
+    ...(ahead.length > 0 && {
+      planned: ahead.map(({ worth }) => worth - netWorthOf(latest)),
+    }),
     standing: standingOf(kept),
   };
 }
