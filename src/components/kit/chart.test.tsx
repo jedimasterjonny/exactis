@@ -113,8 +113,8 @@ describe("ChartContainer", () => {
   });
 
   // jsdom lays nothing out and draws nothing, so the class that reaches
-  // what each concerns is what is read: the axes' labels, and what
-  // reaches past the surface's edge.
+  // what each concerns is what is read: the axes' labels, what reaches
+  // past the surface's edge, and the layers recharts focuses on a press.
   it.each([
     {
       name: "[&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground",
@@ -123,6 +123,10 @@ describe("ChartContainer", () => {
     {
       name: "[&_.recharts-surface]:overflow-visible",
       what: "draws what reaches past the surface's edge rather than cutting it",
+    },
+    {
+      name: "[&_g[tabindex='-1']]:outline-none",
+      what: "draws no outline round a layer of the plot a press focuses",
     },
   ])("$what", ({ name }) => {
     render(

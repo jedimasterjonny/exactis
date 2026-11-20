@@ -28,7 +28,9 @@ import { ChartContainer as ChartContainerBase } from "@/components/ui/chart";
 // label widened by spaced text keeps its first and last letters, into
 // the card's padding; a series stays within the plot, its domain fitted
 // to it, and where an axis lets data run past it recharts clips the
-// series there.
+// series there. A press on a series focuses the layer recharts draws it
+// in, which is never tabbed to, and is drawn with no outline, so a mouse
+// or a finger leaves no frame round part of the plot.
 export function ChartContainer({
   className,
   ...props
@@ -39,7 +41,7 @@ export function ChartContainer({
     <ChartContainerBase
       {...props}
       className={cn(
-        "[&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground [&_.recharts-surface]:overflow-visible [&_.recharts-surface:focus-visible]:rounded-md [&_.recharts-surface:focus-visible]:outline-3 [&_.recharts-surface:focus-visible]:outline-offset-2 [&_.recharts-surface:focus-visible]:outline-ring/50 [&_.recharts-surface:focus-visible]:outline-solid",
+        "[&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground [&_.recharts-surface]:overflow-visible [&_.recharts-surface:focus-visible]:rounded-md [&_.recharts-surface:focus-visible]:outline-3 [&_.recharts-surface:focus-visible]:outline-offset-2 [&_.recharts-surface:focus-visible]:outline-ring/50 [&_.recharts-surface:focus-visible]:outline-solid [&_g[tabindex='-1']]:outline-none",
         className,
       )}
       ref={closeOnTouchAway}
