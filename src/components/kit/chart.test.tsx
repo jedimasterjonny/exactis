@@ -112,6 +112,22 @@ describe("ChartContainer", () => {
     );
   });
 
+  // jsdom lays out no axis, so the class that reaches its labels is what
+  // is read.
+  it("draws the axes' labels in the muted ink", () => {
+    render(
+      <ChartContainer config={{}}>
+        <LineChart data={[{ x: 1, y: 1 }]}>
+          <Line dataKey="y" />
+        </LineChart>
+      </ChartContainer>,
+    );
+
+    expect(screen.getByText(bySlot("chart"), { suggest: false })).toHaveClass(
+      "[&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground",
+    );
+  });
+
   // A mouse leaves the chart before it can press outside it, and
   // recharts closes the tooltip on that by itself.
   it("leaves a mouse pressed outside to recharts", async () => {

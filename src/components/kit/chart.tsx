@@ -20,7 +20,10 @@ import { ChartContainer as ChartContainerBase } from "@/components/ui/chart";
 // controls' own, an outline on the same path with one pseudo-class
 // more, so it wins without overriding anything else, and a mouse, which
 // never focuses visibly, never shows it; under forced colours the global
-// focus rule draws it in the system's text colour.
+// focus rule draws it in the system's text colour. The axes' labels are
+// drawn in the muted ink: recharts 3 moved the tick text out of the
+// group the vendored container's class for them looks inside, so they
+// kept recharts' own grey, too faint on the dark theme's card.
 export function ChartContainer({
   className,
   ...props
@@ -31,7 +34,7 @@ export function ChartContainer({
     <ChartContainerBase
       {...props}
       className={cn(
-        "[&_.recharts-surface:focus-visible]:rounded-md [&_.recharts-surface:focus-visible]:outline-3 [&_.recharts-surface:focus-visible]:outline-offset-2 [&_.recharts-surface:focus-visible]:outline-ring/50 [&_.recharts-surface:focus-visible]:outline-solid",
+        "[&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground [&_.recharts-surface:focus-visible]:rounded-md [&_.recharts-surface:focus-visible]:outline-3 [&_.recharts-surface:focus-visible]:outline-offset-2 [&_.recharts-surface:focus-visible]:outline-ring/50 [&_.recharts-surface:focus-visible]:outline-solid",
         className,
       )}
       ref={closeOnTouchAway}
