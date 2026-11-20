@@ -1332,6 +1332,15 @@ describe("Track record", () => {
     expect(screen.getByRole("region", { name: "Trades" })).toBeInTheDocument();
   });
 
+  // jsdom has no pointer to match, so the class that keys on one is read.
+  it("draws the fold of every reading 44px tall on a touch screen", async () => {
+    await renderRecord(keeping(record));
+
+    expect(within(card()).getByText("Every reading, as a table")).toHaveClass(
+      "pointer-coarse:py-3",
+    );
+  });
+
   // The crosshair steps a month a press, the first onto April, and
   // recharts moves it a frame later.
   it("reads each month under the crosshair, where the record starts, a month not closed, one closed with no reading and this month's among them", async () => {
