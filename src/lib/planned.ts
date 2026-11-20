@@ -18,7 +18,9 @@ export interface PlannedMonth {
 // accounts by from where they stand to that month's end. None unless
 // the latest point is the month the balances are as of, which The run
 // in src/engine/README.md sets the plan's first month after, and
-// carries every balance. monthsOn is called once per month ahead.
+// carries every balance. monthsOn is called once per month ahead. A
+// point keeps these, as moves from its net worth, once the month after
+// it is closed, so a change here changes what is kept from then on.
 export function plannedOf({
   accounts,
   plan,
