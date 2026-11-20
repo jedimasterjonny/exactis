@@ -51,7 +51,7 @@ export function Worksheet({
             <td />
             {columns.map((column) => (
               <th
-                className="w-px pb-3 pl-3 text-right label font-normal text-muted-foreground @lg:pl-8"
+                className="w-px pb-3 pl-3 text-right label text-muted-foreground @lg:pl-8"
                 key={column}
                 scope="col"
               >
