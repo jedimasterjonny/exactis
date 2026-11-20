@@ -2,7 +2,11 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* The dark theme is read off the class on the root, in Tailwind's own
+   form for it: a `dark:` class then weighs what its plain twin does, so
+   it meets that twin and a `forced-colors:` class for the same state by
+   their order in the sheet, rather than outweighing both. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* A ledger folds each row's columns into one cell while its table is too
    narrow to read across, measured on the table rather than the screen,

@@ -20,8 +20,7 @@ interface RadioChoiceProps {
 // Its lines keep to its top, so a choice stretched to a taller one beside
 // it leaves the room beneath them rather than between. Where colours are
 // forced, a radio chosen is filled in the system's text colour around
-// its dot, as it is filled in ink otherwise, in the dark theme too,
-// whose `dark:` classes outweigh a `forced-colors:` one.
+// its dot, as it is filled in ink otherwise.
 export function RadioChoice({
   children,
   isDisabled = false,
@@ -39,7 +38,7 @@ export function RadioChoice({
       <RadioGroupItem
         aria-describedby={`${id}-detail`}
         aria-labelledby={`${id}-name`}
-        className="mt-0.5 forced-colors:data-checked:bg-[CanvasText] forced-colors:dark:data-checked:bg-[CanvasText]"
+        className="mt-0.5 forced-colors:data-checked:bg-[CanvasText]"
         disabled={isDisabled}
         value={value}
       />

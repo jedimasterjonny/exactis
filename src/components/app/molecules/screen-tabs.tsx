@@ -59,8 +59,6 @@ interface Tab {
 // the highlight's text, and is kept from the forcing, which would draw
 // the page's colour behind the name; kept, it would keep the registry's
 // faint focus ring, so the ring is drawn in the system's text colour.
-// The fill and the name are said again for the dark theme, whose
-// `dark:` classes outweigh a `forced-colors:` one.
 export function ScreenTabs({ open, tabs }: ScreenTabsProps): JSX.Element {
   const opening =
     tabs.find(
@@ -71,7 +69,7 @@ export function ScreenTabs({ open, tabs }: ScreenTabsProps): JSX.Element {
       <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden group-data-horizontal/tabs:h-auto">
         {tabs.map(({ label }) => (
           <TabsTrigger
-            className="forced-colors:focus-visible:ring-[CanvasText] pointer-coarse:min-h-11 forced-colors:data-active:bg-[Highlight] forced-colors:data-active:text-[HighlightText] forced-colors:data-active:forced-color-adjust-none forced-colors:dark:data-active:bg-[Highlight] forced-colors:dark:data-active:text-[HighlightText]"
+            className="forced-colors:focus-visible:ring-[CanvasText] pointer-coarse:min-h-11 forced-colors:data-active:bg-[Highlight] forced-colors:data-active:text-[HighlightText] forced-colors:data-active:forced-color-adjust-none"
             key={label}
             value={label}
           >

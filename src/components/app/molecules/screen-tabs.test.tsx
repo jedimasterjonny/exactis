@@ -118,15 +118,13 @@ describe("ScreenTabs", () => {
   });
 
   // jsdom forces no colours, so the classes that do are what is read.
-  it("fills the open tab in the system's highlight under forced colours, in the dark theme too, and rings its focus in the text colour", () => {
+  it("fills the open tab in the system's highlight under forced colours, and rings its focus in the text colour", () => {
     renderTabs();
 
     expect(screen.getByRole("tab", { name: "Rates" })).toHaveClass(
       "forced-colors:data-active:bg-[Highlight]",
       "forced-colors:data-active:text-[HighlightText]",
       "forced-colors:data-active:forced-color-adjust-none",
-      "forced-colors:dark:data-active:bg-[Highlight]",
-      "forced-colors:dark:data-active:text-[HighlightText]",
       "forced-colors:focus-visible:ring-[CanvasText]",
     );
   });
