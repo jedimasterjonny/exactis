@@ -144,7 +144,7 @@ describe("FutureStory", () => {
   });
 
   // jsdom forces no colours, so the classes that do are what is read.
-  it("keeps the outcome's and the chapters' dots in their inks under forced colours, each chapter's ringed in the page's ground", () => {
+  it("keeps the outcome's and the chapters' dots in their inks under forced colours, each chapter's ringed in the page's ground and a plain year's in the text colour", () => {
     told();
 
     expect(
@@ -158,6 +158,9 @@ describe("FutureStory", () => {
         "forced-colors:ring-[Canvas]",
       );
     }
+    expect(
+      screen.getAllByText(bySlot("chapter-dot"), { suggest: false })[1],
+    ).toHaveClass("forced-colors:bg-[CanvasText]");
   });
 
   // The steepest year is the rise of 50%, so it fills the upper half

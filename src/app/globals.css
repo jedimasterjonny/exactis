@@ -81,7 +81,10 @@
   /* Every shade written more than once is named here, once, so a change
      to it is one edit; a shade used once stays a literal at its token,
      and so does white. Some cross themes: the inverse tile takes the dark
-     theme's on paper and the light theme's on ink */
+     theme's on paper and the light theme's on ink. One exception: the
+     dark scope's series and tones are written again for a forced dark
+     palette over the light theme, below the dark scope, since a media
+     query cannot select the theme's class; a test holds the two equal */
   --grey-25: #fafaf8;
   --grey-50: #f4f5f3;
   --grey-100: #e8eae6;
@@ -184,47 +187,100 @@
   --primary-foreground: var(--grey-900);
   --secondary: var(--grey-700);
   --secondary-foreground: var(--grey-100);
-  --muted: var(--grey-700);
   /* grey-400 fails AA on the muted surface */
   --muted-foreground: var(--grey-300);
   --accent: var(--grey-700);
   --accent-foreground: var(--grey-100);
-  --destructive: var(--red-300); /* red-400 fails AA on the muted surface */
-  --border: rgb(255 255 255 / 8%);
   --input: rgb(255 255 255 / 14%);
   --ring: var(--grey-25);
-  /* Series lighten in the dark scope; light-scope petrol reads as mud on ink */
-  --chart-1: #7fb8a8;
-  --chart-2: #43897a;
-  --chart-3: var(--ochre-300);
-  /* The heather lifted for ink: 5.5:1 on the card and ΔE 16.9 or more
-     from each series it can stack against, 11.1 under deuteranopia, and
-     15.1 from the pensions under protanopia, where the stone it replaces
-     sat 1.3 */
-  --chart-4: #aa8dde;
-  /* Debt lightest first, opening below the foreground so it recedes, each
-     step darker and ΔE 4.1 apart, the spacing it kept when it was held
-     above the stone cash was once drawn in: 6.0:1 or more on the card,
-     12.7 or more from the heather and 20.9 from the slate */
-  --chart-5: var(--grey-300);
-  --chart-5-2: #abb0ab;
-  --chart-5-3: #9ea39f;
-  /* Lifted in chroma rather than lightness, since lighter it meets the
-     petrol: ΔE 18.0 from the heather and 13.1 under protanopia */
-  --chart-6: #436eb4;
-  --brand: #d18a7f; /* oxide-300 */
   --brand-foreground: var(--grey-900);
-  --positive: var(--jade-300);
-  /* ochre-100 is indistinguishable from foreground */
-  --caution: var(--ochre-300);
-  /* Lifted for ink with each arm's order kept; ΔE 10.5 where they meet
-     under deuteranopia, 15.7 for the nearest pair */
-  --outcome-surplus: #2b7357;
-  --outcome-comfortable: #5aae8d;
-  --outcome-barely: #b4e6cf;
-  --outcome-almost: #f8ad7c;
-  --outcome-middle: #e55c4a;
-  --outcome-early: #a8302a;
+  /* What Chrome leaves as drawn under forced colours, an SVG's fill and
+     stroke and a key kept from the forcing, reads these, so they follow
+     the forced palette's scheme rather than the theme's: a light palette
+     over the dark theme takes the root's, and a dark one over the light
+     theme takes these again from the block after this scope */
+  @media not (forced-colors: active), (prefers-color-scheme: dark) {
+    --muted: var(--grey-700);
+    --destructive: var(--red-300); /* red-400 fails AA on the muted surface */
+    --border: rgb(255 255 255 / 8%);
+    /* Series lighten in the dark scope; light-scope petrol reads as mud on ink */
+    --chart-1: #7fb8a8;
+    --chart-2: #43897a;
+    --chart-3: var(--ochre-300);
+    /* The heather lifted for ink: 5.5:1 on the card and ΔE 16.9 or more
+       from each series it can stack against, 11.1 under deuteranopia, and
+       15.1 from the pensions under protanopia, where the stone it replaces
+       sat 1.3 */
+    --chart-4: #aa8dde;
+    /* Debt lightest first, opening below the foreground so it recedes, each
+       step darker and ΔE 4.1 apart, the spacing it kept when it was held
+       above the stone cash was once drawn in: 6.0:1 or more on the card,
+       12.7 or more from the heather and 20.9 from the slate */
+    --chart-5: var(--grey-300);
+    --chart-5-2: #abb0ab;
+    --chart-5-3: #9ea39f;
+    /* Lifted in chroma rather than lightness, since lighter it meets the
+       petrol: ΔE 18.0 from the heather and 13.1 under protanopia */
+    --chart-6: #436eb4;
+    --brand: #d18a7f; /* oxide-300 */
+    --positive: var(--jade-300);
+    /* ochre-100 is indistinguishable from foreground */
+    --caution: var(--ochre-300);
+    /* Lifted for ink with each arm's order kept; ΔE 10.5 where they meet
+       under deuteranopia, 15.7 for the nearest pair */
+    --outcome-surplus: #2b7357;
+    --outcome-comfortable: #5aae8d;
+    --outcome-barely: #b4e6cf;
+    --outcome-almost: #f8ad7c;
+    --outcome-middle: #e55c4a;
+    --outcome-early: #a8302a;
+  }
+}
+
+/* The dark scope's series and tones, for a forced dark palette over the
+   light theme, value for value: globals.test.ts holds them equal. */
+@media (forced-colors: active) and (prefers-color-scheme: dark) {
+  :root {
+    --muted: var(--grey-700);
+    --destructive: var(--red-300);
+    --border: rgb(255 255 255 / 8%);
+    --chart-1: #7fb8a8;
+    --chart-2: #43897a;
+    --chart-3: var(--ochre-300);
+    --chart-4: #aa8dde;
+    --chart-5: var(--grey-300);
+    --chart-5-2: #abb0ab;
+    --chart-5-3: #9ea39f;
+    --chart-6: #436eb4;
+    --brand: #d18a7f;
+    --positive: var(--jade-300);
+    --caution: var(--ochre-300);
+    --outcome-surplus: #2b7357;
+    --outcome-comfortable: #5aae8d;
+    --outcome-barely: #b4e6cf;
+    --outcome-almost: #f8ad7c;
+    --outcome-middle: #e55c4a;
+    --outcome-early: #a8302a;
+  }
+}
+
+/* A chart's ink under forced colours. Chrome forces the page's colours
+   but leaves an SVG's fill and stroke as drawn, so a chart's ink lines,
+   its dots and their rings in the card's colour and its labels kept the
+   theme's ink on whatever page the system draws: 1.37:1 under a dark
+   palette over the light theme. Inside a chart they take the system's.
+   Only there: on the root a system colour is kept by the forcing and
+   inherited, so a placeholder, a disabled button and a link would all
+   draw as typed text. The rule finds the charts by the data-slot the
+   vendored container marks itself with, "chart", as the toasts' rule
+   finds their viewport: if upstream renames the slot, a chart's ink
+   stops following the system's. */
+@media (forced-colors: active) {
+  [data-slot="chart"] {
+    --foreground: CanvasText;
+    --card: Canvas;
+    --muted-foreground: CanvasText;
+  }
 }
 
 /* The inverse tile sits on the primary surface, ink in light and paper in
