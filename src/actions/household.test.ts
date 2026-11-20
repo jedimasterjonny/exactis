@@ -96,13 +96,10 @@ describe("importHousehold", () => {
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
-  it("refuses an object with the wrong fields in the rules' words, as any save is", async () => {
-    expect(await importHousehold('{"name":"exactis"}')).toMatchObject({
-      kind: "refused",
-      reason: expect.stringContaining(
-        "Invalid input: expected array, received undefined",
-      ) as unknown,
-    });
+  it("refuses an object with the wrong fields in the app's words, said once, as any save is", async () => {
+    expect(await importHousehold('{"name":"exactis"}')).toStrictEqual(
+      refused("Some of it is missing, or not as this app keeps it"),
+    );
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 

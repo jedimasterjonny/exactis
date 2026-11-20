@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { sipp } from "@/data/accounts.fixture";
 import { kept } from "@/data/household.fixture";
+import { unworded } from "@/lib/answer";
 
 import { currentShape, stamped, upcast } from "./shapes";
 
@@ -99,12 +100,8 @@ describe("shapes", () => {
   });
 
   it("refuses a stamp that is no shape", () => {
-    expect(() => upcast({ ...kept, shape: 0 })).toThrow(
-      "Too small: expected number to be >0",
-    );
-    expect(() => upcast({ ...kept, shape: 1.5 })).toThrow(
-      "Invalid input: expected int, received number",
-    );
+    expect(() => upcast({ ...kept, shape: 0 })).toThrow(unworded());
+    expect(() => upcast({ ...kept, shape: 1.5 })).toThrow(unworded());
   });
 
   it("passes what is no object through as it is", () => {

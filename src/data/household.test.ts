@@ -53,6 +53,7 @@ import { allocation, rates } from "@/data/rates.fixture";
 import { currentShape, stamped } from "@/data/shapes";
 import { targets, targetsUnder } from "@/data/targets.fixture";
 import { project } from "@/engine/projection";
+import { unworded } from "@/lib/answer";
 
 import type { Kept } from "./household";
 
@@ -1091,7 +1092,7 @@ describe("soundKept", () => {
         ...kept,
         cma: { latest: { ...cma, asOf: "30 June 2026" }, previous: null },
       }),
-    ).toThrow("Invalid ISO date");
+    ).toThrow(unworded());
   });
 
   // The August vintage as the reader gives it, with every class's risk
@@ -1128,19 +1129,19 @@ describe("soundKept", () => {
         ...kept,
         cma: stray({ bonds: 0, stocks: 0, volatility: -0.1 }),
       }),
-    ).toThrow("Too small");
+    ).toThrow(unworded());
     expect(() =>
       soundKept({
         ...kept,
         cma: stray({ bonds: 1.2, stocks: 0, volatility: 0.1 }),
       }),
-    ).toThrow("Too big");
+    ).toThrow(unworded());
     expect(() =>
       soundKept({
         ...kept,
         cma: { latest: { ...cma, correlation: -1 }, previous: null },
       }),
-    ).toThrow("Too small");
+    ).toThrow(unworded());
   });
 
   it("keeps the glide path's anchors as typed, and refuses one at no whole age", () => {
@@ -1155,14 +1156,14 @@ describe("soundKept", () => {
     });
     expect(() =>
       soundKept({ ...kept, glide: [{ age: 52.5, bonds: 0.15 }] }),
-    ).toThrow("expected int");
+    ).toThrow(unworded());
   });
 
   it("keeps the target allocation as it was imported, and refuses one on no day", () => {
     expect(soundKept(kept).household.targets).toStrictEqual(targets);
     expect(() =>
       soundKept({ ...kept, targets: { ...targets, importedOn: "7 Sep 2026" } }),
-    ).toThrow("Invalid ISO date");
+    ).toThrow(unworded());
   });
 
   // Four fifths at stocks' 7.95% and a fifth at bonds' 4.45%, and the
@@ -1385,14 +1386,14 @@ describe("soundKept", () => {
           income: [{ ...salary, growth: "earnings" }, ...income],
         },
       }),
-    ).toThrow("Invalid option");
+    ).toThrow(unworded());
   });
 
   it("keeps the curve as the Bank gave it, and refuses one on no day", () => {
     expect(soundKept(kept).household.curve).toStrictEqual(curve);
     expect(() =>
       soundKept({ ...kept, curve: { ...curve, asOf: "1 Sept 2026" } }),
-    ).toThrow("Invalid ISO date");
+    ).toThrow(unworded());
   });
 
   // A household kept before the day was has no account dated, which is
@@ -1414,7 +1415,7 @@ describe("soundKept", () => {
           setOn: "31 Aug 2026",
         })),
       }),
-    ).toThrow("Invalid ISO date");
+    ).toThrow(unworded());
   });
 
   // Counting on by one stays exact well past the most, so a file
@@ -1612,12 +1613,8 @@ describe("soundKept", () => {
       { ...sam, id: 20, qualifyingYears: 30 },
     ]);
     expect(soundKept(kept).household.owners).toStrictEqual(owners);
-    expect(() => soundKept(withPartner(30.5))).toThrow(
-      "Invalid input: expected int, received number",
-    );
-    expect(() => soundKept(withPartner(-1))).toThrow(
-      "Too small: expected number to be >=0",
-    );
+    expect(() => soundKept(withPartner(30.5))).toThrow(unworded());
+    expect(() => soundKept(withPartner(-1))).toThrow(unworded());
   });
 
   // The fixture's owner holds 35 years; Sam holds none. A household kept
@@ -1662,9 +1659,9 @@ describe("soundKept", () => {
     expect(salaryIn(kept)).not.toHaveProperty("bonusMonth");
     expect(() =>
       soundKept(paying({ bonusCadence: "year", bonusMonth: 12 })),
-    ).toThrow("Too big: expected number to be <=11");
+    ).toThrow(unworded());
     expect(() => soundKept(paying({ bonusCadence: "month" }))).toThrow(
-      'Invalid option: expected one of "quarter"|"year"',
+      unworded(),
     );
   });
 
@@ -1742,7 +1739,7 @@ describe("soundKept", () => {
     ).toStrictEqual(drawdowns);
     expect(soundKept(kept).household.plan).not.toHaveProperty("drawdown");
     expect(() => soundKept({ ...kept, drawdown: "isa-first" })).toThrow(
-      'Invalid option: expected one of "savings-first"|"pension-before-isa"|"pension-first"|"pension-to-basic-rate"|"pension-to-allowance"',
+      unworded(),
     );
   });
 
@@ -1831,7 +1828,7 @@ describe("soundKept", () => {
   it("refuses a balances month that is no month", () => {
     expect(() =>
       soundKept({ ...kept, asOf: { month: 12, year: 2026 } }),
-    ).toThrow("Too big: expected number to be <=11");
+    ).toThrow(unworded());
   });
 
   // A year typed a digit long or short would run the plan, or the
@@ -1865,9 +1862,7 @@ describe("soundKept", () => {
   });
 
   it("refuses what is no kept household at all", () => {
-    expect(() => soundKept({ accounts: [] })).toThrow(
-      "Invalid input: expected object, received undefined",
-    );
+    expect(() => soundKept({ accounts: [] })).toThrow(unworded());
   });
 
   // The stamp is the store's, and is no key of the household's, so it is
@@ -1900,7 +1895,7 @@ describe("soundKept", () => {
           income: [{ ...incomeLines[0], match: undefined }],
         },
       }),
-    ).toThrow("Invalid input: expected number, received undefined");
+    ).toThrow(unworded());
   });
 
   // The current account and the home each below nothing break the one
@@ -2205,6 +2200,10 @@ function recorded(
   };
 }
 
+// Every refusal the household schema gives, in the schema's own words,
+// parsed without the map the shared parses take, so each row of thrown
+// and held pins the check that refuses it; through soundKept the app
+// says the ones no schema words itself in its own, as its tests hold.
 function refusalsOf(given: Inputs): string[] {
   const result = household.safeParse(given);
   return result.success
