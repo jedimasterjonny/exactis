@@ -20,13 +20,29 @@ describe("Button", () => {
     );
   });
 
-  it("styles a link as a button, 44px each way on a touch screen, keeping the registry's classes unmerged", () => {
-    const classes = buttonVariants({ size: "sm" }).split(" ");
+  it("styles a link with a button's own classes, merged, 44px each way on a touch screen", () => {
+    render(
+      <Button size="sm" variant="outline">
+        Save
+      </Button>,
+    );
+    const classes = buttonVariants({ size: "sm", variant: "outline" });
 
-    expect(classes).toContain("pointer-coarse:min-h-11");
-    expect(classes).toContain("pointer-coarse:min-w-11");
-    // The base's corners, which a merge with the size's would drop.
-    expect(classes).toContain("rounded-lg");
+    expect(screen.getByRole("button", { name: "Save" })).toHaveAttribute(
+      "class",
+      classes,
+    );
+    expect(classes.split(" ")).toStrictEqual(
+      expect.arrayContaining([
+        "pointer-coarse:min-h-11",
+        "pointer-coarse:min-w-11",
+        "border-border",
+      ]),
+    );
+    // The base's clear border and corners, which the outline's border
+    // and the size's corners replace.
+    expect(classes.split(" ")).not.toContain("border-transparent");
+    expect(classes.split(" ")).not.toContain("rounded-lg");
   });
 
   it("spins while busy, still focusable but swallowing presses", () => {
