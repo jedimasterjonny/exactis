@@ -94,6 +94,31 @@ describe("LabelledSwitch", () => {
     ).toHaveClass("h-8", "pointer-coarse:min-h-11");
   });
 
+  // jsdom lays nothing out, so the class that takes the reach off is read.
+  it("keeps the switch's reach to its row, since a press anywhere on the row turns it", () => {
+    const onCheckedChange = vi.fn<(isChecked: boolean) => void>();
+    render(
+      <LabelledSwitch
+        icon={Sun}
+        isChecked={false}
+        onCheckedChange={onCheckedChange}
+      >
+        Daylight
+      </LabelledSwitch>,
+    );
+
+    expect(screen.getByRole("switch", { name: "Daylight" })).toHaveClass(
+      "after:hidden",
+    );
+
+    fireEvent.click(screen.getByText("Daylight"));
+
+    expect(onCheckedChange).toHaveBeenCalledExactlyOnceWith(
+      true,
+      expect.anything(),
+    );
+  });
+
   // jsdom forces no colours, so the classes that do are what is read.
   it("fills a switch on in the system's highlight under forced colours, and an off one's thumb in the text colour, beside the sidebar's oxide", () => {
     render(

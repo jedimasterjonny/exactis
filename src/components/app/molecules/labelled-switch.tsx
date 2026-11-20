@@ -36,13 +36,14 @@ const tones: Record<
 // right. The name is the switch's accessible name, since the label wraps
 // it, so a caller names the state and never the control. On a touch
 // screen the row is 44px tall, and a press anywhere on it turns the
-// switch. Where colours are forced, a switch on is filled in the
-// system's highlight, its thumb drawn on it, since forcing paints the
-// fill and the thumb in the page's colour alike, and a switch off draws
-// its thumb in the system's text colour, at the start of an outlined
-// pill, so on and off differ by the fill, the thumb's colour and its
-// side. A switch may be held while what it switches is not yet there to
-// switch, its label kept at full strength as a held field's is.
+// switch, so the switch reaches no further than the row. Where colours
+// are forced, a switch on is filled in the system's highlight, its thumb
+// drawn on it, since forcing paints the fill and the thumb in the page's
+// colour alike, and a switch off draws its thumb in the system's text
+// colour, at the start of an outlined pill, so on and off differ by the
+// fill, the thumb's colour and its side. A switch may be held while what
+// it switches is not yet there to switch, its label kept at full
+// strength as a held field's is.
 export function LabelledSwitch({
   children,
   className,
@@ -66,7 +67,7 @@ export function LabelledSwitch({
       <Switch
         checked={isChecked}
         className={cn(
-          "forced-colors:data-checked:bg-[Highlight] forced-colors:*:data-unchecked:bg-[CanvasText]",
+          "after:hidden forced-colors:data-checked:bg-[Highlight] forced-colors:*:data-unchecked:bg-[CanvasText]",
           tones[tone].switch,
         )}
         disabled={isDisabled}
