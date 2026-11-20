@@ -56,7 +56,7 @@ describe("FuturesCount", () => {
 
     expect(within(card).getByText("Sect. II.iv")).toHaveClass("label");
     expect(steps()).toStrictEqual([
-      "Futures run1,000",
+      "Futures runAll 1,000 drawn1,000",
       "Ran out of moneyThe first at 71, half by 86−26",
       "Kept going only by drawing a pension early97% if counted as lasting−4",
       "Lasted to 91970",
@@ -96,7 +96,7 @@ describe("FuturesCount", () => {
     );
 
     expect(steps()).toStrictEqual([
-      "Futures run1,000",
+      "Futures runAll 1,000 drawn1,000",
       "Ran out of moneyThe first at 71, half by 86−26",
       "Kept going only by drawing a pension early94% if counted as lasting−4",
       "Never retired−30",
@@ -128,14 +128,14 @@ describe("FuturesCount", () => {
     );
 
     expect(steps()).toStrictEqual([
-      "Futures run1,000",
+      "Futures runAll 1,000 drawn1,000",
       "Ran out of moneyThe first at 71, half by 86−26",
       "Kept going only by drawing a pension early97% if counted as lasting−4",
       "Lasted to 91970",
     ]);
   });
 
-  it("says nothing beside a count of none", () => {
+  it("says none did beside a count of none once the run is whole", () => {
     render(
       <FuturesCount
         count={1000}
@@ -155,12 +155,14 @@ describe("FuturesCount", () => {
 
     const [, ranOut, early] = steps();
 
-    expect(ranOut).toBe("Ran out of money0");
-    expect(early).toBe("Kept going only by drawing a pension early0");
+    expect(ranOut).toBe("Ran out of moneyNone by 910");
+    expect(early).toBe(
+      "Kept going only by drawing a pension earlyNone needed to0",
+    );
   });
 
-  it("counts the futures drawn so far while the run comes in, and says it has none before the first", () => {
-    const { rerender } = render(
+  it("counts the futures drawn so far while the run comes in", () => {
+    render(
       <FuturesCount
         count={1000}
         plan={plan}
@@ -170,19 +172,75 @@ describe("FuturesCount", () => {
     );
 
     expect(steps()[0]).toBe("Futures run372 of 1,000 drawn so far372");
+  });
 
-    rerender(
+  // 372 drawn so far, every one lasting.
+  it("says none has yet beside a count of none while the run comes in", () => {
+    render(
       <FuturesCount
         count={1000}
         plan={plan}
         projected={1300000}
-        reading={{ ...reading, run: 0 }}
+        reading={{
+          ...reading,
+          chance: 1,
+          early: 0,
+          firstRanOut: null,
+          halfRanOut: null,
+          lasted: 372,
+          ranOut: 0,
+          run: 372,
+        }}
       />,
     );
 
-    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
-    expect(screen.getByRole("paragraph")).toHaveTextContent(
-      "Drawing the first futures…",
+    const [, ranOut, early] = steps();
+
+    expect(ranOut).toBe("Ran out of moneyNone so far0");
+    expect(early).toBe(
+      "Kept going only by drawing a pension earlyNone so far0",
     );
+  });
+
+  // Before the first futures the card is drawn as it lands, its rows the
+  // plan's and its figures to come; the plan at its own rates is known.
+  it("draws the ledger in its landed shape before the first futures are in, every figure to come", () => {
+    render(
+      <FuturesCount
+        count={1000}
+        plan={plan}
+        projected={1300000}
+        reading={{
+          chance: 0,
+          early: 0,
+          firstRanOut: null,
+          halfRanOut: null,
+          lasted: 0,
+          margin: 0,
+          middle: 0,
+          ranOut: 0,
+          run: 0,
+          unretired: 0,
+        }}
+      />,
+    );
+
+    const card = screen.getByRole("region", { name: "How many futures last" });
+    const panel = within(card).getByRole("region", { name: "Net worth at 91" });
+
+    expect(steps()).toStrictEqual([
+      "Futures run0 of 1,000 drawn so far…",
+      "Ran out of moneyNone so far…",
+      "Kept going only by drawing a pension earlyNone so far…",
+      "Lasted to 91…",
+    ]);
+    expect(within(card).getByRole("paragraph")).toHaveTextContent(
+      /^Chance of success…$/u,
+    );
+    expect(
+      within(panel)
+        .getAllByRole("definition")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual(["£1,300,000", "…"]);
   });
 });
