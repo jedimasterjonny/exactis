@@ -984,6 +984,36 @@ describe("ProjectionChart", () => {
     ).not.toBeInTheDocument();
   });
 
+  // jsdom lays nothing out, so the classes that wrap the row are read.
+  it("drops the toggles beneath the caller's controls, still at the right, where they do not fit beside them", () => {
+    render(
+      <ProjectionChart
+        accounts={held}
+        controls={<button type="button">A control</button>}
+        milestones={[]}
+        plan={drawing}
+        points={points}
+      />,
+    );
+
+    const bars = screen.getByRole("switch", { name: "Bars" });
+    // eslint-disable-next-line testing-library/no-node-access -- the toggles' column is the switch's label's parent and has no role or text of its own to query by
+    const toggles = bars.closest("label")?.parentElement;
+
+    expect(toggles).toContainElement(
+      screen.getByRole("switch", { name: "Liquidity" }),
+    );
+    expect(toggles).toHaveClass("flex-1", "justify-end");
+    // eslint-disable-next-line testing-library/no-node-access -- the row is the toggles' column's parent and has no role or text of its own to query by
+    expect(toggles?.parentElement).toHaveClass("flex-wrap");
+    for (const name of ["Bars", "Liquidity"]) {
+      expect(
+        // eslint-disable-next-line testing-library/no-node-access -- the label is the switch's parent and has no role of its own to query by
+        screen.getByRole("switch", { name }).closest("label"),
+      ).not.toHaveClass("ml-auto");
+    }
+  });
+
   it("draws a column per year to begin with, and swaps it for areas on the toggle and back", () => {
     render(
       <ProjectionChart

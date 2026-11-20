@@ -238,10 +238,11 @@ const axisWidth = 57;
 // on and goes undrawn. The toggles take a row above the plot, at its
 // right, side by side and one above the other only where the controls
 // the caller gives for what is plotted, at its left, leave them no
-// room. The row centres what shares it, so a field there, its label
-// above its box and its hint beneath a line each, stands with its box
-// level with the toggles, where aligning their feet set them level with
-// its hint. The rows stand a gap clear of the plot,
+// room, and beneath those controls, still at the right, where they
+// leave no room for one. The row centres what shares it, so a field
+// there, its label above its box and its hint beneath a line each,
+// stands with its box level with the toggles, where aligning their feet
+// set them level with its hint. The rows stand a gap clear of the plot,
 // so a figure box above the top tick does not crowd it. The plot holds
 // 240px at any width, enough for a phone to read its ticks by, and the
 // box around it and its rows is three times as wide as it is tall down
@@ -384,9 +385,9 @@ export function ProjectionChart({
           boxSize,
         )}
       >
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <div>{controls}</div>
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+          <div className="flex flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-2">
             <BasisToggle basis={basis} onBasisChange={setBasis} />
             <MarkToggle mark={mark} onMarkChange={setMark} />
           </div>
@@ -826,7 +827,6 @@ function MarkToggle({
   const isBars = mark === "bar";
   return (
     <LabelledSwitch
-      className="ml-auto"
       icon={isBars ? ChartColumnStacked : ChartArea}
       isChecked={isBars}
       onCheckedChange={(isChecked) => {
