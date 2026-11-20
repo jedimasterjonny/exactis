@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { quoted, registryAnswer } from "@/data/house-prices.fixture";
 import { homeValues } from "@/data/houses.fixture";
-import { points } from "@/data/progress.fixture";
+import { noted, points } from "@/data/progress.fixture";
 
 import { addressOf, readIndex, revalued, worthIn } from "./house-prices";
 
@@ -151,6 +151,14 @@ describe("revalued", () => {
 
     expect(revalued([withCar], bought, index)).toStrictEqual([
       { ...withCar, assets: 386139, house: 374139 },
+    ]);
+  });
+
+  // A point is spread as it is rewritten, so whatever else it keeps is
+  // carried.
+  it("carries the note and the year planned a point keeps as it moves the house", () => {
+    expect(revalued([noted], bought, index)).toStrictEqual([
+      { ...noted, assets: 374139, house: 374139 },
     ]);
   });
 

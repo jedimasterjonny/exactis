@@ -4,11 +4,19 @@ import type { Month } from "@/data/schedule";
 import { isAsset, isPension } from "@/data/accounts";
 import { isOnOrBefore, monthsBetween } from "@/lib/months";
 
-// A progress point as the household keeps it: its balances, and, once
-// the month after it is closed, the month end's reading of the plan. A
-// point kept before the readings were, and the latest, carry neither.
+// A progress point as the household keeps it: its balances; the note
+// its month end kept on it, in the household's own words as typed less
+// the space around it, absent where none was typed; and, once the month
+// after it is closed, the month end's reading of the plan, and the
+// twelve months after the point as the plan carried the household then:
+// each what net worth moved by, from the accounts as they then stood,
+// to that month's end, in whole pounds of that month's money, the first
+// being the month after the point's. A point kept before the readings
+// were, or before the year was, and the latest, carry none of them.
 export type KeptPoint = ProgressPoint & {
   readonly landed?: KeptLanded;
+  readonly note?: string;
+  readonly planned?: readonly number[];
   readonly standing?: KeptStanding;
 };
 

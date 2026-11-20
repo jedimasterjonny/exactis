@@ -73,11 +73,18 @@ describe("shapes", () => {
 
   // The third shape keeps no reading on a point, so the fourth reads it
   // as it is; the step is there so that a build of the third refuses
-  // the fourth, which is the shape kept now.
-  it("carries a household kept in the third shape to the fourth as it is, the shape kept now", () => {
+  // the fourth.
+  it("carries a household kept in the third shape to the fourth as it is", () => {
     expect(upcast({ ...kept, shape: 3 })).toStrictEqual(kept);
-    expect(currentShape).toBe(4);
-    expect(() => upcast({ ...kept, shape: 5 })).toThrow(
+  });
+
+  // The fourth shape keeps no note and no year planned on a point, so
+  // the fifth reads it as it is; the step is there so that a build of
+  // the fourth refuses the fifth, which is the shape kept now.
+  it("carries a household kept in the fourth shape to the fifth as it is, the shape kept now", () => {
+    expect(upcast({ ...kept, shape: 4 })).toStrictEqual(kept);
+    expect(currentShape).toBe(5);
+    expect(() => upcast({ ...kept, shape: 6 })).toThrow(
       "This household was saved by a newer app than this one",
     );
   });

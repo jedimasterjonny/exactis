@@ -12,6 +12,7 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { homePart, homeValues } from "@/data/houses.fixture";
+import { noted } from "@/data/progress.fixture";
 import { currentShape, stamped, upcast } from "@/data/shapes";
 import { portfolios, targets } from "@/data/targets.fixture";
 import {
@@ -234,6 +235,19 @@ describe("createScenario", () => {
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
     expect(openScenario).toHaveBeenCalledExactlyOnceWith("Retire early");
     expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("copies the note and the year planned a point keeps", async () => {
+    const noting = {
+      ...reference,
+      points: [noted, ...reference.points.slice(1)],
+    };
+    await keepFirst("", noting);
+    await make("Retire early");
+
+    expect((await latestOf("Retire early")).points).toStrictEqual(
+      noting.points,
+    );
   });
 
   it("copies the household before anything is saved, as it opens", async () => {
