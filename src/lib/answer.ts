@@ -63,3 +63,10 @@ export function refused(reason: string): Answer<never> {
 export function saved<TValue>(value: TValue): Answer<TValue> {
   return { kind: "saved", value };
 }
+
+// The words for a broken rule no schema words itself, used only where a
+// parse already failed, so a written rule keeps its own: a parse's error
+// map, as the shared parses of a kept household take it.
+export function unworded(): string {
+  return "Some of it is missing, or not as this app keeps it";
+}

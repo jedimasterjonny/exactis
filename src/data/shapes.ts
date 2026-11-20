@@ -2,7 +2,7 @@ import * as z from "zod";
 
 import type { Kept } from "@/data/household";
 
-import { Refusal, refusalOf } from "@/lib/answer";
+import { Refusal, refusalOf, unworded } from "@/lib/answer";
 
 // One step of the chain: a household kept in one shape, as the shape
 // after it.
@@ -85,14 +85,15 @@ export function stamped(kept: Kept): Kept & { readonly shape: number } {
 // passes through as it is, for those rules to refuse in their own words.
 // A shape the steps do not reach is refused, since a newer app kept it
 // and it may hold what this one cannot read, and so is a stamp that is
-// no shape. The steps are this app's unless others are handed in, which
-// only a test of the chain does, so the shape they reach is counted from
-// the steps given rather than read from currentShape.
+// no shape, in the app's words for a rule no schema words itself. The
+// steps are this app's unless others are handed in, which only a test of
+// the chain does, so the shape they reach is counted from the steps given
+// rather than read from currentShape.
 export function upcast(value: unknown, from: readonly Step[] = steps): unknown {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return value;
   }
-  const parsed = envelope.safeParse(value);
+  const parsed = envelope.safeParse(value, { error: unworded });
   if (!parsed.success) {
     throw refusalOf(parsed.error);
   }

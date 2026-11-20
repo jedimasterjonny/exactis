@@ -70,7 +70,7 @@ import {
 } from "@/data/schemas";
 import { upcast } from "@/data/shapes";
 import { statePensionLines } from "@/data/state-pension";
-import { answerOf, Refusal, refusalOf } from "@/lib/answer";
+import { answerOf, Refusal, refusalOf, unworded } from "@/lib/answer";
 import { fixedMonthly, monthly } from "@/lib/cadence";
 import { endsAfterItStarts } from "@/lib/lines";
 import { paidUntil, termOf } from "@/lib/loans";
@@ -1108,7 +1108,8 @@ export function nothingKeptIn(asOf: Month): Kept {
 }
 
 // A value as the kept household it is and the whole it makes, or a
-// refusal in the words of every rule it breaks, once each:
+// refusal in the words of every rule it breaks, once each, and in the
+// app's own words for a rule no schema words itself:
 // what a save is held to before it is kept, and what a read is held to
 // before anything is drawn from it, so neither a save nor a stored
 // version the rules have since tightened past reaches the engine. The
@@ -1121,11 +1122,13 @@ export function soundKept(value: unknown): {
   readonly household: Household;
   readonly kept: Kept;
 } {
-  const parsed = kept.safeParse(value);
+  const parsed = kept.safeParse(value, { error: unworded });
   if (!parsed.success) {
     throw refusalOf(parsed.error);
   }
-  const whole = household.safeParse(householdOf(parsed.data));
+  const whole = household.safeParse(householdOf(parsed.data), {
+    error: unworded,
+  });
   if (!whole.success) {
     throw refusalOf(whole.error);
   }
