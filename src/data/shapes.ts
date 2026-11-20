@@ -44,6 +44,18 @@ type Step = (document: Record<string, unknown>) => Record<string, unknown>;
 // reading dropped, as it drops any key it does not hold, and saving it
 // back that way, since a reading is what the plan said then and nothing
 // can work it out again.
+//
+// 4 to 5: a progress point may keep a note on its month, in the
+// household's own words, and the twelve months after it as the plan
+// carried them once the month after it was closed, from the accounts
+// as they then stood. One kept in the fourth shape keeps neither, so
+// the step carries it as it is. It is taken for the reason the steps to
+// the third and the fourth are: so that a build of the fourth shape
+// refuses a household of the fifth rather than reading it with every
+// note and every year planned dropped, as it drops any key it does not
+// hold, and saving it back that way, since a note is what was written
+// then and a year planned is what the plan said then, and nothing can
+// give either again.
 const steps: readonly Step[] = [
   (document): Record<string, unknown> => {
     const { accounts } = document;
@@ -51,6 +63,7 @@ const steps: readonly Step[] = [
       ? { ...document, accounts: accounts.map(unmarked) }
       : document;
   },
+  (document): Record<string, unknown> => document,
   (document): Record<string, unknown> => document,
   (document): Record<string, unknown> => document,
 ];

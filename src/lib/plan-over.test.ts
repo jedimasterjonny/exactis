@@ -11,6 +11,7 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { kept } from "@/data/household.fixture";
 import { curve } from "@/data/inflation.fixture";
+import { noted } from "@/data/progress.fixture";
 import { currentShape, stamped } from "@/data/shapes";
 import { portfolios, targets } from "@/data/targets.fixture";
 import { Refusal } from "@/lib/answer";
@@ -252,6 +253,15 @@ describe("planOver", () => {
 
     expect(merged.accounts).toStrictEqual([...kept.accounts, recorded]);
     expect(soundKept(merged).kept).toStrictEqual(merged);
+  });
+
+  it("keeps the household's points, the note and the year planned a point keeps among them", () => {
+    const noting = {
+      ...household,
+      points: [noted, ...household.points.slice(1)],
+    };
+
+    expect(adopted(scenarioOf(), noting).points).toStrictEqual(noting.points);
   });
 
   it("keeps the household's import, its day, cash and paid in, under the scenario's shares, where the household imported since the scenario was made", () => {
