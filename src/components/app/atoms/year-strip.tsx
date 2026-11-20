@@ -45,7 +45,12 @@ interface YearStripProps {
 // strip's height, dragged or pressed along it or stepped with the arrow
 // keys, Home and End, and a screen reader reads the year in the words
 // it is given. The columns are its track's drawing and are hidden from
-// the accessibility tree.
+// the accessibility tree. The track is held to the strip's height, since
+// the slider writes its own position on it, which would otherwise leave
+// it and the thumb no height at all. The keyboard's focus is on the
+// input inside the thumb, not the thumb, so the thumb is ringed while
+// that input holds it, and where colours are forced, which draw no ring,
+// it is outlined in the system's text colour then and at no other time.
 export function YearStrip({
   label,
   marks,
@@ -116,9 +121,9 @@ export function YearStrip({
             </span>
           ))}
         </div>
-        <Slider.Track className="absolute inset-0">
+        <Slider.Track className="absolute inset-0 h-full">
           <Slider.Thumb
-            className="h-full w-0.5 bg-foreground outline-hidden after:absolute after:-inset-x-3 after:inset-y-0 focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-full w-0.5 bg-foreground outline-none after:absolute after:-inset-x-3 after:inset-y-0 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 forced-colors:has-focus-visible:outline-2 forced-colors:has-focus-visible:outline-offset-2 forced-colors:has-focus-visible:outline-[CanvasText] forced-colors:has-focus-visible:outline-solid"
             getAriaLabel={() => label}
             getAriaValueText={(_formatted, year) => valueText(year)}
           />
