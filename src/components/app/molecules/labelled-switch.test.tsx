@@ -94,8 +94,8 @@ describe("LabelledSwitch", () => {
     ).toHaveClass("h-8", "pointer-coarse:min-h-11");
   });
 
-  // jsdom forces no colours, so the class that does is what is read.
-  it("fills a switch on in the system's highlight under forced colours, beside the sidebar's oxide", () => {
+  // jsdom forces no colours, so the classes that do are what is read.
+  it("fills a switch on in the system's highlight under forced colours, and an off one's thumb in the text colour, beside the sidebar's oxide", () => {
     render(
       <LabelledSwitch
         icon={Sun}
@@ -109,6 +109,7 @@ describe("LabelledSwitch", () => {
 
     expect(screen.getByRole("switch", { name: "Night watch" })).toHaveClass(
       "forced-colors:data-checked:bg-[Highlight]",
+      "forced-colors:*:data-unchecked:bg-[CanvasText]",
       "data-checked:bg-sidebar-primary",
     );
   });
