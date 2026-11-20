@@ -23,7 +23,12 @@ import { ChartContainer as ChartContainerBase } from "@/components/ui/chart";
 // focus rule draws it in the system's text colour. The axes' labels are
 // drawn in the muted ink: recharts 3 moved the tick text out of the
 // group the vendored container's class for them looks inside, so they
-// kept recharts' own grey, too faint on the dark theme's card.
+// kept recharts' own grey, too faint on the dark theme's card. What is
+// drawn past the surface's edge is drawn rather than cut, so a tick or a
+// label widened by spaced text keeps its first and last letters, into
+// the card's padding; a series stays within the plot, its domain fitted
+// to it, and where an axis lets data run past it recharts clips the
+// series there.
 export function ChartContainer({
   className,
   ...props
@@ -34,7 +39,7 @@ export function ChartContainer({
     <ChartContainerBase
       {...props}
       className={cn(
-        "[&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground [&_.recharts-surface:focus-visible]:rounded-md [&_.recharts-surface:focus-visible]:outline-3 [&_.recharts-surface:focus-visible]:outline-offset-2 [&_.recharts-surface:focus-visible]:outline-ring/50 [&_.recharts-surface:focus-visible]:outline-solid",
+        "[&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground [&_.recharts-surface]:overflow-visible [&_.recharts-surface:focus-visible]:rounded-md [&_.recharts-surface:focus-visible]:outline-3 [&_.recharts-surface:focus-visible]:outline-offset-2 [&_.recharts-surface:focus-visible]:outline-ring/50 [&_.recharts-surface:focus-visible]:outline-solid",
         className,
       )}
       ref={closeOnTouchAway}
