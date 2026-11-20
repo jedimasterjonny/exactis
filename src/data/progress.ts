@@ -115,9 +115,9 @@ export type Balance = (typeof balances)[number];
 // begin in it; the points kept in it, oldest first; and the last of
 // them, which it is read to.
 export interface KeptYear {
-  readonly from: ProgressPoint;
-  readonly points: readonly ProgressPoint[];
-  readonly to: ProgressPoint;
+  readonly from: KeptPoint;
+  readonly points: readonly KeptPoint[];
+  readonly to: KeptPoint;
   readonly year: number;
 }
 
@@ -243,7 +243,7 @@ export function sumOf(moves: readonly Move[], sign: -1 | 1): number {
 // kept no point at all is read from its
 // own first point, as the first year is, so no row carries the move of
 // a year it does not name.
-export function yearsOf(points: readonly ProgressPoint[]): KeptYear[] {
+export function yearsOf(points: readonly KeptPoint[]): KeptYear[] {
   const years: KeptYear[] = [];
   for (const point of points) {
     const last = years.at(-1);

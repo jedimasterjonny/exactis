@@ -299,6 +299,47 @@ describe("ProgressPoints", () => {
     ).toStrictEqual(["May 2025+£3,000£279,000", "Apr 2025+£4,000£275,000"]);
   });
 
+  // February's close kept an invented note and March's an unbroken one,
+  // and January's none. Each note is a row of its own beneath its month,
+  // in the one table both forms draw, read as a row rather than hidden,
+  // the month's rule dropped, spanning every column and held to their
+  // width rather than sizing any.
+  it("reads each month's note back on a row of its own beneath the month, and draws none for a month without one", () => {
+    const unbroken = "x".repeat(200);
+    render(
+      <ProgressPoints
+        points={points.map((point, index) => {
+          if (index === 3) {
+            return { ...point, note: "Car serviced from savings" };
+          }
+          return index === 4 ? { ...point, note: unbroken } : point;
+        })}
+      />,
+    );
+
+    const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+    const [march, marchNote, february, februaryNote, january] = rows;
+
+    expect(
+      rows.map((row) => within(row).getAllByRole("cell").length),
+    ).toStrictEqual([10, 1, 10, 1, 10]);
+    expect(
+      [marchNote, februaryNote].map((row) => row?.textContent),
+    ).toStrictEqual([
+      `Your note\u00a0${unbroken}`,
+      "Your note\u00a0Car serviced from savings",
+    ]);
+    expect(march).toHaveClass("border-b-0");
+    expect(february).toHaveClass("border-b-0");
+    expect(january).not.toHaveClass("border-b-0");
+    expect(
+      within(februaryNote ?? document.body).getByRole("cell"),
+    ).toHaveAttribute("colspan", "9");
+    expect(
+      within(februaryNote ?? document.body).getByRole("paragraph"),
+    ).toHaveClass("w-0", "min-w-full");
+  });
+
   it("draws what would fill the card before any point is kept", () => {
     render(<ProgressPoints points={[]} />);
 

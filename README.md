@@ -22,8 +22,9 @@ in Postgres on Neon and the app on Vercel.
   debt.
 - Income & expenses — the income and expense lines, the milestones, and what a
   month of each year puts by or draws.
-- Progress — the balances month by month from the progress points, with the
-  house revalued by the Land Registry's house price index.
+- Progress — the balances month by month from the progress points and the notes
+  kept on them, with the house revalued by the Land Registry's house price
+  index.
 - Assumptions — the rates, typed or derived from the Bank of England's implied
   inflation curve, BlackRock's capital market assumptions and a target
   allocation imported from Portfolio Performance; the glide path; and each
