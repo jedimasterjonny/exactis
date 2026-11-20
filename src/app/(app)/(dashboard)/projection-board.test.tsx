@@ -73,6 +73,14 @@ class Stalled extends FuturesWorker {
   }
 }
 
+// The milestone chips in the order they stand, placed or not: a chip not
+// placed has no role, so the group's children are read.
+const chips = (): string[] =>
+  [
+    // eslint-disable-next-line testing-library/no-node-access -- the chips are the group's children, and an unplaced one has no role to query by
+    ...screen.getByRole("group", { name: "Milestones" }).children,
+  ].map(({ textContent }) => textContent);
+
 // The vertical rule recharts draws for a ReferenceLine, which carries the
 // year it stands at as an attribute. A rule has no role, label or text,
 // so no query is more accessible than this one and none can be
@@ -686,6 +694,12 @@ describe("ProjectionBoard", () => {
         .getAllByText(bySlot("milestone-chip-unplaced"), { suggest: false })
         .map((chip) => chip.textContent),
     ).toStrictEqual(["Thirty grand …", "Thirty liquid …", "A million …"]);
+    expect(chips()).toStrictEqual([
+      "Ada 18 2027",
+      "Thirty grand …",
+      "Thirty liquid …",
+      "A million …",
+    ]);
     expect(marks()).toStrictEqual(["2027"]);
 
     await waitFor(
@@ -704,6 +718,14 @@ describe("ProjectionBoard", () => {
         .getAllByText(bySlot("milestone-chip-unplaced"), { suggest: false })
         .map((chip) => chip.textContent),
     ).toStrictEqual(["A million reached in 0%"]);
+    // The chips stand as they stood while the run was drawn, the plan's
+    // own before those the run places, though those fall a year sooner.
+    expect(chips()).toStrictEqual([
+      "Ada 18 2027",
+      "Thirty grand 2026",
+      "Thirty liquid 2026",
+      "A million reached in 0%",
+    ]);
     // Recharts keeps a rule where it was mounted, so the ones the run
     // adds come after the plan's own, whatever their years.
     expect(new Set(marks())).toStrictEqual(new Set(["2026", "2027"]));

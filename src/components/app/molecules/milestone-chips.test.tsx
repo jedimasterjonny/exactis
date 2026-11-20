@@ -62,13 +62,12 @@ describe("MilestoneChips", () => {
     }
   });
 
-  it("follows the chips with a milestone yet to be placed, dashed, with an ellipsis for its year and no press", () => {
+  it("draws a milestone yet to be placed dashed, with an ellipsis for its year and no press", () => {
     render(
       <MilestoneChips
-        markers={markers}
+        markers={[...markers, { id: 3, name: "First million", reached: null }]}
         onSelect={vi.fn<(tie: Tie) => void>()}
         selected="retirement"
-        unplaced={[{ id: 3, name: "First million", reached: null }]}
       />,
     );
 
@@ -83,13 +82,12 @@ describe("MilestoneChips", () => {
     expect(within(chip).getByText("…")).toHaveClass("max-sm:hidden");
   });
 
-  it("follows the chips with a milestone too few futures reach, dashed, with the share that do for its year and no press", () => {
+  it("draws a milestone too few futures reach dashed, with the share that do for its year and no press", () => {
     render(
       <MilestoneChips
-        markers={markers}
+        markers={[...markers, { id: 3, name: "First million", reached: 0.12 }]}
         onSelect={vi.fn<(tie: Tie) => void>()}
         selected="retirement"
-        unplaced={[{ id: 3, name: "First million", reached: 0.12 }]}
       />,
     );
 
@@ -102,6 +100,36 @@ describe("MilestoneChips", () => {
     expect(chip).toHaveTextContent("First million reached in 12%");
     expect(chip).toHaveClass("border-dashed", "text-muted-foreground");
     expect(within(chip).getByText("reached in")).toHaveClass("sr-only");
+  });
+
+  // The caller gives the order, so a chip placed can stand where it
+  // stood unplaced; jsdom lays nothing out, so the class holding a year,
+  // an ellipsis and a share to one width is read.
+  it("draws the chips in the order given, placed or not, each figure four wide", () => {
+    render(
+      <MilestoneChips
+        markers={[
+          { id: 1, name: "Kids leave home", year: 2040 },
+          { id: 3, name: "First million", reached: null },
+          { id: "retirement", name: "Retirement", year: 2053 },
+        ]}
+        onSelect={vi.fn<(tie: Tie) => void>()}
+        selected="retirement"
+      />,
+    );
+
+    const group = screen.getByRole("group", { name: "Milestones" });
+
+    expect(
+      // eslint-disable-next-line testing-library/no-node-access -- the chips are the group's children, and an unplaced one has no role to query by
+      [...group.children].map(({ textContent }) => textContent),
+    ).toStrictEqual([
+      "Kids leave home 2040",
+      "First million …",
+      "Retirement 2053",
+    ]);
+    expect(screen.getByText("2040")).toHaveClass("min-w-[4ch]");
+    expect(screen.getByText("…")).toHaveClass("min-w-[4ch]");
   });
 
   // jsdom lays nothing out, so the class that sizes the reach is read: a

@@ -24,7 +24,7 @@ import { MilestoneChips } from "@/components/app/molecules/milestone-chips";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { CardContent } from "@/components/kit/card";
 import { ChartContainer, ChartTooltip } from "@/components/kit/chart";
-import { ageOf } from "@/data/milestones";
+import { ageOf, markersHeld } from "@/data/milestones";
 import { ageIn, endYear } from "@/data/plan";
 import { markersIn, reachedIn, yearsIn } from "@/engine/futures";
 import { axisOf } from "@/lib/axis";
@@ -131,7 +131,10 @@ const tenths = ({ bottomTenth, topTenth }: FutureYear): number[] => [
 // it, moving as the run comes in, as the lanes beneath read it, and
 // not drawn while fewer than half have, its chip dashed and giving the
 // share of the futures drawn so far that reach it in place of a year,
-// or an ellipsis before the first are in. The pounds on
+// or an ellipsis before the first are in. The chips keep one order as
+// the run lands, the milestones card's beneath: those the plan lays out
+// by year, then those reached when conditions hold in the household's
+// order, so a chip placed stays where it stood dashed. The pounds on
 // the axis reach below nothing only as far as the bottom of the fan
 // does, as a plan whose debts outweigh it can, on the dashboard's scale.
 // The years are read off the run once for each run and plan, rather
@@ -361,12 +364,11 @@ export function FuturesFan({
         )}
         {(markers.length > 0 || unplaced.length > 0) && (
           <MilestoneChips
-            markers={markers}
+            markers={markersHeld(markers, { milestones, plan, unplaced })}
             onSelect={(tie) => {
               setChosen(tie === chosen ? undefined : tie);
             }}
             selected={chosen}
-            unplaced={unplaced}
           />
         )}
       </CardContent>

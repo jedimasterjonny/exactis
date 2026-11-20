@@ -75,6 +75,15 @@ export interface MilestoneValues {
   readonly name: string;
 }
 
+// A milestone reached when conditions hold that a run of futures has
+// not placed on the years: the share of the run that reaches it, fewer
+// than half, or null while the futures are drawn.
+export interface Unplaced {
+  readonly id: number;
+  readonly name: string;
+  readonly reached: null | number;
+}
+
 type Basis = (typeof bases)[number];
 
 type Measure = (typeof measures)[number];
@@ -213,6 +222,45 @@ export function isReached(
 // Whether either end of the line is tied to the milestone.
 export function isTiedTo(line: LineValues, tie: Tie): boolean {
   return line.startsAt === tie || line.endsAt === tie;
+}
+
+// The milestones a run of futures places, and those it has not, in an
+// order the run cannot move as it lands, the order the milestones card
+// on Chance lists them in: those the plan lays out, retirement at an age
+// among them, by year as markersOf gives them; then retirement on
+// conditions, once the run places it; then the milestones reached when
+// conditions hold, in the order the household lists them, each placed or
+// not, so one the run places keeps the slot it held unplaced.
+export function markersHeld(
+  markers: readonly Marker[],
+  {
+    milestones,
+    plan,
+    unplaced,
+  }: {
+    readonly milestones: readonly Milestone[];
+    readonly plan: Pick<Plan, "owners">;
+    readonly unplaced: readonly Unplaced[];
+  },
+): readonly (Marker | Unplaced)[] {
+  const isOnConditions = retiresOn(plan) !== undefined;
+  const onConditions = milestones.filter(
+    (milestone) => ageOf(milestone) === undefined,
+  );
+  return [
+    ...markers.filter(({ id }) =>
+      id === "retirement"
+        ? !isOnConditions
+        : !onConditions.some((milestone) => milestone.id === id),
+    ),
+    ...markers.filter(({ id }) => id === "retirement" && isOnConditions),
+    ...onConditions.flatMap(
+      ({ id }) =>
+        markers.find((marker) => marker.id === id) ??
+        unplaced.find((marker) => marker.id === id) ??
+        [],
+    ),
+  ];
 }
 
 // The milestones the plan is laid out by, in the order their years come

@@ -26,6 +26,7 @@ import { ProjectionChart } from "@/components/app/organisms/projection-chart";
 import {
   ageOf,
   conditionsOf,
+  markersHeld,
   measureNames,
   retiresOn,
   retiringAt,
@@ -301,6 +302,8 @@ function Board({
   // and a line move as the slices land; while the run is drawn, the
   // ones it has yet to place are said to be coming, and once it is,
   // the ones it never placed give the share of the run that reach them.
+  // The chips keep one order as it lands, the plan's own by year and
+  // then those it places in the household's order.
   const drawn = futuresIn(run);
   const markers = isProjecting
     ? markersIn(drawn, milestones, laid).filter(({ year }) =>
@@ -455,10 +458,13 @@ function Board({
         choices={
           chosen === undefined ? undefined : (
             <MilestoneChips
-              markers={markers}
+              markers={markersHeld(markers, {
+                milestones,
+                plan: laid,
+                unplaced,
+              })}
               onSelect={setChoice}
               selected={chosen.id}
-              unplaced={unplaced}
             />
           )
         }
