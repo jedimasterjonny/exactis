@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { signOut } from "@/actions/auth";
 import { Sidebar, SidebarProvider } from "@/components/kit/sidebar";
 import { bySlot, stubViewport } from "@/test/dom";
 
@@ -13,6 +14,7 @@ const pathname = vi.hoisted(() => ({ current: "/" }));
 vi.mock("next/navigation", () => ({
   usePathname: (): string => pathname.current,
 }));
+vi.mock("@/actions/auth", () => ({ signOut: vi.fn() }));
 
 // Whether last month is still to be closed, as reads already answered,
 // each marked the way React marks a promise it has seen settle, so the
@@ -151,6 +153,40 @@ describe("PhoneNav", () => {
 
     expect(moreScreens()).not.toBe(before);
     expect(before).not.toBeInTheDocument();
+  });
+
+  // jsdom hides a closed popover, so the form is found hidden; and
+  // draws no rule, so the classes setting the row apart are read.
+  it("ends More's list with sign-out, a form posting its action, set apart and as wide as the rows", () => {
+    barOn("/progress", closed);
+    const list = moreScreens();
+    const form = within(list).getByRole("form", {
+      hidden: true,
+      name: "Sign out",
+      suggest: false,
+    });
+    const button = within(form).getByRole("button", {
+      hidden: true,
+      name: "Sign out",
+      suggest: false,
+    });
+
+    expect(
+      within(list)
+        .getAllByRole("listitem", { hidden: true, suggest: false })
+        .at(-1),
+    ).toContainElement(form);
+    expect(
+      within(list)
+        .getAllByRole("listitem", { hidden: true, suggest: false })
+        .at(-1),
+    ).toHaveClass("mt-1", "border-t", "pt-1");
+    expect(button).toHaveAttribute("type", "submit");
+    expect(button).toHaveClass("min-h-11", "w-full");
+
+    fireEvent.click(button);
+
+    expect(signOut).toHaveBeenCalledOnce();
   });
 
   it("marks the current screen's tab as the page, and not More", () => {

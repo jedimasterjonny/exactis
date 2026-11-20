@@ -2,10 +2,12 @@
 
 import type { JSX } from "react";
 
-import { Ellipsis } from "lucide-react";
+import { cn } from "cn";
+import { Ellipsis, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { signOut } from "@/actions/auth";
 import { DueBadge } from "@/components/app/atoms/due-badge";
 import { useSidebar } from "@/components/kit/sidebar";
 import { monthEnd, screenAt, screens, sectionNumeral, tabs } from "@/lib/nav";
@@ -44,15 +46,16 @@ const reached = screens.filter((screen) => !tabs.includes(screen));
 // end's tab carries a dot while last month is still to be closed, read
 // from the promise the sidebar's badge reads. The tabs are links, so
 // they work before the page hydrates. More opens the sheet once the page
-// has hydrated, and before that a list of the screens it reaches, a
-// native popover in a card above the bar at its end, which a tap outside
-// or Escape closes and which stays shut where popovers are not drawn.
-// Once the page has hydrated More's press is cancelled, so the list
-// never opens over the sheet, and a move to another screen draws the
-// list afresh, which closes one opened before the page hydrated. The
-// tabs sit above the home indicator, the bar running on beneath them to
-// the foot of the screen. A client component, since the pathname is read
-// on the client.
+// has hydrated, and before that a list of the screens it reaches, with
+// sign-out beneath them, set apart, since it is the one action of the
+// sheet's footer that works before the page hydrates, a native popover
+// in a card above the bar at its end, which a tap outside or Escape
+// closes and which stays shut where popovers are not drawn. Once the
+// page has hydrated More's press is cancelled, so the list never opens
+// over the sheet, and a move to another screen draws the list afresh,
+// which closes one opened before the page hydrated. The tabs sit above
+// the home indicator, the bar running on beneath them to the foot of the
+// screen. A client component, since the pathname is read on the client.
 export function PhoneNav({ isDue }: PhoneNavProps): JSX.Element {
   const pathname = usePathname();
   const screen = screenAt(pathname);
@@ -125,6 +128,14 @@ export function PhoneNav({ isDue }: PhoneNavProps): JSX.Element {
                 </Link>
               </li>
             ))}
+            <li className="mt-1 border-t pt-1">
+              <form action={signOut} aria-label="Sign out">
+                <button className={cn(rowClasses, "w-full")} type="submit">
+                  <LogOut aria-hidden />
+                  Sign out
+                </button>
+              </form>
+            </li>
           </ul>
         </li>
       </ul>

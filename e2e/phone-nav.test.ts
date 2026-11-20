@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
+import { actionId } from "./server";
+
 describe("the production build", () => {
   // The shell next build prerenders for the progress screen, which is
   // what a browser with JavaScript off is sent before the store's reads
@@ -9,7 +11,8 @@ describe("the production build", () => {
   // requested. It holds the phone's tab bar, so the tabs are links that
   // work before the page hydrates, with the screen's own marked as the
   // page, and More is drawn closed, opening before the page hydrates a
-  // list of the screens it reaches, as a popover of links.
+  // list of the screens it reaches, as a popover of links, with
+  // sign-out's form beneath them.
   it("prerenders the phone's tab bar into a screen's shell, its tab current", async () => {
     const html = await readFile(".next/server/app/progress.html", "utf8");
     const bar =
@@ -46,5 +49,11 @@ describe("the production build", () => {
       "/plan",
       "/assumptions",
     ]);
+    // React writes the field naming a server action into a form posting
+    // it, so the form posts with JavaScript off as the sign-in form does.
+    expect(list["rows"]).toMatch(/<form [^>]*aria-label="Sign out"[^>]*>/u);
+    expect(list["rows"]).toContain(
+      `name="$ACTION_ID_${await actionId("signOut")}"`,
+    );
   });
 });
