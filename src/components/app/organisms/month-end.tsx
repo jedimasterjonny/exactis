@@ -9,6 +9,7 @@ import * as z from "zod";
 
 import type { Account } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
+import type { KeptPoint } from "@/data/progress";
 import type { Month } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
 import type { Slot } from "@/lib/slot";
@@ -21,11 +22,18 @@ import { Note } from "@/components/app/atoms/note";
 import { RowAction } from "@/components/app/atoms/row-action";
 import { MoneyInput, YearField } from "@/components/app/molecules/figure-field";
 import { MonthField } from "@/components/app/molecules/month-field";
+import { TextField } from "@/components/app/molecules/text-field";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";
 import { balanceGroups } from "@/data/accounts";
-import { month as aMonth, recordId } from "@/data/schemas";
+import {
+  month as aMonth,
+  longestNote,
+  noted,
+  pointNote,
+  recordId,
+} from "@/data/schemas";
 import { monthsOn } from "@/engine/projection";
 import { useSender } from "@/hooks/use-sender";
 import { counted } from "@/lib/count";
@@ -34,17 +42,22 @@ import {
   cutOf,
   formatDated,
   formatDay,
+  formatMonth,
+  isOnOrBefore,
   monthBefore,
+  monthName,
   monthsBetween,
 } from "@/lib/months";
 import { monthEnd, subsectionLabel } from "@/lib/nav";
 
 // The worksheet while it is open: the month the balances are being
-// closed onto, the balances checked, and the figures typed, by the
-// account's id. A balance not typed reads what the plan expected.
+// closed onto, the balances checked, the figures typed, by the account's
+// id, and the note typed, held only while it differs from the one the
+// field opened on. A balance not typed reads what the plan expected.
 interface Draft {
   readonly asOf: Month;
   readonly checked: ReadonlySet<number>;
+  readonly note?: string | undefined;
   readonly typed: ReadonlyMap<number, number>;
 }
 
@@ -60,6 +73,7 @@ interface Held {
 interface MonthEndProps {
   readonly accounts: readonly Account[];
   readonly isUpdating: boolean;
+  readonly latest?: Pick<KeptPoint, "month" | "note"> | undefined;
   readonly month: Month;
   readonly plan: Plan;
   readonly schedule: Schedule;
@@ -83,12 +97,14 @@ type Touched = readonly [id: number, kind: string, name: string];
 // writes over a draft another month or household left.
 const draftKey = "month-end-draft";
 
-// The draft as the tab keeps it, read back, its sets kept as lists.
-// Anything else is no draft.
+// The draft as the tab keeps it, read back, its sets kept as lists, and
+// its note, where it has one, as typed, so a note past its rule comes
+// back to be shown so. Anything else is no draft.
 const keptDraft = z.object({
   draft: z.object({
     asOf: aMonth,
     checked: z.array(recordId).transform((ids) => new Set(ids)),
+    note: z.string().exactOptional(),
     typed: z
       .array(z.tuple([recordId, z.number()]))
       .transform((figures) => new Map(figures)),
@@ -141,6 +157,18 @@ const keptDraft = z.object({
 // draft kept lands in the render after. The note stays until the draft
 // is saved, started again or edited down to nothing, so the fields
 // below it do not move as the first figure is typed.
+// Beneath the ledger, ruled off from it, is the month's note, which the
+// close keeps on the point it records. It opens on the note the latest
+// point keeps where the month picked is the latest's, so a close made
+// again writes what it shows, and empty otherwise, and the draft holds
+// what is typed only while it differs from that, so "Start again" goes
+// back to it. Its hint names the month whose point keeps it, or, for a
+// month before the latest's, which records no point, says none is kept;
+// a note there, or one past its rule, is an error as it is typed, and
+// Save still sends it, for the action to refuse in the same words. The
+// toast says the note was recorded where one was sent and the point
+// recorded, and the note over a restored draft names the note where the
+// draft holds one.
 // The year picked is held between the year the plan's owner was
 // born and the year of the month cut last, which hold the months the
 // store takes, so a year mistyped asks the plan for no more months than
@@ -152,6 +180,7 @@ const keptDraft = z.object({
 export function MonthEnd({
   accounts,
   isUpdating,
+  latest,
   month,
   plan,
   schedule,
@@ -174,6 +203,12 @@ export function MonthEnd({
   const from: Month = { month: plan.month, year: plan.from };
   const rows = rowsOf(accounts, draft, { from, plan, schedule });
   const checked = rows.filter(({ isChecked }) => isChecked);
+  const kept =
+    latest !== undefined && monthsBetween(latest.month, draft.asOf) === 0
+      ? (latest.note ?? "")
+      : "";
+  const note = draft.note ?? kept;
+  const isNoted = note.trim() !== "";
 
   // The draft as edited, held and kept. Its note goes once nothing is
   // checked or typed, since no copy is kept then to say it of.
@@ -223,6 +258,17 @@ export function MonthEnd({
           rows={rows}
           today={today}
         />
+        <div className="border-t pt-4">
+          <TextField
+            error={noteErrorOf(note, draft.asOf, latest)}
+            hint={noteHintOf(draft.asOf, latest)}
+            label="Note"
+            onValueChange={(typed) => {
+              amend({ ...draft, note: typed === kept ? undefined : typed });
+            }}
+            value={note}
+          />
+        </div>
       </CardContent>
       <CardFooter className="justify-end gap-2">
         <span className="mr-auto text-sm text-muted-foreground">
@@ -239,6 +285,7 @@ export function MonthEnd({
                     balance: Math.round(now),
                     id: account.id,
                   })),
+                  ...(isNoted && { note }),
                 }),
               {
                 failure: "Balances not saved",
@@ -249,7 +296,7 @@ export function MonthEnd({
                   }
                 },
                 success: (saved) => ({
-                  description: `${counted(checked.length, "balance")} set as of ${formatDay(cutOf(saved.asOf))}${saved.isRecorded ? ", its progress point recorded" : ""}`,
+                  description: `${counted(checked.length, "balance")} set as of ${formatDay(cutOf(saved.asOf))}${recordedOf(saved.isRecorded, isNoted)}`,
                   title: "Balances updated",
                 }),
               },
@@ -342,9 +389,10 @@ function isBound({ touched }: Held, accounts: readonly Account[]): boolean {
   );
 }
 
-// Whether a draft has nothing checked or typed, as one opened afresh.
-function isEmpty({ checked, typed }: Draft): boolean {
-  return checked.size === 0 && typed.size === 0;
+// Whether a draft has nothing checked or typed, its note among what is
+// typed, as one opened afresh.
+function isEmpty({ checked, note, typed }: Draft): boolean {
+  return checked.size === 0 && typed.size === 0 && note === undefined;
 }
 
 // Keeps a draft in the tab's storage for a reload, or erases the copy
@@ -360,6 +408,7 @@ function keep({ draft, month, touched }: Held): void {
           draft: {
             asOf: draft.asOf,
             checked: [...draft.checked],
+            note: draft.note,
             typed: [...draft.typed],
           },
           month,
@@ -381,6 +430,36 @@ function noDraft(): null {
   return null;
 }
 
+// What is wrong with the note in the field, where anything is: written
+// for a month before the latest point's, which records no point to keep
+// it, or past its rule, each as the action refuses it. A blank note is
+// none, and nothing is wrong with it.
+function noteErrorOf(
+  note: string,
+  asOf: Month,
+  latest: Pick<KeptPoint, "month"> | undefined,
+): string | undefined {
+  if (note.trim() === "") {
+    return undefined;
+  }
+  if (latest !== undefined && !isOnOrBefore(latest.month, asOf)) {
+    return `Clear the note to close ${formatMonth(asOf)}`;
+  }
+  return pointNote.safeParse(note).success ? undefined : noted;
+}
+
+// What the note's field says beneath it: that it is optional, how long
+// it may run and the month whose point keeps it, or, for a month before
+// the latest point's, that it records no point, so keeps no note.
+function noteHintOf(
+  asOf: Month,
+  latest: Pick<KeptPoint, "month"> | undefined,
+): string {
+  return latest === undefined || isOnOrBefore(latest.month, asOf)
+    ? `Optional, up to ${String(longestNote)} characters. Kept with ${monthName(asOf.month, "long")}'s progress point, to read back on Progress.`
+    : `A month before ${formatMonth(latest.month)} records no progress point, so it keeps no note.`;
+}
+
 // A sum that can come to a fraction of a pound either side of nothing,
 // to the pound, nothing written as nothing rather than as minus nothing.
 function pounds(amount: number): string {
@@ -391,6 +470,17 @@ function pounds(amount: number): string {
 // The draft the tab kept, as text, or none.
 function readDraft(): null | string {
   return attempt(() => sessionStorage.getItem(draftKey)) ?? null;
+}
+
+// What a save's toast adds of the point: that it and the note sent were
+// recorded, that it was, or nothing where the month closed records none.
+function recordedOf(isRecorded: boolean, isNoted: boolean): string {
+  if (!isRecorded) {
+    return "";
+  }
+  return isNoted
+    ? ", its progress point and note recorded"
+    : ", its progress point recorded";
 }
 
 // The draft the tab kept, where it reads back as one and was opened on
@@ -458,10 +548,11 @@ function typedAs(account: Account, value: number): number {
   return account.kind === "debt" ? negated(Math.abs(value)) : value;
 }
 
-// The worksheet between the card's header and its footer: the month,
-// the note that the draft was restored, where it was, with the press
-// that starts again, a field a balance in its group, and the balances
-// the month leaves, given every row and the rows checked among them.
+// The worksheet between the card's header and the note's field: the
+// month, the note that the draft was restored, where it was, naming the
+// note where the draft holds one, with the press that starts again, a
+// field a balance in its group, and the balances the month leaves, given
+// every row and the rows checked among them.
 function Worksheet({
   checked,
   draft,
@@ -533,8 +624,9 @@ function Worksheet({
       {isRestored && (
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <Note>
-            The balances are as they were left in this tab, kept until saved or
-            the tab is closed.
+            {draft.note === undefined
+              ? "The balances are as they were left in this tab, kept until saved or the tab is closed."
+              : "The balances and the note are as they were left in this tab, kept until saved or the tab is closed."}
           </Note>
           <Button onClick={onDrop} size="xs" variant="outline">
             Start again

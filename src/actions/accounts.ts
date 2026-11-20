@@ -35,10 +35,24 @@ import { account as heldAccount } from "@/data/household";
 import { isSound, statuses, toRecords } from "@/data/houses";
 import { moving } from "@/data/milestones";
 import { pointOf } from "@/data/progress";
-import { month, named, pounds, recordId, target } from "@/data/schemas";
-import { Refusal } from "@/lib/answer";
+import {
+  month,
+  named,
+  noted,
+  pounds,
+  recordId,
+  sentNote,
+  target,
+} from "@/data/schemas";
+import { Refusal, refused } from "@/lib/answer";
 import { keptOf, landedSince } from "@/lib/landed";
-import { cutOf, isOnOrBefore, monthsBetween, today } from "@/lib/months";
+import {
+  cutOf,
+  formatMonth,
+  isOnOrBefore,
+  monthsBetween,
+  today,
+} from "@/lib/months";
 import { standingOf } from "@/lib/moved";
 import { found, holdUnchanged, replaced, written } from "@/lib/records";
 import { openedScenario } from "@/lib/scenario";
@@ -192,17 +206,20 @@ const openedAsset = z
   .nullable() satisfies z.ZodType<null | Secured>;
 
 // A month end as the worksheet sends it: the month the balances are now
-// as of, and each balance checked against it, by the account's id.
+// as of, each balance checked against it, by the account's id, and the
+// note on the month, where one is written.
 interface Closed {
   readonly asOf: Month;
   readonly balances: readonly {
     readonly balance: number;
     readonly id: number;
   }[];
+  readonly note?: string;
 }
 
 // What a month end may carry: a month, and each balance whole pounds,
-// each account once.
+// each account once. The note is parsed apart, since a person can type
+// one past its rule, and is refused in words rather than failing.
 const closed = z.object({
   asOf: month,
   balances: z
@@ -235,7 +252,12 @@ const order = z
 // it otherwise; a month before the latest moves the balances and
 // records nothing, since the balances read now are not what the
 // accounts held then, and the points before the latest are never
-// touched. A point recorded after the latest, while the balances are
+// touched. The note sent lands on the point recorded, what is sent
+// being what it keeps, so a month closed again keeps the note sent with
+// it or none; a month that records no point keeps no note, and one sent
+// with it is refused, in words naming the latest's month, as a note
+// past its rule is before anything is read, so a note is never dropped
+// unsaid. A point recorded after the latest, while the balances are
 // still as of the latest's month, has the latest keep the month end's
 // reading of the household as it stands before this close: where the
 // invested balances landed among the futures of the oldest close in the
@@ -262,6 +284,11 @@ export async function closeBalances(
 ): Promise<Answer<{ readonly asOf: Month; readonly isRecorded: boolean }>> {
   await requireSession();
   const { asOf, balances } = closed.parse(draft);
+  const sent = sentNote.safeParse(draft.note);
+  if (!sent.success) {
+    return refused(noted);
+  }
+  const note = sent.data;
   const scenario = await openedScenario();
   return amend(async ({ household, kept }) => {
     if (scenario !== null) {
@@ -288,6 +315,11 @@ export async function closeBalances(
     );
     const latest = kept.points.at(-1);
     const isRecorded = latest === undefined || isOnOrBefore(latest.month, asOf);
+    if (!isRecorded && note !== undefined) {
+      throw new Refusal(
+        `A month before ${formatMonth(latest.month)} records no progress point, so it keeps no note`,
+      );
+    }
     const held =
       latest !== undefined &&
       monthsBetween(latest.month, asOf) > 0 &&
@@ -300,7 +332,7 @@ export async function closeBalances(
     const points = isRecorded
       ? [
           ...held.filter((point) => monthsBetween(point.month, asOf) > 0),
-          pointOf(accounts, asOf),
+          { ...pointOf(accounts, asOf), ...(note !== undefined && { note }) },
         ]
       : kept.points;
     return {

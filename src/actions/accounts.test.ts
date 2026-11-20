@@ -1536,6 +1536,115 @@ describe("the account actions", () => {
       ]);
     });
 
+    // On the 25th of September, September is closed after August's
+    // point with a note typed: it lands, trimmed, on September's point,
+    // in the write that has August keep where the plan stood, as a close
+    // with no note has it.
+    it("keeps the note sent on the point a month closed after the latest records, trimmed", async () => {
+      vi.setSystemTime(new Date("2026-09-25T12:00:00Z"));
+
+      expect(
+        await closeBalances({
+          asOf: { month: 8, year: 2026 },
+          balances: [],
+          note: "  Car serviced from savings ",
+        }),
+      ).toStrictEqual(
+        saved({ asOf: { month: 8, year: 2026 }, isRecorded: true }),
+      );
+      expect(soundKept(await latest()).kept.points.slice(-2)).toStrictEqual([
+        { ...kept.points[5], standing: standingOf(kept) },
+        {
+          ...read,
+          month: { month: 8, year: 2026 },
+          note: "Car serviced from savings",
+        },
+      ]);
+      expect(await versions()).toBe(2);
+    });
+
+    // August's point keeps an invented note, and August is closed again:
+    // the point written over it keeps the note sent, and then, closed
+    // again with none sent or a blank one, each over a point keeping a
+    // note, keeps none, as the field showed it cleared. The points
+    // before it are never touched.
+    it("writes the note sent over the latest's on a month closed again, and none where none is sent", async () => {
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        {
+          ...kept,
+          points: kept.points.map((point, index) =>
+            index === 5
+              ? { ...point, note: "Boiler replaced from savings" }
+              : point,
+          ),
+        },
+      );
+      const august = { month: 7, year: 2026 };
+      const closedAgain = saved({ asOf: august, isRecorded: true });
+
+      for (const note of [undefined, "   "]) {
+        expect(
+          await closeBalances({
+            asOf: august,
+            balances: [],
+            note: "Boiler replaced, invoice paid",
+          }),
+        ).toStrictEqual(closedAgain);
+        expect(soundKept(await latest()).kept.points).toStrictEqual([
+          ...kept.points.slice(0, -1),
+          { ...read, month: august, note: "Boiler replaced, invoice paid" },
+        ]);
+        expect(
+          await closeBalances({
+            asOf: august,
+            balances: [],
+            ...(note !== undefined && { note }),
+          }),
+        ).toStrictEqual(closedAgain);
+        expect(soundKept(await latest()).kept.points.at(-1)).toStrictEqual({
+          ...read,
+          month: august,
+        });
+      }
+    });
+
+    // March is before August, the latest point's month, so records no
+    // point to keep a note on: one sent with it is refused, naming
+    // August, and nothing is written; none sent closes March as before.
+    it("refuses a note sent with a month before the latest point's, naming the latest's month, and writes nothing", async () => {
+      expect(
+        await closeBalances({
+          asOf: { month: 2, year: 2026 },
+          balances: [{ balance: 275000, id: 2 }],
+          note: "Car serviced",
+        }),
+      ).toStrictEqual(
+        refused(
+          "A month before August 2026 records no progress point, so it keeps no note",
+        ),
+      );
+      expect(await versions()).toBe(1);
+      expect(refresh).not.toHaveBeenCalled();
+    });
+
+    // A person can type a note past its rule, so it is refused in the
+    // rule's words, before the store is read, rather than failing.
+    it("refuses a note past its rule in its words, before the store is read", async () => {
+      for (const note of ["x".repeat(201), "Car\tserviced"]) {
+        expect(
+          await closeBalances({
+            asOf: { month: 7, year: 2026 },
+            balances: [],
+            note,
+          }),
+        ).toStrictEqual(refused("A note is one line of up to 200 characters"));
+      }
+      expect(openedScenario).not.toHaveBeenCalled();
+      expect(await versions()).toBe(1);
+    });
+
     // It is 15 September 2026: August is cut, September is not until
     // Friday the 25th and nor is any month after it, and the plan's
     // owner was born in 1992.
