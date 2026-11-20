@@ -239,6 +239,55 @@ describe("FuturesFan", () => {
     ).toStrictEqual(["Ten grand …", "Twenty grand …"]);
   });
 
+  // Over the five years a sabbatical at 38 falls in 2030, and the
+  // futures place ten grand in 2027 and twenty grand in 2029: the
+  // plan's own comes first throughout, and each placed chip stands
+  // where it stood dashed.
+  it("keeps the chips in one order as the run lands, the plan's own before those the futures place", () => {
+    const listed = [
+      {
+        conditions: [{ measure: "age", of: "years", times: 38 }],
+        id: 5,
+        name: "Sabbatical",
+      },
+      ...reached,
+    ] as const;
+    const chips = (): string[] =>
+      [
+        // eslint-disable-next-line testing-library/no-node-access -- the chips are the group's children, and an unplaced one has no role to query by
+        ...screen.getByRole("group", { name: "Milestones" }).children,
+      ].map(({ textContent }) => textContent);
+    const { rerender } = render(
+      <FuturesFan
+        futures={[]}
+        isDone={false}
+        milestones={listed}
+        plan={longer}
+      />,
+    );
+
+    expect(chips()).toStrictEqual([
+      "Sabbatical 2030",
+      "Ten grand …",
+      "Twenty grand …",
+    ]);
+
+    rerender(
+      <FuturesFan
+        futures={runningOut()}
+        isDone
+        milestones={listed}
+        plan={longer}
+      />,
+    );
+
+    expect(chips()).toStrictEqual([
+      "Sabbatical 2030",
+      "Ten grand 2027",
+      "Twenty grand 2029",
+    ]);
+  });
+
   it("draws the milestone chosen solid until it is chosen again", () => {
     render(
       <FuturesFan

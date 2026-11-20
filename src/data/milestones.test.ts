@@ -21,6 +21,7 @@ import {
   isMeasuredOn,
   isReached,
   isTiedTo,
+  markersHeld,
   markersOf,
   moving,
   ownerNamed,
@@ -225,6 +226,60 @@ describe("isReached", () => {
       false,
     );
     expect(isHeld({ measure: "liquid", of: "debt", times: 13 })).toBe(false);
+  });
+});
+
+describe("markersHeld", () => {
+  // As a run places them: the first million in 2029 and financial
+  // independence, which fewer than half reach, not at all.
+  const placed = [
+    { id: 9, name: "First million", year: 2029 },
+    { id: 7, name: "Kids leave home", year: 2040 },
+    { id: "retirement", name: "Retirement", year: 2053 },
+    { id: 8, name: "Downsize", year: 2059 },
+  ] as const;
+  const short = { id: 10, name: "Financial independence", reached: 0.48 };
+
+  it("lays out the plan's own by year, then those reached when conditions hold in the household's order, placed or not", () => {
+    expect(
+      markersHeld(placed, { milestones, plan: retiring, unplaced: [short] }),
+    ).toStrictEqual([
+      { id: 7, name: "Kids leave home", year: 2040 },
+      { id: "retirement", name: "Retirement", year: 2053 },
+      { id: 8, name: "Downsize", year: 2059 },
+      { id: 9, name: "First million", year: 2029 },
+      short,
+    ]);
+  });
+
+  // Financial independence placed in 2027, before the first million.
+  it("keeps the household's order among those reached when conditions hold, whatever their years", () => {
+    expect(
+      markersHeld(
+        [{ id: 10, name: "Financial independence", year: 2027 }, ...placed],
+        { milestones, plan: retiring, unplaced: [] },
+      ).map(({ id }) => id),
+    ).toStrictEqual([7, "retirement", 8, 9, 10]);
+  });
+
+  // Retiring on financial independence's conditions, which the run
+  // places in 2049; a run not yet drawn places nothing.
+  it("lays retirement on conditions out after the plan's own, and leaves out what is neither placed nor said to be coming", () => {
+    const plan = {
+      ...retiring,
+      owners: [{ ...owners[0], retirement: independence.conditions }],
+    };
+
+    expect(
+      markersHeld(
+        [
+          { id: 7, name: "Kids leave home", year: 2040 },
+          { id: "retirement", name: "Retirement", year: 2049 },
+          { id: 8, name: "Downsize", year: 2059 },
+        ],
+        { milestones, plan, unplaced: [] },
+      ).map(({ id }) => id),
+    ).toStrictEqual([7, 8, "retirement"]);
   });
 });
 
