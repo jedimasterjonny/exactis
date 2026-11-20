@@ -59,7 +59,7 @@ const caption =
 // The dot each chapter hangs off, by how the year went.
 const tones: Readonly<Record<Story["chapters"][number]["tone"], string>> = {
   caution: "bg-destructive",
-  plain: "bg-muted-foreground",
+  plain: "bg-muted-foreground forced-colors:bg-[CanvasText]",
   positive: "bg-positive",
 };
 
@@ -80,7 +80,8 @@ const tenths = ({ span }: Lived): number[] => [...span];
 // it, from the month the plan opens in its first. The chart is
 // described by its caption, as the fan is. Where colours are forced,
 // the line is drawn in the text's colour as the rest of the text is,
-// and the dots keep their inks on the page's own ground.
+// and the dots keep their inks on the page's own ground, a plain year's
+// in the text's colour, as the ink beside it is.
 export function FutureStory({
   future,
   outcome,
