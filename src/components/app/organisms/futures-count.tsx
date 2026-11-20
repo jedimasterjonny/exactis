@@ -31,9 +31,14 @@ interface FuturesCountProps {
 // them had, and the early draws what the chance would be counted as
 // lasting, so the judgement that they fail shows. Beside it, what the
 // middle future is worth at the plan's end against what the plan is
-// worth there at its own rates, as the dashboard projects it. While the
-// run is coming in the ledger counts the futures drawn so far, and
-// says so, and before the first are drawn it says that much.
+// worth there at its own rates, as the dashboard projects it. The card
+// is drawn in its landed shape from the first paint: every row the plan
+// has, each figure an ellipsis until the first futures are in, and a
+// line beneath each of the first three rows throughout, so none comes
+// or goes as the run lands. While the run is coming in the first counts
+// the futures drawn so far, and once it is whole says all were; the ran
+// out and the early draws say none has yet until one has, and once the
+// run is whole with none, that none did.
 export function FuturesCount({
   count,
   plan,
@@ -41,67 +46,62 @@ export function FuturesCount({
   reading,
 }: FuturesCountProps): JSX.Element {
   const isDone = reading.run >= count;
+  const isEmpty = reading.run === 0;
+  const held = (figure: string): string => (isEmpty ? "…" : figure);
   return (
     <SectionCard
       label={subsectionLabel(chance, 4)}
       title="How many futures last"
     >
       <CardContent>
-        {reading.run === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Drawing the first futures…
-          </p>
-        ) : (
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">
-            <Ledger
-              steps={[
-                {
-                  detail: isDone
-                    ? undefined
-                    : `${formatCount(reading.run)} of ${formatCount(count)} drawn so far`,
-                  figure: formatCount(reading.run),
-                  label: "Futures run",
-                },
-                {
-                  detail:
-                    reading.firstRanOut === null || reading.halfRanOut === null
-                      ? undefined
-                      : `The first at ${String(ageIn(reading.firstRanOut, plan))}, half by ${String(ageIn(reading.halfRanOut, plan))}`,
-                  figure: lessBy(reading.ranOut),
-                  label: "Ran out of money",
-                },
-                {
-                  detail:
-                    reading.early === 0
-                      ? undefined
-                      : `${formatChance((reading.lasted + reading.early) / reading.run)} if counted as lasting`,
-                  figure: lessBy(reading.early),
-                  label: "Kept going only by drawing a pension early",
-                },
-                ...(retiresOn(plan) === undefined ||
-                retiresBy(plan) !== undefined
-                  ? []
-                  : [
-                      {
-                        figure: lessBy(reading.unretired),
-                        label: "Never retired",
-                      },
-                    ]),
-                {
-                  figure: formatCount(reading.lasted),
-                  label: `Lasted to ${String(endAge(plan))}`,
-                },
-              ]}
-              total={formatChance(reading.chance)}
-              totalName="Chance of success"
-            />
-            <AgainstProjection
-              age={endAge(plan)}
-              middle={reading.middle}
-              projected={projected}
-            />
-          </div>
-        )}
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">
+          <Ledger
+            steps={[
+              {
+                detail: isDone
+                  ? `All ${formatCount(count)} drawn`
+                  : `${formatCount(reading.run)} of ${formatCount(count)} drawn so far`,
+                figure: held(formatCount(reading.run)),
+                label: "Futures run",
+              },
+              {
+                detail:
+                  reading.firstRanOut === null || reading.halfRanOut === null
+                    ? noneYet(isDone, `None by ${String(endAge(plan))}`)
+                    : `The first at ${String(ageIn(reading.firstRanOut, plan))}, half by ${String(ageIn(reading.halfRanOut, plan))}`,
+                figure: held(lessBy(reading.ranOut)),
+                label: "Ran out of money",
+              },
+              {
+                detail:
+                  reading.early === 0
+                    ? noneYet(isDone, "None needed to")
+                    : `${formatChance((reading.lasted + reading.early) / reading.run)} if counted as lasting`,
+                figure: held(lessBy(reading.early)),
+                label: "Kept going only by drawing a pension early",
+              },
+              ...(retiresOn(plan) === undefined || retiresBy(plan) !== undefined
+                ? []
+                : [
+                    {
+                      figure: held(lessBy(reading.unretired)),
+                      label: "Never retired",
+                    },
+                  ]),
+              {
+                figure: held(formatCount(reading.lasted)),
+                label: `Lasted to ${String(endAge(plan))}`,
+              },
+            ]}
+            total={held(formatChance(reading.chance))}
+            totalName="Chance of success"
+          />
+          <AgainstProjection
+            age={endAge(plan)}
+            middle={held(formatGbp(reading.middle))}
+            projected={projected}
+          />
+        </div>
       </CardContent>
     </SectionCard>
   );
@@ -117,7 +117,7 @@ function AgainstProjection({
   projected,
 }: {
   readonly age: number;
-  readonly middle: number;
+  readonly middle: string;
   readonly projected: number;
 }): JSX.Element {
   const id = useId();
@@ -133,7 +133,7 @@ function AgainstProjection({
         </div>
         <div className="flex justify-between gap-4">
           <dt>Middle future</dt>
-          <dd className="figure">{formatGbp(middle)}</dd>
+          <dd className="figure">{middle}</dd>
         </div>
       </dl>
     </Panel>
@@ -143,4 +143,10 @@ function AgainstProjection({
 // A count taken off the run, with a real minus, or nought for none.
 function lessBy(count: number): string {
   return count === 0 ? "0" : `−${formatCount(count)}`;
+}
+
+// What a row counting none says beneath it: that none has so far while
+// the run is coming in, and once it is whole, the words given.
+function noneYet(isDone: boolean, once: string): string {
+  return isDone ? once : "None so far";
 }
