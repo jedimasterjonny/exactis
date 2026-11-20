@@ -65,4 +65,16 @@ describe("PinBar", () => {
       left: "100%",
     });
   });
+
+  // jsdom forces no colours, so the classes that do are what is read.
+  it("outlines the track and fills the pin in the text colour under forced colours", () => {
+    render(<PinBar plan={plan} year={2036} />);
+
+    expect(screen.getByText(bySlot("pin-bar"))).toHaveClass(
+      "forced-colors:outline",
+    );
+    expect(screen.getByText(bySlot("pin-bar-pin"))).toHaveClass(
+      "forced-colors:bg-[CanvasText]",
+    );
+  });
 });

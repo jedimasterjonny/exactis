@@ -28,10 +28,13 @@ interface SpanBarProps {
 // payments take the first of the debt greys, the colour a debt is drawn
 // in below nothing on the dashboard. The milestones' rules, and the
 // dots where a line meets one, are ink over the fill, so they stand out
-// against any fill.
+// against any fill. Where colours are forced, which paint every
+// background in the page's colour, income is filled in the system's
+// text colour, as full ink is, and spending and a loan's payments in its
+// grey text colour, as faint ink is.
 const fills: Record<Side, string> = {
-  expense: "bg-foreground/50",
-  income: "bg-chart-2 dark:bg-chart-1",
+  expense: "bg-foreground/50 forced-colors:bg-[GrayText]",
+  income: "bg-chart-2 dark:bg-chart-1 forced-colors:bg-[CanvasText]",
 };
 
 // The least of the span a line is drawn over, as a share of the track, so
@@ -49,8 +52,10 @@ const sliver = 1.2;
 // the milestones', are ruled across the track in faint ink, over the
 // fill, so every bar on the screen carries the same rules and a line's
 // end is read against the milestones without looking up to their pins.
-// Decorative, since the years are written beside it: the bar is hidden
-// from the accessibility tree.
+// Where colours are forced, the track is outlined in the system's text
+// colour and a tied end's dot drawn hollow, since it sits on the fill's
+// end. Decorative, since the years are written beside it: the bar is
+// hidden from the accessibility tree.
 export function SpanBar({
   endsAt,
   firstYear,
@@ -70,13 +75,13 @@ export function SpanBar({
   return (
     <div
       aria-hidden
-      className="relative h-1.5 overflow-hidden rounded-full bg-muted"
+      className="relative h-1.5 overflow-hidden rounded-full bg-muted forced-colors:outline forced-colors:-outline-offset-1"
       data-slot="span-bar"
     >
       <span
         className={cn(
           "absolute inset-y-0 rounded-full",
-          isLoan ? "bg-chart-5" : fills[side],
+          isLoan ? "bg-chart-5 forced-colors:bg-[GrayText]" : fills[side],
         )}
         data-slot="span-bar-fill"
         style={{
@@ -103,7 +108,7 @@ export function SpanBar({
 function TieDot({ at }: { readonly at: number }): JSX.Element {
   return (
     <span
-      className="absolute inset-y-0 w-1.5 -translate-x-1/2 rounded-full bg-foreground"
+      className="absolute inset-y-0 w-1.5 -translate-x-1/2 rounded-full bg-foreground forced-colors:bg-[Canvas] forced-colors:outline forced-colors:-outline-offset-1"
       data-slot="span-bar-tie"
       style={{ left: `${String(at)}%` }}
     />

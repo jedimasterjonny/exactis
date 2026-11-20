@@ -51,4 +51,14 @@ describe("ShareBar", () => {
     expect(bar).toHaveClass("w-full");
     expect(bar).not.toHaveClass("w-16");
   });
+
+  // jsdom forces no colours, so the classes that do are what is read.
+  it("outlines the track and fills the share in the text colour under forced colours", () => {
+    render(<ShareBar share={0.25} />);
+
+    expect(
+      screen.getByText(bySlot("share-bar"), { suggest: false }),
+    ).toHaveClass("forced-colors:outline");
+    expect(fill()).toHaveClass("forced-colors:bg-[CanvasText]");
+  });
 });

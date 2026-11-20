@@ -250,4 +250,63 @@ describe("SpanBar", () => {
         .map((dot) => dot.style.left),
     ).toStrictEqual(["50%"]);
   });
+
+  // jsdom forces no colours, so the classes that do are what is read.
+  it("outlines the track under forced colours, income in the text colour, spending and a loan in the grey text colour, and a tied end's dot hollow", () => {
+    const { rerender } = render(
+      <SpanBar
+        endsAt={2}
+        firstYear={2036}
+        lastMonth={null}
+        lastYear={2045}
+        plan={plan}
+        side="income"
+        startsAt={null}
+      />,
+    );
+
+    expect(screen.getByText(bySlot("span-bar"))).toHaveClass(
+      "forced-colors:outline",
+    );
+    expect(screen.getByText(bySlot("span-bar-fill"))).toHaveClass(
+      "forced-colors:bg-[CanvasText]",
+    );
+    expect(screen.getByText(bySlot("span-bar-tie"))).toHaveClass(
+      "forced-colors:bg-[Canvas]",
+      "forced-colors:outline",
+    );
+
+    rerender(
+      <SpanBar
+        endsAt={null}
+        firstYear={2036}
+        lastMonth={null}
+        lastYear={2045}
+        plan={plan}
+        side="expense"
+        startsAt={null}
+      />,
+    );
+
+    expect(screen.getByText(bySlot("span-bar-fill"))).toHaveClass(
+      "forced-colors:bg-[GrayText]",
+    );
+
+    rerender(
+      <SpanBar
+        endsAt={null}
+        firstYear={2036}
+        isLoan
+        lastMonth={null}
+        lastYear={2045}
+        plan={plan}
+        side="expense"
+        startsAt={null}
+      />,
+    );
+
+    expect(screen.getByText(bySlot("span-bar-fill"))).toHaveClass(
+      "forced-colors:bg-[GrayText]",
+    );
+  });
 });

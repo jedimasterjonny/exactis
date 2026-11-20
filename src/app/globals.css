@@ -363,9 +363,12 @@
    every bar so a rule reads the same on each. A utility rather than a
    component because the four bars are atoms, and an atom may not compose
    another. The look only: where the mark stands and how far it runs are
-   each bar's own. */
+   each bar's own. Where colours are forced, which paint every background
+   in the page's colour, the rule is drawn in the system's grey text
+   colour and ringed in the page's, so where it crosses a fill it shows
+   as a notch through it. */
 @utility mark {
-  @apply w-px bg-foreground/40;
+  @apply w-px bg-foreground/40 forced-colors:bg-[GrayText] forced-colors:outline forced-colors:outline-[Canvas];
 }
 
 /* A display heading's face: the heading font, semibold and tracked tight,

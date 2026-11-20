@@ -12,20 +12,22 @@ interface ShareBarProps {
 // hidden from the accessibility tree for the same reason. A share below
 // nothing, as a loan above the value leaves, draws none, and so does a
 // whole of nothing. The bar is a stub unless the caller's class draws it
-// the width of the row.
+// the width of the row. Where colours are forced, which paint every
+// background in the page's colour, the track is outlined and the share
+// filled in the system's text colour.
 export function ShareBar({ className, share }: ShareBarProps): JSX.Element {
   const held = Number.isFinite(share) ? Math.min(Math.max(share, 0), 1) : 0;
   return (
     <span
       aria-hidden
       className={cn(
-        "mt-1.5 ml-auto block h-1 w-16 overflow-hidden rounded-full bg-muted",
+        "mt-1.5 ml-auto block h-1 w-16 overflow-hidden rounded-full bg-muted forced-colors:outline forced-colors:-outline-offset-1",
         className,
       )}
       data-slot="share-bar"
     >
       <span
-        className="block h-full rounded-full bg-positive"
+        className="block h-full rounded-full bg-positive forced-colors:bg-[CanvasText]"
         data-slot="share-bar-fill"
         style={{ width: `${String(held * 100)}%` }}
       />
