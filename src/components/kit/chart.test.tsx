@@ -112,9 +112,19 @@ describe("ChartContainer", () => {
     );
   });
 
-  // jsdom lays out no axis, so the class that reaches its labels is what
-  // is read.
-  it("draws the axes' labels in the muted ink", () => {
+  // jsdom lays nothing out and draws nothing, so the class that reaches
+  // what each concerns is what is read: the axes' labels, and what
+  // reaches past the surface's edge.
+  it.each([
+    {
+      name: "[&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground",
+      what: "draws the axes' labels in the muted ink",
+    },
+    {
+      name: "[&_.recharts-surface]:overflow-visible",
+      what: "draws what reaches past the surface's edge rather than cutting it",
+    },
+  ])("$what", ({ name }) => {
     render(
       <ChartContainer config={{}}>
         <LineChart data={[{ x: 1, y: 1 }]}>
@@ -124,7 +134,7 @@ describe("ChartContainer", () => {
     );
 
     expect(screen.getByText(bySlot("chart"), { suggest: false })).toHaveClass(
-      "[&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground",
+      name,
     );
   });
 
