@@ -43,6 +43,17 @@ describe("Worksheet", () => {
     ]);
   });
 
+  // At the label's own weight, as every other head is, with none set
+  // over it.
+  it("heads each column as a label, muted", () => {
+    renderSheet();
+
+    const head = screen.getByRole("columnheader", { name: "Stocks" });
+
+    expect(head).toHaveClass("label", "text-muted-foreground");
+    expect(head).not.toHaveClass("font-normal");
+  });
+
   it("describes each row's name with what its figures rest on, rather than reading it as a row", () => {
     renderSheet();
 
