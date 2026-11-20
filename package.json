@@ -66,7 +66,7 @@
     "eslint-plugin-better-tailwindcss": "4.11.0",
     "eslint-plugin-jest-dom": "5.10.2",
     "eslint-plugin-jsx-a11y": "6.10.2",
-    "eslint-plugin-perfectionist": "5.13.0",
+    "eslint-plugin-perfectionist": "5.14.0",
     "eslint-plugin-regexp": "3.3.3",
     "eslint-plugin-sonarjs": "4.2.2",
     "eslint-plugin-testing-library": "7.16.2",
