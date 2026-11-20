@@ -58,7 +58,10 @@ const format: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };
 // caller lets them be. Where colours are forced, the slider's track is
 // outlined and its range filled in the system's text colour, since the
 // forcing paints both in the page's colour, leaving the thumb with no
-// scale.
+// scale. The keyboard's focus is on the input inside the thumb, which
+// the registry's ring on the thumb's own focus never meets, so the thumb
+// is ringed while that input holds it, and where colours are forced,
+// which draw no ring, outlined in the system's text colour.
 export function AgeField({
   hasSlider = true,
   hint,
@@ -97,7 +100,7 @@ export function AgeField({
       <Slider
         aria-labelledby={sliderLabelId}
         className={cn(
-          "pointer-coarse:*:min-h-11 forced-colors:[&_[data-slot=slider-range]]:bg-[CanvasText] forced-colors:[&_[data-slot=slider-track]]:outline",
+          "pointer-coarse:*:min-h-11 forced-colors:[&_[data-slot=slider-range]]:bg-[CanvasText] [&_[data-slot=slider-thumb]]:has-focus-visible:ring-3 forced-colors:[&_[data-slot=slider-thumb]]:has-focus-visible:outline-2 forced-colors:[&_[data-slot=slider-thumb]]:has-focus-visible:outline-offset-2 forced-colors:[&_[data-slot=slider-thumb]]:has-focus-visible:outline-[CanvasText] forced-colors:[&_[data-slot=slider-thumb]]:has-focus-visible:outline-solid forced-colors:[&_[data-slot=slider-track]]:outline",
           isSliderInFlow &&
             "max-md:*:h-11 [&_[data-slot=slider-track]]:bg-input",
         )}

@@ -310,14 +310,14 @@
 }
 
 /* The toasts clear the home indicator and, from sm up, a notch at the
-   right, and rise above the phone's tab bar. This is the one rule here
-   that overrides vendored utilities, the registry's bottom-4 and right-4
-   on the toasts' viewport, and it can only because it sits outside every
-   layer; the registry's Toaster takes no class for its viewport, so the
-   kit cannot pass one. It finds the viewport by its data-slot,
-   "toast-viewport": if upstream renames the slot, the rule stops
-   matching and the toasts lie over the bar again. The phone's bottom is
-   written last, so below md it wins. */
+   right, and rise above the phone's tab bar. This is one of the two rules
+   here that override vendored utilities, the registry's bottom-4 and
+   right-4 on the toasts' viewport, and it can only because it sits
+   outside every layer; the registry's Toaster takes no class for its
+   viewport, so the kit cannot pass one. It finds the viewport by its
+   data-slot, "toast-viewport": if upstream renames the slot, the rule
+   stops matching and the toasts lie over the bar again. The phone's
+   bottom is written last, so below md it wins. */
 [data-slot="toast-viewport"] {
   bottom: calc(1rem + env(safe-area-inset-bottom));
   @variant sm {
@@ -325,6 +325,23 @@
   }
   @variant max-md {
     bottom: calc(var(--phone-nav) + 1rem);
+  }
+}
+
+/* The keyboard's focus where colours are forced: a 2px outline in the
+   system's text colour round whatever holds it. The registry draws focus
+   as a ring, a shadow, which forcing does not draw, so without this a
+   focused button, field, switch, radio or tab looked as it did at rest.
+   It sits outside every layer, so it outranks every utility, the
+   registry's `outline-none` and `outline-hidden` among them, and sets no
+   offset, so each control keeps its own. So a control that rests boxed
+   under forced colours, as `outline-hidden` draws one, must paint its
+   rest box in the page's colour, or its focus is the box it rests in;
+   and a control wanting a forced focus of its own must say it outside
+   the layers too. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText;
   }
 }
 
