@@ -150,4 +150,37 @@ describe("SpreadBar", () => {
       screen.queryByText(bySlot("spread-bar-mark"), { suggest: false }),
     ).not.toBeInTheDocument();
   });
+
+  // jsdom forces no colours, so the classes that do are what is read.
+  it("outlines the track under forced colours, the outer band in the grey text colour, the middle half and the ends in the text colour, and the median hollow", () => {
+    render(
+      <SpreadBar
+        plan={plan}
+        spread={{
+          ends: [2036, 2066],
+          inner: [2046, 2056],
+          median: 2046,
+          outer: [2036, 2056],
+        }}
+      />,
+    );
+
+    const [outer, inner] = screen.getAllByText(bySlot("spread-bar-band"), {
+      suggest: false,
+    });
+
+    expect(screen.getByText(bySlot("spread-bar"))).toHaveClass(
+      "forced-colors:outline",
+    );
+    expect(outer).toHaveClass("forced-colors:bg-[GrayText]");
+    expect(outer).not.toHaveClass("forced-colors:bg-[CanvasText]");
+    expect(inner).toHaveClass("forced-colors:bg-[CanvasText]");
+    expect(
+      screen.getAllByText(bySlot("spread-bar-end"), { suggest: false })[0],
+    ).toHaveClass("forced-colors:bg-[CanvasText]");
+    expect(screen.getByText(bySlot("spread-bar-median"))).toHaveClass(
+      "forced-colors:bg-[Canvas]",
+      "forced-colors:outline-2",
+    );
+  });
 });

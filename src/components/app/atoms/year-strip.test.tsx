@@ -143,6 +143,24 @@ describe("YearStrip", () => {
     expect(thumb?.parentElement).toHaveClass("h-full");
   });
 
+  // jsdom forces no colours, so the classes that do are what is read.
+  it("draws what a year puts by and the thumb in the text colour under forced colours, and what it draws in the grey text colour, short or not", () => {
+    drawStrip();
+
+    const year = screen.getByRole("slider", { hidden: true, name: "Year" });
+    const drawn = screen.getAllByText(bySlot("year-strip-drawn"), {
+      suggest: false,
+    });
+
+    expect(
+      screen.getAllByText(bySlot("year-strip-saved"), { suggest: false })[0],
+    ).toHaveClass("forced-colors:bg-[CanvasText]");
+    expect(drawn[2]).toHaveClass("forced-colors:bg-[GrayText]");
+    expect(drawn[4]).toHaveClass("forced-colors:bg-[GrayText]");
+    // eslint-disable-next-line testing-library/no-node-access -- the thumb is the input's parent and has no role or text of its own to query by
+    expect(year.parentElement).toHaveClass("forced-colors:bg-[CanvasText]");
+  });
+
   // £1,000 put by against £3,000 drawn is a sixth of the strip, written
   // to a hundredth of a percent rather than to every digit of a sum the
   // server and a browser may work out a last digit apart.

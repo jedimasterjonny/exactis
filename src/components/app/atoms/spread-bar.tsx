@@ -38,8 +38,13 @@ interface SpreadBarProps {
 // end, which would read as a year. The years given to mark, the
 // milestones', are ruled across the track in faint ink, as every
 // bar's are, so the median is read against retirement without looking
-// up to its pin. Decorative, since the years are written beside it:
-// hidden from the accessibility tree.
+// up to its pin. Where colours are forced, which paint every background
+// in the page's colour, the track is outlined in the system's text
+// colour, the outer band filled in its grey text colour so the middle
+// half reads over it, the middle half and the ends in its text colour,
+// and the median drawn hollow, ringed in the text colour, since it sits
+// on the middle half. Decorative, since the years are written beside
+// it: hidden from the accessibility tree.
 export function SpreadBar({
   marks = [],
   plan,
@@ -53,10 +58,15 @@ export function SpreadBar({
   return (
     <div
       aria-hidden
-      className="relative h-1.5 rounded-full bg-muted"
+      className="relative h-1.5 rounded-full bg-muted forced-colors:outline"
       data-slot="spread-bar"
     >
-      <Band fill="bg-chart-2/20" last={last} pair={outer} plan={plan} />
+      <Band
+        fill="bg-chart-2/20 forced-colors:bg-[GrayText]"
+        last={last}
+        pair={outer}
+        plan={plan}
+      />
       <Band fill="bg-chart-2/50" last={last} pair={inner} plan={plan} />
       {marks.map((mark) => (
         <span
@@ -70,7 +80,7 @@ export function SpreadBar({
       <End plan={plan} year={ends[1]} />
       {median !== null && (
         <span
-          className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full bg-chart-1 ring-2 ring-card motion-safe:transition-[left]"
+          className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full bg-chart-1 ring-2 ring-card motion-safe:transition-[left] forced-colors:bg-[Canvas] forced-colors:outline-2 forced-colors:outline-solid"
           data-slot="spread-bar-median"
           style={{ left: `${String(placed(median, plan))}%` }}
         />
@@ -100,7 +110,7 @@ function Band({
   return (
     <span
       className={cn(
-        "absolute inset-y-0 rounded-full motion-safe:transition-[left,width]",
+        "absolute inset-y-0 rounded-full motion-safe:transition-[left,width] forced-colors:bg-[CanvasText]",
         fill,
       )}
       data-slot="spread-bar-band"
@@ -126,7 +136,7 @@ function End({
   }
   return (
     <span
-      className="absolute top-1/2 size-2 -translate-1/2 rounded-full bg-chart-2 ring-2 ring-card motion-safe:transition-[left]"
+      className="absolute top-1/2 size-2 -translate-1/2 rounded-full bg-chart-2 ring-2 ring-card motion-safe:transition-[left] forced-colors:bg-[CanvasText]"
       data-slot="spread-bar-end"
       style={{ left: `${String(placed(year, plan))}%` }}
     />

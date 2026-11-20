@@ -18,13 +18,15 @@ interface PinBarProps {
 // as sitting on the track rather than cut into it. The years given to
 // mark, the other milestones', are ruled across the track in faint
 // ink, as a line's bar rules them, so the pins and the bars beneath
-// carry the same rules. Decorative, since the year is written beside
-// it: the bar is hidden from the accessibility tree.
+// carry the same rules. Where colours are forced, which paint every
+// background in the page's colour, the track is outlined and the pin
+// filled in the system's text colour. Decorative, since the year is
+// written beside it: the bar is hidden from the accessibility tree.
 export function PinBar({ marks = [], plan, year }: PinBarProps): JSX.Element {
   return (
     <div
       aria-hidden
-      className="relative h-1.5 rounded-full bg-muted"
+      className="relative h-1.5 rounded-full bg-muted forced-colors:outline"
       data-slot="pin-bar"
     >
       {marks.map((mark) => (
@@ -36,7 +38,7 @@ export function PinBar({ marks = [], plan, year }: PinBarProps): JSX.Element {
         />
       ))}
       <span
-        className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full bg-foreground ring-2 ring-card"
+        className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full bg-foreground ring-2 ring-card forced-colors:bg-[CanvasText]"
         data-slot="pin-bar-pin"
         style={{ left: `${String(placed(year, plan))}%` }}
       />

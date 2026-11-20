@@ -12,18 +12,21 @@ interface StepBarProps {
 // from there to the pin, so the bar runs towards the dot whichever way
 // it went, and a step of nothing is the pin alone. A pin at either end
 // overhangs the track by half its width rather than being held inside
-// it, since the ends are the scale's. Decorative, since the figures are
-// written beside it: the bar is hidden from the accessibility tree.
+// it, since the ends are the scale's. Where colours are forced, which
+// paint every background in the page's colour, the track is outlined
+// and the pin filled in the system's text colour, the bar in its grey
+// text colour. Decorative, since the figures are written beside it: the
+// bar is hidden from the accessibility tree.
 export function StepBar({ from, to }: StepBarProps): JSX.Element {
   return (
     <div
       aria-hidden
-      className="relative h-1.5 rounded-full bg-muted"
+      className="relative h-1.5 rounded-full bg-muted forced-colors:outline"
       data-slot="step-bar"
     >
       {from !== undefined && (
         <span
-          className="absolute inset-y-0 rounded-full bg-foreground/50"
+          className="absolute inset-y-0 rounded-full bg-foreground/50 forced-colors:bg-[GrayText]"
           data-slot="step-bar-fill"
           style={{
             left: `${String(Math.min(from, to))}%`,
@@ -32,7 +35,7 @@ export function StepBar({ from, to }: StepBarProps): JSX.Element {
         />
       )}
       <span
-        className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full bg-foreground ring-2 ring-card"
+        className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full bg-foreground ring-2 ring-card forced-colors:bg-[CanvasText]"
         data-slot="step-bar-pin"
         style={{ left: `${String(to)}%` }}
       />

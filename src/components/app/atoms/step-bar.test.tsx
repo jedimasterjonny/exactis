@@ -65,4 +65,19 @@ describe("StepBar", () => {
       left: "100%",
     });
   });
+
+  // jsdom forces no colours, so the classes that do are what is read.
+  it("outlines the track under forced colours, the pin in the text colour and the bar in the grey text colour", () => {
+    render(<StepBar from={20} to={60} />);
+
+    expect(screen.getByText(bySlot("step-bar"))).toHaveClass(
+      "forced-colors:outline",
+    );
+    expect(screen.getByText(bySlot("step-bar-pin"))).toHaveClass(
+      "forced-colors:bg-[CanvasText]",
+    );
+    expect(screen.getByText(bySlot("step-bar-fill"))).toHaveClass(
+      "forced-colors:bg-[GrayText]",
+    );
+  });
 });

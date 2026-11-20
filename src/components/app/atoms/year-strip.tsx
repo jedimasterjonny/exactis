@@ -40,7 +40,11 @@ interface YearStripProps {
 // height. The milestones rule the strip in faint ink, as they rule
 // every bar, the first and last years are half drawn, at the span's
 // edges where they fall, and the chosen year is drawn whole while the
-// rest fade.
+// rest fade. Where colours are forced, which paint every background in
+// the page's colour, what a year puts by and the thumb are filled in the
+// system's text colour, and the rule through the middle and what a year
+// draws in its grey text colour, a year the savings run out in too, so
+// that one is told only in the ledger's words.
 // The strip is a slider: the chosen year is its thumb, a rule the
 // strip's height, dragged or pressed along it or stepped with the arrow
 // keys, Home and End, and a screen reader reads the year in the words
@@ -83,7 +87,7 @@ export function YearStrip({
         data-slot="year-strip"
       >
         <div aria-hidden className="absolute inset-0 overflow-hidden">
-          <span className="absolute inset-x-0 top-1/2 h-px bg-border" />
+          <span className="absolute inset-x-0 top-1/2 h-px bg-border forced-colors:bg-[GrayText]" />
           {marks.map((mark) => (
             <span
               className="absolute inset-y-0 mark"
@@ -106,13 +110,13 @@ export function YearStrip({
               }}
             >
               <span
-                className="absolute inset-x-px bottom-1/2 rounded-t-xs bg-positive"
+                className="absolute inset-x-px bottom-1/2 rounded-t-xs bg-positive forced-colors:bg-[CanvasText]"
                 data-slot="year-strip-saved"
                 style={{ height: heightOf(saved, most) }}
               />
               <span
                 className={cn(
-                  "absolute inset-x-px top-1/2 rounded-b-xs",
+                  "absolute inset-x-px top-1/2 rounded-b-xs forced-colors:bg-[GrayText]",
                   isShort ? "bg-destructive" : "bg-foreground/50",
                 )}
                 data-slot="year-strip-drawn"
@@ -123,7 +127,7 @@ export function YearStrip({
         </div>
         <Slider.Track className="absolute inset-0 h-full">
           <Slider.Thumb
-            className="h-full w-0.5 bg-foreground outline-none after:absolute after:-inset-x-3 after:inset-y-0 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 forced-colors:has-focus-visible:outline-2 forced-colors:has-focus-visible:outline-offset-2 forced-colors:has-focus-visible:outline-[CanvasText] forced-colors:has-focus-visible:outline-solid"
+            className="h-full w-0.5 bg-foreground outline-none after:absolute after:-inset-x-3 after:inset-y-0 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 forced-colors:bg-[CanvasText] forced-colors:has-focus-visible:outline-2 forced-colors:has-focus-visible:outline-offset-2 forced-colors:has-focus-visible:outline-[CanvasText] forced-colors:has-focus-visible:outline-solid"
             getAriaLabel={() => label}
             getAriaValueText={(_formatted, year) => valueText(year)}
           />
