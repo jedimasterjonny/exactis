@@ -58,6 +58,16 @@ describe("StatePension", () => {
     expect(through("Sam")).toHaveValue("");
   });
 
+  // Its column is as narrow as its fields, so the head's own floor is
+  // what holds it to two lines in capitals rather than three.
+  it("holds the tax year's head wide enough for two lines", () => {
+    renderTab();
+
+    expect(
+      screen.getByRole("columnheader", { name: "Through tax year" }),
+    ).toHaveClass("min-w-28");
+  });
+
   // Thirty-five years earn the full £12,548 a year. The stored record
   // comes back with the page rather than with the answer, so once the
   // store has answered the row shows the record it was given again.

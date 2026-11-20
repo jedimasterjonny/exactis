@@ -6,9 +6,10 @@ import {
   Table as TableBase,
   TableCell as TableCellBase,
   TableHead as TableHeadBase,
+  TableHeader as TableHeaderBase,
 } from "@/components/ui/table";
 
-export { TableBody, TableHeader, TableRow } from "@/components/ui/table";
+export { TableBody, TableRow } from "@/components/ui/table";
 
 // Every table in the product is the container its rows fold by, so a
 // row too wide for the table's width can fold its columns into one
@@ -39,9 +40,40 @@ export function TableCell({
   return <TableCellBase className={cn("px-4", className)} {...props} />;
 }
 
+// Every head in the product is set as a label, muted, a worksheet's
+// columns and a ledger's total among them, so a table's heads are too.
+// The label's capitals in the mono face run up to a third wider than the
+// registry's sentence case, so a head wraps at a word rather than
+// widening its column, and two lines fit the head row's 40px.
 export function TableHead({
   className,
   ...props
 }: ComponentProps<typeof TableHeadBase>): JSX.Element {
-  return <TableHeadBase className={cn("px-4", className)} {...props} />;
+  return (
+    <TableHeadBase
+      className={cn(
+        "px-4 label whitespace-normal text-muted-foreground",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+// A head row's heads sit on its rule rather than in its middle, so where
+// one head wraps to a second line and its neighbours do not, each head's
+// last line still reads along one line above its column. Set over the
+// header rather than on each head, since a head also names a group of
+// rows within the body, and sits there in its row as the row's cells do;
+// the header's selector outweighs the registry's middle on the head.
+export function TableHeader({
+  className,
+  ...props
+}: ComponentProps<typeof TableHeaderBase>): JSX.Element {
+  return (
+    <TableHeaderBase
+      className={cn("[&_th]:pb-1.5 [&_th]:align-bottom", className)}
+      {...props}
+    />
+  );
 }

@@ -156,10 +156,7 @@ export function TargetTable({
               <FoldedCell figure={formatPercent(share)} name={name}>
                 <span>{rate === "—" ? detail : `${rate} · ${detail}`}</span>
               </FoldedCell>
-              <TableHead
-                className="label text-muted-foreground folded:hidden"
-                scope="rowgroup"
-              >
+              <TableHead className="folded:hidden" scope="rowgroup">
                 {name}
               </TableHead>
               <TableCell className="text-muted-foreground folded:hidden">

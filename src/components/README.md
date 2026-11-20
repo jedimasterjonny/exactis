@@ -38,7 +38,8 @@ carries the `positive` and `caution` tones this app needs and base-nova does not
 ship, and `alert` the `caution` one; `button` is at least 44px each way on a
 touch screen, as is a link drawn as one, and spins while its action runs, which
 `alert-dialog` passes on to its confirm; `table` makes each table the container
-its rows fold by and lines its cells up with a card's edge; `card` draws its
+its rows fold by, lines its cells up with a card's edge, and sets its heads as
+every head here is set, a muted label on the head row's rule; `card` draws its
 edge as an outline under forced colours, where the ring, a shadow, is not drawn;
 `input`, `native-select` and `dropdown-menu`'s items are 44px tall on a touch
 screen; and `chart` closes its tooltip when a finger lands outside it, and rings
