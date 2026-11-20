@@ -124,6 +124,25 @@ describe("YearStrip", () => {
     expect(onValueChange).toHaveBeenCalledExactlyOnceWith(2028);
   });
 
+  // jsdom lays nothing out and forces no colours, so the classes are what
+  // is read: the track held to the strip's height, and the thumb ringed,
+  // or outlined where colours are forced, while its input has the focus.
+  it("draws the thumb the strip's height, ringed while the input inside it has the keyboard's focus", () => {
+    drawStrip();
+
+    const year = screen.getByRole("slider", { hidden: true, name: "Year" });
+    // eslint-disable-next-line testing-library/no-node-access -- the thumb is the input's parent and has no role or text of its own to query by
+    const thumb = year.parentElement;
+
+    expect(thumb).toHaveClass(
+      "outline-none",
+      "has-focus-visible:ring-3",
+      "forced-colors:has-focus-visible:outline-[CanvasText]",
+    );
+    // eslint-disable-next-line testing-library/no-node-access -- the track is the thumb's parent and has no role or text of its own to query by
+    expect(thumb?.parentElement).toHaveClass("h-full");
+  });
+
   // £1,000 put by against £3,000 drawn is a sixth of the strip, written
   // to a hundredth of a percent rather than to every digit of a sum the
   // server and a browser may work out a last digit apart.
