@@ -120,8 +120,8 @@ describe("MoneyFlow", () => {
         "Debts first, then savings in this order, which draws follow too",
       ),
     ).toBeInTheDocument();
-    expect(within(flow).getAllByRole("paragraph")[0]).toHaveTextContent(
-      "£484 a month spare in September 2026, after tax, expenses and fixed payments.",
+    expect(said()[0]).toBe(
+      "£484 a month spare in September 2026, after tax, expenses and fixed payments. What the savings below do not take is taken as spent.",
     );
     expect(steps()).toStrictEqual([
       "1Workplace pension£4,350 / moMe · £1,380 salary sacrifice from Salary + £2,376 fixed sum + £594 tax relief£52,200 of the £60,000 allowance a year",
@@ -244,11 +244,33 @@ describe("MoneyFlow", () => {
       },
     });
 
-    expect(screen.getAllByRole("paragraph")[0]).toHaveTextContent(
-      "Nothing spare in September 2026, after tax, expenses and fixed payments.",
+    expect(said()[0]).toBe(
+      "Nothing spare in September 2026: more goes out than comes in.",
     );
     expect(screen.getByText("Short")).toHaveClass("label");
     expect(said()).toContain("Drawn from the savings, cash first.");
+  });
+
+  // An invented £1,000 of spending runs the month out among the fixed
+  // sums: the pension, droppable, is paid its own first and the ISA
+  // £1,150 of its £1,667, so nothing is spare and nothing is short.
+  it("says when nothing is spare because the fixed payments take all that comes in", () => {
+    renderFlow({
+      savings: [{ ...pension, isDroppable: true }, isa, cash],
+      schedule: {
+        expenses: [{ ...household, amount: 1000 }],
+        income: [salary],
+      },
+    });
+
+    expect(said()[0]).toBe(
+      "Nothing spare in September 2026: tax, expenses and fixed payments take all that comes in.",
+    );
+    expect(steps()[1]).toBe(
+      "2Stocks & shares ISA£1,150 / moMe · fixed sum£13,802 of the £20,000 allowance a year",
+    );
+    expect(screen.getByText("Left over")).toHaveClass("label");
+    expect(said()).toContain("Taken as spent.");
   });
 
   // The same month for an owner born in 1960, who at 66 can draw the

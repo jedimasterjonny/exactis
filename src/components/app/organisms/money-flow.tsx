@@ -70,7 +70,8 @@ const penny = 0.01;
 // The order of payment drawn as the money it moves: the month the plan
 // starts in, worked out by the engine, which is pure and cheap, as the
 // plan screen's cash flow card runs it. The card says what is spare once
-// tax, the expenses, the loans' payments and the fixed sums are met,
+// tax, the expenses, the loans' payments and the fixed sums are met, and
+// that what no saving takes is spent, or, when nothing is spare, why;
 // then lists the savings in the order they are paid, each with what
 // lands in it that month and where that comes from: a salary's sacrifice
 // with the NI saved, its own fixed sum, its take of the spare money, and
@@ -166,11 +167,7 @@ export function MoneyFlow({
       title="Where the month's money goes"
     >
       <CardContent className="grid gap-4">
-        <p className="text-sm">
-          {spare > penny
-            ? `${formatGbp(spare)} a month spare in ${month}, after tax, expenses and fixed payments.`
-            : `Nothing spare in ${month}, after tax, expenses and fixed payments.`}
-        </p>
+        <p className="text-sm">{spareLine(spare, flow.left, month)}</p>
         <ol className="divide-y border-y">
           {savings.map((account, index) => {
             const landed = landedIn(account, flow);
@@ -347,6 +344,19 @@ function sourcesOf(landed: Landed): string | undefined {
     : sources
         .map(({ amount, what }) => `${formatGbp(amount)} ${what}`)
         .join(" + ");
+}
+
+// What the card opens on: the money spare in the month after tax, the
+// expenses and the fixed payments, and that what no saving takes is
+// spent; or that nothing is spare, those taking all that comes in, or
+// more going out than comes in, the month left short.
+function spareLine(spare: number, left: number, month: string): string {
+  if (spare > penny) {
+    return `${formatGbp(spare)} a month spare in ${month}, after tax, expenses and fixed payments. What the savings below do not take is taken as spent.`;
+  }
+  return left < -penny
+    ? `Nothing spare in ${month}: more goes out than comes in.`
+    : `Nothing spare in ${month}: tax, expenses and fixed payments take all that comes in.`;
 }
 
 // What a saving paid the spare money says of it: why it takes none of
