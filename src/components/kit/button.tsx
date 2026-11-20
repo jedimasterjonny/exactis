@@ -58,11 +58,9 @@ export function Button({
   );
 }
 
-// The registry's classes for a link drawn as a button, at least 44px
-// each way on a touch screen as a button is. The touch classes are
-// added after the registry's rather than merged with them: a merge
-// re-reads the registry's own classes and drops some, which would
-// redraw every such link's corners and icon, under a mouse too.
+// The registry's classes for a link drawn as a button, merged with the
+// touch classes as a button's are, so a link drawn as a button looks as
+// one does and is at least 44px each way on a touch screen.
 export function buttonVariants(...args: Parameters<typeof variantsOf>): string {
-  return `${variantsOf(...args)} ${touch}`;
+  return cn(variantsOf(...args), touch);
 }
