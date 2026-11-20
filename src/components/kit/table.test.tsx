@@ -72,6 +72,30 @@ describe("Table", () => {
     );
   });
 
+  // A row on a fill of its own names it under the pointer too, which the
+  // merge keeps over the kit's.
+  it("fills no row under the pointer, unless the row says otherwise", () => {
+    render(
+      <Table>
+        <TableBody>
+          <TableRow>
+            <TableCell>Pension</TableCell>
+          </TableRow>
+          <TableRow className="bg-muted/40 hover:bg-muted/40">
+            <TableCell>Stocks</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+
+    const [row, band] = screen.getAllByRole("row");
+
+    expect(row).toHaveClass("hover:bg-transparent");
+    expect(row).not.toHaveClass("hover:bg-muted/50");
+    expect(band).toHaveClass("bg-muted/40", "hover:bg-muted/40");
+    expect(band).not.toHaveClass("hover:bg-transparent");
+  });
+
   // The container is what the folded and unfolded variants measure: the
   // table's own width, not the screen's.
   it("sits the table in a container its rows can fold by", () => {
