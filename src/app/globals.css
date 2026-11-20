@@ -328,6 +328,18 @@
   }
 }
 
+/* On a touch screen the toast's close is drawn 44px each way, as every
+   control is, out into the toast's own padding, so its cross stays where
+   it is and the words keep their width. It finds the close by its
+   data-slot, as the rule above finds the viewport. */
+[data-slot="toast-close"] {
+  @variant pointer-coarse {
+    min-height: --spacing(11);
+    min-width: --spacing(11);
+    margin: calc(var(--spacing) * -2);
+  }
+}
+
 /* The keyboard's focus where colours are forced: a 2px outline in the
    system's text colour round whatever holds it. The registry draws focus
    as a ring, a shadow, which forcing does not draw, so without this a
