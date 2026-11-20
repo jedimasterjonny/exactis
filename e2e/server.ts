@@ -4,8 +4,10 @@ import type { TestProject } from "vitest/node";
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
+import { readFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { setTimeout as sleep } from "node:timers/promises";
+import * as z from "zod";
 
 import { hashPassword } from "@/lib/password";
 
@@ -22,6 +24,30 @@ declare module "vitest" {
 // is ready in well under a second, so this only bounds a server that never
 // will be.
 const startupLimit = 30_000;
+
+// The id the build gave a server action, read from the manifest next
+// build writes, for the tests. A form posting the action carries the id
+// in a field React names for it, as the sign-in form does, so a test can
+// post the action as such a form would, and find the form that posts it
+// in a page's markup.
+export async function actionId(name: string): Promise<string> {
+  const { node } = z
+    .object({
+      node: z.record(z.string(), z.object({ exportedName: z.string() })),
+    })
+    .parse(
+      JSON.parse(
+        await readFile(".next/server/server-reference-manifest.json", "utf8"),
+      ),
+    );
+  const [id] =
+    Object.entries(node).find(([, action]) => action.exportedName === name) ??
+    [];
+  if (id === undefined) {
+    throw new Error(`The build has no server action named ${name}`);
+  }
+  return id;
+}
 
 // Serves the production build for the run and stops it afterwards. The
 // build is the one `bun run build` left in .next, which this does not make:

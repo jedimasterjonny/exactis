@@ -1,6 +1,6 @@
-import { readFile } from "node:fs/promises";
 import { describe, expect, inject, it } from "vitest";
-import * as z from "zod";
+
+import { actionId } from "./server";
 
 const origin = inject("origin");
 
@@ -75,30 +75,6 @@ describe("the production server", () => {
     ]);
   });
 });
-
-// The id the build gave a server action, read from the manifest next
-// build writes. A form posting the action carries the id in a field React
-// names for it, as the sign-in form does; the form that signs out is
-// drawn on screens that read the store, which this server cannot reach,
-// so the id is read here rather than off the page.
-async function actionId(name: string): Promise<string> {
-  const { node } = z
-    .object({
-      node: z.record(z.string(), z.object({ exportedName: z.string() })),
-    })
-    .parse(
-      JSON.parse(
-        await readFile(".next/server/server-reference-manifest.json", "utf8"),
-      ),
-    );
-  const [id] =
-    Object.entries(node).find(([, action]) => action.exportedName === name) ??
-    [];
-  if (id === undefined) {
-    throw new Error(`The build has no server action named ${name}`);
-  }
-  return id;
-}
 
 // The hidden inputs of the form that holds the password field, as name and
 // value. React writes these into a form whose action is a server action,
