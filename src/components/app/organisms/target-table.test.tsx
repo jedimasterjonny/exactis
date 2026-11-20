@@ -240,6 +240,19 @@ describe("TargetTable", () => {
     expect(head).toHaveClass("folded:hidden");
   });
 
+  // The kit's rows take no fill under the pointer, which would clear the
+  // band too were the band not named under the pointer as well.
+  it("holds a group's band under the pointer", () => {
+    renderTable();
+
+    const [band] = within(
+      screen.getAllByRole("rowgroup")[1] ?? document.body,
+    ).getAllByRole("row");
+
+    expect(band).toHaveClass("bg-muted/40", "hover:bg-muted/40");
+    expect(band).not.toHaveClass("hover:bg-transparent");
+  });
+
   // A class carried into sterling from another currency says which, and
   // is chosen by its name alone.
   it("offers no class, then the latest vintage's classes under their sleeves' headings", () => {

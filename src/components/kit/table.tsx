@@ -7,9 +7,10 @@ import {
   TableCell as TableCellBase,
   TableHead as TableHeadBase,
   TableHeader as TableHeaderBase,
+  TableRow as TableRowBase,
 } from "@/components/ui/table";
 
-export { TableBody, TableRow } from "@/components/ui/table";
+export { TableBody } from "@/components/ui/table";
 
 // Every table in the product is the container its rows fold by, so a
 // row too wide for the table's width can fold its columns into one
@@ -73,6 +74,25 @@ export function TableHeader({
   return (
     <TableHeaderBase
       className={cn("[&_th]:pb-1.5 [&_th]:align-bottom", className)}
+      {...props}
+    />
+  );
+}
+
+// No row of a table in the product fills under the pointer, as the
+// registry's would. A fill under the pointer is what a press draws here,
+// as a milestone's chip draws one, and no row of a table is pressed
+// whole: what a row holds to press, a select, a pencil, a folded month's
+// summary, is a control of its own. A row drawn on a fill of its own, as
+// a group's band is, names that fill under the pointer too, or the
+// pointer would clear it.
+export function TableRow({
+  className,
+  ...props
+}: ComponentProps<typeof TableRowBase>): JSX.Element {
+  return (
+    <TableRowBase
+      className={cn("hover:bg-transparent", className)}
       {...props}
     />
   );
