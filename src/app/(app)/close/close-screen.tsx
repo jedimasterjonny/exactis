@@ -927,8 +927,9 @@ function titleOf(moved: Moved, month: string, plan: Plan): string {
 // which readings look back less than a year where one does, that a
 // reading is kept as it stood, and that the plan draws on the savings
 // where a reading drew; and every reading as a table, folded, newest
-// first. Each liquid worth kept is carried into today's money at the
-// plan's inflation, from the money of the month after its own.
+// first, the fold 44px tall on a touch screen. Each liquid worth kept
+// is carried into today's money at the plan's inflation, from the money
+// of the month after its own.
 function TrackRecordSince({
   from,
   inflation,
@@ -1044,7 +1045,7 @@ function TrackRecordSince({
         </Note>
       )}
       <details>
-        <summary className="cursor-pointer text-sm font-medium">
+        <summary className="cursor-pointer text-sm font-medium pointer-coarse:py-3">
           Every reading, as a table
         </summary>
         <div className="pt-3">
