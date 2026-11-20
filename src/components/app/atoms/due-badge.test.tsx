@@ -45,4 +45,15 @@ describe("DueBadge", () => {
     expect(screen.getByText("Due")).toHaveClass("sr-only");
     expect(screen.getByText("Due")).not.toHaveAttribute("data-variant");
   });
+
+  // jsdom forces no colours, so the classes that do are what is read.
+  it("fills the dot in the text colour under forced colours, ringed in the page's", () => {
+    render(<DueBadge isDue={due} shape="dot" />);
+
+    expect(screen.getByText(bySlot("due-dot"))).toHaveClass(
+      "forced-colors:bg-[CanvasText]",
+      "forced-colors:outline-2",
+      "forced-colors:outline-[Canvas]",
+    );
+  });
 });

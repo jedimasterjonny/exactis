@@ -22,7 +22,10 @@ type Shape = "dot" | "pill";
 // ringed in the card's colour, hidden from a screen reader, which hears
 // Due in its place; the dot is set where the caller's class places it,
 // out of the flow, so the word comes after whatever the badge follows and
-// a link holding both is named by its label and then Due.
+// a link holding both is named by its label and then Due. Where colours
+// are forced, which paint every background in the page's colour and
+// draw no ring, a shadow, the dot is filled in the system's text colour
+// and ringed by an outline in the page's, so it stays off the icon.
 export function DueBadge({
   className,
   isDue,
@@ -49,7 +52,7 @@ function Due({
       <span
         aria-hidden
         className={cn(
-          "absolute size-2 rounded-full bg-caution ring-2 ring-card",
+          "absolute size-2 rounded-full bg-caution ring-2 ring-card forced-colors:bg-[CanvasText] forced-colors:outline-2 forced-colors:outline-[Canvas]",
           className,
         )}
         data-slot="due-dot"
