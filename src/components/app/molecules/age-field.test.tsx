@@ -268,6 +268,25 @@ describe("AgeField", () => {
     }
   });
 
+  // jsdom forces no colours and draws no focus, so the classes are what
+  // is read.
+  it("rings the slider's thumb while the input inside it has the keyboard's focus, outlined under forced colours", () => {
+    render(
+      <AgeField
+        label="Retirement age"
+        max={91}
+        min={34}
+        onValueCommitted={vi.fn<(age: number) => void>()}
+        value={61}
+      />,
+    );
+
+    expect(screen.getByText(bySlot("slider"), { suggest: false })).toHaveClass(
+      "[&_[data-slot=slider-thumb]]:has-focus-visible:ring-3",
+      "forced-colors:[&_[data-slot=slider-thumb]]:has-focus-visible:outline-[CanvasText]",
+    );
+  });
+
   // The arrow keys move the thumb as a drag does, Shift by five years,
   // reporting the age it moves to and committing it in the one step.
   it("reports each age the slider in the flow moves through, five years with Shift, and commits the one it stops at", () => {

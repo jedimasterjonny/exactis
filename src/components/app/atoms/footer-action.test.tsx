@@ -42,4 +42,18 @@ describe("FooterAction", () => {
       "pointer-coarse:h-11",
     );
   });
+
+  // jsdom forces no colours, so the class that does is what is read.
+  it("rests unboxed under forced colours, its rest box in the page's colour", () => {
+    stubViewport(1024);
+    render(
+      <SidebarProvider>
+        <FooterAction type="submit">Sign out</FooterAction>
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Sign out" })).toHaveClass(
+      "forced-colors:outline-[Canvas]",
+    );
+  });
 });

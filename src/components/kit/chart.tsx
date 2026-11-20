@@ -17,10 +17,10 @@ import { ChartContainer as ChartContainerBase } from "@/components/ui/chart";
 // neither: it leaves the chart before it can press outside. The surface
 // recharts hands the focus to is drawn with no outline by the vendored
 // container, so the keyboard reached it unseen; the ring is the
-// controls' own, an outline so it survives forced colours, on the same
-// path with one pseudo-class more, so it wins without overriding
-// anything else, and a mouse, which never focuses visibly, never shows
-// it.
+// controls' own, an outline on the same path with one pseudo-class
+// more, so it wins without overriding anything else, and a mouse, which
+// never focuses visibly, never shows it; under forced colours the global
+// focus rule draws it in the system's text colour.
 export function ChartContainer({
   className,
   ...props
