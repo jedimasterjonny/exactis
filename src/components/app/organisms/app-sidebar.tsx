@@ -62,7 +62,8 @@ export function AppSidebar({ isDue }: AppSidebarProps): JSX.Element {
             Sign out
           </FooterAction>
         </form>
-        {/* The one Latin motto, and the whole of the 40k licence. */}
+        {/* The one Latin motto; with the Cogitator's name, the whole of the
+            40k licence. */}
         <span className="label text-sidebar-foreground/60">
           Certitudo in numeris
         </span>
